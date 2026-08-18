@@ -8,7 +8,7 @@
     "rubyArgs": [
       "ref:request"
     ],
-    "reason": "host_authorization.rb:91 calls `mark_as_authorized(request)`; the port also threads the raw env it holds separately."
+    "reason": "host_authorization.rb:91 calls `mark_as_authorized(request)`, which writes the header through `request.set_header` (host_authorization.rb:167-168). trails' `Request` constructor CLONES the env it is given (http/request.ts:157), so a header written through the Request is invisible downstream and the port threads the raw env alongside it. Blocked on story converge-actiondispatch-request-env-clone-to-rack-shared-env (RFC 0023), which decides the clone."
   },
   {
     "package": "actiondispatch",

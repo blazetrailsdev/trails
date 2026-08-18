@@ -576,7 +576,18 @@ function stripCalleeReceiverArg(
 ): string[] {
   if (ruby.recv !== undefined) return tsArgs;
   if (tsArgs.length !== rubyArgs.length + 1) return tsArgs;
-  const sigs = (calleeSigs ?? []).map(stripThis).filter((sig) => sig.length === tsArgs.length);
+  // A call may omit the callee's trailing OPTIONAL parameters — Rails'
+  // `compare_with_real_token(token, session = nil)` is called with the token
+  // alone (request_forgery_protection.rb:519), and its port keeps that
+  // defaulted `session`, so the site is one argument shorter than the
+  // signature. Only the parameters the site actually fills have to line up.
+  const sigs = (calleeSigs ?? [])
+    .map(stripThis)
+    .filter(
+      (sig) =>
+        sig.length >= tsArgs.length &&
+        sig.slice(tsArgs.length).every((param) => param.kind !== "required"),
+    );
   const receiverAt = (index: number): boolean =>
     sigs.some((sig) => {
       const ref = BARE_REF_ARG.exec(tsArgs[index]);

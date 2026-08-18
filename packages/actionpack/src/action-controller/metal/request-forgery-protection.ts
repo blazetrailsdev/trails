@@ -27,6 +27,9 @@ export interface ProtectionMethods {
 }
 
 export class NullSessionHash {
+  /** Rails: `NullSessionHash#initialize(req)` (request_forgery_protection.rb:271-275). */
+  constructor(_req?: unknown) {}
+
   get(_key: string): unknown {
     return undefined;
   }
@@ -78,7 +81,8 @@ export class NullSession implements ProtectionMethods {
     this._controller = controller;
   }
   handleUnverifiedRequest(): void {
-    this._controller.session = Object.create(null);
+    const request = this._controller.request;
+    this._controller.session = new NullSessionHash(request);
     this._controller.cookies = new NullCookieJar();
     const flash = this._controller.flash;
     if (
@@ -377,27 +381,31 @@ export function realCsrfToken(controller: CsrfController, _session?: unknown): B
 }
 
 /** @internal */
-export function csrfTokenHmac(c: CsrfController, session: unknown, identifier: string): Buffer {
+export function csrfTokenHmac(
+  controller: CsrfController,
+  session: unknown,
+  identifier: string,
+): Buffer {
   return getCrypto()
-    .createHmac("sha256", realCsrfToken(c, session))
+    .createHmac("sha256", realCsrfToken(controller, session))
     .update(identifier)
     .digest()
     .subarray(0, AUTHENTICITY_TOKEN_LENGTH);
 }
 
 /** @internal */
-export function globalCsrfToken(c: CsrfController, session?: unknown): Buffer {
-  return csrfTokenHmac(c, session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
+export function globalCsrfToken(controller: CsrfController, session?: unknown): Buffer {
+  return csrfTokenHmac(controller, session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
 }
 
 /** @internal */
 export function perFormCsrfToken(
-  c: CsrfController,
+  controller: CsrfController,
   session: unknown,
   actionPath: string,
   method: string,
 ): Buffer {
-  return csrfTokenHmac(c, session, `${actionPath}#${method.toLowerCase()}`);
+  return csrfTokenHmac(controller, session, `${actionPath}#${method.toLowerCase()}`);
 }
 
 /** @internal */
@@ -416,29 +424,31 @@ export function unmaskToken(masked: Buffer): Buffer {
 
 /** @internal */
 export function maskedAuthenticityToken(
-  c: CsrfController,
+  controller: CsrfController,
   formOptions: { action?: string; method?: string } = {},
 ): string {
   const { action, method } = formOptions;
-  const requestPath = c.request.path ?? "/";
   // Rails: `per_form_csrf_tokens && action && method` — Ruby `&&` only treats
   // nil/false as falsy, so an empty-string action ("submit to current path")
   // still triggers per-form generation.
-  const raw =
-    c.perFormCsrfTokens && action != null && method != null
-      ? perFormCsrfToken(c, null, normalizeActionPath(action, requestPath), method)
-      : globalCsrfToken(c);
-  return maskToken(raw);
+  let rawToken: Buffer;
+  if (controller.perFormCsrfTokens && action != null && method != null) {
+    const actionPath = normalizeActionPath(controller, action);
+    rawToken = perFormCsrfToken(controller, null, actionPath, method);
+  } else {
+    rawToken = globalCsrfToken(controller);
+  }
+  return maskToken(rawToken);
 }
 
 /** @internal */
-export function formAuthenticityParam(c: CsrfController): unknown {
-  return c.params?.[c.requestForgeryProtectionToken ?? "authenticity_token"];
+export function formAuthenticityParam(controller: CsrfController): unknown {
+  return controller.params?.[controller.requestForgeryProtectionToken ?? "authenticity_token"];
 }
 
 /** @internal */
-export function requestAuthenticityTokens(c: CsrfController): unknown[] {
-  return [formAuthenticityParam(c), c.request.xCsrfToken];
+export function requestAuthenticityTokens(controller: CsrfController): unknown[] {
+  return [formAuthenticityParam(controller), controller.request.xCsrfToken];
 }
 
 function compareBuffers(a: Buffer, b: Buffer): boolean {
@@ -446,35 +456,39 @@ function compareBuffers(a: Buffer, b: Buffer): boolean {
 }
 
 /** @internal */
-export function compareWithRealToken(c: CsrfController, token: Buffer, session?: unknown): boolean {
-  return compareBuffers(token, realCsrfToken(c, session));
+export function compareWithRealToken(
+  controller: CsrfController,
+  token: Buffer,
+  session?: unknown,
+): boolean {
+  return compareBuffers(token, realCsrfToken(controller, session));
 }
 
 /** @internal */
 export function compareWithGlobalToken(
-  c: CsrfController,
+  controller: CsrfController,
   token: Buffer,
   session?: unknown,
 ): boolean {
-  return compareBuffers(token, globalCsrfToken(c, session));
+  return compareBuffers(token, globalCsrfToken(controller, session));
 }
 
 /** @internal */
 export function isValidPerFormCsrfToken(
-  c: CsrfController,
+  controller: CsrfController,
   token: Buffer,
   session?: unknown,
 ): boolean {
-  if (!c.perFormCsrfTokens) return false;
+  if (!controller.perFormCsrfTokens) return false;
   // Rails: request.path.chomp("/") — strips a single trailing slash, so "/" → "".
-  const path = (c.request.path ?? "").replace(/\/$/, "");
-  const method = c.request.requestMethod ?? c.request.method;
-  return compareBuffers(token, perFormCsrfToken(c, session, path, method));
+  const path = (controller.request.path ?? "").replace(/\/$/, "");
+  const method = controller.request.requestMethod ?? controller.request.method;
+  return compareBuffers(token, perFormCsrfToken(controller, session, path, method));
 }
 
 /** @internal */
 export function isValidAuthenticityToken(
-  c: CsrfController,
+  controller: CsrfController,
   session: unknown,
   encoded: unknown,
 ): boolean {
@@ -485,22 +499,22 @@ export function isValidAuthenticityToken(
   } catch {
     return false;
   }
-  if (masked.length === AUTHENTICITY_TOKEN_LENGTH) return compareWithRealToken(c, masked, session);
+  if (masked.length === AUTHENTICITY_TOKEN_LENGTH) return compareWithRealToken(controller, masked);
   if (masked.length === AUTHENTICITY_TOKEN_LENGTH * 2) {
     const csrfToken = unmaskToken(masked);
     return (
-      compareWithGlobalToken(c, csrfToken, session) ||
-      compareWithRealToken(c, csrfToken, session) ||
-      isValidPerFormCsrfToken(c, csrfToken, session)
+      compareWithGlobalToken(controller, csrfToken) ||
+      compareWithRealToken(controller, csrfToken) ||
+      isValidPerFormCsrfToken(controller, csrfToken)
     );
   }
   return false;
 }
 
 /** @internal */
-export function isAnyAuthenticityTokenValid(c: CsrfController): boolean {
-  for (const token of requestAuthenticityTokens(c)) {
-    if (isValidAuthenticityToken(c, c.session, token)) return true;
+export function isAnyAuthenticityTokenValid(controller: CsrfController): boolean {
+  for (const token of requestAuthenticityTokens(controller)) {
+    if (isValidAuthenticityToken(controller, controller.session, token)) return true;
   }
   return false;
 }
@@ -557,15 +571,18 @@ export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): 
 }
 
 /** @internal */
-export function normalizeRelativeActionPath(relActionPath: string, requestPath: string): string {
-  let path = requestPath + "/" + relActionPath;
+export function normalizeRelativeActionPath(
+  controller: CsrfController,
+  relActionPath: string,
+): string {
+  let path = (controller.request.path ?? "/") + "/" + relActionPath;
   path = path.replace(/\/\.\//g, "/");
   // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
   return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 /** @internal */
-export function normalizeActionPath(actionPath: string, requestPath: string): string {
+export function normalizeActionPath(controller: CsrfController, actionPath: string): string {
   // Mirrors Ruby's URI.parse: relative inputs without a leading "/" pass
   // through unparsed; absolute paths, protocol-relative ("//host/x"), and
   // absolute URLs all have their `.pathname` extracted (using a dummy base
@@ -573,7 +590,7 @@ export function normalizeActionPath(actionPath: string, requestPath: string): st
   if (actionPath === "" || !actionPath.startsWith("/")) {
     const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
     if (!SCHEME_RE.test(actionPath)) {
-      return normalizeRelativeActionPath(actionPath, requestPath);
+      return normalizeRelativeActionPath(controller, actionPath);
     }
   }
   let parsedPath: string;

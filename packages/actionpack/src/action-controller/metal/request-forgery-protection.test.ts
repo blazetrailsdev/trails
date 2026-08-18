@@ -305,19 +305,22 @@ describe("P20b/P20c smoke", () => {
 });
 
 describe("normalizeActionPath / normalizeRelativeActionPath", () => {
+  const at = (path: string): CsrfController =>
+    ({ request: { method: "POST", baseUrl: "https://example.com", path } }) as CsrfController;
+
   it("strips trailing slash from absolute paths", () => {
-    expect(normalizeActionPath("/foo/bar/", "/current")).toBe("/foo/bar");
-    expect(normalizeActionPath("/foo/bar", "/current")).toBe("/foo/bar");
+    expect(normalizeActionPath(at("/current"), "/foo/bar/")).toBe("/foo/bar");
+    expect(normalizeActionPath(at("/current"), "/foo/bar")).toBe("/foo/bar");
   });
   it("extracts path from full URL", () => {
-    expect(normalizeActionPath("https://example.com/foo/", "/current")).toBe("/foo");
+    expect(normalizeActionPath(at("/current"), "https://example.com/foo/")).toBe("/foo");
   });
   it("extracts path from protocol-relative URL", () => {
-    expect(normalizeActionPath("//example.com/foo/", "/current")).toBe("/foo");
+    expect(normalizeActionPath(at("/current"), "//example.com/foo/")).toBe("/foo");
   });
   it("joins relative paths onto request path and collapses /./", () => {
-    expect(normalizeActionPath("bar", "/foo")).toBe("/foo/bar");
-    expect(normalizeActionPath("./bar", "/foo")).toBe("/foo/bar");
-    expect(normalizeRelativeActionPath("bar/", "/foo")).toBe("/foo/bar");
+    expect(normalizeActionPath(at("/foo"), "bar")).toBe("/foo/bar");
+    expect(normalizeActionPath(at("/foo"), "./bar")).toBe("/foo/bar");
+    expect(normalizeRelativeActionPath(at("/foo"), "bar/")).toBe("/foo/bar");
   });
 });

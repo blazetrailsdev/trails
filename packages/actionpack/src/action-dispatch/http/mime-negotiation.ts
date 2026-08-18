@@ -25,10 +25,6 @@ import { ParseError } from "./parameters.js";
  */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
-const CONTENT_TYPE_KEY = "action_dispatch.request.content_type";
-const ACCEPTS_KEY = "action_dispatch.request.accepts";
-const FORMATS_KEY = "action_dispatch.request.formats";
-
 /**
  * Raised when a `Content-Type` or `Accept` header cannot be parsed as a
  * valid MIME type. Mirrors `ActionDispatch::Http::MimeNegotiation::InvalidType`,
@@ -135,14 +131,16 @@ export class MimeNegotiation {
   /** Sets the format by string extension (`request.format = :iphone`). */
   set format(extension: unknown) {
     this.parameters["format"] = extension == null ? "" : String(extension);
-    this.setHeader(FORMATS_KEY, [MimeType.lookupByExtension(this.parameters["format"] as string)]);
+    this.setHeader("action_dispatch.request.formats", [
+      MimeType.lookupByExtension(this.parameters["format"] as string),
+    ]);
   }
 
   /** Sets the formats by string extensions (multiple, ordered, with fallback). */
   set formats(extensions: unknown[]) {
     this.parameters["format"] = extensions[0] == null ? "" : String(extensions[0]);
     this.setHeader(
-      FORMATS_KEY,
+      "action_dispatch.request.formats",
       extensions.map((ext) => MimeType.lookupByExtension(String(ext))),
     );
   }
@@ -154,20 +152,15 @@ const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
 
 /** The MIME type of the HTTP request (parsed from `CONTENT_TYPE`). */
 export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
-  const cached = this.getHeader(CONTENT_TYPE_KEY);
-  if (cached !== undefined) return cached as MimeType | null;
-  const raw = this.getHeader("CONTENT_TYPE") as string | undefined;
-  try {
-    let v: MimeType | null = null;
-    if (raw) {
-      const match = raw.match(/^([^,;]*)/);
-      if (match) v = MimeType.lookup(match[1].trim().toLowerCase());
+  return this.fetchHeader("action_dispatch.request.content_type", (k) => {
+    const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
+    try {
+      const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
+      return this.setHeader(k, v);
+    } catch (e) {
+      throw new InvalidType((e as Error).message);
     }
-    this.setHeader(CONTENT_TYPE_KEY, v);
-    return v;
-  } catch (e) {
-    throw new InvalidType((e as Error).message);
-  }
+  }) as MimeType | null;
 }
 
 /** @internal */
@@ -177,21 +170,20 @@ export function hasContentType(this: MimeNegotiationHost): boolean {
 
 /** Accepted MIME types parsed from `HTTP_ACCEPT`. */
 export function accepts(this: MimeNegotiationHost): MimeType[] {
-  const cached = this.getHeader(ACCEPTS_KEY);
-  if (cached !== undefined) return cached as MimeType[];
-  const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
-  try {
-    const ct = contentMimeType.call(this);
-    // Rails: `[content_mime_type]` — array of one element even when nil. The
-    // subsequent `validAcceptHeader` gate prevents `accepts` from being used in
-    // the all-blank branch, so a `[null]` payload never reaches the formats
-    // filter. Kept verbatim for parity with `fetch_header` cache semantics.
-    const v: MimeType[] = header === "" ? ([ct] as MimeType[]) : MimeType.parse(header);
-    this.setHeader(ACCEPTS_KEY, v);
-    return v;
-  } catch (e) {
-    throw new InvalidType((e as Error).message);
-  }
+  return this.fetchHeader("action_dispatch.request.accepts", (k) => {
+    const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
+    try {
+      // Rails: `[content_mime_type]` — array of one element even when nil. The
+      // subsequent `validAcceptHeader` gate prevents `accepts` from being used in
+      // the all-blank branch, so a `[null]` payload never reaches the formats
+      // filter. Kept verbatim for parity with `fetch_header` cache semantics.
+      const v: MimeType[] =
+        header === "" ? ([contentMimeType.call(this)] as MimeType[]) : MimeType.parse(header);
+      return this.setHeader(k, v);
+    } catch (e) {
+      throw new InvalidType((e as Error).message);
+    }
+  }) as MimeType[];
 }
 
 /**
@@ -206,7 +198,7 @@ export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType
 }
 
 export function formats(this: MimeNegotiationHost): MimeType[] {
-  return this.fetchHeader(FORMATS_KEY, (k) => {
+  return this.fetchHeader("action_dispatch.request.formats", (k) => {
     let v: MimeType[];
     let extType: MimeType | undefined;
     if (paramsReadable.call(this)) {
@@ -225,8 +217,7 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
       v = html ? [html] : [];
     }
     v = v.filter((f) => f.symbol || f.ref() === "*/*");
-    this.setHeader(k, v);
-    return v;
+    return this.setHeader(k, v);
   }) as MimeType[];
 }
 
