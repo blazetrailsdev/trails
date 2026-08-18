@@ -1,3 +1,3 @@
 import { Book } from "./models.js";
 
-export default Book.all().whereMissing("author");
+export default Book.all().where().missing("author");

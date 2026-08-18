@@ -118,7 +118,7 @@ describe("WhereTest", () => {
 
   it("where copies bind params in the right order", async () => {
     const author = authors("david") as any;
-    const davidPosts = author.posts.whereNot({ id: 1 });
+    const davidPosts = author.posts.where().not({ id: 1 });
     const first = await davidPosts.first();
     const joined = await Post.where({ id: davidPosts, title: first.title });
     expect(ids(joined)).toStrictEqual([first.id]);
@@ -354,9 +354,11 @@ describe("WhereTest", () => {
     const treasure = await Treasure.create({ name: "my_treasure" });
     await PriceEstimate.create({ estimateOf: treasure, price: 2, currency: "USD" });
 
-    const actual = await Treasure.joins("priceEstimates").whereNot({
-      price_estimates: { price: 2, currency: "USD" },
-    });
+    const actual = await Treasure.joins("priceEstimates")
+      .where()
+      .not({
+        price_estimates: { price: 2, currency: "USD" },
+      });
     const expected = [
       (treasures("diamond") as any).id,
       (treasures("sapphire") as any).id,
@@ -640,7 +642,7 @@ describe("WhereTest", () => {
 
   it("invert where", async () => {
     const author = authors("david") as any;
-    const davidPosts = author.posts.whereNot({ id: 1 });
+    const davidPosts = author.posts.where().not({ id: 1 });
     const result = await davidPosts.invertWhere().first();
     expect(Number(result.id)).toBe(1);
   });

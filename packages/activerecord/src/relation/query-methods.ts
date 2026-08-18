@@ -31,75 +31,132 @@ import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { any, compactBlank, foreignKey } from "@blazetrails/activesupport";
-
-/**
- * Interface for the scope that WhereChain delegates to.
- */
-export interface WhereChainScope<R> {
-  whereNot(conditions: Record<string, unknown>): R;
-  whereNot(conditions: unknown[]): R;
-  whereNot(cols: string[], tuples: unknown[][]): R;
-  whereAssociated(...associationNames: string[]): R;
-  whereMissing(...associationNames: string[]): R;
-  exists(conditions?: unknown): Promise<boolean>;
-}
+import { any, compactBlank, foreignKey, wrap } from "@blazetrails/activesupport";
 
 /**
  * Provides chainable where.not(), where.associated(), where.missing().
  * Returned by `Relation#where()` when called with no arguments.
  *
- * Mirrors: ActiveRecord::QueryMethods::WhereChain
+ * Mirrors: ActiveRecord::QueryMethods::WhereChain (query_methods.rb:11-148)
  */
 export class WhereChain<R = any> {
-  private _scope: WhereChainScope<R>;
+  private _scope: R;
 
-  constructor(scope: WhereChainScope<R>) {
+  constructor(scope: R) {
     this._scope = scope;
   }
 
-  not(conditions: Record<string, unknown>): R;
-  not(conditions: unknown[]): R;
+  /**
+   * Mirrors: WhereChain#not (query_methods.rb:49-55) — `build_where_clause`
+   * then `@scope.where_clause += where_clause.invert`.
+   */
+  not(opts: Record<string, unknown>): R;
+  not(opts: unknown[]): R;
   not(cols: string[], tuples: unknown[][]): R;
-  not(conditions: Record<string, unknown> | unknown[], tuples?: unknown[][]): R {
-    if (tuples !== undefined) {
-      return this._scope.whereNot(conditions as string[], tuples);
+  not(opts: Record<string, unknown> | string[] | unknown[], ...rest: unknown[]): R {
+    const scope = this._scope as unknown as QueryMethodsHost;
+    // Composite-key positional form (`where.not(cols, tuples)`): the JS analog
+    // of Rails' `where.not([c1, c2] => tuples)`, since JS object keys can't be
+    // arrays. Kept symmetric with `where`'s composite guard, so a mixed-type
+    // array (`where.not(["a", 5], ...)`) falls through to `build_where_clause`.
+    if (
+      Array.isArray(opts) &&
+      rest.length > 0 &&
+      opts.every((c) => typeof c === "string") &&
+      Array.isArray(rest[0])
+    ) {
+      // Rails passes `lookup_table_klass_from_join_dependencies` as the block
+      // to `build_from_hash` (query_methods.rb:1643-1645) so a qualified col
+      // naming a manual-join table binds through the joined model's type.
+      const nodes = scope.predicateBuilder.buildComposite(
+        opts as string[],
+        rest[0] as unknown[][],
+        (tableName) =>
+          lookupTableKlassFromJoinDependencies.call(scope, tableName) as
+            | QueryMethodsHost["_model"]
+            | null,
+      );
+      // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added.
+      if (nodes.length > 0) {
+        scope.whereClause = scope.whereClause.plus(new WhereClause(nodes).invert());
+      }
+      return this._scope;
     }
-    if (Array.isArray(conditions)) {
-      return this._scope.whereNot(conditions);
-    }
-    return this._scope.whereNot(conditions);
+    const whereClause = buildWhereClause.call(scope, opts, rest);
+    scope.whereClause = scope.whereClause.plus(whereClause.invert());
+    return this._scope;
   }
 
+  /**
+   * Mirrors: WhereChain#associated (query_methods.rb:88-101).
+   */
   associated(...associations: string[]): R {
-    // The reflection is discarded on purpose: this call is here for Rails'
-    // fail-fast on an unknown association (`scope_association_reflection`
-    // raises, query_methods.rb:90), which happens before any join is built.
-    // `whereAssociated` re-derives it because it needs the *scope's* reflection
-    // as the scope advances. `missing` below has the same shape.
-    for (const association of associations) this.scopeAssociationReflection(association);
-    return this._scope.whereAssociated(...associations);
+    const scope = this._scope as unknown as QueryMethodsHost;
+    for (const association of associations) {
+      const reflection = this.scopeAssociationReflection(association);
+      if (
+        !scope.joinsValues.includes(reflection.name) &&
+        !scope.leftOuterJoinsValues.includes(reflection.name)
+      ) {
+        joinsBang.call(scope, association);
+      }
+
+      const associationConditions = Object.fromEntries(
+        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+      );
+      if (reflection.options.className) {
+        this.not({ [association]: associationConditions });
+      } else {
+        this.not({ [reflection.tableName]: associationConditions });
+      }
+    }
+
+    return this._scope;
   }
 
+  /**
+   * Mirrors: WhereChain#missing (query_methods.rb:124-137).
+   */
   missing(...associations: string[]): R {
-    for (const association of associations) this.scopeAssociationReflection(association);
-    return this._scope.whereMissing(...associations);
+    const scope = this._scope as unknown as QueryMethodsHost;
+    for (const association of associations) {
+      const reflection = this.scopeAssociationReflection(association);
+      leftOuterJoinsBang.call(scope, association);
+      const associationConditions = Object.fromEntries(
+        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+      );
+      if (reflection.options.className) {
+        whereBang.call(scope, { [association]: associationConditions });
+      } else {
+        whereBang.call(scope, { [reflection.tableName]: associationConditions });
+      }
+    }
+
+    return this._scope;
   }
 
   exists(conditions?: unknown): Promise<boolean> {
-    return this._scope.exists(conditions);
+    return (this._scope as any).exists(conditions);
   }
 
-  private scopeAssociationReflection(association: string): unknown {
-    const model = (this._scope as any)._model ?? (this._scope as any).model;
+  /** Mirrors: WhereChain#scope_association_reflection (query_methods.rb:140-147). */
+  private scopeAssociationReflection(association: string): WhereChainReflection {
+    const model = (this._scope as unknown as QueryMethodsHost).model as any;
     const reflection = model?._reflectOnAssociation?.(association);
     if (!reflection) {
       throw argumentError(
-        `An association named \`:${association}\` does not exist on the model \`${model?.name ?? "unknown"}\`.`,
+        `An association named \`:${association}\` does not exist on the model \`${model?.name}\`.`,
       );
     }
     return reflection;
   }
+}
+
+interface WhereChainReflection {
+  name: string;
+  tableName: string;
+  options: Record<string, unknown>;
+  associationPrimaryKey: string | string[];
 }
 
 /**
@@ -1255,7 +1312,7 @@ function isRelationLike(value: unknown): boolean {
 
 /**
  * Invert all existing WHERE conditions.
- * Swaps where ↔ whereNot clauses.
+ * Swaps where ↔ where.not clauses.
  *
  * Mirrors: ActiveRecord::QueryMethods#invert_where (query_methods.rb:1101-1103)
  */

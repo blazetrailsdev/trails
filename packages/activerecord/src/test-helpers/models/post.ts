@@ -336,7 +336,10 @@ export class Post extends Base {
     this.hasOne(
       "verySpecialCommentWithStringJoins",
       (q: any) =>
-        q.joins("JOIN posts AS p1 ON comments.post_id = p1.id").whereNot({ p1: { id: 999999 } }),
+        q
+          .joins("JOIN posts AS p1 ON comments.post_id = p1.id")
+          .where()
+          .not({ p1: { id: 999999 } }),
       { className: "VerySpecialComment" },
     );
     // trails-authored: a through chain whose intermediate (`through`) reflection
@@ -346,7 +349,10 @@ export class Post extends Base {
     this.hasMany(
       "commentsWithStringJoins",
       (q: any) =>
-        q.joins("JOIN posts AS p2 ON comments.post_id = p2.id").whereNot({ p2: { id: 999999 } }),
+        q
+          .joins("JOIN posts AS p2 ON comments.post_id = p2.id")
+          .where()
+          .not({ p2: { id: 999999 } }),
       { className: "Comment", foreignKey: "post_id" },
     );
     this.hasMany("ratingsViaStringJoinComments", {
@@ -366,7 +372,7 @@ export class Post extends Base {
 
     this.hasMany("categoryPosts", { className: "CategoryPost" });
     this.hasMany("scategories", { through: "categoryPosts", source: "category" });
-    this.hasMany("hmtSpecialCategories", (q: any) => q.whereNot({ name: null }), {
+    this.hasMany("hmtSpecialCategories", (q: any) => q.where().not({ name: null }), {
       through: "categoryPosts",
       source: "category",
       className: "SpecialCategory",

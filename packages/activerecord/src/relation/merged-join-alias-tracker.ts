@@ -33,7 +33,7 @@ export function seedJoinClauseAliases(host: MergedJoinAliasHost, tracker: AliasT
   const ownerTable = host._model.tableName;
   for (const c of host._joinClauses) {
     if (c.assoc) {
-      // Association where-join (whereAssociated / associated): mirror the
+      // Association where-join (where.associated): mirror the
       // collision branch of aliased_table_for — first use keeps the real name
       // and claims it, repeats alias to `{plural_name}_{owner_table}`.
       tracker.aliasNameForTable(c.table, () => `${pluralize(underscore(c.assoc!))}_${ownerTable}`);

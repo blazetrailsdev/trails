@@ -9,7 +9,7 @@
  */
 
 import { Nodes } from "@blazetrails/arel";
-import { wrap } from "@blazetrails/activesupport";
+import { NameError, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
@@ -288,8 +288,8 @@ interface FinderRelation {
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
   isNullRelation(): boolean;
-  limitValue: number | null;
-  offsetValue: number | null;
+  limitValue: number | string | null;
+  offsetValue: number | string | null;
   orderValues: unknown[];
   _rawOrderClauses: string[];
   createWithValue: Record<string, unknown>;
@@ -552,6 +552,17 @@ export async function performTakeBang(this: FinderRelation): Promise<any> {
   return record;
 }
 
+/**
+ * Mirror of Ruby's `NoMethodError` (a subclass of `NameError`), raised where
+ * Ruby's own arithmetic does — see `findNthWithLimit`.
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
 /** @internal */
 export async function findNthWithLimit(
   this: FinderRelation,
@@ -562,8 +573,15 @@ export async function findNthWithLimit(
     return (await this.records()).slice(index, index + limit) ?? [];
   }
   let relation: any = orderedRelation.call(this);
-  if ((this as any).limitValue != null) {
-    limit = Math.min((this as any).limitValue - index, limit);
+  const limitValue = (this as any).limitValue;
+  if (limitValue != null) {
+    // Rails finder_methods.rb:609-611 `[limit_value - index, limit].min`.
+    // `limit!` is a bare assignment, so a String limit_value reaches `-` here
+    // and raises NoMethodError before the comparison.
+    if (typeof limitValue !== "number") {
+      throw new NoMethodError("undefined method `-' for an instance of String");
+    }
+    limit = Math.min(limitValue - index, limit);
   }
   if (limit <= 0) return [];
   if (index > 0) {
@@ -1023,8 +1041,17 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   // Rails: expected_size = ids.size, then clamp down for limit/offset.
   // "11 ids with limit 3, offset 9 should give 2 results."
   let expectedSize = ids.length;
-  const limitValue: number | null = (this as any).limitValue ?? null;
-  const offsetValue: number | null = (this as any).offsetValue ?? null;
+  const limitValue: number | string | null = (this as any).limitValue ?? null;
+  const offsetValue: number | string | null = (this as any).offsetValue ?? null;
+  // `limit!` / `offset!` are bare assignments, so a String reaches
+  // `ids.size > limit_value` (finder_methods.rb:549) and
+  // `ids.size - offset_value` (:556), which raise in Ruby.
+  if (limitValue !== null && typeof limitValue !== "number") {
+    throw new ArgumentError("comparison of Integer with String failed");
+  }
+  if (offsetValue !== null && typeof offsetValue !== "number") {
+    throw new TypeError("String can't be coerced into Integer");
+  }
   if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
   if (offsetValue !== null && ids.length - offsetValue < expectedSize)
     expectedSize = ids.length - offsetValue;
@@ -1038,8 +1065,14 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
 
 /** @internal */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const offsetValue: number = (this as any).offsetValue ?? 0;
-  const limitValue: number | null = (this as any).limitValue ?? null;
+  // Rails finder_methods.rb:568 `ids.slice(offset_value || 0, limit_value ||
+  // ids.size)`: `limit!` / `offset!` are bare assignments, so a String reaches
+  // `Array#slice` and raises TypeError.
+  const offsetValue: number | string = (this as any).offsetValue ?? 0;
+  const limitValue: number | string | null = (this as any).limitValue ?? null;
+  if (typeof offsetValue !== "number" || (limitValue !== null && typeof limitValue !== "number")) {
+    throw new TypeError("no implicit conversion of String into Integer");
+  }
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
   let relation = (this as any).except("limit", "offset");

@@ -15,7 +15,6 @@ import {
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
-import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -33,8 +32,6 @@ export { Range };
 import {
   WhereChain,
   QueryMethodBangs,
-  argumentError,
-  referencesFromConditions,
   defineValueMethods,
   type UnscopeType,
   type ExceptSkip,
@@ -145,18 +142,16 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Build the `Array(reflection.association_primary_key).index_with(nil)` hash
- * used by where.associated / where.missing — one `{ pk: null }` entry per
- * association-primary-key column (query_methods.rb:92 / 128).
+ * Rails' `[limit_value, 11].compact.min` (relation.rb:1266, :1292). `limit!` is
+ * a bare assignment, so `limit_value` can hold whatever the caller passed;
+ * Ruby's `Array#min` raises `ArgumentError` when that is a String.
  */
-function whereChainNullConditions(reflection: {
-  associationPrimaryKey: string | string[];
-}): Record<string, null> {
-  const pk = reflection.associationPrimaryKey;
-  const pks = Array.isArray(pk) ? pk : [pk];
-  const conditions: Record<string, null> = {};
-  for (const col of pks) conditions[col] = null;
-  return conditions;
+function takeLimit(limitValue: number | string | null): number {
+  if (limitValue === null) return 11;
+  if (typeof limitValue !== "number") {
+    throw new ArgumentError("comparison of String with 11 failed");
+  }
+  return Math.min(limitValue, 11);
 }
 
 function validateExplainOptions(options: ExplainOption[]): void {
@@ -303,30 +298,9 @@ export class ExplainProxy<T extends Base> {
    * `exec_explain { @relation.send(:exec_queries) }`, private-bypass included.
    */
   inspect(): Promise<string> {
-    return this.execExplain(async () => {
-      // Rails' `exec_queries` leaves `@records` alone — the assignment lives in
-      // `#load` — so explaining a relation never loads it. trails' `exec_queries`
-      // ends in `loadRecords`, so the load-cache state is snapshotted and
-      // restored around the call to keep `.explain` side-effect-free, and the
-      // `@none` arm of `exec_main_query` (relation.rb:1424-1429) short-circuits
-      // before any query is issued. Both ride
-      // `split-load-records-out-of-exec-queries`.
-      const relation = this._relation as unknown as {
-        _isNone: boolean;
-        _loaded: boolean;
-        _records: T[];
-        execQueries(): Promise<T[]>;
-      };
-      if (relation._isNone) return [];
-      const wasLoaded = relation._loaded;
-      const priorRecords = relation._records;
-      try {
-        return await relation.execQueries();
-      } finally {
-        relation._loaded = wasLoaded;
-        relation._records = priorRecords;
-      }
-    });
+    return this.execExplain(() =>
+      (this._relation as unknown as { execQueries(): Promise<T[]> }).execQueries(),
+    );
   }
 
   /** Mirrors: ActiveRecord::Relation::ExplainProxy#average (relation.rb:16-18) */
@@ -542,7 +516,7 @@ export class Relation<T extends Base> {
     quoted?: boolean;
     as?: string;
     // The association this join was derived from (when added via
-    // whereAssociated/whereMissing), so a repeat of the same association reuses
+    // where.associated/where.missing), so a repeat of the same association reuses
     // the existing join instead of minting a duplicate alias.
     assoc?: string;
     // The base alias candidate a self-join alias was minted from (see
@@ -630,166 +604,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Filter for records WHERE the association IS present.
-   *
-   * Mirrors: ActiveRecord::QueryMethods::WhereChain#associated
-   * (query_methods.rb:88-92) — `@scope.joins!(association)` (unless the
-   * association is already joined) then `self.not(pk => nil)`. Building the
-   * join through JoinDependency means through / HABTM / composite-key shapes
-   * work for free.
-   */
-  whereAssociated(...assocNames: string[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const assocName of assocNames) {
-      const reflection = rel._whereChainReflection(assocName);
-      const scope = rel.clone();
-      // Rails query_methods.rb:89-91: `@scope.joins!(association)` unless it is
-      // already present in joins_values / left_outer_joins_values. Routing the
-      // join through JoinDependency (joins!) rather than a bespoke resolver is
-      // what makes through / HABTM / composite-key shapes work for free.
-      const reflectionName = reflection.name ?? assocName;
-      if (
-        !rel.joinsValues.includes(reflectionName) &&
-        !rel.leftOuterJoinsValues.includes(reflectionName)
-      ) {
-        QueryMethodBangs.joinsBang.call(scope as any, assocName);
-      }
-      // Rails: `self.not(reflection.table_name => Array(pk).index_with(nil))`,
-      // or `self.not(association => …)` when a `:class_name` option is present
-      // (self-joins) so the predicate resolves to the aliased join table.
-      const key = reflection.options.className ? assocName : reflection.tableName;
-      rel = scope.whereNot({ [key]: whereChainNullConditions(reflection) });
-    }
-    return rel;
-  }
-
-  /**
-   * Filter for records WHERE the association IS missing.
-   *
-   * Mirrors: ActiveRecord::QueryMethods::WhereChain#missing — emits a
-   * LEFT OUTER JOIN on the association then WHERE assoc_pk IS NULL.
-   */
-  whereMissing(...assocNames: string[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const assocName of assocNames) {
-      const reflection = rel._whereChainReflection(assocName);
-      const scope = rel.clone();
-      // Rails query_methods.rb:126-128: `@scope.left_outer_joins!(association)`
-      // then `@scope.where!(reflection.table_name => Array(pk).index_with(nil))`
-      // (or `association => …` for a `:class_name` self-join).
-      QueryMethodBangs.leftOuterJoinsBang.call(scope as any, assocName);
-      const key = reflection.options.className ? assocName : reflection.tableName;
-      rel = scope.where({ [key]: whereChainNullConditions(reflection) });
-    }
-    return rel;
-  }
-
-  /**
-   * Resolve the reflection for a where.associated / where.missing association,
-   * mirroring Rails' `WhereChain#scope_association_reflection`. Throws the same
-   * ArgumentError shape when the association does not exist.
-   *
-   * @internal
-   */
-  private _whereChainReflection(assocName: string): {
-    name: string;
-    tableName: string;
-    options: Record<string, unknown>;
-    associationPrimaryKey: string | string[];
-  } {
-    const modelClass = this._model as any;
-    const reflection = modelClass._reflectOnAssociation?.(assocName);
-    if (!reflection) {
-      throw argumentError(
-        `An association named \`:${assocName}\` does not exist on the model \`${modelClass.name}\`.`,
-      );
-    }
-    return reflection;
-  }
-
-  /**
-   * Add NOT WHERE conditions. Accepts a hash of column/value pairs,
-   * or the composite-key positional form (mirrors `where(cols, tuples)`).
-   *
-   * Mirrors: ActiveRecord::Relation#where.not
-   */
-  whereNot(conditions: Record<string, unknown>): Relation<T>;
-  whereNot(conditions: unknown[]): Relation<T>;
-  whereNot(cols: string[], tuples: unknown[][]): Relation<T>;
-  whereNot(
-    conditions: Record<string, unknown> | string[] | unknown[],
-    tuples?: unknown[][],
-  ): Relation<T> {
-    // Mirrors WhereChain#not → build_where_clause: unwrap/forbid strong-params
-    // before deriving references or predicates.
-    conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
-      | Record<string, unknown>
-      | string[];
-    const rel = this.spawn();
-    rel.referencesBang(...referencesFromConditions(conditions));
-    if (
-      Array.isArray(conditions) &&
-      tuples !== undefined &&
-      conditions.every((c) => typeof c === "string")
-    ) {
-      // Composite-key form: `whereNot(cols, tuples)`. Present only when the
-      // second (tuples) argument is supplied AND the column list is all
-      // strings — kept symmetric with `where`'s composite guard so a
-      // mixed-type array (`whereNot(["a", 5], ...)`) routes to the
-      // sanitized-conditions path below instead of building a bogus
-      // predicate off a non-string column name.
-      if (!Array.isArray(tuples)) {
-        throw argumentError(
-          "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
-        );
-      }
-      // The `lookup_table_klass_from_join_dependencies` block (see `where`'s
-      // composite branch) so a qualified col naming a manual-join table binds
-      // through the joined model's type rather than the generic
-      // `TypeCasterConnection` (query_methods.rb:1643-1645).
-      const nodes = this.predicateBuilder.buildComposite(
-        conditions as string[],
-        tuples,
-        (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
-      );
-      // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
-      // (matches Rails' `where.not(...)` no-op for empty hashes).
-      if (nodes.length > 0) {
-        // Rails builds the positive predicates as a WhereClause and inverts the
-        // whole clause (`build_where_clause(...).invert`): one predicate flips
-        // in place (`IN` → `NOT IN`, `Grouping(Or)` → `NOT (...)`), while a flat
-        // multi-predicate single tuple ANDs then negates → `NOT (c1 = ? AND
-        // c2 = ?)` — the same shape as inverting the hash-key `where.not`.
-        rel.whereClause = rel.whereClause.plus(new WhereClause(nodes).invert());
-      }
-      return rel;
-    }
-    if (Array.isArray(conditions)) {
-      // Rails: `where.not(["name = ?", x])` → `build_where_clause(opts, rest).invert`
-      // (query_methods.rb:49). Route the single-array sanitized-conditions form
-      // through the same builder as `where` (it unwraps `[head, ...tail]`), then
-      // invert. An empty array has no `head`; Rails likewise raises on
-      // `where.not([])` (build_where_clause reassigns `opts = nil`).
-      if (conditions.length === 0) {
-        throw argumentError("Relation#whereNot: unsupported argument (empty array)");
-      }
-      const clause = rel.buildWhereClause(conditions);
-      rel.whereClause = rel.whereClause.plus(clause.invert());
-      return rel;
-    }
-    // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
-    // (query_methods.rb:49): the hash routes through the same
-    // `build_where_clause` as `where` — which resolves attribute aliases and
-    // passes the join-dependency lookup block before `build_from_hash`
-    // (query_methods.rb:1631-1644) — then a single WhereClause#invert over the
-    // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
-    // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
-    const clause = rel.buildWhereClause(conditions);
-    rel.whereClause = rel.whereClause.plus(clause.invert());
-    return rel;
-  }
-
-  /**
    * PostgreSQL DISTINCT ON — select distinct rows based on specific columns.
    *
    * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
@@ -820,7 +634,7 @@ export class Relation<T extends Base> {
     // rendering each one's namespace-qualified Rails constant path.
     const className = (this.constructor as typeof Relation)._railsClassName;
     if (this._loaded) {
-      const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
+      const max = takeLimit(this.limitValue);
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${className} [${entries.join(", ")}]>`;
@@ -847,7 +661,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#pretty_print
    */
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
-    const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
+    const max = takeLimit(this.limitValue);
     const subject = this._loaded ? this._records : await this.annotate("loading for pp").limit(max);
     const entries = subject.slice(0, max) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
@@ -1288,7 +1102,17 @@ export class Relation<T extends Base> {
     // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
     // Mirrors Rails, whose read paths run inside `with_connection` and thread the
     // yielded connection.
-    return this.withConnection(() => this.execQueries());
+    // Mirrors: ActiveRecord::Relation#load (relation.rb:1179-1186) —
+    // `@records = exec_queries; @loaded = true`. The assignment lives HERE, not
+    // in `exec_queries`, which is what makes `.explain` (which calls
+    // `exec_queries` directly, relation.rb:13) side-effect-free.
+    const token = this._loadToken;
+    const records = await this.withConnection(() => this.execQueries());
+    // A reset() landed while the query was in flight: return the rows we got
+    // without clobbering the fresh state.
+    if (token !== this._loadToken) return records;
+    this.loadRecords(records);
+    return [...this._records];
   }
 
   /**
@@ -1305,19 +1129,9 @@ export class Relation<T extends Base> {
       // Rails materializes a `distinct_relation_for_primary_key` subquery value
       // (an eager-loading relation with limit/offset over a collection reflection)
       // into a literal id list inside `.where()`. trails' `.where()` is sync, so
-      // the materialization is deferred to here — run it before the contradiction
-      // check so an empty id set becomes an empty `IN` (no-query empty result).
+      // the materialization is deferred to here — run it before `exec_main_query`
+      // so an empty id set becomes an empty `IN` (contradiction, no query).
       await this._materializeDeferredDistinctPkPredicates();
-
-      // Rails Relation#exec_main_query short-circuits a contradictory
-      // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
-      // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
-      // SELECT is sent and `.explain` collects zero queries. Distinct from
-      // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
-      if (this.whereClause.isContradiction()) {
-        this.loadRecords([]);
-        return [];
-      }
 
       // Capture the load token before any await so we can detect if a
       // reset() landed while the query was in flight and bail without
@@ -1326,19 +1140,7 @@ export class Relation<T extends Base> {
 
       const rows = await this.execMainQuery();
       if (token !== this._loadToken) return [];
-      this.loadRecords(this.instantiateRecords(rows));
-
-      // Apply readonly and strict_loading flags to loaded records
-      if (this.readonlyValue) {
-        for (const record of this._records) {
-          (record as any)._readonly = true;
-        }
-      }
-      if (this.strictLoadingValue != null) {
-        for (const record of this._records) {
-          (record as any)._strictLoading = this.strictLoadingValue;
-        }
-      }
+      const records = this.instantiateRecords(rows);
 
       // Preload associations via separate queries. Rails builds this list as
       // `preload = preload_values; preload += includes_values unless eager_loading?`
@@ -1353,12 +1155,24 @@ export class Relation<T extends Base> {
         ...(this.isEagerLoading ? [] : this.includesValues),
         ...bypassPreloads.filter((n) => !this.preloadValues.includes(n)),
       ];
-      if (preloadAssocs.length > 0 && this._records.length > 0) {
-        await this.preloadAssociations(this._records, preloadAssocs);
+      if (preloadAssocs.length > 0 && records.length > 0) {
+        await this.preloadAssociations(records, preloadAssocs);
         if (token !== this._loadToken) return [];
       }
 
-      return [...this._records];
+      // Rails applies both flags AFTER `preload_associations` (relation.rb:1417-1418).
+      if (this.readonlyValue) {
+        for (const record of records) {
+          (record as any)._readonly = true;
+        }
+      }
+      if (this.strictLoadingValue != null) {
+        for (const record of records) {
+          (record as any)._strictLoading = this.strictLoadingValue;
+        }
+      }
+
+      return records;
     });
   }
 
@@ -1373,15 +1187,25 @@ export class Relation<T extends Base> {
     // the eager-loading `select_all(relation.arel, "SQL", async: async)`
     // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
     // querying.rb:67-68).
+    // Mirrors relation.rb:1424-1429: the `@none` arm short-circuits before the
+    // query cache block and before any SQL is issued.
+    if (this._isNone) return Result.empty();
+
     const c = this._conn();
     const async =
       this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
 
-    // Rails' `eager_loading?`, which `exec_main_query` reads for itself
-    // (relation.rb:1428) exactly as `exec_queries` does for its preload list.
-    if (this.isEagerLoading) {
-      const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-      return this.skipQueryCacheIfNecessary(async () => {
+    // Mirrors relation.rb:1431-1451: ONE `skip_query_cache_if_necessary` over
+    // the contradiction / eager_loading? / plain arms, not one per arm.
+    return this.skipQueryCacheIfNecessary(async () => {
+      // relation.rb:1432-1433: a contradictory where-clause (e.g. `where(id: [])`,
+      // which compiles to an empty `IN`) returns `[].freeze` before any SELECT.
+      if (this.whereClause.isContradiction()) return Result.empty();
+
+      // Rails' `eager_loading?`, which `exec_main_query` reads for itself
+      // (relation.rb:1434) exactly as `exec_queries` does for its preload list.
+      if (this.isEagerLoading) {
+        const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
         // trails' remaining capability gap: a composite-PK/CTE/FROM-override
         // eager load can't emit the aliased JOIN, so it degrades to a preload
         // (`_eagerLoadBypassesJoinDependency`). Rails always JOINs.
@@ -1390,21 +1214,19 @@ export class Relation<T extends Base> {
           this._eagerBypassPreloads = allEager;
           return result;
         }
-        // Mirrors: relation.rb:1432-1443.
+        // Mirrors: relation.rb:1435-1446.
         return this.applyJoinDependency({}, async (relation, joinDependency) => {
           if (relation.isNullRelation()) return Result.empty();
           joinDependency.applyColumnAliases(relation);
           this._joinDependency = joinDependency;
           return this._conn().selectAll(relation.toArel(), "SQL", [], { async });
         });
-      });
-    }
+      }
 
-    // Awaiting the FutureResult here is trails' `future.result` in
-    // `exec_queries` (relation.rb:1408).
-    return this.skipQueryCacheIfNecessary(() =>
-      c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
-    );
+      // Awaiting the FutureResult here is trails' `future.result` in
+      // `exec_queries` (relation.rb:1408).
+      return c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async });
+    });
   }
 
   /**
@@ -3529,9 +3351,9 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#with_values */
   withValues: Array<Record<string, unknown>>;
   /** Mirrors: ActiveRecord::Relation#limit_value */
-  limitValue: number | null;
+  limitValue: number | string | null;
   /** Mirrors: ActiveRecord::Relation#offset_value */
-  offsetValue: number | null;
+  offsetValue: number | string | null;
   /** Mirrors: ActiveRecord::Relation#lock_value */
   lockValue: string | boolean | null;
   /** Mirrors: ActiveRecord::Relation#readonly_value */

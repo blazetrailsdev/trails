@@ -394,7 +394,8 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("preload through missing records", async () => {
     const post = await Post.all()
-      .whereNot({ author_id: Author.all().select("id") })
+      .where()
+      .not({ author_id: Author.all().select("id") })
       .preload({ author: { comments: "post" } })
       .firstBang();
     await assertQueriesCount(0, false, () => {

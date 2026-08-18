@@ -112,7 +112,7 @@ describe("OrTest", () => {
 
   it("or with unscope where column", async () => {
     const expected = await Post.where("id = 1 or id = 2");
-    const partial = Post.where({ id: 1 }).whereNot({ id: 2 });
+    const partial = Post.where({ id: 1 }).where().not({ id: 2 });
     expect(await partial.or(partial.unscope({ where: "id" }).where("id = 2"))).toEqual(expected);
   });
 

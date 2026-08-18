@@ -181,7 +181,14 @@ export class Batches {
     let remaining: number | null = null;
     let batchLimit = of;
     if (this.limitValue !== null) {
-      remaining = this.limitValue as number;
+      // Rails batches.rb `remaining = limit_value` then `remaining < batch_limit`.
+      // `limit!` is a bare assignment, so a String limit_value reaches the
+      // comparison and raises `ArgumentError` in Ruby's `Comparable`.
+      const limitValue = this.limitValue;
+      if (typeof limitValue !== "number") {
+        throw new ArgumentError(`comparison of String with ${batchLimit} failed`);
+      }
+      remaining = limitValue;
       if (remaining < batchLimit) batchLimit = remaining;
     }
 

@@ -2078,9 +2078,11 @@ describe("RelationTest", () => {
   });
 
   it("automatically added where not references", () => {
-    const scope1 = Post.all().whereNot({ comments: { body: "Bla" } });
+    const scope1 = Post.all()
+      .where()
+      .not({ comments: { body: "Bla" } });
     expect((scope1 as any).referencesValues.map(String)).toEqual(["comments"]);
-    const scope2 = Post.all().whereNot({ "comments.body": "Bla" });
+    const scope2 = Post.all().where().not({ "comments.body": "Bla" });
     expect((scope2 as any).referencesValues.map(String)).toEqual(["comments"]);
   });
 

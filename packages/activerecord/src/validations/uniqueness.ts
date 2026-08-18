@@ -216,12 +216,12 @@ export class UniquenessValidator extends EachValidator {
             ? record._dirty.attributeWas(col)
             : record.readAttribute(col),
         );
-        relation = relation.whereNot(pk, [dbVals]);
+        relation = relation.where().not(pk, [dbVals]);
       } else {
         const dbVal = record._dirty?.attributeChanged(pk)
           ? record._dirty.attributeWas(pk)
           : record.readAttribute(pk);
-        relation = relation.whereNot({ [pk]: [dbVal] });
+        relation = relation.where().not({ [pk]: [dbVal] });
       }
     }
 
