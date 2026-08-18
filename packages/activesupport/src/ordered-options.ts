@@ -115,8 +115,8 @@ export class OrderedOptions {
   }
 
   /**
-   * Mirrors `inspect` (ordered_options.rb:68-70), whose `super` is `Hash#inspect`
-   * — the rendering `toString` below is.
+   * Mirrors `inspect` (ordered_options.rb:68-70). Its `super` is `Hash#inspect`,
+   * which is the rendering `toString` below carries.
    */
   inspect(): string {
     return `#<${this.constructor.name} ${this.toString()}>`;
@@ -125,7 +125,7 @@ export class OrderedOptions {
   /**
    * `Hash#to_s`, which is `Hash#inspect`. Rails does not override it on
    * `OrderedOptions`, so `to_s` renders the pairs and not the `#<…>` form
-   * (activesupport/test/ordered_options_test.rb:277-278).
+   * (activesupport/test/ordered_options_test.rb:283-285).
    */
   toString(): string {
     const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
