@@ -35,7 +35,7 @@ describe("join value union structural dedup", () => {
   fixtures({});
 
   it("emits a single LEFT OUTER JOIN for a structurally-equal Hash spec joined twice", () => {
-    const rel = Author.leftJoins({ posts: "comments" }).leftJoins({ posts: "comments" });
+    const rel = Author.leftJoins({ posts: ":comments" }).leftJoins({ posts: ":comments" });
     // left_outer_joins_values |= dedups the structurally-equal Hash spec (eql?),
     // so the value survives once — mirroring Rails, not JS reference identity.
     expect(asHost(rel).leftOuterJoinsValues).toHaveLength(1);
@@ -55,7 +55,7 @@ describe("join value union structural dedup", () => {
   it("keeps distinct Hash specs as separate joins", () => {
     // Dedup is by value, not by shape: two hashes with the same key but
     // different nested target must both survive.
-    const rel = Author.leftJoins({ posts: "comments" }).leftJoins({ posts: "author" });
+    const rel = Author.leftJoins({ posts: ":comments" }).leftJoins({ posts: ":author" });
     expect(asHost(rel).leftOuterJoinsValues).toHaveLength(2);
   });
 

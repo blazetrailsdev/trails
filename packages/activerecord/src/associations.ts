@@ -230,50 +230,25 @@ export interface ReflectionLike {
 }
 
 /**
- * Model registry that tracks a monotonic `generation`, bumped on any mutation
- * that can change what a name resolves to — a FRESH registration as much as a
- * rebind (`super.get(name) !== model` is true for `prev === undefined`).
- * Reflections memoize their resolved `klass` and through/source chain alongside
- * the generation they were resolved at, so a later registration invalidates
- * every stale memo at once instead of poisoning it permanently.
- *
- * What that heals is a memo formed under an INCOMPLETE registry, not a shadowed
- * name. Instrumenting the two-file repro
- * (`nested-through-associations.test.ts` + `associations.test.ts`, RFC 0078)
- * counts 184 fresh registrations and ZERO rebinds: nothing is ever bound to a
- * different class, and both files import the canonical models. The poisoned
- * memo is `ThroughReflection#sourceReflectionName`'s `null`, written by the
- * catch that swallows `NameError: Missing model class Tagging` raised from
- * `throughRef.klass` while `Tagging` is not yet registered; `sourceReflection`
- * then reads that `null` and `checkValidityBang` raises
- * `HasManyThroughSourceAssociationNotFoundError` forever. The healing bump is
- * whatever model registers next.
- *
- * The consequence worth knowing: a negative memo formed after the LAST
- * registration in a worker has no later bump to heal it. Story
- * `dont-memoize-negative-source-resolution-from-unresolvable-klass` (RFC 0078)
- * covers not memoizing a resolution that failed for a missing class.
+ * Ruby has no model registry at all — Zeitwerk resolves a constant when the
+ * method naming it runs, and a reload discards the model classes and their
+ * reflection objects together, so a reflection memo can never outlive the class
+ * it resolved against. trails keeps one long-lived registry per worker instead,
+ * which is what makes a memo formed under a still-INCOMPLETE registry
+ * reachable. The answer is Rails' own `||=` (reflection.rb:422, :989, :261,
+ * :1113): a resolution that failed writes no memo and is retried, so it heals
+ * itself once the missing model registers. Do not add an invalidation counter
+ * here — memoizing a negative resolution is what needs one.
  * @internal
  */
 class ModelRegistry extends Map<string, typeof Base> {
-  #generation = 0;
-
-  /** Bumps only on a mutation that can change what a name resolves to. */
-  get generation(): number {
-    return this.#generation;
-  }
-
   // Write-through runs here, not at each caller, so a direct
   // `modelRegistry.set` (the HABTM join model) or `.delete` (the PG schema
   // helper) cannot leave the registry and the constant table disagreeing.
   // `registerModelConstant` is the single path that binds a model class to a
   // name; this must not write the constant table itself.
   override set(name: string, model: typeof Base): this {
-    // Guard (inside registerModelConstant) before any mutation: a rejected
-    // registration must not bump the generation, which would invalidate every
-    // reflection memo for a write that never happened.
     registerModelConstant(name, model);
-    if (super.get(name) !== model) this.#generation++;
     return super.set(name, model);
   }
 
@@ -283,15 +258,11 @@ class ModelRegistry extends Map<string, typeof Base> {
     // knows nothing about — only drop the constant when it is still ours.
     const model = super.get(name);
     const deleted = super.delete(name);
-    if (deleted) {
-      this.#generation++;
-      unregisterConstant(name, model);
-    }
+    if (deleted) unregisterConstant(name, model);
     return deleted;
   }
 
   override clear(): void {
-    if (this.size > 0) this.#generation++;
     for (const [name, model] of this) unregisterConstant(name, model);
     super.clear();
   }

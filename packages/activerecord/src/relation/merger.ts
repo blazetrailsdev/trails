@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { assertValidKeys, isBlank } from "@blazetrails/activesupport";
+import { assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Relation } from "../relation.js";
@@ -161,10 +161,12 @@ export class Merger {
       return;
     }
 
+    // merger.rb:122-126 — `partition { |join| case join when Hash, Symbol,
+    // Array; true end }`. A Ruby Symbol is a leading-colon string in trails.
     const associations: unknown[] = [];
     const others: unknown[] = [];
     for (const v of joinsValues) {
-      if (!(v instanceof JoinDependency) && other._isNamedJoinValue(v)) {
+      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
         associations.push(v);
       } else {
         others.push(v);

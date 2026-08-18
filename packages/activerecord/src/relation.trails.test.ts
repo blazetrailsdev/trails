@@ -198,7 +198,7 @@ describe("RelationTest", () => {
   });
 
   it("constructJoinDependency handles array-form spec — joins(['posts','comments'])", () => {
-    // leftJoins(["posts", "comments"]) is equivalent to chaining leftJoins("posts").leftJoins("comments").
+    // leftJoins(["posts", "comments"]) is equivalent to chaining leftJoins("posts").leftJoins(":comments").
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -222,7 +222,7 @@ describe("RelationTest", () => {
     registerModel("CJDPost", Post);
     registerModel("CJDComment", Comment);
     // Array spec goes directly through constructJoinDependency via leftJoins
-    const sql = Author.all().leftJoins(["posts", "comments"]).toSql();
+    const sql = Author.all().leftJoins([":posts", ":comments"]).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
   });
@@ -251,7 +251,7 @@ describe("RelationTest", () => {
     registerModel("HashAuthor", Author);
     registerModel("HashPost", Post);
     registerModel("HashComment", Comment);
-    const sql = Author.all().leftJoins({ posts: "comments" }).toSql();
+    const sql = Author.all().leftJoins({ posts: ":comments" }).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
     // Verify comments is joined through posts: ON clause must reference the
@@ -291,9 +291,9 @@ describe("RelationTest", () => {
     registerModel("LeftJoinAuthor2", Author);
     registerModel("LeftJoinPost2", Post);
 
-    const rel = Author.leftJoins("posts");
+    const rel = Author.leftJoins(":posts");
     // Association name stored in leftOuterJoinsValues, not pre-resolved to _joinClauses
-    expect((rel as any).leftOuterJoinsValues).toContain("posts");
+    expect((rel as any).leftOuterJoinsValues).toContain(":posts");
     expect((rel as any)._joinClauses.some((j: any) => j.table === "posts")).toBe(false);
     // SQL still contains LEFT OUTER JOIN
     expect(rel.toSql()).toMatch(/LEFT OUTER JOIN/i);
@@ -343,7 +343,7 @@ describe("RelationTest", () => {
     registerModel("RefLeftAuthor", Author);
     registerModel("RefLeftPost", Post);
 
-    const rel = Author.all().includes("posts").references("posts").leftJoins("posts");
+    const rel = Author.all().includes("posts").references("posts").leftJoins(":posts");
     const sqlStr = rel.toSql();
     // "posts" table should appear only once in LEFT OUTER JOIN clauses
     const leftJoinMatches = sqlStr.match(/LEFT OUTER JOIN/gi) ?? [];
@@ -369,9 +369,9 @@ describe("RelationTest", () => {
     registerModel("EagerLeftAuthor", Author);
     registerModel("EagerLeftPost", Post);
     // Both eagerLoad and leftJoins present, no explicit joins_values/_joinClauses
-    const rel = Author.leftJoins("posts").eagerLoad("posts");
+    const rel = Author.leftJoins(":posts").eagerLoad("posts");
     expect((rel as any).eagerLoadValues).toContain("posts");
-    expect((rel as any).leftOuterJoinsValues).toContain("posts");
+    expect((rel as any).leftOuterJoinsValues).toContain(":posts");
     // buildJoinBuckets must not short-circuit; SQL must be non-empty (no throw)
     expect(() => rel.toSql()).not.toThrow();
   });
@@ -555,7 +555,7 @@ describe("RelationTest", () => {
 
       const withCollectionLeftJoin = JlArticle.all()
         .eagerLoad("jlAuthor")
-        .leftJoins("jlComments")
+        .leftJoins(":jlComments")
         .limit(5);
       expect((withCollectionLeftJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
 

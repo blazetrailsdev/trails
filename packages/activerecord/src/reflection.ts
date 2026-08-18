@@ -370,9 +370,9 @@ export class AbstractReflection {
         // Use a live registry lookup (not self.klass): addCounterCacheCallbacks fires
         // while the module is first loaded, potentially before the target class is
         // properly registered, so resolving through the reflection here would seed its
-        // memo from a half-built registry. (`klass` now self-heals on re-registration
-        // via the registry generation, so this is no longer a permanent-poisoning
-        // hazard — it just avoids the needless early resolve.)
+        // memo from a half-built registry. (`klass` memoizes with Rails' `||=`, so a
+        // failed resolve is retried rather than standing — this just avoids the
+        // needless early resolve.)
         const klassName = self.className;
         const resolvedKlass = modelRegistry.get(klassName);
         if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
@@ -558,7 +558,6 @@ export class MacroReflection extends AbstractReflection {
   readonly pluralName: string;
   private _scope: ((...args: any[]) => any) | null;
   private _klassCache: typeof Base | null = null;
-  private _klassCacheGeneration = -1;
 
   constructor(
     name: string | null,
@@ -617,22 +616,14 @@ export class MacroReflection extends AbstractReflection {
   }
 
   get klass(): typeof Base {
-    // Rails memoizes `@klass ||=`. We additionally gate the memo on the model
-    // registry's generation so a memo resolved against an incomplete registry
-    // re-resolves instead of standing forever. The generation bumps on any
-    // registration, a fresh one included (see ModelRegistry in associations.ts),
-    // which is what heals it — a name rebound to a DIFFERENT class is not the
-    // mechanism, and does not occur in the repro this gate exists for.
-    if (this._klassCache && this._klassCacheGeneration === modelRegistry.generation) {
-      return this._klassCache;
-    }
+    // Rails `@klass ||= compute_class(class_name)` (reflection.rb:422-423). The
+    // `||=` is load-bearing: a resolve that fails never writes a memo, so a
+    // lookup made against a still-incomplete model registry is retried rather
+    // than standing forever.
+    if (this._klassCache) return this._klassCache;
     const resolved = this.options.anonymousClass
       ? (this.options.anonymousClass as typeof Base)
       : this._klass(this.className);
-    // Read the generation *after* resolving: an autoload miss registers the class
-    // it just found, bumping the generation mid-resolve. Recording the pre-resolve
-    // value would leave this memo flagged stale the moment it's written.
-    this._klassCacheGeneration = modelRegistry.generation;
     this._klassCache = resolved;
     return resolved;
   }
@@ -918,50 +909,26 @@ export class AssociationReflection extends MacroReflection {
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
-    this.expireInverseCachesIfRegistryChanged();
+    // Rails `return unless inverse_name; @inverse_of ||= klass._reflect_on_association
+    // inverse_name` (reflection.rb:258-261) — an unresolved inverse is not memoized.
     const name = this.inverseName();
     if (!name) return null;
-    if (this._inverseOfCache !== undefined) return this._inverseOfCache;
-    const result = this.klass._reflectOnAssociation(name) ?? null;
-    this._inverseOfCache = result;
-    // Re-stamp post-resolve for the same reason `klass` does (see its comment).
-    this._inverseCacheGeneration = modelRegistry.generation;
-    return result;
+    if (this._inverseOfCache) return this._inverseOfCache;
+    this._inverseOfCache = this.klass._reflectOnAssociation(name) ?? null;
+    return this._inverseOfCache;
   }
 
   private _inverseNameCache: string | null | undefined = undefined;
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
-  private _inverseCacheGeneration = -1;
 
-  /**
-   * Both inverse memos hold values resolved off `this.klass` — an inverse
-   * reflection *owned by* the target class, and a name derived from scanning
-   * it. `klass` self-heals on a registry rebind, so these must too, or they
-   * keep serving the previous target's reflection after it has healed.
-   * (`_foreignKeyCache` / `_activeRecordPrimaryKeyCache` derive from
-   * `activeRecord` and options rather than the resolved target, so they are
-   * deliberately not gated.)
-   * @internal
-   */
-  private expireInverseCachesIfRegistryChanged(): void {
-    if (this._inverseCacheGeneration === modelRegistry.generation) return;
-    this._inverseCacheGeneration = modelRegistry.generation;
-    this._inverseOfCache = undefined;
-    this._inverseNameCache = undefined;
-  }
-
-  /** @internal */
+  /** @internal Mirrors `inverse_name` (reflection.rb:749-755). */
   override inverseName(): string | null {
-    this.expireInverseCachesIfRegistryChanged();
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
     const explicit = this.options.inverseOf;
     if (explicit !== undefined) {
       this._inverseNameCache = explicit === false ? null : (explicit as string);
     } else {
       this._inverseNameCache = this.automaticInverseOf();
-      // automaticInverseOf scans `this.klass`, which can autoload-and-register
-      // mid-scan; re-stamp so the memo isn't written already flagged stale.
-      this._inverseCacheGeneration = modelRegistry.generation;
     }
     return this._inverseNameCache;
   }
@@ -1485,65 +1452,13 @@ export class ThroughReflection extends AbstractReflection {
   get delegateReflection(): AssociationReflection {
     return this._delegate;
   }
-  private _sourceReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
-    undefined;
-  private _throughReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
-    undefined;
   private _sourceReflectionNameCache: string | null | undefined = undefined;
   private _klassCache: typeof Base | null = null;
-  private _cacheGeneration = -1;
 
   constructor(delegate: AssociationReflection) {
     super();
     this._delegate = delegate;
     this.ensureOptionNotGivenAsClassBang("sourceType");
-  }
-
-  /**
-   * Record the generation this reflection's memos are valid at.
-   *
-   * The rule here is unconditional and greppable: **every write to a memo on
-   * this class is immediately followed by a stamp.** Never stamp before the
-   * resolve — resolving can autoload-and-register a class and bump the
-   * generation mid-flight, and stamping the pre-resolve value would leave the
-   * memo flagged stale the moment it is written, forcing the next touch to wipe
-   * and recompute the whole through/source chain. Error paths stamp too: a
-   * resolve that threw can have bumped the generation just as easily as one that
-   * succeeded (a namespaced candidate walk may register a class and then reject
-   * it), and the negative memo they write is just as much a memo.
-   *
-   * Two exits deliberately do not stamp, and neither writes a memo:
-   * `sourceReflectionName`'s ambiguity rethrow (it escapes before the write), and
-   * `inverseOf`'s no-inverse-name return. `expireCachesIfRegistryChanged` is the
-   * one caller that stamps at *entry*; see its comment for why.
-   * @internal
-   */
-  private stampGeneration(): void {
-    this._cacheGeneration = modelRegistry.generation;
-  }
-
-  /**
-   * Every memo this class owns (klass, through/source, and the inverse
-   * reflection resolved off `klass`) derives from classes resolved out of the
-   * model registry, so they all go stale together when a name is rebound to a
-   * different class. Drop them as a unit rather than returning a target that
-   * the registry no longer maps this reflection to. `inverseName` is absent
-   * because it delegates to the AssociationReflection memo, which gates itself.
-   *
-   * Stamps at *entry*, uniquely, so a nested getter (sourceReflection →
-   * sourceReflectionName → throughReflection) doesn't re-clear what its caller is
-   * mid-way through computing. Each getter re-stamps after it resolves, so a
-   * mid-flight autoload bump doesn't leave a memo stale on write.
-   * @internal
-   */
-  private expireCachesIfRegistryChanged(): void {
-    if (this._cacheGeneration === modelRegistry.generation) return;
-    this.stampGeneration();
-    this._klassCache = null;
-    this._sourceReflectionCache = undefined;
-    this._throughReflectionCache = undefined;
-    this._sourceReflectionNameCache = undefined;
-    this._inverseOfCache = undefined;
   }
 
   get name(): string {
@@ -1645,22 +1560,12 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get klass(): typeof Base {
-    // Rails: @klass ||= delegate_reflection._klass(class_name), where @klass is
-    // seeded with options[:anonymous_class] in the constructor.
-    this.expireCachesIfRegistryChanged();
+    // Rails `@klass ||= delegate_reflection._klass(class_name)`
+    // (reflection.rb:989-990), where @klass is seeded with
+    // options[:anonymous_class] in the constructor.
     if (this._klassCache) return this._klassCache;
     const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
     this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
-    // Resolving can autoload-and-register the target, bumping the generation
-    // mid-flight; re-sync so this memo isn't stale the moment it's written.
-    //
-    // This also certifies any sibling memo repopulated during the resolve (e.g.
-    // `className` above can derive through `sourceReflection`) at the post-bump
-    // generation. That is sound because the only bump reachable inside a
-    // synchronous resolve is an autoload registering a name that was, by
-    // definition, absent from the registry — a registry *miss* is what triggers
-    // the autoload — so it cannot change what any earlier lookup resolved to.
-    this.stampGeneration();
     return this._klassCache;
   }
 
@@ -1711,40 +1616,25 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.isCollection() ? singularize(this.nameString) : this.name;
   }
 
+  /**
+   * Mirrors: `source_reflection` (reflection.rb:1010-1014) — computed on every
+   * read, never memoized.
+   */
   get sourceReflection(): AssociationReflection | ThroughReflection | null {
-    this.expireCachesIfRegistryChanged();
-    if (this._sourceReflectionCache !== undefined) return this._sourceReflectionCache;
     const srcName = this.sourceReflectionName();
-    if (!srcName) {
-      this._sourceReflectionCache = null;
-      this.stampGeneration();
-      return null;
-    }
+    if (!srcName) return null;
     const throughRef = this.throughReflection;
-    if (!throughRef) {
-      this._sourceReflectionCache = null;
-      this.stampGeneration();
-      return null;
-    }
+    if (!throughRef) return null;
     try {
-      const src = throughRef.klass._reflectOnAssociation(srcName) ?? null;
-      this._sourceReflectionCache = src;
-      this.stampGeneration();
-      return src;
+      return throughRef.klass._reflectOnAssociation(srcName) ?? null;
     } catch {
-      this._sourceReflectionCache = null;
-      this.stampGeneration();
       return null;
     }
   }
 
+  /** Mirrors: `through_reflection` (reflection.rb:1028-1030) — not memoized. */
   get throughReflection(): AssociationReflection | ThroughReflection | null {
-    this.expireCachesIfRegistryChanged();
-    if (this._throughReflectionCache !== undefined) return this._throughReflectionCache;
-    const through = this.activeRecord._reflectOnAssociation(this.through) ?? null;
-    this._throughReflectionCache = through;
-    this.stampGeneration();
-    return through;
+    return this.activeRecord._reflectOnAssociation(this.through) ?? null;
   }
 
   get joinTable(): string {
@@ -1853,12 +1743,11 @@ export class ThroughReflection extends AbstractReflection {
     // the underlying reflection would resolve the inverse against the delegate's
     // name-derived klass (`leadDeveloper` → nonexistent `LeadDeveloper`) instead
     // of the source class (`Developer`).
-    this.expireCachesIfRegistryChanged();
+    // reflection.rb:258-261 — `return unless inverse_name` then `@inverse_of ||=`.
     const name = this.inverseName();
     if (!name) return null;
-    if (this._inverseOfCache !== undefined) return this._inverseOfCache;
+    if (this._inverseOfCache) return this._inverseOfCache;
     this._inverseOfCache = this.klass._reflectOnAssociation(name) ?? null;
-    this.stampGeneration();
     return this._inverseOfCache;
   }
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
@@ -1875,22 +1764,22 @@ export class ThroughReflection extends AbstractReflection {
     return [...new Set(names)];
   }
 
+  /**
+   * Mirrors: `source_reflection_name` (reflection.rb:1112-1130). The Ruby memo
+   * is `@source_reflection_name ||=`, so a run that finds no name writes
+   * nothing and the next read tries again — which is what makes a name resolved
+   * against a still-incomplete model registry recoverable.
+   */
   sourceReflectionName(): string | null {
-    this.expireCachesIfRegistryChanged();
-    if (this._sourceReflectionNameCache !== undefined) return this._sourceReflectionNameCache;
+    if (this._sourceReflectionNameCache) return this._sourceReflectionNameCache;
 
     if (this.options.source) {
       this._sourceReflectionNameCache = this.options.source as string;
-      this.stampGeneration();
       return this._sourceReflectionNameCache;
     }
 
     const throughRef = this.throughReflection;
-    if (!throughRef) {
-      this._sourceReflectionNameCache = null;
-      this.stampGeneration();
-      return null;
-    }
+    if (!throughRef) return null;
 
     try {
       const singular = singularize(this.nameString);
@@ -1905,12 +1794,9 @@ export class ThroughReflection extends AbstractReflection {
         );
       }
       this._sourceReflectionNameCache = matching[0] ?? null;
-      this.stampGeneration();
     } catch (e: unknown) {
-      // Escapes before any memo write, so there is nothing to stamp.
       if (e instanceof AmbiguousSourceReflectionForThroughAssociation) throw e;
       this._sourceReflectionNameCache = null;
-      this.stampGeneration();
     }
     return this._sourceReflectionNameCache ?? null;
   }

@@ -63,12 +63,12 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("merging multiple left joins from different associations", async () => {
     const count = await Author.joins(":posts")
-      .merge(Post.leftJoins("comments").merge(Comment.leftJoins("ratings")))
+      .merge(Post.leftJoins(":comments").merge(Comment.leftJoins(":ratings")))
       .count();
     expect(count).toBe(17);
 
-    const outerCount = await Author.leftJoins("posts")
-      .merge(Post.leftJoins("comments").merge(Comment.leftJoins("ratings")))
+    const outerCount = await Author.leftJoins(":posts")
+      .merge(Post.leftJoins(":comments").merge(Comment.leftJoins(":ratings")))
       .count();
     expect(outerCount).toBe(17);
   });
@@ -94,14 +94,14 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("merging left joins should be left joins", async () => {
     expect(
-      await Author.leftJoins("posts")
+      await Author.leftJoins(":posts")
         .merge((Post as any).noComments())
         .count(),
     ).toBe(5);
   });
 
   it("left joins aliases left outer joins", () => {
-    expect(Post.leftOuterJoins(":comments").toSql()).toBe(Post.leftJoins("comments").toSql());
+    expect(Post.leftOuterJoins(":comments").toSql()).toBe(Post.leftJoins(":comments").toSql());
   });
 
   it("left outer joins return has value for every comment", async () => {

@@ -1,3 +1,4 @@
+import { isPlainObject } from "@blazetrails/activesupport";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
@@ -972,7 +973,6 @@ export class AssociationScope {
     const item = evaluated as {
       referencesValues?: Array<string | Nodes.SqlLiteral>;
       joinsValues?: unknown[];
-      _isNamedJoinValue?: (v: unknown) => boolean;
       _joinClauses?: unknown[];
       leftOuterJoinsValues?: unknown[];
       includesValues?: unknown[];
@@ -998,7 +998,7 @@ export class AssociationScope {
     const namedInner: unknown[] = [];
     const others: unknown[] = [];
     for (const v of item.joinsValues ?? []) {
-      if (!(v instanceof JoinDependency) && item._isNamedJoinValue?.(v) === true) {
+      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
         namedInner.push(v);
       } else {
         others.push(v);

@@ -788,7 +788,7 @@ describe("DefaultScopingTest", () => {
   it("unscope left joins", async () => {
     const expected = names(await Developer.all());
     const received = names(
-      await (Developer.leftJoins("projects") as any)
+      await (Developer.leftJoins(":projects") as any)
         .select("id")
         .unscope("leftJoins", "select")
         .toArray(),

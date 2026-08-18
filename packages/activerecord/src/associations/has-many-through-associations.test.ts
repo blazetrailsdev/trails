@@ -2219,7 +2219,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through with left joined same table with through table", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOther = await Comment.find(comments("eager_other_comment1").id);
-    const result = await (mary as any).comments.leftJoins("post").toArray();
+    const result = await (mary as any).comments.leftJoins(":post").toArray();
     expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
   });
 

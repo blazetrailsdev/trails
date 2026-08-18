@@ -402,7 +402,7 @@ export class Author extends Base {
     );
     this.hasMany(
       "postsWithNoComments_2",
-      (q: any) => q.leftJoins("comments").where({ "comments.id": null }),
+      (q: any) => q.leftJoins(":comments").where({ "comments.id": null }),
       { className: "Post" },
     );
 

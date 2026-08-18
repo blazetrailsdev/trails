@@ -132,7 +132,7 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all with left joins", async () => {
-    const petsScope = Pet.leftJoins("toys").where({ toys: { name: "Bone" } });
+    const petsScope = Pet.leftJoins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.exists()).toBe(true);
     const countBefore = await petsScope.count();

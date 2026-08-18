@@ -18,7 +18,7 @@ export class Rating extends Base {
     this.hasMany("taggings", { as: "taggable" });
     this.hasMany(
       "taggingsWithoutTag",
-      (q: any) => q.leftJoins("tag").where({ "tags.id": [null, 0] }),
+      (q: any) => q.leftJoins(":tag").where({ "tags.id": [null, 0] }),
       { as: "taggable", className: "Tagging" },
     );
     this.hasMany(
