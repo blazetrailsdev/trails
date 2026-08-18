@@ -172,8 +172,55 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _record: Base;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
-  private _target: T[] = [];
-  private _targetLoaded = false;
+  // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
+  // and `@replaced_or_added_targets` all read `@association`
+  // (collection_proxy.rb:33, 53). trails keeps that direction: these accessors
+  // are the association's `@target` / `@loaded` ivars, so association and proxy
+  // are one seat rather than two stores to keep coherent.
+  private get _target(): T[] {
+    return this._seat()._targetStore as T[];
+  }
+
+  private set _target(records: T[]) {
+    this._seat()._targetStore = records;
+  }
+
+  private get _targetLoaded(): boolean {
+    return this._seat()._loadedStore;
+  }
+
+  private set _targetLoaded(value: boolean) {
+    this._seat()._loadedStore = value;
+  }
+
+  /**
+   * The association object holding the seat. Deliberately a raw
+   * `@association_cache` read rather than `_collectionAssociation()`:
+   * `Base#association` re-syncs the cache, which reads loadedness back off
+   * this proxy, so resolving a seat through it would recurse.
+   */
+  private _seat(): CollectionAssociation {
+    const instance = this._record._associationInstances.get(this._assocName) as
+      | (CollectionAssociation & { isCollection?(): boolean })
+      | undefined;
+    if (instance?.isCollection?.() === true) return instance;
+    // The cache slot holds one of the minimal ad-hoc holders an undeclared
+    // inverse seeds (`associations.ts`, `seed-association-cache.ts`), which has
+    // no `@target` seat of its own. Build the real association object for the
+    // reflection and carry that holder's target onto it — `Base#association`
+    // would hand the ad-hoc holder straight back.
+    const built = _buildAssociationInstance.call(
+      this._record,
+      this._assocDef as never,
+    ) as unknown as CollectionAssociation;
+    if (instance) {
+      const seeded = (instance as unknown as { target?: Base | Base[] | null }).target;
+      built._targetStore = Array.isArray(seeded) ? seeded : seeded ? [seeded] : [];
+      built._loadedStore = instance.isLoaded?.() === true;
+    }
+    this._record._associationInstances.set(this._assocName, built as never);
+    return built;
+  }
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1112-1116).
   private _scope: unknown;
@@ -181,7 +228,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // `Set.new.compare_by_identity`): records that have been added to or
   // replaced on the in-memory target. `replace_on_target` consults it to
   // dedup by identity rather than appending the same record twice.
-  private _replacedOrAddedTargets = new Set<T>();
+  private get _replacedOrAddedTargets(): Set<T> {
+    return this._seat()._replacedOrAddedTargets as Set<T>;
+  }
+
+  private set _replacedOrAddedTargets(value: Set<T>) {
+    this._seat()._replacedOrAddedTargets = value as unknown as Set<Base>;
+  }
   // The JS Proxy wrapper returned by association() — methods that return
   // `self` (push / concat / append) hand this back so callers get the same
   // object they hold, since `this` is the raw target, not the wrapper.
@@ -215,39 +268,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   get target(): T[] {
     return this._target;
-  }
-
-  /** @internal */
-  get _sharedTarget(): T[] {
-    return this._target;
-  }
-
-  set _sharedTarget(records: T[]) {
-    this._target = records;
-  }
-
-  /** @internal */
-  get _sharedReplacedOrAddedTargets(): Set<T> {
-    return this._replacedOrAddedTargets;
-  }
-
-  set _sharedReplacedOrAddedTargets(value: Set<T>) {
-    this._replacedOrAddedTargets = value;
-  }
-
-  /** @internal */
-  get _sharedLoaded(): boolean {
-    return this._targetLoaded;
-  }
-
-  set _sharedLoaded(value: boolean) {
-    this._targetLoaded = value;
-  }
-
-  /** @internal */
-  _adoptSharedTarget(records: T[], loaded: boolean): void {
-    this._target = records;
-    this._targetLoaded = loaded;
   }
 
   /**
@@ -1211,7 +1231,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (collection_association.rb:439-446), and `concat` owns both halves Rails
    * puts there — the new-record-owner `load_target` and the persisted-owner
    * `transaction { concat_records }`. The proxy and the association object
-   * share ONE in-memory target (`_sharedTarget`), so the appended records,
+   * share ONE in-memory target (the association's `@target`), so the appended records,
    * loaded-ness, `@replaced_or_added_targets` dedup and before/after_add
    * callbacks all land on this proxy too.
    */
@@ -1379,7 +1399,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * join-row decision lives on `HasManyThroughAssociation#concat_records` /
    * `#insert_record` (has_many_through_association.rb:24-49). This is that
    * delegation. The proxy and the association object share ONE in-memory target
-   * (`_sharedTarget`, `collection-association.ts:96`), so routing the write onto
+   * (the association's `@target`), so routing the write onto
    * the association keeps membership, loaded-ness, `@replaced_or_added_targets`
    * dedup, and the before/after_add callbacks coherent across both handles.
    *

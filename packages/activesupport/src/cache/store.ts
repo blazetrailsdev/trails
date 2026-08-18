@@ -7,6 +7,7 @@ import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
+import { isEmpty } from "../ruby-empty.js";
 
 /** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
@@ -710,7 +711,11 @@ export abstract class Store {
       );
     }
 
-    return { ...this.options, ...call };
+    if (isEmpty(this.options)) {
+      return call;
+    } else {
+      return { ...this.options, ...call };
+    }
   }
 
   /** Mirrors Rails `Cache::Store#normalize_options` (cache.rb:905–911). */

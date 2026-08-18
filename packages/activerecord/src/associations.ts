@@ -1849,14 +1849,7 @@ export function association<T extends Base = Base>(
     }
   )._create(record, assocName, assocDef) as CollectionProxy<T> & {
     _hydrateFromPreload: (records: T[]) => void;
-    _adoptSharedTarget: (records: Base[], loaded: boolean) => void;
   };
-
-  const instance = record._associationInstances.get(assocName);
-  if (instance?.isCollection?.()) {
-    const raw = instance._rawTarget;
-    proxy._adoptSharedTarget(Array.isArray(raw) ? raw : [], instance._rawLoaded);
-  }
 
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {

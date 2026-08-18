@@ -11,7 +11,7 @@ import type { ExplainOption } from "../abstract/database-statements.js";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
-import { isEmpty } from "../../ruby-empty.js";
+import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
 // Mirrors Rails' build_read_query_regexp which combines the default read list

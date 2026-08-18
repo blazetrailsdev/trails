@@ -7,6 +7,7 @@ import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
+import { isEmpty } from "../ruby-empty.js";
 
 /** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
 class RuntimeError extends Error {
@@ -80,7 +81,7 @@ export class SimpleStubs {
 
   /** Returns true if any stubs are set, false if there are none */
   isStubbed(): boolean {
-    return this.stubs.size !== 0;
+    return !isEmpty(this.stubs);
   }
 
   /** Restores the original object.method described by the Stub */

@@ -6,6 +6,7 @@ import { atomicWrite } from "../core-ext/file/atomic.js";
 import { Integer } from "./integer.js";
 import { hexdigest } from "../hexdigest.js";
 import { registerStoreClass } from "./store-registry.js";
+import { isEmpty } from "../ruby-empty.js";
 
 // max filename size on file system is 255, minus room for timestamp, pid, and
 // random characters appended by Tempfile (file_store.rb:16)
@@ -279,7 +280,7 @@ export class FileStore extends Store implements CacheStore {
     } catch {
       return;
     }
-    if (children.length > 0) return;
+    if (!isEmpty(children)) return;
     // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and we
     // still recurse toward the parent (file_store.rb:193-195).
     try {
