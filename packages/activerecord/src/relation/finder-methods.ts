@@ -579,7 +579,7 @@ export async function findNthWithLimit(
     // `limit!` is a bare assignment, so a String limit_value reaches `-` here
     // and raises NoMethodError before the comparison.
     if (typeof limitValue !== "number") {
-      throw new NoMethodError("undefined method '-' for an instance of String");
+      throw new NoMethodError("undefined method `-' for an instance of String");
     }
     limit = Math.min(limitValue - index, limit);
   }
@@ -1043,14 +1043,14 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   let expectedSize = ids.length;
   const limitValue: number | string | null = (this as any).limitValue ?? null;
   const offsetValue: number | string | null = (this as any).offsetValue ?? null;
-  // Rails finder_methods.rb:549 / :556 compare against `limit_value` /
-  // `offset_value` directly; `limit!` / `offset!` are bare assignments, so a
-  // String reaches `Integer#>` here and raises.
+  // `limit!` / `offset!` are bare assignments, so a String reaches
+  // `ids.size > limit_value` (finder_methods.rb:549) and
+  // `ids.size - offset_value` (:556), which raise in Ruby.
   if (limitValue !== null && typeof limitValue !== "number") {
     throw new ArgumentError("comparison of Integer with String failed");
   }
   if (offsetValue !== null && typeof offsetValue !== "number") {
-    throw new NoMethodError("undefined method '-' for an instance of String");
+    throw new TypeError("String can't be coerced into Integer");
   }
   if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
   if (offsetValue !== null && ids.length - offsetValue < expectedSize)

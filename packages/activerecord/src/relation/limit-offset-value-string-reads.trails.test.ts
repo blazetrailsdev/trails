@@ -27,7 +27,7 @@ describe("string limit_value / offset_value read sites", () => {
   fixtures(["topics"]);
 
   it("second raises NoMethodError rather than yielding NaN", async () => {
-    await expect(Topic.limit("asdfadf").second()).rejects.toThrow(/undefined method '-'/);
+    await expect(Topic.limit("asdfadf").second()).rejects.toThrow(/undefined method `-'/);
   });
 
   it("inspect raises ArgumentError rather than rendering an empty entry list", async () => {

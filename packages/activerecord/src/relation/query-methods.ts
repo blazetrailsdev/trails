@@ -31,7 +31,7 @@ import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { any, compactBlank, foreignKey } from "@blazetrails/activesupport";
+import { any, compactBlank, foreignKey, wrap } from "@blazetrails/activesupport";
 
 /**
  * Provides chainable where.not(), where.associated(), where.missing().
@@ -82,7 +82,7 @@ export class WhereChain<R = any> {
       }
       return this._scope;
     }
-    const whereClause = buildWhereClause.call(scope, opts as any, rest);
+    const whereClause = buildWhereClause.call(scope, opts, rest);
     scope.whereClause = scope.whereClause.plus(whereClause.invert());
     return this._scope;
   }
@@ -101,7 +101,9 @@ export class WhereChain<R = any> {
         joinsBang.call(scope, association);
       }
 
-      const associationConditions = indexWithNil(reflection.associationPrimaryKey);
+      const associationConditions = Object.fromEntries(
+        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+      );
       if (reflection.options.className) {
         this.not({ [association]: associationConditions });
       } else {
@@ -120,7 +122,9 @@ export class WhereChain<R = any> {
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
       leftOuterJoinsBang.call(scope, association);
-      const associationConditions = indexWithNil(reflection.associationPrimaryKey);
+      const associationConditions = Object.fromEntries(
+        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+      );
       if (reflection.options.className) {
         whereBang.call(scope, { [association]: associationConditions });
       } else {
@@ -153,13 +157,6 @@ interface WhereChainReflection {
   tableName: string;
   options: Record<string, unknown>;
   associationPrimaryKey: string | string[];
-}
-
-/** Rails' `Array(reflection.association_primary_key).index_with(nil)`. */
-function indexWithNil(primaryKey: string | string[]): Record<string, null> {
-  const conditions: Record<string, null> = {};
-  for (const col of Array.isArray(primaryKey) ? primaryKey : [primaryKey]) conditions[col] = null;
-  return conditions;
 }
 
 /**

@@ -142,11 +142,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Build the `Array(reflection.association_primary_key).index_with(nil)` hash
- * used by where.associated / where.missing — one `{ pk: null }` entry per
- * association-primary-key column (query_methods.rb:92 / 128).
- */
-/**
  * Rails' `[limit_value, 11].compact.min` (relation.rb:1266, :1292). `limit!` is
  * a bare assignment, so `limit_value` can hold whatever the caller passed;
  * Ruby's `Array#min` raises `ArgumentError` when that is a String.
