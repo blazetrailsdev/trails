@@ -613,7 +613,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["match? → isMatch|match"]);
+      expect(missing).toEqual(["match? → isMatch|match|matchQ"]);
     });
 
     it("still flags an enumerable call the TS body makes in no form", () => {
@@ -625,7 +625,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["any? → isAny|any"]);
+      expect(missing).toEqual(["any? → isAny|any|anyQ"]);
     });
 
     it("does not flag exclude?/none? when the TS body negates the analogue", () => {
@@ -655,7 +655,10 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["exclude? → isExclude|exclude|excludes", "none? → isNone|none"]);
+      expect(missing).toEqual([
+        "exclude? → isExclude|exclude|excludes|excludeQ",
+        "none? → isNone|none|noneQ",
+      ]);
     });
 
     it("marks only aliases the alias table itself lists", () => {
