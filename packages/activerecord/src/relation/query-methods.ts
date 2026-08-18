@@ -94,10 +94,8 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      // Rails compares and re-joins `reflection.name` / `association`, both
-      // Symbols, against joins_values, which also holds Symbols. Ours spells a
-      // Symbol join value with its leading colon (`":author"`), so the bare
-      // reflection name is colonized for both the test and the join it pushes.
+      // Rails compares and re-joins Symbols (query_methods.rb:91-92); a Symbol
+      // join value carries its leading colon, so the bare name is colonized.
       const reflectionName = `:${reflection.name}`;
       if (
         !scope.joinsValues.includes(reflectionName) &&

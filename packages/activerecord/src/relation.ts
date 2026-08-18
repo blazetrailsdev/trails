@@ -2788,11 +2788,9 @@ export class Relation<T extends Base> {
    * intersection.
    */
   get joinedIncludesValues(): AssociationSpec[] {
-    // Rails intersects two Symbol arrays. joins_values now carries the Symbol
-    // spelling (`":comments"`) while includes_values is still swept to the bare
-    // one, so both sides drop a leading colon before the comparison. Once
-    // includes/preload/eagerLoad are swept too, this collapses back to
-    // `joinsValues.has(spec)`.
+    // DEBT: Rails intersects two Symbol arrays. joins_values now carries the
+    // Symbol spelling while includes_values does not, so both sides drop a
+    // leading colon here. Retires with the includes/preload sweep.
     const symbolName = (v: unknown): unknown =>
       typeof v === "string" && v.startsWith(":") ? v.slice(1) : v;
     const joinsValues = new Set<unknown>(this.joinsValues.map(symbolName));
