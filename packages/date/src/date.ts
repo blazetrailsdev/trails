@@ -3957,6 +3957,38 @@ function secToNs(s: number | bigint | Rational): number | bigint | Rational {
 }
 
 /**
+ * @internal `date_core.c` `div_day` (`date_core.c:1070-1076`), the whole days
+ * in a day count and the fraction left over: `f_floor` and `f_mod` of one, both
+ * of which `Rational` already answers ({@link Rational#div} floors, as Ruby's
+ * `Rational#div` does). The C writes the remainder through an out-parameter,
+ * which is the tuple here.
+ */
+function divDay(d: Rational): [number, Rational] {
+  return [d.div(1), d.mod(1)];
+}
+
+/**
+ * @internal `date_core.c` `div_df` (`date_core.c:1078-1086`), the same split
+ * one unit down: the fraction of a day as whole seconds and the fraction of a
+ * second left over.
+ */
+function divDf(d: Rational): [number, Rational] {
+  const s = dayToSec(d);
+  return [s.div(1), s.mod(1)];
+}
+
+/**
+ * @internal `date_core.c` `decode_day` (`date_core.c:1101-1109`), a day count
+ * split into the stored triple — Julian day, day fraction in seconds, and
+ * sub-second in nanoseconds.
+ */
+function decodeDay(d: Rational): [jd: number, df: number, sf: Rational] {
+  const [jd, f1] = divDay(d);
+  const [df, f] = divDf(f1);
+  return [jd, df, secToNs(f) as Rational];
+}
+
+/**
  * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse:
  * `rb_rational_new2(n, INT2FIX(SECOND_IN_NANOSECONDS))`, which answers a
  * Rational unconditionally, whatever it is handed.
@@ -3971,6 +4003,13 @@ function nsToSec(n: Rational): Rational {
  * — 8.64e13, well inside `Number.MAX_SAFE_INTEGER`.
  */
 const DAY_IN_NANOSECONDS = DAY_IN_SECONDS * SECOND_IN_NANOSECONDS;
+
+/**
+ * @internal `date_core.c` `half_days_in_day` (`date_core.c:27`, initialized to
+ * `Rational(1, 2)` at `date_core.c:9496`), the half day `old_to_new` shifts an
+ * astronomical Julian day by to reach the chronological one.
+ */
+const HALF_DAYS_IN_DAY = new Rational(1, 2);
 
 /** @internal `date_core.c` `HALF_DAYS_IN_SECONDS` (`date_core.c:1592`). */
 const HALF_DAYS_IN_SECONDS = DAY_IN_SECONDS / 2;
@@ -4453,6 +4492,48 @@ function decodeJd(jd: number | bigint): [nth: bigint, rjd: number] {
   const nth = div(jd, CM_PERIOD);
   if (nth === 0) return [0n, jd];
   return [BigInt(nth), mod(jd, CM_PERIOD)];
+}
+
+/**
+ * @internal `date_core.c` `old_to_new` (`date_core.c:3105-3137`), which reads a
+ * 1.6.x / 1.8.x `Marshal` dump — an astronomical Julian day, an offset as a day
+ * fraction and a reform — into the six fields {@link Date#marshalLoad} stores.
+ * The C writes them through out-parameters; they are the tuple here.
+ */
+function oldToNew(
+  ajd: Rational,
+  vof: Rational,
+  vsg: number,
+): [nth: bigint, jd: number, df: number, sf: Rational, of: number, sg: number] {
+  const [jd, df, sf] = decodeDay(ajd.add(HALF_DAYS_IN_DAY));
+  const t = dayToSec(vof);
+  const of2 = t.round();
+
+  if (t.cmp(of2) !== 0) rbWarning("fraction of offset is ignored");
+
+  const [nth, rjd] = decodeJd(jd);
+
+  let of = of2;
+  let sg = vsg;
+
+  if (df < 0 || df >= DAY_IN_SECONDS) throw new DateError("invalid day fraction");
+
+  // `date_core.c:3130-3136` verbatim: the sub-second range test has NO body
+  // upstream, so it GATES the offset clamp below rather than raising — an
+  // out-of-range `sf` is what lets an out-of-range `of` be zeroed. Ported as
+  // written; a raise here would be a behaviour trails invented.
+  if (sf.cmp(0) < 0 || sf.cmp(SECOND_IN_NANOSECONDS) >= 0)
+    if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) {
+      of = 0;
+      rbWarning("invalid offset is ignored");
+    }
+
+  if (!cValidStartP(sg)) {
+    sg = DEFAULT_SG;
+    rbWarning("invalid start is ignored");
+  }
+
+  return [nth, rjd, df, sf, of, sg];
 }
 
 /** @internal `date_core.c` `encode_jd` (`date_core.c:1404-1412`). */
@@ -7266,12 +7347,16 @@ export class Date {
    * `d_lite_s_alloc_complex` for `::DateTime` (`:9969`) — and calls
    * {@link Date#initializeCopy} on it. TS cannot allocate an instance whose
    * private fields exist without running a constructor, so the two allocators
-   * are the {@link SEAT} construction each class already has, and the copy is
+   * are the {@link SEAT} construction each class already has, under the
+   * `rb_obj_class(obj)` the allocator is picked off — which is why a subclass
+   * of either answers itself. The copy is
    * `initialize_copy`'s, not `dup_obj_with_new_start`'s: no `set_sg`, so
    * nothing forces `get_c_jd`/`get_c_df` or clears the civil seat.
    */
   dup(): this {
-    return (new Date(SEAT, 0n, 0, DEFAULT_SG) as this).initializeCopy(this);
+    return (new (this.constructor as typeof Date)(SEAT, 0n, 0, DEFAULT_SG) as this).initializeCopy(
+      this,
+    );
   }
 
   /**
@@ -8175,6 +8260,109 @@ export class Date {
    */
   deconstructKeys(keys: string[] | null): Record<string, unknown> {
     return deconstructKeys(this, keys, false);
+  }
+
+  /**
+   * Ruby `Date#marshal_dump` (ruby/date, `date_core.c` `d_lite_marshal_dump`,
+   * `date_core.c:7529-7550`, registered at `:9822`), the six-element Array
+   * `Marshal.dump` writes: `m_nth`, `m_jd`, `m_df`, `m_sf`, `m_of` and `m_sg`,
+   * in that order. The readers are the STORED ones — `m_jd`, not
+   * `m_local_jd` — so a `DateTime`'s day and day-fraction go out in UTC and
+   * come back beside the offset that names their zone.
+   *
+   * `rb_copy_generic_ivar` (`:7544-7547`) carries the receiver's generic ivars
+   * onto the Array; a TS instance has no such side table, so there is nothing
+   * to copy.
+   */
+  marshalDump(): [bigint, number, number, Rational, number, number] {
+    return [this.nth, this.mJd(), this.mDf(), this.mSf(), this.mOf(), this.sg];
+  }
+
+  /**
+   * Ruby `Date#marshal_load(a)` (ruby/date, `date_core.c`
+   * `d_lite_marshal_load`, `date_core.c:7553-7625`, registered at `:9823`),
+   * which writes the dumped Array back into the receiver `Marshal.load`
+   * allocated — so it is the receiver's own class that comes back out, which is
+   * what `test_sub` asserts.
+   *
+   * The `case 2` / `case 3` arms load the 1.6.x and 1.8.x/1.9.2 dumps through
+   * {@link oldToNew} (`:3105-3137`), as they do there.
+   *
+   * `simple_dat_p`'s promotion (`:7603-7612`) — a fractional dump reallocating
+   * the receiver's `SimpleDateData` into a `ComplexDateData` — is a field write
+   * here, as it is at {@link Date#initializeCopy}: `Date` declares the complex
+   * fields and {@link DateTime} overrides this method for its own. The C's
+   * `switch` is duplicated into that override for the same reason the guard and
+   * dispatch of `d_lite_initialize_copy` are — one C function whose two arms
+   * write fields TS keeps private to the class that declares them.
+   */
+  marshalLoad(a: unknown[]): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
+    }
+    if (!Array.isArray(a)) throw new TypeError("expected an array");
+
+    let nth: bigint;
+    let jd: number;
+    let df: number;
+    let sf: Rational;
+    let of: number;
+    let sg: number;
+
+    switch (a.length) {
+      case 2: /* 1.6.x */
+      case 3 /* 1.8.x, 1.9.2 */:
+        {
+          let ajd: Rational;
+          let vof: Rational;
+          let vsg: unknown;
+
+          if (a.length === 2) {
+            ajd = (a[0] as Rational).add(HALF_DAYS_IN_DAY.mul(-1));
+            vof = new Rational(0, 1);
+            vsg = a[1];
+            if (!kNumericP(vsg)) vsg = vsg != null && vsg !== false ? GREGORIAN : JULIAN;
+          } else {
+            ajd = a[0] as Rational;
+            vof = a[1] as Rational;
+            vsg = a[2];
+          }
+
+          [nth, jd, df, sf, of, sg] = oldToNew(ajd, vof, Number(vsg));
+        }
+        break;
+      case 6:
+        {
+          nth = a[0] as bigint;
+          jd = Number(a[1]);
+          df = Number(a[2]);
+          sf = a[3] as Rational;
+          of = Number(a[4]);
+          sg = Number(a[5]);
+        }
+        break;
+      default:
+        throw new TypeError("invalid size");
+    }
+
+    this.nth = nth;
+    this.#jd = jd;
+    this.sg = sg;
+    this.#civil = undefined;
+    if (df || !sf.isZero() || of) {
+      this.#df = df;
+      this.#sf = sf;
+      this.#of = of;
+    } else {
+      // `set_to_simple` (`:7613`) with `HAVE_JD`: the simple struct has no
+      // `df`/`sf`/`of` at all, and here their absence IS `simple_dat_p`
+      // ({@link Date#complexDatP}), so a non-fractional dump must clear them
+      // rather than write zeroes a complex receiver would be read off.
+      this.#df = undefined;
+      this.#sf = undefined;
+      this.#of = undefined;
+    }
+    return this;
   }
 
   /**
@@ -9355,13 +9543,89 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
+   * The complex receiver's half of `d_lite_marshal_load` (`:7602-7615`): a
+   * `DateTime` is always complex, so it takes `set_to_complex` (`:7614`)
+   * whatever the dump held and the promotion branch cannot be reached. One C
+   * function, but the two arms write different data and TS class fields are
+   * private to the class that declares them, so the write is spelled where the
+   * fields live — as at {@link DateTime#initializeCopy}.
+   */
+  override marshalLoad(a: unknown[]): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
+    }
+    if (!Array.isArray(a)) throw new TypeError("expected an array");
+
+    let nth: bigint;
+    let jd: number;
+    let df: number;
+    let sf: Rational;
+    let of: number;
+    let sg: number;
+
+    switch (a.length) {
+      case 2: /* 1.6.x */
+      case 3 /* 1.8.x, 1.9.2 */:
+        {
+          let ajd: Rational;
+          let vof: Rational;
+          let vsg: unknown;
+
+          if (a.length === 2) {
+            ajd = (a[0] as Rational).add(HALF_DAYS_IN_DAY.mul(-1));
+            vof = new Rational(0, 1);
+            vsg = a[1];
+            if (!kNumericP(vsg)) vsg = vsg != null && vsg !== false ? GREGORIAN : JULIAN;
+          } else {
+            ajd = a[0] as Rational;
+            vof = a[1] as Rational;
+            vsg = a[2];
+          }
+
+          [nth, jd, df, sf, of, sg] = oldToNew(ajd, vof, Number(vsg));
+        }
+        break;
+      case 6:
+        {
+          nth = a[0] as bigint;
+          jd = Number(a[1]);
+          df = Number(a[2]);
+          sf = a[3] as Rational;
+          of = Number(a[4]);
+          sg = Number(a[5]);
+        }
+        break;
+      default:
+        throw new TypeError("invalid size");
+    }
+
+    this.nth = nth;
+    this.#jd = jd;
+    this.#df = df;
+    this.#sf = sf;
+    this.#of = of;
+    this.sg = sg;
+    this.#civil = undefined;
+    this.#time = undefined;
+    return this;
+  }
+
+  /**
    * `::DateTime`'s allocator is `d_lite_s_alloc_complex` (`date_core.c:9969`),
    * where `::Date`'s is the simple one; see {@link Date#dup}.
    */
   override dup(): this {
-    return (new DateTime(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG) as this).initializeCopy(
-      this,
-    );
+    return (
+      new (this.constructor as typeof DateTime)(
+        SEAT,
+        0n,
+        0,
+        0,
+        new Rational(0, 1),
+        0,
+        DEFAULT_SG,
+      ) as this
+    ).initializeCopy(this);
   }
 
   /**

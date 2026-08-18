@@ -1,14 +1,9 @@
 /**
  * Port of ruby/date's `test/date/test_date.rb`.
- *
- * `test_sub` is not here yet: it asserts that `#+`, `#-`, `#>>`, `#<<`,
- * `#succ`, the four calendar readers and `Marshal.load` all answer the
- * RECEIVER's class — `d_lite_plus` and friends build through
- * `rb_obj_class(self)` — where the port's builders name `Date` outright, and it
- * needs `Marshal` besides. It is filed against RFC 0088.
  */
 
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@js-temporal/polyfill";
 import {
   Date as RubyDate,
   DateTime as RubyDateTime,
@@ -93,7 +88,107 @@ class RubyHash {
   }
 }
 
+/**
+ * Ruby's `Marshal.dump` / `Marshal.load` over the two `Date#marshal_dump` /
+ * `Date#marshal_load` (`date_core.c:7529-7625`) hooks `test_sub` round-trips a
+ * date through. JS has no `Marshal`, so the two calls the test makes are
+ * spelled here: `dump` is the hook's Array under the receiver's class, and
+ * `load` is what `Marshal` does with it — allocate an instance of that class
+ * and send it `marshal_load`. Ruby's allocator does not run `initialize`;
+ * TS cannot allocate without a constructor, so the no-argument one runs and
+ * `marshalLoad` overwrites every field it set.
+ */
+const Marshal = {
+  dump(d: RubyDate): { klass: new () => RubyDate; a: unknown[] } {
+    return { klass: d.constructor as new () => RubyDate, a: d.marshalDump() };
+  },
+  load(s: { klass: new () => RubyDate; a: unknown[] }): RubyDate {
+    return new s.klass().marshalLoad(s.a);
+  },
+};
+
+/** ruby/date `test/date/test_date.rb:8`. */
+class DateSub extends RubyDate {}
+
+/** ruby/date `test/date/test_date.rb:11`. */
+class DateTimeSub extends RubyDateTime {}
+
 describe("TestDate", () => {
+  /**
+   * ruby/date `test/date/test_date.rb:46-107`.
+   *
+   * `assert_instance_of(DateSub, DateSub.today)` and its `DateTimeSub.now`
+   * sibling (`:53-54`) assert the class the port cannot answer there: RFC
+   * 0088's mapping table has the two statics answer a `Temporal.PlainDate` /
+   * `Temporal.ZonedDateTime` rather than a gem-shaped instance, so there is no
+   * receiver class for them to carry and the two lines assert what the port
+   * does answer instead. Story `port-date-sub-today-now-receiver-class`
+   * (RFC 0088) converges them; every other assertion is here verbatim.
+   */
+  it("sub", () => {
+    const d = new DateSub();
+    const dt = new DateTimeSub();
+
+    expect(d).toBeInstanceOf(DateSub);
+    expect(dt).toBeInstanceOf(DateTimeSub);
+
+    expect(DateSub.today()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTimeSub.now()).toBeInstanceOf(Temporal.ZonedDateTime);
+
+    expect(d.toS()).toEqual("-4712-01-01");
+    expect(dt.toS()).toEqual("-4712-01-01T00:00:00+00:00");
+
+    let d2 = d.plus(1);
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.minus(1) as DateSub;
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.rshift(1);
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.lshift(1);
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.succ();
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.next();
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.italy();
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.england();
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.julian();
+    expect(d2).toBeInstanceOf(DateSub);
+    d2 = d.gregorian();
+    expect(d2).toBeInstanceOf(DateSub);
+    let s = Marshal.dump(d);
+    d2 = Marshal.load(s) as DateSub;
+    expect(d2.equals(d)).toEqual(true);
+    expect(d2).toBeInstanceOf(DateSub);
+
+    let dt2 = dt.plus(1);
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.minus(1) as DateTimeSub;
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.rshift(1);
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.lshift(1);
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.succ();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.next();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.italy();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.england();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.julian();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    dt2 = dt.gregorian();
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+    s = Marshal.dump(dt);
+    dt2 = Marshal.load(s) as DateTimeSub;
+    expect(dt2.equals(dt)).toEqual(true);
+    expect(dt2).toBeInstanceOf(DateTimeSub);
+  });
+
   it("range infinite float", () => {
     const today = new RubyDate(RubyDate.today());
     let r = new RubyRange(today, Number.POSITIVE_INFINITY, true);

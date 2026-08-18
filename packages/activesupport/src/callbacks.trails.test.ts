@@ -96,3 +96,45 @@ describe("setCallback type-omitted form (trails)", () => {
     expect(ran).toEqual(["block"]);
   });
 });
+
+// trails-only coverage: `run_callbacks(kind, type)` (callbacks.rb:96-104)
+// forwards `type` into `CallbackChain#compile(type)` (callbacks.rb:614-630),
+// whose type arm folds only the callbacks of that one kind and memoizes them in
+// @single_callbacks. Rails has no test for it, so it is pinned here.
+describe("runCallbacks type argument (trails)", () => {
+  class Target {}
+
+  const build = (ran: string[]): Target => {
+    const target = new Target();
+    defineCallbacks(target, "save");
+    setCallback(target, "save", "before", () => {
+      ran.push("before");
+    });
+    setCallback(target, "save", "after", () => {
+      ran.push("after");
+    });
+    return target;
+  };
+
+  it("runs only the callbacks of the given type", () => {
+    const ran: string[] = [];
+    const target = build(ran);
+    runCallbacks(target, "save", () => ran.push("block"), undefined, "before");
+    expect(ran).toEqual(["before", "block"]);
+  });
+
+  it("runs the whole chain when no type is given", () => {
+    const ran: string[] = [];
+    const target = build(ran);
+    runCallbacks(target, "save", () => ran.push("block"));
+    expect(ran).toEqual(["before", "block", "after"]);
+  });
+
+  it("memoizes each type separately from the unfiltered sequence", () => {
+    const ran: string[] = [];
+    const target = build(ran);
+    runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
+    runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
+    expect(ran).toEqual(["block", "after", "block", "after"]);
+  });
+});
