@@ -547,7 +547,10 @@ describe("RelationTest", () => {
       const limitableEager = JlArticle.all().eagerLoad("jlAuthor").limit(5);
       expect((limitableEager as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
-      const withCollectionJoin = JlArticle.all().eagerLoad("jlAuthor").joins("jlComments").limit(5);
+      const withCollectionJoin = JlArticle.all()
+        .eagerLoad("jlAuthor")
+        .joins(":jlComments")
+        .limit(5);
       expect((withCollectionJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
 
       const withCollectionLeftJoin = JlArticle.all()
@@ -560,12 +563,12 @@ describe("RelationTest", () => {
       // both belongsTo) — resolve to non-collection reflections, so the second
       // using_limitable_reflections? clause stays true and the relation does NOT
       // defer (Rails resolves the hash via construct_join_dependency.reflections).
-      const singularJoin = JlArticle.all().eagerLoad("jlAuthor").joins("jlAuthor").limit(5);
+      const singularJoin = JlArticle.all().eagerLoad("jlAuthor").joins(":jlAuthor").limit(5);
       expect((singularJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
       const singularNestedJoin = JlArticle.all()
         .eagerLoad("jlAuthor")
-        .joins({ jlAuthor: "jlProfile" })
+        .joins({ ":jlAuthor": ":jlProfile" })
         .limit(5);
       expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
     } finally {
@@ -935,7 +938,7 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
     // select_association_list(joins_values) + left_outer_joins_values. `author`
     // is singular, but the joined `comments` collection is not, so a limit here
     // takes the rewrite rather than a direct LIMIT on the fanned-out join.
-    const sql = CanonPost.eagerLoad("author").joins("comments").limit(1).toSql();
+    const sql = CanonPost.eagerLoad("author").joins(":comments").limit(1).toSql();
     expect(sql).toMatch(/WHERE .*IN \(SELECT DISTINCT /);
     expect(sql).not.toMatch(/\bLIMIT 1\s*$/);
   });

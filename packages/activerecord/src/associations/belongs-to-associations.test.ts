@@ -360,7 +360,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("belongs to with primary key joins on correct column", async () => {
-    const sql = Client.joins("firmWithPrimaryKey").toSql();
+    const sql = Client.joins(":firmWithPrimaryKey").toSql();
     expect(sql).toMatch(/firm_with_primary_keys_companies|firm_with_primary_key/i);
     expect(sql).not.toMatch(/["'`]firm_with_primary_keys_companies["'`]\.["'`]id["'`]/);
     expect(sql).toMatch(/["'`]firm_with_primary_keys_companies["'`]\.["'`]name["'`]/);

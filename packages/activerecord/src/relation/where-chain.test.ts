@@ -100,7 +100,7 @@ describe("WhereChainTest", () => {
 
   it("associated unscoped merged joined with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .unscope("where")
         .where()
         .associated("author")
@@ -112,7 +112,7 @@ describe("WhereChainTest", () => {
   it("associated unscoped merged joined extended early with scope on association", async () => {
     expect(
       await Post.extending(Post.namedExtension)
-        .joins("author")
+        .joins(":author")
         .unscope("where")
         .where()
         .associated("author")
@@ -123,7 +123,7 @@ describe("WhereChainTest", () => {
 
   it("associated unscoped merged joined extended late with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .unscope("where")
         .where()
         .associated("author")
@@ -145,7 +145,7 @@ describe("WhereChainTest", () => {
 
   it("associated ordered merged joined with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .order({ created_at: "desc" })
         .where()
         .associated("author")
@@ -155,13 +155,16 @@ describe("WhereChainTest", () => {
   });
 
   it("associated with enum", async () => {
-    const first = await Author.joins("readingListing").where().associated("readingListing").first();
+    const first = await Author.joins(":readingListing")
+      .where()
+      .associated("readingListing")
+      .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
   it("associated with enum ordered", async () => {
     const first = await Author.order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .associated("readingListing")
       .first();
@@ -170,7 +173,7 @@ describe("WhereChainTest", () => {
 
   it("associated with enum unscoped", async () => {
     const first = await Author.unscope("where")
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .associated("readingListing")
       .first();
@@ -180,7 +183,7 @@ describe("WhereChainTest", () => {
   it("associated with enum extended early", async () => {
     const first = await Author.extending(Author.namedExtension)
       .order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .associated("readingListing")
       .first();
@@ -189,7 +192,7 @@ describe("WhereChainTest", () => {
 
   it("associated with enum extended late", async () => {
     const first = await Author.order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .associated("readingListing")
       .extending(Author.namedExtension)
@@ -201,7 +204,7 @@ describe("WhereChainTest", () => {
   // `joins!` unions with it so there is one join and the predicate dedups onto
   // it. See the self-join note above.
   it("associated with add joins before", async () => {
-    const relation = await Comment.joins("children").where().associated("children");
+    const relation = await Comment.joins(":children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
@@ -215,7 +218,7 @@ describe("WhereChainTest", () => {
 
   // Self-join `children` — see the self-join note above.
   it("associated with add left outer joins before", async () => {
-    const relation = await Comment.leftOuterJoins("children").where().associated("children");
+    const relation = await Comment.leftOuterJoins(":children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
@@ -261,7 +264,7 @@ describe("WhereChainTest", () => {
 
   it("missing unscoped merged with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .unscope("where")
         .where()
         .missing("author")
@@ -292,7 +295,7 @@ describe("WhereChainTest", () => {
 
   it("missing ordered merged joined with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .order({ created_at: "desc" })
         .where()
         .missing("author")
@@ -304,7 +307,7 @@ describe("WhereChainTest", () => {
   it("missing unscoped merged joined extended early with scope on association", async () => {
     expect(
       await Post.extending(Post.namedExtension)
-        .joins("author")
+        .joins(":author")
         .unscope("where")
         .where()
         .missing("author")
@@ -315,7 +318,7 @@ describe("WhereChainTest", () => {
 
   it("missing unscoped merged joined extended late with scope on association", async () => {
     expect(
-      await Post.joins("author")
+      await Post.joins(":author")
         .unscope("where")
         .where()
         .missing("author")
@@ -326,13 +329,13 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with enum", async () => {
-    const first = await Author.joins("readingListing").where().missing("unreadListing").first();
+    const first = await Author.joins(":readingListing").where().missing("unreadListing").first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
   it("missing with enum ordered", async () => {
     const first = await Author.order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .missing("unreadListing")
       .first();
@@ -341,7 +344,7 @@ describe("WhereChainTest", () => {
 
   it("missing with enum unscoped", async () => {
     const first = await Author.unscope("where")
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .missing("unreadListing")
       .first();
@@ -351,7 +354,7 @@ describe("WhereChainTest", () => {
   it("missing with enum extended early", async () => {
     const first = await Author.extending(Author.namedExtension)
       .order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .missing("unreadListing")
       .first();
@@ -360,7 +363,7 @@ describe("WhereChainTest", () => {
 
   it("missing with enum extended late", async () => {
     const first = await Author.order({ id: "desc" })
-      .joins("readingListing")
+      .joins(":readingListing")
       .where()
       .missing("unreadListing")
       .extending(Author.namedExtension)
@@ -388,7 +391,7 @@ describe("WhereChainTest", () => {
   });
 
   it("association not eq", () => {
-    const relation = Post.joins("comments")
+    const relation = Post.joins(":comments")
       .where()
       .not({ comments: { title: "hello" } });
     const sql = relation.toSql();

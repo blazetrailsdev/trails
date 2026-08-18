@@ -126,10 +126,10 @@ describe("FieldOrderedValuesTest", () => {
       );
 
     const order = ["Bob", "Anna", "John"];
-    let books = Book.joins("author").inOrderOf("authors.name", order);
+    let books = Book.joins(":author").inOrderOf("authors.name", order);
     expect(await authorNames(books)).toEqual(order);
 
-    books = Book.joins("author").inOrderOf("authors.name", order);
+    books = Book.joins(":author").inOrderOf("authors.name", order);
     expect(await authorNames(books)).toEqual(order);
   });
 

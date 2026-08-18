@@ -74,7 +74,7 @@ export class Company extends AbstractCompany {
     this.attribute("metadata", "json");
 
     this.scope("ofFirstFirm", (q: any) =>
-      q.joins({ account: "firm" }).where({ "companies.id": 1 }),
+      q.joins({ ":account": ":firm" }).where({ "companies.id": 1 }),
     );
   }
 

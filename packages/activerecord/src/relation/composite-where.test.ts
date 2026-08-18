@@ -179,7 +179,7 @@ describe("Relation#where — composite-key form", () => {
 
   it("qualified composite col naming a join-only table binds through that table's model type", () => {
     // A qualified col naming a table that exists only as a join-dependency
-    // (`contracts` reached via `Comment.joins({ company: "contracts" })`) — NOT
+    // (`contracts` reached via `Comment.joins({ ":company": ":contracts" })`) — NOT
     // a direct reflection on the base model — must still re-root on the joined
     // model so the bind is typed by that model's column type. Rails threads
     // `lookup_table_klass_from_join_dependencies` as the `associated_table`
@@ -192,7 +192,7 @@ describe("Relation#where — composite-key form", () => {
     // generic `TypeCasterConnection` (klass === null), which reads the raw
     // string column type and leaves it unquoted (`x`).
     const rel: any = (Comment as any)
-      .joins({ company: "contracts" })
+      .joins({ ":company": ":contracts" })
       .where(["comments.id", "contracts.metadata"], [[1, "x"]]);
     let eq: any;
     const walk = (n: any) => {
@@ -240,7 +240,7 @@ describe("Relation#where — composite-key form", () => {
     await (Comment as any).create({ post_id: other.id, body: "c2" });
 
     const rows = await (Post as any)
-      .joins("comments")
+      .joins(":comments")
       .where(["posts.id", "comments.post_id"], [[post.id, post.id]])
       .toArray();
     expect(rows.map((r: any) => r.title)).toEqual(["joined"]);

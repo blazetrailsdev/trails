@@ -871,12 +871,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("find grouped", async () => {
-    const allPosts = await Post.all().where("category_id = 1").joins("categories");
+    const allPosts = await Post.all().where("category_id = 1").joins(":categories");
     const grouped = await Post.all()
       .where("category_id = 1")
       .group("author_id")
       .select("count(posts.id) as posts_count")
-      .joins("categories");
+      .joins(":categories");
     expect(allPosts.length).toBe(5);
     expect(grouped.length).toBe(2);
   });

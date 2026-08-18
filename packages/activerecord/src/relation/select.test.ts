@@ -120,7 +120,7 @@ describe("SelectTest", () => {
   });
 
   it("select with hash and table alias", async () => {
-    const post = (await Post.joins("comments", "commentsWithExtend")
+    const post = (await Post.joins(":comments", ":commentsWithExtend")
       .select("title", {
         posts: { title: ":post_title" },
         comments: { body: ":comment_body" },
@@ -150,7 +150,7 @@ describe("SelectTest", () => {
   });
 
   it("select with hash argument with few tables", async () => {
-    const post = (await Post.joins("comments")
+    const post = (await Post.joins(":comments")
       .select("title", {
         posts: { title: ":post_title" },
         comments: { body: ":comment_body" },
@@ -203,7 +203,7 @@ describe("SelectTest", () => {
   });
 
   it("merging select from different model", async () => {
-    const posts = Post.select("id", "title").joins("comments");
+    const posts = Post.select("id", "title").joins(":comments");
     const comments = Comment.where({ body: "Thank you for the welcome" });
 
     for (const post of [
@@ -248,19 +248,19 @@ describe("SelectTest", () => {
   });
 
   it("aliased select using as with joins and includes", async () => {
-    const posts = Post.select("posts.id AS field_alias").joins("comments").includes("comments");
+    const posts = Post.select("posts.id AS field_alias").joins(":comments").includes("comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
   it("aliased select not using as with joins and includes", async () => {
-    const posts = Post.select("posts.id field_alias").joins("comments").includes("comments");
+    const posts = Post.select("posts.id field_alias").joins(":comments").includes("comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
   it("star select with joins and includes", async () => {
-    const posts = Post.select("posts.*").joins("comments").includes("comments");
+    const posts = Post.select("posts.*").joins(":comments").includes("comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual([
       "id",

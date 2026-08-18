@@ -78,7 +78,7 @@ describe("StatementCacheTest", () => {
 
   it("statement cache with complex statement", async () => {
     const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
-      return Liquid.joins({ molecules: "electrons" }).where({
+      return Liquid.joins({ ":molecules": ":electrons" }).where({
         "molecules.name": "dioxane",
         "electrons.name": "lepton",
       }) as any;

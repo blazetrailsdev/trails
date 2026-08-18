@@ -57,7 +57,7 @@ describe("_deriveForeignKey inverse_of branches", () => {
   // fallback singularizes ("interests" → "Interest"), then the inverse
   // belongs_to :human derives `human_id`.
   it("has_many inverse_of, no className (plural fallback) derives the inverse FK", () => {
-    const sql = unquoted(Human.joins("interests").toSql());
+    const sql = unquoted(Human.joins(":interests").toSql());
     expect(sql).toContain("interests.human_id = humans.id");
   });
 
@@ -65,7 +65,7 @@ describe("_deriveForeignKey inverse_of branches", () => {
   // fallback camelizes the name as-is ("face" → "Face"); the inverse
   // belongs_to :human derives `human_id`.
   it("has_one inverse_of, no className (singular fallback) derives the inverse FK", () => {
-    const sql = unquoted(Human.joins("face").toSql());
+    const sql = unquoted(Human.joins(":face").toSql());
     expect(sql).toContain("faces.human_id = humans.id");
   });
 
@@ -73,7 +73,7 @@ describe("_deriveForeignKey inverse_of branches", () => {
   // inverse belongs_to :book declares foreignKey: "book1_id", so derivation
   // returns "book1_id" verbatim — NOT the owner-name default "book_id".
   it("uses the inverse belongs_to's explicit foreignKey, not the owner default", () => {
-    const sql = unquoted(Book.joins("citations").toSql());
+    const sql = unquoted(Book.joins(":citations").toSql());
     expect(sql).toContain("citations.book1_id = books.id");
     expect(sql).not.toContain("citations.book_id");
   });

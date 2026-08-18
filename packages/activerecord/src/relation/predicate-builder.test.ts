@@ -77,7 +77,7 @@ describe("PredicateBuilderTest", () => {
   it("registering new handlers for association", () => {
     Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
-      const sql = Reply.joins("topic")
+      const sql = Reply.joins(":topic")
         .where({ topics: { title: new RegexFilter("rails") } })
         .toSql();
       expect(sql).toMatch(
@@ -110,7 +110,7 @@ describe("PredicateBuilderTest", () => {
     registerModel("RegexpReply", RegexpReply);
     Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
-      const sql = RegexpReply.joins("regexp_topic")
+      const sql = RegexpReply.joins(":regexp_topic")
         .references(new Nodes.SqlLiteral("regexp_topic") as any)
         .toSql();
       expect(sql).toMatch(

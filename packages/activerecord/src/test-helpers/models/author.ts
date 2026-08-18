@@ -473,7 +473,7 @@ export class Author extends Base {
 
     this.hasMany(
       "generalCategorizations",
-      (q: any) => q.joins("category").where({ "categories.name": "General" }),
+      (q: any) => q.joins(":category").where({ "categories.name": "General" }),
       { className: "Categorization" },
     );
     this.hasMany("generalPosts", { through: "generalCategorizations", source: "post" });

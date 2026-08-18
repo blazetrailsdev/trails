@@ -81,15 +81,15 @@ describe("WhereTest", () => {
 
   it("type casting nested joins", async () => {
     const comment = comments("eager_other_comment1");
-    const result = await Comment.joins({ post: "author" }).where({ authors: { id: "2-foo" } });
+    const result = await Comment.joins({ ":post": ":author" }).where({ authors: { id: "2-foo" } });
     expect(ids(result)).toStrictEqual([(comment as any).id]);
   });
 
   it("where with through association", async () => {
-    const r1 = await Author.joins("comments").where({ comments: comments("greetings") });
+    const r1 = await Author.joins(":comments").where({ comments: comments("greetings") });
     expect(ids(r1)).toStrictEqual([(authors("david") as any).id]);
 
-    const r2 = await Author.joins("categories").where({ categories: categories("technology") });
+    const r2 = await Author.joins(":categories").where({ categories: categories("technology") });
     expect(ids(r2)).toStrictEqual([(authors("bob") as any).id]);
   });
 
@@ -128,7 +128,7 @@ describe("WhereTest", () => {
     const chef = await Chef.create({});
     await CakeDesigner.create({ chef });
 
-    const cakeDesigners = CakeDesigner.joins("chef").where({ chefs: { id: (chef as any).id } });
+    const cakeDesigners = CakeDesigner.joins(":chef").where({ chefs: { id: (chef as any).id } });
     const chefs = await Chef.where({ employable: cakeDesigners });
 
     expect(ids(chefs)).toStrictEqual([(chef as any).id]);
@@ -284,17 +284,17 @@ describe("WhereTest", () => {
   it("belongs to nested where", () => {
     const parent = new Comment();
     (parent as any).id = 1;
-    const expected = Post.where({ comments: { parent_id: 1 } }).joins("comments");
-    const actual = Post.where({ comments: { parent } }).joins("comments");
+    const expected = Post.where({ comments: { parent_id: 1 } }).joins(":comments");
+    const actual = Post.where({ comments: { parent } }).joins(":comments");
     expect(actual.toSql()).toEqual(expected.toSql());
   });
 
   it("belongs to nested where with relation", async () => {
     const author = authors("david") as any;
-    const expected = await Author.where({ id: author }).joins("posts");
+    const expected = await Author.where({ id: author }).joins(":posts");
     const actual = await Author.where({
       posts: { author_id: Author.where({ id: author.id }) },
-    }).joins("posts");
+    }).joins(":posts");
     expect(sortedIds(actual)).toStrictEqual(sortedIds(expected));
   });
 
@@ -354,7 +354,7 @@ describe("WhereTest", () => {
     const treasure = await Treasure.create({ name: "my_treasure" });
     await PriceEstimate.create({ estimateOf: treasure, price: 2, currency: "USD" });
 
-    const actual = await Treasure.joins("priceEstimates")
+    const actual = await Treasure.joins(":priceEstimates")
       .where()
       .not({
         price_estimates: { price: 2, currency: "USD" },
@@ -429,8 +429,8 @@ describe("WhereTest", () => {
     (thing as any).id = 1;
     const expected = Treasure.where({
       priceEstimates: { thing_type: "Post", thing_id: 1 },
-    }).joins("priceEstimates");
-    const actual = Treasure.where({ priceEstimates: { thing } }).joins("priceEstimates");
+    }).joins(":priceEstimates");
+    const actual = Treasure.where({ priceEstimates: { thing } }).joins(":priceEstimates");
     expect(actual.toSql()).toEqual(expected.toSql());
   });
 
@@ -439,9 +439,9 @@ describe("WhereTest", () => {
     (treasure as any).id = 1;
     const expected = Treasure.where({
       priceEstimates: { estimate_of_type: "Treasure", estimate_of_id: 1 },
-    }).joins("priceEstimates");
+    }).joins(":priceEstimates");
     const actual = Treasure.where({ priceEstimates: { estimateOf: treasure } }).joins(
-      "priceEstimates",
+      ":priceEstimates",
     );
     expect(actual.toSql()).toEqual(expected.toSql());
   });
@@ -650,7 +650,7 @@ describe("WhereTest", () => {
   it("nested conditional on enum", async () => {
     const post = await Post.first();
     await Comment.create({ label: "default", post, body: "Nice weather today" });
-    const result = await Post.joins("comments").where({
+    const result = await Post.joins(":comments").where({
       comments: { label: "default", body: "Nice weather today" },
     });
     expect(ids(result)).toStrictEqual([(post as any).id]);

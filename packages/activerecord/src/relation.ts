@@ -2788,8 +2788,15 @@ export class Relation<T extends Base> {
    * intersection.
    */
   get joinedIncludesValues(): AssociationSpec[] {
-    const joinsValues = new Set<unknown>(this.joinsValues);
-    return [...new Set(this.includesValues)].filter((spec) => joinsValues.has(spec));
+    // Rails intersects two Symbol arrays. joins_values now carries the Symbol
+    // spelling (`":comments"`) while includes_values is still swept to the bare
+    // one, so both sides drop a leading colon before the comparison. Once
+    // includes/preload/eagerLoad are swept too, this collapses back to
+    // `joinsValues.has(spec)`.
+    const symbolName = (v: unknown): unknown =>
+      typeof v === "string" && v.startsWith(":") ? v.slice(1) : v;
+    const joinsValues = new Set<unknown>(this.joinsValues.map(symbolName));
+    return [...new Set(this.includesValues)].filter((spec) => joinsValues.has(symbolName(spec)));
   }
 
   /** Mirrors: ActiveRecord::Relation#values (relation.rb:1281-1283) — `@values.dup`. */

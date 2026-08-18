@@ -256,16 +256,16 @@ describe("RelationMergingTest", () => {
   });
 
   it("relation merging with joins", async () => {
-    const comments = Comment.joins("post")
+    const comments = Comment.joins(":post")
       .where({ body: "Thank you for the welcome" })
       .merge(Post.where({ body: "Such a lovely day" }));
     expect(await comments.count()).toBe(1);
   });
 
   it("relation merging with left outer joins", async () => {
-    const comments = Comment.joins("post")
+    const comments = Comment.joins(":post")
       .where({ body: "Thank you for the welcome" })
-      .merge(Post.leftOuterJoins("author").where({ body: "Such a lovely day" }));
+      .merge(Post.leftOuterJoins(":author").where({ body: "Such a lovely day" }));
     expect(await comments.count()).toBe(1);
   });
 
@@ -275,14 +275,14 @@ describe("RelationMergingTest", () => {
     // named/raw boundary — `joins(:a, "RAW", :b)` folds in as `[a, RAW, b]`, not
     // reordered to `[RAW, a, b]`.
     const rawJoin = "INNER JOIN authors ON authors.id = posts.author_id";
-    const source = Post.joins("comments", rawJoin, "author");
+    const source = Post.joins(":comments", rawJoin, ":author");
     // `merge` routes through Merger#mergeJoins...
     const merged = Post.all().merge(source);
-    expect(merged.joinsValues).toEqual(["comments", rawJoin, "author"]);
+    expect(merged.joinsValues).toEqual([":comments", rawJoin, ":author"]);
     // ...and `mergeBang` folds field-by-field; both must preserve the order.
     const banged = Post.all();
     (banged as any).mergeBang(source);
-    expect(banged.joinsValues).toEqual(["comments", rawJoin, "author"]);
+    expect(banged.joinsValues).toEqual([":comments", rawJoin, ":author"]);
   });
 
   it("relation merging with cross-klass joins builds a join dependency", () => {
@@ -290,7 +290,7 @@ describe("RelationMergingTest", () => {
     // resolve against `other`'s klass, not the receiver — they must NOT be pushed
     // into the receiver's joins_values (which would resolve them on the wrong
     // model). `merge` and `mergeBang` must agree here.
-    const source = Post.joins("author");
+    const source = Post.joins(":author");
     const merged = Comment.all().merge(source);
     expect(merged.joinsValues.length).toBe(1);
     expect(merged.joinsValues[0]).toBeInstanceOf(JoinDependency);
@@ -307,7 +307,7 @@ describe("RelationMergingTest", () => {
     // `other`'s klass, so they build an OuterJoin JoinDependency on `other` rather
     // than folding into the receiver's left_outer_joins_values. `merge` and
     // `mergeBang` must agree — mergeBang's old inline block skipped this split.
-    const source = Post.leftOuterJoins("author");
+    const source = Post.leftOuterJoins(":author");
     const merged = Comment.all().merge(source);
     expect(merged.leftOuterJoinsValues.length).toBe(1);
     expect(merged.leftOuterJoinsValues[0]).toBeInstanceOf(JoinDependency);
@@ -369,7 +369,7 @@ describe("RelationMergingTest", () => {
   });
 
   it("merging with from clause on different class", async () => {
-    expect(await Comment.joins("post").merge(Post.from("posts")).first()).toBeTruthy();
+    expect(await Comment.joins(":post").merge(Post.from("posts")).first()).toBeTruthy();
   });
 
   it("merging with order with binds", () => {
@@ -448,7 +448,7 @@ describe("MergingDifferentRelationsTest", () => {
 
   it("merging where relations", async () => {
     const helloByBob = await Post.where({ body: "hello" })
-      .joins("author")
+      .joins(":author")
       .merge(Author.where({ name: "Bob" }))
       .order("posts.id")
       .pluck("posts.id");
@@ -458,7 +458,7 @@ describe("MergingDifferentRelationsTest", () => {
 
   it("merging order relations", async () => {
     let postsByAuthorName = await Post.limit(3)
-      .joins("author")
+      .joins(":author")
       .where()
       .not({ "authors.name": "David" })
       .merge(Author.order("name"))
@@ -466,7 +466,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
 
     postsByAuthorName = await Post.limit(3)
-      .joins("author")
+      .joins(":author")
       .where()
       .not({ "authors.name": "David" })
       .merge(Author.order("name"))
@@ -476,7 +476,7 @@ describe("MergingDifferentRelationsTest", () => {
 
   it("merging order relations (using a hash argument)", async () => {
     const postsByAuthorName = await Post.limit(4)
-      .joins("author")
+      .joins(":author")
       .where()
       .not({ "authors.name": "David" })
       .merge(Author.order({ name: "desc" }))

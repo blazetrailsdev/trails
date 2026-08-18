@@ -199,18 +199,18 @@ export class Post extends Base {
     this.scope("limitBy", (q: any, l: number) => q.limit(l));
     this.scope("locked", (q: any) => q.lock());
     this.scope("mostCommented", (q: any, commentsCount: number) =>
-      q.joins("comments").group("posts.id").having("count(comments.id) >= ?", commentsCount),
+      q.joins(":comments").group("posts.id").having("count(comments.id) >= ?", commentsCount),
     );
 
     this.scope("noComments", (q: any) => q.leftJoins("comments").where({ comments: { id: null } }));
     this.scope("withSpecialComments", (q: any) =>
-      q.joins("comments").where({ comments: { type: "SpecialComment" } }),
+      q.joins(":comments").where({ comments: { type: "SpecialComment" } }),
     );
     this.scope("withVerySpecialComments", (q: any) =>
-      q.joins("comments").where({ comments: { type: "VerySpecialComment" } }),
+      q.joins(":comments").where({ comments: { type: "VerySpecialComment" } }),
     );
     this.scope("withPost", (q: any, postId: number) =>
-      q.joins("comments").where({ comments: { post_id: postId } }),
+      q.joins(":comments").where({ comments: { post_id: postId } }),
     );
     this.scope("withComments", (q: any) => q.preload("comments"));
     this.scope("withTags", (q: any) => q.preload("taggings"));
@@ -218,10 +218,10 @@ export class Post extends Base {
       q.with({ posts_with_tags: q.model.where("tags_count > 0") }).from("posts_with_tags AS posts"),
     );
     this.scope("taggedWith", (q: any, id: number) =>
-      q.joins("taggings").where({ taggings: { tag_id: id } }),
+      q.joins(":taggings").where({ taggings: { tag_id: id } }),
     );
     this.scope("taggedWithComment", (q: any, comment: string) =>
-      q.joins("taggings").where({ taggings: { comment } }),
+      q.joins(":taggings").where({ taggings: { comment } }),
     );
     // Rails: `-> { containing_the_letter_a.or(titled_with_an_apostrophe) }` —
     // each bare scope call resolves against the lambda's `self` (the current
@@ -330,7 +330,7 @@ export class Post extends Base {
     });
     this.hasOne(
       "verySpecialCommentWithPostWithJoins",
-      (q: any) => q.joins("post").order("posts.id"),
+      (q: any) => q.joins(":post").order("posts.id"),
       { className: "VerySpecialComment" },
     );
     this.hasOne(
@@ -783,7 +783,7 @@ export class PostWithSpecialCategorization extends Post {
     this.defaultScope((q: any) =>
       q
         .where({ type: "PostWithSpecialCategorization" })
-        .joins("categorizations")
+        .joins(":categorizations")
         .where({ categorizations: { special: true } }),
     );
   }

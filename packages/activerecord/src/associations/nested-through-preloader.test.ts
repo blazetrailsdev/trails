@@ -106,10 +106,10 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     // Mirrors Post.joins(:special_comments_ratings).where(...) in
     // vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb.
     const david = authors("david");
-    const matched = await Author.joins("ratings").where({ "ratings.value": 1 }).distinct();
+    const matched = await Author.joins(":ratings").where({ "ratings.value": 1 }).distinct();
     expect(matched.map((row) => row.id)).toContain(david.id);
 
-    const none = await Author.joins("ratings").where({ "ratings.value": 9999 });
+    const none = await Author.joins(":ratings").where({ "ratings.value": 9999 });
     expect(none).toHaveLength(0);
   });
 

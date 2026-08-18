@@ -336,7 +336,7 @@ export class DeveloperFilteredOnJoins extends Base {
       joinTable: "developers_projects",
     });
     this.defaultScope((q: any) =>
-      q.joins("projects").where({ projects: { name: "Active Controller" } }),
+      q.joins(":projects").where({ projects: { name: "Active Controller" } }),
     );
   }
 }

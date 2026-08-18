@@ -314,7 +314,7 @@ describe("BindParameterTest", () => {
     // INNER JOIN. trails resolves association joins through the model registry;
     // Author/Post are registered in `beforeAll` (their fixtures load but don't
     // auto-register the classes).
-    const subquery = Author.joins("thinkingPosts").where({ name: "David" });
+    const subquery = Author.joins(":thinkingPosts").where({ name: "David" });
     const scope = Author.from(subquery, "authors").where({ id: 1 });
     expect(await scope.count()).toBe(1);
   });

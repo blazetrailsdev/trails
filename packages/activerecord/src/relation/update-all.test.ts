@@ -116,7 +116,7 @@ describe("UpdateAllTest", () => {
     expect(updatedPosts.length).toBeGreaterThan(0);
     updatedPosts.forEach((post: any) => expect(post.title).toBe("ig"));
 
-    const nonUpdated = await Post.joins("comments")
+    const nonUpdated = await Post.joins(":comments")
       .group("posts.id")
       .having(`count(comments.id) < ${minimumCommentsCount}`)
       .first();
@@ -124,7 +124,7 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all with joins", async () => {
-    const petsScope = Pet.joins("toys").where({ toys: { name: "Bone" } });
+    const petsScope = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.exists()).toBe(true);
     const countBefore = await petsScope.count();
@@ -155,7 +155,7 @@ describe("UpdateAllTest", () => {
     const greetingsComment = comments("greetings");
     const moreGreetingsComment = comments("more_greetings");
 
-    const commentsScope = Comment.joins("post")
+    const commentsScope = Comment.joins(":post")
       .where({ "posts.id": welcomePost.id })
       .order("comments.id")
       .limit(1);
@@ -174,7 +174,7 @@ describe("UpdateAllTest", () => {
     const greetingsComment = comments("greetings");
     const moreGreetingsComment = comments("more_greetings");
 
-    const commentsScope = Comment.joins("post")
+    const commentsScope = Comment.joins(":post")
       .where({ "posts.id": welcomePost.id })
       .order("comments.id")
       .offset(1);
@@ -191,7 +191,7 @@ describe("UpdateAllTest", () => {
     const parrot = pets("parrot");
     expect(parrot.integer).toBeFalsy();
 
-    await Pet.joins("toys")
+    await Pet.joins(":toys")
       .where({ toys: { name: "Bone" } })
       .updateCounters({ integer: 1 });
 
@@ -457,7 +457,7 @@ describe("UpdateAllTest", () => {
 
   it("update all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
-    const joinScope = CpkOrder.joins("orderAgreements").where({
+    const joinScope = CpkOrder.joins(":orderAgreements").where({
       orderAgreements: { signature: agreement.signature },
     });
     expect(await joinScope.updateAll({ status: "shipped" })).toBe(1);

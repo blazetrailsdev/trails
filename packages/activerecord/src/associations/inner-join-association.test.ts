@@ -82,19 +82,21 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {
-    const result = await Author.joins(["thinkingPosts", "welcomePosts"]).first();
+    const result = await Author.joins([":thinkingPosts", ":welcomePosts"]).first();
     expect((result as any)?.id).toBe((authors("david") as any).id);
   });
 
   it("construct finder sql does not table name collide on duplicate associations", async () => {
-    const sql = Person.joins({ agents: { agents: "agents" } })
-      .joins({ agents: { agents: { primaryContact: "agents" } } })
+    const sql = Person.joins({ ":agents": { ":agents": ":agents" } })
+      .joins({ ":agents": { ":agents": { ":primaryContact": ":agents" } } })
       .toSql();
     expect(/agents_people_4/i.test(sql)).toBe(true);
   });
 
   it("construct finder sql does not table name collide on duplicate associations with left outer joins", () => {
-    const sql = Person.joins({ agents: "agents" }).leftOuterJoins({ agents: "agents" }).toSql();
+    const sql = Person.joins({ ":agents": ":agents" })
+      .leftOuterJoins({ ":agents": ":agents" })
+      .toSql();
     expect(/agents_people_2/i.test(sql)).toBe(true);
     expect(/INNER JOIN/i.test(sql)).toBe(true);
     expect(/agents_people_4/i.test(sql)).toBe(false);
@@ -107,7 +109,7 @@ describe("InnerJoinAssociationTest", () => {
 
     const expected = people("susan");
     const queries = await captureSql(async () => {
-      const result = await Person.joins("agents").joins(stringJoin);
+      const result = await Person.joins(":agents").joins(stringJoin);
       expect(result.map((p) => p.id)).toEqual([(expected as any).id]);
     });
     expect(queries.some((sql) => /agents_people_2/i.test(sql))).toBe(true);
@@ -123,7 +125,7 @@ describe("InnerJoinAssociationTest", () => {
 
     const expected = people("susan");
     const queries = await captureSql(async () => {
-      const result = await Person.joins("agents").joins(
+      const result = await Person.joins(":agents").joins(
         new Nodes.InnerJoin(agents, new Nodes.On(constraint)),
       );
       expect(result.map((p) => p.id)).toEqual([(expected as any).id]);
@@ -156,7 +158,7 @@ describe("InnerJoinAssociationTest", () => {
       postsTable.createJoin(postsTable, postsTable.createOn(constraint)),
     );
     authorsRel = authorsRel
-      .joins("authorAddress")
+      .joins(":authorAddress")
       .merge(authorsRel.where({ "posts.type": "SpecialPost" }));
 
     const result = await authorsRel;
@@ -193,14 +195,14 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("join conditions added to join clause", () => {
-    const sql = Author.joins("essays").toSql();
+    const sql = Author.joins(":essays").toSql();
     expect(/writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql)).toBe(true);
     expect(/WHERE/i.test(sql)).toBe(false);
   });
 
   it("join association conditions support string and arel expressions", async () => {
-    expect(await Author.joins("welcomePostsWithOneComment").count()).toBe(0);
-    expect(await Author.joins("welcomePostsWithComments").count()).toBe(1);
+    expect(await Author.joins(":welcomePostsWithOneComment").count()).toBe(0);
+    expect(await Author.joins(":welcomePostsWithComments").count()).toBe(1);
   });
 
   it("join conditions allow nil associations", async () => {
@@ -209,7 +211,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("join with reserved word", async () => {
-    const result = await CategoryPost.joins("group").where({
+    const result = await CategoryPost.joins(":group").where({
       "group.id": (categories("technology") as any).id,
     });
     expect(result.map((cp) => [(cp as any).post_id, (cp as any).category_id])).toEqual([
@@ -221,25 +223,25 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("find with implicit inner joins without select does not imply readonly", async () => {
-    const authorsRel = await Author.joins("posts");
+    const authorsRel = await Author.joins(":posts");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
   it("find with implicit inner joins honors readonly with select", async () => {
-    const authorsRel = await Author.joins("posts").select("authors.*");
+    const authorsRel = await Author.joins(":posts").select("authors.*");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
   it("find with implicit inner joins honors readonly false", async () => {
-    const authorsRel = await Author.joins("posts").readonly(false);
+    const authorsRel = await Author.joins(":posts").readonly(false);
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
   it("find with implicit inner joins does not set associations", async () => {
-    const authorsRel = await Author.joins("posts").select("authors.*");
+    const authorsRel = await Author.joins(":posts").select("authors.*");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => (a as any)._loadedAssociations?.posts === undefined)).toBe(true);
   });
@@ -248,14 +250,14 @@ describe("InnerJoinAssociationTest", () => {
     const allAuthors = await Author.all();
     let realCount = 0;
     for (const a of allAuthors) realCount += await (a as any).posts.count();
-    expect(await Author.joins("posts").count()).toBe(realCount);
+    expect(await Author.joins(":posts").count()).toBe(realCount);
   });
 
   it("calculate honors implicit inner joins", async () => {
     const allAuthors = await Author.all();
     let realCount = 0;
     for (const a of allAuthors) realCount += await (a as any).posts.count();
-    expect(await Author.joins("posts").count("authors.id")).toBe(realCount);
+    expect(await Author.joins(":posts").count("authors.id")).toBe(realCount);
   });
 
   it("calculate honors implicit inner joins and distinct and conditions", async () => {
@@ -265,7 +267,7 @@ describe("InnerJoinAssociationTest", () => {
       const ps = await (a as any).posts;
       if (ps.some((p: any) => String(p.title).startsWith("Welcome"))) realCount += 1;
     }
-    const authorsWithWelcomingPostTitles = await Author.joins("posts")
+    const authorsWithWelcomingPostTitles = await Author.joins(":posts")
       .where("posts.title like 'Welcome%'")
       .distinct()
       .count("authors.id");
@@ -273,7 +275,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const scope = Post.joins("specialComments").where({ id: (posts("sti_comments") as any).id });
+    const scope = Post.joins(":specialComments").where({ id: (posts("sti_comments") as any).id });
 
     expect(await scope.where({ "comments.type": "Comment" })).toHaveLength(0);
     expect((await scope.where({ "comments.type": "SpecialComment" })).length).toBeGreaterThan(0);
@@ -283,13 +285,13 @@ describe("InnerJoinAssociationTest", () => {
   it("find with conditions on reflection", async () => {
     expect((await (posts("welcome") as any).comments).length).toBeGreaterThan(0);
     expect(
-      await Post.joins("nonexistentComments").where({ id: (posts("welcome") as any).id }),
+      await Post.joins(":nonexistentComments").where({ id: (posts("welcome") as any).id }),
     ).toHaveLength(0);
   });
 
   it("find with conditions on through reflection", async () => {
     expect((await (posts("welcome") as any).tags).length).toBeGreaterThan(0);
-    expect(await Post.joins("miscTags").where({ id: (posts("welcome") as any).id })).toHaveLength(
+    expect(await Post.joins(":miscTags").where({ id: (posts("welcome") as any).id })).toHaveLength(
       0,
     );
   });
@@ -299,7 +301,7 @@ describe("InnerJoinAssociationTest", () => {
     await (author as any).association("categorizations").create({});
     await (author as any).association("categorizations").create({ special: true });
 
-    const result = await Author.where({ id: author.id }).joins("specialCategorizations");
+    const result = await Author.where({ id: author.id }).joins(":specialCategorizations");
     expect(result.map((a) => a.id)).toEqual([author.id]);
   });
 
@@ -326,7 +328,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("joins a belongs_to association with a composite foreign key", async () => {
     const { ShardedComment, ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
-    const firstPostComments = await ShardedComment.joins("blogPost").where({
+    const firstPostComments = await ShardedComment.joins(":blogPost").where({
       blogPost: { title: "My first post in my Blog1!" },
     });
     const expectedBlogPostFixture = shardedBlogPosts("great_post_blog_one");
@@ -346,7 +348,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("joins a has_many association with a composite foreign key", async () => {
     const { ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
-    const blogPosts = await ShardedBlogPost.joins("comments").where({
+    const blogPosts = await ShardedBlogPost.joins(":comments").where({
       comments: { body: "Your first blog post is great!" },
     });
 
@@ -359,7 +361,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("inner joins includes all nested associations", async () => {
     const queries = await captureSql(async () => {
-      await Friendship.joins(["friendFavoriteReferenceJob", "followerFavoriteReferenceJob"]);
+      await Friendship.joins([":friendFavoriteReferenceJob", ":followerFavoriteReferenceJob"]);
     });
     const sql = queries.join("\n");
     expect(/["`]friendships["`]\.["`]friend_id["`]/i.test(sql)).toBe(true);
