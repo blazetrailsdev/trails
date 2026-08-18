@@ -25,6 +25,6 @@
     "tsFile": "relation/batches.ts",
     "rubyName": "record_cursor_values",
     "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `record.attributes.slice(*cursor).values` (batches.rb:409) — Ruby `Hash#slice`, whose TS spelling over the attributes object is a `map` of the cursor names, not a call."
   }
 ]

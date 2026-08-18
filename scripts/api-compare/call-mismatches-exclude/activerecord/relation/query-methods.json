@@ -60,14 +60,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_where_clause",
     "call": "order:constructor,sql",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_where_clause",
-    "call": "sanitize_sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): ORDER only. Rails reaches `Arel.sql(opts)` in the String arm (query_methods.rb:1623) before the `WhereClause.new` at the bottom, and handles a bare Arel node in the same trailing `else`; the port early-returns the node arm as `new WhereClause([opts])` (query-methods.ts:1143) above the String arm, so the constructor is first in TS evaluation order. Same calls, same results."
   },
   {
     "package": "activerecord",
@@ -81,21 +74,21 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_with_join_node",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `.join_sources.first` (query_methods.rb:1959) — Ruby `Array#first` on the join-sources Array, spelled `.joinSources()[0]` in TS."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_with_join_node",
     "call": "order:table,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Verified per-site (RFC 0106): ORDER only. Rails constructs `Arel::Table.new(name)` before touching `table` (query_methods.rb:1955-1957); the port hoists `this.table` into a local first so it can raise its no-arel-table guard before allocating (query-methods.ts:3658-3660). Same calls, same results."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "does_not_support_reverse?",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `String.new(order) unless order.instance_of?(String)` (query_methods.rb:2047) exists only to shed a String SUBCLASS's method overrides (Arel::Nodes::SqlLiteral#count). JS has no String subclassing to shed, so the port is the plain `String(order)` coercion (query-methods.ts:2395)."
   },
   {
     "package": "activerecord",

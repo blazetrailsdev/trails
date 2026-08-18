@@ -36,7 +36,7 @@
     "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
     "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): relation.rb:1426 is `FutureResult.wrap([])`, the async arm of the `@none` short-circuit. trails has no FutureResult — `loadAsync` memoizes the load PROMISE itself (relation.ts:753-765) because instantiation/eager-loading/preloading are all awaited inside `execQueries` — so the async arm returns the same `Result.empty()` the sync arm does."
   },
   {
     "package": "activerecord",
@@ -61,7 +61,7 @@
     "tsFile": "relation.ts",
     "rubyName": "to_sql",
     "call": "apply_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): relation.rb:1211-1215 renders the eager arm inside an `apply_join_dependency` block. trails' `toSql` is synchronous (relation.ts:1935) while `applyJoinDependency` is async, so the eager arm renders the aliased manager `_buildEagerOperandManager()` returns instead. Retires with the build_arel/apply_join_dependency routing convergence (story relation-arel-build-arel-routing), not here."
   },
   {
     "package": "activerecord",

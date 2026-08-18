@@ -145,19 +145,7 @@ export class WhereClause {
 
   extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
     const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
-    for (const node of this.predicates) {
-      const attr = extractAttribute(node);
-      if (attr !== null) {
-        attrs.push(attr);
-        continue;
-      }
-      // Mirrors Rails each_attributes' fallback: when no plain Attribute is
-      // found but the predicate is an equality whose left is an Arel expression
-      // (e.g. a NamedFunction like `abs(salary)`), use that expression node so a
-      // later equality on the same expression replaces this one.
-      const expr = predicationLeft(node);
-      if (expr !== null) attrs.push(expr);
-    }
+    this.eachAttributes((attr) => attrs.push(attr));
     return attrs;
   }
 
@@ -230,7 +218,10 @@ export class WhereClause {
       let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
         const left = (node as any).left;
-        if (left && typeof left.fetchAttribute === "function") attr = left;
+        // Rails' `node.left.is_a?(Arel::Predications)` (where_clause.rb:129): include()
+        // leaves no is_a? marker, so membership is tested via Predications#eq
+        // (predications.rb:17).
+        if (left && typeof left.eq === "function") attr = left;
       }
       if (attr) fn(attr, node);
     }
