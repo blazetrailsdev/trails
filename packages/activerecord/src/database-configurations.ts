@@ -281,8 +281,8 @@ export class DatabaseConfigurations {
     if (typeof config === "string") {
       // Ruby dispatches `when Symbol` / `when Hash, String`
       // (database_configurations.rb:177-182). A Ruby Symbol is a JS string, so
-      // the two String arms are told apart here: a string with a URI scheme
-      // ("postgres://", "sqlite3:") is the String arm, one without is the
+      // the type no longer separates the arms: a string carrying a URI scheme
+      // ("postgres://", "sqlite3:") takes the String arm, one without takes the
       // Symbol arm.
       if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
