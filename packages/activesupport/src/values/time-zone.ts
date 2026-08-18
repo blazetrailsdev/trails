@@ -1086,14 +1086,7 @@ export class TimeZone {
    * `dst?` / `observed_utc_offset` / `abbreviation` off.
    */
   periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
-    return new TimezonePeriod(this.abbreviation(date), this.utcOffsetAt(date), this.isDst(date));
-  }
-
-  /**
-   * Timezone abbreviation at a given instant.
-   */
-  abbreviation(date: Date | Temporal.Instant = Temporal.Now.instant()): string {
-    return getZoneInfo(this.tzinfo, toDate(date)).abbreviation;
+    return new TimezonePeriod(this.abbr(date), this.utcOffsetAt(date), this.isDst(date));
   }
 
   /**
