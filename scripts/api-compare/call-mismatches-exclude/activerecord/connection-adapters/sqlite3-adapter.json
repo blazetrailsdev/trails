@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "configure_connection",
-    "call": "merge",
-    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:838: `DEFAULT_PRAGMAS.merge(pragmas)`. The port spreads the two objects rather than calling a `merge` method — JS objects have no `merge`. Tracked by RFC 0094."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "connect",
     "call": "new_client",
     "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:807: `@raw_connection = self.class.new_client(@connection_parameters)` hands the sqlite3 gem the whole config hash. trails has no `@connection_parameters` hash and its `newClient` returns an adapter rather than a raw driver handle, so `connect()` opens the driver directly from the expanded filename. Tracked by RFC 0094 (sqlite3-adapter-construction-fidelity)."

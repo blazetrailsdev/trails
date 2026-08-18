@@ -4,7 +4,7 @@
     "tsFile": "migration.ts",
     "rubyName": "call",
     "call": "build_watcher",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails memoizes a `FileUpdateChecker` over the migration paths (migration.rb:658,675-680); trails registers migrations programmatically, so `CheckPending#call` checks the migrator directly and has no watcher to build."
   },
   {
     "package": "activerecord",
@@ -18,7 +18,7 @@
     "tsFile": "migration.ts",
     "rubyName": "change_table",
     "call": "compatible_table_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `Migration::Current` wrappers (migration.rb:580-609) exist only so a `Migration[x.y]` compatibility class can override the identity hook `compatible_table_definition` (migration.rb:612-614). Version compatibility is out of scope for the port, so the wrappers are not ported and the base `change_table` is what pairs here."
   },
   {
     "package": "activerecord",
@@ -32,14 +32,14 @@
     "tsFile": "migration.ts",
     "rubyName": "create_join_table",
     "call": "compatible_table_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `Migration::Current` wrappers (migration.rb:580-609) exist only so a `Migration[x.y]` compatibility class can override the identity hook `compatible_table_definition` (migration.rb:612-614). Version compatibility is out of scope for the port, so the wrappers are not ported and the base `create_join_table` is what pairs here."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "create_table",
     "call": "compatible_table_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `Migration::Current` wrappers (migration.rb:580-609) exist only so a `Migration[x.y]` compatibility class can override the identity hook `compatible_table_definition` (migration.rb:612-614). Version compatibility is out of scope for the port, so the wrappers are not ported and the base `create_table` is what pairs here."
   },
   {
     "package": "activerecord",
@@ -53,55 +53,55 @@
     "tsFile": "migration.ts",
     "rubyName": "drop_table",
     "call": "compatible_table_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `Migration::Current` wrappers (migration.rb:580-609) exist only so a `Migration[x.y]` compatibility class can override the identity hook `compatible_table_definition` (migration.rb:612-614). Version compatibility is out of scope for the port, so the wrappers are not ported and the base `drop_table` is what pairs here."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "env",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`ActiveRecord::ConnectionHandling::DEFAULT_ENV.call` (migration.rb:773) invokes a Proc; the port's DEFAULT_ENV is a function it calls directly, so there is no `call` callee to record."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "generate_migrator_advisory_lock_id",
     "call": "crc32",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`Zlib.crc32` (migration.rb:1617) is Ruby stdlib; the port calls the trails CRC-32 helper `_crc32` (migration.ts:2642), whose underscored name cannot match the Ruby callee."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "migrate",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`DatabaseTasks.migration_connection.pool.with_connection` (migration.rb:973) checks a connection out for the exec_migration block; trails migrations run against the already-seated `this.connection` (RFC 0073's permanent-checkout flip is where this converges)."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "needs_migration?",
     "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `Array#size` (migration.rb:1296); JS reads `.length`, a property, not a call."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "parse_migration_filename",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `Array#first` on the `scan` result (migration.rb:1374); JS indexes with `[0]`, which records no callee."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "revert",
     "call": "run",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `run(*migration_classes.reverse, revert: true)` (migration.rb:853); the port spells the same method `_run` (migration.ts:1168), so the underscored callee does not match."
   },
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "validate",
     "call": "find",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `Enumerable#find` over `group_by(&:name)` (migration.rb:1558,1561); the port counts names and versions in two Maps and walks the list in order, so the first duplicate reported matches Rails' first-occurrence semantics."
   }
 ]

@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
-    "rubyName": "build",
-    "call": "include?",
-    "reason": "Rails' Duration.build sets `variable` via `VARIABLE_PARTS.include?(part)` (activesupport/lib/active_support/duration.rb:206); trails' port derives it without the ported `include`/`includes` call. Unmasked by the RFC 0025 same-file-closure fix, not introduced by it."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "reject!",
     "reason": "Ruby `Hash#reject!` prunes the zero-valued entries of `@parts` in place; the TS constructor omits them while building the parts object, so there is no receiver to reject from. Surfaced by the DescendantsTracker `reject!` port making the name resolvable, not by a change in this file."

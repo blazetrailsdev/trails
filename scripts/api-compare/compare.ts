@@ -3044,8 +3044,12 @@ export function main() {
                 calls: rubyCallsByName.get(rubyName) ?? [],
                 weak: rubyWeakCallsByName.get(rubyName) ?? [],
               };
+        // A body whose every Ruby call is weak still gets compared:
+        // significantMissingCalls returns empty for an empty `rubyCalls`, so the
+        // pair is counted and found clean rather than leaving the population.
+        // Returning early here keyed the denominator on the RUBY side alone, so
+        // converging a false-positive class read as LOST coverage (RFC 0108).
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
-        if (rubyCalls.length === 0) return;
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
         const { tsClass, ambiguous } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
         if (ambiguous) return;

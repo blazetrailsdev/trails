@@ -10,12 +10,5 @@
       "kwargs{locale=ref:locale}"
     ],
     "reason": "inflector/transliterate.rb:123 calls `transliterate(string, locale: locale)`; the port passes the replacement `\"?\"` positionally between them."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "transliterate.ts",
-    "rubyName": "transliterate",
-    "call": "include?",
-    "reason": "Ruby core Array#include? over ALLOWED_ENCODINGS_FOR_TRANSLITERATE (inflector/transliterate.rb:66), not a ported trails method — JS strings carry no encoding."
   }
 ]

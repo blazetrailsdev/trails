@@ -665,11 +665,6 @@ export function _parseHexBinary(bin: string): string {
  *
  * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
  *
- * @missingRailsCall cast_backend_name_to_module — belongs to
- * `current_thread_backend=`, which the call gate pairs with this reader (the
- * bare-camel candidate wins over `setCurrentThreadBackend`);
- * {@link setCurrentThreadBackend} makes the call.
- *
  * @internal
  */
 export function currentThreadBackend(): XmlMiniBackend | null | undefined {
