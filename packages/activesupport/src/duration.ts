@@ -426,28 +426,6 @@ export class Duration {
   }
 
   /**
-   * Mirrors: ActiveSupport::Duration#as_json (duration.rb:459-461).
-   */
-  asJson(_options: unknown = null): number {
-    return Math.trunc(this.inSeconds());
-  }
-
-  /**
-   * Mirrors: ActiveSupport::Duration#coerce (duration.rb:245-254). Ruby's
-   * numeric-coercion protocol hands back `[other, self]` so the arithmetic
-   * operator re-dispatches with a Scalar on the left.
-   */
-  coerce(other: unknown): [Scalar, Duration] {
-    if (other instanceof Scalar) {
-      return [other, this];
-    }
-    if (other instanceof Duration) {
-      return [new Scalar(other.inSeconds()), this];
-    }
-    return [new Scalar(other as number), this];
-  }
-
-  /**
    * Mirrors: ActiveSupport::Duration#sum (duration.rb:485-510).
    *
    * The `acts_like?` guard is spelled as the receiver check
@@ -490,6 +468,28 @@ export class Duration {
     if (time instanceof Temporal.PlainDate)
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
     return applyDurationPreservingNs(time, this.parts, sign);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#as_json (duration.rb:459-461).
+   */
+  asJson(_options: unknown = null): number {
+    return Math.trunc(this.inSeconds());
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#coerce (duration.rb:245-254). Ruby's
+   * numeric-coercion protocol hands back `[other, self]` so the arithmetic
+   * operator re-dispatches with a Scalar on the left.
+   */
+  coerce(other: unknown): [Scalar, Duration] {
+    if (other instanceof Scalar) {
+      return [other, this];
+    }
+    if (other instanceof Duration) {
+      return [new Scalar(other.inSeconds()), this];
+    }
+    return [new Scalar(other as number), this];
   }
 
   /**
