@@ -151,10 +151,10 @@ export abstract class MimePart {
     public name: string,
   ) {}
 
-  /** @internal Declared by the BufferPart / TempfilePart subclasses. */
+  /** @internal */
   abstract isFile(): boolean;
 
-  /** @internal Declared by the BufferPart / TempfilePart subclasses. */
+  /** @internal */
   abstract close(): void;
 
   /** @internal */
@@ -203,7 +203,7 @@ export class TempfilePart extends MimePart {
   }
   /** @internal */
   close(): void {
-    if (typeof this.body?.close === "function") this.body.close();
+    this.body.close();
   }
 }
 
@@ -218,7 +218,7 @@ export class Collector {
     this.mimeParts.forEach((part) => cb(part));
   }
 
-  /** @internal Enumerable#find_all */
+  /** @internal */
   findAll(predicate: (part: MimePart) => boolean): MimePart[] {
     return this.mimeParts.filter((part) => predicate(part));
   }

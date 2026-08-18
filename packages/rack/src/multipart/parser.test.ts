@@ -36,6 +36,7 @@ const tempfileFactory = (_filename: string, _contentType: string) => {
       buffer += s;
     },
     read: () => buffer,
+    close: () => {},
   };
 };
 
@@ -139,17 +140,7 @@ describe("Rack::Multipart::Parser", () => {
     const prev = getMultipartFileLimit();
     try {
       setMultipartFileLimit(1);
-      expect(() =>
-        fix("text", "AaB03x", (_f, _ct) => {
-          let b = "";
-          return {
-            write: (s: string) => {
-              b += s;
-            },
-            read: () => b,
-          };
-        }),
-      ).toThrow(MultipartPartLimitError);
+      expect(() => fix("text")).toThrow(MultipartPartLimitError);
     } finally {
       setMultipartFileLimit(prev);
     }
