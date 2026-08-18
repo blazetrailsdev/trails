@@ -344,7 +344,7 @@ export class EncryptableRecord {
       (typeof record.attributeNames === "function" ? record.attributeNames() : []);
     const encryptedAttrs: Set<string> =
       record.constructor._encryptedAttributes ?? new Set<string>();
-    const merged = [...new Set<string>([...names, ...encryptedAttrs])];
+    const merged = [...new Set<string>([...names, ...[...encryptedAttrs].map(String)])];
     return record._createRecord?.(merged);
   }
 
@@ -468,8 +468,7 @@ export function ciphertextFor(this: any, attributeName: string): unknown {
   if (encryptedAttribute.call(this, attributeName)) {
     return this.readAttributeBeforeTypeCast?.(attributeName);
   }
-  // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).
-  return this._attributes?.valuesForDatabase?.()?.[attributeName];
+  return this.readAttributeForDatabase(attributeName);
 }
 
 /**
@@ -669,7 +668,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
   // encryptAttribute's durable branch buffers this in _pendingEncryptions so
   // the original column rides the same replay-safe machinery as its source.
-  encryptAttribute.call(this, originalAttributeName, {});
+  encrypts.call(this, originalAttributeName);
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
 }
 

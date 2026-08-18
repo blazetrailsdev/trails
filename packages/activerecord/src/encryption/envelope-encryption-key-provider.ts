@@ -5,10 +5,10 @@
  * Mirrors: ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";
+import type { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Configurable } from "./configurable.js";
 import { Decryption } from "./errors.js";
@@ -82,6 +82,6 @@ export class EnvelopeEncryptionKeyProvider {
 
   /** @internal */
   private generateRandomSecret(): string {
-    return getCrypto().randomBytes(32).toString("base64");
+    return (Configurable.keyGenerator as KeyGenerator).generateRandomKey();
   }
 }

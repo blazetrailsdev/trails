@@ -9,12 +9,13 @@ import { Configurable } from "./configurable.js";
  */
 export class AutoFilteredParameters {
   private _filterParameters: string[];
-  private _attributesByClass: Map<any, string[]> = new Map();
+  private _attributesByClass: Map<any, string[]>;
   private _collecting = true;
   private _hookDisposer?: () => void;
 
   constructor(filterParameters: string[]) {
     this._filterParameters = filterParameters;
+    this._attributesByClass = new Map();
     this.installCollectingHook();
   }
 
@@ -59,8 +60,10 @@ export class AutoFilteredParameters {
 
   /** @internal */
   private isExcludedFromFilterParameters(filterParameter: string): boolean {
-    return Configurable.config.excludedFromFilterParameters.some(
-      (excluded) => excluded === filterParameter,
+    return (
+      Configurable.config.excludedFromFilterParameters.find(
+        (excludedFilter) => String(excludedFilter) === filterParameter,
+      ) !== undefined
     );
   }
 
@@ -81,8 +84,9 @@ export class AutoFilteredParameters {
 
   private applyFilter(klass: any, attribute: string): void {
     if (!Configurable.config.addToFilterParameters) return;
-    const prefix = klass?.name ? underscore(klass.name) : "";
-    const filter = prefix ? `${prefix}.${attribute}` : attribute;
+    const filter = [klass?.name ? underscore(klass.name) : null, String(attribute)]
+      .filter((part) => part != null)
+      .join(".");
     if (
       !this.isExcludedFromFilterParameters(filter) &&
       !this.isExcludedFromFilterParameters(attribute)

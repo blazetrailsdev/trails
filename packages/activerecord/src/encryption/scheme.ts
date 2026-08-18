@@ -15,7 +15,7 @@ import { type Compressor } from "./config.js";
 import { Configurable } from "./configurable-slot.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import type { Context } from "./context.js";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, wrap } from "@blazetrails/activesupport";
 
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -77,7 +77,7 @@ export class Scheme {
     this.downcase = options.downcase || options.ignoreCase;
     this.ignoreCase = options.ignoreCase;
     this._previousSchemesParam = options.previousSchemes;
-    this.previousSchemes = options.previousSchemes ?? [];
+    this.previousSchemes = wrap(options.previousSchemes);
 
     this._contextProperties = {};
     if (options.encryptor !== undefined) {

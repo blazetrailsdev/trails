@@ -11,8 +11,8 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
 
   it("generate_random_key generates random keys with a custom length", () => {
     const gen = new KeyGenerator();
-    expect(gen.generateRandomKey(10)).not.toBe(gen.generateRandomKey(10));
-    expect(Buffer.from(gen.generateRandomKey(10), "base64").length).toBe(10);
+    expect(gen.generateRandomKey({ length: 10 })).not.toBe(gen.generateRandomKey({ length: 10 }));
+    expect(Buffer.from(gen.generateRandomKey({ length: 10 }), "base64").length).toBe(10);
   });
 
   it("generate_random_hex_key generates random hexadecimal keys with the cipher key length by default", () => {
@@ -25,8 +25,10 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
 
   it("generate_random_hex_key generates random hexadecimal keys with a custom length", () => {
     const gen = new KeyGenerator();
-    expect(gen.generateRandomHexKey(10)).not.toBe(gen.generateRandomHexKey(10));
-    const key = gen.generateRandomHexKey(10);
+    expect(gen.generateRandomHexKey({ length: 10 })).not.toBe(
+      gen.generateRandomHexKey({ length: 10 }),
+    );
+    const key = gen.generateRandomHexKey({ length: 10 });
     expect(key.length).toBe(20);
     expect(key).toMatch(/^[0-9a-f]+$/);
   });

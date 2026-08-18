@@ -87,6 +87,14 @@ export class Properties {
     this._data.set("e", value);
   }
 
+  get compressed(): boolean | undefined {
+    return this.get("c") as boolean | undefined;
+  }
+
+  set compressed(value: boolean | undefined) {
+    this.set("c", value);
+  }
+
   get encryptedDataKey(): string | undefined {
     return this.get("k") as string | undefined;
   }

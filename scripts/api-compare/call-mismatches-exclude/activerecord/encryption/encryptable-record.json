@@ -2,64 +2,43 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "_create_record",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "ciphertext_for",
-    "call": "read_attribute_for_database",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "encrypt_attribute",
     "call": "columns_hash",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails reads the column default eagerly with `columns_hash[name.to_s]&.default` (encryptable_record.rb:91); trails' durable decorator resolves that default at attribute-replay time instead, because `encrypts` runs at class-definition time where `columnsHash` would force schema reflection before a connection exists."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "encrypt_attribute",
     "call": "order:constructor,schemeFor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Rails calls `scheme_for` then `EncryptedAttributeType.new` inside the `decorate_attributes` block (encryptable_record.rb:88-91); trails builds the pending decorator first and hangs `schemeFor` off a lazy `scheme` getter on it, so the constructor is recorded ahead of `schemeFor`."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "override_accessors_to_preserve_original",
     "call": "encrypted_attribute?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' reader lives in an anonymous `Module.new` that is `include`d so its body can call `super()` (encryptable_record.rb:110-118), and the `encrypted_attribute?` guard only exists to decide between that `super()` value and the original column; TS has no ancestor chain to `super()` into from a mixin, so trails redefines the prototype accessor to read the original attribute directly and the guard has nothing to guard."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "override_accessors_to_preserve_original",
     "call": "include",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "preserve_original_encrypted",
-    "call": "encrypts",
-    "reason": "Rails' bare `encrypts original_attribute_name` is realized via `encryptAttribute(originalName, {}, buildScheme({}))` so the original_<name> scheme reuses buildScheme's legacy-encryptor shim + defaultEncryptor fallback; the declaration still happens, just not through the public `encrypts` entry."
+    "reason": "Rails mixes the overriding reader/writer in with `include(Module.new { ... })` (encryptable_record.rb:110-123) so the generated methods can `super()` into the attribute methods; TS has no ancestor chain, so trails defines the accessor pair on the prototype with `Object.defineProperty` and there is no module to include."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "validate_column_size",
     "call": "columns_hash",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails reads `columns_hash[attribute_name.to_s]&.limit` (encryptable_record.rb:139); trails reads `_attributeDefinitions` because this runs from `encrypts` at class-definition time, where `columnsHash` would force schema reflection before a connection exists."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "validate_column_size",
     "call": "order:validatesLengthOf,limit",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Ordering artifact of the `columns_hash` substitution on the same line (encryptable_record.rb:139-140): the limit is read off `_attributeDefinitions`, so the only `limit` call left is the one inside the already-registered LengthValidator check that precedes `validatesLengthOf`."
   }
 ]

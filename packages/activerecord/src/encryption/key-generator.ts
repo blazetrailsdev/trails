@@ -26,16 +26,16 @@ export class KeyGenerator {
     return generator.generateKey(salt, length ?? this.keyLength()).toString("base64");
   }
 
-  generateRandomKey(length?: number): string {
-    return getCrypto()
-      .randomBytes(length ?? this.keyLength())
-      .toString("base64");
+  generateRandomKey({ length = this.keyLength() }: { length?: number } = {}): string {
+    return getCrypto().randomBytes(length).toString("base64");
   }
 
-  generateRandomHexKey(length?: number): string {
-    return getCrypto()
-      .randomBytes(length ?? this.keyLength())
-      .toString("hex");
+  generateRandomHexKey({ length = this.keyLength() }: { length?: number } = {}): string {
+    // Rails' `generate_random_key(length: length).unpack("H*")[0]`
+    // (key_generator.rb:30-32). `generateRandomKey` hands back the raw bytes
+    // base64-encoded (Ruby returns a binary String), so the hex re-encoding
+    // goes through that buffer.
+    return Buffer.from(this.generateRandomKey({ length }), "base64").toString("hex");
   }
 
   deriveKey(password: string, length?: number, salt?: string): string {

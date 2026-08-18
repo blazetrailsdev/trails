@@ -26,7 +26,7 @@
     "tsFile": "encryption/cipher/aes256-gcm.ts",
     "rubyName": "encrypt",
     "call": "order:generateIv,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Rails builds `OpenSSL::Cipher.new` before `generate_iv` (aes256_gcm.rb:38-43) only so `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv` takes the IV as a constructor argument, so the IV must be produced first and the two calls necessarily swap order."
   },
   {
     "package": "activerecord",
@@ -46,6 +46,6 @@
     "tsFile": "encryption/cipher/aes256-gcm.ts",
     "rubyName": "generate_deterministic_iv",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`OpenSSL::Digest::SHA256.new` (aes256_gcm.rb:95) names the digest as an object; Node's `createHmac(\"sha256\", key)` names it as a string argument, so there is no constructor call to make."
   }
 ]

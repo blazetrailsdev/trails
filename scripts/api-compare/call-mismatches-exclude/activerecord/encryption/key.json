@@ -2,15 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/key.ts",
-    "rubyName": "derive_from",
-    "call": "derive_key_from",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/key.ts",
     "rubyName": "id",
     "call": "first",
-    "reason": "Verified per-site (RFC 0106): `Digest::SHA1.hexdigest(secret).first(4)` (`encryption/key.rb:25`) — ActiveSupport's `String#first(n)`, a positional idiom whose JS spelling is `slice(0, n)`. `first`/`last`/`size` are positional/property idioms with no JS call form, deliberately left uncredited by RFC 0092 (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment), so the reason-text route is the sanctioned one; nothing was dropped from the TS body. The digest divergence on the same line (SHA-256/8 chars where Rails takes SHA-1/4) is fixed here, closing `encryption-key-id-uses-sha256-not-sha1`."
+    "reason": "`Digest::SHA1.hexdigest(secret).first(4)` (key.rb:24) is ActiveSupport's String#first, whose faithful JS spelling is `String#slice(0, 4)` — a differently-named native call the gate cannot credit."
   }
 ]

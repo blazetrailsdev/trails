@@ -272,12 +272,12 @@ export class Encryptor {
     const key = encKeyObj.secret;
     if (key == null) throw new Configuration("No encryption key provided");
 
-    const [cipherInput, compressed] = this.compressIfWorthIt(clearText);
+    const [cipherInput, wasCompressed] = this.compressIfWorthIt(clearText);
     const message = this.cipher().encrypt(cipherInput, { key, ...cipherOptions });
-    if (compressed) message.addHeader("c", true);
     if (encKeyObj.publicTags) {
-      message.addHeaders(encKeyObj.publicTags);
+      message.headers.add(encKeyObj.publicTags);
     }
+    if (wasCompressed) message.headers.compressed = true;
     return message;
   }
 
