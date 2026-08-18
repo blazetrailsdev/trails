@@ -1,10 +1,10 @@
 /**
- * trails-only cover for the two `ActionDispatch::Request` arms that the
+ * trails-only cover for the `ActionDispatch::Request` arms that the
  * Rack-header convergence brought over and that `request_test.rb` does not
  * exercise directly: the chunked-transfer branch of `content_length`
  * (request.rb:292-295), the `fetch_header` memoization of `GET`
  * (request.rb:395-404), and the by-reference env `Rack::Request::Env#initialize`
- * gives every `set_header` (rack/request.rb:47-49) — the semantics
+ * gives every `set_header` — the semantics
  * `HostAuthorization#mark_as_authorized` (host_authorization.rb:167) relies on.
  */
 import { describe, it, expect } from "vitest";

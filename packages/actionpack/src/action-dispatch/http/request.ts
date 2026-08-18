@@ -153,16 +153,18 @@ export class Request {
   #method?: string;
   #requestMethod?: string;
 
+  /**
+   * Mirrors: `Request#initialize` (`request.rb:64-73`), whose `super` reaches
+   * `Rack::Request::Env#initialize` (`rack/request.rb:62-65`)
+   * and keeps `env` by reference — the semantics `set_header` writes through, so a write made on
+   * one `Request` is visible to the middleware downstream of it.
+   *
+   * The Rack minimums are filled in here because Rails' request tests get them
+   * from `Rack::MockRequest.env_for` (`request_test.rb:26`), which has no trails
+   * equivalent.
+   */
   constructor(env: RackEnv = {}) {
-    // `Rack::Request::Env#initialize` (`rack/request.rb:47-49`) holds the env by
-    // reference, and Rails depends on that: every `set_header` in
-    // action_dispatch/http/** is a mutation the next middleware observes — e.g.
-    // HostAuthorization#mark_as_authorized (host_authorization.rb:167) writes
-    // through a throwaway Request into the env the downstream app receives.
     this.env = env;
-    // Rails' request tests build their env through `Rack::MockRequest.env_for`,
-    // which supplies these; trails has no equivalent, so the constructor fills
-    // the same Rack minimums in.
     this.env["REQUEST_METHOD"] ??= "GET";
     this.env["SERVER_NAME"] ??= "localhost";
     this.env["SERVER_PORT"] ??= "80";

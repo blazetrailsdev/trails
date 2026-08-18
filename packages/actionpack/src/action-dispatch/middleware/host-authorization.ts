@@ -275,10 +275,12 @@ export class HostAuthorization {
     return out;
   }
 
-  /** @internal Mirrors: `HostAuthorization#excluded?` (`host_authorization.rb:163-165`). */
+  /**
+   * @internal Mirrors: `HostAuthorization#excluded?`
+   * (`host_authorization.rb:163-165`). `@exclude.call(request)` invokes a Proc,
+   * which carries no receiver, hence the `null` thisArg.
+   */
   private isExcluded(request: Request): boolean {
-    // `@exclude.call(request)` invokes a Proc, which carries no receiver, so the
-    // `null` thisArg — not `this.exclude(request)`, which would bind the middleware.
     return Boolean(this.exclude && this.exclude.call(null, request));
   }
 
