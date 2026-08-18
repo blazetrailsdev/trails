@@ -482,8 +482,14 @@ export class ThroughAssociation extends Association {
     if (!throughRefl) return null;
     const model = (this.reflection as any).activeRecord;
     const assocDef = model?._associations?.find((a: any) => a.name === this.reflection.name);
-    const sourceName = assocDef?.options?.source ?? (this.reflection as any).source;
-    if (sourceName) {
+    // `source_reflection_names` (reflection.rb:1108-1110) is the candidate list
+    // Rails scans. Unlike `source_reflection_name` it never touches
+    // `through_reflection.klass`, so it cannot raise NameError while the model
+    // registry is still filling — which is what this whole fallback exists for.
+    const sourceNames: string[] = assocDef?.options?.source
+      ? [assocDef.options.source as string]
+      : ((this.reflection as any).sourceReflectionNames?.() ?? []);
+    if (sourceNames.length > 0) {
       let throughKlass: typeof Base | null = null;
       try {
         throughKlass = throughRefl.klass;
@@ -491,10 +497,13 @@ export class ThroughAssociation extends Association {
         // klass resolution may fail for polymorphic reflections
       }
       if (throughKlass) {
-        const candidates = [sourceName, pluralize(sourceName), singularize(sourceName)];
-        for (const name of candidates) {
-          const r = throughKlass._reflectOnAssociation(name) as AssociationLikeReflection | null;
-          if (r) return r;
+        for (const sourceName of sourceNames) {
+          if (!sourceName) continue;
+          const candidates = [sourceName, pluralize(sourceName), singularize(sourceName)];
+          for (const name of candidates) {
+            const r = throughKlass._reflectOnAssociation(name) as AssociationLikeReflection | null;
+            if (r) return r;
+          }
         }
       }
     }

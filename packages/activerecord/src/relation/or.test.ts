@@ -11,8 +11,12 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Paragraph } from "../test-helpers/models/paragraph.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 
-registerModel([Author, Post, SpecialPost, Comment, Paragraph]);
+// `Post` declares `has_many :categories, through: :categorizations`, whose
+// through reflection resolves Categorization during automatic-inverse /
+// class-name derivation. Rails autoloads it there; trails needs it registered.
+registerModel([Author, Post, SpecialPost, Comment, Paragraph, Categorization]);
 
 // Compare via `<`/`>` (not subtraction): PG round-trips `id` as a BigInt and a
 // BigInt-returning sort comparator throws "Cannot convert a BigInt value to a
