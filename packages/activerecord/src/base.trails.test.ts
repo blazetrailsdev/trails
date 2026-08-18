@@ -416,10 +416,10 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     await dev.updateColumn("name", "name");
     await dev.reload();
     // A declared attribute IS in `types`, so an unprojected slot takes
-    // `default_attribute`'s `types.key?` arm and dups the initialized default
-    // (attribute_set/builder.rb:82-87, `Attribute::Null#with_type` →
-    // `with_cast_value`, attribute.rb:231-233) rather than landing on
-    // `Attribute.null`. Only a plain ignored column (the case above) drops out.
+    // `default_attribute`'s `types.key?` arm, which ASSIGNS `@attributes[name]`
+    // (attribute_set/builder.rb:82-87) — the `else` arm's `Attribute.null` is
+    // returned but never assigned, which is why only a plain ignored column
+    // (the case above) drops out of the set.
     expect("name" in dev).toBe(true);
   });
 });
