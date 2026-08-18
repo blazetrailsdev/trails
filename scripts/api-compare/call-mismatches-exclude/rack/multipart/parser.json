@@ -59,7 +59,7 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "multipart/parser.rb:161 is `body = String.new` — the empty body of a BufferPart, built before `klass.new(body, head, filename, content_type, name)` at parser.rb:164. The port has one `Part` class instead of MimePart/BufferPart/TempfilePart and constructs it up-front with an empty body (parser.ts:197), so the argumentless `String.new` pairs against that construction. Converging is the Collector class hierarchy, tracked by story `converge-rack-multipart-collector-mimepart-hierarchy` (RFC 0106)."
+    "reason": "rack multipart/parser.rb:161 seeds the buffer part's body with `String.new` (a mutable String buffer); JS strings are immutable and have no such constructor, so the port seeds it with the empty string literal — the 5-argument `klass.new` beside it (parser.rb:164) is ported as-is."
   },
   {
     "package": "rack",

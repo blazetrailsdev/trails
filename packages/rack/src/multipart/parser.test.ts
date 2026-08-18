@@ -29,10 +29,20 @@ const fixDir = path.join(
   "test",
   "multipart",
 );
+const tempfileFactory = (_filename: string, _contentType: string) => {
+  let buffer = "";
+  return {
+    write: (s: string) => {
+      buffer += s;
+    },
+    read: () => buffer,
+  };
+};
+
 function fix(
   name: string,
   boundary = "AaB03x",
-  tf: ((f: string, ct: string) => any) | null = null,
+  tf: (f: string, ct: string) => any = tempfileFactory,
 ) {
   const c = fs.readFileSync(path.join(fixDir, name), "binary");
   let done = false;

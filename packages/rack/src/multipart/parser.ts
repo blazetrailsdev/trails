@@ -142,8 +142,7 @@ class SBuf {
 // ── Collector ─────────────────────────────────────────────────────────────────
 
 /** @internal */
-export class Part {
-  isFile = false;
+export abstract class MimePart {
   constructor(
     public body: any,
     public head: string,
@@ -151,81 +150,131 @@ export class Part {
     public contentType: string | null | undefined,
     public name: string,
   ) {}
-  close() {
-    if (this.isFile && typeof this.body?.close === "function") this.body.close();
-  }
-  getData(cb: (d: any) => void) {
-    if (this.filename === "") return;
-    let d: any = this.body;
-    if (this.filename != null) {
+
+  /** @internal Declared by the BufferPart / TempfilePart subclasses. */
+  abstract isFile(): boolean;
+
+  /** @internal Declared by the BufferPart / TempfilePart subclasses. */
+  abstract close(): void;
+
+  /** @internal */
+  getData(cb: (data: any) => void): void {
+    let data: any = this.body;
+    if (this.filename === "") {
+      // filename is blank which means no file has been selected
+      return;
+    } else if (this.filename != null) {
       if (typeof this.body?.rewind === "function") this.body.rewind();
-      d = {
-        filename: this.filename.split(/[/\\]/).at(-1) ?? "",
+
+      // Take the basename of the upload's original filename.
+      // This handles the full Windows paths given by Internet Explorer
+      // (and perhaps other broken user agents) without affecting
+      // those which give the lone filename.
+      const fn = this.filename.split(/[/\\]/).at(-1) ?? "";
+
+      data = {
+        filename: fn,
         type: this.contentType,
         name: this.name,
         tempfile: this.body,
         head: this.head,
       };
     }
-    cb(d);
+
+    cb(data);
+  }
+}
+
+/** @internal */
+export class BufferPart extends MimePart {
+  /** @internal */
+  isFile(): boolean {
+    return false;
+  }
+  /** @internal */
+  close(): void {}
+}
+
+/** @internal */
+export class TempfilePart extends MimePart {
+  /** @internal */
+  isFile(): boolean {
+    return true;
+  }
+  /** @internal */
+  close(): void {
+    if (typeof this.body?.close === "function") this.body.close();
   }
 }
 
 /** @internal */
 export class Collector {
-  private parts: Part[] = [];
+  private mimeParts: MimePart[] = [];
   private openFiles = 0;
-  constructor(private tf: ((f: string, ct: string) => any) | null) {}
+  constructor(private tempfile: ((filename: string, contentType: string) => any) | null) {}
 
   /** @internal */
-  each(cb: (p: Part) => void) {
-    this.parts.forEach(cb);
+  each(cb: (part: MimePart) => void) {
+    this.mimeParts.forEach((part) => cb(part));
   }
 
-  files() {
-    return this.parts.filter((p) => p.isFile);
+  /** @internal Enumerable#find_all */
+  findAll(predicate: (part: MimePart) => boolean): MimePart[] {
+    return this.mimeParts.filter((part) => predicate(part));
   }
 
   /** @internal */
   onMimeHead(
-    i: number,
+    mimeIndex: number,
     head: string,
     filename: string | null | undefined,
-    ct: string | null | undefined,
+    contentType: string | null | undefined,
     name: string,
   ) {
-    const p = new Part("", head, filename, ct, name);
-    if (filename != null && this.tf) {
-      p.body = this.tf(filename, ct ?? "");
-      if (typeof p.body?.binmode === "function") p.body.binmode();
-      p.isFile = true;
-      this.openFiles++;
+    let body: any;
+    let klass: typeof BufferPart | typeof TempfilePart;
+    if (filename != null) {
+      body = this.tempfile!(filename, contentType ?? "");
+      if (typeof body?.binmode === "function") body.binmode();
+      klass = TempfilePart;
+      this.openFiles += 1;
+    } else {
+      body = "";
+      klass = BufferPart;
     }
-    this.parts[i] = p;
+
+    this.mimeParts[mimeIndex] = new klass(body, head, filename, contentType, name);
+
     this.checkPartLimits();
   }
 
   /** @internal */
-  onMimeBody(i: number, c: string) {
-    const p = this.parts[i];
-    if (typeof p.body === "string") p.body += c;
-    else if (typeof p.body?.write === "function") p.body.write(c);
+  onMimeBody(mimeIndex: number, content: string) {
+    const part = this.mimeParts[mimeIndex];
+    if (typeof part.body === "string") part.body += content;
+    else if (typeof part.body?.write === "function") part.body.write(content);
   }
 
   /** @internal */
-  onMimeFinish(_i: number) {}
+  onMimeFinish(_mimeIndex: number) {}
 
   /** @internal */
   private checkPartLimits() {
-    const fl = getMultipartFileLimit(),
-      pl = getMultipartTotalPartLimit();
-    if (fl > 0 && this.openFiles >= fl) {
-      this.parts.forEach((x) => x.close());
-      throw new MultipartPartLimitError();
+    const fileLimit = getMultipartFileLimit();
+    const partLimit = getMultipartTotalPartLimit();
+
+    if (fileLimit > 0) {
+      if (this.openFiles >= fileLimit) {
+        this.mimeParts.forEach((part) => part.close());
+        throw new MultipartPartLimitError("Maximum file multiparts in content reached");
+      }
     }
-    if (pl > 0 && this.parts.length >= pl) {
-      this.parts.forEach((x) => x.close());
-      throw new MultipartTotalPartLimitError();
+
+    if (partLimit > 0) {
+      if (this.mimeParts.length >= partLimit) {
+        this.mimeParts.forEach((part) => part.close());
+        throw new MultipartTotalPartLimitError("Maximum total multiparts in content reached");
+      }
     }
   }
 }
@@ -240,60 +289,65 @@ export class Parser {
   static readonly BUFSIZE = 1_048_576;
   static readonly TEXT_PLAIN = "text/plain";
   /** @internal */ state: State = "FAST_FORWARD";
-  private qp: QueryParser;
+  private queryParser: QueryParser;
   private params: ReturnType<QueryParser["makeParams"]>;
   private bufsize: number;
-  private mi = 0;
-  private col: Collector;
-  private sb: SBuf;
-  private bodyRe: RegExp;
-  private bodyReEnd: RegExp;
-  private endBSz: number;
-  private rxMaxSz: number;
-  private headRe: RegExp;
+  private mimeIndex = 0;
+  private collector: Collector;
+  private sbuf: SBuf;
+  private bodyRegex: RegExp;
+  private bodyRegexAtEnd: RegExp;
+  private endBoundarySize: number;
+  private rxMaxSize: number;
+  private headRegex: RegExp;
 
-  static parseBoundary(ct: string | null | undefined): string | null {
-    if (!ct) return null;
-    const m = MULTIPART.exec(ct);
-    return m ? m[1] : null;
+  static parseBoundary(contentType: string | null | undefined): string | null {
+    if (!contentType) return null;
+    const data = MULTIPART.exec(contentType);
+    if (!data) return null;
+    return data[1];
   }
 
   static parse(
     io: { read(n: number): string | null },
-    cl: number | null,
-    ct: string | null | undefined,
-    tmpfile: ((f: string, ct: string) => any) | null,
+    contentLength: number | null,
+    contentType: string | null | undefined,
+    tmpfile: ((filename: string, contentType: string) => any) | null,
     bufsize: number,
     qp: QueryParser,
   ): MultipartInfo {
-    if (cl === 0) return EMPTY;
-    const b = Parser.parseBoundary(ct);
-    if (!b) return EMPTY;
-    if (b.length > 70)
-      throw new BoundaryTooLongError(`multipart boundary size too large (${b.length} characters)`);
-    const boundedIo = cl != null ? new BoundedIO(io, cl) : io;
-    const p = new Parser(b, tmpfile, bufsize, qp);
-    p.parse(boundedIo);
-    return p.result();
+    if (contentLength === 0) return EMPTY;
+    const boundary = Parser.parseBoundary(contentType);
+    if (!boundary) return EMPTY;
+    if (boundary.length > 70)
+      // RFC 1521 Section 7.2.1 imposes a 70 character maximum for the boundary.
+      // Most clients use no more than 55 characters.
+      throw new BoundaryTooLongError(
+        `multipart boundary size too large (${boundary.length} characters)`,
+      );
+    if (contentLength != null) io = new BoundedIO(io, contentLength);
+    const parser = new Parser(boundary, tmpfile, bufsize, qp);
+    parser.parse(io);
+    return parser.result();
   }
 
   constructor(
     boundary: string,
-    tmpfile: ((f: string, ct: string) => any) | null,
+    tmpfile: ((filename: string, contentType: string) => any) | null,
     bufsize: number,
     queryParser: QueryParser,
   ) {
-    this.qp = queryParser;
+    this.queryParser = queryParser;
     this.params = queryParser.makeParams();
     this.bufsize = bufsize;
-    this.col = new Collector(tmpfile);
-    this.sb = new SBuf("");
+    this.collector = new Collector(tmpfile);
+    this.sbuf = new SBuf("");
     const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    this.bodyRe = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)`, "s");
-    this.bodyReEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
-    this.endBSz = boundary.length + 4;
-    this.rxMaxSz = boundary.length + 6;
-    this.headRe = new RegExp(`(.*?${EOL})${EOL}`, "s");
+    this.bodyRegex = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)`, "s");
+    this.bodyRegexAtEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
+    this.endBoundarySize = boundary.length + 4;
+    this.rxMaxSize = boundary.length + 6;
+    this.headRegex = new RegExp(`(.*?${EOL})${EOL}`, "s");
   }
 
   parse(io: { read(n: number, outbuf?: string): string | null }) {
@@ -311,13 +365,16 @@ export class Parser {
   }
 
   result(): MultipartInfo {
-    this.col.each((p) =>
-      p.getData((d) => {
-        this.tagMultipartEncoding(p.filename, p.contentType, p.name, d);
-        this.qp.normalizeParams(this.params, p.name, d);
+    this.collector.each((part) =>
+      part.getData((data) => {
+        this.tagMultipartEncoding(part.filename, part.contentType, part.name, data);
+        this.queryParser.normalizeParams(this.params, part.name, data);
       }),
     );
-    return { params: this.params.toParamsHash(), tmpFiles: this.col.files().map((p) => p.body) };
+    return {
+      params: this.params.toParamsHash(),
+      tmpFiles: this.collector.findAll((part) => part.isFile()).map((part) => part.body),
+    };
   }
 
   /** @internal From WEBrick::HTTPUtils */
@@ -332,7 +389,7 @@ export class Parser {
   ) {
     const content = io.read(this.bufsize, outbuf);
     this.handleEmptyContentBang(content);
-    this.sb.concat(content!);
+    this.sbuf.concat(content!);
   }
 
   /** @internal */ private handleFastForward(): void | "want_read" {
@@ -343,7 +400,7 @@ export class Parser {
         return;
       }
       if (t === "END_BOUNDARY") {
-        if (this.sb.pos === this.endBSz && this.sb.rest === EOL) {
+        if (this.sbuf.pos === this.endBoundarySize && this.sbuf.rest === EOL) {
           this.state = "DONE";
           return;
         }
@@ -353,77 +410,77 @@ export class Parser {
 
   /** @internal */ private handleConsumeToken() {
     const t = this.consumeBoundary();
-    this.state = t === "END_BOUNDARY" || (this.sb.eos && t !== "BOUNDARY") ? "DONE" : "MIME_HEAD";
+    this.state = t === "END_BOUNDARY" || (this.sbuf.eos && t !== "BOUNDARY") ? "DONE" : "MIME_HEAD";
   }
 
   /** @internal */ private handleMimeHead(): void | "want_read" {
-    if (!this.sb.scanUntil(this.headRe)) return "want_read";
-    const head = this.sb.cap(1),
-      ct = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
-    let name: string | undefined, filename: string | undefined, fstar: string | undefined;
-    const dm = MULTIPART_CONTENT_DISPOSITION.exec(head);
-    if (dm && dm[1].length <= CONTENT_DISPOSITION_MAX_BYTES) {
-      const p = this.parseDispositionParams(dm[1]);
-      name = p.name;
-      filename = p.filename;
-      fstar = p.filenameStar;
+    if (!this.sbuf.scanUntil(this.headRegex)) return "want_read";
+    const head = this.sbuf.cap(1),
+      contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
+    let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
+    const dispositionMatch = MULTIPART_CONTENT_DISPOSITION.exec(head);
+    if (dispositionMatch && dispositionMatch[1].length <= CONTENT_DISPOSITION_MAX_BYTES) {
+      const params = this.parseDispositionParams(dispositionMatch[1]);
+      name = params.name;
+      filename = params.filename;
+      filenameStar = params.filenameStar;
     } else {
-      const im = MULTIPART_CONTENT_ID.exec(head);
-      if (im) name = im[1];
+      const contentId = MULTIPART_CONTENT_ID.exec(head);
+      if (contentId) name = contentId[1];
     }
-    if (fstar) filename = this.normalizeFilename(fstar.split("'", 3)[2] ?? "");
+    if (filenameStar) filename = this.normalizeFilename(filenameStar.split("'", 3)[2] ?? "");
     else if (filename != null) filename = this.normalizeFilename(filename);
-    if (!name) name = filename ?? `${ct ?? Parser.TEXT_PLAIN}[]`;
-    this.col.onMimeHead(this.mi, head, filename, ct, name);
+    if (!name) name = filename ?? `${contentType ?? Parser.TEXT_PLAIN}[]`;
+    this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
     this.state = "MIME_BODY";
   }
 
   /** @internal */ private handleMimeBody(): void | "want_read" {
-    const bwb = this.sb.checkUntil(this.bodyRe);
-    if (bwb != null) {
-      const body = bwb.replace(this.bodyReEnd, "");
-      this.col.onMimeBody(this.mi, body);
-      this.sb.pos += body.length + 2;
+    const bodyWithBoundary = this.sbuf.checkUntil(this.bodyRegex);
+    if (bodyWithBoundary != null) {
+      const body = bodyWithBoundary.replace(this.bodyRegexAtEnd, "");
+      this.collector.onMimeBody(this.mimeIndex, body);
+      this.sbuf.pos += body.length + 2;
       this.state = "CONSUME_TOKEN";
-      this.mi++;
+      this.mimeIndex++;
     } else {
-      if (this.rxMaxSz < this.sb.restSize) {
-        const d = this.sb.restSize - this.rxMaxSz;
-        this.col.onMimeBody(this.mi, this.sb.peek(d));
-        this.sb.pos += d;
-        this.sb.string = this.sb.rest;
+      if (this.rxMaxSize < this.sbuf.restSize) {
+        const delta = this.sbuf.restSize - this.rxMaxSize;
+        this.collector.onMimeBody(this.mimeIndex, this.sbuf.peek(delta));
+        this.sbuf.pos += delta;
+        this.sbuf.string = this.sbuf.rest;
       }
       return "want_read";
     }
   }
 
   /** @internal */ private consumeBoundary(): "BOUNDARY" | "END_BOUNDARY" | null {
-    const r = this.sb.scanUntil(this.bodyRe);
+    const r = this.sbuf.scanUntil(this.bodyRegex);
     if (r) return r.endsWith(EOL) ? "BOUNDARY" : "END_BOUNDARY";
-    this.sb.terminate();
+    this.sbuf.terminate();
     return null;
   }
-  /** @internal */ private normalizeFilename(fn: string): string {
-    if (!/%(?![0-9a-fA-F]{2})/.test(fn)) {
+  /** @internal */ private normalizeFilename(filename: string): string {
+    if (!/%(?![0-9a-fA-F]{2})/.test(filename)) {
       try {
-        fn = unescapePath(fn);
+        filename = unescapePath(filename);
       } catch {
         /* keep as-is for malformed UTF-8 sequences */
       }
     }
-    return fn.split(/[/\\]/).at(-1) ?? "";
+    return filename.split(/[/\\]/).at(-1) ?? "";
   }
   /** @internal */ private tagMultipartEncoding(
-    _f: string | null | undefined,
-    _ct: string | null | undefined,
-    _n: string,
-    _b: any,
+    _filename: string | null | undefined,
+    _contentType: string | null | undefined,
+    _name: string,
+    _body: any,
   ) {}
   /** @internal */ private findEncoding(enc: string | null | undefined): string {
     return enc ?? "UTF-8";
   }
-  /** @internal */ private handleEmptyContentBang(c: string | null | undefined) {
-    if (!c) throw new EmptyContentError();
+  /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {
+    if (!content) throw new EmptyContentError();
   }
 
   private parseDispositionParams(raw: string): {
