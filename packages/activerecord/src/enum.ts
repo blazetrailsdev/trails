@@ -13,7 +13,7 @@ import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
-import { loadSchema as reflectSchemaSync } from "./model-schema.js";
+import { loadSchema as reflectSchemaSync, ownProp, type SchemaHost } from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -981,13 +981,18 @@ export function raiseConflictError(
 export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
   const host = klass as unknown as {
     _enumsPendingTypeCheck?: Set<string>;
-    _columnsHash?: Record<string, { type?: unknown } | undefined>;
   };
   const pending = host._enumsPendingTypeCheck;
   if (!pending || !pending.has(name)) return;
   // A backing DB column resolves the subtype; an unknown name is simply absent
-  // from the resolved columns hash.
-  const column = host._columnsHash?.[name];
+  // from the resolved columns hash. `ownProp`, NOT `ownSchemaMemo`: this runs
+  // inside the class's own decorator replay, before `applyColumnsHash` stamps
+  // `_schemaRevision`, so the `schemaStaleAgainstAncestors` pull fallback would
+  // blank the hash just written.
+  const columnsHash = ownProp(klass as unknown as SchemaHost, "_columnsHash") as
+    | Record<string, { type?: unknown } | undefined>
+    | undefined;
+  const column = columnsHash?.[name];
   if (column && column.type != null) {
     // Backed by a real column — clear the marker so we don't re-check on every
     // subsequent `typeForAttribute` call. Copy-on-write to avoid mutating an

@@ -373,13 +373,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (collection_proxy.rb): `records.length`. `records` resolves through
    * `load_target`, which returns the cached `@target` when the association is
    * already loaded — so a loaded proxy counts in memory with NO query and only
-   * an unloaded one re-queries. The inherited `Relation#length` always
-   * re-queries via `toArray`/`_execLoad`, which is why we override here: the
-   * proxy keeps loaded state in `_target`/`_targetLoaded`, not Relation's
-   * `_records`/`_loaded`, so `loadTarget()` (which short-circuits on
-   * `_targetLoaded`) is the faithful path.
+   * an unloaded one re-queries. `Relation`'s `to: :records` delegate
+   * (delegation.rb:101) always re-queries via `toArray`/`_execLoad`, which is
+   * why this overrides it: the proxy keeps loaded state in
+   * `_target`/`_targetLoaded`, not Relation's `_records`/`_loaded`, so
+   * `loadTarget()` (which short-circuits on `_targetLoaded`) is the faithful
+   * path.
    */
-  override async length(): Promise<number> {
+  async length(): Promise<number> {
     return (await this.loadTarget()).length;
   }
 

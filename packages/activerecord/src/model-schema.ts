@@ -56,7 +56,16 @@ function nextSchemaEpoch(): number {
   return ++schemaEpoch;
 }
 
-function ownProp<K extends keyof SchemaHost>(host: SchemaHost, key: K): SchemaHost[K] | undefined {
+/**
+ * Ruby class ivars are not inherited; JS statics are. Reads the memo only when
+ * the class owns it, so a subclass never serves an ancestor's value.
+ *
+ * @internal
+ */
+export function ownProp<K extends keyof SchemaHost>(
+  host: SchemaHost,
+  key: K,
+): SchemaHost[K] | undefined {
   return Object.prototype.hasOwnProperty.call(host, key) ? host[key] : undefined;
 }
 
@@ -576,7 +585,7 @@ export async function createTable(this: typeof Base): Promise<void> {
 // Missing ClassMethods from parity:api
 // ---------------------------------------------------------------------------
 
-interface SchemaHost {
+export interface SchemaHost {
   name: string;
   tableName: string;
   primaryKey: string | string[];
