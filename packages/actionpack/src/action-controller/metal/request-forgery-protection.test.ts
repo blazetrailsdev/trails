@@ -287,6 +287,16 @@ describe("P20b/P20c smoke", () => {
     expect(requestAuthenticityTokens(c)).toEqual(["p", "x"]);
   });
 
+  it("Exception raises InvalidAuthenticityToken with its warningMessage", () => {
+    const strategy = new Exception({} as never);
+    expect(() => strategy.handleUnverifiedRequest()).toThrow(InvalidAuthenticityToken);
+
+    strategy.warningMessage = "HTTP Origin header didn't match request.base_url";
+    expect(() => strategy.handleUnverifiedRequest()).toThrow(
+      "HTTP Origin header didn't match request.base_url",
+    );
+  });
+
   it("protectionMethodClass maps names + passes class through", () => {
     expect(protectionMethodClass("null_session")).toBe(NullSession);
     expect(protectionMethodClass("reset_session")).toBe(ResetSession);
