@@ -118,12 +118,12 @@ describe("TestDate", () => {
    * ruby/date `test/date/test_date.rb:46-107`.
    *
    * `assert_instance_of(DateSub, DateSub.today)` and its `DateTimeSub.now`
-   * sibling (`:53-54`) assert the class the port cannot answer there: RFC
-   * 0088's mapping table has the two statics answer a `Temporal.PlainDate` /
+   * sibling (`:53-54`) assert the class the port cannot answer there: the
+   * mapping table RFC 0088 commits to (`README.md:110-122`, "Temporal is the
+   * default return type") has the two statics answer a `Temporal.PlainDate` /
    * `Temporal.ZonedDateTime` rather than a gem-shaped instance, so there is no
    * receiver class for them to carry and the two lines assert what the port
-   * does answer instead. Story `port-date-sub-today-now-receiver-class`
-   * (RFC 0088) converges them; every other assertion is here verbatim.
+   * does answer instead. Every other assertion is here verbatim.
    */
   it("sub", () => {
     const d = new DateSub();

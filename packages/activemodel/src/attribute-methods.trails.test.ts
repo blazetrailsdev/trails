@@ -49,4 +49,28 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(new Person({ name: "Alexander" }).nicknameShort()).toBe("parent");
     expect(new Employee({ name: "Alexander" }).nicknameShort()).toBe("Ale");
   });
+
+  it("the bare pattern generates the reader through the define_method_attribute hook", () => {
+    const seen: string[] = [];
+    class Person extends Model {
+      static defineMethodAttribute = function (
+        this: unknown,
+        canonicalName: string,
+        options: Parameters<typeof Model.defineMethodAttribute>[1],
+      ) {
+        seen.push(canonicalName);
+        return Model.defineMethodAttribute.call(this, canonicalName, options);
+      };
+      static {
+        this.attribute("name", "string");
+      }
+    }
+
+    expect(seen).toEqual(["name"]);
+    expect(Object.getOwnPropertyDescriptor(Person.prototype, "name")).toBeUndefined();
+    const person = new Person({ name: "Alexander" });
+    expect(person.name).toBe("Alexander");
+    person.name = "Bob";
+    expect(person.readAttribute("name")).toBe("Bob");
+  });
 });

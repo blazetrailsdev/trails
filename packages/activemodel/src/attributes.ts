@@ -1,3 +1,4 @@
+import type { CodeGenerator } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
@@ -13,6 +14,8 @@ import {
   attributeAliases as _attributeAliases,
   isAttributeAliases as _isAttributeAliases,
   attributeMethodPatterns as _attributeMethodPatterns,
+  buildMangledName,
+  defineAttributeMethod as _defineAttributeMethod,
   isAttributeMethodPatterns as _isAttributeMethodPatterns,
   isRespondToWithoutAttributes as _isRespondToWithoutAttributes,
   type AttributeMethodHost,
@@ -23,7 +26,7 @@ import {
   pushPendingDefault,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
-import { MissingAttributeError, type InstanceHost } from "./attribute-methods.js";
+import { type InstanceHost } from "./attribute-methods.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -108,7 +111,16 @@ export interface AttributeOptions {
   range?: boolean;
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
+ * — registers the attribute, then `define_attribute_method(name)` generates its
+ * methods. A name the class already answers (`toJSON`, `freeze`, `attributes`)
+ * gets no accessor, because `define_attribute_method_pattern`'s
+ * `instance_method_already_implemented?` arm rejects it; such an attribute still
+ * round-trips through `readAttribute` / `writeAttribute`.
+ *
+ * @internal
+ */
 export function attribute(
   this: {
     _attributeDefinitions: Map<string, AttributeDefinition>;
@@ -184,63 +196,48 @@ export function attribute(
   // and all known subclasses so they recompute on next _defaultAttributes() call.
   resetDefaultAttributes(this);
 
-  // Don't install an accessor if `name` resolves anywhere on the prototype
-  // chain (Model.prototype or any ancestor). Otherwise an attribute named
-  // e.g. `toJSON` / `asJson` / `freeze` / `attributes` would shadow the
-  // framework method on this subclass — JSON.stringify would hit the
-  // attribute getter instead of `Model#toJSON`, serialization callers
-  // would get the raw value instead of the mixin, etc. The attribute
-  // still round-trips via `readAttribute(name)` / `writeAttribute(name,
-  // value)`, which operate on `_attributes` directly — callers MUST use
-  // those methods for reserved names, NOT direct property access
-  // (`instance[name]`) or assignment (`instance[name] = value`). Direct
-  // assignment would create an own property on the instance and shadow
-  // the framework method per-instance.
-  if (!(name in this.prototype)) {
-    Object.defineProperty(this.prototype, name, {
-      get(this: {
-        readAttribute(n: string): unknown;
-        _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-      }) {
-        if (!this._attributes.getAttribute(name).isInitialized()) {
-          throw new MissingAttributeError(
-            `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-          );
-        }
-        return this.readAttribute(name);
-      },
-      set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
-        this.writeAttribute(name, value);
-      },
-      configurable: true,
-    });
-  }
+  _defineAttributeMethod.call(this as unknown as AttributeMethodHost, name);
 
   defineDirtyAttributeMethods(this.prototype, name);
 }
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
+ * (attributes.rb:92-102) — the writer hook `define_attribute_method_pattern`
+ * dispatches the `"="` suffix pattern (attributes.rb:35) through
+ * (attribute_methods.rb:333-335), generating
+ * `def name=(value); _write_attribute("name", value); end`.
  *
- * In Rails this generates a `canonical_name=` writer via code evaluation.
- * Trails installs writers via Object.defineProperty in `attribute()`, so no
- * code generation is required here. The method exists for API-compare parity
- * and to expose the AttrNames accessor-method computation that Rails uses
- * to derive the writer method name.
+ * Ruby's `name=` writer takes the `set*` spelling here
+ * (docs/ruby-ts-conventions.md) because the bare camel name belongs to the
+ * bare pattern's generated reader, as it does in Ruby. The generated method
+ * keeps Rails' own name, `"#{as}="`; a JS assignment (`person.name = x`)
+ * reaches the `set` half of that reader's accessor property instead, because a
+ * `MethodSet` applies one descriptor per generated name
+ * (code_generator.rb:32-36) and a property cannot take its halves from two.
  *
  * @internal Rails-private helper.
  */
-export function defineMethodAttribute(
+export function setDefineMethodAttribute(
+  this: unknown,
   canonicalName: string,
-  { owner }: { owner?: unknown; as?: string } = {},
+  { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  // Writers are already installed by attribute() via Object.defineProperty.
-  // Compute and expose the method name the same way Rails would, for callers
-  // that inspect the name (e.g. alias generation paths).
   const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
     writer: true,
   });
-  void methodName;
+  const tempMethodName = buildMangledName(methodName);
+  owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as: `${as}=` }, (batch) => {
+    batch.push((mod) => {
+      Object.defineProperty(mod, tempMethodName, {
+        value: function (this: { _writeAttribute(n: string, v: unknown): void }, value: unknown) {
+          this._writeAttribute(canonicalName, value);
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+  });
 }
 
 /**

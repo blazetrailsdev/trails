@@ -83,6 +83,7 @@ import {
   type AttributeMethodHost,
   resolveAliasName,
   resolveAliasNameIn,
+  defineMethodAttribute,
   undefineAttributeMethods,
   attributeMissing,
   attributeAliases,
@@ -110,7 +111,7 @@ import { FormatValidator } from "./validations/format.js";
 import { AcceptanceValidator } from "./validations/acceptance.js";
 import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
-import { type AttributeDefinition, attribute } from "./attributes.js";
+import { type AttributeDefinition, attribute, setDefineMethodAttribute } from "./attributes.js";
 import {
   _defaultAttributes,
   attributeTypes,
@@ -280,13 +281,12 @@ export class Model {
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   // Rails: `class_attribute :attribute_method_patterns, … default:
   // [ ClassMethods::AttributeMethodPattern.new ]`
-  // (activemodel/lib/active_model/attribute_methods.rb:72). The bare pattern
-  // (empty prefix/suffix) routes the plain `attribute` reader through Ruby's
-  // method_missing. trails has no method_missing — attribute readers are real
-  // accessor properties defined by `attribute()` — so `defineAttributeMethodPattern`
-  // skips the bare pattern to avoid generating a colliding `attr` method, while
-  // the seed keeps `attributeMethodPatterns()` faithful to Rails' default.
-  static _attributeMethodPatterns: AttributeMethodPattern[] = [new AttributeMethodPattern()];
+  // (activemodel/lib/active_model/attribute_methods.rb:72), plus the `"="`
+  // suffix pattern `Attributes` adds on include (attributes.rb:35).
+  static _attributeMethodPatterns: AttributeMethodPattern[] = [
+    new AttributeMethodPattern(),
+    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
+  ];
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
@@ -310,6 +310,8 @@ export class Model {
   // -- Attributes (Phase 1000) --
 
   static attribute = attribute;
+  static defineMethodAttribute = defineMethodAttribute;
+  static setDefineMethodAttribute = setDefineMethodAttribute;
   static _defaultAttributes = _defaultAttributes;
   static decorateAttributes = decorateAttributes;
   static attributeTypes = attributeTypes;

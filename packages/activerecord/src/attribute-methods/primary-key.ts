@@ -4,7 +4,10 @@
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 import { underscore } from "@blazetrails/activesupport";
-import { dangerousAttributeMethods } from "../attribute-methods.js";
+import {
+  dangerousAttributeMethods,
+  isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
+} from "../attribute-methods.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 interface PrimaryKeyRecord {
@@ -284,15 +287,47 @@ export function id(this: PrimaryKeyInstance, value?: unknown): unknown {
   return readId.call(this);
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods::ID_ATTRIBUTE_METHODS
+ * (primary_key.rb:66). The Ruby names are translated by
+ * docs/ruby-ts-conventions.md, except `id=` and `id?`, which are the names
+ * `define_attribute_method_pattern` builds from the `"="` and `"?"` suffix
+ * patterns and so are what the guard is asked about.
+ */
+const ID_ATTRIBUTE_METHODS = new Set([
+  "id",
+  "id=",
+  "id?",
+  "idBeforeTypeCast",
+  "idWas",
+  "idInDatabase",
+  "idForDatabase",
+]);
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#instance_method_already_implemented?
+ * (primary_key.rb:69-71) — `super || primary_key && ID_ATTRIBUTE_METHODS.include?(method_name)`.
+ * `PrimaryKey` is included after `AttributeMethods`, so this override runs
+ * first and `super` is the one in attribute-methods.ts.
+ */
 export function isInstanceMethodAlreadyImplemented(
   this: PrimaryKeyHost & { prototype: any },
   methodName: string,
 ): boolean {
-  return methodName in this.prototype;
+  return (
+    attributeMethodsIsInstanceMethodAlreadyImplemented.call(this as any, methodName) ||
+    (primaryKey.call(this) != null && ID_ATTRIBUTE_METHODS.has(methodName))
+  );
 }
 
-export function isDangerousAttributeMethod(_this: PrimaryKeyHost, name: string): boolean {
-  return dangerousAttributeMethods().has(name);
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#dangerous_attribute_method?
+ * (primary_key.rb:74-76) — `super && !ID_ATTRIBUTE_METHODS.include?(method_name)`,
+ * which is what keeps the `super` above from raising for the id methods Active
+ * Record itself defines.
+ */
+export function isDangerousAttributeMethod(this: PrimaryKeyHost, name: string): boolean {
+  return dangerousAttributeMethods().has(name) && !ID_ATTRIBUTE_METHODS.has(name);
 }
 
 /**
