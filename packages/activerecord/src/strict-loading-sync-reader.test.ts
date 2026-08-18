@@ -139,7 +139,9 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     ship.strictLoadingBang();
     const developer = new Developer({ id: developers("david").id });
     const assoc = ship.association("developer") as any;
-    assoc.target = developer;
+    // The Preloader path's bare `@target = …` (association.rb:189); `target=`
+    // would mark it loaded (:100-103) and skip the reader path under test.
+    assoc._writeTargetStore(developer);
     // loaded is still false; reader short-circuits on the non-null target.
     expect(assoc.loaded).toBe(false);
     expect(() => (ship as any).developer).not.toThrow();
