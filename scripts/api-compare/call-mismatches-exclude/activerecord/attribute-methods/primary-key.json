@@ -44,20 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "instance_method_already_implemented?",
-    "call": "include?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails primary_key.rb:69-71 is `super || primary_key && ID_ATTRIBUTE_METHODS.include?(method_name)`; trails primary-key.ts:274-279 answers via `methodName in this.prototype` — the prototype chain already contains the id methods the Rails guard enumerates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "instance_method_already_implemented?",
-    "call": "primary_key",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails primary_key.rb:69-71 is `super || primary_key && ID_ATTRIBUTE_METHODS.include?(method_name)`; trails primary-key.ts:274-279 answers via `methodName in this.prototype` — the prototype chain already contains the id methods the Rails guard enumerates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "reset_primary_key",
     "call": "base_class?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

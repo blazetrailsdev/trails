@@ -411,6 +411,12 @@ const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
  *
  * Rails' only `override: true` caller is `alias_attribute_method_definition`
  * (activerecord/attribute_methods.rb:94), and so is trails'.
+ *
+ * `"define_method_#{pattern.proxy_target}"` (attribute_methods.rb:333) is
+ * spelled out rather than interpolated: a proxy target ending in `=` names a
+ * Ruby writer, whose bare camel spelling belongs to the reader hook of the same
+ * name, so it takes the `set*` fallback docs/ruby-ts-conventions.md gives a
+ * `name=` writer.
  */
 export function defineAttributeMethodPattern(
   this: AttributeMethodHost,
@@ -438,21 +444,9 @@ export function defineAttributeMethodPattern(
     if (!override) return;
   }
 
-  // Rails' default bare pattern (empty prefix/suffix) exists to route the plain
-  // `attribute` reader through method_missing. trails exposes readers as real
-  // accessor properties via `attribute()`, so generating a bare `attr` method
-  // for the attribute's own name would collide with that accessor — the seeded
-  // bare pattern is kept only so `attributeMethodPatterns()` matches Rails'
-  // default. An alias name has no such accessor, so for `alias_attribute` this
-  // pattern is what defines it, as it is in Rails; the writer rides along on
-  // the same accessor property instead of coming from an `attribute=` pattern.
-  if (pattern.prefix === "" && pattern.suffix === "") {
-    if (as === attrName) return;
-    defineAliasAccessor(owner, canonicalMethodName, publicMethodName, attrName);
-    return;
-  }
-
-  const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);
+  const generateMethod = pattern.proxyTarget.endsWith("=")
+    ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
+    : camelize(`define_method_${pattern.proxyTarget}`, false);
 
   const generator = (this as unknown as Record<string, unknown>)[generateMethod];
   if (typeof generator === "function") {
@@ -593,16 +587,6 @@ export function defineProxyCall(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Instance-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-export type InstanceHost = {
-  _attributes?: { has(name: string): boolean };
-  _attributeMethodPatterns?: AttributeMethodPattern[];
-  constructor: AttributeMethodHost;
-};
-
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#build_mangled_name
  * Returns a compilable temp name for attributes with non-identifier characters.
@@ -614,6 +598,16 @@ export function buildMangledName(name: string): string {
     .join("");
   return `__temp__${hex}`;
 }
+
+// ---------------------------------------------------------------------------
+// Instance-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+export type InstanceHost = {
+  _attributes?: { has(name: string): boolean };
+  _attributeMethodPatterns?: AttributeMethodPattern[];
+  constructor: AttributeMethodHost;
+};
 
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#define_call
@@ -665,46 +659,83 @@ function extractParameters(affixes: Array<string | { parameters?: string | null 
 }
 
 /**
- * @internal The alias reader/writer pair for the bare pattern. Rails generates
- * a plain reader here and takes the writer from the `attribute=` pattern; trails
- * spells readers as accessor properties (see `attribute()`), so the alias is one
- * get/set property. `@noRailsEquivalent` — the accessor half of
- * `define_attribute_method_pattern`'s bare arm, which has no separate name in
- * Rails.
+ * Whether a class body — as opposed to a generated attribute-methods module —
+ * answers `name` anywhere up the chain. `include()` splices a module's carrier
+ * directly below the including class's prototype, and a carrier has no own
+ * `constructor`, which is what tells the two apart; that is the JS spelling of
+ * Rails' `!superclass.instance_method(name).owner.is_a?(GeneratedAttributeMethods)`
+ * (activerecord/attribute_methods.rb:170-176).
+ *
+ * @noRailsEquivalent PERMANENT. Rails' ActiveModel happily generates a reader
+ * over an inherited method, because a Ruby reader is an ordinary method and
+ * nothing in the runtime depends on `to_json` staying callable. A trails reader
+ * is an accessor property, so generating one for `attribute("toJSON")` would
+ * leave `JSON.stringify` with a string where the runtime demands a function —
+ * pinned by "attribute named toJSON does not shadow Model#toJSON". ActiveRecord
+ * needs none of this: its `instance_method_already_implemented?` override
+ * (attribute_methods.rb:165-179) rejects such a name before the hook runs.
  */
-function defineAliasAccessor(
-  owner: CodeGenerator,
-  canonicalMethodName: string,
-  publicMethodName: string,
-  attrName: string,
+function isDefinedByAClassBody(klass: unknown, name: string): boolean {
+  const start = (klass as { prototype?: object }).prototype;
+  for (
+    let link: object | null = start ?? null;
+    link;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    if (!Object.prototype.hasOwnProperty.call(link, name)) continue;
+    return Object.prototype.hasOwnProperty.call(link, "constructor");
+  }
+  return false;
+}
+
+/**
+ * @noRailsEquivalent PERMANENT. ActiveModel has no `define_method_attribute`:
+ * for a plain `ActiveModel::Attributes` includer,
+ * `respond_to?("define_method_attribute", true)` is false, so the bare pattern
+ * takes the `else` branch of attribute_methods.rb:333-346 and
+ * `define_proxy_call` generates the ordinary method
+ * `def name; attribute("name"); end`, dispatching to the private instance
+ * method `attribute(attr_name)` (attributes.rb:161). Only ActiveRecord defines
+ * the hook (attribute_methods/read.rb:11). This is invented surface, taking
+ * that hook's name so `define_attribute_method_pattern` reaches it, because
+ * trails spells an attribute reader as an accessor property (`person.name`,
+ * not `person.name()`) and `define_proxy_call` emits an ordinary method. The
+ * descriptor also carries the `set` half, since a `MethodSet` applies one
+ * descriptor per generated name (code_generator.rb:32-36) and a property
+ * cannot take its halves from two — so `define_method_attribute=`'s generated
+ * `name=` (attributes.rb:92) is a method beside it rather than this property's
+ * setter.
+ */
+export function defineMethodAttribute(
+  this: unknown,
+  canonicalName: string,
+  { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const mangledName = buildMangledName(canonicalMethodName);
-  owner.defineCachedMethod(
-    mangledName,
-    { namespace: "alias_attribute", as: publicMethodName },
-    (sources) => {
-      sources.push((mod) => {
-        Object.defineProperty(mod, mangledName, {
-          get(
-            this: ReadWriteHost & {
-              _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-            },
-          ) {
-            if (!this._attributes.getAttribute(attrName).isInitialized()) {
-              throw new MissingAttributeError(
-                `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-              );
-            }
-            return this.readAttribute(attrName);
+  if (as === canonicalName && isDefinedByAClassBody(this, as)) return;
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
+  const mangledName = buildMangledName(methodName);
+  owner.defineCachedMethod(mangledName, { namespace: "active_model", as }, (sources) => {
+    sources.push((mod) => {
+      Object.defineProperty(mod, mangledName, {
+        get(
+          this: ReadWriteHost & {
+            _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
           },
-          set(this: ReadWriteHost, value: unknown) {
-            this.writeAttribute(attrName, value);
-          },
-          configurable: true,
-        });
+        ) {
+          if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
+            throw new MissingAttributeError(
+              `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+            );
+          }
+          return this.readAttribute(canonicalName);
+        },
+        set(this: ReadWriteHost, value: unknown) {
+          this.writeAttribute(canonicalName, value);
+        },
+        configurable: true,
       });
-    },
-  );
+    });
+  });
 }
 
 function ensureOwnPatterns(host: AttributeMethodHost): void {

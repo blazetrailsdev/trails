@@ -9,7 +9,8 @@
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */
 
-import { Model, AttrNames } from "@blazetrails/activemodel";
+import { Model, AttrNames, buildMangledName } from "@blazetrails/activemodel";
+import type { CodeGenerator } from "@blazetrails/activesupport";
 
 /**
  * The Write module interface.
@@ -37,23 +38,46 @@ export function _writeAttribute(this: Model, name: string, value: unknown): void
   Model.prototype._writeAttribute.call(this, name, value);
 }
 
-// Mirrors: ActiveRecord::AttributeMethods::Write::ClassMethods private#define_method_attribute=
-// Rails derives writer method metadata via defineAttributeAccessorMethod and
-// uses it while generating dynamic attribute writers. TypeScript attribute
-// access is handled statically, so we compute the same metadata for parity
-// but intentionally do not register or define anything.
-/** @internal */
-function defineMethodAttribute(
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::Write::ClassMethods private
+ * #define_method_attribute= (write.rb:15-26) — the writer hook
+ * `define_attribute_method_pattern` dispatches the `"="` suffix pattern
+ * (write.rb:10) through (activemodel/attribute_methods.rb:333-335), generating
+ * `def name=(value); _write_attribute("name", value); end`.
+ *
+ * Ruby's `name=` writer takes the `set*` spelling here
+ * (docs/ruby-ts-conventions.md) because the bare camel name belongs to `Read`'s
+ * `define_method_attribute` (read.rb:11), as it does in Ruby. The generated
+ * method keeps Rails' own name, `"#{as}="`; a JS assignment reaches the `set`
+ * half of that hook's accessor property instead, because a
+ * `MethodSet` applies one descriptor per generated name
+ * (activesupport/code_generator.rb:32-36) and a property cannot take its halves
+ * from two.
+ *
+ * @internal Rails-private helper.
+ */
+export function setDefineMethodAttribute(
+  this: unknown,
   canonicalName: string,
-  { owner }: { owner?: unknown; as?: string } = {},
+  { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(
-    owner,
-    canonicalName,
-    {
-      writer: true,
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
+    writer: true,
+  });
+  const tempMethodName = buildMangledName(methodName);
+  owner.defineCachedMethod(
+    tempMethodName,
+    { namespace: "active_record", as: `${as}=` },
+    (batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, tempMethodName, {
+          value: function (this: Model, value: unknown) {
+            this._writeAttribute(canonicalName, value);
+          },
+          writable: true,
+          configurable: true,
+        });
+      });
     },
   );
-  void methodName;
-  void attrNameRef;
 }

@@ -14,6 +14,7 @@ export {
   resolveAliasName,
   resolveAliasNameIn,
   AttrNames,
+  buildMangledName,
   defineDirtyAttributeMethods,
   isInstanceMethodAlreadyImplemented,
 } from "./attribute-methods.js";
