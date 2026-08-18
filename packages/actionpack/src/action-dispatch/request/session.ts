@@ -110,7 +110,7 @@ const Unspecified: unknown = {};
 
 /** Ruby's `hash.class.name` for the `Session#update` TypeError message. */
 function classNameOf(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
+  if (value === null || value === undefined) return "NilClass";
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
@@ -308,17 +308,18 @@ export class Session {
 
   /** Mirrors: `Session#update` (`request/session.rb:181-189`) — updates the session with given Hash. */
   update(hash: unknown): Record<string, unknown> {
-    if (hash == null || typeof hash !== "object") {
+    const other = hash as { toHash?: () => Record<string, unknown> } | null | undefined;
+    // Ruby's `respond_to?(:to_hash)`: a Hash and anything defining `to_hash`
+    // convert; an Array does not, so it must raise rather than be spread.
+    const respondsToToHash = typeof other?.toHash === "function";
+    if (!respondsToToHash && (hash == null || typeof hash !== "object" || Array.isArray(hash))) {
       throw new TypeError(`no implicit conversion of ${classNameOf(hash)} into Hash`);
     }
 
     this.loadForWriteBang();
-    const other = hash as { toHash?: () => Record<string, unknown> };
     return Object.assign(
       this.delegate,
-      stringifyKeys(
-        typeof other.toHash === "function" ? other.toHash() : (hash as Record<string, unknown>),
-      ),
+      stringifyKeys(respondsToToHash ? other.toHash!() : (hash as Record<string, unknown>)),
     );
   }
 

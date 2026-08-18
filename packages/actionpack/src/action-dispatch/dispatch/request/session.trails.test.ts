@@ -42,6 +42,20 @@ describe("Session", () => {
     expect(session.isLoaded()).toBe(true);
   });
 
+  it("update raises TypeError for a value that does not convert to a Hash", () => {
+    const req = makeReq();
+    const store = {
+      loadSession: () => [1, {}] as [unknown, Record<string, unknown>],
+      sessionExists: () => true,
+      deleteSession: () => null,
+      extractSessionId: () => 1,
+    };
+    const session = Session.create(store, req, {});
+
+    expect(() => session.update(null)).toThrow("no implicit conversion of NilClass into Hash");
+    expect(() => session.update([1, 2])).toThrow("no implicit conversion of Array into Hash");
+  });
+
   it("delete removes the session from the request", () => {
     const req = makeReq();
     Session.disabled(req);
