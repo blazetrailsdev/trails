@@ -179,9 +179,8 @@ export const SessionObject = {
     return RequestSession.create(this as any, req, this.defaultOptions);
   },
 
-  loadedSession(this: unknown, session: unknown): boolean {
-    if (!(session instanceof RequestSession)) return true;
-    return (session as unknown as { loaded?: boolean }).loaded === true;
+  isLoadedSession(this: unknown, session: unknown): boolean {
+    return !(session instanceof RequestSession) || session.isLoaded();
   },
 };
 

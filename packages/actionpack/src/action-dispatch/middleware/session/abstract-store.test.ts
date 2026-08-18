@@ -94,7 +94,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
         "staleSessionCheckBang",
         "commitSession",
         "prepareSession",
-        "loadedSession",
+        "isLoadedSession",
       ]) {
         expect(typeof proto[name]).toBe("function");
       }
@@ -157,9 +157,9 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     });
   });
 
-  describe("SessionObject.loadedSession", () => {
+  describe("SessionObject.isLoadedSession", () => {
     it("returns true for non-Session inputs", () => {
-      expect(SessionObject.loadedSession.call({}, {})).toBe(true);
+      expect(SessionObject.isLoadedSession.call({}, {})).toBe(true);
     });
   });
 });
