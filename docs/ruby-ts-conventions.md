@@ -15,25 +15,32 @@ comparison credits your implementation.
 The Example column shows the TS **symbol name(s)** parity:api looks for (it
 matches the first candidate present in the target file), not a call expression.
 
-| Ruby                                                                                                                     | TypeScript                           | Example                                               |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
-| `predicate?` (bare)                                                                                                      | `is*` prefix, camel fallback         | `valid?` → `isValid` or `valid`                       |
-| `is_*?`                                                                                                                  | camel form only (no doubled `isIs*`) | `is_number?` → `isNumber`                             |
-| `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute` or `isHasAttribute` |
-| `include?` / `member?` / `exclude?`                                                                                      | `is*` / camel / native JS spelling   | `include?` → `isInclude` or `include` or `includes`   |
-| `name!` (bang)                                                                                                           | `*Bang` suffix                       | `save!` → `saveBang`                                  |
-| `name=` (setter)                                                                                                         | bare camel name, `set*` fallback     | `table_name=` → `tableName` or `setTableName`         |
-| `initialize` / `new`                                                                                                     | `constructor`                        | `initialize` → `constructor`                          |
-| `to_s` / `to_str`                                                                                                        | `toString`                           | `to_s` → `toString`                                   |
-| `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
-| `to_sql`                                                                                                                 | `toSql`                              | `to_sql` → `toSql`                                    |
-| `-@` (unary minus)                                                                                                       | `negate`                             | `-@` → `negate`                                       |
-| everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
+| Ruby                                                                                                                     | TypeScript                                    | Example                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------ |
+| `predicate?` (bare)                                                                                                      | `is*` prefix, camel then `Q` fallback         | `valid?` → `isValid` or `valid` or `validQ`                              |
+| `is_*?`                                                                                                                  | camel form (no doubled `isIs*`), `Q` fallback | `is_number?` → `isNumber` or `isNumberQ`                                 |
+| `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` / `Q` fallback             | `has_attribute?` → `hasAttribute` or `isHasAttribute` or `hasAttributeQ` |
+| `include?` / `member?` / `exclude?`                                                                                      | `is*` / camel / native JS spelling / `Q`      | `include?` → `isInclude` or `include` or `includes` or `includeQ`        |
+| `name!` (bang)                                                                                                           | `*Bang` suffix                                | `save!` → `saveBang`                                                     |
+| `name=` (setter)                                                                                                         | bare camel name, `set*` fallback              | `table_name=` → `tableName` or `setTableName`                            |
+| `initialize` / `new`                                                                                                     | `constructor`                                 | `initialize` → `constructor`                                             |
+| `to_s` / `to_str`                                                                                                        | `toString`                                    | `to_s` → `toString`                                                      |
+| `to_json`                                                                                                                | `toJSON`                                      | `to_json` → `toJSON`                                                     |
+| `to_sql`                                                                                                                 | `toSql`                                       | `to_sql` → `toSql`                                                       |
+| `-@` (unary minus)                                                                                                       | `negate`                                      | `-@` → `negate`                                                          |
+| everything else                                                                                                          | `snake_case` → `camelCase`                    | `has_many` → `hasMany`                                                   |
 
 Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
 (`Logger#debug` next to `Logger#debug?`) offers the QUOTED LITERAL spelling
 first — `get "debug?"` — because its camel candidate names the sibling, not the
-predicate. `is_*?` collapses to a single candidate so trails can't
+predicate. Every predicate also offers the `Q` suffix as its LAST candidate
+(`active_connections?` → `activeConnectionsQ`): `Q` is the query-method
+letter, and it is the spelling trails uses wherever the bare camel name is
+already taken on the same TS object by an unrelated Rails member
+(`connection_class` next to `connection_class?`) — cases where `is*` reads
+wrong and the quoted literal is unreachable by dot notation, as a `static` or
+as a named `export`. It is offered last, so it only widens what counts and
+never moves an existing pairing. `is_*?` collapses to a single camel candidate so trails can't
 land the redundant doubled `isIsNumber`. Already-predicate prefixes keep the
 `is*` fallback because the disambiguating alias is sometimes needed when the bare
 name collides with a macro (e.g. `isHasOne()` alongside the `Model.hasOne`

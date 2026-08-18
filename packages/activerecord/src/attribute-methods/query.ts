@@ -4,16 +4,12 @@
  * Mirrors: ActiveRecord::AttributeMethods::Query
  */
 
-import { BooleanType } from "@blazetrails/activemodel";
+import { isBlank } from "@blazetrails/activesupport";
+import { BooleanType, type Type } from "@blazetrails/activemodel";
 
-const booleanType = new BooleanType();
-
-interface PublicSendable {
-  [key: string]: unknown;
-}
-
-interface RawReadable {
+interface QueryHost {
   _readAttribute(name: string): unknown;
+  typeForAttribute(name: string, block?: () => Type): Type;
 }
 
 /**
@@ -24,8 +20,10 @@ interface RawReadable {
  *
  * Mirrors: ActiveRecord::AttributeMethods::Query#query_attribute
  */
-export function queryAttribute(this: PublicSendable, name: string): boolean {
-  return castToBoolean(publicSend(this, name));
+export function queryAttribute(this: QueryHost, attrName: string): boolean {
+  const value = publicSend(this, attrName);
+
+  return queryCastAttribute.call(this, attrName, value);
 }
 
 function publicSend(obj: object, name: string): unknown {
@@ -56,25 +54,41 @@ function publicSend(obj: object, name: string): unknown {
  *
  * Mirrors: ActiveRecord::AttributeMethods::Query#_query_attribute
  */
-export function _queryAttribute(this: RawReadable, name: string): boolean {
-  const value = this._readAttribute(name);
-  // Rails: _query_attribute reads the value then calls query_cast_attribute
-  return castToBoolean(queryCastAttribute.call(this, name, value));
+export function _queryAttribute(this: QueryHost, attrName: string): boolean {
+  const value = this._readAttribute(attrName);
+
+  return queryCastAttribute.call(this, attrName, value);
 }
 
-function castToBoolean(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "bigint") return value !== 0n;
-  const cast = booleanType.cast(value);
-  if (cast !== null) return cast;
-  return !!value;
-}
-
-// Mirrors: ActiveRecord::AttributeMethods::Query::ClassMethods private#query_cast_attribute
+// Mirrors: ActiveRecord::AttributeMethods::Query private#query_cast_attribute
+// (attribute_methods/query.rb:29-46).
 /** @internal */
-export function queryCastAttribute(this: any, attrName: string, value: unknown): unknown {
-  // typeForAttribute is a class method — look it up on the constructor, not the instance.
-  const type = (this.constructor.typeForAttribute?.(attrName) ?? booleanType) as BooleanType;
-  return type.deserialize(value);
+export function queryCastAttribute(this: QueryHost, attrName: string, value: unknown): boolean {
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+  // Ruby `!type_for_attribute(attr_name) { false }` — the block supplies
+  // `false` when the name is not a declared attribute, so the negation is
+  // "this is a virtual/method-backed name", and the value has to be coerced
+  // from its raw form rather than through a column type.
+  if (!this.typeForAttribute(attrName, () => false as unknown as Type)) {
+    if (typeof value === "number" || typeof value === "bigint" || !/[^0-9]/.test(String(value))) {
+      return toI(value) !== 0;
+    }
+    if (BooleanType.FALSE_VALUES.has(value)) return false;
+    return !isBlank(value);
+  } else if (typeof value === "number" || typeof value === "bigint") {
+    // Ruby `value.respond_to?(:zero?)` — the Numeric protocol, and the only
+    // JS values that answer it.
+    return value !== 0 && value !== 0n;
+  } else {
+    return !isBlank(value);
+  }
+}
+
+// Ruby String#to_i: leading integer prefix, 0 when there is none.
+function toI(value: unknown): number {
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  const m = /^\s*[+-]?\d+/.exec(String(value));
+  return m ? parseInt(m[0], 10) : 0;
 }
