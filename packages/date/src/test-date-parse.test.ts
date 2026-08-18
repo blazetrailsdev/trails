@@ -8,11 +8,8 @@
  * camelCased by `docs/ruby-ts-conventions.md` (`:sec_fraction` is
  * `secFraction`).
  *
- * The heuristic family's remaining tests are not here: `test__parse`'s table,
- * `test__parse_too_long_year` (`limit:` kwarg),
- * `test_parse__comp` (`DateTime.now`) and `test_parse__d_to_s`
- * (`DateTime#to_s`) each need a reader this package has not ported. They are
- * filed against RFC 0088.
+ * `test__parse`'s zone rows also assert the zone's `String#encoding`; a JS
+ * string carries no encoding, so only the zone equality carries over.
  *
  * `test_parse__ex`'s two trailing `begin ... rescue ArgumentError => e` blocks
  * assert that what `parse('')` raises is both an `ArgumentError` and a
@@ -37,6 +34,1408 @@ function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {
 }
 
 describe("TestDateParse", () => {
+  it(" parse", () => {
+    const cases: [[string, boolean], (number | string | null)[]][] = [
+      // ctime(3), asctime(3)
+      [
+        ["Sat Aug 28 02:55:50 1999", false],
+        [1999, 8, 28, 2, 55, 50, null, null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:55:50 02", false],
+        [2, 8, 28, 2, 55, 50, null, null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:55:50 02", true],
+        [2002, 8, 28, 2, 55, 50, null, null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:55:50 0002", false],
+        [2, 8, 28, 2, 55, 50, null, null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:55:50 0002", true],
+        [2, 8, 28, 2, 55, 50, null, null, 6],
+      ],
+
+      // date(1)
+      [
+        ["Sat Aug 28 02:29:34 JST 1999", false],
+        [1999, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 MET DST 1999", false],
+        [1999, 8, 28, 2, 29, 34, "MET DST", 2 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 AMT 1999", false],
+        [1999, 8, 28, 2, 29, 34, "AMT", null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 PMT 1999", false],
+        [1999, 8, 28, 2, 29, 34, "PMT", null, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 PMT -1999", false],
+        [-1999, 8, 28, 2, 29, 34, "PMT", null, 6],
+      ],
+
+      [
+        ["Sat Aug 28 02:29:34 JST 02", false],
+        [2, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 JST 02", true],
+        [2002, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 JST 0002", false],
+        [2, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 JST 0002", true],
+        [2, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 AEST 0002", true],
+        [2, 8, 28, 2, 29, 34, "AEST", 10 * 3600, 6],
+      ],
+
+      [
+        ["Sat Aug 28 02:29:34 GMT+09 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT+09", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT+0900 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT+0900", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT+09:00 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT+09:00", 9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT-09 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT-09", -9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT-0900 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT-0900", -9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT-09:00 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT-09:00", -9 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT-090102 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT-090102", -9 * 3600 - 60 - 2, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT-09:01:02 0002", false],
+        [2, 8, 28, 2, 29, 34, "GMT-09:01:02", -9 * 3600 - 60 - 2, 6],
+      ],
+
+      [
+        ["Sat Aug 28 02:29:34 GMT Standard Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "GMT Standard Time", 0 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 Mountain Standard Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "Mountain Standard Time", -7 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 Mountain Daylight Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "Mountain Daylight Time", -6 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 Mexico Standard Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "Mexico Standard Time", -6 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 E. Australia Standard Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "E. Australia Standard Time", 10 * 3600, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 W.  Central  Africa  Standard  Time 2000", false],
+        [2000, 8, 28, 2, 29, 34, "W. Central Africa Standard Time", 1 * 3600, 6],
+      ],
+
+      // part of iso 8601
+      [
+        ["1999-05-23 23:55:21", false],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["1999-05-23 23:55:21+0900", false],
+        [1999, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["1999-05-23 23:55:21-0900", false],
+        [1999, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["1999-05-23 23:55:21+09:00", false],
+        [1999, 5, 23, 23, 55, 21, "+09:00", 9 * 3600, null],
+      ],
+      [
+        ["1999-05-23T23:55:21-09:00", false],
+        [1999, 5, 23, 23, 55, 21, "-09:00", -9 * 3600, null],
+      ],
+      [
+        ["1999-05-23 23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["1999-05-23T23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["-1999-05-23T23:55:21Z", false],
+        [-1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["-1999-05-23T23:55:21Z", true],
+        [-1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["19990523T23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+
+      [
+        ["+011985-04-12", false],
+        [11985, 4, 12, null, null, null, null, null, null],
+      ],
+      [
+        ["+011985-04-12T10:15:30", false],
+        [11985, 4, 12, 10, 15, 30, null, null, null],
+      ],
+      [
+        ["-011985-04-12", false],
+        [-11985, 4, 12, null, null, null, null, null, null],
+      ],
+      [
+        ["-011985-04-12T10:15:30", false],
+        [-11985, 4, 12, 10, 15, 30, null, null, null],
+      ],
+
+      [
+        ["02-04-12", false],
+        [2, 4, 12, null, null, null, null, null, null],
+      ],
+      [
+        ["02-04-12", true],
+        [2002, 4, 12, null, null, null, null, null, null],
+      ],
+      [
+        ["0002-04-12", false],
+        [2, 4, 12, null, null, null, null, null, null],
+      ],
+      [
+        ["0002-04-12", true],
+        [2, 4, 12, null, null, null, null, null, null],
+      ],
+
+      [
+        ["19990523", true],
+        [1999, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["-19990523", true],
+        [-1999, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["990523", true],
+        [1999, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["0523", false],
+        [null, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["23", false],
+        [null, null, 23, null, null, null, null, null, null],
+      ],
+
+      [
+        ["19990523 235521", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["990523 235521", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["0523 2355", false],
+        [null, 5, 23, 23, 55, null, null, null, null],
+      ],
+      [
+        ["23 2355", false],
+        [null, null, 23, 23, 55, null, null, null, null],
+      ],
+
+      [
+        ["19990523T235521", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["990523T235521", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["19990523T235521.99", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["990523T235521.99", true],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["0523T2355", false],
+        [null, 5, 23, 23, 55, null, null, null, null],
+      ],
+
+      [
+        ["19990523T235521+0900", true],
+        [1999, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["990523T235521-0900", true],
+        [1999, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["19990523T235521.99+0900", true],
+        [1999, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["990523T235521.99-0900", true],
+        [1999, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["0523T2355Z", false],
+        [null, 5, 23, 23, 55, null, "Z", 0, null],
+      ],
+
+      [
+        ["19990523235521.123456+0900", true],
+        [1999, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["19990523235521.123456-0900", true],
+        [1999, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["19990523235521,123456+0900", true],
+        [1999, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["19990523235521,123456-0900", true],
+        [1999, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+
+      [
+        ["990523235521,123456-0900", false],
+        [99, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["0523235521,123456-0900", false],
+        [null, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["23235521,123456-0900", false],
+        [null, null, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["235521,123456-0900", false],
+        [null, null, null, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["5521,123456-0900", false],
+        [null, null, null, null, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["21,123456-0900", false],
+        [null, null, null, null, null, 21, "-0900", -9 * 3600, null],
+      ],
+
+      [
+        ["3235521,123456-0900", false],
+        [null, null, 3, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["35521,123456-0900", false],
+        [null, null, null, 3, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["521,123456-0900", false],
+        [null, null, null, null, 5, 21, "-0900", -9 * 3600, null],
+      ],
+
+      // reversed iso 8601 (?)
+      [
+        ["23-05-1999", false],
+        [1999, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["23-05-1999 23:55:21", false],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["23-05--1999 23:55:21", false],
+        [-1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["23-05-'99", false],
+        [99, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["23-05-'99", true],
+        [1999, 5, 23, null, null, null, null, null, null],
+      ],
+
+      // broken iso 8601 (?)
+      [
+        ["19990523T23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["19990523235521.1234-100", true],
+        [1999, 5, 23, 23, 55, 21, "-100", -1 * 3600, null],
+      ],
+      [
+        ["19990523235521.1234-10", true],
+        [1999, 5, 23, 23, 55, 21, "-10", -10 * 3600, null],
+      ],
+
+      // part of jis x0301
+      [
+        ["M11.05.23", false],
+        [1878, 5, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["T11.05.23 23:55:21+0900", false],
+        [1922, 5, 23, 23, 55, 21, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["S11.05.23 23:55:21-0900", false],
+        [1936, 5, 23, 23, 55, 21, "-0900", -9 * 3600, null],
+      ],
+      [
+        ["S40.05.23 23:55:21+09:00", false],
+        [1965, 5, 23, 23, 55, 21, "+09:00", 9 * 3600, null],
+      ],
+      [
+        ["S40.05.23T23:55:21-09:00", false],
+        [1965, 5, 23, 23, 55, 21, "-09:00", -9 * 3600, null],
+      ],
+      [
+        ["H11.05.23 23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["H11.05.23T23:55:21Z", false],
+        [1999, 5, 23, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["H31.04.30 23:55:21Z", false],
+        [2019, 4, 30, 23, 55, 21, "Z", 0, null],
+      ],
+      [
+        ["H31.04.30T23:55:21Z", false],
+        [2019, 4, 30, 23, 55, 21, "Z", 0, null],
+      ],
+
+      // ofx date
+      [
+        ["19990523235521", false],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["19990523235521.123", false],
+        [1999, 5, 23, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["19990523235521.123[-9]", false],
+        [1999, 5, 23, 23, 55, 21, "-9", -(9 * 3600), null],
+      ],
+      [
+        ["19990523235521.123[+9]", false],
+        [1999, 5, 23, 23, 55, 21, "+9", +(9 * 3600), null],
+      ],
+      [
+        ["19990523235521.123[9]", false],
+        [1999, 5, 23, 23, 55, 21, "9", +(9 * 3600), null],
+      ],
+      [
+        ["19990523235521.123[9 ]", false],
+        [1999, 5, 23, 23, 55, 21, "9 ", +(9 * 3600), null],
+      ],
+      [
+        ["19990523235521.123[-9.50]", false],
+        [1999, 5, 23, 23, 55, 21, "-9.50", -(9 * 3600 + 30 * 60), null],
+      ],
+      [
+        ["19990523235521.123[+9.50]", false],
+        [1999, 5, 23, 23, 55, 21, "+9.50", +(9 * 3600 + 30 * 60), null],
+      ],
+      [
+        ["19990523235521.123[-5:EST]", false],
+        [1999, 5, 23, 23, 55, 21, "EST", -5 * 3600, null],
+      ],
+      [
+        ["19990523235521.123[+9:JST]", false],
+        [1999, 5, 23, 23, 55, 21, "JST", 9 * 3600, null],
+      ],
+      [
+        ["19990523235521.123[+12:XXX YYY ZZZ]", false],
+        [1999, 5, 23, 23, 55, 21, "XXX YYY ZZZ", 12 * 3600, null],
+      ],
+      [
+        ["235521.123", false],
+        [null, null, null, 23, 55, 21, null, null, null],
+      ],
+      [
+        ["235521.123[-9]", false],
+        [null, null, null, 23, 55, 21, "-9", -9 * 3600, null],
+      ],
+      [
+        ["235521.123[+9]", false],
+        [null, null, null, 23, 55, 21, "+9", +9 * 3600, null],
+      ],
+      [
+        ["235521.123[-9 ]", false],
+        [null, null, null, 23, 55, 21, "-9 ", -9 * 3600, null],
+      ],
+      [
+        ["235521.123[-5:EST]", false],
+        [null, null, null, 23, 55, 21, "EST", -5 * 3600, null],
+      ],
+      [
+        ["235521.123[+9:JST]", false],
+        [null, null, null, 23, 55, 21, "JST", +9 * 3600, null],
+      ],
+
+      // rfc 2822
+      [
+        ["Sun, 22 Aug 1999 00:45:29 -0400", false],
+        [1999, 8, 22, 0, 45, 29, "-0400", -4 * 3600, 0],
+      ],
+      [
+        ["Sun, 22 Aug 1999 00:45:29 -9959", false],
+        [1999, 8, 22, 0, 45, 29, "-9959", -(99 * 3600 + 59 * 60), 0],
+      ],
+      [
+        ["Sun, 22 Aug 1999 00:45:29 +9959", false],
+        [1999, 8, 22, 0, 45, 29, "+9959", +(99 * 3600 + 59 * 60), 0],
+      ],
+      [
+        ["Sun, 22 Aug 05 00:45:29 -0400", true],
+        [2005, 8, 22, 0, 45, 29, "-0400", -4 * 3600, 0],
+      ],
+      [
+        ["Sun, 22 Aug 49 00:45:29 -0400", true],
+        [2049, 8, 22, 0, 45, 29, "-0400", -4 * 3600, 0],
+      ],
+      [
+        ["Sun, 22 Aug 1999 00:45:29 GMT", false],
+        [1999, 8, 22, 0, 45, 29, "GMT", 0, 0],
+      ],
+      [
+        ["Sun,\u000022\r\nAug\r\n1999\r\n00:45:29\r\nGMT", false],
+        [1999, 8, 22, 0, 45, 29, "GMT", 0, 0],
+      ],
+      [
+        ["Sun, 22 Aug 1999 00:45 GMT", false],
+        [1999, 8, 22, 0, 45, null, "GMT", 0, 0],
+      ],
+      [
+        ["Sun, 22 Aug -1999 00:45 GMT", false],
+        [-1999, 8, 22, 0, 45, null, "GMT", 0, 0],
+      ],
+      [
+        ["Sun, 22 Aug 99 00:45:29 UT", true],
+        [1999, 8, 22, 0, 45, 29, "UT", 0, 0],
+      ],
+      [
+        ["Sun, 22 Aug 0099 00:45:29 UT", true],
+        [99, 8, 22, 0, 45, 29, "UT", 0, 0],
+      ],
+
+      // rfc 850, obsoleted by rfc 1036
+      [
+        ["Tuesday, 02-Mar-99 11:20:32 GMT", true],
+        [1999, 3, 2, 11, 20, 32, "GMT", 0, 2],
+      ],
+
+      // W3C Working Draft - XForms - 4.8 Time
+      [
+        ["2000-01-31 13:20:00-5", false],
+        [2000, 1, 31, 13, 20, 0, "-5", -5 * 3600, null],
+      ],
+
+      // [-+]\d+.\d+
+      [
+        ["2000-01-31 13:20:00-5.5", false],
+        [2000, 1, 31, 13, 20, 0, "-5.5", -5 * 3600 - 30 * 60, null],
+      ],
+      [
+        ["2000-01-31 13:20:00-5,5", false],
+        [2000, 1, 31, 13, 20, 0, "-5,5", -5 * 3600 - 30 * 60, null],
+      ],
+      [
+        ["2000-01-31 13:20:00+3.5", false],
+        [2000, 1, 31, 13, 20, 0, "+3.5", 3 * 3600 + 30 * 60, null],
+      ],
+      [
+        ["2000-01-31 13:20:00+3,5", false],
+        [2000, 1, 31, 13, 20, 0, "+3,5", 3 * 3600 + 30 * 60, null],
+      ],
+
+      // mil
+      [
+        ["2000-01-31 13:20:00 Z", false],
+        [2000, 1, 31, 13, 20, 0, "Z", 0 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20:00 H", false],
+        [2000, 1, 31, 13, 20, 0, "H", 8 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20:00 M", false],
+        [2000, 1, 31, 13, 20, 0, "M", 12 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20 M", false],
+        [2000, 1, 31, 13, 20, null, "M", 12 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20:00 S", false],
+        [2000, 1, 31, 13, 20, 0, "S", -6 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20:00 A", false],
+        [2000, 1, 31, 13, 20, 0, "A", 1 * 3600, null],
+      ],
+      [
+        ["2000-01-31 13:20:00 P", false],
+        [2000, 1, 31, 13, 20, 0, "P", -3 * 3600, null],
+      ],
+
+      // dot
+      [
+        ["1999.5.2", false],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["1999.05.02", false],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["-1999.05.02", false],
+        [-1999, 5, 2, null, null, null, null, null, null],
+      ],
+
+      [
+        ["0099.5.2", false],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["0099.5.2", true],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+
+      [
+        ["'99.5.2", false],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["'99.5.2", true],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+
+      // reversed dot
+      [
+        ["2.5.1999", false],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["02.05.1999", false],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["02.05.-1999", false],
+        [-1999, 5, 2, null, null, null, null, null, null],
+      ],
+
+      [
+        ["2.5.0099", false],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["2.5.0099", true],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+
+      [
+        ["2.5.'99", false],
+        [99, 5, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["2.5.'99", true],
+        [1999, 5, 2, null, null, null, null, null, null],
+      ],
+
+      // vms
+      [
+        ["08-DEC-1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["31-JAN-1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["31-JAN--1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+
+      [
+        ["08-DEC-88", false],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["08-DEC-88", true],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["08-DEC-0088", false],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["08-DEC-0088", true],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+
+      // swapped vms
+      [
+        ["DEC-08-1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["JAN-31-1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["JAN-31--1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["JAN-1999", false],
+        [1999, 1, null, null, null, null, null, null, null],
+      ],
+      [
+        ["JAN--1999", false],
+        [-1999, 1, null, null, null, null, null, null, null],
+      ],
+
+      // reversed vms
+      [
+        ["1988-DEC-08", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["1999-JAN-31", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["-1999-JAN-31", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+
+      [
+        ["0088-DEC-08", false],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["0088-DEC-08", true],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+
+      [
+        ["'88/12/8", false],
+        [88, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["'88/12/8", true],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+
+      // non-spaced eu
+      [
+        ["08/dec/1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["31/jan/1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["31/jan/-1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["08.dec.1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["31.jan.1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["31.jan.-1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+
+      // non-spaced us
+      [
+        ["dec/08/1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["jan/31/1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan/31/-1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan/31", false],
+        [null, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan/1988", false],
+        [1988, 1, null, null, null, null, null, null, null],
+      ],
+      [
+        ["dec.08.1988", false],
+        [1988, 12, 8, null, null, null, null, null, null],
+      ],
+      [
+        ["jan.31.1999", false],
+        [1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan.31.-1999", false],
+        [-1999, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan.31", false],
+        [null, 1, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["jan.1988", false],
+        [1988, 1, null, null, null, null, null, null, null],
+      ],
+
+      // month and day of month
+      [
+        ["Jan 1", false],
+        [null, 1, 1, null, null, null, null, null, null],
+      ],
+      [
+        ["Jul 11", false],
+        [null, 7, 11, null, null, null, null, null, null],
+      ],
+      [
+        ["July 11", false],
+        [null, 7, 11, null, null, null, null, null, null],
+      ],
+      [
+        ["Sept 23", false],
+        [null, 9, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["Sep. 23", false],
+        [null, 9, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["Sept. 23", false],
+        [null, 9, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["September 23", false],
+        [null, 9, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["October 1st", false],
+        [null, 10, 1, null, null, null, null, null, null],
+      ],
+      [
+        ["October 23rd", false],
+        [null, 10, 23, null, null, null, null, null, null],
+      ],
+      [
+        ["October 25th 1999", false],
+        [1999, 10, 25, null, null, null, null, null, null],
+      ],
+      [
+        ["October 25th -1999", false],
+        [-1999, 10, 25, null, null, null, null, null, null],
+      ],
+      [
+        ["october 25th 1999", false],
+        [1999, 10, 25, null, null, null, null, null, null],
+      ],
+      [
+        ["OCTOBER 25th 1999", false],
+        [1999, 10, 25, null, null, null, null, null, null],
+      ],
+      [
+        ["oCtoBer 25th 1999", false],
+        [1999, 10, 25, null, null, null, null, null, null],
+      ],
+      [
+        ["aSep 23", false],
+        [null, null, 23, null, null, null, null, null, null],
+      ],
+
+      // month and year
+      [
+        ["Sept 1990", false],
+        [1990, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["Sept '90", false],
+        [90, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["Sept '90", true],
+        [1990, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["1990/09", false],
+        [1990, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["09/1990", false],
+        [1990, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["aSep '90", false],
+        [90, null, null, null, null, null, null, null, null],
+      ],
+
+      // year
+      [
+        ["'90", false],
+        [90, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["'90", true],
+        [1990, null, null, null, null, null, null, null, null],
+      ],
+
+      // month
+      [
+        ["Jun", false],
+        [null, 6, null, null, null, null, null, null, null],
+      ],
+      [
+        ["June", false],
+        [null, 6, null, null, null, null, null, null, null],
+      ],
+      [
+        ["Sep", false],
+        [null, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["Sept", false],
+        [null, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["September", false],
+        [null, 9, null, null, null, null, null, null, null],
+      ],
+      [
+        ["aSep", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+
+      // day of month
+      [
+        ["1st", false],
+        [null, null, 1, null, null, null, null, null, null],
+      ],
+      [
+        ["2nd", false],
+        [null, null, 2, null, null, null, null, null, null],
+      ],
+      [
+        ["3rd", false],
+        [null, null, 3, null, null, null, null, null, null],
+      ],
+      [
+        ["4th", false],
+        [null, null, 4, null, null, null, null, null, null],
+      ],
+      [
+        ["29th", false],
+        [null, null, 29, null, null, null, null, null, null],
+      ],
+      [
+        ["31st", false],
+        [null, null, 31, null, null, null, null, null, null],
+      ],
+      [
+        ["1sta", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+
+      // era
+      [
+        ["Sat Aug 28 02:29:34 GMT CE 2000", false],
+        [2000, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT C.E. 2000", false],
+        [2000, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT BCE 2000", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT B.C.E. 2000", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT AD 2000", false],
+        [2000, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT A.D. 2000", false],
+        [2000, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT BC 2000", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT B.C. 2000", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT 2000 BC", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT 2000 BCE", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT 2000 B.C.", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+      [
+        ["Sat Aug 28 02:29:34 GMT 2000 B.C.E.", false],
+        [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
+      ],
+
+      // collection
+      [
+        ["Tuesday, May 18, 1999 Published at 13:36 GMT 14:36 UK", false],
+        [1999, 5, 18, 13, 36, null, "GMT", 0, 2],
+      ], // bbc.co.uk
+      [
+        ["July 20, 2000 Web posted at: 3:37 p.m. EDT (1937 GMT)", false],
+        [2000, 7, 20, 15, 37, null, "EDT", -4 * 3600, null],
+      ], // cnn.com
+      [
+        ["12:54 p.m. EDT, September 11, 2006", false],
+        [2006, 9, 11, 12, 54, null, "EDT", -4 * 3600, null],
+      ], // cnn.com
+      [
+        ["February 04, 2001 at 10:59 AM PST", false],
+        [2001, 2, 4, 10, 59, null, "PST", -8 * 3600, null],
+      ], // old amazon.com
+      [
+        ["Monday May 08, @01:55PM", false],
+        [null, 5, 8, 13, 55, null, null, null, 1],
+      ], // slashdot.org
+      [
+        ["06.June 2005", false],
+        [2005, 6, 6, null, null, null, null, null, null],
+      ], // dhl.com
+
+      // etc.
+      [
+        ["8:00 pm lt", false],
+        [null, null, null, 20, 0, null, "lt", null, null],
+      ],
+      [
+        ["4:00 AM, Jan. 12, 1990", false],
+        [1990, 1, 12, 4, 0, null, null, null, null],
+      ],
+      [
+        ["Jan. 12 4:00 AM 1990", false],
+        [1990, 1, 12, 4, 0, null, null, null, null],
+      ],
+      [
+        ["1990-01-12 04:00:00+00", false],
+        [1990, 1, 12, 4, 0, 0, "+00", 0, null],
+      ],
+      [
+        ["1990-01-11 20:00:00-08", false],
+        [1990, 1, 11, 20, 0, 0, "-08", -8 * 3600, null],
+      ],
+      [
+        ["1990/01/12 04:00:00", false],
+        [1990, 1, 12, 4, 0, 0, null, null, null],
+      ],
+      [
+        ["Thu Jan 11 20:00:00 PST 1990", false],
+        [1990, 1, 11, 20, 0, 0, "PST", -8 * 3600, 4],
+      ],
+      [
+        ["Fri Jan 12 04:00:00 GMT 1990", false],
+        [1990, 1, 12, 4, 0, 0, "GMT", 0, 5],
+      ],
+      [
+        ["Thu, 11 Jan 1990 20:00:00 -0800", false],
+        [1990, 1, 11, 20, 0, 0, "-0800", -8 * 3600, 4],
+      ],
+      [
+        ["12-January-1990, 04:00 WET", false],
+        [1990, 1, 12, 4, 0, null, "WET", 0 * 3600, null],
+      ],
+      [
+        ["jan 2 3 am +4 5", false],
+        [5, 1, 2, 3, null, null, "+4", 4 * 3600, null],
+      ],
+      [
+        ["jan 2 3 am +4 5", true],
+        [2005, 1, 2, 3, null, null, "+4", 4 * 3600, null],
+      ],
+      [
+        ["fri1feb3bc4pm+5", false],
+        [-2, 2, 1, 16, null, null, "+5", 5 * 3600, 5],
+      ],
+      [
+        ["fri1feb3bc4pm+5", true],
+        [-2, 2, 1, 16, null, null, "+5", 5 * 3600, 5],
+      ],
+      [
+        ["03 feb 1st", false],
+        [3, 2, 1, null, null, null, null, null, null],
+      ],
+
+      // apostrophe
+      [
+        ["July 4, '79", true],
+        [1979, 7, 4, null, null, null, null, null, null],
+      ],
+      [
+        ["4th July '79", true],
+        [1979, 7, 4, null, null, null, null, null, null],
+      ],
+
+      // day of week
+      [
+        ["Sunday", false],
+        [null, null, null, null, null, null, null, null, 0],
+      ],
+      [
+        ["Mon", false],
+        [null, null, null, null, null, null, null, null, 1],
+      ],
+      [
+        ["Tue", false],
+        [null, null, null, null, null, null, null, null, 2],
+      ],
+      [
+        ["Wed", false],
+        [null, null, null, null, null, null, null, null, 3],
+      ],
+      [
+        ["Thurs", false],
+        [null, null, null, null, null, null, null, null, 4],
+      ],
+      [
+        ["Friday", false],
+        [null, null, null, null, null, null, null, null, 5],
+      ],
+      [
+        ["Sat.", false],
+        [null, null, null, null, null, null, null, null, 6],
+      ],
+      [
+        ["sat.", false],
+        [null, null, null, null, null, null, null, null, 6],
+      ],
+      [
+        ["SAT.", false],
+        [null, null, null, null, null, null, null, null, 6],
+      ],
+      [
+        ["sAt.", false],
+        [null, null, null, null, null, null, null, null, 6],
+      ],
+
+      // time
+      [
+        ["09:55", false],
+        [null, null, null, 9, 55, null, null, null, null],
+      ],
+      [
+        ["09:55:30", false],
+        [null, null, null, 9, 55, 30, null, null, null],
+      ],
+      [
+        ["09:55:30am", false],
+        [null, null, null, 9, 55, 30, null, null, null],
+      ],
+      [
+        ["09:55:30pm", false],
+        [null, null, null, 21, 55, 30, null, null, null],
+      ],
+      [
+        ["09:55:30a.m.", false],
+        [null, null, null, 9, 55, 30, null, null, null],
+      ],
+      [
+        ["09:55:30p.m.", false],
+        [null, null, null, 21, 55, 30, null, null, null],
+      ],
+      [
+        ["09:55:30pm GMT", false],
+        [null, null, null, 21, 55, 30, "GMT", 0, null],
+      ],
+      [
+        ["09:55:30p.m. GMT", false],
+        [null, null, null, 21, 55, 30, "GMT", 0, null],
+      ],
+      [
+        ["09:55+0900", false],
+        [null, null, null, 9, 55, null, "+0900", 9 * 3600, null],
+      ],
+      [
+        ["09 AM", false],
+        [null, null, null, 9, null, null, null, null, null],
+      ],
+      [
+        ["09am", false],
+        [null, null, null, 9, null, null, null, null, null],
+      ],
+      [
+        ["09 A.M.", false],
+        [null, null, null, 9, null, null, null, null, null],
+      ],
+      [
+        ["09 PM", false],
+        [null, null, null, 21, null, null, null, null, null],
+      ],
+      [
+        ["09pm", false],
+        [null, null, null, 21, null, null, null, null, null],
+      ],
+      [
+        ["09 P.M.", false],
+        [null, null, null, 21, null, null, null, null, null],
+      ],
+
+      [
+        ["9h22m23s", false],
+        [null, null, null, 9, 22, 23, null, null, null],
+      ],
+      [
+        ["9h 22m 23s", false],
+        [null, null, null, 9, 22, 23, null, null, null],
+      ],
+      [
+        ["9h22m", false],
+        [null, null, null, 9, 22, null, null, null, null],
+      ],
+      [
+        ["9h 22m", false],
+        [null, null, null, 9, 22, null, null, null, null],
+      ],
+      [
+        ["9h", false],
+        [null, null, null, 9, null, null, null, null, null],
+      ],
+      [
+        ["9h 22m 23s am", false],
+        [null, null, null, 9, 22, 23, null, null, null],
+      ],
+      [
+        ["9h 22m 23s pm", false],
+        [null, null, null, 21, 22, 23, null, null, null],
+      ],
+      [
+        ["9h 22m am", false],
+        [null, null, null, 9, 22, null, null, null, null],
+      ],
+      [
+        ["9h 22m pm", false],
+        [null, null, null, 21, 22, null, null, null, null],
+      ],
+      [
+        ["9h am", false],
+        [null, null, null, 9, null, null, null, null, null],
+      ],
+      [
+        ["9h pm", false],
+        [null, null, null, 21, null, null, null, null, null],
+      ],
+
+      [
+        ["00:00", false],
+        [null, null, null, 0, 0, null, null, null, null],
+      ],
+      [
+        ["01:00", false],
+        [null, null, null, 1, 0, null, null, null, null],
+      ],
+      [
+        ["11:00", false],
+        [null, null, null, 11, 0, null, null, null, null],
+      ],
+      [
+        ["12:00", false],
+        [null, null, null, 12, 0, null, null, null, null],
+      ],
+      [
+        ["13:00", false],
+        [null, null, null, 13, 0, null, null, null, null],
+      ],
+      [
+        ["23:00", false],
+        [null, null, null, 23, 0, null, null, null, null],
+      ],
+      [
+        ["24:00", false],
+        [null, null, null, 24, 0, null, null, null, null],
+      ],
+
+      [
+        ["00:00 AM", false],
+        [null, null, null, 0, 0, null, null, null, null],
+      ],
+      [
+        ["12:00 AM", false],
+        [null, null, null, 0, 0, null, null, null, null],
+      ],
+      [
+        ["01:00 AM", false],
+        [null, null, null, 1, 0, null, null, null, null],
+      ],
+      [
+        ["11:00 AM", false],
+        [null, null, null, 11, 0, null, null, null, null],
+      ],
+      [
+        ["00:00 PM", false],
+        [null, null, null, 12, 0, null, null, null, null],
+      ],
+      [
+        ["12:00 PM", false],
+        [null, null, null, 12, 0, null, null, null, null],
+      ],
+      [
+        ["01:00 PM", false],
+        [null, null, null, 13, 0, null, null, null, null],
+      ],
+      [
+        ["11:00 PM", false],
+        [null, null, null, 23, 0, null, null, null, null],
+      ],
+
+      // pick up the rest
+      [
+        ["2000-01-02 1", false],
+        [2000, 1, 2, 1, null, null, null, null, null],
+      ],
+      [
+        ["2000-01-02 23", false],
+        [2000, 1, 2, 23, null, null, null, null, null],
+      ],
+      [
+        ["2000-01-02 24", false],
+        [2000, 1, 2, 24, null, null, null, null, null],
+      ],
+      [
+        ["1 03:04:05", false],
+        [null, null, 1, 3, 4, 5, null, null, null],
+      ],
+      [
+        ["02 03:04:05", false],
+        [null, null, 2, 3, 4, 5, null, null, null],
+      ],
+      [
+        ["31 03:04:05", false],
+        [null, null, 31, 3, 4, 5, null, null, null],
+      ],
+
+      // null, space
+      [
+        ["", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        [" ", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["          ", true],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\t", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\n", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\v", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\f", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\r", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["\t\n\v\f\r ", false],
+        [null, null, null, null, null, null, null, null, null],
+      ],
+      [
+        ["1999-05-23\t\n\v\f\r 21:34:56", false],
+        [1999, 5, 23, 21, 34, 56, null, null, null],
+      ],
+    ];
+    for (const [x, y] of cases) {
+      const h = Date._parse(...x);
+      const a = valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "zone", "offset", "wday");
+      if (y[1] === -1) {
+        a[1] = -1;
+        a[2] = h.yday ?? null;
+      }
+      const l = `<failed at ${x[0]}>`;
+      expect(a, l).toEqual(y);
+      if (y[6] != null) {
+        // Ruby also asserts the zone's `encoding`; a JS string has none.
+        const h2 = Date._parse(x[0], x[1]);
+        // eslint-disable-next-line vitest/no-conditional-expect -- Ruby's `if y[6]` guards it too
+        expect(h2.zone, l).toBe(y[6]);
+      }
+    }
+  });
+
   it(" parse slash exp", () => {
     const cases: [[string, boolean], (number | null)[]][] = [
       // little
@@ -315,6 +1714,58 @@ describe("TestDateParse", () => {
     }
   });
 
+  it("parse  comp", () => {
+    const n = new DateTime(DateTime.now());
+
+    let d = dtParse("073");
+    expect([d.year, d.yday, d.hour, d.min, d.sec]).toEqual([n.year, 73, 0, 0, 0]);
+    d = dtParse("13");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([n.year, n.mon, 13, 0, 0, 0]);
+
+    d = dtParse("Mar 13");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([n.year, 3, 13, 0, 0, 0]);
+    d = dtParse("Mar 2004");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([2004, 3, 1, 0, 0, 0]);
+    d = dtParse("23:55");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([
+      n.year,
+      n.mon,
+      n.mday,
+      23,
+      55,
+      0,
+    ]);
+    d = dtParse("23:55:30");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([
+      n.year,
+      n.mon,
+      n.mday,
+      23,
+      55,
+      30,
+    ]);
+
+    d = dtParse("Sun 23:55");
+    const d2 = d.minus(d.wday) as DateTime;
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([
+      d2.year,
+      d2.mon,
+      d2.mday,
+      23,
+      55,
+      0,
+    ]);
+    d = dtParse("Aug 23:55");
+    expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([n.year, 8, 1, 23, 55, 0]);
+  });
+
+  it("parse  d to s", () => {
+    const d = new Date(2002, 3, 14);
+    expect(Date.parse(d.toS()).equals(d.toDate())).toBe(true);
+
+    const dt = new DateTime(2002, 3, 14, 11, 22, 33, new Rational(9, 24));
+    expect(DateTime.parse(dt.toS()).equals(dt.toDatetime())).toBe(true);
+  });
   it("parse  ex", () => {
     expect(() => Date.parse("")).toThrow(Date.Error);
     expect(() => DateTime.parse("")).toThrow(Date.Error);
