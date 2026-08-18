@@ -4,6 +4,12 @@ import { describe, it, expect } from "vitest";
 
 import { SpellChecker } from "./spell-checker.js";
 
+// minitest's `assert_empty`. did-you-mean has no dependencies, so the shared
+// activesupport testing/assertions surface is not reachable from here.
+function assertEmpty(actual: unknown[]): void {
+  expect(actual).toHaveLength(0);
+}
+
 function assertSpell(expected: string | string[], input: string, dictionary: string[]): void {
   const corrections = new SpellChecker({ dictionary }).correct(input);
   expect(corrections).toEqual(Array.isArray(expected) ? expected : [expected]);
@@ -43,8 +49,8 @@ describe("SpellCheckerTest", () => {
     const names = ["first_name_change", "first_name_changed?", "first_name_will_change!"];
     assertSpell(names, "first_name_change!", names);
 
-    expect(new SpellChecker({ dictionary: ["proc"] }).correct("product_path")).toEqual([]);
-    expect(new SpellChecker({ dictionary: ["fork"] }).correct("fooo")).toEqual([]);
+    assertEmpty(new SpellChecker({ dictionary: ["proc"] }).correct("product_path"));
+    assertEmpty(new SpellChecker({ dictionary: ["fork"] }).correct("fooo"));
   });
 
   it("spell checker corrects misspells", () => {
@@ -61,6 +67,11 @@ describe("SpellCheckerTest", () => {
   });
 
   it("spell checker excludes input from dictionary", () => {
-    expect(new SpellChecker({ dictionary: ["input"] }).correct("input")).toEqual([]);
+    assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
+    // The Ruby test's second and third arms pass `:input` as a dictionary entry
+    // and as the input; a Ruby Symbol is a JS string, so both collapse onto the
+    // first arm here rather than exercising a distinct value protocol.
+    assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
+    assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
   });
 });

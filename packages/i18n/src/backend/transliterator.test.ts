@@ -103,6 +103,6 @@ describe("I18nBackendTransliterator", () => {
   });
 
   it("DEFAULT_APPROXIMATIONS is frozen to prevent concurrency issues", () => {
-    expect(Object.isFrozen(HashTransliterator.DEFAULT_APPROXIMATIONS)).toBe(true);
+    expect(Object.isFrozen(HashTransliterator.DEFAULT_APPROXIMATIONS)).toBeTruthy();
   });
 });

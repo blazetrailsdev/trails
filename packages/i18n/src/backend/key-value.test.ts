@@ -94,6 +94,7 @@ describe("I18nBackendKeyValueTest", () => {
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
     expect(t(1 as unknown as TranslateKey)).toBe("foo");
+    expect(t("1")).toBe("foo");
   });
 
   it("store_translations handle subtrees by default", () => {
