@@ -28,7 +28,7 @@ export interface ProtectionMethods {
 
 export class NullSessionHash {
   /** Rails: `NullSessionHash#initialize(req)` (request_forgery_protection.rb:271-275). */
-  constructor(_req?: unknown) {}
+  constructor(_req: unknown) {}
 
   get(_key: string): unknown {
     return undefined;

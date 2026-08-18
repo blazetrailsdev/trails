@@ -567,6 +567,12 @@ const BARE_REF_ARG = /^id:(.+)$/;
  * position, since a callee whose leading VALUE parameter happens to be
  * receiver-typed (`typeCastPluckValues`' `result: Result`) would otherwise take
  * the strip away from the receiver the site actually passes.
+ *
+ * A signature LONGER than the site is still a candidate as long as every
+ * parameter past the last argument is optional: Rails'
+ * `compare_with_real_token(token, session = nil)` is called with the token
+ * alone (request_forgery_protection.rb:519), and the port keeps that defaulted
+ * `session`, so only the parameters the site actually fills can be lined up.
  */
 function stripCalleeReceiverArg(
   ruby: CallSite,
@@ -576,11 +582,6 @@ function stripCalleeReceiverArg(
 ): string[] {
   if (ruby.recv !== undefined) return tsArgs;
   if (tsArgs.length !== rubyArgs.length + 1) return tsArgs;
-  // A call may omit the callee's trailing OPTIONAL parameters — Rails'
-  // `compare_with_real_token(token, session = nil)` is called with the token
-  // alone (request_forgery_protection.rb:519), and its port keeps that
-  // defaulted `session`, so the site is one argument shorter than the
-  // signature. Only the parameters the site actually fills have to line up.
   const sigs = (calleeSigs ?? [])
     .map(stripThis)
     .filter(
