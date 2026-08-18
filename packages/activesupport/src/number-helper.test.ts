@@ -237,6 +237,41 @@ describe("NumberHelperTest", () => {
     expect(numberToHumanSize(1_073_741_824, { delimiter: ".", separator: "," })).toBe("1 GB");
   });
 
+  it("number to human", () => {
+    expect(numberToHuman(-123)).toBe("-123");
+    expect(numberToHuman(-0.5)).toBe("-0.5");
+    expect(numberToHuman(0)).toBe("0");
+    expect(numberToHuman(0.5)).toBe("0.5");
+    expect(numberToHuman(123)).toBe("123");
+    expect(numberToHuman(1234)).toBe("1.23 Thousand");
+    expect(numberToHuman(12345)).toBe("12.3 Thousand");
+    expect(numberToHuman(1234567)).toBe("1.23 Million");
+    expect(numberToHuman(1234567890)).toBe("1.23 Billion");
+    expect(numberToHuman(1234567890123)).toBe("1.23 Trillion");
+    expect(numberToHuman(1234567890123456)).toBe("1.23 Quadrillion");
+    // Rails' literal exceeds Number.MAX_SAFE_INTEGER; the nearest double still
+    // rounds to the same significant digits, so the assertion holds verbatim.
+    // eslint-disable-next-line no-loss-of-precision
+    expect(numberToHuman(1234567890123456789)).toBe("1230 Quadrillion");
+    expect(numberToHuman(489939, { precision: 2 })).toBe("490 Thousand");
+    expect(numberToHuman(489939, { precision: 4 })).toBe("489.9 Thousand");
+    expect(numberToHuman(489000, { precision: 4 })).toBe("489 Thousand");
+    expect(numberToHuman(489939, { precision: 2, roundMode: ":down" })).toBe("480 Thousand");
+    expect(numberToHuman(489000, { precision: 4, stripInsignificantZeros: false })).toBe(
+      "489.0 Thousand",
+    );
+    expect(numberToHuman(1234567, { precision: 4, significant: false })).toBe("1.2346 Million");
+    expect(numberToHuman(1234567, { precision: 1, significant: false, separator: "," })).toBe(
+      "1,2 Million",
+    );
+    // significant forced to false
+    expect(numberToHuman(1234567, { precision: 0, significant: true, separator: "," })).toBe(
+      "1 Million",
+    );
+    expect(numberToHuman(999999)).toBe("1 Million");
+    expect(numberToHuman(999999999)).toBe("1 Billion");
+  });
+
   it("number to human with custom units that are missing the needed key", () => {
     const units = { million: "M" };
     // Thousand is missing, falls through to smaller unit

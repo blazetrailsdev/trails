@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Batches
  */
 import { ArgumentError } from "@blazetrails/activemodel";
-import { kernelArray } from "@blazetrails/activesupport";
+import { kernelArray as Array } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -58,7 +58,7 @@ export class Batches {
     // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
     // see findInBatches below for why it lives on the iterator.
     enumerator.size = async (): Promise<number> => {
-      cursor = kernelArray(cursor);
+      cursor = Array(cursor);
       return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
     };
     return enumerator;
@@ -93,7 +93,7 @@ export class Batches {
     // block hangs off the returned iterator under the same name; `size` is
     // async here only because the count reaches the database.
     const size = async (): Promise<number> => {
-      cursor = kernelArray(cursor);
+      cursor = Array(cursor);
       const total = await applyLimits(
         relation,
         cursor,
@@ -153,7 +153,7 @@ export class Batches {
     block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
   ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
     const self = this;
-    const cursor = kernelArray(cursorOption ?? this.primaryKey).map(String);
+    const cursor = Array(cursorOption ?? this.primaryKey).map(String);
     // `ensure_valid_options_for_batching!` reaches the schema cache, which is
     // async here, so the validation runs when the batches are first pulled
     // rather than at `in_batches` call time.
@@ -299,12 +299,12 @@ export async function ensureValidOptionsForBatchingBang(
   order: "asc" | "desc" | ("asc" | "desc")[],
 ): Promise<void> {
   if (start !== undefined && start !== null) {
-    if (kernelArray(start).length !== cursor.length) {
+    if (Array(start).length !== cursor.length) {
       throw new Error(":start must contain one value per cursor column");
     }
   }
   if (finish !== undefined && finish !== null) {
-    if (kernelArray(finish).length !== cursor.length) {
+    if (Array(finish).length !== cursor.length) {
       throw new Error(":finish must contain one value per cursor column");
     }
   }
@@ -315,30 +315,30 @@ export async function ensureValidOptionsForBatchingBang(
   // whole check (and so this method) is a promise.
   // Ruby `Array(nil)` is `[]`, so a model with no primary key subtracts to an
   // empty set and skips the check entirely (batches.rb:314).
-  if (kernelArray<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
+  if (Array<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
     const model = relation.model;
-    const indexes = (await model.schemaCache().indexes(relation.tableName)) as Array<{
+    const indexes = (await model.schemaCache().indexes(relation.tableName)) as {
       unique: boolean;
       where?: string | null;
       columns: string[];
-    }>;
+    }[];
     const uniqueIndex = indexes.find(
       (index) =>
         index.unique &&
         !index.where &&
-        isEmpty(kernelArray(index.columns).filter((c) => !cursor.includes(c))),
+        isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
     );
     if (!uniqueIndex) {
       throw new Error(":cursor must include a primary key or other unique column(s)");
     }
   }
 
-  if (kernelArray(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
+  if (Array(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
     // `:order` takes Symbols, which trails spells as bare strings (CLAUDE.md,
     // "A Ruby Symbol is a JS string"), so the colon Ruby's `order.inspect`
     // prints at batches.rb:324 has to be restored here for the message to read
     // as it does in Rails.
-    const inspected = Array.isArray(order)
+    const inspected = globalThis.Array.isArray(order)
       ? `[${order.map((o) => `:${o}`).join(", ")}]`
       : `:${order}`;
     throw new ArgumentError(
@@ -400,7 +400,7 @@ export function batchCondition(
   // Multi-column: (col1 STRICT_OP val1) OR (col1 = val1 AND <rest>)
   // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
   const cursorPositions = cursor.map(
-    (column, i) => [column, kernelArray(values)[i], operators[i]] as const,
+    (column, i) => [column, Array(values)[i], operators[i]] as const,
   );
   const [firstCol, firstVal, firstOp] = cursorPositions[cursorPositions.length - 1];
   let whereClause: any = table.get(firstCol)[firstOp](firstVal);
@@ -420,7 +420,7 @@ export function buildBatchOrders(
   cursor: string[],
   order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
 ): [string, "asc" | "desc"][] {
-  return cursor.map((column, i) => [column, kernelArray(order)[i] ?? "asc"]);
+  return cursor.map((column, i) => [column, Array(order)[i] ?? "asc"]);
 }
 
 /** @internal */
@@ -434,16 +434,15 @@ export function batchOnLoadedRelation(opts: {
 }): any[] {
   const { relation, cursor, batchLimit } = opts;
   // relation.records() is async in this codebase; loaded records live on _records.
-  let records: any[] = Array.isArray(relation._records) ? relation._records : [];
+  let records: any[] = globalThis.Array.isArray(relation._records) ? relation._records : [];
   const order = buildBatchOrders(cursor, opts.order as any).map(([, second]) => second);
 
   if (opts.start != null || opts.finish != null) {
     records = records.filter((record) => {
       const values = recordCursorValues(record, cursor);
       return (
-        (opts.start == null ||
-          compareValuesForOrder(values, kernelArray(opts.start), order) >= 0) &&
-        (opts.finish == null || compareValuesForOrder(values, kernelArray(opts.finish), order) <= 0)
+        (opts.start == null || compareValuesForOrder(values, Array(opts.start), order) >= 0) &&
+        (opts.finish == null || compareValuesForOrder(values, Array(opts.finish), order) <= 0)
       );
     });
   }
