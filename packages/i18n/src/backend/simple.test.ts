@@ -41,10 +41,9 @@ describe("I18nBackendSimpleTest", () => {
     config().enforceAvailableLocales = false;
   });
 
-  // Minitest's `assert_predicate`. The i18n package has no activesupport
-  // dependency, so its testing/assertions surface is out of reach. Ruby names
-  // the predicate with a method Symbol (`:frozen?`); JS has no such protocol to
-  // send, so it is a function applied to `actual`.
+  // Minitest's `assert_predicate`, which i18n cannot import (no activesupport
+  // dependency). Ruby names the predicate with a Symbol; JS has no such
+  // protocol to send, so it is a function applied to `actual`.
   function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
     expect(predicate(actual)).toBe(true);
   }
@@ -165,9 +164,8 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    // The gem's `else` arm (for a loader without `unsafe_load_file`/`load_file`)
-    // asserts the same tree with String keys; a Ruby Symbol is a JS string, so
-    // it is the same assertion here.
+    // The gem's `else` arm asserts the same tree with String keys, which is the
+    // same assertion here.
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
     assertPredicate((data as TranslationData)["en"], (en) =>
       Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
@@ -246,8 +244,7 @@ describe("I18nBackendSimpleTest", () => {
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
     expect(t(1)).toBe("foo");
-    // The gem's third arm passes the Symbol `:'1'`; a Ruby Symbol is a JS
-    // string, so it collapses onto the first arm here.
+    // The gem's third arm passes the Symbol `:'1'`, the same key here.
     expect(t("1")).toBe("foo");
   });
 

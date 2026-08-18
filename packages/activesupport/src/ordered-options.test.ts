@@ -66,8 +66,7 @@ describe("OrderedOptionsTest", () => {
     expect((a as unknown as Options).testKey).toBe(56);
     expect(a.get("testKey")).toBe(56);
     expect(a.dig("testKey")).toBe(56);
-    // The gem's fourth arm digs the String `"test_key"` where the third digs
-    // the Symbol; both are the same key here.
+    // The gem's fourth arm digs the String spelling of the third arm's Symbol.
     expect(a.dig("testKey")).toBe(56);
   });
 
@@ -75,8 +74,8 @@ describe("OrderedOptionsTest", () => {
     const a = new OrderedOptions();
 
     a.set("testKey", [{ a: 1 }]);
-    expect(a.dig("testKey", "0", "a")).toBe(1);
-    expect(a.dig("testKey", "1", "a")).toBeUndefined();
+    expect(a.dig("testKey", 0, "a")).toBe(1);
+    expect(a.dig("testKey", 1, "a")).toBeUndefined();
   });
 
   it("method access", () => {
@@ -170,16 +169,14 @@ describe("OrderedOptionsTest", () => {
     a.foo = ":bar";
     a.set("baz", ":quz");
 
-    // The gem interpolates the Hash literal's rendering into the expected
-    // string (`#{{ foo: :bar, baz: :quz }}`); it is spelled out here.
+    // The gem interpolates the Hash literal's own rendering (`#{{ foo: :bar }}`).
     const hash = `{foo: ":bar", baz: ":quz"}`;
     expect(a.inspect()).toBe(`#<ActiveSupport::OrderedOptions ${hash}>`);
   });
 
   it("inheritable option inspect", () => {
     const object = new InheritableOptions({ one: "first value" });
-    // As in "ordered option inspect": the gem interpolates the Hash literal's
-    // rendering into each expected string.
+    // As above: the gem interpolates each Hash literal's own rendering.
     const one = `{one: "first value"}`;
     expect(object.inspect()).toBe(`#<ActiveSupport::InheritableOptions ${one}>`);
 
@@ -244,9 +241,8 @@ describe("OrderedOptionsTest", () => {
     object.set("two", "second value");
     object.set("three", "third value");
 
-    // Each pair below is the gem's Symbol arm followed by its String arm. `[]=`
-    // symbolizes, so in Ruby only the Symbol arm is a key; both spellings are
-    // the same JS string here, so the String arm answers true too.
+    // Each pair is the gem's Symbol arm followed by its String arm, which `[]=`
+    // symbolizes onto the same key here.
     expect(object.isKey("one")).toBeTruthy();
     expect(object.isKey("one")).toBeTruthy();
     expect(object.isKey("two")).toBeTruthy();
@@ -261,7 +257,7 @@ describe("OrderedOptionsTest", () => {
     object.set("two", "second value");
     object.set("three", "third value");
 
-    // As in "ordered options key" above: the gem's String arms are the same key.
+    // As in "ordered options key": the gem's String arms are the same key here.
     expect(object.isKey("one")).toBeTruthy();
     expect(object.isKey("one")).toBeTruthy();
     expect(object.isKey("two")).toBeTruthy();
@@ -369,9 +365,8 @@ describe("OrderedOptionsTest", () => {
     object.set("two", "second value");
     object.set("three", "third value");
 
-    // The gem prints through `PP.pp(object, io)` and asserts on `io.string`.
-    // There is no PP here; `pretty_print` (ordered_options.rb:116-118) hands PP
-    // the same `to_h` this renders.
+    // No PP here; `pretty_print` (ordered_options.rb:116-118) hands PP the same
+    // `to_h` this renders.
     expect(object.toString()).toBe(
       `{one: "first value", two: "second value", three: "third value"}`,
     );
@@ -385,7 +380,7 @@ describe("OrderedOptionsTest", () => {
       `{one: "first value", two: "second value", three: "third value"}`,
     );
 
-    // As above: no PP, and `pretty_print` renders the same `to_h`.
+    // As above: no PP; `pretty_print` renders the same `to_h`.
     expect(object.toString()).toBe(
       `{one: "first value", two: "second value", three: "third value"}`,
     );

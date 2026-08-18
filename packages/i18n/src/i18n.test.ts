@@ -445,9 +445,8 @@ describe("I18nTest", () => {
   it("normalize_keys normalizes given locale, keys and scope to an array of single-key symbols", () => {
     expect(normalizeKeys("en", "bar", "foo")).toEqual(["en", "foo", "bar"]);
     expect(normalizeKeys("en", "baz.buz", "foo.bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
-    // The gem asserts the dotted keys twice — once as Symbols (`:'baz.buz'`),
-    // once as Strings — and the array arm twice for the same reason. A Ruby
-    // Symbol is a JS string, so each pair collapses onto one call here.
+    // The gem asserts the dotted keys and the array arm twice each, once as
+    // Symbols and once as Strings; each pair is one call here.
     expect(normalizeKeys("en", "baz.buz", "foo.bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
     expect(normalizeKeys("en", ["baz", "buz"], ["foo", "bar"])).toEqual([
       "en",
@@ -499,9 +498,8 @@ describe("I18nTest", () => {
 
   it("available_locales_set should return a set", () => {
     expect(config().availableLocalesSet.constructor).toBe(Set);
-    // The gem stores each locale twice — as a Symbol and as a String — so its
-    // set is `available_locales.size * 2`. Both spellings are the same JS
-    // string here, so the set holds one entry per locale.
+    // The gem stores each locale as a Symbol and as a String, so its set is
+    // `size * 2`; both spellings are one JS string, so it holds one per locale.
     expect(config().availableLocalesSet.size).toBe(config().availableLocales.length);
   });
 

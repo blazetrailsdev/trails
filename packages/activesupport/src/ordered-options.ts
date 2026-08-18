@@ -100,7 +100,7 @@ export class OrderedOptions {
   }
 
   /** Mirrors `dig` (ordered_options.rb:45-47). */
-  dig(key: string, ...identifiers: string[]): unknown {
+  dig(key: string, ...identifiers: (string | number)[]): unknown {
     let value = this.get(String(key));
     for (const identifier of identifiers) {
       if (value == null || typeof value !== "object") return undefined;

@@ -11,10 +11,9 @@ import { Fallbacks } from "./fallbacks.js";
 import { config, resetConfig, setDefaultLocale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 
-// Minitest's `assert_predicate` / `refute_predicate`. The i18n package has no
-// activesupport dependency, so its testing/assertions surface is out of reach.
-// Ruby names the predicate with a method Symbol (`:empty?`); JS has no such
-// protocol to send, so it is a function applied to `actual`.
+// Minitest's `assert_predicate` / `refute_predicate`, which i18n cannot import
+// (no activesupport dependency). Ruby names the predicate with a Symbol; JS has
+// no such protocol to send, so it is a function applied to `actual`.
 function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
   expect(predicate(actual)).toBe(true);
 }
@@ -221,9 +220,8 @@ describe("I18nFallbacksHashCompatibilityTest", () => {
   });
 
   it("#inspect", () => {
-    // fallbacks_test.rb:182 interpolates the Hash literal `{:"de-AT"=>[:"de-DE"]}`
-    // into the expected string. `Fallbacks#inspect`'s symbol/locale renderers are
-    // file-private, so the rendering is spelled out here rather than computed.
+    // fallbacks_test.rb:182 interpolates the Hash literal's own rendering;
+    // `Fallbacks#inspect`'s renderers are file-private, so it is spelled out.
     const map = `{:"de-AT"=>[:"de-DE"]}`;
     expect(fallbacks.inspect()).toBe(
       `#<I18n::Locale::Fallbacks @map=${map} @defaults=[:"en-US", :en]>`,

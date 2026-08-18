@@ -68,9 +68,8 @@ describe("SpellCheckerTest", () => {
 
   it("spell checker excludes input from dictionary", () => {
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
-    // The Ruby test's second and third arms pass `:input` as a dictionary entry
-    // and as the input; a Ruby Symbol is a JS string, so both collapse onto the
-    // first arm here rather than exercising a distinct value protocol.
+    // The gem's second and third arms pass `:input` as the dictionary entry and
+    // as the input; a Ruby Symbol is a JS string, so both are the first arm here.
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
   });
