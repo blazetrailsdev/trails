@@ -52,6 +52,6 @@
       "kwargs{seconds=ref:value}",
       "bool:false"
     ],
-    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`: Rails' Duration constructor carries the total seconds in its own seat (`initialize(value, parts, variable)`, duration.rb:280). trails' constructor is `(parts, variable)` and derives the total from the parts, so no factory can pass the leading value. Converging is the ctor seat itself, tracked by story `converge-duration-constructor-value-seat` (RFC 0106)."
+    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`: Rails' Duration constructor carries the total seconds in its own seat (`initialize(value, parts, variable = nil)`, duration.rb:226). trails' constructor is `(parts, variable)` and derives the total from the parts, so no factory can pass the leading value. Converging is the ctor seat itself, tracked by story `converge-duration-constructor-value-seat` (RFC 0106)."
   }
 ]
