@@ -218,9 +218,9 @@ export class WhereClause {
       let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
         const left = (node as any).left;
-        // Rails: `node.left if equality_node?(node) && node.left.is_a?(Arel::Predications)`.
-        // Predications is mixed in by include(), which leaves no is_a? marker, so
-        // the membership test is one of its methods (predications.rb:16).
+        // Rails' `node.left.is_a?(Arel::Predications)` (where_clause.rb:129): include()
+        // leaves no is_a? marker, so membership is tested via Predications#eq
+        // (predications.rb:17).
         if (left && typeof left.eq === "function") attr = left;
       }
       if (attr) fn(attr, node);
