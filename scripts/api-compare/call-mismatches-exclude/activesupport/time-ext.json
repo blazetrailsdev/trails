@@ -2,52 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "integer?",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/time/calculations.rb:123 calls `integer?` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "local",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:newSec",
-      "ref:newMin",
-      "ref:newHour",
-      "ref:newDay",
-      "ref:newMonth",
-      "ref:newYear",
-      "nil",
-      "nil",
-      "ref:isdst",
-      "nil"
-    ],
-    "reason": "time/calculations.rb:123-155 calls `::Time.local(sec, min, hour, day, month, year, nil, nil, isdst, nil)`; the port passes only the six date/time components, the trailing four having no Temporal analogue."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:newYear",
-      "ref:newMonth",
-      "ref:newDay",
-      "ref:newHour",
-      "ref:newMin",
-      "ref:newSec",
-      "ref:zone"
-    ],
-    "reason": "time/calculations.rb:123-155 builds the changed value with `::Time.new(year, month, day, hour, min, sec, zone)`; the port's `new` at this site constructs the ArgumentError Ruby raises from the same guard."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "preserve_timezone",
     "call": "system_local_time?",
     "kind": "args",
