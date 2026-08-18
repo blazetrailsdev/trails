@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/pool-manager.ts",
     "rubyName": "pool_configs",
     "call": "flat_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): pool_manager.rb:22 is `@role_to_shard_mapping.flat_map { |_, shard_map| shard_map.values }`; trails walks the nested JS Maps with two `for..of` loops (pool-manager.ts:34-39). Same pool configs, same order."
   }
 ]

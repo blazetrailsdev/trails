@@ -15,35 +15,35 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
     "call": "acquire_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Tracked debt (RFC 0073 pool-checkout convergence): connection_pool.rb:548 is `checkout_and_verify(acquire_connection(checkout_timeout))`; trails inlines the acquire at connection-pool.ts:906-925 because its `acquire_connection` does not block on the queue (the wait is `_available.poll`, which is async). Owned by 0073's checkout reshape, not by this burndown."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
     "call": "lock",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Tracked debt (RFC 0073 pool-checkout convergence): connection_pool.rb:550 is `@pinned_connection.lock.synchronize`; trails has no per-connection Monitor — JS is single-threaded and the pinned path is guarded by the same-tick `_resolvePinnedConnection`. Owned by 0073."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
     "call": "checkin",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Tracked debt (RFC 0073 pool-checkout convergence): connection_pool.rb:510-511 is `conn.steal!; checkin conn`; trails' _clearReloadableConnections (connection-pool.ts:1209-1218) inlines the checkin as `_checkedOut.delete` + `_leases._peek(ctx).clear` + `expire()` because `checkin` is async here. Owned by 0073's checkin reshape."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "disconnect",
     "call": "checkin",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Tracked debt (RFC 0073 pool-checkout convergence): connection_pool.rb:457-458 is `conn.steal!; checkin conn`; trails' _disconnect clears `_checkedOut`/`_leases` wholesale instead, for the same async-checkin reason. Owned by 0073."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`; trails' _flush partitions in one `for..of` over `_available.clear()` because eviction and re-add must happen under the same synchronous pass. Same predicate (`!in_use?` and idle >= minimum_idle)."
   },
   {
     "package": "activerecord",
@@ -57,27 +57,27 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "reap",
     "call": "checkin",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): reap recovers connections whose OWNER THREAD died (connection_pool.rb:628-642). JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no stale set to steal, reset and check back in; the guard is the discarded? early return Rails also has."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "reap",
     "call": "remove",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): see `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640 cannot arise in a single-threaded runtime."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "reap",
     "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): see `reap`/`checkin` above — connection_pool.rb:628-633 selects on `conn.owner.alive?`, which has no JS analogue."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "stat",
     "call": "count",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): connection_pool.rb:687-689 derives busy/dead/idle with three `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps the same numbers as maintained sets (`_checkedOut.size`, `_available.length`) and has no `dead` bucket because there are no dead owner threads."
   }
 ]

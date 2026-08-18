@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/postgresql/explain-pretty-printer.ts",
     "rubyName": "pp",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/explain_pretty_printer.rb's `result.rows.map(&:first)` / `.first` is index-0 access on a JS array; `Array#first` is not a ported method name."
   }
 ]

@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "can_remove_no_wait?",
     "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): connection_pool/queue.rb `@queue.size > @num_waiting`; trails' queue holds its entries in a JS array whose `.length` is the same quantity — `Array#size` is not a ported method name."
   }
 ]

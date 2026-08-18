@@ -4,7 +4,7 @@
     "tsFile": "connection-adapters/abstract/schema-creation.ts",
     "rubyName": "accept",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_creation.rb:12 builds the visitor name with `o.class.name.split('::').last` and `send`s it; TypeScript has no `send`, so trails' accept (schema-creation.ts:137-148) dispatches through an explicit `instanceof` chain and never splits a class name."
   },
   {
     "package": "activerecord",
@@ -19,26 +19,5 @@
     "rubyName": "column_options",
     "call": "merge",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_creation.rb:146-148 is `o.options.merge(column: o)`; trails schema-creation.ts:579-581 uses object spread `{...o.options, column: o}`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-creation.ts",
-    "rubyName": "visit_AddCheckConstraint",
-    "call": "accept",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-creation.ts",
-    "rubyName": "visit_AddForeignKey",
-    "call": "accept",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-creation.ts",
-    "rubyName": "visit_TableDefinition",
-    "call": "accept",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

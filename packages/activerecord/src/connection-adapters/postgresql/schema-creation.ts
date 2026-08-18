@@ -23,10 +23,7 @@ import {
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
 } from "../abstract/schema-definitions.js";
-import type {
-  ExclusionConstraintDefinition,
-  UniqueConstraintDefinition,
-} from "./schema-definitions.js";
+import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 
 type PgTableDef = AbstractTableDefinition & {
   exclusionConstraints: ExclusionConstraintDefinition[];
@@ -118,9 +115,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     sql += ((o.constraintValidations as string[] | undefined) ?? [])
       .map((fk) => this.visitValidateConstraint(fk))
       .join(" ");
-    sql += ((o.exclusionConstraintAdds as ExclusionConstraintDefinition[] | undefined) ?? [])
-      .map((con) => this.visitAddExclusionConstraint(con))
-      .join(" ");
+    sql += (
+      await Promise.all(
+        ((o.exclusionConstraintAdds as ExclusionConstraintDefinition[] | undefined) ?? []).map(
+          (con) => this.visitAddExclusionConstraint(con),
+        ),
+      )
+    ).join(" ");
     sql += (
       await Promise.all(
         ((o.uniqueConstraintAdds as UniqueConstraintDefinition[] | undefined) ?? []).map((con) =>
@@ -132,8 +133,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override visitAddForeignKey(o: ForeignKeyDefinition): string {
-    let sql = super.visitAddForeignKey(o);
+  protected override async visitAddForeignKey(o: ForeignKeyDefinition): Promise<string> {
+    let sql = await super.visitAddForeignKey(o);
     if (!o.validate) sql += " NOT VALID";
     return sql;
   }
@@ -195,13 +196,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitAddExclusionConstraint(o: ExclusionConstraintDefinition): string {
-    return `ADD ${this.visitExclusionConstraintDefinition(o)}`;
+  protected async visitAddExclusionConstraint(o: ExclusionConstraintDefinition): Promise<string> {
+    return `ADD ${await this.accept(o)}`;
   }
 
   /** @internal */
   protected async visitAddUniqueConstraint(o: UniqueConstraintDefinition): Promise<string> {
-    return `ADD ${await this.visitUniqueConstraintDefinition(o)}`;
+    return `ADD ${await this.accept(o)}`;
   }
 
   /**
@@ -216,8 +217,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     o:
       | Parameters<AbstractSchemaCreation["accept"]>[0]
       | ChangeColumnDefinition
-      | ChangeColumnDefaultDefinition,
+      | ChangeColumnDefaultDefinition
+      | ExclusionConstraintDefinition
+      | UniqueConstraintDefinition,
   ): Promise<string> {
+    if (o instanceof ExclusionConstraintDefinition)
+      return Promise.resolve(this.visitExclusionConstraintDefinition(o));
+    if (o instanceof UniqueConstraintDefinition) return this.visitUniqueConstraintDefinition(o);
     if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
     if (o instanceof ChangeColumnDefaultDefinition)
       return this.visitChangeColumnDefaultDefinition(o);

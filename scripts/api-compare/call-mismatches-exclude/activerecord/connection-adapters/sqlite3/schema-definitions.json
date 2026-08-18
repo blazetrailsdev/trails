@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/sqlite3/schema-definitions.ts",
     "rubyName": "change_column",
     "call": "column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/schema_definitions.rb's `change_column` re-enters `column(column_name, type, **options)` on the table definition; trails' SQLite Table#changeColumn forwards to the adapter's `changeColumn`, which rebuilds the table (copy_table) — the definition-level column re-declaration happens inside that rebuild."
   }
 ]

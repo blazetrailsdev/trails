@@ -4,7 +4,7 @@
     "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "before_commit_records",
     "call": "run_action_on_records",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): transaction.rb's `before_commit_records` routes through `run_action_on_records`, which threads the `@run_commit_callbacks` flag; trails' beforeCommitRecords walks `this.records` directly because its callback dispatch is async and cannot be driven by the shared synchronous helper."
   },
   {
     "package": "activerecord",
@@ -18,14 +18,14 @@
     "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "begin_transaction",
     "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): transaction.rb's `@stack.size` on a Ruby Array is `this._stack.length` on the JS array — `Array#size` is not a ported method name."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "commit_transaction",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): Ruby's `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array; `Array#last` is not a ported method name."
   },
   {
     "package": "activerecord",
@@ -46,6 +46,6 @@
     "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "rollback_transaction",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): Ruby's `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array; `Array#last` is not a ported method name."
   }
 ]

@@ -4,34 +4,6 @@
     "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "initialize",
     "call": "push",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "new_client",
-    "call": "db_error",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "new_client",
-    "call": "hostname_error",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "new_client",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "new_client",
-    "call": "username_error",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): mysql2_adapter.rb:61-66 pushes onto `@config[:flags]` (a Ruby Array) while building the client flags; trails composes the mysql2 driver options object instead — the node driver takes named booleans, not a FLAGS array, so there is no array to push onto."
   }
 ]

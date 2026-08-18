@@ -2,43 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "commit_db_transaction",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "default_insert_value",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "exec_rollback_db_transaction",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "internal_begin_transaction",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "reset_isolation_level",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/database_statements.rb:140 is `Arel.sql(column.default_function)`; trails calls the same `Arel.sql` export, imported as `arelSql` because the surrounding bodies bind `sql` as a parameter name (sqlite3/database-statements.ts:11)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/database_statements.rb:136 is `result.rows.first`, which is `result.rows[0]` on a JS array; `Array#first` is not a ported method name."
   }
 ]

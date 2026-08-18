@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/postgresql/oid/hstore.ts",
     "rubyName": "deserialize",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/hstore.rb's scanner allocates a `Hash.new`; trails accumulates into an object literal, which is not a `new` expression."
   }
 ]

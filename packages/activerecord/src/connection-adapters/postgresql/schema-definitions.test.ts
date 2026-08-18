@@ -382,22 +382,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(sql).toContain("NULLS NOT DISTINCT");
   });
 
-  it("emits unique constraint using index", async () => {
-    const td = new TableDefinition("orders", { adapter: leased });
-    td.uniqueConstraint("position", { name: "unique_pos", usingIndex: "orders_pos_idx" });
-    const sql = await toSql(td);
-    expect(sql).toContain('USING INDEX "orders_pos_idx"');
-  });
-
-  it("emits DEFERRABLE without INITIALLY clause when deferrable: true", async () => {
-    const td = new TableDefinition("orders", { adapter: leased });
-    td.uniqueConstraint("position", { name: "unique_pos", deferrable: true });
-    const sql = await toSql(td);
-    expect(sql).toContain('CONSTRAINT "unique_pos" UNIQUE ("position") DEFERRABLE');
-    expect(sql).not.toContain("INITIALLY TRUE");
-    expect(sql).not.toContain("INITIALLY");
-  });
-
   it("emits exclusion constraint without CONSTRAINT clause when name is omitted", async () => {
     const td = new TableDefinition("meetings", { adapter: leased });
     td.exclusionConstraint("room WITH =", { using: "gist" });

@@ -153,17 +153,16 @@ export class SchemaCreation {
     createSql += ` ${this.adapter.quoteTableName(o.name)}`;
 
     // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
-    // (the api-compare wide gate tracks it) but map to thunks so each column
-    // visit runs only after the previous one settles: Rails' block is
-    // sequential, and PG's default quoting issues a live regtype query per
-    // defaulted column that must not run concurrently.
+    // but map to thunks so each column visit runs only after the previous one
+    // settles: Rails' block is sequential, and PG's default quoting issues a
+    // live regtype query per defaulted column that must not run concurrently.
     const statements: string[] = [];
-    for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
+    for (const visit of o.columns.map((c) => () => this.accept(c))) {
       statements.push(await visit());
     }
 
     const primaryKeys = o.primaryKeys();
-    if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
+    if (primaryKeys) statements.push(await this.accept(primaryKeys));
 
     if (this.supportsIndexesInCreate()) {
       for (const [columnName, options] of o.indexes) {
@@ -279,9 +278,11 @@ export class SchemaCreation {
     let sql = `ALTER TABLE ${this.adapter.quoteTableName(o.name)} `;
 
     sql += (await Promise.all(o.adds.map((col) => this.accept(col)))).join(" ");
-    sql += o.foreignKeyAdds.map((fk) => this.visitAddForeignKey(fk)).join(" ");
+    sql += (await Promise.all(o.foreignKeyAdds.map((fk) => this.visitAddForeignKey(fk)))).join(" ");
     sql += o.foreignKeyDrops.map((fk) => this.visitDropForeignKey(fk)).join(" ");
-    sql += o.checkConstraintAdds.map((con) => this.visitAddCheckConstraint(con)).join(" ");
+    sql += (
+      await Promise.all(o.checkConstraintAdds.map((con) => this.visitAddCheckConstraint(con)))
+    ).join(" ");
     sql += (
       await Promise.all(o.checkConstraintDrops.map((con) => this.visitDropCheckConstraint(con)))
     ).join(" ");
@@ -307,8 +308,8 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitAddForeignKey(o: ForeignKeyDefinition): string {
-    return `ADD ${this.visitForeignKeyDefinition(o)}`;
+  protected async visitAddForeignKey(o: ForeignKeyDefinition): Promise<string> {
+    return `ADD ${await this.accept(o)}`;
   }
 
   protected async visitCreateIndexDefinition(o: CreateIndexDefinition): Promise<string> {
@@ -503,8 +504,8 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitAddCheckConstraint(o: CheckConstraintDefinition): string {
-    return `ADD ${this.visitCheckConstraintDefinition(o)}`;
+  protected async visitAddCheckConstraint(o: CheckConstraintDefinition): Promise<string> {
+    return `ADD ${await this.accept(o)}`;
   }
 
   /**
