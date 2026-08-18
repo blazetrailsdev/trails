@@ -381,6 +381,69 @@ export function narrowPredicateCandidates(
 }
 
 /**
+ * The TS call a Ruby name is spelled as when {@link significantMissingCalls}'s
+ * ported-with-args gate SUPPRESSES it — i.e. the name maps to no ported TS
+ * method that takes arguments, so the gate never asks whether the TS body makes
+ * it, and it never consumes the TS name it actually ports.
+ *
+ * That is fine while the spelling is unique to it, and wrong the moment a
+ * SIBLING Ruby call in the same body maps to the same TS name: the sibling is
+ * then credited with the suppressed call's port and stops flagging, so the real
+ * omission can be recorded in no register at all (RFC 0106 Open Question 1).
+ * `GeneratedRelationMethods#generate_method` is the worked case — Rails calls
+ * `method_defined?(method)` (delegation.rb:76) and
+ * `RESERVED_METHOD_NAMES.include?(method.to_s)` (delegation.rb:78), trails
+ * spells the memo guard `this._methods.has(name)` (relation/delegation.ts), and
+ * `include?`'s `has` alias claimed it.
+ *
+ * Entries are here rather than in {@link JS_ENUMERABLE_ALIASES} because that
+ * table's contract is that an alias can only ever SILENCE a flag; these
+ * spellings exist to take a name away from a sibling, which can raise one.
+ *
+ * `method_defined?` — `Module#method_defined?(name)` asks whether a name is
+ * installed on a method table; trails' generated-method tables are `Map`s, so
+ * the port is `table.has(name)`, the same JS callee `include?`/`key?` alias to.
+ */
+export const SUPPRESSED_CALL_TS_SPELLINGS = new Map<string, string[]>([
+  ["method_defined?", ["has"]],
+]);
+
+/**
+ * The TS call names in `tsCalls` already spoken for by a Ruby call the
+ * ported-with-args gate suppresses, so no OTHER Ruby call in the same body may
+ * be credited with them (see {@link SUPPRESSED_CALL_TS_SPELLINGS}).
+ *
+ * Deliberately keyed on that gate ALONE. The other suppression —
+ * {@link NO_JS_CALL_FORM} — is the set of names whose faithful port emits no
+ * callee at all, so those calls have no TS spelling to consume and claiming one
+ * for them would manufacture rows against ports that are correct.
+ */
+export function suppressedCallClaims(
+  rubyCalls: readonly string[],
+  tsCalls: Set<string>,
+  isPortedWithArgs: (tsName: string) => boolean,
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+  significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+  aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
+): Set<string> {
+  const claimed = new Set<string>();
+  for (const rc of rubyCalls) {
+    if (!significant.has(rc)) continue;
+    const mapped = mapCall(rc);
+    if (!mapped || mapped.length === 0) continue;
+    if (mapped.some(isPortedWithArgs)) continue;
+    for (const c of [
+      ...mapped,
+      ...aliasCall(rc),
+      ...(SUPPRESSED_CALL_TS_SPELLINGS.get(rc) ?? []),
+    ]) {
+      if (tsCalls.has(c)) claimed.add(c);
+    }
+  }
+  return claimed;
+}
+
+/**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
  * name-matched pair, returns the fidelity-critical Ruby body calls that are
  * absent from the TS body's call-set, formatted as `ruby_call → tsCand|tsCand`.
@@ -413,6 +476,18 @@ export function significantMissingCalls(
   bodyRubyCalls: readonly string[] = rubyCalls,
 ): string[] {
   const missing: string[] = [];
+  const claimed = suppressedCallClaims(
+    bodyRubyCalls.filter((rc) => rc !== rubyName),
+    tsCalls,
+    isPortedWithArgs,
+    mapCall,
+    significant,
+    aliasCall,
+  );
+  const unclaimed = (calls: Set<string>) =>
+    claimed.size === 0 ? calls : new Set([...calls].filter((c) => !claimed.has(c)));
+  const availableTsCalls = unclaimed(tsCalls);
+  const availableNegatedTsCalls = unclaimed(negatedTsCalls);
   for (const rc of rubyCalls) {
     if (rc === rubyName) continue; // self/recursive call
     if (!significant.has(rc)) continue;
@@ -434,14 +509,14 @@ export function significantMissingCalls(
     if (!raw || raw.length === 0) continue;
     const mapped = narrowPredicateCandidates(rc, raw, bodyRubyCalls, mapCall);
     if (!mapped.some(isPortedWithArgs)) continue;
-    if (mapped.some((c) => tsCalls.has(c))) continue;
+    if (mapped.some((c) => availableTsCalls.has(c))) continue;
     // A NEGATED alias (`exclude? → includes`) is matched against the negated
     // call-set: a bare `xs.includes(y)` where Rails wrote `exclude?` is the
     // inverted condition, and must not silence the ratchet. Direct aliases —
     // including `none? → every`, whose de-Morgan port negates inside the
     // callback — keep matching the plain call-set (see NEGATED_ALIASES).
     const aliasMatched = aliasCall(rc).some((c) =>
-      requiresNegatedAlias(rc, c) ? negatedTsCalls.has(c) : tsCalls.has(c),
+      requiresNegatedAlias(rc, c) ? availableNegatedTsCalls.has(c) : availableTsCalls.has(c),
     );
     if (aliasMatched) continue;
     missing.push(`${rc} → ${mapped.join("|")}`);
