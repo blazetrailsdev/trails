@@ -618,8 +618,11 @@ export class MacroReflection extends AbstractReflection {
 
   get klass(): typeof Base {
     // Rails memoizes `@klass ||=`. We additionally gate the memo on the model
-    // registry's generation so a class re-registered under this reflection's
-    // className re-resolves instead of returning a stale target forever.
+    // registry's generation so a memo resolved against an incomplete registry
+    // re-resolves instead of standing forever. The generation bumps on any
+    // registration, a fresh one included (see ModelRegistry in associations.ts),
+    // which is what heals it — a name rebound to a DIFFERENT class is not the
+    // mechanism, and does not occur in the repro this gate exists for.
     if (this._klassCache && this._klassCacheGeneration === modelRegistry.generation) {
       return this._klassCache;
     }

@@ -939,8 +939,8 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
 /**
  * The TS class that owns `tsName` in the file a pair matched, given every
  * class in that file declaring the name and the Ruby entity the pair came
- * from. One declaration needs no disambiguation; several are resolved in three
- * steps, each of which must name exactly ONE owner or fall through — an
+ * from. One declaration needs no disambiguation; several are resolved in the
+ * steps below, each of which must name exactly ONE owner or fall through — an
  * unresolved (`undefined`) result records nothing rather than pairing wrongly
  * (see ambiguousTsOwner):
  *
@@ -964,6 +964,19 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
  * time-ext.ts's single `toTime` body answers `Time#to_time`, `Date#to_time` and
  * `DateTime#to_time` alike (RFC 0108).
  *
+ *  0. reader vs WRITER. Ruby's `name` / `name=` pair both translate to the TS
+ *     name `name` (conventions.ts), spelled as a plain member for the reader
+ *     and a `set name` accessor for the writer, so a file holding both declares
+ *     the name on two owners. Pairing by name alone let the class's `set`
+ *     accessor answer for the Ruby READER — `mime_negotiation.rb:85`'s
+ *     `set_header k, v` held to `set formats`'s
+ *     `set_header "action_dispatch.request.formats", …` (`:137`), and the
+ *     `variant` reader's argument-less `ArrayInquirer.new` (`:100`) held to the
+ *     error `variant=` raises (`:96`). Keep only the owners whose writer-ness
+ *     matches the Ruby method's, so a writer pairs with the `set` accessor and
+ *     a reader never does (RFC 0108). Runs first: the Ruby class's own short
+ *     name (step 1) names the class the accessor sits on either way.
+ *
  *  4. one BODY declared twice. The trails mixin convention (CLAUDE.md "Module
  *     mixins") exports a top-level function and re-exports the very same
  *     function through a grouping object — `export function toTime()` beside
@@ -981,10 +994,25 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
 export function resolveTsOwner(
   owners: ReadonlySet<string> | undefined,
   rubyModule: string,
-  { hosts, seatOf, rubySeat, rubySeats = new Set(), callSetOf }: TsOwnerResolution = {},
+  {
+    hosts,
+    seatOf,
+    rubySeat,
+    rubySeats = new Set(),
+    callSetOf,
+    writerOf,
+    rubyIsWriter,
+  }: TsOwnerResolution = {},
 ): string | undefined {
   if (!owners || owners.size === 0) return undefined;
   if (owners.size === 1) return [...owners][0];
+  if (writerOf && rubyIsWriter !== undefined) {
+    const kept = [...owners].filter((o) => writerOf(o) === rubyIsWriter);
+    if (kept.length > 0 && kept.length < owners.size) {
+      if (kept.length === 1) return kept[0];
+      owners = new Set(kept);
+    }
+  }
   const short = rubyModule.split("::").at(-1) ?? rubyModule;
   if (owners.has(short)) return short;
   if (hosts) {
@@ -1030,6 +1058,12 @@ export interface TsOwnerResolution {
   /** The call-sets the file records for each TS owner declaring the name, for
    *  the one-body-two-declarations arm — see resolveTsOwner step 4. */
   callSetOf?: (tsOwner: string) => readonly string[][] | undefined;
+  /** Whether each TS owner declares the name as a `set` accessor — the port's
+   *  spelling of Ruby's `name=` writer. See resolveTsOwner step 0. */
+  writerOf?: (tsOwner: string) => boolean;
+  /** Whether the Ruby method under comparison is the `name=` writer rather than
+   *  the same-named reader. Absent leaves the writer arm off. */
+  rubyIsWriter?: boolean;
 }
 
 /** The seat a Ruby owner FQN states, if any: `ActiveRecord::Persistence::ClassMethods`
@@ -1169,6 +1203,10 @@ export interface RubyOwnerResolution {
   tsSeat?: OwnerSeat;
   rubyOwnersOnTsSeat?: number;
 }
+
+/** A Ruby `name=` writer, as opposed to an operator method that merely ends in
+ *  `=` (`==`, `<=`, `!=`) — those port to a named method, never a `set` accessor. */
+const RUBY_WRITER_NAME = /^[A-Za-z_]\w*=$/;
 
 /**
  * True when a Ruby WRITER resolved to the TS READER's body.
@@ -2419,6 +2457,10 @@ export function main() {
     // owner with the prototype one (RFC 0108).
     const tsStaticOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsInstanceOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // The owners that declare the name as a `set` accessor (file → name →
+    // owners) — the port's spelling of Ruby's `name=` writer, so
+    // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
+    const tsWriterOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -2487,6 +2529,11 @@ export function main() {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsOwnersByFileName.set(file, owners);
+        if (m.writer === true) {
+          const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+          writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
+          tsWriterOwnersByFileName.set(file, writerOwners);
+        }
         // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
         if (owner !== "") {
           const bySeat =
@@ -3015,6 +3062,9 @@ export function main() {
           rubySeat,
           rubySeats,
           callSetOf: (tsOwner) => tsCallsByFileNameOwner.get(tsFile)?.get(tsName)?.get(tsOwner),
+          writerOf: (tsOwner) =>
+            tsWriterOwnersByFileName.get(tsFile)?.get(tsName)?.has(tsOwner) ?? false,
+          rubyIsWriter: RUBY_WRITER_NAME.test(rubyName),
         });
         const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
         const ambiguous =

@@ -1917,6 +1917,38 @@ describe("ownerCallArgSites", () => {
   ]);
   const twiceDeclaredByFile = new Map([["time-ext.ts", new Map([["toTime", [sites, sites]]])]]);
 
+  it("pairs a Ruby reader with the TS member, not the same-named set accessor", () => {
+    // mime-negotiation.ts declares `formats` twice: the reader as a top-level
+    // function (`""`) and `formats=` as `set formats` on `MimeNegotiation`
+    // (mime_negotiation.rb:84-86 vs :136-141). The Ruby class's short name is
+    // `MimeNegotiation` either way, so name-only resolution handed the reader
+    // the writer's body.
+    const owners = new Set(["", "MimeNegotiation"]);
+    const writerOf = (o: string) => o === "MimeNegotiation";
+    expect(
+      resolveTsOwner(owners, "ActionDispatch::Http::MimeNegotiation", {
+        writerOf,
+        rubyIsWriter: false,
+      }),
+    ).toBe("");
+    expect(
+      resolveTsOwner(owners, "ActionDispatch::Http::MimeNegotiation", {
+        writerOf,
+        rubyIsWriter: true,
+      }),
+    ).toBe("MimeNegotiation");
+  });
+
+  it("leaves resolution to the later steps when no owner is a set accessor", () => {
+    const owners = new Set(["", "MimeNegotiation"]);
+    expect(
+      resolveTsOwner(owners, "ActionDispatch::Http::MimeNegotiation", {
+        writerOf: () => false,
+        rubyIsWriter: false,
+      }),
+    ).toBe("MimeNegotiation");
+  });
+
   it("compares a twice-declared single body under its resolved owner", () => {
     const owners = new Set(["", "TimeExt"]);
     const tsClass = resolveTsOwner(owners, "Time", {

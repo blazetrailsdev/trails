@@ -569,12 +569,19 @@ export function narrowToProjectedColumns(
   const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
   // An ignored column is dropped from columnNames(), so a `new` record's seeded
   // default for a still-declared-and-ignored attribute (Rails' AttributedDeveloper
-  // `name`) would otherwise survive narrowing as an initialized value. Rails
-  // leaves it uninitialized after a load that didn't project it — its
-  // `_default_attributes` entry is `Attribute.uninitialized`, so
-  // `@attributes.key?` is false. Uninitialize any ignored column the row did not
-  // carry so a narrowed reload matches; an ignored column present in a raw
-  // `SELECT *` row (in rowKeys) is untouched and keeps its loaded value.
+  // `name`) would otherwise survive narrowing as an initialized value.
+  //
+  // Rails does NOT leave such a slot uninitialized, contrary to what this
+  // comment used to claim: a defaultless `attribute` records only a PendingType,
+  // and `Attribute::Null#with_type` → `with_cast_value(name, nil, type)`
+  // (attribute.rb:231-233) is initialized; a load that skips the column then
+  // dups that default via `default_attribute`'s `types.key?` arm
+  // (attribute_set/builder.rb:81-85). Rails' own test is narrower — an ignored
+  // REAL column (`Developer#first_name`, base_test.rb:1825-1834) is not in
+  // `types`, lands on `Attribute.null`, and stays out of `@attributes`. The
+  // narrowing is kept for the trails-only shape base.test.ts pins (a column both
+  // declared and ignored); an ignored column present in a raw `SELECT *` row (in
+  // rowKeys) is untouched and keeps its loaded value.
   const ignoredColumns = (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [];
   for (const c of ignoredColumns) {
     if (!pkSet.has(c) && !rowKeys.has(c)) narrowable.push(c);
@@ -1018,7 +1025,13 @@ function castStiValueFromAttrs(
   const subclassValue =
     attrsHash[inheritCol] ?? attrsHash[snakeCol] ?? attrsHash[camelCol] ?? undefined;
   if (!isPresent(subclassValue)) return { found: false };
-  return { found: true, value: castInheritanceColumnValue(modelClass, inheritCol, subclassValue) };
+  // Rails reaches this through `subclass_from_attributes` → `find_sti_class`
+  // (inheritance.rb:312), which casts through `base_class`, not the receiver.
+  // Only the subclass lookup and its `subclass == self` check stay on it.
+  return {
+    found: true,
+    value: castInheritanceColumnValue(baseClass.call(modelClass), inheritCol, subclassValue),
+  };
 }
 
 /**

@@ -230,13 +230,29 @@ export interface ReflectionLike {
 }
 
 /**
- * Model registry that tracks a monotonic `generation`, bumped whenever a name
- * is bound to a different class (or unbound). Reflections memoize their
- * resolved `klass` alongside the generation it was resolved at, so a
- * re-registration under the same name invalidates every stale memo at once
- * instead of poisoning it permanently. Without this, a test file registering a
- * bespoke model under a canonical name poisons the canonical reflections for
- * the rest of the vitest worker's life.
+ * Model registry that tracks a monotonic `generation`, bumped on any mutation
+ * that can change what a name resolves to — a FRESH registration as much as a
+ * rebind (`super.get(name) !== model` is true for `prev === undefined`).
+ * Reflections memoize their resolved `klass` and through/source chain alongside
+ * the generation they were resolved at, so a later registration invalidates
+ * every stale memo at once instead of poisoning it permanently.
+ *
+ * What that heals is a memo formed under an INCOMPLETE registry, not a shadowed
+ * name. Instrumenting the two-file repro
+ * (`nested-through-associations.test.ts` + `associations.test.ts`, RFC 0078)
+ * counts 184 fresh registrations and ZERO rebinds: nothing is ever bound to a
+ * different class, and both files import the canonical models. The poisoned
+ * memo is `ThroughReflection#sourceReflectionName`'s `null`, written by the
+ * catch that swallows `NameError: Missing model class Tagging` raised from
+ * `throughRef.klass` while `Tagging` is not yet registered; `sourceReflection`
+ * then reads that `null` and `checkValidityBang` raises
+ * `HasManyThroughSourceAssociationNotFoundError` forever. The healing bump is
+ * whatever model registers next.
+ *
+ * The consequence worth knowing: a negative memo formed after the LAST
+ * registration in a worker has no later bump to heal it. Story
+ * `dont-memoize-negative-source-resolution-from-unresolvable-klass` (RFC 0078)
+ * covers not memoizing a resolution that failed for a missing class.
  * @internal
  */
 class ModelRegistry extends Map<string, typeof Base> {
