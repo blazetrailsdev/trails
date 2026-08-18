@@ -54,15 +54,6 @@ describe("Numeric helpers (functional equivalents of Rails numeric extensions)",
     const past = hours(1).ago();
     expect(past.epochMilliseconds).toBeLessThan(Date.now() - 59 * 60 * 1000);
   });
-
-  it("Duration.sum adds an array of durations", () => {
-    const total = Duration.sum([seconds(10), minutes(1), seconds(20)]);
-    expect(total.inSeconds()).toBe(90);
-  });
-
-  it("Duration.sum of empty array is zero", () => {
-    expect(Duration.sum([]).inSeconds()).toBe(0);
-  });
 });
 
 describe("Scalar", () => {

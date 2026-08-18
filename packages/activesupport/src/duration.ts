@@ -9,6 +9,9 @@
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
+import { inspect } from "./core-ext/object/inspect.js";
+import { ArgumentError } from "./hash-utils.js";
+import { isEmpty } from "./ruby-empty.js";
 import type { TimeWithZone } from "./time-with-zone.js";
 
 export type DurationParts = {
@@ -315,21 +318,61 @@ export class Duration {
   since(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   since(date?: Date | Temporal.Instant): Temporal.Instant;
   since(
-    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
   ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
-    if (date instanceof Temporal.PlainDate)
-      return applyDurationToDate(date, this.parts, this._partKeys, 1);
-    return applyDurationPreservingNs(date, this.parts, 1);
+    return this.sum(1, time);
   }
 
   ago(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   ago(date?: Date | Temporal.Instant): Temporal.Instant;
   ago(
-    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
   ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
-    if (date instanceof Temporal.PlainDate)
-      return applyDurationToDate(date, this.parts, this._partKeys, -1);
-    return applyDurationPreservingNs(date, this.parts, -1);
+    return this.sum(-1, time);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#sum (duration.rb:485-510).
+   *
+   * The `acts_like?` guard is spelled as the receiver check
+   * `core-ext/date-and-time/calculations.ts:200-210` uses: neither of trails'
+   * receivers carries an `acts_like_*?` marker method, so being one IS the
+   * answer — a `Date`/`Temporal.Instant` is a moment, a `Temporal.PlainDate`
+   * is a calendar day.
+   *
+   * Each arm's per-part loop lives in a module function because the two
+   * receivers take different unit methods: {@link applyDurationToDate} is the
+   * `@parts.each` loop verbatim, {@link applyDurationPreservingNs} carries it
+   * for a moment receiver in a fixed unit order rather than `@parts` order
+   * (tracked by `duration-sum-instant-arm-ignores-part-order`).
+   */
+  private sum(
+    sign: 1 | -1,
+    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (
+      !(
+        time instanceof Date ||
+        time instanceof Temporal.Instant ||
+        time instanceof Temporal.PlainDate
+      )
+    ) {
+      throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
+    }
+
+    if (isEmpty(this._partKeys)) {
+      // `time.since(sign * value)`. An empty `@parts` here means a zero value —
+      // the constructor only leaves `_partKeys` empty when it was given no
+      // parts — so the moment receiver is unchanged, while `Date#since` still
+      // widens the calendar day into a zoned Time
+      // (`core_ext/date/calculations.rb:61-63`).
+      if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
+      return applyDurationPreservingNs(time, this.parts, sign);
+    }
+
+    if (time instanceof Temporal.PlainDate)
+      return applyDurationToDate(time, this.parts, this._partKeys, sign);
+    return applyDurationPreservingNs(time, this.parts, sign);
   }
 
   fromNow(): Temporal.Instant {
@@ -573,15 +616,6 @@ export class Duration {
       throw new TypeError(`can't build an ActiveSupport::Duration from a ${typeName}`);
     }
     return new Duration({ seconds: value });
-  }
-
-  /**
-   * Sum an array of durations. Mirrors Enumerable#sum for durations.
-   *
-   * @internal
-   */
-  static sum(durations: Duration[]): Duration {
-    return durations.reduce((acc, d) => acc.plus(d), new Duration());
   }
 }
 
