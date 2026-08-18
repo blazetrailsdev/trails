@@ -34,7 +34,12 @@ describe("a leading-colon where key", () => {
     // `Post#firstComment` is `class_name: "Comment"` over the `comments` table,
     // so the condition is keyed by the association Symbol
     // (query_methods.rb:96-98), not by `reflection.table_name`.
+    const conn = Post.connection;
     const sql = Post.where().associated("firstComment").toSql();
-    expect(sql).toContain('"firstComment"."id" IS NOT NULL');
+    const qualified = `${conn.quoteTableName("firstComment")}.${conn.quoteColumnName("id")}`;
+    expect(sql).toContain(`${qualified} IS NOT NULL`);
+    expect(sql).not.toContain(
+      `${conn.quoteTableName("comments")}.${conn.quoteColumnName("id")} IS NOT NULL`,
+    );
   });
 });
