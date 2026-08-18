@@ -560,14 +560,16 @@ describe("AdapterForeignKeyTest", () => {
     class KlassHasFk extends Base {
       static {
         this.tableName = "fk_test_has_fk";
-        // Declare fk_id so the constructor assignment is a known name under
-        // strict writeFromUser — this anonymous class has never been
-        // schema-warmed, and Ruby's lazy column load has no sync analogue here;
-        // otherwise the value is dropped and the INSERT hits NOT NULL before FK.
-        this.attribute("fk_id", "integer");
       }
     }
-    const hasFk = new KlassHasFk({ fk_id: 1231231231 });
+    // Ruby loads the schema lazily on first attribute access (Class.new with
+    // nothing but `self.table_name`); trails' lazy load is the SYNC cache read
+    // in `loadSchema`, which answers nothing for a table no query has warmed
+    // yet, so reflect once up front. Unlike an `attribute()` declaration this
+    // keeps the column DB-reflected.
+    await KlassHasFk.ensureSchemaLoaded();
+    const hasFk = new KlassHasFk();
+    (hasFk as unknown as { fk_id: number }).fk_id = 1231231231;
     const error = await hasFk.save({ validate: false }).catch((e) => e);
     expect(error).toBeInstanceOf(InvalidForeignKey);
     expect(error.cause).toBeTruthy();
