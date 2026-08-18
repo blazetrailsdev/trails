@@ -86,11 +86,10 @@ export class Session {
     req: { env: Record<string, unknown> },
     options: Record<string, unknown> = {},
   ): Session {
-    const existing = req.env[ENV_SESSION_KEY] as Session | undefined;
-    req.env[ENV_SESSION_OPTIONS_KEY] = options;
+    const existing = Session.find(req);
     const session = new Session(store, req.env, options);
 
-    if (existing && existing instanceof Session) {
+    if (existing) {
       const oldData = existing.toHash();
       session.loadData();
       for (const [key, value] of Object.entries(oldData)) {
@@ -100,13 +99,14 @@ export class Session {
       }
     }
 
-    req.env[ENV_SESSION_KEY] = session;
+    Session.set(req, session);
+    Options.set(req, options);
     return session;
   }
 
   static disabled(req: { env: Record<string, unknown> }): Session {
     const session = new Session(null, req.env, { id: null }, false);
-    req.env[ENV_SESSION_OPTIONS_KEY] = { id: null };
+    Options.set(req, { id: null });
     return session;
   }
 
