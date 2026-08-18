@@ -2,6 +2,34 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/data-streaming.ts",
+    "rubyName": "send_data",
+    "call": "merge",
+    "reason": "Inherited from actioncontroller/base.json: `send_data`/`send_file` are ported once in action-dispatch/send-file.ts and re-exported by metal/data-streaming.ts, so crediting the named re-export moved these existing rows to the file data_streaming.rb actually maps onto. Same unconverged omission, same RFC 0047 bucket, new home — not new debt."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/data-streaming.ts",
+    "rubyName": "send_data",
+    "call": "render",
+    "reason": "Inherited from actioncontroller/base.json: `send_data`/`send_file` are ported once in action-dispatch/send-file.ts and re-exported by metal/data-streaming.ts, so crediting the named re-export moved these existing rows to the file data_streaming.rb actually maps onto. Same unconverged omission, same RFC 0047 bucket, new home — not new debt."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/data-streaming.ts",
+    "rubyName": "send_data",
+    "call": "send_file_headers!",
+    "reason": "Inherited from actioncontroller/base.json: `send_data`/`send_file` are ported once in action-dispatch/send-file.ts and re-exported by metal/data-streaming.ts, so crediting the named re-export moved these existing rows to the file data_streaming.rb actually maps onto. Same unconverged omission, same RFC 0047 bucket, new home — not new debt."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/data-streaming.ts",
+    "rubyName": "send_file",
+    "call": "send_file_headers!",
+    "reason": "Inherited from actioncontroller/base.json: `send_data`/`send_file` are ported once in action-dispatch/send-file.ts and re-exported by metal/data-streaming.ts, so crediting the named re-export moved these existing rows to the file data_streaming.rb actually maps onto. Same unconverged omission, same RFC 0047 bucket, new home — not new debt."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/data-streaming.ts",
     "rubyName": "send_file_headers!",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

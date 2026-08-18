@@ -2048,6 +2048,7 @@ export function dedupeRubyMethodInto(
       rubyName: rm.name,
       rubyModule: itemFqn,
       umbrellaConfig: rm.umbrellaConfig,
+      notes: rm.notes,
       mixinFile: rm.mixinFile,
       definedInFile: rm.file,
     });
@@ -2059,6 +2060,8 @@ export interface SeenRubyMethod {
   rubyName: string;
   rubyModule: string;
   umbrellaConfig?: boolean;
+  /** The Ruby extractor's classification — `"class_attribute"` for an `mattr_accessor`/`class_attribute`-generated reader. */
+  notes?: string;
   /** Set when the first sighting came in through `include`/`extend` — see `mixinMethodCreditedToOwnFile`. */
   mixinFile?: string;
   /** The Ruby file that actually defines it — see `reopeningMethodCreditedToOwnFile`. */
@@ -3395,7 +3398,7 @@ export function main() {
 
       for (const [
         _dedupeKey,
-        { rubyName, rubyModule, umbrellaConfig, mixinFile, definedInFile },
+        { rubyName, rubyModule, umbrellaConfig, notes, mixinFile, definedInFile },
       ] of seen) {
         const tsCandidates = rubyMethodToTs(rubyName, siblingRubyNames)!;
 
@@ -3544,6 +3547,33 @@ export function main() {
         // same 2-Ruby-methods-cover-1-TS-property accounting the direct-match
         // path already applies to every `attr_accessor`-backed property in the
         // codebase. Not umbrella-specific inflation; just consistent with it.
+        // An `mattr_accessor`/`class_attribute` reader on a MODULE has no
+        // settable ESM counterpart — a module export is not assignable from
+        // outside — so trails renders the pair as an exported binding plus a
+        // `setX()` writer (`ActiveSupport.parse_json_times` →
+        // `parseJsonTimes` / `setParseJsonTimes`, json.ts:20-23), the same
+        // settled shape RFC 0068 gives a blocking Ruby `x=`. The extractor
+        // records an exported `let` as a value, not a method, so only the
+        // writer half is in `tsFilesByMethod`; crediting the reader through it
+        // measures the accessor as the one ported pair it is, exactly as the
+        // umbrella-config arm below does for the same rendering.
+        if (notes === "class_attribute") {
+          const setter = tsCandidates.map((c) => `set${c.charAt(0).toUpperCase()}${c.slice(1)}`);
+          const port = setter.find((c) => tsFilesByMethod.has(c));
+          if (port) {
+            const actualFile = [...(tsFilesByMethod.get(port) as Set<string>)].sort()[0];
+            fileMatched++;
+            moves.push({
+              tsName: port,
+              rubyName,
+              rubyModule,
+              expectedFile: expectedTs,
+              actualFile,
+            });
+            continue;
+          }
+        }
+
         if (umbrellaConfig) {
           const directPort = tsCandidates.find((c) => tsFilesByMethod.has(c));
           const setterForms = tsCandidates.map(

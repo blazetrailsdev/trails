@@ -1208,7 +1208,13 @@ export class Relation<T extends Base> {
     // always convert table names to downcase as in Oracle quoted table names are in uppercase
     const downcased = joinedTables.map((name) => name.toLowerCase());
 
-    return this.referencesValues.some((ref) => !downcased.includes(String(ref)));
+    // `references_values.map(&:to_s)` (relation.rb:1488) — `references!` stores
+    // `*table_names` unconverted (query_methods.rb:360-363), so a Symbol drops
+    // its colon here.
+    return this.referencesValues.some((ref) => {
+      const string = typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref);
+      return !downcased.includes(string);
+    });
   }
 
   /**

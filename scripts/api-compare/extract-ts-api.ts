@@ -883,7 +883,20 @@ export function extractFromProgram(
         if (fileFunctions.some((f) => f.name === sym.name)) continue;
         const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
         const decl = resolved.valueDeclaration ?? resolved.declarations?.[0];
-        if (decl && decl.getSourceFile() === sourceFile) {
+        // A NAMED re-export — `export { parameterize } from "./transliterate.js"`
+        // — is how TS spells a Ruby one-line delegation (`String#parameterize`
+        // is `Inflector.parameterize(self, …)`, core_ext/string/inflections.rb:184).
+        // The member really is part of this file's surface, so it counts here as
+        // well as in the file that defines the body, exactly as Ruby counts it in
+        // both `inflections.rb` and `transliterate.rb`. `export *` barrels declare
+        // no specifier here and are unaffected.
+        const namedReExport = sym.declarations?.some(
+          (d) =>
+            ts.isExportSpecifier(d) &&
+            d.getSourceFile() === sourceFile &&
+            d.parent.parent.moduleSpecifier !== undefined,
+        );
+        if (decl && (decl.getSourceFile() === sourceFile || namedReExport === true)) {
           let params: ParamInfo[] = [];
           let isFunctionLike = false;
 

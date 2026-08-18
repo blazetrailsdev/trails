@@ -16,6 +16,19 @@
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
+    "rubyName": "load_country_zones",
+    "call": "create",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tzId",
+      "nil",
+      "ref:get"
+    ],
+    "reason": "Rails passes `create(tz_id, nil, TZInfo::Timezone.get(tz_id))` (time_zone.rb:278) because `create` is `alias_method :create, :new` over `initialize(name, utc_offset = nil, tzinfo = nil)`. trails resolves zones through `Intl`, which has no TZInfo::Timezone object to hand over, so `create` takes the name alone and looks the zone data up itself; the third argument has no value to carry. Converges when trails grows a tzinfo object (the `time-with-zone-residue-structural-blockers` seam)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "values/time-zone.ts",
     "rubyName": "now",
     "call": "in_time_zone",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

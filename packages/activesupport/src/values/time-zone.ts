@@ -653,7 +653,7 @@ export class TimeZone {
    * (time_zone.rb:223-225), sorted by `<=>` (time_zone.rb:333-337).
    */
   static all(): TimeZone[] {
-    zones ??= Object.values(TimeZone.#zonesMap()).sort((a, b) => a.compareTo(b) ?? 0);
+    zones ??= Object.values(TimeZone.zonesMap()).sort((a, b) => a.compareTo(b) ?? 0);
     return zones;
   }
 
@@ -661,7 +661,8 @@ export class TimeZone {
    * Current time in this timezone.
    */
   now(): TimeWithZone {
-    return new TimeWithZone(instantFrom(currentTime()), this);
+    // `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518).
+    return new TimeWithZone(instantFrom(this.timeNow()), this);
   }
 
   /**
@@ -1052,6 +1053,17 @@ export class TimeZone {
   }
 
   /**
+   * `abbr(time)` (time_zone.rb:567) — `tzinfo.abbr(time)`, the abbreviation the
+   * zone is observing at `time`. trails' `tzinfo` is the IANA name rather than a
+   * `TZInfo::Timezone`, so the delegation goes through the same `getZoneInfo`
+   * shim `dst?`'s port reads, which is where `TZInfo::TimezonePeriod#abbr`
+   * lives here.
+   */
+  abbr(time: Date | Temporal.Instant): string {
+    return getZoneInfo(this.tzinfo, toDate(time)).abbreviation;
+  }
+
+  /**
    * Whether DST is in effect at the given instant.
    */
   isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
@@ -1074,14 +1086,7 @@ export class TimeZone {
    * `dst?` / `observed_utc_offset` / `abbreviation` off.
    */
   periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
-    return new TimezonePeriod(this.abbreviation(date), this.utcOffsetAt(date), this.isDst(date));
-  }
-
-  /**
-   * Timezone abbreviation at a given instant.
-   */
-  abbreviation(date: Date | Temporal.Instant = Temporal.Now.instant()): string {
-    return getZoneInfo(this.tzinfo, toDate(date)).abbreviation;
+    return new TimezonePeriod(this.abbr(date), this.utcOffsetAt(date), this.isDst(date));
   }
 
   /**
@@ -1184,7 +1189,7 @@ export class TimeZone {
     const code = countryCode.toUpperCase();
     let memo = countryZonesMemo.get(code);
     if (memo === undefined) {
-      memo = TimeZone.#loadCountryZones(code);
+      memo = TimeZone.loadCountryZones(code);
       countryZonesMemo.set(code, memo);
     }
     return memo;
@@ -1223,7 +1228,7 @@ export class TimeZone {
    * {@link TimeZone.create} — trails resolves zones through `Intl`, which has
    * no TZInfo error hierarchy to port.
    */
-  static #loadCountryZones(code: string): TimeZone[] {
+  private static loadCountryZones(code: string): TimeZone[] {
     // `getTimeZones` reports an unknown region as no zones rather than by
     // raising, and rejects a malformed one with a `RangeError`; every real
     // Alpha2 code has at least one zone, so both are the raise `Country.get`
@@ -1263,13 +1268,22 @@ export class TimeZone {
    * keyed by that name — `zones[name] = timezone if timezone`, hence the
    * nullish guard — under the `@zones_map` memo `all` reads through.
    */
-  static #zonesMap(): Record<string, TimeZone> {
+  private static zonesMap(): Record<string, TimeZone> {
     zonesMapMemo ??= Object.keys(MAPPING).reduce<Record<string, TimeZone>>((zones, name) => {
       const timezone = TimeZone.find(name);
       if (timezone != null) zones[name] = timezone;
       return zones;
     }, {});
     return zonesMapMemo;
+  }
+
+  /**
+   * `time_now` (time_zone.rb:610-612) — `Time.now`, the seam Rails' own time
+   * helpers stub. trails stubs the clock through `time-travel.ts`, so
+   * `currentTime()` is `Time.now` here.
+   */
+  private timeNow(): Date {
+    return currentTime();
   }
 
   toString(): string {

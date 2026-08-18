@@ -2181,6 +2181,33 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((f) => f.name === "with")!.noRailsEquivalent).toBeUndefined();
   });
 
+  it("counts a named re-export as the re-exporting file's own surface", () => {
+    const info = extractFromFiles("/p", {
+      "transliterate.ts": `
+        export function parameterize(string: string): string { return string; }
+      `,
+      "inflector.ts": `
+        export { parameterize } from "./transliterate.js";
+      `,
+    });
+    expect(fileFunctionsOf(info, "transliterate.ts").map((f) => f.name)).toContain("parameterize");
+    expect(fileFunctionsOf(info, "inflector.ts").map((f) => f.name)).toContain("parameterize");
+  });
+
+  it("does not count an `export *` barrel's members as the barrel's surface", () => {
+    const info = extractFromFiles("/p", {
+      "transliterate.ts": `
+        export function parameterize(string: string): string { return string; }
+      `,
+      "index.ts": `
+        export * from "./transliterate.js";
+      `,
+    });
+    expect((info.fileFunctions?.["index.ts"] ?? []).map((f) => f.name)).not.toContain(
+      "parameterize",
+    );
+  });
+
   it("reads a renamed export's own reason instead of the declaration's", () => {
     const info = extractFromFiles("/p", {
       "registry.ts": `

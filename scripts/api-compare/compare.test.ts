@@ -12,6 +12,7 @@ import {
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
+  type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
   rubyFileHasTsCounterpart,
@@ -1538,6 +1539,18 @@ describe("dedupeRubyMethodInto", () => {
       line: 1,
     };
   }
+
+  it("carries the extractor's class_attribute note onto the seen entry", () => {
+    // The accessor arm of the compare loop reads it to credit an
+    // `mattr_accessor` reader through its `setX` writer.
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(
+      seen,
+      { ...rm("parse_json_times"), notes: "class_attribute" },
+      "ActiveSupport",
+    );
+    expect(seen.get("parse_json_times")!.notes).toBe("class_attribute");
+  });
 
   it("retains distinct Ruby methods even when their first TS candidates collide", () => {
     // Regression: previous dedup keyed on the first TS candidate, so

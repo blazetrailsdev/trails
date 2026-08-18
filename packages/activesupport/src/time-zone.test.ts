@@ -755,7 +755,7 @@ describe("TimeZoneTest", () => {
   it("abbr", () => {
     const tz = TimeZone.find("America/New_York")!;
     const jan = new Date(Date.UTC(2024, 0, 15));
-    expect(tz.abbreviation(jan)).toBe("EST");
+    expect(tz.abbr(jan)).toBe("EST");
   });
 
   it("dst", () => {
