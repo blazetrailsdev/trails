@@ -108,22 +108,28 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
   // and find_sti_class raises unless the resolved constant is self or in
   // descendants (:242-265). An STI ancestor is neither, so the type never
   // reaches the column — this test used to assert the port's build-as-is escape.
+  // The class names are unique to this file because the assertion turns on which
+  // class the global model registry resolves the stored type to.
   it("scope that sets type overwrites the STI type column", async () => {
-    class Vehicle extends Base {
+    class ScopeStiVehicle extends Base {
       static {
         this._tableName = "vehicles";
         this.attribute("id", "integer");
         this.attribute("type", "string");
       }
     }
-    Vehicle.inheritanceColumn = "type";
-    class Car extends Vehicle {}
-    registerModel("ScopeStiVehicle", Vehicle);
-    registerSubclass(Car);
+    ScopeStiVehicle.inheritanceColumn = "type";
+    class ScopeStiCar extends ScopeStiVehicle {}
+    registerModel(ScopeStiVehicle);
+    registerSubclass(ScopeStiCar);
 
-    const rel = Vehicle.where({ type: "ScopeStiVehicle" });
-    await Vehicle.scoping(rel, async () => {
-      expect(() => new Car({})).toThrow(SubclassNotFound);
+    const rel = ScopeStiVehicle.where({ type: "ScopeStiVehicle" });
+    await ScopeStiVehicle.scoping(rel, async () => {
+      expect(() => new ScopeStiCar({})).toThrow(
+        new SubclassNotFound(
+          "Invalid single-table inheritance type: ScopeStiVehicle is not a subclass of ScopeStiCar",
+        ),
+      );
     });
   });
 });
