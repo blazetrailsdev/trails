@@ -6,20 +6,17 @@
  * @see https://api.rubyonrails.org/classes/ActionController/BasicImplicitRender.html
  */
 
-export function defaultRender(controller: {
+interface BasicImplicitRenderHost {
   performed: boolean;
   head(status: number | string): void;
-}): void {
-  if (!controller.performed) {
-    controller.head("no_content");
-  }
 }
 
-export function sendAction(
-  controller: { performed: boolean; head(status: number | string): void },
-  method: () => unknown,
-): unknown {
+export function sendAction(controller: BasicImplicitRenderHost, method: () => unknown): unknown {
   const ret = method();
-  defaultRender(controller);
+  if (!controller.performed) defaultRender(controller);
   return ret;
+}
+
+export function defaultRender(controller: BasicImplicitRenderHost): void {
+  controller.head("no_content");
 }

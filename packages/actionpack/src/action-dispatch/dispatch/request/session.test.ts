@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Session, type SessionStore } from "../../request/session.js";
+import { Options, Session, type SessionStore } from "../../request/session.js";
 
 function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = {}): SessionStore {
   const exists = opts.exists ?? true;
@@ -190,5 +190,42 @@ describe("Request", () => {
       s.destroy();
       expect(s.idWas).toBe(1);
     });
+  });
+});
+
+// ==========================================================================
+// No Rails counterpart: `Session::Options` (request/session.rb:47-73) has no
+// test of its own in session_test.rb — request_test.rb's `RequestSession#session`
+// only asserts `Options.find(req)` is an Options instance, through a
+// `Request#session` reader trails has not converged yet.
+// ==========================================================================
+describe("Options", () => {
+  it("create stores an Options instance", () => {
+    const req = makeReq();
+    Session.create(makeStore(), req, { key: "_session_id" });
+    const options = Options.find(req);
+    expect(options).toBeInstanceOf(Options);
+    expect((options as Options).get("key")).toBe("_session_id");
+    expect((options as Options).toHash()).toEqual({ key: "_session_id" });
+  });
+
+  it("disabled stores an Options instance whose id is nil", () => {
+    const req = makeReq();
+    Session.disabled(req);
+    const options = Options.find(req) as Options;
+    expect(options).toBeInstanceOf(Options);
+    expect(options.id(req)).toBeNull();
+  });
+
+  it("id falls back to the store when no id is stored", () => {
+    const req = makeReq();
+    const options = new Options(makeStore(), {});
+    expect(options.id(req)).toBe(1);
+  });
+
+  it("[]= writes through and values_at reads back", () => {
+    const options = new Options(null, { key: "_session_id" });
+    options.set("secure", true);
+    expect(options.valuesAt("key", "secure")).toEqual(["_session_id", true]);
   });
 });

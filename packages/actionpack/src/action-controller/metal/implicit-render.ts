@@ -8,7 +8,10 @@
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
-import { sendAction as _sendAction } from "./basic-implicit-render.js";
+import {
+  defaultRender as _defaultRender,
+  sendAction as _sendAction,
+} from "./basic-implicit-render.js";
 
 /**
  * Rails `BasicImplicitRender#send_action` — re-exposed because
@@ -75,7 +78,7 @@ export function defaultRender(this: ImplicitRenderHost): void {
   this.logger?.info(
     `No template found for ${this.controllerName ?? ""}#${this.actionName}, rendering head :no_content`,
   );
-  this.head(204);
+  _defaultRender(this);
 }
 
 /**
@@ -109,38 +112,4 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const isHtml = req.format?.ref === "html" || req.format?.symbol === "html";
   const isXhr = typeof req.isXhr === "function" ? req.isXhr() : req.xhr === true;
   return Boolean(isGet) && Boolean(isHtml) && !isXhr;
-}
-
-export function implicitRender(context: {
-  performed: boolean;
-  actionName: string;
-  controllerName: string;
-  head(status: number): void;
-  render(): void;
-  templateExists?(action: string): boolean;
-  anyTemplates?(action: string): boolean;
-  isInteractiveBrowserRequest?(): boolean;
-}): void {
-  if (context.performed) return;
-
-  if (context.templateExists?.(context.actionName)) {
-    context.render();
-    return;
-  }
-
-  if (context.anyTemplates?.(context.actionName)) {
-    throw new UnknownFormat(
-      `${context.controllerName}#${context.actionName} is missing a template for this request format and variant.`,
-    );
-  }
-
-  if (context.isInteractiveBrowserRequest?.()) {
-    throw new MissingExactTemplate(
-      `${context.controllerName}#${context.actionName} is missing a template for this request format.`,
-      context.controllerName,
-      context.actionName,
-    );
-  }
-
-  context.head(204);
 }
