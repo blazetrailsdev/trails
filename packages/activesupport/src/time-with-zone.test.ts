@@ -969,7 +969,7 @@ describe("TimeWithZoneTest", () => {
   it("plus Duration with mixed variable and fixed parts across DST", () => {
     // 2006-04-01 10:30 EST + 1 day + 1 second
     const twz = eastern.local(2006, 4, 1, 10, 30);
-    const dur = new Duration({ days: 1, seconds: 1 });
+    const dur = new Duration(86401, { days: 1, seconds: 1 });
     const result = twz.plus(dur);
     expect(result.day).toBe(2);
     expect(result.hour).toBe(10);

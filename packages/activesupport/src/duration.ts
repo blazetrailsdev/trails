@@ -95,10 +95,16 @@ export class Duration {
 
   private readonly _variable: boolean;
 
+  /**
+   * Mirrors: ActiveSupport::Duration#value (duration.rb:133) — the
+   * `attr_reader :value` every factory fills through the constructor seat.
+   */
+  readonly value: number;
+
   // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
-  // (duration.rb:226-234). trails carries no separate `@value` — totals derive
-  // from `parts` via inSeconds(), which is what `value == 0` reads here.
-  constructor(parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
+  // (duration.rb:280-287).
+  constructor(value: number, parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
+    this.value = value;
     this.parts = {
       years: parts.years ?? 0,
       months: parts.months ?? 0,
@@ -113,8 +119,7 @@ export class Duration {
     const given = (Object.keys(parts) as (keyof DurationParts)[]).filter(
       (part) => PART_ORDER.includes(part) && parts[part] !== undefined,
     );
-    this._partKeys =
-      this.inSeconds() === 0 ? given : given.filter((part) => this.parts[part] !== 0);
+    this._partKeys = value === 0 ? given : given.filter((part) => this.parts[part] !== 0);
     this._variable = variable ?? this._partKeys.some((part) => VARIABLE_PARTS.includes(part));
   }
 
@@ -124,26 +129,26 @@ export class Duration {
 
   // Explicit variable flags mirror Rails' factory constructors
   // (duration.rb:155-180): fixed units pass false, calendar units true.
-  static seconds(n: number): Duration {
-    return new Duration({ seconds: n }, false);
+  static seconds(value: number): Duration {
+    return new Duration(value, { seconds: value }, false);
   }
-  static minutes(n: number): Duration {
-    return new Duration({ minutes: n }, false);
+  static minutes(value: number): Duration {
+    return new Duration(value * SECONDS_PER_MINUTE, { minutes: value }, false);
   }
-  static hours(n: number): Duration {
-    return new Duration({ hours: n }, false);
+  static hours(value: number): Duration {
+    return new Duration(value * SECONDS_PER_HOUR, { hours: value }, false);
   }
-  static days(n: number): Duration {
-    return new Duration({ days: n }, true);
+  static days(value: number): Duration {
+    return new Duration(value * SECONDS_PER_DAY, { days: value }, true);
   }
-  static weeks(n: number): Duration {
-    return new Duration({ weeks: n }, true);
+  static weeks(value: number): Duration {
+    return new Duration(value * SECONDS_PER_WEEK, { weeks: value }, true);
   }
-  static months(n: number): Duration {
-    return new Duration({ months: n }, true);
+  static months(value: number): Duration {
+    return new Duration(value * SECONDS_PER_MONTH, { months: value }, true);
   }
-  static years(n: number): Duration {
-    return new Duration({ years: n }, true);
+  static years(value: number): Duration {
+    return new Duration(value * SECONDS_PER_YEAR, { years: value }, true);
   }
 
   // Numeric/Integer singular aliases (core_ext/numeric/time.rb, core_ext/integer/time.rb):
@@ -202,11 +207,13 @@ export class Duration {
   plus(other: Duration | number): Duration {
     if (typeof other === "number") {
       return new Duration(
+        this.value + other,
         mergeParts(this.parts, this._partKeys, { seconds: other }),
         this._variable,
       );
     }
     return new Duration(
+      this.value + other.value,
       mergeParts(this.parts, this._partKeys, other._parts()),
       this._variable || other._variable,
     );
@@ -215,6 +222,7 @@ export class Duration {
   minus(other: Duration | number): Duration {
     if (typeof other === "number") {
       return new Duration(
+        this.value - other,
         mergeParts(this.parts, this._partKeys, { seconds: -other }),
         this._variable,
       );
@@ -222,24 +230,26 @@ export class Duration {
     return this.plus(other.negate());
   }
 
-  times(n: number): Duration {
+  times(other: number): Duration {
     return new Duration(
-      this._transformValues((number) => number * n),
+      this.value * other,
+      this.transformValues((number) => number * other),
       this._variable,
     );
   }
 
   // Mirrors Rails `/` with a Numeric (duration.rb:297-305): divides each
   // part, preserving the receiver's variable flag.
-  dividedBy(n: number): Duration {
+  dividedBy(other: number): Duration {
     return new Duration(
-      this._transformValues((number) => number / n),
+      this.value / other,
+      this.transformValues((number) => number / other),
       this._variable,
     );
   }
 
   /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
-  private _transformValues(fn: (number: number) => number): Partial<DurationParts> {
+  private transformValues(fn: (number: number) => number): Partial<DurationParts> {
     const result: Partial<DurationParts> = {};
     for (const key of this._partKeys) {
       result[key] = fn(this.parts[key]);
@@ -247,14 +257,20 @@ export class Duration {
     return result;
   }
 
+  // Mirrors Rails `Duration#-@` (duration.rb:322-324).
   negate(): Duration {
-    return this.times(-1);
+    return new Duration(
+      -this.value,
+      this.transformValues((number) => -number),
+      this._variable,
+    );
   }
 
   modulo(other: Duration | number): Duration {
-    const thisSecs = this.inSeconds();
-    const otherSecs = typeof other === "number" ? other : other.inSeconds();
-    return new Duration({ seconds: thisSecs % otherSecs });
+    if (other instanceof Duration) {
+      return Duration.build(this.value % other.value);
+    }
+    return Duration.build(this.value % other);
   }
 
   // ---------------------------------------------------------------------------
@@ -272,15 +288,7 @@ export class Duration {
   }
 
   inSeconds(): number {
-    return (
-      this.parts.years * SECONDS_PER_YEAR +
-      this.parts.months * SECONDS_PER_MONTH +
-      this.parts.weeks * SECONDS_PER_WEEK +
-      this.parts.days * SECONDS_PER_DAY +
-      this.parts.hours * SECONDS_PER_HOUR +
-      this.parts.minutes * SECONDS_PER_MINUTE +
-      this.parts.seconds
-    );
+    return this.value;
   }
 
   inMilliseconds(): number {
@@ -422,7 +430,7 @@ export class Duration {
    * sparseness lives in `_partKeys` and is applied on the way out.
    */
   _parts(): Partial<DurationParts> {
-    return this._transformValues((number) => number);
+    return this.transformValues((number) => number);
   }
 
   /**
@@ -487,7 +495,7 @@ export class Duration {
       return [other, this];
     }
     if (other instanceof Duration) {
-      return [new Scalar(other.inSeconds()), this];
+      return [new Scalar(other.value), this];
     }
     return [new Scalar(other as number), this];
   }
@@ -598,7 +606,7 @@ export class Duration {
     const sign = match[1] === "-" ? -1 : 1;
     const parse = (s: string | undefined) => (s ? parseFloat(s) * sign : 0);
 
-    return new Duration({
+    const parts = {
       years: parse(match[2]),
       months: parse(match[3]),
       weeks: parse(match[4]),
@@ -606,7 +614,9 @@ export class Duration {
       hours: parse(match[6]),
       minutes: parse(match[7]),
       seconds: parse(match[8]),
-    });
+    };
+    const value = Duration.calculateTotalSeconds(parts);
+    return new Duration(value, parts);
   }
 
   // Build from seconds (Rails' Duration.build)
@@ -616,7 +626,7 @@ export class Duration {
         value === null ? "NilClass" : typeof value === "string" ? "String" : String(typeof value);
       throw new TypeError(`can't build an ActiveSupport::Duration from a ${typeName}`);
     }
-    return new Duration({ seconds: value });
+    return new Duration(value, { seconds: value });
   }
 }
 

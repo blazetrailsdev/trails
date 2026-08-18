@@ -2,13 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
-    "rubyName": "-@",
-    "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "reject!",
     "reason": "Ruby `Hash#reject!` prunes the zero-valued entries of `@parts` in place; the TS constructor omits them while building the parts object, so there is no receiver to reject from. Surfaced by the DescendantsTracker `reject!` port making the name resolvable, not by a change in this file."
@@ -31,20 +24,7 @@
     "package": "activesupport",
     "tsFile": "duration.ts",
     "rubyName": "parse",
-    "call": "calculate_total_seconds",
-    "reason": "Rails' `Duration.parse` is `new(calculate_total_seconds(parts), parts)` (duration.rb:212-215) — the total is computed to fill the `value` constructor seat. trails' constructor is `(parts, variable)` and derives the total itself via `inSeconds()`, so there is no argument for the call to fill; `calculateTotalSeconds` is ported and holds the same PARTS_IN_SECONDS arithmetic."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "duration.ts",
-    "rubyName": "seconds",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:value",
-      "kwargs{seconds=ref:value}",
-      "bool:false"
-    ],
-    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`: Rails' Duration constructor carries the total seconds in its own seat (`initialize(value, parts, variable = nil)`, duration.rb:226). trails' constructor is `(parts, variable)` and derives the total from the parts, so no factory can pass the leading value. Converging is the ctor seat itself, tracked by story `converge-duration-constructor-value-seat` (RFC 0106)."
+    "call": "order:calculateTotalSeconds,constructor",
+    "reason": "Rails' Duration.parse delegates the string to ISO8601Parser and raises through it (duration.rb:144-147); trails inlines that parser, so parse's own invalid-input guards `throw new Error(...)` and the extractor reads each as a `constructor` call ahead of calculateTotalSeconds. The value seat itself is filled in Rails' order — calculateTotalSeconds(parts), then new Duration(value, parts). Converges with the inlined parser (the iso8601 new/serialize rows track the serializer half)."
   }
 ]

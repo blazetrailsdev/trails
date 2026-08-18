@@ -89,8 +89,8 @@ describe("DurationTest", () => {
   });
 
   it("inspect", () => {
-    expect(new Duration({ seconds: 0 }).inspect()).toBe("0 seconds");
-    expect(new Duration({ days: 0 }).inspect()).toBe("0 seconds");
+    expect(new Duration(0, { seconds: 0 }).inspect()).toBe("0 seconds");
+    expect(new Duration(0, { days: 0 }).inspect()).toBe("0 seconds");
     expect(Duration.months(1).inspect()).toBe("1 month");
     expect(Duration.months(1).plus(Duration.days(1)).inspect()).toBe("1 month and 1 day");
     expect(Duration.months(6).minus(Duration.days(2)).inspect()).toBe("6 months and -2 days");
