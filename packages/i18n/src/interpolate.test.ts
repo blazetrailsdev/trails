@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as I18n from "./index.js";
 import { ArgumentError, MissingInterpolationArgument, config } from "./index.js";
 import type { MissingInterpolationArgumentHandler } from "./index.js";
-
 import { inspect } from "./exceptions.js";
 import { resetConfig } from "./i18n.js";
 import { resetClassConfig } from "./config.js";
@@ -72,9 +71,11 @@ describe("I18nInterpolateTest", () => {
   });
 
   it("String interpolation does not raise when extra values were passed", () => {
-    expect(
-      I18n.interpolate("%{first} %{last}", { first: "Masao", last: "Mutoh", salutation: "Mr." }),
-    ).toBe("Masao Mutoh");
+    expect(() => {
+      expect(
+        I18n.interpolate("%{first} %{last}", { first: "Masao", last: "Mutoh", salutation: "Mr." }),
+      ).toBe("Masao Mutoh");
+    }).not.toThrow();
   });
 
   it("% acts as escape character in String interpolation", () => {
@@ -105,7 +106,7 @@ describe("I18nMissingInterpolationCustomHandlerTest", () => {
 
   it("String interpolation can use custom missing interpolation handler", () => {
     expect(I18n.interpolate("%{first} %{last}", { first: "Masao" })).toBe(
-      `Masao missing key is last, values are {:first=>"Masao"}, given string is '%{first} %{last}'`,
+      `Masao missing key is last, values are ${inspect({ first: "Masao" })}, given string is '%{first} %{last}'`,
     );
   });
 });

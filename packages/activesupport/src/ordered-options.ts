@@ -19,6 +19,13 @@ import { presence } from "./core-ext/object/blank.js";
 import { KeyError } from "./core-ext/key-error.js";
 
 export class OrderedOptions {
+  /**
+   * Ruby's `self.class.name` carries the module nesting, and `inspect`
+   * (ordered_options.rb:68-70) renders it. The class declares that name over
+   * `Function.name` so `this.constructor.name` is the gem's string.
+   */
+  static name = "ActiveSupport::OrderedOptions";
+
   private readonly data: Map<string, unknown>;
 
   /**
@@ -62,9 +69,10 @@ export class OrderedOptions {
         target.set(method, value);
         return true;
       },
-      has(target, method: string | symbol) {
-        if (typeof method === "symbol" || method in target) return true;
-        return target.isKey(method);
+      // Mirrors `respond_to_missing?` (ordered_options.rb:60-62), which answers
+      // true for every name — `key?` is the membership test, not this.
+      has() {
+        return true;
       },
     });
   }
@@ -92,7 +100,7 @@ export class OrderedOptions {
   }
 
   /** Mirrors `dig` (ordered_options.rb:45-47). */
-  dig(key: string, ...identifiers: string[]): unknown {
+  dig(key: string, ...identifiers: (string | number)[]): unknown {
     let value = this.get(String(key));
     for (const identifier of identifiers) {
       if (value == null || typeof value !== "object") return undefined;
@@ -106,14 +114,22 @@ export class OrderedOptions {
     return true;
   }
 
-  /** Mirrors `inspect` (ordered_options.rb:68-70). */
+  /**
+   * Mirrors `inspect` (ordered_options.rb:68-70). Its `super` is `Hash#inspect`,
+   * which is the rendering `toString` below carries.
+   */
   inspect(): string {
-    const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
-    return `#<${this.constructor.name} {${pairs.join(", ")}}>`;
+    return `#<${this.constructor.name} ${this.toString()}>`;
   }
 
+  /**
+   * `Hash#to_s`, which is `Hash#inspect`. Rails does not override it on
+   * `OrderedOptions`, so `to_s` renders the pairs and not the `#<…>` form
+   * (activesupport/test/ordered_options_test.rb:283-285).
+   */
   toString(): string {
-    return this.inspect();
+    const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    return `{${pairs.join(", ")}}`;
   }
 
   // -- Hash members, which Rails inherits rather than defining --
@@ -203,6 +219,8 @@ export class OrderedOptions {
  * through the faster `_get`.
  */
 export class InheritableOptions extends OrderedOptions {
+  static override name = "ActiveSupport::InheritableOptions";
+
   private readonly parent: OrderedOptions | Record<string, unknown>;
 
   /**
@@ -230,13 +248,13 @@ export class InheritableOptions extends OrderedOptions {
 
   /** Mirrors `inspect` (ordered_options.rb:108-110). */
   override inspect(): string {
-    const pairs = Object.entries(this.toH()).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
-    return `#<${this.constructor.name} {${pairs.join(", ")}}>`;
+    return `#<${this.constructor.name} ${this.toString()}>`;
   }
 
-  /** Mirrors `to_s` (ordered_options.rb:112-114). */
+  /** Mirrors `to_s` (ordered_options.rb:112-114) — `to_h.to_s`. */
   override toString(): string {
-    return this.inspect();
+    const pairs = Object.entries(this.toH()).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    return `{${pairs.join(", ")}}`;
   }
 
   /**

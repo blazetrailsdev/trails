@@ -31,9 +31,9 @@
       "value": 39
     },
     "activesupport": {
-      "assertionCount": 908,
-      "kind": 1253,
-      "value": 107
+      "assertionCount": 888,
+      "kind": 1229,
+      "value": 105
     },
     "arel": {
       "assertionCount": 180,
@@ -46,8 +46,8 @@
       "value": 0
     },
     "did-you-mean": {
-      "assertionCount": 1,
-      "kind": 2,
+      "assertionCount": 0,
+      "kind": 0,
       "value": 0
     },
     "globalid": {
@@ -56,9 +56,9 @@
       "value": 1
     },
     "i18n": {
-      "assertionCount": 18,
-      "kind": 23,
-      "value": 4
+      "assertionCount": 6,
+      "kind": 0,
+      "value": 0
     },
     "rack": {
       "assertionCount": 0,

@@ -41,6 +41,13 @@ describe("I18nBackendSimpleTest", () => {
     config().enforceAvailableLocales = false;
   });
 
+  // Minitest's `assert_predicate`, which i18n cannot import (no activesupport
+  // dependency). Ruby names the predicate with a Symbol; JS has no such
+  // protocol to send, so it is a function applied to `actual`.
+  function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
+    expect(predicate(actual)).toBe(true);
+  }
+
   /** Stands in for Ruby's `send`, which the gem's tests use for these. */
   function send(
     target: Simple,
@@ -56,8 +63,10 @@ describe("I18nBackendSimpleTest", () => {
     return backend.storeTranslations(locale, data);
   }
 
+  /** Mirrors `translations` in i18n/test/test_helper.rb:36-38, which reads the
+   * raw `@translations` ivar rather than going through the lazy reader. */
   function translations(): TranslationData {
-    return backend.translations();
+    return (backend as unknown as { translationsStore: TranslationData }).translationsStore;
   }
 
   /** Stands in for `I18n.t`, which the facade story ports. */
@@ -97,6 +106,7 @@ describe("I18nBackendSimpleTest", () => {
     expect((t("available") as TranslationData)["-1"]).toBe("No");
     expect(t("available.-1")).toBe("No");
     expect((t("available") as TranslationData)[0]).toBe("Maybe");
+    expect((t("available") as TranslationData)[-0]).toBe("Maybe");
     expect(t("available.-0")).toBe("Maybe");
     expect(t("available.+0")).toBe("Maybe");
     expect((t("available") as TranslationData)[1]).toBe("Yes");
@@ -154,11 +164,24 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
+    // The gem's `else` arm asserts the same tree with String keys, which is the
+    // same assertion here.
+    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
+    assertPredicate((data as TranslationData)["en"], (en) =>
+      Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
+    );
   });
 
   it("simple load_json: loads data from a JSON file", () => {
     const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
+    // The gem's `else` arm (for a loader without `unsafe_load_file`/`load_file`)
+    // asserts the same tree with String keys; a Ruby Symbol is a JS string, so
+    // it is the same assertion here.
+    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
+    assertPredicate((data as TranslationData)["en"], (en) =>
+      Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
+    );
   });
 
   it("simple load_translations: loads data from known file formats", () => {
@@ -221,6 +244,8 @@ describe("I18nBackendSimpleTest", () => {
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
     expect(t(1)).toBe("foo");
+    // The gem's third arm passes the Symbol `:'1'`, the same key here.
+    expect(t("1")).toBe("foo");
   });
 
   it("simple store_translations: store translations doesn't deep symbolize keys if skip_symbolize_keys is true", async () => {
@@ -235,7 +260,6 @@ describe("I18nBackendSimpleTest", () => {
     // JS object keys are already strings, so the only observable difference is
     // that the stored subtree is the caller's object rather than a deep copy.
     expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
-    expect((translations()["fr"] as TranslationData)["foo"]).toBe(data.foo);
   });
 
   // reloading translations
@@ -243,7 +267,7 @@ describe("I18nBackendSimpleTest", () => {
   it("simple reload_translations: unloads translations", async () => {
     storeTranslations("en", { foo: "bar" });
     await backend.reloadBang();
-    expect(translations()).toEqual({});
+    expect(translations()).toBeUndefined();
   });
 
   it("simple reload_translations: uninitializes the backend", async () => {

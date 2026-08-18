@@ -54,6 +54,17 @@ describe("Backend::Simple", () => {
     expect(backend.translate(":en", ":foo.bar")).toBe("baz");
   });
 
+  // simple_test.rb:184's `skip_symbolize_keys: true` arm is unobservable in the
+  // gem's terms here — JS object keys are already strings — so the only visible
+  // difference is that the stored subtree is the caller's object, not a copy.
+  it("stores the caller's own subtree when skipSymbolizeKeys is set", () => {
+    const backend = new Simple();
+    const data = { foo: { bar: "barfr", baz: "bazfr" } };
+    backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
+
+    expect((backend.translations()["fr"] as Record<string, unknown>)["foo"]).toBe(data.foo);
+  });
+
   it("does not vivify a locale for the property reads JSON.stringify makes", () => {
     const backend = new Simple();
     backend.storeTranslations("en", { foo: { bar: "baz" } });

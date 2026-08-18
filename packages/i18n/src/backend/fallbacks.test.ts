@@ -468,6 +468,6 @@ describe("I18nBackendOnFallbackHookTest", () => {
 
   it("on_fallback should not be called when use a String locale", () => {
     expect(t("bar", { locale: "de" })).toBe("Bar in :de");
-    expect(backend.fallbackCollector).toBeUndefined();
+    expect(backend.fallbackCollector == null).toBeTruthy();
   });
 });
