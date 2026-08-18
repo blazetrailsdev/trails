@@ -1165,7 +1165,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Alias for count.
+   * Returns the size of the collection, executing a SELECT COUNT(*) query if
+   * the collection hasn't been loaded.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#size
    * (collection_proxy.rb:782-784) — `@association.size`. Every arm of
@@ -1177,7 +1178,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Check if the collection is empty.
+   * Returns true if the collection is empty.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#empty?
    * (collection_proxy.rb:831-833) — `@association.empty?`.
