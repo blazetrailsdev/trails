@@ -33,8 +33,6 @@ describe("SelectManagerTest (trails)", () => {
     const mgr = new SelectManager(users);
     mgr.join("comments ON comments.user_id = users.id");
     expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.StringJoin);
-    // Rails stores the raw String on the node (string_join.rb:5-9); the visitor
-    // visits it (to_sql.rb:528-530), so there is no SqlLiteral wrap.
     expect((mgr.joinSources()[0] as Nodes.StringJoin).left).toBe(
       "comments ON comments.user_id = users.id",
     );
