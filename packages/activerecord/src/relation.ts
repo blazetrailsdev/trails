@@ -146,6 +146,19 @@ function valuesEqual(a: unknown, b: unknown): boolean {
  * used by where.associated / where.missing — one `{ pk: null }` entry per
  * association-primary-key column (query_methods.rb:92 / 128).
  */
+/**
+ * Rails' `[limit_value, 11].compact.min` (relation.rb:1266, :1292). `limit!` is
+ * a bare assignment, so `limit_value` can hold whatever the caller passed;
+ * Ruby's `Array#min` raises `ArgumentError` when that is a String.
+ */
+function takeLimit(limitValue: number | string | null): number {
+  if (limitValue === null) return 11;
+  if (typeof limitValue !== "number") {
+    throw new ArgumentError("comparison of String with 11 failed");
+  }
+  return Math.min(limitValue, 11);
+}
+
 function validateExplainOptions(options: ExplainOption[]): void {
   let seenHash = false;
   for (let i = 0; i < options.length; i++) {
@@ -647,7 +660,7 @@ export class Relation<T extends Base> {
     // rendering each one's namespace-qualified Rails constant path.
     const className = (this.constructor as typeof Relation)._railsClassName;
     if (this._loaded) {
-      const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
+      const max = takeLimit(this.limitValue);
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${className} [${entries.join(", ")}]>`;
@@ -674,7 +687,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#pretty_print
    */
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
-    const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
+    const max = takeLimit(this.limitValue);
     const subject = this._loaded ? this._records : await this.annotate("loading for pp").limit(max);
     const entries = subject.slice(0, max) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
@@ -3356,9 +3369,9 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#with_values */
   withValues: Array<Record<string, unknown>>;
   /** Mirrors: ActiveRecord::Relation#limit_value */
-  limitValue: number | null;
+  limitValue: number | string | null;
   /** Mirrors: ActiveRecord::Relation#offset_value */
-  offsetValue: number | null;
+  offsetValue: number | string | null;
   /** Mirrors: ActiveRecord::Relation#lock_value */
   lockValue: string | boolean | null;
   /** Mirrors: ActiveRecord::Relation#readonly_value */

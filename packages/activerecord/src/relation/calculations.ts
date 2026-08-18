@@ -133,8 +133,8 @@ interface CalculationRelation {
   _conn(): CalculationConnection;
   /** Rails `delegate :with_connection, to: :model` (delegation.rb:106). */
   withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
-  limitValue: number | null;
-  offsetValue: number | null;
+  limitValue: number | string | null;
+  offsetValue: number | string | null;
   optimizerHintsValues: string[];
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
