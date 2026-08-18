@@ -4,14 +4,7 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "first",
-    "reason": "Verified per-site (RFC 0106): `insert.keys.first` (abstract_mysql_adapter.rb:640) is reached through `InsertBuilder#firstColumn()`, the trails contract that bundles Rails' `quote_column_name(insert.keys.first)` into one fragment call (insert-all.ts:789-792); the builder exposes no raw key list to this file. Converging is `insert-builder-exposes-raw-keys`-shaped work in insert-all.ts, not here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_insert_sql",
-    "call": "quote_column_name",
-    "reason": "Verified per-site (RFC 0106): same site as the `first` row — `quote_column_name(insert.keys.first)` (abstract_mysql_adapter.rb:640) is performed inside `InsertBuilder#firstColumn()` (insert-all.ts:789-792), which quotes through the connection, so no `quoteColumnName` call appears in this body."
+    "reason": "RFC 0106: Ruby Set#first on `insert.keys` (abstract_mysql_adapter.rb:640). JS Set has no `first`; the port destructures the iterator (`const [firstKey] = insert.keys`), which emits no callee. The sibling `quote_column_name` call converged in the same pass."
   },
   {
     "package": "activerecord",

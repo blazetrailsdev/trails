@@ -589,7 +589,8 @@ export interface InsertBuilder {
   rawUpdateSql(): Nodes.SqlLiteral | undefined;
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
-  firstColumn(): string | undefined;
+  /** Mirrors Rails `InsertAll::Builder`’s `delegate :keys, to: :insert_all` (insert_all.rb:228). */
+  readonly keys: Set<string>;
   quotedTableName(): string;
 }
 
@@ -779,14 +780,8 @@ export class Builder implements InsertBuilder {
     return new Visitors.SQLite(q);
   }
 
-  /**
-   * Quoted no-op column for MySQL `ON DUPLICATE KEY UPDATE col=col`.
-   * Mirrors Rails `no_op_column = quote_column_name(insert.keys.first) if insert.keys.first`
-   * — the first explicit insert key, no timestamps, nil when there are none.
-   * @internal
-   */
-  firstColumn(): string | undefined {
-    const [first] = this._insertAll.keys;
-    return first === undefined ? undefined : this.quoteColumn(first);
+  /** Mirrors: `delegate :keys, to: :insert_all` (insert_all.rb:228). */
+  get keys(): Set<string> {
+    return this._insertAll.keys;
   }
 }

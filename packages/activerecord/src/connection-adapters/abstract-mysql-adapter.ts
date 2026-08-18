@@ -1108,7 +1108,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // `database_version` — a server round-trip trails can only await.
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     // Can use any column as it will be assigned to itself.
-    const noOpColumn = insert.firstColumn();
+    const [firstKey] = insert.keys;
+    const noOpColumn = firstKey !== undefined ? this.quoteColumnName(firstKey) : undefined;
 
     // MySQL 8.0.19 replaces `VALUES(<expression>)` clauses with row and column alias names, see https://dev.mysql.com/worklog/task/?id=6312 .
     // then MySQL 8.0.20 deprecates the `VALUES(<expression>)` see https://dev.mysql.com/worklog/task/?id=13325 .

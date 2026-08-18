@@ -53,7 +53,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "foreign_keys_enabled?",
     "call": "fetch",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_statements.rb:1783-1785 is `@config.fetch(:foreign_keys, true)` — key-present semantics, so an explicitly configured nil stays falsy; trails schema-statements.ts:2487-2493 reads `adapter._config?.foreignKeys !== false`, which coerces null (and any non-false value) to true. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
+    "reason": "RFC 0106: schema_statements.rb:1783-1785 is `@config.fetch(:foreign_keys, true)`. The port already matches its SEMANTICS — schema-statements.ts:2328-2331 spells the key-present test as `\"foreignKeys\" in this._config ? ... : true`, so a stored null stays falsy — but `in` emits no callee, so no TS call can credit Ruby's `fetch`. Language shortcoming: JS has no Hash#fetch."
   },
   {
     "package": "activerecord",
