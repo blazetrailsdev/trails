@@ -1491,7 +1491,7 @@ describe("FinderTest", () => {
     await EagerRating.create({ value: 1, comment_id: c1.id });
     await EagerRating.create({ value: 2, comment_id: c2.id });
 
-    const eager = await EagerPost.eagerLoad({ comments: "ratings" })
+    const eager = await EagerPost.eagerLoad({ ":comments": ":ratings" })
       .order("posts.id, ratings.id, comments.id")
       .first();
     const expected = await EagerPost.first();
@@ -2347,7 +2347,7 @@ describe("FinderTest", () => {
   // Post#tags_with_destroy (dependent: :destroy) walks the Tag class on the
   // destroy cascade in `exists with loaded relation having unsaved records`.
   registerModel("Tag", CanonicalTag);
-  // uniqueCategorizedPosts.includes("specialComments") resolves the SpecialComment
+  // uniqueCategorizedPosts.includes(":specialComments") resolves the SpecialComment
   // STI subtype through the registry.
   registerModel("SpecialComment", SpecialComment);
 
@@ -2385,7 +2385,7 @@ describe("FinderTest", () => {
 
   it("exists uses existing scope", async () => {
     const post = (await authors("david").posts.first())!;
-    const authorsRel = Author.includes("posts").where({ name: "David", posts: { id: post.id } });
+    const authorsRel = Author.includes(":posts").where({ name: "David", posts: { id: post.id } });
     expect(await authorsRel.exists(authors("david").id)).toBe(true);
   });
 
@@ -2519,14 +2519,14 @@ describe("FinderTest", () => {
 
   it("exists with distinct and offset and eagerload and order", async () => {
     expect(
-      await Post.eagerLoad("comments")
+      await Post.eagerLoad(":comments")
         .distinct()
         .offset(10)
         .merge(Comment.order({ post_id: "asc" }))
         .exists(),
     ).toBe(true);
     expect(
-      await Post.eagerLoad("comments")
+      await Post.eagerLoad(":comments")
         .distinct()
         .offset(11)
         .merge(Comment.order({ post_id: "asc" }))
@@ -2562,7 +2562,7 @@ describe("FinderTest", () => {
 
   it("exists with eager load", async () => {
     expect(
-      await Topic.eagerLoad("replies")
+      await Topic.eagerLoad(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
         .exists(),
@@ -2571,17 +2571,17 @@ describe("FinderTest", () => {
 
   it("exists with includes limit and empty result", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Topic.includes("replies").limit(0).exists()).toBe(false);
+      expect(await Topic.includes(":replies").limit(0).exists()).toBe(false);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await Topic.includes("replies").limit(1).where("0 = 1").exists()).toBe(false);
+      expect(await Topic.includes(":replies").limit(1).where("0 = 1").exists()).toBe(false);
     });
   });
 
   it("exists with distinct association includes and limit", async () => {
     const author = (await Author.first())!;
     const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts.includes(
-      "specialComments",
+      ":specialComments",
     );
     await assertNoQueries(false, async () => {
       expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
@@ -2594,7 +2594,7 @@ describe("FinderTest", () => {
   it("exists with distinct association includes limit and order", async () => {
     const author = (await Author.first())!;
     const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts
-      .includes("specialComments")
+      .includes(":specialComments")
       .order("comments.tags_count DESC");
     await assertNoQueries(false, async () => {
       expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
@@ -2606,7 +2606,7 @@ describe("FinderTest", () => {
 
   it("exists should reference correct aliases while joining tables of has many through association", async () => {
     const ratings = (developers("david") as any).ratings
-      .includes({ comment: "post" })
+      .includes({ ":comment": ":post" })
       .where({ posts: { id: 1 } });
     await assertQueriesCount(1, false, async () => {
       expect(await ratings.limit(1).exists()).toBe(false);

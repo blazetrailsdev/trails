@@ -449,7 +449,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("include has many through", async () => {
     const allPosts = (await Post.all().order("posts.id")) as Base[];
-    const postsWithAuthors = (await Post.all().includes("authors").order("posts.id")) as Base[];
+    const postsWithAuthors = (await Post.all().includes(":authors").order("posts.id")) as Base[];
     expect(postsWithAuthors.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).authors.toArray()) as Base[]).length;
@@ -460,7 +460,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has one", async () => {
-    const post = await Post.includes("tagging").find(posts("welcome").id);
+    const post = await Post.includes(":tagging").find(posts("welcome").id);
     const tagging = taggings("welcome_general");
     await assertNoQueries(false, async () => {
       const target = (post as any).association("tagging").target as Base;
@@ -469,7 +469,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has one defined in abstract parent", async () => {
-    const item = await Item.includes("tagging").find(items("dvd").id);
+    const item = await Item.includes(":tagging").find(items("dvd").id);
     const tagging = taggings("godfather");
     await assertNoQueries(false, async () => {
       const target = (item as any).association("tagging").target as Base;
@@ -479,7 +479,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("include polymorphic has many through", async () => {
     const allPosts = (await Post.all().order("posts.id")) as Base[];
-    const postsWithTags = (await Post.all().includes("tags").order("posts.id")) as Base[];
+    const postsWithTags = (await Post.all().includes(":tags").order("posts.id")) as Base[];
     expect(postsWithTags.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
@@ -491,7 +491,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("include polymorphic has many", async () => {
     const allPosts = (await Post.all().order("posts.id")) as Base[];
-    const postsWithTaggings = (await Post.all().includes("taggings").order("posts.id")) as Base[];
+    const postsWithTaggings = (await Post.all().includes(":taggings").order("posts.id")) as Base[];
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
@@ -577,7 +577,7 @@ describe("AssociationsJoinModelTest", () => {
 
     await expect(
       (general as any).taggings
-        .includes("taggable")
+        .includes(":taggable")
         .where("bogus_table.column = 1")
         .references("bogus_table")
         .toArray(),
@@ -616,7 +616,7 @@ describe("AssociationsJoinModelTest", () => {
     // `taggable` source's own `-> { where(...) }` scope just like the direct
     // query, restricting the eager-loaded through target to the welcome post.
     const general = await ScopedSourceTag.all()
-      .includes("welcomeTaggedPosts")
+      .includes(":welcomeTaggedPosts")
       .find(tags("general").id);
     await assertNoQueries(false, async () => {
       const target = (general as any).association("welcomeTaggedPosts").target as Base[];
@@ -625,7 +625,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("eager has many polymorphic with source type", async () => {
-    const tagWithInclude = await Tag.all().includes("taggedPosts").find(tags("general").id);
+    const tagWithInclude = await Tag.all().includes(":taggedPosts").find(tags("general").id);
     const desired = [posts("welcome").id, posts("thinking").id].sort(
       (a: any, b: any) => Number(a) - Number(b),
     );
@@ -724,7 +724,7 @@ describe("AssociationsJoinModelTest", () => {
     // source reflection `nonexistentComments` on Post carries `where("comments.id < 0")`;
     // the preloader must fold that source scope just like the direct query, leaving
     // the eager-loaded through target empty.
-    const author = (await Author.all().includes("nonexistentComments").first()) as any;
+    const author = (await Author.all().includes(":nonexistentComments").first()) as any;
     // Assert the association was actually preloaded — a fresh collection proxy's
     // `target` is `[]`, so an empty target alone can't distinguish a preloaded
     // empty result from one that never loaded. With it loaded, read through the
@@ -931,7 +931,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("polymorphic has many", async () => {
     const expected = taggings("welcome_general");
-    const p = await Post.includes("taggings").find(posts("welcome").id);
+    const p = await Post.includes(":taggings").find(posts("welcome").id);
     await assertNoQueries(false, async () => {
       const target = (p as any).association("taggings").target as Base[];
       expect(target.map((t) => t.id)).toContain(expected.id);
@@ -944,7 +944,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("polymorphic has one", async () => {
     const expected = await Post.find(posts("welcome").id);
-    const tagging = await Tagging.includes("taggable").find(taggings("welcome_general").id);
+    const tagging = await Tagging.includes(":taggable").find(taggings("welcome_general").id);
     await assertNoQueries(false, async () => {
       const taggable = (tagging as any).association("taggable").target as Base;
       expect(taggable.id).toBe(expected.id);
@@ -952,7 +952,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic belongs to", async () => {
-    const p = await Post.includes({ taggings: "taggable" }).find(posts("welcome").id);
+    const p = await Post.includes({ ":taggings": ":taggable" }).find(posts("welcome").id);
     await assertNoQueries(false, async () => {
       const firstTagging = ((p as any).association("taggings").target as Base[])[0];
       const taggable = (firstTagging as any).association("taggable").target as Base;
@@ -965,7 +965,7 @@ describe("AssociationsJoinModelTest", () => {
     // the two Post taggables; pin `taggings.id` so first/second resolve to
     // non-nil taggables on PG/MySQL too (heap order isn't guaranteed there).
     const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
-      .includes("taggable")
+      .includes(":taggable")
       .order("taggings.id")) as Base[];
     await assertNoQueries(false, async () => {
       void ((taggingList[0] as any).association("taggable").target as Base).id;
@@ -983,7 +983,7 @@ describe("AssociationsJoinModelTest", () => {
   it("preload nil polymorphic belongs to", async () => {
     let error: unknown;
     try {
-      await Tagging.where("taggable_type IS NULL").includes("taggable");
+      await Tagging.where("taggable_type IS NULL").includes(":taggable");
     } catch (e) {
       error = e;
     }
@@ -992,7 +992,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("preload polymorphic has many", async () => {
     const allPosts = (await Post.all().order("posts.id")) as Base[];
-    const postsWithTaggings = (await Post.all().includes("taggings").order("posts.id")) as Base[];
+    const postsWithTaggings = (await Post.all().includes(":taggings").order("posts.id")) as Base[];
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
@@ -1004,7 +1004,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("belongs to shared parent", async () => {
     const commentList = (await Comment.where(`post_id = ${posts("welcome").id}`).includes(
-      "post",
+      ":post",
     )) as Base[];
     await assertNoQueries(false, async () => {
       const p0 = (commentList[0] as any).association("post").target as Base;
@@ -1109,7 +1109,7 @@ describe("AssociationsJoinModelTest", () => {
     // Rails uses lazy load (posts(:welcome).tags.first); trails' lazy-load path does not
     // cache the join record on the tag, so includes() is used to exercise the same
     // no-query guarantee via the eager-load path.
-    const post = await Post.includes("tags").find(posts("welcome").id);
+    const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
     await assertNoQueries(false, async () => {
@@ -1120,7 +1120,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model with find", async () => {
     // Rails (line 70) is identical to line 58 — same lazy-load + no-query assertion.
     // Same includes() substitution applies; see comment above.
-    const post = await Post.includes("tags").find(posts("welcome").id);
+    const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
     await assertNoQueries(false, async () => {
@@ -1129,7 +1129,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic has many going through join model with include on source reflection", async () => {
-    const post = await Post.includes("funkyTags").find(posts("welcome").id);
+    const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
     await assertNoQueries(false, async () => {
@@ -1138,7 +1138,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic has many going through join model with include on source reflection with find", async () => {
-    const post = await Post.includes("funkyTags").find(posts("welcome").id);
+    const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
     expect(tag.id).toBe(tags("general").id);
     await assertNoQueries(false, async () => {
@@ -1164,7 +1164,7 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include has many through polymorphic has many", async () => {
-    const author = await Author.includes("taggings").find(authors("david").id);
+    const author = await Author.includes(":taggings").find(authors("david").id);
     const expectedIds = [taggings("welcome_general").id, taggings("thinking_general").id]
       .map(Number)
       .sort((a, b) => a - b);
@@ -1180,7 +1180,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("eager load has many through has many", async () => {
     const author = (await Author.where({ name: "David" })
-      .includes("comments")
+      .includes(":comments")
       .order("comments.id")
       .first()) as Author;
     SpecialComment.new();
@@ -1192,15 +1192,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("eager load has many through has many with conditions", async () => {
-    const post = (await Post.includes("invalidTags").first()) as Post;
+    const post = (await Post.includes(":invalidTags").first()) as Post;
     await assertNoQueries(false, async () => {
       await (post as any).invalidTags.toArray();
     });
   });
 
   it("eager belongs to and has one not singularized", async () => {
-    await expect(Author.includes("authorAddress").first()).resolves.not.toThrow();
-    await expect(AuthorAddress.includes("author").first()).resolves.not.toThrow();
+    await expect(Author.includes(":authorAddress").first()).resolves.not.toThrow();
+    await expect(AuthorAddress.includes(":author").first()).resolves.not.toThrow();
   });
 
   it("associating unsaved records with has many through", async () => {
@@ -1278,7 +1278,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("preload polymorphic has many through", async () => {
     const allPosts = (await Post.order("posts.id")) as Base[];
-    const postsWithTags = (await Post.includes("tags").order("posts.id")) as Base[];
+    const postsWithTags = (await Post.includes(":tags").order("posts.id")) as Base[];
     expect(allPosts.length).toBe(postsWithTags.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expectedLen = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
@@ -1293,22 +1293,22 @@ describe("AssociationsJoinModelTest", () => {
       "Can't join 'Post' to association named 'nonexistentRelation'; perhaps you misspelled it?";
 
     const includesFind = async () =>
-      Post.includes("nonexistentRelation")
+      Post.includes(":nonexistentRelation")
         .where({ nonexistentRelation: { name: "Rochester" } })
         .find(1);
     await expect(includesFind()).rejects.toThrow(ConfigurationError);
     await expect(includesFind()).rejects.toThrow(message);
 
     const eagerLoadFind = async () =>
-      Post.eagerLoad("nonexistentRelation")
+      Post.eagerLoad(":nonexistentRelation")
         .where({ nonexistentRelation: { name: "Rochester" } })
         .find(1);
     await expect(eagerLoadFind()).rejects.toThrow(ConfigurationError);
     await expect(eagerLoadFind()).rejects.toThrow(message);
 
     const combinedFind = async () =>
-      Post.eagerLoad("nonexistentRelation")
-        .includes("nonexistentRelation")
+      Post.eagerLoad(":nonexistentRelation")
+        .includes(":nonexistentRelation")
         .where({ nonexistentRelation: { name: "Rochester" } })
         .find(1);
     await expect(combinedFind()).rejects.toThrow(ConfigurationError);

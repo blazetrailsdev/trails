@@ -416,7 +416,7 @@ describe("InverseHasOneTests", () => {
   });
 
   it("parent instance should be shared with eager loaded child on find", async () => {
-    let human = (await Human.where({ name: "Gordon" }).includes("face"))[0];
+    let human = (await Human.where({ name: "Gordon" }).includes(":face"))[0];
     let face = (human as any).face;
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
@@ -424,7 +424,7 @@ describe("InverseHasOneTests", () => {
     face.human.name = "Mungo";
     expect(face.human.name).toBe((human as any).name);
 
-    human = (await Human.where({ name: "Gordon" }).includes("face").order("faces.id"))[0];
+    human = (await Human.where({ name: "Gordon" }).includes(":face").order("faces.id"))[0];
     face = (human as any).face;
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
@@ -562,7 +562,7 @@ describe("InverseHasManyTests", () => {
   });
 
   it("parent instance should be shared with eager loaded children", async () => {
-    let human = (await Human.where({ name: "Gordon" }).includes("interests"))[0];
+    let human = (await Human.where({ name: "Gordon" }).includes(":interests"))[0];
     let interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
       expect(interest.human.name).toBe((human as any).name);
@@ -572,7 +572,7 @@ describe("InverseHasManyTests", () => {
       expect(interest.human.name).toBe((human as any).name);
     }
 
-    human = (await Human.where({ name: "Gordon" }).includes("interests").order("interests.id"))[0];
+    human = (await Human.where({ name: "Gordon" }).includes(":interests").order("interests.id"))[0];
     interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
       expect(interest.human.name).toBe((human as any).name);
@@ -787,10 +787,10 @@ describe("InverseHasManyTests", () => {
       const interests = await findHasManyTarget(human, "interests", { inverseOf: "human" });
       expect(interests.length).toBeGreaterThan(0);
 
-      const preloaded = (await (Human as any).includes("interests").first())!;
+      const preloaded = (await (Human as any).includes(":interests").first())!;
       expect(preloaded.association("interests").target.length).toBeGreaterThan(0);
 
-      const joined = (await (Human as any).joins(":interests").includes("interests").first())!;
+      const joined = (await (Human as any).joins(":interests").includes(":interests").first())!;
       expect(joined.association("interests").target.length).toBeGreaterThan(0);
     } finally {
       (Interest as any).resetCallbacks("find");
@@ -888,7 +888,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
-    let face = (await Face.where({ description: "trusting" }).includes("human"))[0] as any;
+    let face = (await Face.where({ description: "trusting" }).includes(":human"))[0] as any;
     let human = face.human;
     expect(human.face.description).toBe(face.description);
     face.description = "gormless";
@@ -897,7 +897,7 @@ describe("InverseBelongsToTests", () => {
     expect(human.face.description).toBe(face.description);
 
     face = (
-      await Face.where({ description: "trusting" }).includes("human").order("humans.id")
+      await Face.where({ description: "trusting" }).includes(":human").order("humans.id")
     )[0] as any;
     human = face.human;
     expect(human.face.description).toBe(face.description);
@@ -1085,7 +1085,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
-    let face = (await Face.where({ description: "confused" }).includes("human"))[0] as any;
+    let face = (await Face.where({ description: "confused" }).includes(":human"))[0] as any;
     let human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
     expect(human.polymorphicFace.description).toBe(face.description);
     face.description = "gormless";
@@ -1094,7 +1094,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(human.polymorphicFace.description).toBe(face.description);
 
     face = (
-      await Face.where({ description: "confused" }).includes("human").order("humans.id")
+      await Face.where({ description: "confused" }).includes(":human").order("humans.id")
     )[0] as any;
     human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
     expect(human.polymorphicFace.description).toBe(face.description);

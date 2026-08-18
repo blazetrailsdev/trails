@@ -169,7 +169,7 @@ describe("InnerJoinAssociationTest", () => {
     const stringJoin =
       "LEFT JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
-    expect(await Person.eagerLoad("agents").joins(stringJoin).count()).toBe(3);
+    expect(await Person.eagerLoad(":agents").joins(stringJoin).count()).toBe(3);
   });
 
   it("eager load with arel joins", async () => {
@@ -181,7 +181,7 @@ describe("InnerJoinAssociationTest", () => {
       .and(agents.get("id").gt(agents2.get("id")));
     const arelJoin = new Nodes.OuterJoin(agents, new Nodes.On(constraint));
 
-    expect(await Person.eagerLoad("agents").joins(arelJoin).count()).toBe(3);
+    expect(await Person.eagerLoad(":agents").joins(arelJoin).count()).toBe(3);
   });
 
   it("construct finder sql ignores empty joins hash", () => {
@@ -206,7 +206,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("join conditions allow nil associations", async () => {
-    const authorsRel = Author.includes("essays").where({ essays: { id: null } });
+    const authorsRel = Author.includes(":essays").where({ essays: { id: null } });
     expect(await authorsRel.count()).toBe(1);
   });
 
@@ -311,7 +311,7 @@ describe("InnerJoinAssociationTest", () => {
     await (author as any).specialCategories.create({ name: "Special" });
 
     const categoriesRel = await (author as any).categories
-      .includes("specialCategorizations")
+      .includes(":specialCategorizations")
       .references("specialCategorizations");
     expect(categoriesRel.length).toBe(2);
   });
@@ -321,7 +321,9 @@ describe("InnerJoinAssociationTest", () => {
     await (author as any).categories.create({ name: "Not Special" });
     await (author as any).specialCategories.create({ name: "Special" });
 
-    const cats = await (author as any).categories.eagerLoad("specialCategorizations").order("name");
+    const cats = await (author as any).categories
+      .eagerLoad(":specialCategorizations")
+      .order("name");
     expect((await cats[0].specialCategorizations).length).toBe(0);
     expect((await cats[1].specialCategorizations).length).toBe(1);
   });

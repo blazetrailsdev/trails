@@ -181,7 +181,7 @@ describe("OrTest", () => {
   });
 
   it("or with references inequality", async () => {
-    const joined = Post.includes("author");
+    const joined = Post.includes(":author");
     const actual = joined
       .where({ authors: { id: 1 } })
       .or(joined.where({ title: "I don't have any comments" }));
@@ -230,9 +230,9 @@ describe("OrTest", () => {
     // hits because it doesn't run the query.
     let threw = false;
     try {
-      Post.includes("author").includes("author").or(Post.includes("author"));
-      Post.eagerLoad("author").eagerLoad("author").or(Post.eagerLoad("author"));
-      Post.preload("author").preload("author").or(Post.preload("author"));
+      Post.includes(":author").includes(":author").or(Post.includes(":author"));
+      Post.eagerLoad(":author").eagerLoad(":author").or(Post.eagerLoad(":author"));
+      Post.preload(":author").preload(":author").or(Post.preload(":author"));
       Post.group("author_id").group("author_id").or(Post.group("author_id"));
       Post.joins(":author").joins(":author").or(Post.joins(":author"));
       Post.leftOuterJoins(":author").leftOuterJoins(":author").or(Post.leftOuterJoins(":author"));

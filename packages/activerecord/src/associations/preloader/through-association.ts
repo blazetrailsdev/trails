@@ -397,7 +397,7 @@ export class ThroughAssociation extends Association {
           ...scope.whereClause.predicates,
           ...whereClause.predicates,
         ]);
-        const sourceName = sourceRefl.name;
+        const sourceName = `:${sourceRefl.name}`;
         const nestedIncludes: any[] = reflScope?.includesValues ?? [];
         if (nestedIncludes.length > 0) {
           scope = scope.includes({ [sourceName]: nestedIncludes });

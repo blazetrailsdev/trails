@@ -6304,13 +6304,13 @@ describe("HasManyAssociationsTest", () => {
     const allBulbs = await (car as any).allBulbs.sortBy((b: any) => b.id);
     expect(allBulbs.map((b: any) => b.id)).toEqual([bulb1.id, bulb2.id]);
 
-    const includesCar = (await HmCar.includes("allBulbs").find(car.id)) as any;
+    const includesCar = (await HmCar.includes(":allBulbs").find(car.id)) as any;
     expect((await includesCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
       bulb1.id,
       bulb2.id,
     ]);
 
-    const eagerCar = (await HmCar.eagerLoad("allBulbs").find(car.id)) as any;
+    const eagerCar = (await HmCar.eagerLoad(":allBulbs").find(car.id)) as any;
     expect((await eagerCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
       bulb1.id,
       bulb2.id,
@@ -6753,7 +6753,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many preloading with duplicate records", async () => {
-    const allPosts = await HmPost.joins(":comments").preload("comments").order("id");
+    const allPosts = await HmPost.joins(":comments").preload(":comments").order("id");
     const first = allPosts[0] as any;
     const commentIds = (await first.comments)
       .map((c: any) => Number(c.id))

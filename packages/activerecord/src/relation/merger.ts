@@ -135,10 +135,10 @@ export class Merger {
     if (!reflection) return;
 
     if (this.other.preloadValues.length > 0) {
-      rel.preloadBang({ [reflection.name]: this.other.preloadValues });
+      rel.preloadBang({ [`:${reflection.name}`]: this.other.preloadValues });
     }
     if (this.other.includesValues.length > 0) {
-      rel.includesBang({ [reflection.name]: this.other.includesValues });
+      rel.includesBang({ [`:${reflection.name}`]: this.other.includesValues });
     }
   }
 

@@ -145,7 +145,7 @@ describe("build_joins from(subquery) dedup", () => {
   // live-path exclusion filter deciding which value to drop before emission.
   it("dedups an association named in both joins and eager_load", () => {
     const liveSql = (
-      Post.joins(":author").eagerLoad("author") as unknown as { toSql(): string }
+      Post.joins(":author").eagerLoad(":author") as unknown as { toSql(): string }
     ).toSql();
     expect((liveSql.match(/INNER JOIN/g) ?? []).length).toBe(1);
     expect(liveSql).not.toContain("LEFT OUTER JOIN");
@@ -159,7 +159,7 @@ describe("build_joins from(subquery) dedup", () => {
   // `eager_load(:x).left_outer_joins(:x)` legitimately emits two joins.
   it("emits the eager and left_outer joins separately when there is no named join to walk against", () => {
     const liveSql = (
-      Post.eagerLoad("author").leftOuterJoins(":author") as unknown as { toSql(): string }
+      Post.eagerLoad(":author").leftOuterJoins(":author") as unknown as { toSql(): string }
     ).toSql();
     const q = (name: string) => escapeRegExp(quoteTableName(name));
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
@@ -171,7 +171,7 @@ describe("build_joins from(subquery) dedup", () => {
   // with one AliasTracker on both halves.
   it("emits the same joins for eager_load + left_outer_joins + a raw join on both paths", () => {
     const build = () =>
-      Post.joins("CROSS JOIN categories").eagerLoad("author").leftOuterJoins(":comments");
+      Post.joins("CROSS JOIN categories").eagerLoad(":author").leftOuterJoins(":comments");
     const liveSql = (build() as unknown as { toSql(): string }).toSql();
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
     // The eager live path projects `t0_r*` aliases, so compare from the FROM on:

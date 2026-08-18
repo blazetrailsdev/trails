@@ -623,7 +623,7 @@ describe("PreloaderTest", () => {
     const author = authors("david");
     const book = books("awdr");
     const post = posts("welcome");
-    const bookLoaded = (await Book.where({ id: book.id }).includes("author"))[0];
+    const bookLoaded = (await Book.where({ id: book.id }).includes(":author"))[0];
     const postFresh = (await Post.where({ id: post.id }))[0];
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
@@ -1250,7 +1250,7 @@ describe("PreloaderTest", () => {
 
     let orders: any[];
     const sqls = await captureSql(async () => {
-      orders = await CpkOrderPL.where("id = ?", orderId).includes("orderAgreements");
+      orders = await CpkOrderPL.where("id = ?", orderId).includes(":orderAgreements");
     });
     expect(sqls).toHaveLength(2);
     const preloadSql = sqls[1];
@@ -1267,7 +1267,7 @@ describe("PreloaderTest", () => {
 
     let agreements: any[];
     const sqls = await captureSql(async () => {
-      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes("order");
+      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes(":order");
     });
     expect(sqls).toHaveLength(2);
     const preloadSql = sqls[1];
@@ -1324,7 +1324,7 @@ describe("PreloaderTest", () => {
 
   it("preload marks belongs_to association loaded on owner", async () => {
     const welcome = posts("welcome");
-    const loaded = await Post.where({ id: welcome.id }).includes("author");
+    const loaded = await Post.where({ id: welcome.id }).includes(":author");
     expect(loaded).toHaveLength(1);
     const assoc = (loaded[0] as any).association("author");
     expect(assoc.isLoaded()).toBe(true);
@@ -1333,7 +1333,7 @@ describe("PreloaderTest", () => {
 
   it("preload sets has_many association target on owner", async () => {
     const david = authors("david");
-    const owners = await Author.where({ id: david.id }).includes("posts");
+    const owners = await Author.where({ id: david.id }).includes(":posts");
     const assoc = (owners[0] as any).association("posts");
     expect(assoc.isLoaded()).toBe(true);
     const ids = (assoc.target as Base[]).map((r) => r.id);
@@ -1588,12 +1588,12 @@ describe("WithAnnotationsTest", () => {
 
   it("has many through with annotation includes a query comment when eager loading", async () => {
     const plain = await captureSql(async () => {
-      await SpacePirateAnnotated.includes("treasureEstimates").first();
+      await SpacePirateAnnotated.includes(":treasureEstimates").first();
     });
     expect(plain.length).toBeGreaterThan(0);
     expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(async () => {
-      await SpacePirateAnnotated.includes("treasureEstimatesWithAnnotation").first();
+      await SpacePirateAnnotated.includes(":treasureEstimatesWithAnnotation").first();
     });
     expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
@@ -1744,7 +1744,7 @@ describe("AssociationsTest", () => {
     await molecule.electrons.create({ name: "electron_1" });
     await molecule.electrons.create({ name: "electron_2" });
 
-    const liquids = await Liquid.includes({ molecules: "electrons" })
+    const liquids = await Liquid.includes({ ":molecules": ":electrons" })
       .references("molecules")
       .where("molecules.id is not null");
     expect((await (liquids[0] as any).molecules.toArray()).length).toBe(1);
@@ -1803,8 +1803,8 @@ describe("AssociationsTest", () => {
     // symbol/column-reference form.
     let raised: unknown;
     try {
-      await Account.all().order("id").includes("firm").first();
-      await Account.all().order({ id: "asc" }).includes("firm").first();
+      await Account.all().order("id").includes(":firm").first();
+      await Account.all().order({ id: "asc" }).includes(":firm").first();
     } catch (e) {
       raised = e;
     }
@@ -2007,7 +2007,7 @@ describe("AssociationsTest", () => {
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
     const comment = shardedComments("great_comment_blog_post_one");
     const comments = await ShardedComment.where({ id: (comment as any).id }).preload(
-      "blogPostById",
+      ":blogPostById",
     );
     const loaded = comments[0];
     // Rails reads `comment.blog_post_by_id` from the preloaded cache and compares

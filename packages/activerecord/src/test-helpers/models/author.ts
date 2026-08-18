@@ -209,12 +209,12 @@ export class Author extends Base {
     this.hasMany("serializedPosts");
     this.hasOne("post");
     this.hasMany("verySpecialComments", { through: "posts" });
-    this.hasMany("postsWithComments", (q: any) => q.includes("comments"), { className: "Post" });
+    this.hasMany("postsWithComments", (q: any) => q.includes(":comments"), { className: "Post" });
     this.hasMany(
       "popularGroupedPosts",
       (q: any) =>
         q
-          .includes("comments")
+          .includes(":comments")
           .group("type")
           .having("SUM(legacy_comments_count) > 1")
           .select("type"),
@@ -222,19 +222,19 @@ export class Author extends Base {
     );
     this.hasMany(
       "postsWithCommentsSortedByCommentId",
-      (q: any) => q.includes("comments").order("comments.id"),
+      (q: any) => q.includes(":comments").order("comments.id"),
       { className: "Post" },
     );
     this.hasMany("postsSortedById", (q: any) => q.order("id"), { className: "Post" });
     this.hasMany("postsSortedByIdLimited", (q: any) => q.order("posts.id").limit(1), {
       className: "Post",
     });
-    this.hasMany("postsWithCategories", (q: any) => q.includes("categories"), {
+    this.hasMany("postsWithCategories", (q: any) => q.includes(":categories"), {
       className: "Post",
     });
     this.hasMany(
       "postsWithCommentsAndCategories",
-      (q: any) => q.includes("comments", "categories").order("posts.id"),
+      (q: any) => q.includes(":comments", ":categories").order("posts.id"),
       { className: "Post" },
     );
     this.hasMany("postsWithSpecialCategorizations", { className: "PostWithSpecialCategorization" });
@@ -243,7 +243,7 @@ export class Author extends Base {
     });
     this.hasOne(
       "postAboutThinkingWithLastComment",
-      (q: any) => q.where("posts.title like '%thinking%'").includes("lastComment"),
+      (q: any) => q.where("posts.title like '%thinking%'").includes(":lastComment"),
       { className: "Post" },
     );
 
@@ -317,7 +317,7 @@ export class Author extends Base {
     );
     this.hasMany(
       "commentsWithInclude",
-      (q: any) => q.includes("post").where({ posts: { type: "Post" } }),
+      (q: any) => q.includes(":post").where({ posts: { type: "Post" } }),
       { through: "posts", source: "comments" },
     );
     this.hasMany("commentsForFirstAuthor", (q: any) => q.forFirstAuthor(), {
@@ -397,7 +397,7 @@ export class Author extends Base {
     this.hasMany("helloPostComments", { through: "helloPosts", source: "comments" });
     this.hasMany(
       "postsWithNoComments",
-      (q: any) => q.where({ "comments.id": null }).includes("comments"),
+      (q: any) => q.where({ "comments.id": null }).includes(":comments"),
       { className: "Post" },
     );
     this.hasMany(

@@ -279,7 +279,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const davidId = authors("david").id;
     const maryId = authors("mary").id;
     const postList = await Post.where({ id: [davidId, maryId] })
-      .preload("author", "authorFavoritesWithScope")
+      .preload(":author", ":authorFavoritesWithScope")
       .order("id");
     // With preloading, author_favorites_with_scope should be cached
     for (const p of postList) {
@@ -290,7 +290,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("preload sti rhs class", async () => {
-    const devs = await Developer.includes("firms").all();
+    const devs = await Developer.includes(":firms").all();
     expect(devs.length).toBeGreaterThan(0);
     for (const dev of devs) {
       expect((dev as any).firms).toBeDefined();
@@ -304,7 +304,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await SuperMembership.create({ club_id: club.id, member_id: member1.id });
     await CurrentMembership.create({ club_id: club.id, member_id: member2.id });
 
-    const club1 = await Club.includes("members").findBy({ id: club.id });
+    const club1 = await Club.includes(":members").findBy({ id: club.id });
     const clubMembers = ((club1 as any).members as any[]).sort(
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
@@ -323,7 +323,7 @@ describe("HasManyThroughAssociationsTest", () => {
       member_id: (await Member.create({ name: "Bob" })).id,
     });
 
-    const preloadedClubs = await Club.joins(":memberships").preload("membership");
+    const preloadedClubs = await Club.joins(":memberships").preload(":membership");
     expect(preloadedClubs.length).toBeGreaterThan(0);
     for (const c of preloadedClubs) {
       expect((c as any).membership).toBeDefined();
@@ -348,7 +348,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("PersonPrime", PersonPrime);
 
     const posts = await (PersonPrime as any)
-      .includes("posts")
+      .includes(":posts")
       .first()
       .then((p: any) => p.posts);
     expect(posts.length).toBeGreaterThan(1);
@@ -532,8 +532,8 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("pk is not required for join", async () => {
-    const post = await Post.includes("scategories").first();
-    const post2 = await Post.includes("categories").first();
+    const post = await Post.includes(":scategories").first();
+    const post2 = await Post.includes(":categories").first();
     const sCategories = await (post as any).scategories.toArray();
     const categories2 = await (post2 as any).categories.toArray();
     expect(sCategories.length).toBeGreaterThan(0);
@@ -1368,7 +1368,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("count with include should alias join table", async () => {
     const michael = await Person.find(people("michael").id);
-    expect(await (michael as any).posts.includes("readers").count()).toBe(2);
+    expect(await (michael as any).posts.includes(":readers").count()).toBe(2);
   });
 
   it("inner join with quoted table name", async () => {
@@ -1743,27 +1743,27 @@ describe("HasManyThroughAssociationsTest", () => {
     const first = await Author.first();
 
     const preloadedGeneralCats = (await Author.preload(
-      "generalPosts",
-      "generalCategorizations",
+      ":generalPosts",
+      ":generalCategorizations",
     ).first())!.generalCategorizations;
     expect(preloadedGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
 
     const eagerGeneralCats = (await Author.eagerLoad(
-      "generalPosts",
-      "generalCategorizations",
+      ":generalPosts",
+      ":generalCategorizations",
     ).first())!.generalCategorizations;
     expect(eagerGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
 
     const welcomePost = await Post.find(posts("welcome").id);
     const preloadedGeneralPosts = (await Author.preload(
-      "generalCategorizations",
-      "generalPosts",
+      ":generalCategorizations",
+      ":generalPosts",
     ).first())!.generalPosts;
     expect(preloadedGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
 
     const eagerGeneralPosts = (await Author.eagerLoad(
-      "generalCategorizations",
-      "generalPosts",
+      ":generalCategorizations",
+      ":generalPosts",
     ).first())!.generalPosts;
     expect(eagerGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
   });
@@ -1771,9 +1771,9 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through polymorphic with rewhere", async () => {
     const post = await TaggedPost.create({ title: "Tagged", body: "Post" });
     const tag = await (post as any).tags.create({ name: "Tag" });
-    const preloaded = (await TaggedPost.preload("tags").last())!.tags;
+    const preloaded = (await TaggedPost.preload(":tags").last())!.tags;
     expect(preloaded.map((t: any) => t.id)).toEqual([tag.id]);
-    const eagerLoaded = (await TaggedPost.eagerLoad("tags").last())!.tags;
+    const eagerLoaded = (await TaggedPost.eagerLoad(":tags").last())!.tags;
     expect(eagerLoaded.map((t: any) => t.id)).toEqual([tag.id]);
   });
 
@@ -1994,7 +1994,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const loaded = await Person.where({ id: person.id })
       .where(`readers.id = ${readerId} or 1=1`)
       .references("readers")
-      .includes("posts");
+      .includes(":posts");
     const p = loaded[0];
     expect((p as any).posts.loaded).toBe(true);
     expect(await (p as any).posts.toArray()).toEqual([]);
@@ -2018,7 +2018,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     const result = await Owner.where({ name: "Rainbow Unicat" })
-      .includes({ pets: "persons" })
+      .includes({ ":pets": ":persons" })
       .first();
     const persons = await (result as any).persons.toArray();
     expect(persons.map((p: any) => p.id)).toEqual([person.id]);
@@ -2236,7 +2236,7 @@ describe("HasManyThroughAssociationsTest", () => {
       ":commentsForFirstAuthor": ":post",
     })
       .joins("inner join posts posts_alias on authors.id = posts_alias.author_id")
-      .eagerLoad("categories")
+      .eagerLoad(":categories")
       .take();
     expect(result?.id).toBe(david.id);
   });

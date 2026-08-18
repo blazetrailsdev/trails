@@ -214,8 +214,8 @@ export class Post extends Base {
     this.scope("withPost", (q: any, postId: number) =>
       q.joins(":comments").where({ comments: { post_id: postId } }),
     );
-    this.scope("withComments", (q: any) => q.preload("comments"));
-    this.scope("withTags", (q: any) => q.preload("taggings"));
+    this.scope("withComments", (q: any) => q.preload(":comments"));
+    this.scope("withTags", (q: any) => q.preload(":taggings"));
     this.scope("withTagsCte", (q: any) =>
       q.with({ posts_with_tags: q.model.where("tags_count > 0") }).from("posts_with_tags AS posts"),
     );
@@ -245,11 +245,11 @@ export class Post extends Base {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithPosts", (q: any) => q.includes("posts"), {
+    this.belongsTo("authorWithPosts", (q: any) => q.includes(":posts"), {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithAddress", (q: any) => q.includes("authorAddress"), {
+    this.belongsTo("authorWithAddress", (q: any) => q.includes(":authorAddress"), {
       className: "Author",
       foreignKey: "author_id",
     });
@@ -327,7 +327,7 @@ export class Post extends Base {
     });
 
     this.hasOne("verySpecialComment");
-    this.hasOne("verySpecialCommentWithPost", (q: any) => q.includes("post"), {
+    this.hasOne("verySpecialCommentWithPost", (q: any) => q.includes(":post"), {
       className: "VerySpecialComment",
     });
     this.hasOne(
@@ -511,7 +511,7 @@ export class Post extends Base {
 
     this.hasMany("readers");
     this.hasMany("secureReaders");
-    this.hasMany("readersWithPerson", (q: any) => q.includes("person"), { className: "Reader" });
+    this.hasMany("readersWithPerson", (q: any) => q.includes(":person"), { className: "Reader" });
     this.hasMany("people", { through: "readers" });
     this.hasMany("singlePeople", { through: "readers" });
     this.hasMany("peopleWithCallbacks", {
@@ -758,7 +758,7 @@ export class PostWithDefaultInclude extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.includes("comments"));
+    this.defaultScope((q: any) => q.includes(":comments"));
     this.hasMany("comments", { foreignKey: "post_id" });
   }
 }
@@ -805,7 +805,7 @@ export class PostWithPreloadDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope((q: any) => q.preload("readers"));
+    this.defaultScope((q: any) => q.preload(":readers"));
   }
 }
 
@@ -815,7 +815,7 @@ export class PostWithIncludesDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope((q: any) => q.includes("readers"));
+    this.defaultScope((q: any) => q.includes(":readers"));
   }
 }
 

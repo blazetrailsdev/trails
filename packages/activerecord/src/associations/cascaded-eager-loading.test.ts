@@ -82,7 +82,7 @@ describe("CascadedEagerLoadingTest", () => {
     posts.reduce((sum, p) => sum + targetArr(p, "comments").length, 0);
 
   it("eager association loading with cascaded two levels", async () => {
-    const loaded = await Author.all().includes({ posts: "comments" }).order("id");
+    const loaded = await Author.all().includes({ ":posts": ":comments" }).order("id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
     expect(targetArr(loaded[1], "posts")).toHaveLength(3);
@@ -91,7 +91,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with cascaded two levels and one level", async () => {
     const loaded = await Author.all()
-      .includes({ posts: "comments" }, "categorizations")
+      .includes({ ":posts": ":comments" }, ":categorizations")
       .order("id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -103,7 +103,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with hmt does not table name collide when joining associations", async () => {
     const authors = await Author.joins(":posts")
-      .eagerLoad("comments")
+      .eagerLoad(":comments")
       .where({ posts: { tags_count: 1 } })
       .order(":id");
     await assertQueriesCount(0, false, () => {
@@ -121,7 +121,7 @@ describe("CascadedEagerLoadingTest", () => {
     // joined onto it. No second `posts`/`posts_authors` join, no ambiguous column.
     const loaded = await Author.all()
       .joins(":posts")
-      .eagerLoad({ posts: "comments" })
+      .eagerLoad({ ":posts": ":comments" })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -132,7 +132,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading dedups a single-step manual join and eager root", async () => {
     // Author.joins(:posts).eager_load(:posts): single-step root coincides with
     // the manual join — one un-aliased INNER `posts`, no duplicate.
-    const loaded = await Author.all().joins(":posts").eagerLoad("posts").order("authors.id");
+    const loaded = await Author.all().joins(":posts").eagerLoad(":posts").order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
     expect(targetArr(loaded[1], "posts")).toHaveLength(3);
@@ -158,7 +158,7 @@ describe("CascadedEagerLoadingTest", () => {
     // column. Mirrors the root-only string dedup but down the whole nested path.
     const loaded = await Author.all()
       .joins({ ":posts": ":comments" })
-      .eagerLoad({ posts: "comments" })
+      .eagerLoad({ ":posts": ":comments" })
       .order("authors.id");
     // INNER JOIN semantics (manual join wins): only authors with a post that has
     // a comment, only posts that have comments. The eager hydration reads the
@@ -177,7 +177,7 @@ describe("CascadedEagerLoadingTest", () => {
     // dedups the FULL reflection chain (join_dependency.rb:214-219), so the
     // intermediate `posts` collapses against the manual join too — not just the
     // `comments` target. No extra aliased `posts` (e.g. `posts_authors`).
-    const rel = Author.all().joins(":comments").eagerLoad("comments").order("authors.id");
+    const rel = Author.all().joins(":comments").eagerLoad(":comments").order("authors.id");
     // The intermediate `posts` join is deduped: no aliased duplicate such as
     // `posts_authors`/`posts_authors_join` re-emitted for the eager spec.
     const sql = rel.toSql();
@@ -193,7 +193,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading grafts stashed associations to correct parent", async () => {
     const person = await Person.all()
-      .eagerLoad({ primaryContact: "primaryContact" })
+      .eagerLoad({ ":primaryContact": ":primaryContact" })
       .where("primary_contacts_people_2.first_name = ?", "Susan")
       .order("people.id")
       .first();
@@ -205,7 +205,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("cascaded eager association loading with join for count", async () => {
     const categories = Category.all()
       .joins(":categorizations")
-      .includes({ posts: "comments" }, "authors");
+      .includes({ ":posts": ":comments" }, ":authors");
     expect(await categories.count()).toBe(4);
     expect((await categories).length).toBe(4);
     expect(await categories.distinct().count()).toBe(3);
@@ -215,8 +215,8 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("cascaded eager association loading with duplicated includes", async () => {
     const categories = Category.all()
-      .includes("categorizations")
-      .includes({ categorizations: "author" })
+      .includes(":categorizations")
+      .includes({ ":categorizations": ":author" })
       .where("categorizations.id is not null")
       .references("categorizations");
     expect(await categories.count()).toBe(3);
@@ -225,8 +225,8 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("cascaded eager association loading with twice includes edge cases", async () => {
     const categories = Category.all()
-      .includes({ categorizations: "author" })
-      .includes({ categorizations: "post" })
+      .includes({ ":categorizations": ":author" })
+      .includes({ ":categorizations": ":post" })
       .where("posts.id is not null")
       .references("posts");
     expect(await categories.count()).toBe(3);
@@ -234,7 +234,7 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with join for count", async () => {
-    const authorsRel = Author.all().joins(":specialPosts").includes("posts", "categorizations");
+    const authorsRel = Author.all().joins(":specialPosts").includes(":posts", ":categorizations");
     await authorsRel.count();
     await assertQueriesCount(3, false, async () => {
       await authorsRel;
@@ -245,16 +245,16 @@ describe("CascadedEagerLoadingTest", () => {
     let authors = await Author.includes(null);
     expect(authors).toHaveLength(3);
 
-    authors = await Author.includes(["posts", null]);
+    authors = await Author.includes([":posts", null]);
     expect(authors).toHaveLength(3);
 
-    authors = await Author.includes({ posts: null });
+    authors = await Author.includes({ ":posts": null });
     expect(authors).toHaveLength(3);
   });
 
   it("eager association loading with cascaded two levels with two has many associations", async () => {
     const loaded = await Author.all()
-      .includes({ posts: ["comments", "categorizations"] })
+      .includes({ ":posts": [":comments", ":categorizations"] })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -264,7 +264,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with cascaded two levels and self table reference", async () => {
     const loaded = await Author.all()
-      .includes({ posts: ["comments", "author"] })
+      .includes({ ":posts": [":comments", ":author"] })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
@@ -277,7 +277,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with cascaded two levels with condition", async () => {
     const loaded = await Author.all()
-      .includes({ posts: "comments" })
+      .includes({ ":posts": ":comments" })
       .where("authors.id=1")
       .order("authors.id");
     expect(loaded).toHaveLength(1);
@@ -286,7 +286,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with cascaded three levels by ping pong", async () => {
     const firms = await Firm.all()
-      .includes({ account: { firm: "account" } })
+      .includes({ ":account": { ":firm": ":account" } })
       .order("companies.id");
     expect(firms).toHaveLength(3);
     const firstAccount = target(firms[0], "account") as Base;
@@ -311,7 +311,7 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with has many sti", async () => {
-    const loaded = await Topic.all().includes("replies").order("topics.id");
+    const loaded = await Topic.all().includes(":replies").order("topics.id");
     // topics(:first).replies.size / topics(:second).replies.size — Topic#replies
     // is has_many Reply by parent_id, so query it directly to avoid loading the
     // fixture record's proxy (whose STI subtree drags in an unrelated inverse_of).
@@ -327,7 +327,7 @@ describe("CascadedEagerLoadingTest", () => {
     const reply = new Reply({ title: "gaga", content: "boo-boo", parent_id: 1 });
     expect(await reply.save()).toBe(true);
 
-    const loaded = await Topic.all().includes("replies").order(["topics.id", "replies_topics.id"]);
+    const loaded = await Topic.all().includes(":replies").order(["topics.id", "replies_topics.id"]);
     await assertQueriesCount(0, false, () => {
       expect(targetArr(loaded[0], "replies")).toHaveLength(2);
       expect(targetArr(loaded[1], "replies")).toHaveLength(0);
@@ -335,7 +335,7 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with belongs to sti", async () => {
-    const replies = await Reply.all().includes("topic").order("topics.id");
+    const replies = await Reply.all().includes(":topic").order("topics.id");
     expect(replies.map((r) => r.id)).toContain((topics("second") as any).id);
     expect(replies.map((r) => r.id)).not.toContain((topics("first") as any).id);
     await assertQueriesCount(0, false, () => {
@@ -345,7 +345,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with multiple stis and order", async () => {
     const author = await Author.all()
-      .includes({ posts: ["specialComments", "verySpecialComment"] })
+      .includes({ ":posts": [":specialComments", ":verySpecialComment"] })
       .order(["authors.name", "comments.body", "very_special_comments_posts.body"])
       .where("posts.id = 4")
       .first();
@@ -359,7 +359,9 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading of stis with multiple references", async () => {
     const loaded = await Author.all()
-      .includes({ posts: { specialComments: { post: ["specialComments", "verySpecialComment"] } } })
+      .includes({
+        ":posts": { ":specialComments": { ":post": [":specialComments", ":verySpecialComment"] } },
+      })
       .order("comments.body, very_special_comments_posts.body")
       .where("posts.id = 4");
     expect(loaded.map((a) => a.id)).toEqual([(authors("david") as any).id]);
@@ -375,7 +377,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading where first level returns nil", async () => {
     const loaded = await Author.all()
-      .includes({ postAboutThinking: "comments" })
+      .includes({ ":postAboutThinking": ":comments" })
       .order("authors.id DESC");
     expect(loaded.map((a) => a.id)).toEqual([
       (authors("bob") as any).id,
@@ -396,7 +398,7 @@ describe("CascadedEagerLoadingTest", () => {
     const post = await Post.all()
       .where()
       .not({ author_id: Author.all().select("id") })
-      .preload({ author: { comments: "post" } })
+      .preload({ ":author": { ":comments": ":post" } })
       .firstBang();
     await assertQueriesCount(0, false, () => {
       expect(target(post, "author")).toBeNull();
@@ -406,14 +408,14 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading with missing first record", async () => {
     const posts = await Post.all()
       .where({ id: 3 })
-      .preload({ author: { comments: "post" } });
+      .preload({ ":author": { ":comments": ":post" } });
     expect(posts).toHaveLength(1);
   });
 
   it("eager association loading with recursive cascading four levels has many through", async () => {
     const source = (
       await Vertex.all()
-        .includes({ sinks: { sinks: { sinks: "sinks" } } })
+        .includes({ ":sinks": { ":sinks": { ":sinks": ":sinks" } } })
         .order("vertices.id")
     )[0];
     await assertQueriesCount(0, false, () => {
@@ -426,7 +428,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading with recursive cascading four levels has and belongs to many", async () => {
     const sink = (
       await Vertex.all()
-        .includes({ sources: { sources: { sources: "sources" } } })
+        .includes({ ":sources": { ":sources": { ":sources": ":sources" } } })
         .order("vertices.id DESC")
     )[0];
     await assertQueriesCount(0, false, () => {
@@ -441,7 +443,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("eager association loading with cascaded interdependent one level and two levels", async () => {
     const loaded = await Author.all()
-      .includes("comments", { posts: "categorizations" })
+      .includes(":comments", { ":posts": ":categorizations" })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "comments")).toHaveLength(11);
@@ -457,11 +459,13 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("preloaded records are not duplicated", async () => {
     const author = (await Author.first())!;
-    const expectedPosts = await Post.where({ author }).includes({ author: "firstPosts" });
+    const expectedPosts = await Post.where({ author }).includes({ ":author": ":firstPosts" });
     const expected = expectedPosts.map(
       (post) => targetArr(target(post, "author")!, "firstPosts").length,
     );
-    const actualPosts = await (author as any).posts.includes({ author: "firstPosts" }).toArray();
+    const actualPosts = await (author as any).posts
+      .includes({ ":author": ":firstPosts" })
+      .toArray();
     const actual = actualPosts.map(
       (post: Base) => targetArr(target(post, "author")!, "firstPosts").length,
     );
@@ -493,7 +497,7 @@ describe("CascadedEagerLoadingTest", () => {
       Comment.afterInitialize((record: Comment) => {
         retrievedComments.push(record);
       });
-      await authorsRel.preload({ recentPost: "comments" }).load();
+      await authorsRel.preload({ ":recentPost": ":comments" }).load();
     });
 
     // Rails: assert_equal [last_comment], retrieved_comments — AR#== is same
@@ -528,7 +532,7 @@ describe("CascadedEagerLoadingTest", () => {
       Author.afterInitialize((record: Author) => {
         retrievedAuthors.push(record);
       });
-      await authorsRel.preload({ recentResponse: "author" }).load();
+      await authorsRel.preload({ ":recentResponse": ":author" }).load();
     });
 
     // Rails: assert_equal [author, authors(:bob)], retrieved_authors — AR#== is

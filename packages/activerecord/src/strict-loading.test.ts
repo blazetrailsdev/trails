@@ -358,7 +358,7 @@ describe("StrictLoadingTest", () => {
         developer_id: developer!.id,
       });
 
-      const preloaded = (await Developer.all().includes("ship").first())!;
+      const preloaded = (await Developer.all().includes(":ship").first())!;
       expect(preloaded.isStrictLoading()).toBe(true);
       const loaded = await loadSingularTarget(preloaded, "ship");
       expect(loaded?.id).toBe(ship.id);
@@ -376,7 +376,7 @@ describe("StrictLoadingTest", () => {
       const dev = await Developer.first();
       await AuditLog.create({ developer_id: dev!.id, message: "M" });
 
-      const devs = await Developer.all().includes("auditLogs");
+      const devs = await Developer.all().includes(":auditLogs");
 
       for (const d of devs) {
         await association(d, "auditLogs");
@@ -399,7 +399,7 @@ describe("StrictLoadingTest", () => {
       const dev0 = await Developer.first();
       await AuditLog.create({ developer_id: dev0!.id, message: "M" });
 
-      const dev = (await Developer.all().includes("auditLogs").first())!;
+      const dev = (await Developer.all().includes(":auditLogs").first())!;
       await association(dev, "auditLogs");
 
       await dev.reload();
@@ -415,7 +415,7 @@ describe("StrictLoadingTest", () => {
     const contract = await Contract.create({ developer_id: dev!.id, company_id: firm.id });
     await association(dev!, "contracts").concat(contract);
 
-    const loaded = await Developer.all().strictLoading().includes("firms").first();
+    const loaded = await Developer.all().strictLoading().includes(":firms").first();
     expect(loaded!.isStrictLoading()).toBe(true);
 
     const firms = (loaded as any).association("firms").target ?? [];
@@ -453,7 +453,7 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
     }
 
-    const dev = (await Developer.all().includes("auditLogs").strictLoading().first())!;
+    const dev = (await Developer.all().includes(":auditLogs").strictLoading().first())!;
     expect(dev.isStrictLoading()).toBe(true);
 
     const logs = (dev as any).association("auditLogs").target ?? [];
@@ -469,7 +469,7 @@ describe("StrictLoadingTest", () => {
         await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
       }
 
-      const dev = (await Developer.all().includes("auditLogs").first())!;
+      const dev = (await Developer.all().includes(":auditLogs").first())!;
       expect(dev.isStrictLoading()).toBe(false);
 
       const logs = (dev as any).association("auditLogs").target ?? [];
@@ -485,12 +485,12 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
     }
 
-    const dev = (await Developer.all().eagerLoad("strictLoadingAuditLogs").first())!;
+    const dev = (await Developer.all().eagerLoad(":strictLoadingAuditLogs").first())!;
     const logs = (dev as any).association("strictLoadingAuditLogs").target ?? [];
     expect(logs).toHaveLength(3);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
 
-    const dev2 = (await Developer.all().eagerLoad("auditLogs").strictLoading(false).first())!;
+    const dev2 = (await Developer.all().eagerLoad(":auditLogs").strictLoading(false).first())!;
     const logs2 = (dev2 as any).association("auditLogs").target ?? [];
     expect(logs2.every((l: any) => !l._strictLoading)).toBe(true);
   });
@@ -502,13 +502,13 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
     }
 
-    const dev = (await Developer.all().eagerLoad("auditLogs").strictLoading().first())!;
+    const dev = (await Developer.all().eagerLoad(":auditLogs").strictLoading().first())!;
     expect(dev.isStrictLoading()).toBe(true);
     const logs = (dev as any).association("auditLogs").target ?? [];
     expect(logs).toHaveLength(3);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
 
-    const dev2 = (await Developer.all().eagerLoad("auditLogs").strictLoading(false).first())!;
+    const dev2 = (await Developer.all().eagerLoad(":auditLogs").strictLoading(false).first())!;
     expect(dev2.isStrictLoading()).toBe(false);
     const logs2 = (dev2 as any).association("auditLogs").target ?? [];
     expect(logs2.every((l: any) => !l._strictLoading)).toBe(true);
@@ -522,7 +522,7 @@ describe("StrictLoadingTest", () => {
         await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
       }
 
-      const dev = (await Developer.all().eagerLoad("auditLogs").first())!;
+      const dev = (await Developer.all().eagerLoad(":auditLogs").first())!;
       expect(dev.isStrictLoading()).toBe(false);
       expect((await AuditLog.last())?.isStrictLoading()).toBe(true);
 
@@ -596,7 +596,7 @@ describe("StrictLoadingTest", () => {
     const first = await Developer.first();
     await first!.updateColumn("mentor_id", mentor.id);
 
-    const developer = (await Developer.all().includes("strictLoadingMentor").first())!;
+    const developer = (await Developer.all().includes(":strictLoadingMentor").first())!;
 
     const loaded = await loadSingularTarget(developer, "strictLoadingMentor");
     expect(loaded?.id).toBe(mentor.id);
@@ -609,7 +609,7 @@ describe("StrictLoadingTest", () => {
       const first = await Developer.first();
       await first!.updateColumn("mentor_id", mentor.id);
 
-      const developer = (await Developer.all().includes("mentor").first())!;
+      const developer = (await Developer.all().includes(":mentor").first())!;
       const loaded = await loadSingularTarget(developer, "mentor");
       expect(loaded?.id).toBe(mentor.id);
     });
@@ -644,7 +644,7 @@ describe("StrictLoadingTest", () => {
     const ship = await Ship.first();
     await ship!.updateColumn("developer_id", developers("david").id);
 
-    const developer = (await Developer.all().includes("strictLoadingShip").first())!;
+    const developer = (await Developer.all().includes(":strictLoadingShip").first())!;
     const loaded = await loadSingularTarget(developer, "strictLoadingShip");
     expect(loaded).not.toBeNull();
   });
@@ -655,7 +655,7 @@ describe("StrictLoadingTest", () => {
       const ship = await Ship.first();
       await ship!.updateColumn("developer_id", developers("david").id);
 
-      const developer = (await Developer.all().includes("ship").first())!;
+      const developer = (await Developer.all().includes(":ship").first())!;
       const loaded = await loadSingularTarget(developer, "ship");
       expect(loaded).not.toBeNull();
     });
@@ -694,7 +694,7 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
     }
 
-    const dev = (await Developer.all().includes("strictLoadingOptAuditLogs").first())!;
+    const dev = (await Developer.all().includes(":strictLoadingOptAuditLogs").first())!;
     const first = await association(dev, "strictLoadingOptAuditLogs").first();
     expect(first).not.toBeNull();
   });
@@ -707,7 +707,7 @@ describe("StrictLoadingTest", () => {
         await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
       }
 
-      const dev = (await Developer.all().includes("auditLogs").first())!;
+      const dev = (await Developer.all().includes(":auditLogs").first())!;
       const first = await association(dev, "auditLogs").first();
       expect(first).not.toBeNull();
     });
@@ -746,7 +746,7 @@ describe("StrictLoadingTest", () => {
     const developer = await Developer.first();
     await association(developer!, "projects").concat((await Project.first())!);
 
-    const dev = (await Developer.all().includes("strictLoadingProjects").first())!;
+    const dev = (await Developer.all().includes(":strictLoadingProjects").first())!;
     const first = await association(dev, "strictLoadingProjects").first();
     expect(first).not.toBeNull();
   });
@@ -757,7 +757,7 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await association(developer!, "projects").concat((await Project.first())!);
 
-      const dev = (await Developer.all().includes("projects").first())!;
+      const dev = (await Developer.all().includes(":projects").first())!;
       const first = await association(dev, "projects").first();
       expect(first).not.toBeNull();
     });

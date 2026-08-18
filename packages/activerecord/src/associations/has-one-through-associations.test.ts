@@ -476,7 +476,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("has one through eager loading", async () => {
     let loaded: any[] = [];
     await assertQueriesCount(3, false, async () => {
-      loaded = await Member.all().includes("club").where("name = ?", "Groucho Marx");
+      loaded = await Member.all().includes(":club").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
     await assertQueriesCount(0, false, async () => {
@@ -487,7 +487,7 @@ describe("HasOneThroughAssociationsTest", () => {
   it("has one through eager loading through polymorphic", async () => {
     let loaded: any[] = [];
     await assertQueriesCount(3, false, async () => {
-      loaded = await Member.all().includes("sponsorClub").where("name = ?", "Groucho Marx");
+      loaded = await Member.all().includes(":sponsorClub").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
     await assertQueriesCount(0, false, async () => {
@@ -499,22 +499,22 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = members("groucho");
     // conditions on the through table
     expect(
-      ((await Member.all().includes("favoriteClub").find(member.id)) as any).association(
+      ((await Member.all().includes(":favoriteClub").find(member.id)) as any).association(
         "favoriteClub",
       ).target?.id,
     ).toBe(clubs("moustache_club").id);
     await memberships("membership_of_favorite_club").updateColumns({ favorite: false });
-    const refetched = (await Member.all().includes("favoriteClub").find(member.id)) as any;
+    const refetched = (await Member.all().includes(":favoriteClub").find(member.id)) as any;
     await refetched.reload();
     expect(refetched.association("favoriteClub").target).toBeNull();
 
     // conditions on the source table
     expect(
-      ((await Member.all().includes("hairyClub").find(member.id)) as any).association("hairyClub")
+      ((await Member.all().includes(":hairyClub").find(member.id)) as any).association("hairyClub")
         .target?.id,
     ).toBe(clubs("moustache_club").id);
     await clubs("moustache_club").updateColumns({ name: "Association of Clean-Shaven Persons" });
-    const refetched2 = (await Member.all().includes("hairyClub").find(member.id)) as any;
+    const refetched2 = (await Member.all().includes(":hairyClub").find(member.id)) as any;
     await refetched2.reload();
     expect(refetched2.association("hairyClub").target).toBeNull();
   });
@@ -527,7 +527,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("eager has one through polymorphic with source type", async () => {
     const loaded = await Club.all()
-      .includes("sponsoredMember")
+      .includes(":sponsoredMember")
       .where("name = ?", "Moustache and Eyebrow Fancier Club");
     // Only the eyebrow fanciers club has a sponsored_member
     await assertQueriesCount(0, false, () => {
@@ -539,7 +539,7 @@ describe("HasOneThroughAssociationsTest", () => {
     let loaded: any[] = [];
     await assertQueriesCount(1, false, async () => {
       loaded = await Member.all()
-        .includes("club")
+        .includes(":club")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name")
         .references("clubs"); // force fallback
@@ -554,7 +554,7 @@ describe("HasOneThroughAssociationsTest", () => {
     let loaded: any[] = [];
     await assertQueriesCount(1, false, async () => {
       loaded = await Member.all()
-        .includes("sponsorClub")
+        .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name")
         .references("clubs"); // force fallback
@@ -571,7 +571,7 @@ describe("HasOneThroughAssociationsTest", () => {
     let loaded: any[] = [];
     await assertQueriesCount(1, false, async () => {
       loaded = await Member.all()
-        .includes("sponsorClub")
+        .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
         .order("clubs.name DESC")
         .references("clubs"); // force fallback
@@ -676,7 +676,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await member.reload();
     let loaded: any[] = [];
     await assertQueriesCount(3, false, async () => {
-      loaded = await MemberDetail.all().includes("memberType");
+      loaded = await MemberDetail.all().includes(":memberType");
     });
     const newDetail = loaded[0];
     expect(newDetail.association("memberType").isLoaded()).toBe(true);
@@ -691,12 +691,12 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await readHasOne(club, "sponsoredMember")).not.toBeNull();
 
     await (await Club.find(club.id)).save();
-    await (await Club.all().includes("sponsoredMember").find(club.id)).save();
+    await (await Club.all().includes(":sponsoredMember").find(club.id)).save();
 
     await (await readHasOne(club, "sponsor")).destroy();
 
     await (await Club.find(club.id)).save();
-    await (await Club.all().includes("sponsoredMember").find(club.id)).save();
+    await (await Club.all().includes(":sponsoredMember").find(club.id)).save();
   });
 
   it("through belongs to after destroy", async () => {

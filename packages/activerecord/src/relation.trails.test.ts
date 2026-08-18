@@ -139,14 +139,14 @@ describe("RelationTest", () => {
   // a merge must dedup structurally, not accumulate duplicate specs the preloader
   // then double-loads.
   it("merge unions preload/includes/eager_load specs without duplicating", () => {
-    const preloadMerged = CanonPost.preload("comments").merge(CanonPost.preload("comments"));
-    expect((preloadMerged as any).preloadValues).toEqual(["comments"]);
+    const preloadMerged = CanonPost.preload(":comments").merge(CanonPost.preload(":comments"));
+    expect((preloadMerged as any).preloadValues).toEqual([":comments"]);
 
-    const includesMerged = CanonPost.includes("comments").merge(CanonPost.includes("comments"));
-    expect((includesMerged as any).includesValues).toEqual(["comments"]);
+    const includesMerged = CanonPost.includes(":comments").merge(CanonPost.includes(":comments"));
+    expect((includesMerged as any).includesValues).toEqual([":comments"]);
 
-    const eagerMerged = CanonPost.eagerLoad("comments").merge(CanonPost.eagerLoad("comments"));
-    expect((eagerMerged as any).eagerLoadValues).toEqual(["comments"]);
+    const eagerMerged = CanonPost.eagerLoad(":comments").merge(CanonPost.eagerLoad(":comments"));
+    expect((eagerMerged as any).eagerLoadValues).toEqual([":comments"]);
   });
 
   // No like-named Rails test: guards the documented proc-merge path
@@ -343,7 +343,7 @@ describe("RelationTest", () => {
     registerModel("RefLeftAuthor", Author);
     registerModel("RefLeftPost", Post);
 
-    const rel = Author.all().includes("posts").references("posts").leftJoins(":posts");
+    const rel = Author.all().includes(":posts").references("posts").leftJoins(":posts");
     const sqlStr = rel.toSql();
     // "posts" table should appear only once in LEFT OUTER JOIN clauses
     const leftJoinMatches = sqlStr.match(/LEFT OUTER JOIN/gi) ?? [];
@@ -369,8 +369,8 @@ describe("RelationTest", () => {
     registerModel("EagerLeftAuthor", Author);
     registerModel("EagerLeftPost", Post);
     // Both eagerLoad and leftJoins present, no explicit joins_values/_joinClauses
-    const rel = Author.leftJoins(":posts").eagerLoad("posts");
-    expect((rel as any).eagerLoadValues).toContain("posts");
+    const rel = Author.leftJoins(":posts").eagerLoad(":posts");
+    expect((rel as any).eagerLoadValues).toContain(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
     // buildJoinBuckets must not short-circuit; SQL must be non-empty (no throw)
     expect(() => rel.toSql()).not.toThrow();
@@ -454,7 +454,7 @@ describe("RelationTest", () => {
           registerModel(this);
         }
       }
-      const sql = Book.all().eagerLoad("author").limit(10).toSql();
+      const sql = Book.all().eagerLoad(":author").limit(10).toSql();
       expect(sql).toContain("LIMIT 10");
       expect(sql).not.toContain(" IN (SELECT");
     } finally {
@@ -485,7 +485,7 @@ describe("RelationTest", () => {
         }
       }
       // hasMany is a collection association → not limitable → IN-subquery for fan-out avoidance
-      const sql = EagerArticle.all().eagerLoad("eagerComments").limit(5).toSql();
+      const sql = EagerArticle.all().eagerLoad(":eagerComments").limit(5).toSql();
       expect(sql).toContain(" IN (SELECT");
       // LIMIT 5 lives inside the subquery, not on the outer query
       expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
@@ -544,17 +544,17 @@ describe("RelationTest", () => {
       // joins ∪ left_outer_joins clause (finder_methods.rb:464-470) has a
       // collection (hasMany), so the two-clause using_limitable_reflections? test
       // is false and the relation defers to distinct-PK materialization.
-      const limitableEager = JlArticle.all().eagerLoad("jlAuthor").limit(5);
+      const limitableEager = JlArticle.all().eagerLoad(":jlAuthor").limit(5);
       expect((limitableEager as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
       const withCollectionJoin = JlArticle.all()
-        .eagerLoad("jlAuthor")
+        .eagerLoad(":jlAuthor")
         .joins(":jlComments")
         .limit(5);
       expect((withCollectionJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
 
       const withCollectionLeftJoin = JlArticle.all()
-        .eagerLoad("jlAuthor")
+        .eagerLoad(":jlAuthor")
         .leftJoins(":jlComments")
         .limit(5);
       expect((withCollectionLeftJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
@@ -563,11 +563,11 @@ describe("RelationTest", () => {
       // both belongsTo) — resolve to non-collection reflections, so the second
       // using_limitable_reflections? clause stays true and the relation does NOT
       // defer (Rails resolves the hash via construct_join_dependency.reflections).
-      const singularJoin = JlArticle.all().eagerLoad("jlAuthor").joins(":jlAuthor").limit(5);
+      const singularJoin = JlArticle.all().eagerLoad(":jlAuthor").joins(":jlAuthor").limit(5);
       expect((singularJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
 
       const singularNestedJoin = JlArticle.all()
-        .eagerLoad("jlAuthor")
+        .eagerLoad(":jlAuthor")
         .joins({ ":jlAuthor": ":jlProfile" })
         .limit(5);
       expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
@@ -659,7 +659,7 @@ describe("Relation#arel build_arel convergence", () => {
   // subquery with an explicit single-column select projects that one column,
   // not JoinDependency aliases (regression guard for build_arel convergence).
   it("arel of an eager relation projects normal columns, not join-dependency aliases", () => {
-    const rel = Gadget.eagerLoad("widget").select(Gadget.arelTable.get("id"));
+    const rel = Gadget.eagerLoad(":widget").select(Gadget.arelTable.get("id"));
     const sql = Gadget.connection.toSql(rel.arel().ast);
     expect(sql).not.toMatch(/t\d+_r\d+/);
     expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
@@ -669,7 +669,7 @@ describe("Relation#arel build_arel convergence", () => {
   // subquery: an eager-loading relation used as a `where(id: …)` value has its
   // eager_load converted to a LEFT OUTER JOIN (not dropped), projecting only PK.
   it("where with eager-loading relation subquery converts eager-load to a join", () => {
-    const sql = Widget.where({ id: Gadget.eagerLoad("widget") }).toSql();
+    const sql = Widget.where({ id: Gadget.eagerLoad(":widget") }).toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toMatch(/IN \(SELECT ["`]gadgets["`]\.["`]id["`]/);
     expect(sql).not.toMatch(/t\d+_r\d+/);
@@ -697,7 +697,7 @@ describe("Relation#arel build_arel convergence", () => {
   // fallback (valid on SQLite/PostgreSQL). The load path substitutes a literal
   // id list instead — see the canonical RelationTest materialization tests.
   it("where with eager-loading limited collection relation subquery renders the inline distinct subquery for sync toSql", () => {
-    const sql = Gadget.where({ widget_id: Widget.eagerLoad("gadgets").limit(5) }).toSql();
+    const sql = Gadget.where({ widget_id: Widget.eagerLoad(":gadgets").limit(5) }).toSql();
     expect(sql).toMatch(/widget_id\W+IN \(SELECT DISTINCT ["`]widgets["`]\.["`]id["`]/);
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toMatch(/LIMIT 5/);
@@ -732,7 +732,7 @@ describe("RelationTest", () => {
   // load time: the main query carries the literal `author_id IN (<ids>)`, never
   // a LIMIT-bearing subquery, on every adapter.
   it("where with eager-loading limited collection relation subquery materializes distinct primary keys at load time", async () => {
-    const subquery = CanonAuthor.eagerLoad("posts").order({ id: "asc" }).limit(2);
+    const subquery = CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
@@ -765,7 +765,10 @@ describe("RelationTest", () => {
   // short-circuits as a contradiction (Rails `none!`): an empty result with no
   // main query issued and no error.
   it("where with eager-loading limited collection relation subquery yielding no ids is empty", async () => {
-    const subquery = CanonAuthor.where({ id: -1 }).eagerLoad("posts").order({ id: "asc" }).limit(2);
+    const subquery = CanonAuthor.where({ id: -1 })
+      .eagerLoad(":posts")
+      .order({ id: "asc" })
+      .limit(2);
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
@@ -782,7 +785,7 @@ describe("RelationTest", () => {
   // inline LIMIT-in-IN subquery MySQL rejects. Rails materializes at
   // `.where()`-build time, so all terminals see `pk IN (ids)`.
   it("count, pluck, and exists over an eager-loading limited collection subquery materialize distinct primary keys", async () => {
-    const subquery = () => CanonAuthor.eagerLoad("posts").order({ id: "asc" }).limit(2);
+    const subquery = () => CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
     const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
     const expectedPostIds = await CanonPost.where({ author_id: limitedAuthorIds })
       .order("id")
@@ -807,7 +810,7 @@ describe("RelationTest", () => {
   // skipping distinct_relation_for_primary_key — so a grouped eager+limit
   // subquery is NOT deferred and builds the plain `IN (SELECT … GROUP BY …)`.
   it("where with a grouped eager-loading limited subquery does not defer materialization", () => {
-    const subquery = CanonAuthor.eagerLoad("posts").group("authors.id").limit(2);
+    const subquery = CanonAuthor.eagerLoad(":posts").group("authors.id").limit(2);
     const sql = CanonPost.where({ author_id: subquery }).toSql();
     expect(sql).toMatch(/IN \(SELECT/i);
     expect(sql).toMatch(/GROUP BY/i);
@@ -820,7 +823,7 @@ describe("RelationTest", () => {
   // (Author hasOne post → Post belongsTo author) stays limitable, so a
   // limit/offset relation is NOT deferred to distinct_relation_for_primary_key.
   it("where with a singular nested-hash eager-loading limited subquery does not defer materialization", () => {
-    const subquery = CanonAuthor.eagerLoad({ post: "author" }).order({ id: "asc" }).limit(2);
+    const subquery = CanonAuthor.eagerLoad({ ":post": ":author" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(false);
   });
 
@@ -828,7 +831,7 @@ describe("RelationTest", () => {
   // hasMany comments) makes the reflection set non-limitable, so the relation
   // defers to distinct-PK materialization just as a top-level collection does.
   it("where with a collection nested-hash eager-loading limited subquery defers materialization", () => {
-    const subquery = CanonAuthor.eagerLoad({ post: "comments" }).order({ id: "asc" }).limit(2);
+    const subquery = CanonAuthor.eagerLoad({ ":post": ":comments" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
   });
 });
@@ -938,13 +941,13 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
     // select_association_list(joins_values) + left_outer_joins_values. `author`
     // is singular, but the joined `comments` collection is not, so a limit here
     // takes the rewrite rather than a direct LIMIT on the fanned-out join.
-    const sql = CanonPost.eagerLoad("author").joins(":comments").limit(1).toSql();
+    const sql = CanonPost.eagerLoad(":author").joins(":comments").limit(1).toSql();
     expect(sql).toMatch(/WHERE .*IN \(SELECT DISTINCT /);
     expect(sql).not.toMatch(/\bLIMIT 1\s*$/);
   });
 
   it("applies the limit directly when every eager and joined reflection is singular", () => {
-    const sql = CanonPost.eagerLoad("author").limit(1).toSql();
+    const sql = CanonPost.eagerLoad(":author").limit(1).toSql();
     expect(sql).not.toContain("SELECT DISTINCT");
     expect(sql).toMatch(/\bLIMIT 1\s*$/);
   });

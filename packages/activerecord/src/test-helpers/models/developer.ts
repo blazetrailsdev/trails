@@ -322,7 +322,7 @@ export class DeveloperWithIncludes extends Base {
   static {
     this.tableName = "developers";
     this.hasMany("auditLogs", { foreignKey: "developer_id" });
-    this.defaultScope((q: any) => q.includes("auditLogs"));
+    this.defaultScope((q: any) => q.includes(":auditLogs"));
   }
 }
 
@@ -476,7 +476,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-    this.defaultScope((q: any) => q.includes("projects"));
+    this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
 
@@ -494,7 +494,7 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
   // Method-form `default_scope` override (Rails: `def self.default_scope`),
   // not the `default_scope { }` macro registry.
   static defaultScope(this: any): any {
-    return this.includes("projects");
+    return this.includes(":projects");
   }
 }
 
@@ -507,7 +507,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-    this.defaultScope((q: any) => q.includes("projects"));
+    this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
 
@@ -520,7 +520,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-    this.defaultScope((q: any) => q.includes("projects"));
+    this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
 
@@ -533,7 +533,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-    this.defaultScope((q: any) => q.includes("projects"));
+    this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
 
