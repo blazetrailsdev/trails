@@ -4,6 +4,7 @@
  */
 
 import { I18n } from "../i18n.js";
+import { isEmpty } from "../ruby-empty.js";
 
 export interface InflectionRule {
   rule: RegExp;
@@ -151,7 +152,7 @@ export class Inflections {
   }
 
   private defineAcronymRegexPatterns(): void {
-    if (this.acronyms.size === 0) {
+    if (isEmpty(this.acronyms)) {
       this.acronymRegex = /(?=a)b/;
       this.acronymsCamelizeRegex = /^\w/;
       this.acronymsUnderscoreRegex = /(?=a)b/;

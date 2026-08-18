@@ -5,6 +5,7 @@
 
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
 import { NotImplementedError } from "../../cache/store.js";
+import { isEmpty } from "../../ruby-empty.js";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
@@ -207,7 +208,7 @@ export function tokenize(source: string): [string, string][] {
       if (len > 0) tokens.push([":TEXT", scanner.string.slice(pos, pos + len)]);
       tokens.push([":OPEN", scanner.matched]);
       if (scanner.scan(CODE_RE) !== null) {
-        if (scanner.matched !== "") tokens.push([":CODE", scanner.matched]);
+        if (!isEmpty(scanner.matched)) tokens.push([":CODE", scanner.matched]);
         if (!scanner.isEos()) tokens.push([":CLOSE", scanner.scan(FINISH_RE)!]);
       } else {
         // @nie disposition=TODO

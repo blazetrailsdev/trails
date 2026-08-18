@@ -56,8 +56,10 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
   // that implement only `target` / `isLoaded` / `setTarget`. Those are singular
   // by construction, so falling through is right.
   if ((instance as { isCollection?(): boolean }).isCollection?.()) {
-    const proxy = this._collectionProxies.get(name) as { loaded?: boolean } | undefined;
-    if (proxy?.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
+    // One seat since RFC 0022's fold: the proxy writes `@loaded` on this very
+    // instance, so read it here rather than back off the proxy (which resolves
+    // its seat through this function).
+    if (instance.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
     return;
   }
   // Reads the loaded target through the association cache

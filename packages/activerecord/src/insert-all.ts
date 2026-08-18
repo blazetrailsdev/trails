@@ -8,7 +8,7 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import { isEmpty } from "./ruby-empty.js";
+import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;

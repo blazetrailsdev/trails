@@ -11,7 +11,7 @@
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";

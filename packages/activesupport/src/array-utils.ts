@@ -6,6 +6,7 @@ import { ArgumentError, assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { camelize } from "./inflector.js";
 import { inspect, toS } from "./core-ext/object/inspect.js";
+import { isEmpty } from "./ruby-empty.js";
 
 /**
  * Wraps its argument in an array unless it is already an array (or array-like).
@@ -217,7 +218,7 @@ export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[]
 export function toFs(self: unknown[], format = "default"): string {
   switch (format) {
     case "db":
-      if (self.length === 0) {
+      if (isEmpty(self)) {
         return "null";
       } else {
         return self.map((e) => (e as { id: unknown }).id).join(",");

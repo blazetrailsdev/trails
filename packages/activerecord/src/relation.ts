@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { except, hexdigest, isBlank, Notifications, toFs } from "@blazetrails/activesupport";
-import { isEmpty } from "./ruby-empty.js";
+import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";

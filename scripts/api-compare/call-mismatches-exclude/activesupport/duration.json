@@ -67,5 +67,12 @@
     "rubyName": "since",
     "call": "sum",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "duration.ts",
+    "rubyName": "sum",
+    "call": "empty?",
+    "reason": "Name collision, not an omission: Ruby's `sum` here is the private instance method `sum(sign, time)` (duration.rb:486-510) whose `@parts.empty?` arm trails ports inside `applyDuration`; the TS owner the comparator pairs it with is the unrelated `static sum(durations)` Enumerable helper. The two `since`/`ago` rows above record the same unported private `sum`."
   }
 ]

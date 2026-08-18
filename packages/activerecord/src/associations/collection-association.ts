@@ -1,6 +1,5 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { association as associationProxy } from "../associations.js";
 import {
   underscore,
   isAbortSignal,
@@ -35,13 +34,6 @@ export interface ReplacePlan {
    * which Rails deletes in a transaction (`delete_or_destroy`, :393-397).
    */
   pending?: Promise<unknown>;
-}
-
-/** @internal */
-interface SharedTargetStore {
-  _sharedTarget: Base[];
-  _sharedLoaded: boolean;
-  _sharedReplacedOrAddedTargets: Set<Base>;
 }
 
 /**
@@ -80,8 +72,6 @@ export class CollectionAssociation extends Association {
   // `CollectionProxy`.
   _namedScopeRelations?: Map<string, unknown>;
 
-  private _sharedTargetEnabled = false;
-
   /**
    * Mirrors: `CollectionAssociation#callback` / `#callbacks_for`
    * (collection_association.rb:492-505) — instance methods on the association,
@@ -96,112 +86,53 @@ export class CollectionAssociation extends Association {
   /** @internal */
   callbacksFor = callbacksFor;
 
+  // Rails has no `CollectionAssociation#initialize`: `Association#initialize`
+  // runs `reset` (association.rb:46), which seeds `@target = []`
+  // (collection_association.rb:89). trails' base constructor does not call
+  // `reset`, so the collection seat is opened here instead.
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
-    this._writeTargetStore([]);
-    this._sharedTargetEnabled = true;
+    this._targetStore = [];
   }
 
   /**
-   * A cache *lookup*, never a build: constructing a proxy here would be
-   * re-entrant (its constructor resolves through-scopes that read back through
-   * this association). Until one exists there is no second store to keep
-   * coherent, and `association()` hands the proxy this very array
-   * (`_adoptSharedTarget`), so no reference already handed out goes stale.
-   */
-  private _sharedStore(): SharedTargetStore | null {
-    if (!this._sharedTargetEnabled) return null;
-    return (
-      (this.owner._collectionProxies.get(this.reflection.name) as SharedTargetStore | undefined) ??
-      null
-    );
-  }
-
-  /**
-   * Rails' `CollectionProxy` forwards `target`/`loaded` to its `@association`;
-   * trails inverts the ownership (RFC 0022 makes the proxy the canonical
-   * has_many store) so the association forwards the other way. Either
-   * direction gives the one invariant that matters: ONE in-memory target.
+   * Ruby's `@target` for a collection is always an Array (`reset` seeds it with
+   * `[]`, collection_association.rb:89); the override only narrows the
+   * singular-shaped base type.
    */
   override get target(): Base[] {
-    const store = this._sharedStore();
-    return store ? store._sharedTarget : (this._targetStore as Base[]);
+    return this._targetStore as Base[];
   }
 
   /**
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#target=
-   * (`collection_association.rb:285-296`). Without `has_many_inversing` this is
+   * (`collection_association.rb:284-295`). Without `has_many_inversing` this is
    * the plain holder write (`super`); with it, a single inverse record folds
    * into the collection via `replace_on_target(record, true, replace: true,
    * inversing: true)` and a `nil` is a no-op — it cannot be removed from the
    * inverse.
-   *
-   * `associationProxy` materializes the `CollectionProxy` first because RFC
-   * 0022 makes the proxy the canonical has_many store — the trails analog of
-   * Rails' `@target` — so the `replace_on_target` write lands where readers
-   * (`size()`/`load()`) look. The `super` arms keep the pre-existing coercion
-   * of a lone record and of `null` to an array, which Rails leaves to Ruby's
-   * untyped `@target`.
    */
   override set target(records: Base | Base[] | null) {
     if (!this.reflection.klass?.hasManyInversing) {
-      this._writeTargetStore(records == null ? [] : Array.isArray(records) ? records : [records]);
+      super.target = records;
       return;
     }
 
     if (records === null) {
       // It's not possible to remove the record from the inverse association.
     } else if (Array.isArray(records)) {
-      this._writeTargetStore(records);
+      super.target = records;
     } else {
-      associationProxy(this.owner, this.reflection.name);
       void this.replaceOnTarget(records, true, { replace: true, inversing: true });
     }
   }
 
   /**
-   * Ruby's `@target = …` ivar write — Rails' `super` inside `target=`, and the
-   * direct writes `reset`/`load_target`/`replace` make without going through
-   * `target=`. RFC 0022 puts the canonical has_many target on the
-   * `CollectionProxy`, so the write has to pick the shared store when one
-   * exists.
-   *
-   * @internal
-   */
-  private _writeTargetStore(value: Base[]): void {
-    const store = this._sharedStore();
-    if (store) store._sharedTarget = value;
-    else this._targetStore = value;
-  }
-
-  override get loaded(): boolean {
-    const store = this._sharedStore();
-    return store ? store._sharedLoaded : this._loadedStore;
-  }
-
-  override set loaded(value: boolean) {
-    const store = this._sharedStore();
-    if (store) store._sharedLoaded = value;
-    else this._loadedStore = value;
-  }
-
-  /**
    * Rails' `@replaced_or_added_targets`, the other half of
-   * `replace_on_target`'s state — it has to travel with the target, since two
-   * sets over one array double-append.
+   * `replace_on_target`'s state.
    * @internal
    */
-  get _replacedOrAddedTargets(): Set<Base> {
-    return this._sharedStore()?._sharedReplacedOrAddedTargets ?? this._replacedOrAddedTargetsStore;
-  }
-
-  set _replacedOrAddedTargets(value: Set<Base>) {
-    const store = this._sharedStore();
-    if (store) store._sharedReplacedOrAddedTargets = value;
-    else this._replacedOrAddedTargetsStore = value;
-  }
-
-  private _replacedOrAddedTargetsStore = new Set<Base>();
+  _replacedOrAddedTargets = new Set<Base>();
 
   /**
    * Rails' `@_was_loaded` (collection_association.rb:468-489): `loaded?` as of
@@ -419,7 +350,7 @@ export class CollectionAssociation extends Association {
 
   override reset(): void {
     super.reset();
-    this._writeTargetStore([]);
+    this._targetStore = [];
     // Rails' `Set.new.compare_by_identity`: a JS Set already compares object
     // members by identity.
     this._replacedOrAddedTargets = new Set<Base>();
@@ -862,11 +793,11 @@ export class CollectionAssociation extends Association {
     await this.transaction(async () => {
       // replaceRecords diffs against assoc.target; restore originalTarget so
       // it sees the real DB state rather than the already-updated in-memory target
-      this._writeTargetStore([...pending.originalTarget]);
+      this._targetStore = [...pending.originalTarget];
       try {
         await replaceRecords(this, pending.newTarget, pending.originalTarget);
       } finally {
-        this._writeTargetStore(currentTarget);
+        this._targetStore = currentTarget;
       }
     });
   }
@@ -903,7 +834,7 @@ export class CollectionAssociation extends Association {
       // Every collection subclass overrides `findTarget` to return `Base[]`;
       // the cast only narrows the singular-shaped base signature.
       return Promise.resolve(this.findTarget()).then((findTarget) => {
-        this._writeTargetStore(this.mergeTargetLists(findTarget as Base[], this.target));
+        this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
         return loaded();
       });
     }
@@ -1254,7 +1185,7 @@ export class CollectionAssociation extends Association {
     this._lastRemoveAborted = false;
     // Rails' tail after `delete_records` (collection_association.rb:404-409).
     const pruned = (): boolean => {
-      this._writeTargetStore(this.target.filter((r) => !includesRecord(records, r)));
+      this._targetStore = this.target.filter((r) => !includesRecord(records, r));
       for (const record of records) {
         // A `dependent: :destroy` record is frozen once destroyed, so clearing its
         // inverse foreign key would raise FrozenError. Rails leaves the destroyed
@@ -1383,7 +1314,7 @@ export class CollectionAssociation extends Association {
    * @internal
    */
   _mergeLoaderResults(rows: Base[]): void {
-    this._writeTargetStore(this.mergeTargetLists(rows, this.target));
+    this._targetStore = this.mergeTargetLists(rows, this.target);
     this.loadedBang();
   }
 

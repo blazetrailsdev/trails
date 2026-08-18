@@ -2,17 +2,10 @@
  * Ruby `empty?`, for ports of Ruby collection predicates.
  *
  * This has no Rails counterpart — `Array#empty?`, `Hash#empty?` and
- * `String#empty?` are Ruby core, the same way the sibling `ruby-truthy.ts`
- * models Ruby truthiness. It lives here rather than in activesupport for the
- * same reason that one does: the call-set comparator resolves a Ruby call name
- * against the PORTED names of the package it appears in, so exporting `isEmpty`
- * from activesupport would make every Ruby `empty?` in an activesupport body
- * resolvable and surface eight unrelated divergences at once. activerecord
- * already resolves `empty?` (`ActiveRecord::Result#empty`), so the population
- * here is unchanged. Those eight are real, pre-existing divergences and want
- * their own story; surfacing them as a side effect of this helper's placement
- * would have baselined them, which is the one thing the exclude tree must never
- * grow for.
+ * `String#empty?` are Ruby core, the same way `activerecord`'s sibling
+ * `ruby-truthy.ts` models Ruby truthiness. It lives in activesupport, the
+ * lowest package every port can reach, so an `empty?` in an activesupport body
+ * spells the same call an activerecord one does.
  *
  * It exists because the obvious
  * spellings — `xs.length === 0`, `Object.keys(h).length === 0` — are property

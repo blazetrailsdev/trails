@@ -32,10 +32,15 @@ export class Association {
   owner: Base;
   readonly reflection: AssociationDefinition;
   readonly disableJoins: boolean;
-  /** @internal */
-  protected _targetStore: Base | Base[] | null = null;
-  /** @internal */
-  protected _loadedStore = false;
+  /**
+   * Ruby's `@target` ivar. Public-but-`@internal` rather than `protected`
+   * because `CollectionProxy` is Rails' `@association.target` reader/writer
+   * (collection_proxy.rb:53) and holds no seat of its own.
+   * @internal
+   */
+  _targetStore: Base | Base[] | null = null;
+  /** Ruby's `@loaded` ivar; see `_targetStore`. @internal */
+  _loadedStore = false;
 
   get loaded(): boolean {
     return this._loadedStore;

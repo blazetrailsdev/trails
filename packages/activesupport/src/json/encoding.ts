@@ -1,4 +1,5 @@
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
+import { isEmpty } from "../ruby-empty.js";
 
 /**
  * Serialization options threaded through `as_json` — only the subset Rails'
@@ -37,7 +38,7 @@ export class JSONGemEncoder {
    *   `??`.
    */
   encode(value: unknown): string {
-    if (Object.keys(this.options).length !== 0) {
+    if (!isEmpty(this.options)) {
       value = asJson(value, this.options);
     }
     let json = this.stringify(this.jsonify(value));
