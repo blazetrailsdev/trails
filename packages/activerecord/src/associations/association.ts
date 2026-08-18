@@ -362,13 +362,16 @@ export class Association {
     }
     // Branches 3 + 4.
     const associationScope = this.associationScope();
-    const target = this.targetScope();
+    const globalScope = klass.globalCurrentScope();
+    const targetScope = this.targetScope();
     const base =
-      target != null && typeof target.merge === "function"
-        ? target.merge(associationScope)
+      targetScope != null && typeof targetScope.mergeBang === "function"
+        ? targetScope.mergeBang(associationScope)
         : associationScope;
-    const globalScope = klass?.globalCurrentScope();
-    return globalScope && typeof base?.merge === "function" ? base.merge(globalScope) : base;
+    if (globalScope) {
+      return typeof base?.mergeBang === "function" ? base.mergeBang(globalScope) : base;
+    }
+    return base;
   }
 
   /**
@@ -969,7 +972,7 @@ export class Association {
     const arFactory = getAssociationRelationFactory();
     if (!arFactory) return sfa;
     const ar = arFactory(klass, this);
-    return sfa ? (ar as any).merge(sfa) : ar;
+    return sfa ? (ar as any).mergeBang(sfa) : ar;
   }
 
   /** @internal */

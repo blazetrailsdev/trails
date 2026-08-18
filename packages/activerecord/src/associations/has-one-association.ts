@@ -552,16 +552,21 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
 
-    if (this.reflection.options.as) {
-      const typeCol =
-        this.reflection.options.foreignType ?? `${underscore(this.reflection.options.as)}_type`;
+    // Rails reads the polymorphic type column off `reflection.type`
+    // (foreign_association.rb:35), which is `foreign_type` — already resolved
+    // from `options[:foreign_type]` / `"#{options[:as]}_type"` by the rich
+    // reflection, so the derivation is not repeated here.
+    const type =
+      (ctor._reflectOnAssociation?.(this.reflection.name) as { type?: string | null } | null)
+        ?.type ?? null;
+    if (type) {
       // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
       // subclasses store their base class name in the `as:` type column.
       const typeName = (ctor as typeof Base).polymorphicName();
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, typeName);
+        (record as any)._writeAttribute(type, typeName);
       } else {
-        (record as any)[typeCol] = typeName;
+        (record as any)[type] = typeName;
       }
     }
   }

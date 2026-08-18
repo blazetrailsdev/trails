@@ -1,4 +1,5 @@
 import {
+  foreignKey,
   underscore,
   singularize,
   pluralize,
@@ -9,6 +10,7 @@ import {
 import * as Reflection from "../../reflection.js";
 import { habtmTargetFk, joinHabtmTableNames } from "../../associations.js";
 import { CollectionAssociation as CollectionAssociationBuilder } from "./collection-association.js";
+import { HasMany } from "./has-many.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /**
@@ -66,14 +68,7 @@ export class HasAndBelongsToMany {
     };
     joinModel._associations.push(joinModel.leftReflection);
 
-    const rhsOptions: Record<string, unknown> = {};
-    if (options.className) {
-      rhsOptions.foreignKey = `${underscore(demodulize(options.className as string))}_id`;
-      rhsOptions.className = options.className;
-    }
-    if (options.associationForeignKey) {
-      rhsOptions.foreignKey = options.associationForeignKey;
-    }
+    const rhsOptions = this.belongsToOptions(options);
 
     joinModel.rightReflection = {
       name: rightName,
@@ -88,20 +83,33 @@ export class HasAndBelongsToMany {
   middleReflection(joinModel: any): any {
     const lhsModelName = this.lhsModel.name.toLowerCase();
     const middleName = [pluralize(lhsModelName), this.associationName].sort().join("_");
+    const middleOptions = this.middleOptions(joinModel);
 
+    return HasMany.createReflection(this.lhsModel, middleName, null, middleOptions);
+  }
+
+  private middleOptions(joinModel: any): Record<string, unknown> {
     const middleOptions: Record<string, unknown> = {};
     middleOptions.className = `${this.lhsModel.name}::${joinModel.name}`;
     if (this.options.foreignKey) {
       middleOptions.foreignKey = this.options.foreignKey;
     }
+    return middleOptions;
+  }
 
-    return {
-      name: middleName,
-      macro: "hasMany",
-      scope: null,
-      options: middleOptions,
-      activeRecord: this.lhsModel,
-    };
+  private belongsToOptions(options: Record<string, unknown>): Record<string, unknown> {
+    const rhsOptions: Record<string, unknown> = {};
+
+    if (options.className) {
+      rhsOptions.foreignKey = foreignKey(options.className as string);
+      rhsOptions.className = options.className;
+    }
+
+    if (options.associationForeignKey) {
+      rhsOptions.foreignKey = options.associationForeignKey;
+    }
+
+    return rhsOptions;
   }
 
   private _fallbackTableName(name: string): string {
@@ -366,7 +374,7 @@ export class HasAndBelongsToMany {
 
 /** @internal */
 function middleOptions(builder: HasAndBelongsToMany, joinModel: unknown): Record<string, unknown> {
-  return (builder as any)._middleOptions?.(joinModel) ?? {};
+  return (builder as any).middleOptions(joinModel);
 }
 
 /** @internal */
@@ -379,5 +387,5 @@ function belongsToOptions(
   builder: HasAndBelongsToMany,
   options: Record<string, unknown>,
 ): Record<string, unknown> {
-  return (builder as any)._belongsToOptions?.(options) ?? {};
+  return (builder as any).belongsToOptions(options);
 }

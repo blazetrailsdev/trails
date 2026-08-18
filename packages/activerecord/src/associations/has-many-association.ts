@@ -202,11 +202,6 @@ export class HasManyAssociation extends CollectionAssociation {
     }
   }
 
-  protected override setOwnerAttributes(record: Base): void {
-    if (this.reflection.options.through) return;
-    super.setOwnerAttributes(record);
-  }
-
   /**
    * Source the FK/type-column null map from the Rails-named helper so
    * `dependent: :nullify` honors the rich reflection (custom foreignKey,
