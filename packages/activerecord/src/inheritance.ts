@@ -1115,8 +1115,14 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * each through {@link findStiClassInHierarchy} (registry-safe) instead of
  * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
  * resolves to a name (default `"type"`), and the dispatch is gated on the
- * column-aware `_has_attribute?` ({@link classHasAttribute}). Returns null (no
- * dispatch) when no source names an inheritance value at all.
+ * column-aware `_has_attribute?` ({@link classHasAttribute}) — or, for a
+ * receiver that is explicitly STI-enabled ({@link stiEnabled}), on that
+ * assignment, which is the same structural fact Rails reads off
+ * `_has_attribute?` and, unlike trails' schema reflection, never goes cold.
+ * Without that arm an STI *leaf* whose `type` column had not reflected yet and
+ * which tracks no descendants of its own built as-is where Rails raises.
+ * Returns null (no dispatch) when no source names an inheritance value at
+ * all.
  *
  * Matching Rails' `subclass_from_attributes` → `find_sti_class`: when an
  * explicitly STI-enabled receiver carries a *present* inheritance value that
@@ -1144,18 +1150,12 @@ export function subclassFromAttributesForNew(
   // reflected DB column) is the primary guard. But trails' schema reflection is
   // not always warm at construction — a canonical STI base like `Company` declares
   // no `attribute("type")` and its `type` column only reflects once the schema
-  // loads — so an explicitly STI-enabled hierarchy or a tracked STI subtree stands in as the
-  // trails-reliable signal that `findStiClassInHierarchy` could resolve. A plain
-  // model with none of the three can never
-  // dispatch (it has no in-subtree match), so short-circuit the source probing —
-  // including the non-memoized columnDefaults build — on the hot path.
+  // loads — so an explicit `stiEnabled` assignment or a tracked STI subtree stands
+  // in as the trails-reliable signal that `findStiClassInHierarchy` could resolve.
+  // A plain model with none of the three can never dispatch (it has no in-subtree
+  // match), so short-circuit the source probing — including the non-memoized
+  // columnDefaults build — on the hot path.
   // `inheritance_column = nil` disables STI even when a real `type` column exists.
-  // An explicitly STI-enabled receiver never short-circuits: `inheritanceColumn`
-  // having been assigned on it or an ancestor ({@link stiEnabled}) is the same
-  // structural fact Rails reads off `_has_attribute?(inheritance_column)`, and it
-  // does not go cold. Without that arm an STI leaf whose `type` column has not
-  // reflected yet and which tracks no descendants of its own — `VerySpecialClient` —
-  // built as-is where Rails raises SubclassNotFound.
   const col = modelClass.inheritanceColumn;
   if (col === null) return null;
   if (

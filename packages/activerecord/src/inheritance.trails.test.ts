@@ -22,14 +22,16 @@ describe("_instantiate STI dispatch", () => {
   });
 });
 
+/**
+ * The gate short-circuited on `!classHasAttribute && descendants.length === 0`,
+ * which swallowed an STI *leaf* whose `type` column had not reflected yet and
+ * which tracks no descendants of its own: it built as-is (and then failed as an
+ * unknown attribute) where Rails' `_has_attribute?(inheritance_column)` gate
+ * (`inheritance.rb:55`, `subclass_from_attributes`) reaches `find_sti_class` and
+ * raises. No fixtures/schema load in this describe on purpose — the reflection
+ * has to be cold for the leaf to be one.
+ */
 describe("new() STI dispatch gate", () => {
-  // The gate short-circuited on `!classHasAttribute && descendants.length === 0`,
-  // which swallowed an STI *leaf* whose `type` column had not reflected yet and
-  // which tracks no descendants of its own: it built as-is (and then failed as an
-  // unknown attribute) where Rails' `_has_attribute?(inheritance_column)` gate
-  // (inheritance.rb:55, subclass_from_attributes) reaches find_sti_class and
-  // raises. No fixtures/schema load here on purpose — the reflection has to be
-  // cold for the leaf to be one.
   it("raises SubclassNotFound for a bad type on a cold STI leaf", () => {
     expect(() => VerySpecialClient.new({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
