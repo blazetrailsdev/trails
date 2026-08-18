@@ -64,6 +64,7 @@ const HOST_PARAM_TYPES = new Set([
   "Date",
   "Time",
   "DateTime",
+  "DateOrTime",
   "Numeric",
   "Duration",
   "PlainDate",
