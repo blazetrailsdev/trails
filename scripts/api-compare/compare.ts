@@ -604,9 +604,18 @@ export const ORDER_PREFIX = "order:";
  * reads "TS calls b before a; Rails calls a before b" — so the row is a stable
  * baseline key rather than a whole-sequence string that churns on every edit.
  *
- * A TS name two of the body's Ruby calls could both be ported as carries no
- * position for either ({@link ambiguousTsNames}), so it is skipped here; the
- * membership check still sees it.
+ * A TS name that carries no position for the call under test is skipped here;
+ * the membership check still sees it. Two causes, settled in ONE filter — the
+ * union computed below — rather than two overlapping ones:
+ *   - two of the body's Ruby calls could both be ported as it, so no position
+ *     can be attributed to either ({@link ambiguousTsNames});
+ *   - one of the body's Ruby calls is SUPPRESSED by the ported-with-args gate
+ *     and the name is the spelling it ports ({@link suppressedCallClaims}), so
+ *     the position belongs to a call this check never reaches. That is the
+ *     same indivisible-position fact as an ambiguous name, arriving by a
+ *     different route: the second owner is invisible to the gate rather than
+ *     visible-and-tied (RFC 0106 Open Question 1). `significantMissingCalls`
+ *     honours the same claims by withholding them from `tsCalls`.
  *
  * `bodyRubyCalls` is the body's call list BEFORE `dropWeakCalls` — the
  * disambiguation above is about what the Ruby body NAMES, and a call the weak
@@ -621,8 +630,19 @@ export function reorderedCalls(
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   bodyRubyCalls: readonly string[] = rubyCalls,
+  aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
 ): string[] {
-  const ambiguous = ambiguousTsNames(bodyRubyCalls, mapCall);
+  const unpositioned = new Set([
+    ...ambiguousTsNames(bodyRubyCalls, mapCall),
+    ...suppressedCallClaims(
+      bodyRubyCalls.filter((rc) => rc !== rubyName),
+      new Set(tsCalls),
+      isPortedWithArgs,
+      mapCall,
+      significant,
+      aliasCall,
+    ),
+  ]);
   const rubySeq: string[] = [];
   for (const rc of rubyCalls) {
     if (rc === rubyName) continue;
@@ -632,7 +652,7 @@ export function reorderedCalls(
     if (!raw || raw.length === 0) continue;
     const mapped = narrowPredicateCandidates(rc, raw, bodyRubyCalls, mapCall);
     if (!mapped.some(isPortedWithArgs)) continue;
-    const hit = mapped.find((c) => tsCalls.includes(c) && !ambiguous.has(c));
+    const hit = mapped.find((c) => tsCalls.includes(c) && !unpositioned.has(c));
     if (hit === undefined) continue;
     if (rubySeq.includes(hit)) continue;
     rubySeq.push(hit);

@@ -560,10 +560,40 @@ export class TimezonePeriod {
 export class TimeZone {
   readonly name: string;
   readonly tzinfo: string; // IANA name
+  /** `@utc_offset` (time_zone.rb:311), which {@link utcOffset} reads first. */
+  readonly #utcOffset: number | null;
 
-  constructor(name: string, ianaName?: string) {
+  /**
+   * `initialize(name, utc_offset = nil, tzinfo = nil)` (time_zone.rb:309-313):
+   * a caller holding the resolved zone hands it over rather than making
+   * `find_tzinfo` re-resolve it (`load_country_zones`, time_zone.rb:278).
+   */
+  constructor(name: string, utcOffset: number | null = null, tzinfo: string | null = null) {
     this.name = name;
-    this.tzinfo = ianaName ?? name;
+    this.#utcOffset = utcOffset;
+    this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
+  }
+
+  /**
+   * `find_tzinfo(name)` — `TZInfo::Timezone.get(MAPPING[name] || name)`
+   * (time_zone.rb:207-209). trails has no `TZInfo::Timezone` object, so the
+   * zone IS its IANA identifier and `Timezone.get`'s resolve-or-raise is an
+   * `Intl.DateTimeFormat` probe.
+   */
+  static findTzinfo(name: string): string {
+    const ianaName = MAPPING[name] ?? name;
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
+    } catch (error) {
+      // ECMA-402 mandates a RangeError for a `timeZone` the runtime does not
+      // know, and only for that — so it is the one failure standing in for
+      // `Timezone.get`'s InvalidTimezoneIdentifier. Anything else out of the
+      // probe is a different fault and propagates, as a non-TZInfo error would
+      // through `find_tzinfo` (time_zone.rb:208).
+      if (!(error instanceof RangeError)) throw error;
+      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
+    }
+    return ianaName;
   }
 
   /**
@@ -632,20 +662,12 @@ export class TimeZone {
    * (`@lazy_zones_map[arg] ||= create(arg)`, time_zone.rb:237-238), so every
    * call here builds a fresh instance as Ruby's `new` does.
    */
-  static create(name: string): TimeZone {
-    const ianaName = MAPPING[name] ?? name;
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
-    } catch (error) {
-      // ECMA-402 mandates a RangeError for a `timeZone` the runtime does not
-      // know, and only for that — so it is the one failure standing in for
-      // `Timezone.get`'s InvalidTimezoneIdentifier. Anything else out of the
-      // probe is a different fault and propagates, as a non-TZInfo error would
-      // through `find_tzinfo` (time_zone.rb:208).
-      if (!(error instanceof RangeError)) throw error;
-      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
-    }
-    return new TimeZone(name, ianaName);
+  static create(
+    name: string,
+    utcOffset: number | null = null,
+    tzinfo: string | null = null,
+  ): TimeZone {
+    return new TimeZone(name, utcOffset, tzinfo);
   }
 
   /**
@@ -1010,6 +1032,7 @@ export class TimeZone {
    * derivation `isDst` already uses).
    */
   get utcOffset(): number {
+    if (this.#utcOffset !== null) return this.#utcOffset;
     const now = new Date();
     const jan = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 0, 1)).utcOffsetSeconds;
     const jul = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 6, 1)).utcOffsetSeconds;
@@ -1258,7 +1281,7 @@ export class TimeZone {
           }
           return memo;
         }
-        return [TimeZone.create(tzId)];
+        return [TimeZone.create(tzId, null, tzId)];
       })
       .sort((a, b) => a.compareTo(b) ?? 0);
   }
