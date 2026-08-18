@@ -1380,7 +1380,7 @@ function uniqArray(arr: unknown[]): unknown[] {
  * that for the join-value unions (`joins_values`, `left_outer_joins_values`):
  * {@link deepEqual} tests `===` first, then delegates to a node's own `eql`, and
  * falls back to per-key structural equality for plain-object specs — so
- * `leftJoins({ posts: "x" })` called twice folds to one entry as in Rails.
+ * `leftJoins({ ":posts": "x" })` called twice folds to one entry as in Rails.
  * @internal
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {

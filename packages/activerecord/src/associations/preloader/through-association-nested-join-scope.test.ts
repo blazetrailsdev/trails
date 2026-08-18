@@ -66,7 +66,7 @@ type HasManyHost = {
 (Member as unknown as HasOneHost).hasOne(
   "davidCategorizedClub",
   (rel: NestedRel) =>
-    rel.leftJoins({ category: ":categorizations" }).where({ categorizations: { author_id: 1 } }),
+    rel.leftJoins({ ":category": ":categorizations" }).where({ categorizations: { author_id: 1 } }),
   {
     through: "currentMembership",
     source: "club",
@@ -154,7 +154,7 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     const groucho = members("groucho");
     const sql = throughScopeSql([groucho], "davidCategorizedClub");
     // The deeper `categorizations` join is realized on the through query by
-    // nesting the scope's `.leftJoins({ category: ":categorizations" })` under the
+    // nesting the scope's `.leftJoins({ ":category": ":categorizations" })` under the
     // source reflection, and the copied full where_clause qualifies it, so the
     // predicate rides the through query's WHERE too.
     // Quote identifiers via the active adapter (Rails' `quote_table_name`

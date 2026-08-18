@@ -8,6 +8,7 @@ import {
   MissingAttributeError,
   missingAttribute,
   resolveAliasNameIn,
+  isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   type InstanceHost as AttributeMethodsInstanceHost,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
@@ -532,13 +533,36 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
 }
 
 /**
+ * Ruby's `superclass.instance_method(name).owner.is_a?(GeneratedAttributeMethods)`
+ * (attribute_methods.rb:176). JS has no `UnboundMethod#owner`, so we walk the
+ * ancestry the way method lookup does — `include()` splices a module's carrier
+ * into the prototype chain directly below the including class's prototype, so
+ * per ancestor the class body outranks its generated module — and report which
+ * kind of link defines the name first.
+ */
+function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
+  for (let c = klass; typeof c === "function"; c = Object.getPrototypeOf(c)) {
+    if (c.prototype && Object.prototype.hasOwnProperty.call(c.prototype, name)) return false;
+    const mod = Object.prototype.hasOwnProperty.call(c, "_generatedAttributeMethods")
+      ? c._generatedAttributeMethods
+      : undefined;
+    // `is_a?(GeneratedAttributeMethods)`: the `_generatedAttributeMethods`
+    // field IS that module. ActiveModel's lazy `generated_attribute_methods`
+    // seats a plain `Module` there where ActiveRecord seats the subclass, so
+    // the field, not the constructor, is the discriminator.
+    if (mod instanceof Module && mod.isMethodDefined(name)) return true;
+  }
+  return false;
+}
+
+/**
  * Mirrors: ClassMethods#instance_method_already_implemented?
  * (attribute_methods.rb:165-179) — the dangerous-method raise comes first, so
  * `alias_attribute :save, :name` raises rather than generating an accessor
- * over Active Record's own method. The `superclass == Base` split below it
- * reduces to the prototype probe here: the generated module is spliced into
- * the prototype chain, so an inherited generated accessor and an inherited
- * real method are both visible from `this.prototype`.
+ * over Active Record's own method.
+ *
+ * `Base` is found by the `_isActiveRecordBase` own-property sentinel rather
+ * than imported, which would close a module-init cycle.
  */
 export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost,
@@ -549,7 +573,34 @@ export function isInstanceMethodAlreadyImplemented(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
     );
   }
-  return methodName in this.prototype;
+
+  const superclass = Object.getPrototypeOf(this);
+  if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
+    return _amInstanceMethodAlreadyImplemented.call(this as any, methodName);
+  } else {
+    // If ThisClass < ... < SomeSuperClass < ... < Base and SomeSuperClass
+    // defines its own attribute method, then we don't want to override that.
+    const base = frameworkBase(this);
+    const defined =
+      base != null &&
+      isMethodDefinedWithin.call(this, methodName, superclass, base) &&
+      !isOwnedByGeneratedAttributeMethods(superclass, methodName);
+    return defined || _amInstanceMethodAlreadyImplemented.call(this as any, methodName);
+  }
+}
+
+/**
+ * Find the framework `Base` class in `klass`'s prototype chain without
+ * importing the `Base` value (which would close a module-init cycle). `Base` is
+ * the single class that *owns* the `_isActiveRecordBase` sentinel.
+ */
+function frameworkBase(klass: unknown): any {
+  let c: unknown = klass;
+  while (typeof c === "function" && c !== Function.prototype) {
+    if (Object.prototype.hasOwnProperty.call(c, "_isActiveRecordBase")) return c;
+    c = Object.getPrototypeOf(c);
+  }
+  return null;
 }
 
 export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: string): boolean {
