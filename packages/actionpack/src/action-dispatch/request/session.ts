@@ -1,9 +1,20 @@
+import { KeyError, stringifyKeys } from "@blazetrails/activesupport";
+
 /**
  * ActionDispatch::Request::Session
  *
  * Wraps a session store and provides a Hash-like interface for session data.
  * Supports lazy loading, destruction, and tracking of the original session id.
  */
+
+/**
+ * The `ActionDispatch::Request` shape `Session` reads and writes headers on.
+ * Ruby passes the request itself; TS names the structural minimum.
+ *
+ * @noRailsEquivalent PERMANENT — structural stand-in for `ActionDispatch::Request`,
+ * which this file must not import (it would close a module cycle).
+ */
+export type Req = { env: Record<string, unknown> };
 
 /**
  * The duck type `Session` requires of the store it wraps (Rails' `@by`,
@@ -14,14 +25,10 @@
  * token store strategy, unrelated to this Rack-store shape.
  */
 export interface SessionStore {
-  loadSession(env: Record<string, unknown>): [unknown, Record<string, unknown>];
-  sessionExists(env: Record<string, unknown>): boolean;
-  deleteSession(
-    env: Record<string, unknown>,
-    id: unknown,
-    options: Record<string, unknown>,
-  ): unknown;
-  extractSessionId(req: { env: Record<string, unknown> }): unknown;
+  loadSession(req: Req): [unknown, Record<string, unknown>];
+  sessionExists(req: Req): boolean;
+  deleteSession(req: Req, id: unknown, options: unknown): unknown;
+  extractSessionId(req: Req): unknown;
 }
 
 const ENV_SESSION_KEY = "rack.session";
@@ -48,7 +55,7 @@ export class Options {
    * (`request/session.rb:48-50`) —
    * `req.set_header ENV_SESSION_OPTIONS_KEY, options`.
    */
-  static set(req: { env: Record<string, unknown> }, options: unknown): void {
+  static set(req: Req, options: unknown): void {
     req.env[ENV_SESSION_OPTIONS_KEY] = options;
   }
 
@@ -56,7 +63,7 @@ export class Options {
    * Mirrors: ActionDispatch::Request::Session::Options.find
    * (`request/session.rb:52-54`) — `req.get_header ENV_SESSION_OPTIONS_KEY`.
    */
-  static find(req: { env: Record<string, unknown> }): unknown {
+  static find(req: Req): unknown {
     return req.env[ENV_SESSION_OPTIONS_KEY];
   }
 
@@ -71,7 +78,7 @@ export class Options {
   }
 
   /** Mirrors: `Options#id` (`request/session.rb:65-69`). */
-  id(req: { env: Record<string, unknown> }): unknown {
+  id(req: Req): unknown {
     // Ruby's `fetch` with a block returns the STORED value whenever the key
     // exists — including a stored `nil`, which is how a disabled session
     // short-circuits the `@by` lookup.
@@ -95,68 +102,45 @@ export class Options {
   }
 }
 
+/**
+ * Singleton object used to determine if an optional param wasn't specified
+ * (`request/session.rb:16`).
+ */
+const Unspecified: unknown = {};
+
 export class Session {
-  private store: SessionStore | null;
-  private env: Record<string, unknown>;
-  private options: Record<string, unknown>;
-  private data: Record<string, unknown> | null = null;
-  private loaded = false;
-  private id: unknown = null;
-  private _idWas: unknown = null;
-  private existed: boolean;
-  private destroyed = false;
-  private _enabled: boolean;
+  private by: SessionStore | null;
+  private req: Req;
+  private delegate: Record<string, unknown>;
+  private loaded: boolean;
+  private exists: boolean | null;
+  private enabled: boolean;
+  private _idWas: unknown;
+  private idWasInitialized: boolean;
 
-  private constructor(
-    store: SessionStore | null,
-    env: Record<string, unknown>,
-    options: Record<string, unknown>,
-    enabled = true,
-  ) {
-    this.store = store;
-    this.env = env;
-    this.options = options;
-    this._enabled = enabled;
-    this.existed = enabled && store ? store.sessionExists(env) : false;
-    if (this.existed && store) {
-      const [sessionId, data] = store.loadSession(env);
-      this._idWas = sessionId;
-      this.id = sessionId;
-      this.data = { ...data };
-      this.loaded = true;
-    }
-  }
-
-  static create(
-    store: SessionStore,
-    req: { env: Record<string, unknown> },
-    defaultOptions: Record<string, unknown> = {},
-  ): Session {
-    const existing = Session.find(req);
-    const session = new Session(store, req.env, defaultOptions);
-
-    if (existing) {
-      const oldData = existing.toHash();
-      session.loadData();
-      for (const [key, value] of Object.entries(oldData)) {
-        if (!(key in session.getData())) {
-          session.getData()[key] = value;
-        }
-      }
-    }
+  /**
+   * Mirrors: `Session.create` (`request/session.rb:19-27`) — creates a session
+   * hash, merging the properties of the previous session if any.
+   */
+  static create(store: SessionStore, req: Req, defaultOptions: Record<string, unknown>): Session {
+    const sessionWas = Session.find(req);
+    const session = new Session(store, req);
+    if (sessionWas) session.mergeBang(sessionWas);
 
     Session.set(req, session);
     Options.set(req, new Options(store, defaultOptions));
     return session;
   }
 
-  static disabled(req: { env: Record<string, unknown> }): Session {
-    const session = new Session(null, req.env, { id: null }, false);
+  /** Mirrors: `Session.disabled` (`request/session.rb:29-33`). */
+  static disabled(req: Req): Session {
+    const session = new Session(null, req, { enabled: false });
     Options.set(req, new Options(null, { id: null }));
     return session;
   }
 
-  static find(req: { env: Record<string, unknown> }): Session | null {
+  /** Mirrors: `Session.find` (`request/session.rb:35-37`). */
+  static find(req: Req): Session | null {
     const session = req.env[ENV_SESSION_KEY];
     if (session instanceof Session) return session;
     return null;
@@ -166,8 +150,13 @@ export class Session {
    * Mirrors: ActionDispatch::Request::Session.set
    * (`request/session.rb:39-41`) — `req.set_header ENV_SESSION_KEY, session`.
    */
-  static set(req: { env: Record<string, unknown> }, session: unknown): void {
+  static set(req: Req, session: unknown): void {
     req.env[ENV_SESSION_KEY] = session;
+  }
+
+  /** Mirrors: `Session.delete` (`request/session.rb:43-45`). */
+  static delete(req: Req): void {
+    delete req.env[ENV_SESSION_KEY];
   }
 
   /**
@@ -178,168 +167,249 @@ export class Session {
    */
   static Options = Options;
 
-  private loadData(): void {
-    if (!this.loaded && !this.destroyed && this.store) {
-      const [sessionId, data] = this.store.loadSession(this.env);
-      this.id = sessionId;
-      this.data = { ...data };
-      this.loaded = true;
-    } else if (!this.loaded && !this.destroyed) {
-      this.data = {};
-      this.loaded = true;
+  /** Mirrors: `Session#initialize` (`request/session.rb:75-83`). */
+  constructor(by: SessionStore | null, req: Req, { enabled = true }: { enabled?: boolean } = {}) {
+    this.by = by;
+    this.req = req;
+    this.delegate = {};
+    this.loaded = false;
+    this.exists = null; // We haven't checked yet.
+    this.enabled = enabled;
+    this._idWas = null;
+    this.idWasInitialized = false;
+  }
+
+  /** Mirrors: `Session#id` (`request/session.rb:85-87`). */
+  id(): unknown {
+    return this.options()!.id(this.req);
+  }
+
+  /** Mirrors: `Session#enabled?` (`request/session.rb:89-91`). */
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /** Mirrors: `Session#options` (`request/session.rb:93-95`). */
+  options(): Options | undefined {
+    return Options.find(this.req) as Options | undefined;
+  }
+
+  /** Mirrors: `Session#destroy` (`request/session.rb:97-108`). */
+  destroy(): void {
+    this.clear();
+
+    if (this.isEnabled()) {
+      const options = (this.options() ?? {}) as Options;
+      this.by!.deleteSession(this.req, options.id(this.req), options);
+
+      // Load the new sid to be written with the response.
+      this.loaded = false;
+      this.loadForWriteBang();
     }
   }
 
-  isEnabled(): boolean {
-    return this._enabled;
+  /**
+   * Mirrors: `Session#[]` (`request/session.rb:112-121`) — returns value of the
+   * key stored in the session or `nil` if the given key is not found.
+   */
+  get(key: unknown): unknown {
+    this.loadForReadBang();
+    key = String(key);
+
+    if (key === "session_id") {
+      const id = this.id() as { publicId?: unknown } | null | undefined;
+      return id == null ? null : id.publicId;
+    } else {
+      return this.delegate[key as string];
+    }
   }
 
+  /**
+   * Mirrors: `Session#dig` (`request/session.rb:125-129`) — returns the nested
+   * value specified by the sequence of keys, or `nil` if any intermediate step
+   * is `nil`.
+   */
+  dig(...keys: unknown[]): unknown {
+    this.loadForReadBang();
+    keys = keys.map((key, i) => (i === 0 ? String(key) : key));
+    let value: unknown = this.delegate;
+    for (const key of keys) {
+      if (value == null) return undefined;
+      value = (value as Record<string, unknown>)[key as string];
+    }
+    return value;
+  }
+
+  /** Mirrors: `Session#has_key?` (`request/session.rb:132-135`). */
+  hasKey(key: unknown): boolean {
+    this.loadForReadBang();
+    return Object.hasOwn(this.delegate, String(key));
+  }
+
+  /** Mirrors: `Session#keys` (`request/session.rb:140-143`) — returns keys of the session as Array. */
+  get keys(): string[] {
+    this.loadForReadBang();
+    return Object.keys(this.delegate);
+  }
+
+  /** Mirrors: `Session#values` (`request/session.rb:146-149`) — returns values of the session as Array. */
+  get values(): unknown[] {
+    this.loadForReadBang();
+    return Object.values(this.delegate);
+  }
+
+  /** Mirrors: `Session#[]=` (`request/session.rb:152-155`) — writes given value to given key. */
+  set(key: unknown, value: unknown): void {
+    this.loadForWriteBang();
+    this.delegate[String(key)] = value;
+  }
+
+  /** Mirrors: `alias store []=` (`request/session.rb:156`). */
+  store(key: unknown, value: unknown): void {
+    this.set(key, value);
+  }
+
+  /** Mirrors: `Session#clear` (`request/session.rb:159-162`) — clears the session. */
+  clear(): void {
+    this.loadForDeleteBang();
+    this.delegate = {};
+  }
+
+  /** Mirrors: `Session#to_hash` (`request/session.rb:165-168`) — returns the session as Hash. */
+  toHash(): Record<string, unknown> {
+    this.loadForReadBang();
+    const dup = { ...this.delegate };
+    for (const [k, v] of Object.entries(dup)) {
+      if (v == null) delete dup[k];
+    }
+    return dup;
+  }
+
+  /** Mirrors: `alias :to_h :to_hash` (`request/session.rb:169`). */
+  toH(): Record<string, unknown> {
+    return this.toHash();
+  }
+
+  /** Mirrors: `Session#update` (`request/session.rb:181-189`) — updates the session with given Hash. */
+  update(hash: unknown): Record<string, unknown> {
+    if (hash == null || typeof hash !== "object") {
+      throw new TypeError(`no implicit conversion of ${typeof hash} into Hash`);
+    }
+
+    this.loadForWriteBang();
+    const other = hash as { toHash?: () => Record<string, unknown> };
+    return Object.assign(
+      this.delegate,
+      stringifyKeys(
+        typeof other.toHash === "function" ? other.toHash() : (hash as Record<string, unknown>),
+      ),
+    );
+  }
+
+  /** Mirrors: `alias :merge! :update` (`request/session.rb:190`). */
+  mergeBang(hash: unknown): Record<string, unknown> {
+    return this.update(hash);
+  }
+
+  /** Mirrors: `Session#delete` (`request/session.rb:193-196`) — deletes given key from the session. */
+  delete(key: unknown): unknown {
+    this.loadForDeleteBang();
+    const k = String(key);
+    const value = this.delegate[k];
+    delete this.delegate[k];
+    return value;
+  }
+
+  /**
+   * Mirrors: `Session#fetch` (`request/session.rb:211-218`) — returns value of
+   * the given key, or raises `KeyError` if it can't be found and no default is
+   * set.
+   */
+  fetch(
+    key: unknown,
+    defaultValue: unknown = Unspecified,
+    block?: (key: string) => unknown,
+  ): unknown {
+    this.loadForReadBang();
+    const k = String(key);
+    if (defaultValue === Unspecified) {
+      if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
+      if (block) return block(k);
+      throw new KeyError(`key not found: "${k}"`);
+    } else {
+      if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
+      if (block) return block(k);
+      return defaultValue;
+    }
+  }
+
+  /** Mirrors: `Session#exists?` (`request/session.rb:228-232`). */
+  isExists(): boolean {
+    if (!this.isEnabled()) return false;
+    if (this.exists !== null) return this.exists;
+    return (this.exists = this.by!.sessionExists(this.req));
+  }
+
+  /** Mirrors: `Session#loaded?` (`request/session.rb:234-236`). */
   isLoaded(): boolean {
     return this.loaded;
   }
 
-  isExists(): boolean {
-    if (!this._enabled) return false;
-    return this.existed;
+  /** Mirrors: `Session#empty?` (`request/session.rb:238-241`). */
+  isEmpty(): boolean {
+    this.loadForReadBang();
+    return Object.keys(this.delegate).length === 0;
   }
 
-  hasKey(key: string): boolean {
-    return Object.hasOwn(this.getData(), key);
-  }
-
-  each(callback: (key: string, value: unknown) => void): void {
-    const data = this.toHash();
-    for (const [key, value] of Object.entries(data)) {
-      callback(key, value);
+  /** Mirrors: `Session#each` (`request/session.rb:243-245`). */
+  each(block: (key: string, value: unknown) => void): void {
+    for (const [key, value] of Object.entries(this.toHash())) {
+      block(key, value);
     }
   }
 
-  /** @internal */
-  loadForReadBang(): void {
-    if (!this.loaded && this.isExists()) this.loadBang();
+  /** Mirrors: `Session#id_was` (`request/session.rb:247-250`). */
+  idWas(): unknown {
+    this.loadForReadBang();
+    return this._idWas;
   }
 
-  /** @internal */
-  loadForWriteBang(): void {
-    if (this._enabled) {
-      if (!this.loaded) this.loadBang();
+  /** Mirrors: `Session#load_for_read!` (`request/session.rb:253-255`). */
+  private loadForReadBang(): void {
+    if (!this.isLoaded() && this.isExists()) this.loadBang();
+  }
+
+  /** Mirrors: `Session#load_for_write!` (`request/session.rb:257-263`). */
+  private loadForWriteBang(): void {
+    if (this.isEnabled()) {
+      if (!this.isLoaded()) this.loadBang();
     } else {
       throw new DisabledSessionError();
     }
   }
 
-  /** @internal */
-  loadForDeleteBang(): void {
-    if (this._enabled && !this.loaded) this.loadBang();
+  /** Mirrors: `Session#load_for_delete!` (`request/session.rb:265-267`). */
+  private loadForDeleteBang(): void {
+    if (this.isEnabled() && !this.isLoaded()) this.loadBang();
   }
 
-  /** @internal */
-  loadBang(): void {
-    if (this._enabled && this.store) {
-      const [sessionId, data] = this.store.loadSession(this.env);
-      this.id = sessionId;
-      this.data = { ...data };
-    } else if (this.data == null) {
-      this.data = {};
+  /**
+   * Mirrors: `Session#load!` (`request/session.rb:269-278`).
+   *
+   * @missingRailsCall replace — Language shortcoming: Rails' `@delegate.replace`
+   * empties the Hash and refills it in place; a plain JS object has no in-place
+   * replace, and `@delegate` is never aliased out of this class, so rebinding it
+   * is the same observable state.
+   */
+  private loadBang(): void {
+    if (this.isEnabled()) {
+      if (!this.isExists()) this.idWasInitialized = true;
+      const [id, session] = this.by!.loadSession(this.req);
+      this.options()!.set("id", id);
+      this.delegate = stringifyKeys(session);
+      if (!this.idWasInitialized) this._idWas = id;
     }
+    this.idWasInitialized = true;
     this.loaded = true;
-  }
-
-  private getData(): Record<string, unknown> {
-    this.loadData();
-    return this.data!;
-  }
-
-  get(key: string): unknown {
-    return this.getData()[key];
-  }
-
-  set(key: string, value: unknown): void {
-    this.getData()[key] = value;
-  }
-
-  store_value(key: string, value: unknown): void {
-    this.set(key, value);
-  }
-
-  get keys(): string[] {
-    return Object.keys(this.getData());
-  }
-
-  get values(): unknown[] {
-    return Object.values(this.getData());
-  }
-
-  clear(): void {
-    this.loadData();
-    this.data = {};
-  }
-
-  update(hash: Record<string, unknown>): void {
-    const data = this.getData();
-    for (const [key, value] of Object.entries(hash)) {
-      data[key] = value;
-    }
-  }
-
-  delete(key: string): unknown {
-    const data = this.getData();
-    const value = data[key];
-    delete data[key];
-    return value;
-  }
-
-  fetch(key: string, ...args: unknown[]): unknown {
-    const data = this.getData();
-    if (Object.hasOwn(data, key)) return data[key];
-    if (args.length > 0) {
-      if (typeof args[0] === "function") {
-        return (args[0] as (key: string) => unknown)(key);
-      }
-      return args[0];
-    }
-    throw new Error(`key not found: "${key}"`);
-  }
-
-  dig(...keys: string[]): unknown {
-    let current: unknown = this.getData();
-    for (const key of keys) {
-      if (current == null || typeof current !== "object") return undefined;
-      current = (current as Record<string, unknown>)[key];
-    }
-    return current ?? undefined;
-  }
-
-  get idWas(): unknown {
-    return this._idWas ?? null;
-  }
-
-  destroy(): void {
-    if (!this.existed && this.id == null) {
-      this.data = {};
-      this.loaded = true;
-      this.destroyed = true;
-      return;
-    }
-    if (!this.loaded) {
-      this.loadData();
-    }
-    if (this.id != null && this.store) {
-      this.store.deleteSession(this.env, this.id, this.options);
-    }
-    this.data = {};
-    this.destroyed = true;
-  }
-
-  get empty(): boolean {
-    return this.keys.length === 0;
-  }
-
-  toHash(): Record<string, unknown> {
-    return { ...this.getData() };
-  }
-
-  toH(): Record<string, unknown> {
-    return this.toHash();
   }
 }
