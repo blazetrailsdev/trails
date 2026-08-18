@@ -1,14 +1,12 @@
 /**
- * CurrentAttributes — thread-isolated attribute store.
- * Mirrors ActiveSupport::CurrentAttributes behavior.
- *
- * Each subclass maintains its own isolated storage using AsyncLocalStorage
- * (when available) or falling back to a module-level store. In Node.js
- * tests, we use a simple synchronous store (no async context).
+ * Mirrors: ActiveSupport::CurrentAttributes (current_attributes.rb). Rails keeps
+ * the singletons in `IsolatedExecutionState`, which trails has no counterpart
+ * for, so `currentInstances` is module-level and its entries process-wide.
  */
 
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import { CodeGenerator } from "./code-generator.js";
+import { objectWith } from "./core-ext/object/with.js";
 import { include, Module } from "./include.js";
 
 const __FILE__ = import.meta.url;
@@ -21,18 +19,36 @@ interface AttributeDefinition<T = AttributeValue> {
   default?: DefaultValue<T>;
 }
 
+/** Mirrors Ruby ArgumentError. @internal */
+class ArgumentError extends Error {
+  override name = "ArgumentError";
+}
+
 /** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */
 type ResetCallback = (this: CurrentAttributes) => void;
+
+/** Mirrors: ActiveSupport::CurrentAttributes::INVALID_ATTRIBUTE_NAMES (:95). */
+const INVALID_ATTRIBUTE_NAMES = [
+  "set",
+  "reset",
+  "resets",
+  "instance",
+  "beforeReset",
+  "afterReset",
+  "resetAll",
+  "clearAll",
+];
+
+/** Mirrors: ActiveSupport::CurrentAttributes::NOT_SET (current_attributes.rb:97). */
+const NOT_SET: unknown = Object.freeze({});
 
 /**
  * Base class for current-attributes objects. Subclass and call
  * `static attribute(name, options?)` to define attributes.
  */
 export abstract class CurrentAttributes {
-  /** @internal per-class attribute definitions */
-  public static _definitions: Map<string, AttributeDefinition> = new Map();
-  /** @internal per-class instance storage (one per class, reset on each "request") */
-  public static _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes> = new WeakMap();
+  /** Mirrors: `class_attribute :defaults` (current_attributes.rb:196). */
+  public static defaults: Record<string, AttributeValue> = {};
 
   static {
     // Mirrors `include ActiveSupport::Callbacks; define_callbacks :reset` — the
@@ -41,63 +57,49 @@ export abstract class CurrentAttributes {
     defineCallbacks(CurrentAttributes.prototype, "reset");
   }
 
-  /** @internal per-instance attribute values */
-  protected _attributes: Map<string, AttributeValue> = new Map();
+  /** Mirrors: `attr_accessor :attributes` (current_attributes.rb:198). */
+  attributes: Record<string, AttributeValue>;
+
+  constructor() {
+    this.attributes = this.resolveDefaults();
+  }
 
   // -------------------------------------------------------------------------
   // Class-level API
   // -------------------------------------------------------------------------
 
   /**
-   * Define one or more attributes on this class.
-   * ```ts
-   * static { this.attribute("user", "account"); }
-   * ```
-   */
-  private static readonly RESTRICTED_NAMES = new Set(["reset", "set"]);
-
-  /**
-   * Mirrors: CurrentAttributes.attribute (current_attributes.rb:114-140).
+   * Mirrors: CurrentAttributes.attribute (current_attributes.rb:113-140).
    *
-   * current_attributes.rb:128 makes a second
-   * `define_cached_method("#{name}=")` call for the writer. A TS attribute is
-   * one accessor pair, not two methods, so the writer has no separate
-   * descriptor to cache or to copy onto the owner; both Rails definitions land
-   * on the reader's entry.
+   * A TS attribute is one accessor pair, not two methods, so the writer
+   * `define_cached_method` (:128) lands on the reader's entry, as do the two
+   * `Delegation.generate(singleton_class, …, to: :instance)` calls (:138-139).
    */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
-  static attribute(name: string, ...rest: unknown[]): void {
+  static attribute(...args: unknown[]): void {
     const ctor = this as unknown as CurrentAttributesClass;
-    if (!Object.prototype.hasOwnProperty.call(ctor, "_definitions")) {
-      ctor._definitions = new Map(ctor._definitions);
-    }
-    const lastArg = rest[rest.length - 1];
-    const hasOptions =
-      lastArg !== undefined &&
-      typeof lastArg === "object" &&
-      lastArg !== null &&
-      !Array.isArray(lastArg);
+    const lastArg = args[args.length - 1];
+    const hasOptions = typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg);
     const options: AttributeDefinition = hasOptions ? (lastArg as AttributeDefinition) : {};
-    const extraNames = hasOptions ? rest.slice(0, -1) : rest;
-    const allNames = [name, ...(extraNames as string[])];
-    const restricted = allNames.filter((n) => CurrentAttributes.RESTRICTED_NAMES.has(n));
-    if (restricted.length > 0) {
-      throw new Error(`Restricted attribute names: ${restricted.join(", ")}`);
-    }
+    const names = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const defaultValue: unknown = "default" in options ? options.default : NOT_SET;
 
-    for (const n of allNames) ctor._definitions.set(n, options);
+    const invalidAttributeNames = names.filter((name) => INVALID_ATTRIBUTE_NAMES.includes(name));
+    if (invalidAttributeNames.length > 0) {
+      throw new ArgumentError(`Restricted attribute names: ${invalidAttributeNames.join(", ")}`);
+    }
 
     CodeGenerator.batch(generatedAttributeMethods.call(ctor), __FILE__, __LINE__, (owner) => {
-      for (const name of allNames) {
+      for (const name of names) {
         owner.defineCachedMethod(name, { namespace: "current_attributes" }, (batch) => {
           batch.push((mod) =>
             Object.defineProperty(mod, name, {
               get(this: CurrentAttributes) {
-                return this._get(name);
+                return this.attributes[name];
               },
               set(this: CurrentAttributes, value: unknown) {
-                this._set(name, value);
+                this.attributes[name] = value;
               },
               configurable: true,
             }),
@@ -105,15 +107,39 @@ export abstract class CurrentAttributes {
         });
       }
     });
+
+    for (const name of names) {
+      Object.defineProperty(ctor, name, {
+        configurable: true,
+        get(this: typeof CurrentAttributes) {
+          return (this.instance() as unknown as Record<string, unknown>)[name];
+        },
+        set(this: typeof CurrentAttributes, value: unknown) {
+          (this.instance() as unknown as Record<string, unknown>)[name] = value;
+        },
+      });
+    }
+
+    ctor.defaults = {
+      ...ctor.defaults,
+      ...Object.fromEntries(names.map((name) => [name, defaultValue])),
+    };
   }
 
-  /** Returns the singleton instance for this class (creates one if needed). */
+  /** Mirrors: CurrentAttributes.instance (current_attributes.rb:101-103) */
   static instance<T extends typeof CurrentAttributes>(this: T): InstanceType<T> {
-    const ctor = this as unknown as CurrentAttributesClass;
-    if (!ctor._instances.has(ctor)) {
-      ctor._instances.set(ctor, new (ctor as unknown as new () => CurrentAttributes)());
+    const key = (this as typeof CurrentAttributes).currentInstancesKey();
+    let instance = currentInstances.get(key);
+    if (instance === undefined) {
+      instance = new (this as unknown as new () => CurrentAttributes)();
+      currentInstances.set(key, instance);
     }
-    return ctor._instances.get(ctor) as InstanceType<T>;
+    return instance as InstanceType<T>;
+  }
+
+  /** Mirrors: CurrentAttributes.current_instances_key (:176-178) @internal */
+  private static currentInstancesKey(): string {
+    return this.name;
   }
 
   /**
@@ -122,9 +148,9 @@ export abstract class CurrentAttributes {
    */
   static beforeReset<T extends typeof CurrentAttributes>(
     this: T,
-    callback: (this: InstanceType<T>) => void,
+    ...methods: (string | ((this: InstanceType<T>) => void))[]
   ): void {
-    setCallback(this.prototype, "reset", "before", callback as ResetCallback);
+    setCallback(this.prototype, "reset", "before", ...(methods as ResetCallback[]));
   }
 
   /**
@@ -133,89 +159,73 @@ export abstract class CurrentAttributes {
    */
   static resets<T extends typeof CurrentAttributes>(
     this: T,
-    callback: (this: InstanceType<T>) => void,
+    ...methods: (string | ((this: InstanceType<T>) => void))[]
   ): void {
-    setCallback(this.prototype, "reset", "after", callback as ResetCallback);
+    setCallback(this.prototype, "reset", "after", ...(methods as ResetCallback[]));
   }
 
   /** Alias for {@link CurrentAttributes.resets} (Rails' `after_reset`). */
   static afterReset<T extends typeof CurrentAttributes>(
     this: T,
-    callback: (this: InstanceType<T>) => void,
+    ...methods: (string | ((this: InstanceType<T>) => void))[]
   ): void {
-    this.resets(callback);
+    this.resets(...methods);
   }
 
-  /**
-   * Resets this class's instance: runs the `:reset` callbacks around clearing
-   * all attributes. Mirrors Rails
-   * `run_callbacks :reset { self.attributes = resolve_defaults }` — clearing
-   * `_attributes` is equivalent since defaults are re-evaluated lazily on read.
-   */
+  /** Mirrors: `delegate :reset, to: :instance` (current_attributes.rb:154). */
   static reset(): void {
-    const inst = this.instance();
-    runCallbacks(inst, "reset", () => {
-      inst._attributes.clear();
-    });
+    this.instance().reset();
   }
 
-  /** Set multiple attributes at once via the class. */
-  static set(attrs: Record<string, AttributeValue>): void {
-    const inst = this.instance();
-    for (const [k, v] of Object.entries(attrs)) {
-      (inst as unknown as Record<string, unknown>)[k] = v;
-    }
-  }
-
-  /** Delegate class-level method calls to the instance. */
-  static new<T extends typeof CurrentAttributes>(this: T): InstanceType<T> {
-    return new (this as unknown as new () => CurrentAttributes)() as InstanceType<T>;
-  }
-
-  // Proxy class-level attribute reads/writes to instance via Proxy trick.
-  // We do this in the constructor of concrete subclasses.
-  static _setupProxy(): void {
-    // noop: JS doesn't allow class-level dynamic property dispatch easily;
-    // users call CurrentAttributes.instance().attr or override accessors.
+  /** Mirrors: `delegate :set, to: :instance` (current_attributes.rb:154). */
+  static set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
+    return this.instance().set(attributes, block);
   }
 
   // -------------------------------------------------------------------------
   // Instance-level API
   // -------------------------------------------------------------------------
 
-  protected _get(name: string): AttributeValue {
-    const ctor = this.constructor as CurrentAttributesClass;
-    if (this._attributes.has(name)) return this._attributes.get(name);
-    const def = ctor._definitions.get(name);
-    if (def && def.default !== undefined) {
-      const val =
-        typeof def.default === "function" ? (def.default as () => unknown)() : def.default;
-      this._attributes.set(name, val);
-      return val;
-    }
-    return undefined;
+  /** Expose attributes within a block. Mirrors: CurrentAttributes#set (:213-215) */
+  set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
+    return objectWith(this as unknown as Record<string, unknown>, attributes, () => block());
   }
 
-  protected _set(name: string, value: AttributeValue): void {
-    this._attributes.set(name, value);
+  /** Reset all attributes. Mirrors: CurrentAttributes#reset (:218-222) */
+  reset(): void {
+    runCallbacks(this, "reset", () => {
+      this.attributes = this.resolveDefaults();
+    });
   }
 
-  get attributes(): Record<string, AttributeValue> {
+  /** Mirrors: CurrentAttributes#resolve_defaults (:225-231) @internal */
+  private resolveDefaults(): Record<string, AttributeValue> {
     const ctor = this.constructor as CurrentAttributesClass;
     const result: Record<string, AttributeValue> = {};
-    for (const [name] of ctor._definitions) {
-      if (this._attributes.has(name)) {
-        result[name] = this._attributes.get(name);
+    for (const [key, value] of Object.entries(ctor.defaults)) {
+      if (value !== NOT_SET) {
+        result[key] = typeof value === "function" ? (value as () => unknown)() : dup(value);
       }
     }
     return result;
   }
 }
 
+/** Ruby's `Object#dup` over the values `resolve_defaults` copies. @internal */
+function dup(value: unknown): unknown {
+  if (Array.isArray(value)) return [...value];
+  if (value !== null && typeof value === "object") {
+    return Object.assign(Object.create(Object.getPrototypeOf(value) as object), value);
+  }
+  return value;
+}
+
+/** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
+const currentInstances = new Map<string, CurrentAttributes>();
+
 // Internal alias for static method use
 type CurrentAttributesClass = typeof CurrentAttributes & {
-  _definitions: Map<string, AttributeDefinition>;
-  _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes>;
+  defaults: Record<string, AttributeValue>;
   _generatedAttributeMethods?: Module;
 };
 
