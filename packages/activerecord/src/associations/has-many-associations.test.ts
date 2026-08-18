@@ -478,7 +478,7 @@ describe("HasManyAssociationsTest", () => {
     essay.writer = writer;
     await essay.save();
 
-    expect(await Category.joins("humanWritersOfTypedEssays").count()).toBe(1);
+    expect(await Category.joins(":humanWritersOfTypedEssays").count()).toBe(1);
   });
 
   it("build with polymorphic has many does not allow to override type and id", async () => {
@@ -2163,7 +2163,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect(book.last_read).toBe("reading");
     expect(
-      await SpecialAuthor.joins("books")
+      await SpecialAuthor.joins(":books")
         .where({ books: { last_read: "reading" } })
         .count(),
     ).not.toBe(0);
@@ -2727,7 +2727,7 @@ describe("HasManyAssociationsTest", () => {
     await Developer.create({ name: "Smith" });
     await expect(
       Developer.all()
-        .joins("auditLogs")
+        .joins(":auditLogs")
         .where({ "audit_logs.message": null, name: "Smith" })
         .toArray(),
     ).resolves.not.toThrow();
@@ -4834,7 +4834,7 @@ describe("HasManyAssociationsTest", () => {
         .select(
           `${NamespacedFirm.tableName}.id, COUNT(${NamespacedClient.tableName}.id) AS num_clients`,
         )
-        .joins("clients")
+        .joins(":clients")
         .group(`${NamespacedFirm.tableName}.id`)
         .find(firm.id)) as any;
       expect(Number(stats.readAttribute("num_clients"))).toBe(1);
@@ -6753,7 +6753,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many preloading with duplicate records", async () => {
-    const allPosts = await HmPost.joins("comments").preload("comments").order("id");
+    const allPosts = await HmPost.joins(":comments").preload("comments").order("id");
     const first = allPosts[0] as any;
     const commentIds = (await first.comments)
       .map((c: any) => Number(c.id))

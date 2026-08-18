@@ -46,7 +46,7 @@ describe("join value union structural dedup", () => {
   it("emits a single INNER JOIN for a structurally-equal Hash spec joined twice", () => {
     // The inner-joins Hash path previously pushed with no dedup at all;
     // joins_values |= folds the structurally-equal spec in Rails.
-    const rel = Author.joins({ posts: "comments" }).joins({ posts: "comments" });
+    const rel = Author.joins({ ":posts": ":comments" }).joins({ ":posts": ":comments" });
     expect(asHost(rel).joinsValues).toHaveLength(1);
     const sql = asHost(rel).toSql();
     expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(2); // posts + comments, no dup
@@ -62,7 +62,9 @@ describe("join value union structural dedup", () => {
   it("folds a structurally-equal Hash spec across a same-klass merge", () => {
     // Rails merge_joins unions via joins! (joins_values |=), so a same-klass
     // merge dedups the equal spec structurally rather than by reference.
-    const rel = Author.joins({ posts: "comments" }).merge(Author.joins({ posts: "comments" }));
+    const rel = Author.joins({ ":posts": ":comments" }).merge(
+      Author.joins({ ":posts": ":comments" }),
+    );
     expect(asHost(rel).joinsValues).toHaveLength(1);
   });
 });

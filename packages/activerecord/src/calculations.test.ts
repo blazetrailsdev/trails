@@ -428,17 +428,17 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct joins count with order and limit", async () => {
-    expect(await Account.joins("firm").distinct().order("firm_id").limit(3).count()).toBe(3);
+    expect(await Account.joins(":firm").distinct().order("firm_id").limit(3).count()).toBe(3);
   });
 
   it("distinct joins count with order and offset", async () => {
-    expect(await Account.joins("firm").distinct().order("firm_id").offset(2).count()).toBe(3);
+    expect(await Account.joins(":firm").distinct().order("firm_id").offset(2).count()).toBe(3);
   });
 
   it("distinct joins count with order and limit and offset", async () => {
-    expect(await Account.joins("firm").distinct().order("firm_id").limit(3).offset(2).count()).toBe(
-      3,
-    );
+    expect(
+      await Account.joins(":firm").distinct().order("firm_id").limit(3).offset(2).count(),
+    ).toBe(3);
   });
 
   it("distinct joins count with group by", async () => {
@@ -801,24 +801,24 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table", async () => {
-    expect(await Account.joins("firm").count("companies.id")).toBe(5);
-    expect(await Account.joins("firm").distinct().count("companies.id")).toBe(4);
+    expect(await Account.joins(":firm").count("companies.id")).toBe(5);
+    expect(await Account.joins(":firm").distinct().count("companies.id")).toBe(4);
   });
 
   it("count arel attribute in joined table with", async () => {
-    expect(await Account.joins("firm").count(Company.arelTable.get("id"))).toBe(5);
-    expect(await Account.joins("firm").distinct().count(Company.arelTable.get("id"))).toBe(4);
+    expect(await Account.joins(":firm").count(Company.arelTable.get("id"))).toBe(5);
+    expect(await Account.joins(":firm").distinct().count(Company.arelTable.get("id"))).toBe(4);
   });
 
   it("count selected arel attribute in joined table", async () => {
-    expect(await Account.joins("firm").select(Company.arelTable.get("id")).count()).toBe(5);
-    expect(await Account.joins("firm").distinct().select(Company.arelTable.get("id")).count()).toBe(
-      4,
-    );
+    expect(await Account.joins(":firm").select(Company.arelTable.get("id")).count()).toBe(5);
+    expect(
+      await Account.joins(":firm").distinct().select(Company.arelTable.get("id")).count(),
+    ).toBe(4);
   });
 
   it("should count field in joined table with group by", async () => {
-    const c = (await Account.group("accounts.firm_id").joins("firm").count("companies.id")) as Map<
+    const c = (await Account.group("accounts.firm_id").joins(":firm").count("companies.id")) as Map<
       unknown,
       number
     >;
@@ -826,7 +826,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table with group by when tables share column names", async () => {
-    const counts = (await Company.joins("account").group("accounts.status").count()) as Map<
+    const counts = (await Company.joins(":account").group("accounts.status").count()) as Map<
       unknown,
       number
     >;
@@ -845,7 +845,7 @@ describe("CalculationsTest", () => {
       [5, 3],
       [7, 1],
     ]);
-    const result = await Post.joins("comments").group("comments.post_id").count();
+    const result = await Post.joins(":comments").group("comments.post_id").count();
     expect(result).toEqual(expected);
   });
 
@@ -956,19 +956,19 @@ describe("CalculationsTest", () => {
   it("maximum with not auto table name prefix if column included", async () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id, developer_id: 7 });
-    expect(await Company.joins("contracts").maximum("contracts.developer_id")).toBe(7);
+    expect(await Company.joins(":contracts").maximum("contracts.developer_id")).toBe(7);
   });
 
   it("minimum with not auto table name prefix if column included", async () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id, developer_id: 7 });
-    expect(await Company.joins("contracts").minimum("contracts.developer_id")).toBe(7);
+    expect(await Company.joins(":contracts").minimum("contracts.developer_id")).toBe(7);
   });
 
   it("sum with not auto table name prefix if column included", async () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id, developer_id: 7 });
-    expect(await Company.joins("contracts").sum("contracts.developer_id")).toBe(7);
+    expect(await Company.joins(":contracts").sum("contracts.developer_id")).toBe(7);
   });
 
   it("sum with grouped calculation", async () => {
@@ -1043,13 +1043,13 @@ describe("CalculationsTest", () => {
     ];
     // Rails: AuthorAddress.joins(author: [:topics, :books])...pluck("topics.last_read", "books.last_read")
     // We verify structure rather than exact values due to enum serialization.
-    const rows = await Author.joins({ topics: [] }).limit(1).pluck("id");
+    const rows = await Author.joins({ ":topics": [] }).limit(1).pluck("id");
     expect(Array.isArray(rows)).toBe(true);
     void expected;
   });
 
   it("pluck type cast with joins without table name qualified column", async () => {
-    const rows = await Author.joins("topics").limit(1).pluck("id");
+    const rows = await Author.joins(":topics").limit(1).pluck("id");
     expect(Array.isArray(rows)).toBe(true);
   });
 
@@ -1109,7 +1109,7 @@ describe("CalculationsTest", () => {
   it("pluck auto table name prefix", async () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id });
-    const ids = (await Company.joins("contracts").pluck("companies.id")).map(Number);
+    const ids = (await Company.joins(":contracts").pluck("companies.id")).map(Number);
     expect(ids).toContain(Number(c.id));
   });
 
@@ -1127,7 +1127,7 @@ describe("CalculationsTest", () => {
     const contract = await Contract.create({ company_id: c.id, developer_id: 7 });
     // When joining, the unqualified "developer_id" should pick from contracts.developer_id
     const result = await Company.where({ id: c.id })
-      .joins("contracts")
+      .joins(":contracts")
       .pluck("contracts.developer_id");
     expect(result).toEqual([7]);
     void contract;
@@ -1163,7 +1163,10 @@ describe("CalculationsTest", () => {
     // == [[1,1,"Thank you for the welcome"],[1,2,"Thank you again for the welcome"],[2,3,"Don't think too hard"]]
     // Verify the posts are returned in the right order by plucking posts.id.
     const postIds = (
-      await Post.joins("comments").order("posts.id ASC, comments.id ASC").limit(3).pluck("posts.id")
+      await Post.joins(":comments")
+        .order("posts.id ASC, comments.id ASC")
+        .limit(3)
+        .pluck("posts.id")
     ).map(Number);
     expect(postIds).toEqual([1, 1, 2]);
   });
@@ -1255,9 +1258,9 @@ describe("CalculationsTest", () => {
   it("ids with join", async () => {
     const company = await Company.first();
     const contract = await Contract.create({ company_id: company!.id });
-    const ids = (await Company.joins("contracts").where({ "contracts.id": contract.id }).ids()).map(
-      Number,
-    );
+    const ids = (
+      await Company.joins(":contracts").where({ "contracts.id": contract.id }).ids()
+    ).map(Number);
     expect(ids).toEqual([Number(company!.id)]);
   });
 
@@ -1268,7 +1271,7 @@ describe("CalculationsTest", () => {
       looter_type: "ShipPart",
       looter_id: part.id,
     });
-    const ids = (await ShipPart.joins("trinkets").ids()).map(Number);
+    const ids = (await ShipPart.joins(":trinkets").ids()).map(Number);
     expect(ids).toContain(Number(part.id));
     void treasure;
   });
@@ -1431,7 +1434,7 @@ describe("CalculationsTest", () => {
     const c = await Company.create({ name: "test" });
     await Contract.create({ company_id: c.id, developer_id: 7 });
     const ids = (await Company.where({ id: c.id })
-      .joins("contracts")
+      .joins(":contracts")
       .pluck("contracts.developer_id")) as number[];
     expect(ids).toEqual([7]);
   });
@@ -1497,7 +1500,7 @@ describe("CalculationsTest", () => {
     // Use a join rather than includes to pick developer_id from contracts
     const rows = (
       (await Company.where({ id: c.id })
-        .joins("contracts")
+        .joins(":contracts")
         .pluck("companies.name", "contracts.developer_id")) as [unknown, unknown][]
     ).map(([name, devId]) => [name, devId != null ? Number(devId) : null]);
     expect(rows).toEqual([["test", 7]]);
@@ -1520,7 +1523,7 @@ describe("CalculationsTest", () => {
   it("pluck with qualified name on loaded", async () => {
     // Rails: Topic.joins(:replies).order(:id).pluck("topics.id", "replies_topics.id") == [[1,2],[3,4]]
     // Topic 1 has reply 2; Topic 3 has reply 4.
-    const t = Topic.joins("replies").order("topics.id");
+    const t = Topic.joins(":replies").order("topics.id");
     expect(t.isLoaded).toBe(false);
     const before = (await t.pluck("topics.id")).map(Number);
     expect(before).toEqual([1, 3]);
@@ -1534,9 +1537,9 @@ describe("CalculationsTest", () => {
     // Rails: Topic.joins(:replies).order(:id).pluck("topics.title", "replies_topics.title")
     // == [["The First Topic","The Second Topic of the day"],["The Third Topic of the day","The Fourth Topic of the day"]]
     // Verifies the join alias (replies_topics) is accessible via qualified column name.
-    const topicTitles = (await Topic.joins("replies").order("topics.id").pluck("topics.title")).map(
-      String,
-    );
+    const topicTitles = (
+      await Topic.joins(":replies").order("topics.id").pluck("topics.title")
+    ).map(String);
     expect(topicTitles).toEqual(["The First Topic", "The Third Topic of the day"]);
   });
 
@@ -1581,7 +1584,7 @@ describe("CalculationsTest", () => {
       looter_type: "ShipPart",
       looter_id: part.id,
     });
-    const sum = await ShipPart.joins("trinkets").sum("ship_parts.id");
+    const sum = await ShipPart.joins(":trinkets").sum("ship_parts.id");
     expect(Number(sum)).toBe(Number(part.id));
     void treasure;
   });
@@ -1598,7 +1601,7 @@ describe("CalculationsTest", () => {
       looter_type: "ShipPart",
       looter_id: part.id,
     });
-    const ids = (await ShipPart.joins("trinkets").pluck("ship_parts.id")).map(Number);
+    const ids = (await ShipPart.joins(":trinkets").pluck("ship_parts.id")).map(Number);
     expect(ids).toContain(Number(part.id));
     void treasure;
   });
@@ -1696,7 +1699,7 @@ describe("CalculationsTest", () => {
       looter_type: "ShipPart",
       looter_id: part.id,
     });
-    const result = (await ShipPart.joins("trinkets")
+    const result = (await ShipPart.joins(":trinkets")
       .group("ship_parts.name")
       .sum("ship_parts.id")) as Map<unknown, number>;
     expect(Number(result.get("has trinket"))).toBe(Number(part.id));
@@ -1873,7 +1876,7 @@ describe("CalculationsTest", () => {
       "AVG(accounts.credit_limit) AS avg_credit_limit",
     )
       .where({ id: railsCore.id })
-      .joins("account")
+      .joins(":account")
       .group("companies.id")
       .take();
     expect(firm).toBeDefined();

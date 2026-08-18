@@ -407,10 +407,10 @@ describe("RelationScopingTest", () => {
   });
 
   it("circular joins with scoping does not crash", async () => {
-    const posts = (await Post.joins({ comments: "post" }).scoping(async () =>
+    const posts = (await Post.joins({ ":comments": ":post" }).scoping(async () =>
       Post.first(10),
     )) as Base[];
-    const expected = (await Post.joins({ comments: "post" }).first(10)) as Base[];
+    const expected = (await Post.joins({ ":comments": ":post" }).first(10)) as Base[];
     expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 

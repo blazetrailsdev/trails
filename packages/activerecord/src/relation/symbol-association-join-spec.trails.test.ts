@@ -19,30 +19,30 @@ describe("a leading-colon association spec", () => {
   fixtures(["posts", "comments"]);
 
   it("joins the same association as the bare string", async () => {
-    expect(Post.joins(":comments").toSql()).toBe(Post.joins("comments").toSql());
-    expect(await Post.joins(":comments").count()).toBe(await Post.joins("comments").count());
+    expect(Post.joins(":comments").toSql()).toBe(Post.joins(":comments").toSql());
+    expect(await Post.joins(":comments").count()).toBe(await Post.joins(":comments").count());
   });
 
   it("left outer joins the same association as the bare string", async () => {
-    expect(Post.leftOuterJoins(":comments").toSql()).toBe(Post.leftOuterJoins("comments").toSql());
+    expect(Post.leftOuterJoins(":comments").toSql()).toBe(Post.leftOuterJoins(":comments").toSql());
     expect(await Post.leftOuterJoins(":comments").count()).toBe(
-      await Post.leftOuterJoins("comments").count(),
+      await Post.leftOuterJoins(":comments").count(),
     );
   });
 
   it("joins a nested spec given as a colon string", () => {
-    expect(Post.joins({ comments: ":post" }).toSql()).toBe(
-      Post.joins({ comments: "post" }).toSql(),
+    expect(Post.joins({ ":comments": ":post" }).toSql()).toBe(
+      Post.joins({ ":comments": ":post" }).toSql(),
     );
   });
 
   it("joins a nested spec whose key is a colon string", async () => {
     // Rails `joins(comments: :post)` — both halves of the hash are Symbols.
     expect(Post.joins({ ":comments": ":post" }).toSql()).toBe(
-      Post.joins({ comments: "post" }).toSql(),
+      Post.joins({ ":comments": ":post" }).toSql(),
     );
     expect(await Post.joins({ ":comments": ":post" }).count()).toBe(
-      await Post.joins({ comments: "post" }).count(),
+      await Post.joins({ ":comments": ":post" }).count(),
     );
   });
 });

@@ -239,7 +239,7 @@ describe("where-hash key resolves to the referenced join alias", () => {
 
   it("aliases the JOIN to the reference name and binds the WHERE to it", () => {
     const sql = (HaPet as any)
-      .joins("toys")
+      .joins(":toys")
       .where({ toys: { name: "Bone" } })
       .toSql();
     // Identifier quote char differs by adapter (" on sqlite/pg, ` on

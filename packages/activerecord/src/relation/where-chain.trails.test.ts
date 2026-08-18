@@ -30,7 +30,7 @@ describe("WhereChain associated join guard (trails)", () => {
   fixtures(["posts", "authors", "authorAddresses", "comments"]);
 
   it("does not duplicate an inner join already in joins_values", () => {
-    const sql = Post.joins("author").where().associated("author").toSql();
+    const sql = Post.joins(":author").where().associated("author").toSql();
     expect(authorsJoinCount(sql)).toBe(1);
     expect(sql).toMatch(/INNER JOIN/i);
     // The IS NOT NULL predicate still lands on the (unaliased) target table.
@@ -38,7 +38,7 @@ describe("WhereChain associated join guard (trails)", () => {
   });
 
   it("does not add an inner join when a left outer join is already present", () => {
-    const sql = Post.leftOuterJoins("author").where().associated("author").toSql();
+    const sql = Post.leftOuterJoins(":author").where().associated("author").toSql();
     expect(authorsJoinCount(sql)).toBe(1);
     expect(sql).toMatch(/LEFT OUTER JOIN/i);
     expect(sql).not.toMatch(/INNER JOIN/i);
@@ -51,11 +51,11 @@ describe("WhereChain associated join guard (trails)", () => {
   // the association name (`self.not(children => …)`), so it resolves to the
   // same aliased join table (`children`) rather than the owner PK.
   it("does not duplicate a self-join already in joins_values", () => {
-    const inner = Comment.joins("children").where().associated("children").toSql();
+    const inner = Comment.joins(":children").where().associated("children").toSql();
     expect(joinCount(inner)).toBe(1);
     expect(inner).toMatch(/["`]?children["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
 
-    const loj = Comment.leftOuterJoins("children").where().associated("children").toSql();
+    const loj = Comment.leftOuterJoins(":children").where().associated("children").toSql();
     expect(joinCount(loj)).toBe(1);
     expect(loj).toMatch(/["`]?children["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });

@@ -38,7 +38,7 @@ describe("build_joins from(subquery) dedup", () => {
   };
 
   it("emits a single INNER JOIN (no LEFT OUTER JOIN) through the from-subquery", () => {
-    const sub = Post.joins("author").leftOuterJoins("author");
+    const sub = Post.joins(":author").leftOuterJoins(":author");
     const sql = (Post.from(sub, "posts") as unknown as { toSql(): string }).toSql();
     expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(1);
     expect(sql).not.toContain("LEFT OUTER JOIN");
@@ -54,9 +54,9 @@ describe("build_joins from(subquery) dedup", () => {
       const m = sql.match(/LEFT OUTER JOIN [^)]*/);
       return (m?.[0] ?? "").trim();
     };
-    const liveSql = (Post.leftOuterJoins("author") as unknown as { toSql(): string }).toSql();
+    const liveSql = (Post.leftOuterJoins(":author") as unknown as { toSql(): string }).toSql();
     const subSql = (
-      Post.from(Post.leftOuterJoins("author"), "posts") as unknown as { toSql(): string }
+      Post.from(Post.leftOuterJoins(":author"), "posts") as unknown as { toSql(): string }
     ).toSql();
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(1);
     // The short-circuited live path emits the exact same LEFT OUTER JOIN clause
@@ -72,7 +72,7 @@ describe("build_joins from(subquery) dedup", () => {
   // still emit BOTH the base left-outer join AND the merged one, identically to
   // the subquery path.
   it("emits cross-klass merged left_outer_joins on the live path like the from-subquery path", () => {
-    const build = () => Post.leftOuterJoins("comments").merge(Comment.leftOuterJoins("post"));
+    const build = () => Post.leftOuterJoins(":comments").merge(Comment.leftOuterJoins(":post"));
     const liveSql = (build() as unknown as { toSql(): string }).toSql();
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
     // Base `comments` join + the merged cross-klass `post` JoinDependency.
@@ -89,7 +89,9 @@ describe("build_joins from(subquery) dedup", () => {
   // off and a raw join node goes to `leading_join` — emitted BEFORE the
   // association joins, not appended after them.
   it("keeps a raw join leading when the only joins_values JoinDependency is cross-klass", () => {
-    const rel = Post.joins("CROSS JOIN categories").joins("comments").merge(Comment.joins("post"));
+    const rel = Post.joins("CROSS JOIN categories")
+      .joins(":comments")
+      .merge(Comment.joins(":post"));
     const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
     const q = (name: string) => escapeRegExp(quoteTableName(name));
     expect(sql).toMatch(
@@ -107,8 +109,8 @@ describe("build_joins from(subquery) dedup", () => {
       `FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`,
     );
     for (const build of [
-      () => Post.joins("CROSS JOIN categories").joins("comments"),
-      () => Post.joins("CROSS JOIN categories").joins("comments").merge(Comment.joins("post")),
+      () => Post.joins("CROSS JOIN categories").joins(":comments"),
+      () => Post.joins("CROSS JOIN categories").joins(":comments").merge(Comment.joins(":post")),
     ]) {
       const liveSql = (build() as unknown as { toSql(): string }).toSql();
       const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
@@ -123,7 +125,7 @@ describe("build_joins from(subquery) dedup", () => {
   // unconditionally (query_methods.rb:1866-1867) — so it is appended after the
   // association joins even when the leading-loop guard is off.
   it("appends a raw join that trails a named join instead of leading with it", () => {
-    const build = () => Post.joins("comments").joins("CROSS JOIN categories");
+    const build = () => Post.joins(":comments").joins("CROSS JOIN categories");
     const q = (name: string) => escapeRegExp(quoteTableName(name));
     // Both halves of the split see the raw-vs-named interleaving, so both append.
     for (const sql of [
@@ -143,7 +145,7 @@ describe("build_joins from(subquery) dedup", () => {
   // live-path exclusion filter deciding which value to drop before emission.
   it("dedups an association named in both joins and eager_load", () => {
     const liveSql = (
-      Post.joins("author").eagerLoad("author") as unknown as { toSql(): string }
+      Post.joins(":author").eagerLoad("author") as unknown as { toSql(): string }
     ).toSql();
     expect((liveSql.match(/INNER JOIN/g) ?? []).length).toBe(1);
     expect(liveSql).not.toContain("LEFT OUTER JOIN");
@@ -157,7 +159,7 @@ describe("build_joins from(subquery) dedup", () => {
   // `eager_load(:x).left_outer_joins(:x)` legitimately emits two joins.
   it("emits the eager and left_outer joins separately when there is no named join to walk against", () => {
     const liveSql = (
-      Post.eagerLoad("author").leftOuterJoins("author") as unknown as { toSql(): string }
+      Post.eagerLoad("author").leftOuterJoins(":author") as unknown as { toSql(): string }
     ).toSql();
     const q = (name: string) => escapeRegExp(quoteTableName(name));
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
@@ -169,7 +171,7 @@ describe("build_joins from(subquery) dedup", () => {
   // with one AliasTracker on both halves.
   it("emits the same joins for eager_load + left_outer_joins + a raw join on both paths", () => {
     const build = () =>
-      Post.joins("CROSS JOIN categories").eagerLoad("author").leftOuterJoins("comments");
+      Post.joins("CROSS JOIN categories").eagerLoad("author").leftOuterJoins(":comments");
     const liveSql = (build() as unknown as { toSql(): string }).toSql();
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
     // The eager live path projects `t0_r*` aliases, so compare from the FROM on:

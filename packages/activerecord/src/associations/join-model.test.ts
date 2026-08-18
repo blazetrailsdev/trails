@@ -1316,16 +1316,16 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("eager association with scope with string joins", async () => {
-    await expect(Post.joins("verySpecialCommentWithStringJoins").first()).resolves.not.toThrow();
+    await expect(Post.joins(":verySpecialCommentWithStringJoins").first()).resolves.not.toThrow();
   });
 
   it("through association with scope with string joins", async () => {
     // The intermediate (`through`) reflection scope carries a raw-string join
     // (`JOIN posts AS p2 ...`). It must be emitted, attached to its own chain
     // step, so the alias `p2` is in scope for the scope's `whereNot` predicate.
-    const sql = Post.joins("ratingsViaStringJoinComments").toSql();
+    const sql = Post.joins(":ratingsViaStringJoinComments").toSql();
     expect(sql).toContain("JOIN posts AS p2 ON comments.post_id = p2.id");
-    await expect(Post.joins("ratingsViaStringJoinComments").first()).resolves.not.toThrow();
+    await expect(Post.joins(":ratingsViaStringJoinComments").first()).resolves.not.toThrow();
   });
 
   it("has many through goes through all sti classes", async () => {

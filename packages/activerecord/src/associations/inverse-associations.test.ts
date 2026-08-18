@@ -790,7 +790,7 @@ describe("InverseHasManyTests", () => {
       const preloaded = (await (Human as any).includes("interests").first())!;
       expect(preloaded.association("interests").target.length).toBeGreaterThan(0);
 
-      const joined = (await (Human as any).joins("interests").includes("interests").first())!;
+      const joined = (await (Human as any).joins(":interests").includes("interests").first())!;
       expect(joined.association("interests").target.length).toBeGreaterThan(0);
     } finally {
       (Interest as any).resetCallbacks("find");

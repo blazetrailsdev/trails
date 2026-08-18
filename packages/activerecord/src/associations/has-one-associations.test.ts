@@ -1212,7 +1212,7 @@ describe("HasOneAssociationsTest", () => {
     expect(book.status).toBe("published");
     expect(
       await (SpecialAuthor as any)
-        .joins("book")
+        .joins(":book")
         .where({ books: { status: "published" } })
         .count(),
     ).not.toBe(0);
@@ -1233,7 +1233,7 @@ describe("HasOneAssociationsTest", () => {
     // the has_one join renders `varchar = bigint`, which PostgreSQL rejects at
     // query time. Rails never runs into that because the test only builds.
     const relation = (SpecialAuthor as any)
-      .joins({ book: "subscription" })
+      .joins({ ":book": ":subscription" })
       .where()
       .not(whereClause);
     expect(typeof relation.toSql()).toBe("string");

@@ -137,7 +137,7 @@ describe("SerializationTest", () => {
     // (YAML) coder's encoded form (`YAML.dump("Hello") == "Hello\n"`). trails'
     // query layer does not re-serialize a serialized-attribute predicate, so the
     // WHERE must use that pre-serialized string to match the stored value.
-    const results = await Author.joins("serializedPosts").where({
+    const results = await Author.joins(":serializedPosts").where({
       name: "David",
       serialized_posts: { title: "Hello" },
     });

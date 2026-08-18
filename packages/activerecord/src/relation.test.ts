@@ -384,7 +384,7 @@ describe("RelationTest", () => {
     const comment = await (post as any).comments.create({ body: "hu" });
     for (let i = 0; i < 3; i++) await comment.ratings.create();
 
-    const relation = CanonPost.joins("comments").merge(CanonComment.joins("ratings"));
+    const relation = CanonPost.joins(":comments").merge(CanonComment.joins(":ratings"));
 
     const ids = await relation.where({ id: (post as any).id }).pluck("id");
     expect(ids.length).toBe(3);
@@ -541,7 +541,7 @@ describe("RelationTest", () => {
     )}.id = ${canonicalQuoteTableName("ratings")}.comment_id`;
     const specialCommentsWithRatings = CanonSpecialComment.joins(joinString);
     const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
-      .joins("specialComments")
+      .joins(":specialComments")
       .merge(specialCommentsWithRatings);
     const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
 
@@ -561,9 +561,9 @@ describe("RelationTest", () => {
   });
 
   it("relation merging with merged joins as symbols", async () => {
-    const specialCommentsWithRatings = CanonSpecialComment.joins("ratings");
+    const specialCommentsWithRatings = CanonSpecialComment.joins(":ratings");
     const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
-      .joins("specialComments")
+      .joins(":specialComments")
       .merge(specialCommentsWithRatings);
     const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
 
@@ -572,7 +572,7 @@ describe("RelationTest", () => {
 
   it("relation merging with merged symbol joins keeps inner joins", async () => {
     const queries = await captureSql(async () => {
-      await CanonAuthor.joins("posts").merge(CanonPost.joins("comments"));
+      await CanonAuthor.joins(":posts").merge(CanonPost.joins(":comments"));
     });
 
     const nbInnerJoin = queries.reduce(
@@ -585,11 +585,11 @@ describe("RelationTest", () => {
 
   it("relation merging with merged symbol joins has correct size and count", async () => {
     // Has one entry per comment
-    const mergedAuthorsWithCommentedPostsRelation = CanonAuthor.joins("posts").merge(
-      CanonPost.joins("comments"),
+    const mergedAuthorsWithCommentedPostsRelation = CanonAuthor.joins(":posts").merge(
+      CanonPost.joins(":comments"),
     );
 
-    const postIdsWithAuthor = await CanonPost.joins("author").pluck("id");
+    const postIdsWithAuthor = await CanonPost.joins(":author").pluck("id");
     const manualCommentsOnPostThatHaveAuthor = await CanonComment.where({
       post_id: postIdsWithAuthor,
     }).pluck("id");
@@ -607,9 +607,9 @@ describe("RelationTest", () => {
   // across the merged JoinDependencies (Rails build_joins). See
   // relation/merged-join-alias-tracker.ts.
   it("relation merging with merged symbol joins is aliased", async () => {
-    const categorizationsWithAuthors = CanonCategorization.joins("author");
+    const categorizationsWithAuthors = CanonCategorization.joins(":author");
     const queries = await captureSql(async () => {
-      await CanonPost.joins("author", "categorizations")
+      await CanonPost.joins(":author", ":categorizations")
         .merge(CanonAuthor.select("id"))
         .merge(categorizationsWithAuthors);
     });
@@ -632,14 +632,14 @@ describe("RelationTest", () => {
   // `ambiguous column name: authors.id` at runtime. See the sibling
   // `is aliased` test above.
   it("relation with merged joins aliased works", async () => {
-    const categorizationsWithAuthors = CanonCategorization.joins("author");
-    const postsWithJoinsAndMerges = CanonPost.joins("author", "categorizations")
+    const categorizationsWithAuthors = CanonCategorization.joins(":author");
+    const postsWithJoinsAndMerges = CanonPost.joins(":author", ":categorizations")
       .merge(CanonAuthor.select("id"))
       .merge(categorizationsWithAuthors);
 
-    const authorWithPosts = await CanonAuthor.joins("posts").pluck("id");
-    const categorizationsWithAuthor = await CanonCategorization.joins("author").pluck("id");
-    const postsWithAuthorAndCategorizations = await CanonPost.joins("categorizations")
+    const authorWithPosts = await CanonAuthor.joins(":posts").pluck("id");
+    const categorizationsWithAuthor = await CanonCategorization.joins(":author").pluck("id");
+    const postsWithAuthorAndCategorizations = await CanonPost.joins(":categorizations")
       .where({ author_id: authorWithPosts, categorizations: { id: categorizationsWithAuthor } })
       .pluck("id");
 

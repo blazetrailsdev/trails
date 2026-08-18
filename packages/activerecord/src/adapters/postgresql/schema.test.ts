@@ -266,11 +266,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         const song = await (Song as any).create({});
         const album = await (Album as any).create({});
         await song.albums.push(album);
-        const found = await (Song as any).joins("albums").where({ "albums.id": album.id }).first();
+        const found = await (Song as any).joins(":albums").where({ "albums.id": album.id }).first();
         expect(found.id).toBe(song.id);
-        const albumIds1 = await (Song as any).joins("albums").pluck("albums.id");
+        const albumIds1 = await (Song as any).joins(":albums").pluck("albums.id");
         expect(albumIds1).toEqual([album.id]);
-        const albumIds2 = await (Song as any).joins("albums").pluck("music.albums.id");
+        const albumIds2 = await (Song as any).joins(":albums").pluck("music.albums.id");
         expect(albumIds2).toEqual([album.id]);
       } finally {
         cleanup();

@@ -47,7 +47,7 @@ describe("Relation on an aliased table", () => {
   });
 
   it("roots the join dependency on the alias", () => {
-    const sql = aliased().joins("comments").toSql();
+    const sql = aliased().joins(":comments").toSql();
     expect(sql).toContain(`${aliasQ}.${idQ}`);
     expect(sql).not.toContain(`= ${baseQ}.${idQ}`);
   });

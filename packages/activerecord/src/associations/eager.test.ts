@@ -229,36 +229,38 @@ describe("EagerAssociationTest", () => {
   it("loading association with same table joins", async () => {
     const superMemberships = [memberships("super_membership_of_boring_club")];
 
-    let member = (await Member.joins("favoriteMemberships").first()) as any;
+    let member = (await Member.joins(":favoriteMemberships").first()) as any;
     expect(member.id).toBe(members("groucho").id);
     expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
       superMemberships.map((m) => m.id),
     );
 
-    member = await Member.joins("favoriteMemberships").preload("superMemberships").first();
+    member = await Member.joins(":favoriteMemberships").preload("superMemberships").first();
     expect(member.id).toBe(members("groucho").id);
     expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
       superMemberships.map((m) => m.id),
     );
 
-    member = await Member.joins("favoriteMemberships").eagerLoad("superMemberships").first();
+    member = await Member.joins(":favoriteMemberships").eagerLoad("superMemberships").first();
     expect(member.id).toBe(members("groucho").id);
     expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
       superMemberships.map((m) => m.id),
     );
   });
   it("loading association with intersection joins", async () => {
-    let member = (await Member.joins("currentMembership").first()) as any;
+    let member = (await Member.joins(":currentMembership").first()) as any;
     expect(member.id).toBe(members("groucho").id);
     expect((await member.club)?.id).toBe(clubs("boring_club").id);
     expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
 
-    member = await Member.joins("currentMembership").preload("club", "currentMembership").first();
+    member = await Member.joins(":currentMembership").preload("club", "currentMembership").first();
     expect(member.id).toBe(members("groucho").id);
     expect((await member.club)?.id).toBe(clubs("boring_club").id);
     expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
 
-    member = await Member.joins("currentMembership").eagerLoad("club", "currentMembership").first();
+    member = await Member.joins(":currentMembership")
+      .eagerLoad("club", "currentMembership")
+      .first();
     expect(member.id).toBe(members("groucho").id);
     expect((await member.club)?.id).toBe(clubs("boring_club").id);
     expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
@@ -1494,7 +1496,7 @@ describe("EagerAssociationTest", () => {
   it("eager loading with order on joined table preloads", async () => {
     let loaded: Post[] = [];
     await assertQueriesCount(2, false, async () => {
-      loaded = await Post.all().joins("comments").includes("author").order("comments.id DESC");
+      loaded = await Post.all().joins(":comments").includes("author").order("comments.id DESC");
     });
     expect(loaded[2].id).toBe(posts("eager_other").id);
     await assertNoQueries(false, () => {
@@ -1508,7 +1510,7 @@ describe("EagerAssociationTest", () => {
       loaded = await Post.all()
         .select("distinct posts.*")
         .includes("author")
-        .joins("comments")
+        .joins(":comments")
         .where("comments.body like 'Thank you%'")
         .order("posts.id");
     });
@@ -1520,7 +1522,7 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       loaded = await Post.all()
         .includes("author")
-        .joins({ taggings: "tag" })
+        .joins({ ":taggings": ":tag" })
         .where("tags.name = 'General'")
         .order("posts.id");
     });
@@ -1532,7 +1534,7 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       loaded = await Post.all()
         .includes("author")
-        .joins({ taggings: { tag: "taggings" } })
+        .joins({ ":taggings": { ":tag": ":taggings" } })
         .where("taggings_tags.super_tag_id=2")
         .order("posts.id");
     });
@@ -1548,7 +1550,7 @@ describe("EagerAssociationTest", () => {
       loaded = await Post.all()
         .select("posts.*, authors.name as author_name")
         .includes("comments")
-        .joins("author")
+        .joins(":author")
         .order("posts.id");
     });
     expect(loaded[0].id).toBe(posts("welcome").id);
@@ -1563,7 +1565,7 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       loaded = await Author.all()
         .includes("authorAddress")
-        .joins("comments")
+        .joins(":comments")
         .where("posts.title like 'Welcome%'");
     });
     expect(loaded[0].id).toBe(authors("david").id);
@@ -1637,7 +1639,7 @@ describe("EagerAssociationTest", () => {
   it("joins with includes should preload via joins", async () => {
     let post: Post | undefined;
     await assertQueriesCount(1, false, async () => {
-      const loaded = await Post.includes("comments").joins("comments").order("posts.id desc");
+      const loaded = await Post.includes("comments").joins(":comments").order("posts.id desc");
       post = loaded[0];
     });
     await assertNoQueries(false, async () => {
@@ -1654,7 +1656,7 @@ describe("EagerAssociationTest", () => {
     let post: Post | undefined;
     await assertQueriesCount(1, false, async () => {
       const loaded = await Post.includes("comments", "author")
-        .joins("comments")
+        .joins(":comments")
         .order("posts.id desc");
       post = loaded[0];
     });

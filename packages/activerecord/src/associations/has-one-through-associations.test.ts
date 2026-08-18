@@ -733,14 +733,14 @@ describe("HasOneThroughAssociationsTest", () => {
     const david = authors("david");
     expect((await readHasOne(david, "essayCategory"))?.id).toBe(categories("general").id);
 
-    let joined = await Author.joins("essayCategory").where({
+    let joined = await Author.joins(":essayCategory").where({
       "categories.id": categories("general").id,
     });
     expect(joined[0]?.id).toBe(authors("david").id);
 
     expect((await readHasOne(david, "essayOwner"))?.id).toBe(owners("blackbeard").id);
 
-    joined = await Author.joins("essayOwner").where("owners.name = 'blackbeard'");
+    joined = await Author.joins(":essayOwner").where("owners.name = 'blackbeard'");
     expect(joined[0]?.id).toBe(authors("david").id);
   });
 
@@ -748,7 +748,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const david = authors("david");
     expect((await readHasOne(david, "essayCategory_2"))?.id).toBe(categories("general").id);
 
-    const joined = await Author.joins("essayCategory_2").where({
+    const joined = await Author.joins(":essayCategory_2").where({
       "categories.id": categories("general").id,
     });
     expect(joined[0]?.id).toBe(authors("david").id);

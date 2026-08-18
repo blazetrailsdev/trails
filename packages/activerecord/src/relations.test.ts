@@ -899,8 +899,8 @@ describe("RelationTest", () => {
     const reader = await Reader.createBang({ post_id: post.id, person_id: 1 });
     const comment = await Comment.createBang({ post_id: post.id, body: "body" });
 
-    const postRel = Post.preload("readers").joins("readers").where({ title: "Uhuu" });
-    let resultComment = (await Comment.joins("post").merge(postRel))[0];
+    const postRel = Post.preload("readers").joins(":readers").where({ title: "Uhuu" });
+    let resultComment = (await Comment.joins(":post").merge(postRel))[0];
     expect(Number(resultComment.id)).toBe(Number(comment.id));
 
     let postAssoc = (resultComment as any).association("post");
@@ -911,7 +911,7 @@ describe("RelationTest", () => {
     expect(readersAssoc.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
 
     const postRel2 = Post.includes("readers").where({ title: "Uhuu" });
-    resultComment = (await Comment.joins("post").merge(postRel2).first())!;
+    resultComment = (await Comment.joins(":post").merge(postRel2).first())!;
     expect(Number(resultComment.id)).toBe(Number(comment.id));
 
     postAssoc = (resultComment as any).association("post");
@@ -924,14 +924,14 @@ describe("RelationTest", () => {
     // Rails merges :eager_load as a NORMAL_VALUE (merger.rb) — a straight union
     // via eager_load!, never gated on model equality nor nested under a
     // reflection, so it crosses the model boundary untouched.
-    const merged = Comment.joins("post").merge(Post.eagerLoad("readers")) as any;
+    const merged = Comment.joins(":post").merge(Post.eagerLoad("readers")) as any;
     expect(merged.eagerLoadValues).toContain("readers");
 
     // merge! (in-place) shares Merger#merge in Rails; trails routes both through
     // the same foldMerge* helpers, so the cross-model reflection-nesting applies
     // identically — the bang path must nest `{ post: [:readers] }`, not ask
     // Comment to preload `:readers` directly.
-    const bang = Comment.joins("post") as any;
+    const bang = Comment.joins(":post") as any;
     bang.mergeBang(Post.preload("readers").where({ title: "Uhuu" }));
     expect(bang.preloadValues).toEqual([{ post: ["readers"] }]);
     const bangComment = (await bang.toArray())[0];

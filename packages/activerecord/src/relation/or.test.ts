@@ -234,8 +234,8 @@ describe("OrTest", () => {
       Post.eagerLoad("author").eagerLoad("author").or(Post.eagerLoad("author"));
       Post.preload("author").preload("author").or(Post.preload("author"));
       Post.group("author_id").group("author_id").or(Post.group("author_id"));
-      Post.joins("author").joins("author").or(Post.joins("author"));
-      Post.leftOuterJoins("author").leftOuterJoins("author").or(Post.leftOuterJoins("author"));
+      Post.joins(":author").joins(":author").or(Post.joins(":author"));
+      Post.leftOuterJoins(":author").leftOuterJoins(":author").or(Post.leftOuterJoins(":author"));
       Post.from("posts").or(Post.from("posts"));
     } catch {
       threw = true;

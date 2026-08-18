@@ -85,7 +85,7 @@ export class Comment extends Base {
     this.scope("containingTheLetterE", (q: any) => q.where("comments.body LIKE '%e%'"));
     this.scope("notAgain", (q: any) => q.where("comments.body NOT LIKE '%again%'"));
     this.scope("forFirstPost", (q: any) => q.where({ post_id: 1 }));
-    this.scope("forFirstAuthor", (q: any) => q.joins("post").where({ "posts.author_id": 1 }));
+    this.scope("forFirstAuthor", (q: any) => q.joins(":post").where({ "posts.author_id": 1 }));
     this.scope("created", (q: any) => q.all());
     this.scope("orderedByPostId", (q: any) => q.order("comments.post_id DESC"));
     this.scope("allAsScope", (q: any) => q.all());

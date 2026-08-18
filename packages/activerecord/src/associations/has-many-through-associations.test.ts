@@ -250,14 +250,14 @@ describe("HasManyThroughAssociationsTest", () => {
   it("through association with joins", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
-    const result = await (mary as any).comments.merge(Post.joins("comments")).toArray();
+    const result = await (mary as any).comments.merge(Post.joins(":comments")).toArray();
     expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
   });
 
   it("through association with left joins", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
-    const result = await (mary as any).comments.merge(Post.leftOuterJoins("comments")).toArray();
+    const result = await (mary as any).comments.merge(Post.leftOuterJoins(":comments")).toArray();
     expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
   });
 
@@ -323,7 +323,7 @@ describe("HasManyThroughAssociationsTest", () => {
       member_id: (await Member.create({ name: "Bob" })).id,
     });
 
-    const preloadedClubs = await Club.joins("memberships").preload("membership");
+    const preloadedClubs = await Club.joins(":memberships").preload("membership");
     expect(preloadedClubs.length).toBeGreaterThan(0);
     for (const c of preloadedClubs) {
       expect((c as any).membership).toBeDefined();
@@ -1783,7 +1783,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const essayCats = await (david as any).essayCategories.toArray();
     expect(essayCats.map((c: any) => c.id)).toEqual([general.id]);
 
-    const joinedAuthors = await Author.joins("essayCategories").where({
+    const joinedAuthors = await Author.joins(":essayCategories").where({
       "categories.id": general.id,
     });
     expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
@@ -1792,7 +1792,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const essayOwners = await (david as any).essayOwners.toArray();
     expect(essayOwners.map((o: any) => o.id)).toEqual([blackbeard.id]);
 
-    const ownersAuthors = await Author.joins("essayOwners").where({ "owners.name": "blackbeard" });
+    const ownersAuthors = await Author.joins(":essayOwners").where({ "owners.name": "blackbeard" });
     expect(ownersAuthors.map((a: any) => a.id)).toContain(david.id);
   });
 
@@ -1802,7 +1802,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const essayCats2 = await (david as any).essayCategories_2.toArray();
     expect(essayCats2.map((c: any) => c.id)).toEqual([general.id]);
 
-    const joinedAuthors = await Author.joins("essayCategories_2").where({
+    const joinedAuthors = await Author.joins(":essayCategories_2").where({
       "categories.id": general.id,
     });
     expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
@@ -1831,7 +1831,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("joining has many through with distinct", async () => {
-    const mary = await Author.joins("uniqueCategorizedPosts")
+    const mary = await Author.joins(":uniqueCategorizedPosts")
       .where({ id: authors("mary").id })
       .first();
     expect(await (mary as any).uniqueCategorizedPosts.size()).toBe(1);
@@ -1840,7 +1840,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("joining has many through belongs to", async () => {
     const maryCatId = categorizations("mary_thinking_sti").id;
-    const postList = await Post.joins("authorCategorizations")
+    const postList = await Post.joins(":authorCategorizations")
       .order("posts.id")
       .where({ "categorizations.id": maryCatId });
     expect(postList.map((p: any) => p.id)).toEqual([
@@ -2074,15 +2074,15 @@ describe("HasManyThroughAssociationsTest", () => {
       await Reader.create({ post_id: post2.id, person_id: p.id });
     }
 
-    const activePersons = await Person.joins("readers")
-      .joins("posts")
+    const activePersons = await Person.joins(":readers")
+      .joins(":posts")
       .distinct()
       .where({ "posts.title": "active" });
     const sum = activePersons.reduce((acc: number, p: any) => acc + p.followers_count, 0);
     expect(sum).toBe(10);
     expect(
-      await Person.joins("readers")
-        .joins("posts")
+      await Person.joins(":readers")
+        .joins(":posts")
         .distinct()
         .where({ "posts.title": "active" })
         .sum("followers_count"),
@@ -2212,7 +2212,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("has many through with scope that has joined same table with parent relation", async () => {
     const david = await Author.find(authors("david").id);
-    const result = await Author.joins("commentsForFirstAuthor").take();
+    const result = await Author.joins(":commentsForFirstAuthor").take();
     expect(result?.id).toBe(david.id);
   });
 
@@ -2233,7 +2233,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through with scope should accept string and hash join", async () => {
     const david = await Author.find(authors("david").id);
     const result = await Author.joins({
-      commentsForFirstAuthor: "post",
+      ":commentsForFirstAuthor": ":post",
     })
       .joins("inner join posts posts_alias on authors.id = posts_alias.author_id")
       .eagerLoad("categories")
@@ -2597,7 +2597,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(tagsBefore.length).toBeGreaterThan(0);
 
     const tag = tagsBefore[0];
-    const postTags2 = await Post.joins("tags").where({ id: post.id });
+    const postTags2 = await Post.joins(":tags").where({ id: post.id });
     expect(postTags2.length).toBeGreaterThan(0);
     expect(postTags2.map((p: any) => p.id)).toContain(post.id);
   });

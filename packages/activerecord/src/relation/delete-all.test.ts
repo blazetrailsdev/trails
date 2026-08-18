@@ -107,7 +107,7 @@ describe("DeleteAllTest", () => {
   });
 
   it("delete all with joins and where part is hash", async () => {
-    const pets = Pet.joins("toys").where({ toys: { name: "Bone" } });
+    const pets = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await pets.exists()).toBe(true);
     const countBefore = await pets.count();
@@ -115,7 +115,7 @@ describe("DeleteAllTest", () => {
   });
 
   it("delete all with joins and where part is not hash", async () => {
-    const pets = Pet.joins("toys").where("toys.name = ?", "Bone");
+    const pets = Pet.joins(":toys").where("toys.name = ?", "Bone");
 
     expect(await pets.exists()).toBe(true);
     const countBefore = await pets.count();
@@ -164,7 +164,7 @@ describe("DeleteAllTest", () => {
     // resolves to the join table. trails resolves the camelCase association name
     // `orderAgreements` the same way; the snake-vs-camel association-name spelling
     // is the only difference (trails' naming convention), not a divergence.
-    const joinScope = CpkOrder.joins("orderAgreements").where({
+    const joinScope = CpkOrder.joins(":orderAgreements").where({
       orderAgreements: { signature: agreement.signature },
     });
     expect(await joinScope.deleteAll()).toBe(1);

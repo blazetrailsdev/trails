@@ -102,7 +102,7 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with hmt does not table name collide when joining associations", async () => {
-    const authors = await Author.joins("posts")
+    const authors = await Author.joins(":posts")
       .eagerLoad("comments")
       .where({ posts: { tags_count: 1 } })
       .order(":id");
@@ -120,7 +120,7 @@ describe("CascadedEagerLoadingTest", () => {
     // dedups them to ONE un-aliased `posts` (manual INNER), with `comments`
     // joined onto it. No second `posts`/`posts_authors` join, no ambiguous column.
     const loaded = await Author.all()
-      .joins("posts")
+      .joins(":posts")
       .eagerLoad({ posts: "comments" })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
@@ -132,7 +132,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading dedups a single-step manual join and eager root", async () => {
     // Author.joins(:posts).eager_load(:posts): single-step root coincides with
     // the manual join — one un-aliased INNER `posts`, no duplicate.
-    const loaded = await Author.all().joins("posts").eagerLoad("posts").order("authors.id");
+    const loaded = await Author.all().joins(":posts").eagerLoad("posts").order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
     expect(targetArr(loaded[1], "posts")).toHaveLength(3);
@@ -142,7 +142,7 @@ describe("CascadedEagerLoadingTest", () => {
     // A dotted-path eager spec roots at its first segment (`posts.comments` →
     // `posts`), so it too dedups against the coinciding manual `joins(:posts)`.
     const loaded = await Author.all()
-      .joins("posts")
+      .joins(":posts")
       .eagerLoad("posts.comments")
       .order("authors.id");
     expect(loaded).toHaveLength(3);
@@ -157,7 +157,7 @@ describe("CascadedEagerLoadingTest", () => {
     // their manual INNER JOINs — no duplicate `posts`/`comments`, no ambiguous
     // column. Mirrors the root-only string dedup but down the whole nested path.
     const loaded = await Author.all()
-      .joins({ posts: "comments" })
+      .joins({ ":posts": ":comments" })
       .eagerLoad({ posts: "comments" })
       .order("authors.id");
     // INNER JOIN semantics (manual join wins): only authors with a post that has
@@ -177,7 +177,7 @@ describe("CascadedEagerLoadingTest", () => {
     // dedups the FULL reflection chain (join_dependency.rb:214-219), so the
     // intermediate `posts` collapses against the manual join too — not just the
     // `comments` target. No extra aliased `posts` (e.g. `posts_authors`).
-    const rel = Author.all().joins("comments").eagerLoad("comments").order("authors.id");
+    const rel = Author.all().joins(":comments").eagerLoad("comments").order("authors.id");
     // The intermediate `posts` join is deduped: no aliased duplicate such as
     // `posts_authors`/`posts_authors_join` re-emitted for the eager spec.
     const sql = rel.toSql();
@@ -204,7 +204,7 @@ describe("CascadedEagerLoadingTest", () => {
 
   it("cascaded eager association loading with join for count", async () => {
     const categories = Category.all()
-      .joins("categorizations")
+      .joins(":categorizations")
       .includes({ posts: "comments" }, "authors");
     expect(await categories.count()).toBe(4);
     expect((await categories).length).toBe(4);
@@ -234,7 +234,7 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with join for count", async () => {
-    const authorsRel = Author.all().joins("specialPosts").includes("posts", "categorizations");
+    const authorsRel = Author.all().joins(":specialPosts").includes("posts", "categorizations");
     await authorsRel.count();
     await assertQueriesCount(3, false, async () => {
       await authorsRel;

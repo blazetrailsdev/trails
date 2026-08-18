@@ -2146,14 +2146,14 @@ describe("FinderTest", () => {
 
       expect(
         await Author.select("COUNT(*) as total_posts", "authors.*")
-          .joins("posts")
+          .joins(":posts")
           .group("id")
           .having("total_posts > 2")
           .include(bob),
       ).toBe(false);
       expect(
         await Author.select("COUNT(*) as total_posts", "authors.*")
-          .joins("posts")
+          .joins(":posts")
           .group("id")
           .having("total_posts > 2")
           .include(mary),
@@ -2544,7 +2544,7 @@ describe("FinderTest", () => {
 
   it("exists with joins", async () => {
     expect(
-      await Topic.joins("replies")
+      await Topic.joins(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
         .exists(),

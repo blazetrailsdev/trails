@@ -94,11 +94,14 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
+      // Rails tests `reflection.name` but joins the caller's own `association`
+      // (query_methods.rb:91-92); both are Symbols, spelled with their colon.
+      const reflectionName = `:${reflection.name}`;
       if (
-        !scope.joinsValues.includes(reflection.name) &&
-        !scope.leftOuterJoinsValues.includes(reflection.name)
+        !scope.joinsValues.includes(reflectionName) &&
+        !scope.leftOuterJoinsValues.includes(reflectionName)
       ) {
-        joinsBang.call(scope, association);
+        joinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
       }
 
       const associationConditions = Object.fromEntries(
@@ -121,7 +124,7 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      leftOuterJoinsBang.call(scope, association);
+      leftOuterJoinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
       const associationConditions = Object.fromEntries(
         wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
       );

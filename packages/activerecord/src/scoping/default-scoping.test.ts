@@ -594,7 +594,7 @@ describe("DefaultScopingTest", () => {
   it("unscope left outer joins", async () => {
     const expected = names(await Developer.all());
     const received = names(
-      await Developer.leftOuterJoins("projects").select("id").unscope("leftOuterJoins", "select"),
+      await Developer.leftOuterJoins(":projects").select("id").unscope("leftOuterJoins", "select"),
     );
     expect(received).toEqual(expected);
   });
@@ -812,25 +812,25 @@ describe("DefaultScopingTest", () => {
   it("default scope with joins", async () => {
     expect(
       await Comment.where({ post_id: await SpecialPostWithDefaultScope.pluck("id") }).count(),
-    ).toBe(await Comment.joins("specialPostWithDefaultScope").count());
+    ).toBe(await Comment.joins(":specialPostWithDefaultScope").count());
     expect(await Comment.where({ post_id: await Post.pluck("id") }).count()).toBe(
-      await Comment.joins("post").count(),
+      await Comment.joins(":post").count(),
     );
   });
 
   it("joins not affected by scope other than default or unscoped", async () => {
-    const without = (await Comment.joins("post")).map((c: any) => c.id).sort();
+    const without = (await Comment.joins(":post")).map((c: any) => c.id).sort();
     let withScope: any[] = [];
     await (Post.where({ id: [1, 5, 6] }) as any).scoping(async () => {
-      withScope = (await Comment.joins("post")).map((c: any) => c.id).sort();
+      withScope = (await Comment.joins(":post")).map((c: any) => c.id).sort();
     });
     expect(withScope).toEqual(without);
   });
 
   it("unscoped with joins should not have default scope", async () => {
-    const expected = (await Comment.joins("post")).map((c: any) => c.id).sort();
+    const expected = (await Comment.joins(":post")).map((c: any) => c.id).sort();
     const received = await (SpecialPostWithDefaultScope as any).unscoped(async () =>
-      (await Comment.joins("specialPostWithDefaultScope")).map((c: any) => c.id).sort(),
+      (await Comment.joins(":specialPostWithDefaultScope")).map((c: any) => c.id).sort(),
     );
     expect(received).toEqual(expected);
   });
@@ -844,15 +844,15 @@ describe("DefaultScopingTest", () => {
     // of Temporal); Temporal.Now.instant() is the Time.now analogue.
     await post.specialComments.updateAll({ deleted_at: Temporal.Now.instant() });
 
-    await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
+    await expect(Post.joins(":specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
     expect(await (await post.specialComments.reload()).toArray()).toEqual([]);
 
     const specialCommentIds = async (rel: any) =>
       (await (await rel.find(post.id)).specialComments.toArray()).map((c: any) => c.id);
 
     await (SpecialComment as any).unscoped(async () => {
-      expect((await Post.joins("specialComments").find(post.id)).id).toBe(post.id);
-      expect(await specialCommentIds(Post.joins("specialComments"))).toEqual(expected);
+      expect((await Post.joins(":specialComments").find(post.id)).id).toBe(post.id);
+      expect(await specialCommentIds(Post.joins(":specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.eagerLoad("specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.includes("specialComments"))).toEqual(expected);
       expect(await specialCommentIds(Post.preload("specialComments"))).toEqual(expected);
