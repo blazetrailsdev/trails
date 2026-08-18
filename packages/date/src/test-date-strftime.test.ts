@@ -192,7 +192,7 @@ describe("TestDateStrftime", () => {
   });
 
   it("strftime 3 1", { timeout: 30_000 }, () => {
-    for (const d of dateRange(new RubyDate(1970, 1, 1), new RubyDate(2037, 12, 31))) {
+    for (const d of new RubyDate(1970, 1, 1).upto(new RubyDate(2037, 12, 31))) {
       const t = RubyTime.utc(Number(d.year), d.mon, d.day);
       expect(d.strftime("%U")).toEqual(t.strftime("%U"));
       expect(d.strftime("%W")).toEqual(t.strftime("%W"));
@@ -203,7 +203,7 @@ describe("TestDateStrftime", () => {
     const s = RubyTime.now().strftime("%G");
     // eslint-disable-next-line vitest/no-conditional-in-test -- Ruby's `omit if`
     if (s.length === 0 || s === "%G") return ctx.skip();
-    for (const d of dateRange(new RubyDate(1970, 1, 1), new RubyDate(2037, 12, 31))) {
+    for (const d of new RubyDate(1970, 1, 1).upto(new RubyDate(2037, 12, 31))) {
       const t = RubyTime.utc(Number(d.year), d.mon, d.day);
       expect(d.strftime("%G")).toEqual(t.strftime("%G"));
       expect(d.strftime("%g")).toEqual(t.strftime("%g"));
@@ -543,17 +543,4 @@ describe("TestDateStrftime", () => {
 /** Ruby's `Object#inspect` over the message argument, whose Rationals hold BigInts. */
 function inspect(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? String(v) : v));
-}
-
-/**
- * Ruby's `(Date.new(1970,1,1)..Date.new(2037,12,31)).each`, whose `Range#each`
- * walks by `Date#succ` — `d_lite_next_day` over `d_lite_plus(self, 1)`. `#succ`
- * itself is not ported yet (0088-date-gem-port/port-test-date-arith-operators
- * owns it), so the walk calls the `plus` it is defined as, and `cmp` for the
- * `<= end` the Range walks to.
- */
-function* dateRange(from: RubyDate, to: RubyDate): Generator<RubyDate> {
-  for (let d = from; d.cmp(to)! <= 0; d = d.plus(1)) {
-    yield d;
-  }
 }

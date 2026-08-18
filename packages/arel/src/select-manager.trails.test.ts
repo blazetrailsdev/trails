@@ -33,6 +33,9 @@ describe("SelectManagerTest (trails)", () => {
     const mgr = new SelectManager(users);
     mgr.join("comments ON comments.user_id = users.id");
     expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.StringJoin);
+    expect((mgr.joinSources()[0] as Nodes.StringJoin).left).toBe(
+      "comments ON comments.user_id = users.id",
+    );
   });
 
   // Trails-only coverage for Arel::SelectManager#lock's `case` arms
