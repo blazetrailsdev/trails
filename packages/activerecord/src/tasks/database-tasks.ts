@@ -1408,23 +1408,13 @@ export class DatabaseTasks {
     const fs = getFs();
     if (!fs.existsSync(file)) return true;
 
-    let adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter;
-    try {
-      adapter = await this._migrationAdapter();
-    } catch (error) {
-      if (error instanceof ConnectionNotDefined) return false;
-      throw error;
-    }
+    return await this.withTemporaryPool(dbConfig, async (pool) => {
+      const internalMetadata = pool.internalMetadata;
+      if (internalMetadata.enabled == null || internalMetadata.enabled === false) return false;
+      if (!(await internalMetadata.tableExists())) return false;
 
-    const { InternalMetadata } = await import("../internal-metadata.js");
-    const metadata = new InternalMetadata(adapter.pool);
-    if (!(await metadata.tableExists())) return false;
-
-    const storedSha1 = await metadata.get("schema_sha1");
-    if (!storedSha1) return false;
-
-    const fileSha1 = await this.schemaSha1(file);
-    return storedSha1 === fileSha1;
+      return (await internalMetadata.get("schema_sha1")) === (await this.schemaSha1(file));
+    });
   }
 
   /**
