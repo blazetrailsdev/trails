@@ -658,6 +658,11 @@ export class Builder implements InsertBuilder {
     return this._insertAll.updateDuplicates();
   }
 
+  /** Mirrors: `delegate :keys, to: :insert_all` (insert_all.rb:228). */
+  get keys(): Set<string> {
+    return this._insertAll.keys;
+  }
+
   into(): string {
     const tableName = this.quoteTable(this.model.arelTable.name);
     const keys = [...this._insertAll.keysIncludingTimestamps()];
@@ -778,10 +783,5 @@ export class Builder implements InsertBuilder {
     if (this._connection.adapterName === "mysql2") return new Visitors.MySQL(q);
     if (this._connection.adapterName === "postgres") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
-  }
-
-  /** Mirrors: `delegate :keys, to: :insert_all` (insert_all.rb:228). */
-  get keys(): Set<string> {
-    return this._insertAll.keys;
   }
 }
