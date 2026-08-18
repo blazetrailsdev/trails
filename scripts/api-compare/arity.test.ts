@@ -202,6 +202,11 @@ describe("arityMatches", () => {
     expect(arityMatches([], [req("date", "Date")]).ok).toBe(true);
   });
 
+  it("strips a leading core-extension receiver under its import alias (time: RubyTime)", () => {
+    // ruby Time#system_local_time?  vs  isSystemLocalTime(time: RubyTime)
+    expect(arityMatches([], [req("time", "RubyTime")]).ok).toBe(true);
+  });
+
   it("strips a leading core-extension receiver by type (dateOrTime: DateOrTime)", () => {
     // ruby DateAndTime::Calculations#next_weekday  vs  nextWeekday(dateOrTime: DateOrTime)
     expect(arityMatches([], [req("dateOrTime", "DateOrTime")]).ok).toBe(true);

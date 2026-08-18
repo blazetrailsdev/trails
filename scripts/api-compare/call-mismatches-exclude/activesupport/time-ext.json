@@ -2,24 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "preserve_timezone",
-    "call": "system_local_time?",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/time/compatibility.rb:17 calls `system_local_time?` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "preserve_timezone",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_time/compatibility.rb:15 calls `preserve_timezone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "xmlschema",
     "call": "in_time_zone",
     "reason": "Date#xmlschema (core_ext/date/conversions.rb:95-97) reaches in_time_zone through to_time; the port formats the date directly."

@@ -848,17 +848,16 @@ export function toDate(date: Date): Temporal.PlainDate {
  * `getlocal(utc_offset)` in the receiver's own offset.
  */
 export function toTime(
-  receiver: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+  time: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
 ): Temporal.ZonedDateTime {
-  if (receiver instanceof RubyTime) {
-    const self = receiver.toTime();
-    return preserveTimezone(receiver) ? self : self.withTimeZone(Temporal.Now.timeZoneId());
+  if (time instanceof RubyTime) {
+    const self = time.toTime();
+    return preserveTimezone(time) ? self : self.withTimeZone(Temporal.Now.timeZoneId());
   }
 
   // A Ruby `DateTime` without an explicit offset is `+00:00` (date.rb's
   // `civil`), which is the offset a `PlainDateTime` stands in for here.
-  const zoned =
-    receiver instanceof Temporal.PlainDateTime ? receiver.toZonedDateTime("UTC") : receiver;
+  const zoned = time instanceof Temporal.PlainDateTime ? time.toZonedDateTime("UTC") : time;
   return compatibilityPreserveTimezone()
     ? zoned.withTimeZone(zoned.offset)
     : zoned.withTimeZone(Temporal.Now.timeZoneId());

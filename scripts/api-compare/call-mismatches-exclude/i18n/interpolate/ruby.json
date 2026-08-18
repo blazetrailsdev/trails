@@ -6,6 +6,6 @@
     "call": "missing_interpolation_argument_handler",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "i18n interpolate/ruby.rb:34 reads the handler with no arguments and calls the returned proc; the port folds both into one call taking (key, values, string)."
+    "reason": "interpolate/ruby.rb:43 READS the handler (`config.missing_interpolation_argument_handler`, no arguments) and then invokes the returned Proc with `.call(key, values, string)`. JS has no `Proc#call`: invoking the function a getter returns is spelled by calling the getter's result directly, so the read and the invocation collapse into the one call site — the same shortcoming the file's `@missingRailsCall call` tag already records for `value.call(values)`."
   }
 ]
