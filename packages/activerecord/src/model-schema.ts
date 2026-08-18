@@ -762,8 +762,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
     }
   }
 
-  this._attributesBuilder = new AttributeSetBuilder(attributeTypes, defaults);
-  return this._attributesBuilder;
+  const builder = new AttributeSetBuilder(attributeTypes, defaults);
+  this._attributesBuilder = builder;
+  return builder;
 }
 
 /**
@@ -772,8 +773,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
 export function columns(this: SchemaHost): any[] {
   const ownColumns = ownSchemaMemo(this, "_columns");
   if (ownColumns != null) return ownColumns;
-  this._columns = Object.values(columnsHash.call(this as unknown as typeof Base));
-  return this._columns;
+  const built = Object.values(columnsHash.call(this as unknown as typeof Base));
+  this._columns = built;
+  return built;
 }
 
 /**
