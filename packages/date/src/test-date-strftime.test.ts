@@ -1,17 +1,17 @@
 /**
  * Port of ruby/date's `test/date/test_date_strftime.rb`, the standard
- * directive set (`:70-215`, through `test_strftime__minus`) and the GNU
- * coreutils extensions (`:216-356`, through `test_strftime__gnuext_complex`)
- * plus `test_overflow` (`:445-452`).
- *
- * `test__different_format` (`:359-443`) is not here: it exercises the instance
- * formatters (`ctime`/`asctime`/`iso8601`/`xmlschema`/`rfc3339`/`jisx0301`)
- * and the `limit:` kwarg, none of which are ported yet.
+ * directive set (`:70-215`, through `test_strftime__minus`), the GNU
+ * coreutils extensions (`:216-356`, through `test_strftime__gnuext_complex`),
+ * `test__different_format` (`:359-443`) and `test_overflow` (`:445-452`).
  *
  * The gem's statics answer `Temporal` under RFC 0088, so where Ruby writes
  * `DateTime.parse(s)` and then calls `#strftime` on the result, this file goes
  * through the exported `dtNewByFrags`/`dNewByFrags` builders those statics
  * themselves call — the gem-shaped object that carries `strftime`.
+ *
+ * `test__different_format`'s `limit:` arms go through the statics, which answer
+ * `Temporal` under RFC 0088, so where Ruby compares the parsed `DateTime` to
+ * `d2` directly this file compares the seat each side names.
  *
  * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm goes through
  * {@link assertWarning}, which sets `$VERBOSE` for the block the way Ruby's
@@ -20,7 +20,13 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { Date as RubyDate, DateTime as RubyDateTime, Rational, dtNewByFrags } from "./date.js";
+import {
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Rational,
+  dNewByFrags,
+  dtNewByFrags,
+} from "./date.js";
 import { Time as RubyTime } from "./time.js";
 import { setRubyVerbose } from "./rb-warning.js";
 
@@ -44,6 +50,7 @@ function assertWarning(pattern: RegExp, block: () => void): void {
   expect(output).toMatch(pattern);
 }
 
+const gemDateParse = (str: string) => dNewByFrags(RubyDate._parse(str));
 const gemDateTimeParse = (str: string) => dtNewByFrags(RubyDate._parse(str));
 const gemDateTimeStrptime = (str: string, fmt: string) =>
   dtNewByFrags(RubyDateTime._strptime(str, fmt));
@@ -427,6 +434,100 @@ describe("TestDateStrftime", () => {
     expect(d.strftime("%_100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001".padStart(100));
     expect(d.strftime("%0100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001".padStart(100, "0"));
     expect(d.strftime("%^+")).toEqual("SAT FEB  3 04:05:06 +09:00 2001");
+  });
+
+  it("different format", () => {
+    let d: RubyDate = new RubyDate(2001, 2, 3);
+
+    expect(d.ctime()).toEqual("Sat Feb  3 00:00:00 2001");
+    expect(d.asctime()).toEqual(d.ctime());
+
+    expect(d.iso8601()).toEqual("2001-02-03");
+    expect(d.iso8601()).toEqual(d.xmlschema());
+    expect(d.rfc3339()).toEqual("2001-02-03T00:00:00+00:00");
+    expect(d.rfc2822()).toEqual("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(d.rfc2822()).toEqual(d.rfc822());
+    expect(d.httpdate()).toEqual("Sat, 03 Feb 2001 00:00:00 GMT");
+    expect(d.jisx0301()).toEqual("H13.02.03");
+
+    d = new RubyDateTime(2001, 2, 3);
+
+    expect(d.ctime()).toEqual("Sat Feb  3 00:00:00 2001");
+    expect(d.asctime()).toEqual(d.ctime());
+
+    expect(d.iso8601()).toEqual("2001-02-03T00:00:00+00:00");
+    expect(d.iso8601()).toEqual(d.rfc3339());
+    expect(d.iso8601()).toEqual(d.xmlschema());
+    expect(d.rfc2822()).toEqual("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(d.rfc2822()).toEqual(d.rfc822());
+    expect(d.httpdate()).toEqual("Sat, 03 Feb 2001 00:00:00 GMT");
+    expect(d.jisx0301()).toEqual("H13.02.03T00:00:00+00:00");
+
+    const d2 = gemDateTimeParse("2001-02-03T04:05:06.123456");
+    expect(d2.iso8601(3)).toEqual("2001-02-03T04:05:06.123+00:00");
+    expect(d2.rfc3339(3)).toEqual("2001-02-03T04:05:06.123+00:00");
+    expect(d2.jisx0301(3)).toEqual("H13.02.03T04:05:06.123+00:00");
+    expect(d2.iso8601(3.5)).toEqual("2001-02-03T04:05:06.123+00:00");
+    expect(d2.rfc3339(3.5)).toEqual("2001-02-03T04:05:06.123+00:00");
+    expect(d2.jisx0301(3.5)).toEqual("H13.02.03T04:05:06.123+00:00");
+    expect(d2.iso8601(9)).toEqual("2001-02-03T04:05:06.123456000+00:00");
+    expect(d2.rfc3339(9)).toEqual("2001-02-03T04:05:06.123456000+00:00");
+    expect(d2.jisx0301(9)).toEqual("H13.02.03T04:05:06.123456000+00:00");
+    expect(d2.iso8601(9.9)).toEqual("2001-02-03T04:05:06.123456000+00:00");
+    expect(d2.rfc3339(9.9)).toEqual("2001-02-03T04:05:06.123456000+00:00");
+    expect(d2.jisx0301(9.9)).toEqual("H13.02.03T04:05:06.123456000+00:00");
+
+    expect(new RubyDateTime(1800).jisx0301()).toEqual("1800-01-01T00:00:00+00:00");
+
+    expect(gemDateParse("1868-01-25").jisx0301()).toEqual("1868-01-25");
+    expect(gemDateParse("1872-12-31").jisx0301()).toEqual("1872-12-31");
+
+    expect(gemDateParse("1873-01-01").jisx0301()).toEqual("M06.01.01");
+    expect(gemDateParse("1912-07-29").jisx0301()).toEqual("M45.07.29");
+    expect(gemDateParse("1912-07-30").jisx0301()).toEqual("T01.07.30");
+    expect(gemDateParse("1926-12-24").jisx0301()).toEqual("T15.12.24");
+    expect(gemDateParse("1926-12-25").jisx0301()).toEqual("S01.12.25");
+    expect(gemDateParse("1989-01-07").jisx0301()).toEqual("S64.01.07");
+    expect(gemDateParse("1989-01-08").jisx0301()).toEqual("H01.01.08");
+    expect(gemDateParse("2006-09-01").jisx0301()).toEqual("H18.09.01");
+    expect(gemDateParse("2019-04-30").jisx0301()).toEqual("H31.04.30");
+    expect(gemDateParse("2019-05-01").jisx0301()).toEqual("R01.05.01");
+
+    expect(
+      RubyDateTime.iso8601("2001-02-03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 64 }),
+    ).toEqual(d2.toDatetime());
+    expect(
+      RubyDateTime.rfc3339("2001-02-03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 64 }),
+    ).toEqual(d2.toDatetime());
+    expect(
+      RubyDateTime.jisx0301("H13.02.03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 64 }),
+    ).toEqual(d2.toDatetime());
+
+    const exceeds = /string length \(\d+\) exceeds/;
+    expect(() =>
+      RubyDateTime.iso8601("2001-02-03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 1 }),
+    ).toThrow(exceeds);
+    expect(() =>
+      RubyDateTime.rfc3339("2001-02-03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 1 }),
+    ).toThrow(exceeds);
+    expect(() =>
+      RubyDateTime.jisx0301("H13.02.03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 1 }),
+    ).toThrow(exceeds);
+
+    for (const s of [
+      "M06.01.01",
+      "M45.07.29",
+      "T01.07.30",
+      "T15.12.24",
+      "S01.12.25",
+      "S64.01.07",
+      "H01.01.08",
+      "H18.09.01",
+      "H31.04.30",
+      "R01.05.01",
+    ]) {
+      expect(gemDateParse(s).jisx0301()).toEqual(s);
+    }
   });
 
   it("overflow", () => {
