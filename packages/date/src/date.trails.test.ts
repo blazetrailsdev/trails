@@ -2478,3 +2478,28 @@ describe("Rational", () => {
     expect(new Rational(1, -0.5).inspect()).toBe("(-2/1)");
   });
 });
+
+// `d_lite_marshal_load`'s `case 2` (1.6.x) and `case 3` (1.8.x, 1.9.2) arms
+// (`date_core.c:7570-7588`) over `old_to_new` (`:3105-3137`). ruby/date's own
+// suite only round-trips the 6-element dump `marshal_dump` writes, so the two
+// legacy arms are covered here; the expectations are what MRI 3.3 answers for
+// the same arrays.
+describe("Date#marshalLoad legacy dumps", () => {
+  it("loads the 3-element 1.8.x dump", () => {
+    const d = new RubyDate(2001, 2, 3);
+    const d2 = new RubyDate().marshalLoad([d.ajd, new Rational(0, 1), RubyDate.ITALY]);
+    expect(d2.toS()).toBe("2001-02-03");
+    expect(d2.equals(d)).toBe(true);
+  });
+
+  it("loads the 2-element 1.6.x dump, whose reform is a boolean", () => {
+    const d = new RubyDate(2001, 2, 3);
+    const d2 = new RubyDate().marshalLoad([d.ajd.add(new Rational(1, 2)), true]);
+    expect(d2.toS()).toBe("2001-02-03");
+    expect(d2.isGregorian).toBe(true);
+  });
+
+  it("raises TypeError on any other size", () => {
+    expect(() => new RubyDate().marshalLoad([1, 2, 3, 4])).toThrow(TypeError);
+  });
+});
