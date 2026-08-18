@@ -406,7 +406,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with subquery with eager loading in from", async () => {
-    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order(":id");
+    const relation = Comment.includes(":post").where({ "posts.type": "Post" }).order(":id");
     const expected = (await relation).map((c) => c.id);
     expect((await Comment.select("*").from(relation)).map((c) => c.id)).toEqual(expected);
     expect((await Comment.select("subquery.*").from(relation)).map((c) => c.id)).toEqual(expected);
@@ -423,7 +423,7 @@ describe("RelationTest", () => {
   // `toSql()` emits. This is Rails-correct, and shared with the where-subquery
   // path (`relation-handler`); converging to `t0_r*` here would diverge.
   it("eager from() subquery projects the table star, not column aliases", async () => {
-    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order(":id");
+    const relation = Comment.includes(":post").where({ "posts.type": "Post" }).order(":id");
     const sql = await (Comment.select("*").from(relation) as any).toSql();
     // Adapter-agnostic: strip identifier quoting (`"` on sqlite/postgres,
     // backticks on mysql) so the shape assertion holds on every CI adapter.
@@ -433,7 +433,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with subquery with eager loading in where", async () => {
-    const relation = Comment.includes("post").where({ "posts.type": "Post" });
+    const relation = Comment.includes(":post").where({ "posts.type": "Post" });
     const expected = (await relation).map((c) => Number(c.id)).sort((a, b) => a - b);
     expect(
       (await Comment.where({ id: relation })).map((c) => Number(c.id)).sort((a, b) => a - b),
@@ -834,7 +834,7 @@ describe("RelationTest", () => {
 
   it("eager association loading of stis with multiple references", async () => {
     const loaded = await Author.eagerLoad({
-      posts: { specialComments: { post: ["specialComments", "verySpecialComment"] } },
+      ":posts": { ":specialComments": { ":post": [":specialComments", ":verySpecialComment"] } },
     })
       .order("comments.body, very_special_comments_posts.body")
       .where("posts.id = 4");
@@ -849,12 +849,12 @@ describe("RelationTest", () => {
   });
 
   it("find with preloaded associations", async () => {
-    const posts1 = await Post.preload("comments").order("posts.id");
+    const posts1 = await Post.preload(":comments").order("posts.id");
     const firstPost = posts1.find((p) => Number(p.id) === 1)!;
     const firstComments = await firstPost.comments;
     expect(firstComments.length).toBeGreaterThan(0);
 
-    const posts2 = await Post.preload("author").order("posts.id");
+    const posts2 = await Post.preload(":author").order("posts.id");
     const withAuthor = posts2[0];
     const author = await withAuthor.author;
     expect(author).toBeTruthy();
@@ -870,11 +870,11 @@ describe("RelationTest", () => {
   });
 
   it("find with included associations", async () => {
-    const posts1 = await Post.includes("comments").order("posts.id");
+    const posts1 = await Post.includes(":comments").order("posts.id");
     const firstComments = await posts1[0].comments;
     expect(firstComments.length).toBeGreaterThan(0);
 
-    const posts2 = await Post.includes("author").order("posts.id");
+    const posts2 = await Post.includes(":author").order("posts.id");
     const author = await posts2[0].author;
     expect(author).toBeTruthy();
   });
@@ -888,7 +888,7 @@ describe("RelationTest", () => {
   it("includes with select", async () => {
     const query = Post.select("legacy_comments_count AS ranking")
       .order("ranking")
-      .includes("comments")
+      .includes(":comments")
       .where({ comments: { id: 1 } });
     expect((query as any).selectValues).toEqual(["legacy_comments_count AS ranking"]);
     expect(await query.size()).toBe(1);
@@ -899,7 +899,7 @@ describe("RelationTest", () => {
     const reader = await Reader.createBang({ post_id: post.id, person_id: 1 });
     const comment = await Comment.createBang({ post_id: post.id, body: "body" });
 
-    const postRel = Post.preload("readers").joins(":readers").where({ title: "Uhuu" });
+    const postRel = Post.preload(":readers").joins(":readers").where({ title: "Uhuu" });
     let resultComment = (await Comment.joins(":post").merge(postRel))[0];
     expect(Number(resultComment.id)).toBe(Number(comment.id));
 
@@ -910,7 +910,7 @@ describe("RelationTest", () => {
     expect(readersAssoc.isLoaded()).toBe(true);
     expect(readersAssoc.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
 
-    const postRel2 = Post.includes("readers").where({ title: "Uhuu" });
+    const postRel2 = Post.includes(":readers").where({ title: "Uhuu" });
     resultComment = (await Comment.joins(":post").merge(postRel2).first())!;
     expect(Number(resultComment.id)).toBe(Number(comment.id));
 
@@ -924,16 +924,16 @@ describe("RelationTest", () => {
     // Rails merges :eager_load as a NORMAL_VALUE (merger.rb) — a straight union
     // via eager_load!, never gated on model equality nor nested under a
     // reflection, so it crosses the model boundary untouched.
-    const merged = Comment.joins(":post").merge(Post.eagerLoad("readers")) as any;
-    expect(merged.eagerLoadValues).toContain("readers");
+    const merged = Comment.joins(":post").merge(Post.eagerLoad(":readers")) as any;
+    expect(merged.eagerLoadValues).toContain(":readers");
 
     // merge! (in-place) shares Merger#merge in Rails; trails routes both through
     // the same foldMerge* helpers, so the cross-model reflection-nesting applies
     // identically — the bang path must nest `{ post: [:readers] }`, not ask
     // Comment to preload `:readers` directly.
     const bang = Comment.joins(":post") as any;
-    bang.mergeBang(Post.preload("readers").where({ title: "Uhuu" }));
-    expect(bang.preloadValues).toEqual([{ post: ["readers"] }]);
+    bang.mergeBang(Post.preload(":readers").where({ title: "Uhuu" }));
+    expect(bang.preloadValues).toEqual([{ ":post": [":readers"] }]);
     const bangComment = (await bang.toArray())[0];
     const bangPost = bangComment.association("post");
     expect(bangPost.isLoaded()).toBe(true);
@@ -944,7 +944,7 @@ describe("RelationTest", () => {
     const post = await Post.createBang({ title: "Uhuu", body: "body" });
     await Reader.createBang({ post_id: post.id, person_id: 1 });
 
-    const postRel = PostWithPreloadDefaultScope.preload("readers")
+    const postRel = PostWithPreloadDefaultScope.preload(":readers")
       .joins("INNER JOIN readers ON readers.post_id = posts.id")
       .where({ title: "Uhuu" });
     const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel);
@@ -954,7 +954,7 @@ describe("RelationTest", () => {
     expect(Number(preloadedReaders[0].post_id)).toBe(Number(post.id));
 
     // includes branch: PostWithIncludesDefaultScope
-    const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
+    const postRel2 = PostWithIncludesDefaultScope.includes(":readers").where({ title: "Uhuu" });
     const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2);
     expect(resultPosts2).toHaveLength(1);
     const includedReaders = await resultPosts2[0].readers;
@@ -963,18 +963,18 @@ describe("RelationTest", () => {
   });
 
   it("loading with one association", async () => {
-    const allPosts = await Post.preload("comments");
+    const allPosts = await Post.preload(":comments");
     const post = allPosts.find((p) => Number(p.id) === 1)!;
     const postComments = await post.comments;
     expect(postComments).toHaveLength(2);
     expect(postComments.map((c: any) => c.id)).toContain(comments("greetings").id);
 
-    const post2 = await Post.where({ title: "Welcome to the weblog" }).preload("comments").first();
+    const post2 = await Post.where({ title: "Welcome to the weblog" }).preload(":comments").first();
     const post2Comments = await post2!.comments;
     expect(post2Comments).toHaveLength(2);
     expect(post2Comments.map((c: any) => c.id)).toContain(comments("greetings").id);
 
-    const postsWithLastComment = await Post.preload("lastComment");
+    const postsWithLastComment = await Post.preload(":lastComment");
     const postWithLastComment = postsWithLastComment.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
     const directLastComment = await freshPost.loadHasOne("lastComment");
@@ -984,10 +984,10 @@ describe("RelationTest", () => {
   it("to sql on eager join", async () => {
     const expected = (
       await captureSql(async () => {
-        await Post.eagerLoad("lastComment").order("comments.id DESC");
+        await Post.eagerLoad(":lastComment").order("comments.id DESC");
       })
     )[0];
-    const actual = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
+    const actual = Post.eagerLoad(":lastComment").order("comments.id DESC").toSql();
     expect(expected).toEqual(actual);
   });
 
@@ -999,7 +999,7 @@ describe("RelationTest", () => {
 
   it("loading with one association with non preload", async () => {
     void posts("welcome");
-    const postsEager = await Post.eagerLoad("lastComment").order("comments.id DESC");
+    const postsEager = await Post.eagerLoad(":lastComment").order("comments.id DESC");
     const post = postsEager.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
     const directLastComment = await freshPost.loadHasOne("lastComment");
@@ -1261,25 +1261,25 @@ describe("RelationTest", () => {
   });
 
   it("size with eager loading and custom order", async () => {
-    const postsRel = Post.includes("comments").order("comments.id");
+    const postsRel = Post.includes(":comments").order("comments.id");
     expect(await postsRel.size()).toBe(11);
     expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and custom select and order", async () => {
-    const postsRel = Post.includes("comments").order("comments.id").select("type");
+    const postsRel = Post.includes(":comments").order("comments.id").select("type");
     expect(await postsRel.size()).toBe(11);
     expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and custom order and distinct", async () => {
-    const postsRel = Post.includes("comments").order("comments.id").distinct();
+    const postsRel = Post.includes(":comments").order("comments.id").distinct();
     expect(await postsRel.size()).toBe(11);
     expect((await postsRel).length).toBe(11);
   });
 
   it("size with eager loading and manual distinct select and custom order", () => {
-    const sql = Post.includes("comments").select("DISTINCT posts.id").order("comments.id").toSql();
+    const sql = Post.includes(":comments").select("DISTINCT posts.id").order("comments.id").toSql();
     expect(sql).toContain("DISTINCT");
   });
 
@@ -2027,7 +2027,7 @@ describe("RelationTest", () => {
   });
 
   it("references triggers eager loading", () => {
-    const scope = Post.includes("comments");
+    const scope = Post.includes(":comments");
     expect(scope.isEagerLoading).toBe(false);
     expect(scope.references("comments").isEagerLoading).toBe(true);
   });
@@ -2038,32 +2038,32 @@ describe("RelationTest", () => {
   });
 
   it("order triggers eager loading", () => {
-    const scope = Post.includes("comments").order("comments.label ASC");
+    const scope = Post.includes(":comments").order("comments.label ASC");
     expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using the owner table", () => {
-    const scope = Post.includes("comments").order("posts.title ASC");
+    const scope = Post.includes(":comments").order("posts.title ASC");
     expect(scope.isEagerLoading).toBe(false);
   });
 
   it("order triggers eager loading when ordering using symbols", () => {
-    const scope = Post.includes("comments").order("comments.label");
+    const scope = Post.includes(":comments").order("comments.label");
     expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using owner table and symbols", () => {
-    const scope = Post.includes("comments").order("posts.title");
+    const scope = Post.includes(":comments").order("posts.title");
     expect(scope.isEagerLoading).toBe(false);
   });
 
   it("order triggers eager loading when ordering using hash syntax", () => {
-    const scope = Post.includes("comments").order({ "comments.label": "ASC" });
+    const scope = Post.includes(":comments").order({ "comments.label": "ASC" });
     expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using the owner table and hash syntax", () => {
-    const scope = Post.includes("comments").order({ "posts.title": "ASC" });
+    const scope = Post.includes(":comments").order({ "posts.title": "ASC" });
     expect(scope.isEagerLoading).toBe(false);
   });
 
@@ -2570,13 +2570,13 @@ describe("RelationTest", () => {
   it("#skip_query_cache! with an eager load", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.eagerLoad("comments").load();
-        await Post.eagerLoad("comments").load();
+        await Post.eagerLoad(":comments").load();
+        await Post.eagerLoad(":comments").load();
       });
 
       await assertQueriesCount(2, false, async () => {
-        await Post.eagerLoad("comments").skipQueryCacheBang().load();
-        await Post.eagerLoad("comments").skipQueryCacheBang().load();
+        await Post.eagerLoad(":comments").skipQueryCacheBang().load();
+        await Post.eagerLoad(":comments").skipQueryCacheBang().load();
       });
     });
   });
@@ -2584,13 +2584,13 @@ describe("RelationTest", () => {
   it("#skip_query_cache! with a preload", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(2, false, async () => {
-        await Post.preload("comments").load();
-        await Post.preload("comments").load();
+        await Post.preload(":comments").load();
+        await Post.preload(":comments").load();
       });
 
       await assertQueriesCount(4, false, async () => {
-        await Post.preload("comments").skipQueryCacheBang().load();
-        await Post.preload("comments").skipQueryCacheBang().load();
+        await Post.preload(":comments").skipQueryCacheBang().load();
+        await Post.preload(":comments").skipQueryCacheBang().load();
       });
     });
   });

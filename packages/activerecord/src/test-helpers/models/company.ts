@@ -65,7 +65,7 @@ export class Company extends AbstractCompany {
     this.hasMany("contracts");
     this.hasMany("developers", { through: "contracts" });
     this.hasMany("specialContracts", (q: any) =>
-      q.includes("specialDeveloper").where().not({ "developers.id": null }),
+      q.includes(":specialDeveloper").where().not({ "developers.id": null }),
     );
     this.hasMany("specialDevelopers", { through: "specialContracts" });
     this.hasMany("comments", { foreignKey: "company" });

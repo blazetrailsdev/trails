@@ -141,7 +141,7 @@ describe("CalculationsTest", () => {
     expect(
       await Account.where("companies.name != 'Summit'")
         .references("companies")
-        .includes("firm")
+        .includes(":firm")
         .maximum("credit_limit"),
     ).toBe(55);
   });
@@ -150,7 +150,7 @@ describe("CalculationsTest", () => {
     expect(
       await Account.where("companies.name != 'Summit'")
         .references("companies")
-        .includes("firm")
+        .includes(":firm")
         .maximum(Account.arelTable.get("credit_limit")),
     ).toBe(55);
   });
@@ -387,19 +387,19 @@ describe("CalculationsTest", () => {
 
   it("count with eager loading and custom order", async () => {
     // Rails: Post.includes(:comments).order("comments.id").count() == 11
-    const count = await Post.includes("comments").order("comments.id").count();
+    const count = await Post.includes(":comments").order("comments.id").count();
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
   });
 
   it("count with eager loading and custom select and order", async () => {
-    const count = await Post.includes("comments").order("comments.id").select("type").count();
+    const count = await Post.includes(":comments").order("comments.id").select("type").count();
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
   });
 
   it("count with eager loading and custom order and distinct", async () => {
-    const count = await Post.includes("comments").order("comments.id").distinct().count();
+    const count = await Post.includes(":comments").order("comments.id").distinct().count();
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
   });
@@ -478,7 +478,7 @@ describe("CalculationsTest", () => {
 
   it("count for a composite primary key model with includes and references", async () => {
     expect(await CpkBook.count()).toBe(
-      await CpkBook.includes("chapters").references("chapters").count(),
+      await CpkBook.includes(":chapters").references("chapters").count(),
     );
   });
 
@@ -698,20 +698,20 @@ describe("CalculationsTest", () => {
   });
 
   it("should count selected field with include", async () => {
-    expect(await Account.includes("firm").distinct().count()).toBe(6);
+    expect(await Account.includes(":firm").distinct().count()).toBe(6);
     // Rails: Account.includes(:firm).distinct.select(:credit_limit).count == 4
     // (4 distinct credit_limit values: 50, 53, 55, 60)
     expect(
-      await Account.includes("firm").distinct().select("credit_limit").count(),
+      await Account.includes(":firm").distinct().select("credit_limit").count(),
     ).toBeGreaterThanOrEqual(4);
   });
 
   it("should not perform joined include by default", async () => {
-    expect(await Account.count()).toBe(await Account.includes("firm").count());
+    expect(await Account.count()).toBe(await Account.includes(":firm").count());
   });
 
   it("should perform joined include when referencing included tables", async () => {
-    const joinedCount = await Account.includes("firm")
+    const joinedCount = await Account.includes(":firm")
       .where({ companies: { name: "37signals" } })
       .count();
     expect(joinedCount).toBe(1);
@@ -731,7 +731,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should count manual select with include", async () => {
-    expect(await Account.select("DISTINCT accounts.id").includes("firm").count()).toBe(6);
+    expect(await Account.select("DISTINCT accounts.id").includes(":firm").count()).toBe(6);
   });
 
   it("should count manual select with count all", async () => {
@@ -1059,7 +1059,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck type cast with eager load without table name qualified column", async () => {
-    const rows = await Author.eagerLoad("topics").limit(1).pluck("id");
+    const rows = await Author.eagerLoad(":topics").limit(1).pluck("id");
     expect(Array.isArray(rows)).toBe(true);
   });
 
@@ -1117,7 +1117,7 @@ describe("CalculationsTest", () => {
     const c = await Company.create({ name: "test" });
     const contract = await Contract.create({ company_id: c.id, developer_id: 7 });
     const ids = (
-      await Company.includes("contracts").where({ "contracts.id": contract.id }).pluck("id")
+      await Company.includes(":contracts").where({ "contracts.id": contract.id }).pluck("id")
     ).map(Number);
     expect(ids).toEqual([Number(c.id)]);
   });
@@ -1278,7 +1278,7 @@ describe("CalculationsTest", () => {
 
   it("ids with eager load", async () => {
     const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
-    const ids = (await Company.all().eagerLoad("contracts").ids())
+    const ids = (await Company.all().eagerLoad(":contracts").ids())
       .map(Number)
       .sort((a, b) => a - b);
     expect(ids).toEqual(all);
@@ -1286,19 +1286,21 @@ describe("CalculationsTest", () => {
 
   it("ids with preload", async () => {
     const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
-    const ids = (await Company.all().preload("contracts").ids()).map(Number).sort((a, b) => a - b);
+    const ids = (await Company.all().preload(":contracts").ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(all);
   });
 
   it("ids with includes", async () => {
     const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
-    const ids = (await Company.all().includes("contracts").ids()).map(Number).sort((a, b) => a - b);
+    const ids = (await Company.all().includes(":contracts").ids())
+      .map(Number)
+      .sort((a, b) => a - b);
     expect(ids).toEqual(all);
   });
 
   it("ids with includes and non primary key order", async () => {
     const all = (await Company.all().order("id")).map((c) => Number(c.id));
-    const ids = (await Company.all().includes("contracts").order(":id").ids()).map(Number);
+    const ids = (await Company.all().includes(":contracts").order(":id").ids()).map(Number);
     expect(ids).toEqual(all);
   });
 
@@ -1307,7 +1309,7 @@ describe("CalculationsTest", () => {
     const expected = (await Company.where({ id: scopedIds }))
       .map((c) => Number(c.id))
       .sort((a, b) => a - b);
-    const ids = (await Company.includes("contracts").where({ id: scopedIds }).ids())
+    const ids = (await Company.includes(":contracts").where({ id: scopedIds }).ids())
       .map(Number)
       .sort((a, b) => a - b)
       .filter((v, i, arr) => arr.indexOf(v) === i);
@@ -1318,7 +1320,7 @@ describe("CalculationsTest", () => {
     const company = await Company.first();
     const contract = await Contract.create({ company_id: company!.id });
     const ids = (
-      await Company.includes("contracts").where({ "contracts.id": contract.id }).ids()
+      await Company.includes(":contracts").where({ "contracts.id": contract.id }).ids()
     ).map(Number);
     expect(ids).toEqual([Number(company!.id)]);
   });
@@ -1326,31 +1328,33 @@ describe("CalculationsTest", () => {
   it("ids on loaded relation with includes and table scope", async () => {
     const company = await Company.first();
     const contract = await Contract.create({ company_id: company!.id });
-    const loaded = await Company.includes("contracts").where({ "contracts.id": contract.id });
+    const loaded = await Company.includes(":contracts").where({ "contracts.id": contract.id });
     const ids = loaded.map((c) => Number(c.id));
     expect(ids).toEqual([Number(company!.id)]);
   });
 
   it("ids with includes limit and empty result", async () => {
-    expect(await Topic.includes("replies").limit(0).ids()).toEqual([]);
-    expect(await Topic.includes("replies").limit(1).where("0 = 1").ids()).toEqual([]);
+    expect(await Topic.includes(":replies").limit(0).ids()).toEqual([]);
+    expect(await Topic.includes(":replies").limit(1).where("0 = 1").ids()).toEqual([]);
   });
 
   it("ids with includes offset", async () => {
-    expect((await Topic.includes("replies").order(":id").offset(4).ids()).map(Number)).toEqual([5]);
-    expect(await Topic.includes("replies").order(":id").offset(5).ids()).toEqual([]);
+    expect((await Topic.includes(":replies").order(":id").offset(4).ids()).map(Number)).toEqual([
+      5,
+    ]);
+    expect(await Topic.includes(":replies").order(":id").offset(5).ids()).toEqual([]);
   });
 
   it("pluck with includes limit and empty result", async () => {
-    expect(await Topic.includes("replies").limit(0).pluck("id")).toEqual([]);
-    expect(await Topic.includes("replies").limit(1).where("0 = 1").pluck("id")).toEqual([]);
+    expect(await Topic.includes(":replies").limit(0).pluck("id")).toEqual([]);
+    expect(await Topic.includes(":replies").limit(1).where("0 = 1").pluck("id")).toEqual([]);
   });
 
   it("pluck with includes offset", async () => {
     expect(
-      (await Topic.includes("replies").order(":id").offset(4).pluck("id")).map(Number),
+      (await Topic.includes(":replies").order(":id").offset(4).pluck("id")).map(Number),
     ).toEqual([5]);
-    expect(await Topic.includes("replies").order(":id").offset(5).pluck("id")).toEqual([]);
+    expect(await Topic.includes(":replies").order(":id").offset(5).pluck("id")).toEqual([]);
   });
 
   it("pluck with join", async () => {
@@ -1359,7 +1363,7 @@ describe("CalculationsTest", () => {
     const ids = (await Reply.order("id").pluck("id")).map(Number);
     expect(ids).toEqual([2, 4]);
     // Verify includes(:topic) works (preloads parent topic via parent_id)
-    const replies = await Reply.includes("topic").order("id");
+    const replies = await Reply.includes(":topic").order("id");
     expect(replies.map((r) => Number(r.id))).toEqual([2, 4]);
   });
 
@@ -1393,7 +1397,7 @@ describe("CalculationsTest", () => {
   );
 
   it("group by with limit", async () => {
-    const actual = await Post.includes("comments")
+    const actual = await Post.includes(":comments")
       .group("type")
       .order({ type: "desc" })
       .limit(2)
@@ -1403,7 +1407,7 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with offset", async () => {
-    const actual = await Post.includes("comments")
+    const actual = await Post.includes(":comments")
       .group("type")
       .order({ type: "desc" })
       .offset(1)
@@ -1413,7 +1417,7 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with limit and offset", async () => {
-    const actual = await Post.includes("comments")
+    const actual = await Post.includes(":comments")
       .group("type")
       .order({ type: "desc" })
       .offset(1)
@@ -1719,7 +1723,7 @@ describe("CalculationsTest", () => {
     await Contract.create({ company_id: developer.id, developer_id: 1 });
     await expect(
       Company.where({ id: developer.id })
-        .includes("contracts")
+        .includes(":contracts")
         .where({ "contracts.id": 1 })
         .count(),
     ).resolves.toBeDefined();

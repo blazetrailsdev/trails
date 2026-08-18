@@ -30,7 +30,7 @@ export class Tagging extends Base {
   declare taggable: Base | null;
 
   static {
-    this.belongsTo("tag", (q: any) => q.includes("tagging"));
+    this.belongsTo("tag", (q: any) => q.includes(":tagging"));
     this.belongsTo("superTag", { className: "Tag", foreignKey: "super_tag_id" });
     this.belongsTo("invalidTag", { className: "Tag", foreignKey: "tag_id" });
     this.belongsTo("orderedTag", { className: "OrderedTag", foreignKey: "tag_id" });

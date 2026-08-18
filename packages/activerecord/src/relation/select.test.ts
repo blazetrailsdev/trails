@@ -198,8 +198,8 @@ describe("SelectTest", () => {
     };
 
     assertNonSelectColumnsWontBeLoaded((await posts.first()) as never);
-    assertNonSelectColumnsWontBeLoaded((await posts.preload("comments").first()) as never);
-    assertNonSelectColumnsWontBeLoaded((await posts.eagerLoad("comments").first()) as never);
+    assertNonSelectColumnsWontBeLoaded((await posts.preload(":comments").first()) as never);
+    assertNonSelectColumnsWontBeLoaded((await posts.eagerLoad(":comments").first()) as never);
   });
 
   it("merging select from different model", async () => {
@@ -225,7 +225,7 @@ describe("SelectTest", () => {
     // Rails reads the aliased extra select via `posts.first.foo`; trails exposes
     // query-only aliases through `readAttribute` (no dynamic accessor is
     // generated for non-schema columns), matching the sibling hash-select tests.
-    const posts = Post.select("posts.id * 1.1 AS foo").eagerLoad("comments");
+    const posts = Post.select("posts.id * 1.1 AS foo").eagerLoad(":comments");
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
     // The explicit extra select is preserved through the JoinDependency and
     // hydrated onto the base record, type-cast via the result set's column_types
@@ -248,19 +248,19 @@ describe("SelectTest", () => {
   });
 
   it("aliased select using as with joins and includes", async () => {
-    const posts = Post.select("posts.id AS field_alias").joins(":comments").includes("comments");
+    const posts = Post.select("posts.id AS field_alias").joins(":comments").includes(":comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
   it("aliased select not using as with joins and includes", async () => {
-    const posts = Post.select("posts.id field_alias").joins(":comments").includes("comments");
+    const posts = Post.select("posts.id field_alias").joins(":comments").includes(":comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual(["id", "field_alias"]);
   });
 
   it("star select with joins and includes", async () => {
-    const posts = Post.select("posts.*").joins(":comments").includes("comments");
+    const posts = Post.select("posts.*").joins(":comments").includes(":comments");
     const post = (await posts.first()) as never as { attributes: Record<string, unknown> };
     expect(Object.keys(post.attributes)).toEqual([
       "id",

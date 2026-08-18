@@ -2742,13 +2742,8 @@ export class Relation<T extends Base> {
    * intersection.
    */
   get joinedIncludesValues(): AssociationSpec[] {
-    // DEBT: Rails intersects two Symbol arrays. joins_values now carries the
-    // Symbol spelling while includes_values does not, so both sides drop a
-    // leading colon here. Retires with the includes/preload sweep.
-    const symbolName = (v: unknown): unknown =>
-      typeof v === "string" && v.startsWith(":") ? v.slice(1) : v;
-    const joinsValues = new Set<unknown>(this.joinsValues.map(symbolName));
-    return [...new Set(this.includesValues)].filter((spec) => joinsValues.has(symbolName(spec)));
+    const joinsValues = new Set<unknown>(this.joinsValues);
+    return [...new Set(this.includesValues)].filter((spec) => joinsValues.has(spec));
   }
 
   /** Mirrors: ActiveRecord::Relation#values (relation.rb:1281-1283) — `@values.dup`. */
