@@ -280,13 +280,14 @@ export class FileStore extends Store implements CacheStore {
     } catch {
       return;
     }
-    if (!isEmpty(children)) return;
-    // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and we
-    // still recurse toward the parent (file_store.rb:193-195).
-    try {
-      getFs().rmdirSync(dir);
-    } catch {}
-    this.deleteEmptyDirectories(getPath().dirname(dir));
+    if (isEmpty(children)) {
+      // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and
+      // we still recurse toward the parent (file_store.rb:197-199).
+      try {
+        getFs().rmdirSync(dir);
+      } catch {}
+      this.deleteEmptyDirectories(getPath().dirname(dir));
+    }
   }
 
   // Resolve symlinks like Ruby File.realpath. Adapters without symlink support
