@@ -661,7 +661,8 @@ export class TimeZone {
    * Current time in this timezone.
    */
   now(): TimeWithZone {
-    return new TimeWithZone(instantFrom(currentTime()), this);
+    // `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518).
+    return new TimeWithZone(instantFrom(this.timeNow()), this);
   }
 
   /**
@@ -1052,6 +1053,17 @@ export class TimeZone {
   }
 
   /**
+   * `abbr(time)` (time_zone.rb:567) — `tzinfo.abbr(time)`, the abbreviation the
+   * zone is observing at `time`. trails' `tzinfo` is the IANA name rather than a
+   * `TZInfo::Timezone`, so the delegation goes through the same `getZoneInfo`
+   * shim `dst?`'s port reads, which is where `TZInfo::TimezonePeriod#abbr`
+   * lives here.
+   */
+  abbr(time: Date | Temporal.Instant): string {
+    return getZoneInfo(this.tzinfo, toDate(time)).abbreviation;
+  }
+
+  /**
    * Whether DST is in effect at the given instant.
    */
   isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
@@ -1270,6 +1282,15 @@ export class TimeZone {
       return zones;
     }, {});
     return zonesMapMemo;
+  }
+
+  /**
+   * `time_now` (time_zone.rb:610-612) — `Time.now`, the seam Rails' own time
+   * helpers stub. trails stubs the clock through `time-travel.ts`, so
+   * `currentTime()` is `Time.now` here.
+   */
+  private timeNow(): Date {
+    return currentTime();
   }
 
   toString(): string {
