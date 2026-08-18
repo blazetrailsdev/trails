@@ -1741,8 +1741,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       });
     } catch (err) {
       if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
-      // Rails: `rescue ::Mysql2::Error => error; case error.error_number`
-      // (mysql2_adapter.rb:26-36).
       switch ((err as { errno?: number }).errno) {
         case Mysql2Adapter.ER_BAD_DB_ERROR:
           throw NoDatabaseError.dbError(
