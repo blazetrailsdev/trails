@@ -108,6 +108,12 @@ export class Options {
  */
 const Unspecified: unknown = {};
 
+/** Ruby's `hash.class.name` for the `Session#update` TypeError message. */
+function classNameOf(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
+}
+
 export class Session {
   private by: SessionStore | null;
   private req: Req;
@@ -246,6 +252,16 @@ export class Session {
     return Object.hasOwn(this.delegate, String(key));
   }
 
+  /** Mirrors: `alias :key? :has_key?` (`request/session.rb:136`). */
+  isKey(key: unknown): boolean {
+    return this.hasKey(key);
+  }
+
+  /** Mirrors: `alias :include? :has_key?` (`request/session.rb:137`). */
+  isInclude(key: unknown): boolean {
+    return this.hasKey(key);
+  }
+
   /** Mirrors: `Session#keys` (`request/session.rb:140-143`) — returns keys of the session as Array. */
   get keys(): string[] {
     this.loadForReadBang();
@@ -293,7 +309,7 @@ export class Session {
   /** Mirrors: `Session#update` (`request/session.rb:181-189`) — updates the session with given Hash. */
   update(hash: unknown): Record<string, unknown> {
     if (hash == null || typeof hash !== "object") {
-      throw new TypeError(`no implicit conversion of ${typeof hash} into Hash`);
+      throw new TypeError(`no implicit conversion of ${classNameOf(hash)} into Hash`);
     }
 
     this.loadForWriteBang();
