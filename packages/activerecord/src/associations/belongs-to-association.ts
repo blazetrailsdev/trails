@@ -150,7 +150,7 @@ export class BelongsToAssociation extends SingularAssociation {
   ): Promise<void> {
     const counterCol = this.counterCacheColumn();
     if (!counterCol) return;
-    if (typeof klass.where !== "function") return;
+    if (typeof klass.unscoped !== "function") return;
 
     const configuredPk = (this.reflection.options as any).primaryKey;
     const rawPk = configuredPk ?? klass.primaryKey ?? "id";
@@ -162,7 +162,7 @@ export class BelongsToAssociation extends SingularAssociation {
       conditions[pks[i]] = foreignKeyValues[i];
     }
 
-    const scope = klass.where(conditions);
+    const scope = klass.unscoped().whereBang(conditions);
     if (typeof scope.updateCounters === "function") {
       const touch = (this.reflection.options as any).touch;
       await scope.updateCounters({ [counterCol]: by, touch });
