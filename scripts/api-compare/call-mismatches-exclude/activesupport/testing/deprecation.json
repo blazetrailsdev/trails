@@ -1,0 +1,13 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "testing/deprecation.ts",
+    "rubyName": "assert_deprecated",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:escape"
+    ],
+    "reason": "testing/deprecation.rb:30 builds the matcher from `escape`; the port's `new` at this site constructs the \"No deprecator given\" error the same guard raises."
+  }
+]

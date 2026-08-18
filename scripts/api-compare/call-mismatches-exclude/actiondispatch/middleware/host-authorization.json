@@ -2,6 +2,17 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/host-authorization.ts",
+    "rubyName": "call",
+    "call": "mark_as_authorized",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:request"
+    ],
+    "reason": "host_authorization.rb:91 calls `mark_as_authorized(request)`; the port also threads the raw env it holds separately."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/host-authorization.ts",
     "rubyName": "excluded?",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

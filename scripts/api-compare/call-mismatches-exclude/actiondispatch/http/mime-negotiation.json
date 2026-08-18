@@ -36,5 +36,26 @@
       "ref:v"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-negotiation.ts",
+    "rubyName": "formats",
+    "call": "set_header",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:k",
+      "ref:v"
+    ],
+    "reason": "mime_negotiation.rb:67 forwards the (k, v) pair; the port names the header constant and the computed map directly."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-negotiation.ts",
+    "rubyName": "variant",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "mime_negotiation.rb:90 constructs the variant collection with no arguments; the port's `new` at this site builds the ArgumentError the same guard raises."
   }
 ]

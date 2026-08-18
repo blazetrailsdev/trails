@@ -30,6 +30,17 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:dup"
+    ],
+    "reason": "rack multipart/parser.rb:49 builds the buffer from `dup`; the port seeds it with the empty string."
+  },
+  {
+    "package": "rack",
+    "tsFile": "multipart/parser.ts",
     "rubyName": "normalize_filename",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

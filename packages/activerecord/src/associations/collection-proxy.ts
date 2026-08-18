@@ -61,15 +61,7 @@ import {
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
-import {
-  countRecords,
-  scope as hasManyScope,
-  setDifference,
-  setIntersection,
-} from "./has-many-association.js";
-import { throughForeignKeyPresent } from "./through-association.js";
-import { foreignKeyPresentFor } from "./foreign-association.js";
-import type { AssociationReflection } from "../reflection.js";
+import { scope as hasManyScope, setDifference, setIntersection } from "./has-many-association.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -750,12 +742,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // which for a through association means re-traversing the in-memory chain
     // (`post.author.books` …) on each read rather than caching a scoped subset.
     //
-    // The `!_targetLoaded` guard is essential: `_findTarget()` short-circuits to
-    // `false` once loaded (mirroring Rails `find_target?` = `!loaded? && …`), so
-    // OR-ing on a bare `!_findTarget()` would send *every* post-load `toArray()`
-    // back down the re-query path and defeat caching entirely. `load()` is the
-    // hydrate/cache chokepoint for the already-loaded case (including staleness).
-    if (!this._targetLoaded && !this._findTarget()) {
+    // The `!_targetLoaded` guard is essential: on an unloaded target
+    // `null_scope?` is exactly `!find_target?` (`owner.new_record? &&
+    // !foreign_key_present?`), so OR-ing on a bare `null_scope?` would send
+    // *every* post-load `toArray()` back down the re-query path and defeat
+    // caching entirely. `load()` is the hydrate/cache chokepoint for the
+    // already-loaded case (including staleness).
+    if (!this._targetLoaded && this.isNullScope()) {
       const results = await this._execLoad();
       return this._mergeTargetLists(results);
     }
@@ -1175,149 +1168,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Alias for count.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#size
+   * (collection_proxy.rb:782-784) — `@association.size`. Every arm of
+   * `CollectionAssociation#size` (collection_association.rb:209-222) lives on
+   * the association; the proxy counts nothing itself.
    */
   async size(): Promise<number> {
-    // Mirrors CollectionAssociation#size (collection_association.rb) branch
-    // ordering exactly.
-    //
-    // `!find_target? || loaded?` → return the in-memory target size. A loaded
-    // target is authoritative; an unloaded one is only authoritative when the
-    // target can't be fetched (new-record owner without a foreign key).
-    if (this._targetLoaded || !this._findTarget()) {
-      return this._target.length;
-    }
-    // `@association_ids` cached by a prior ids_reader → its length, no query.
-    const cachedIds = this._cachedAssociationIds();
-    if (cachedIds) {
-      return cachedIds.length;
-    }
-    // GROUP BY present → a grouped COUNT(*) returns per-group rows rather than
-    // a scalar, so Rails loads the full target and counts it in memory.
-    if (this.groupValues.length > 0) {
-      return (await this.loadTarget()).length;
-    }
-    // No DISTINCT and unsaved records buffered → add them to the persisted
-    // COUNT(*) rather than ignoring them.
-    if (!this.distinctValue && this._target.length > 0) {
-      const unsaved = this._target.filter((r) => r.isNewRecord()).length;
-      return unsaved + (await this._countRecords());
-    }
-    return this._countRecords();
-  }
-
-  /**
-   * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
-   * (has_many_association.rb): prefer an active counter cache, otherwise issue
-   * a `COUNT(*)`; purge non-new records and mark the target loaded when the DB
-   * is empty (a documented side-effect that can avoid an extra SELECT); finally
-   * clamp the result to the association scope's `limit_value`.
-   * @internal
-   */
-  private _countRecords(): Promise<number> {
-    const reflection = this.reflection;
-    return countRecords({
-      hasActiveCachedCounter: () => reflection.hasActiveCachedCounter?.() ?? false,
-      counterCacheColumn: () => reflection.counterCacheColumn?.() ?? null,
-      readCounterAttribute: (col) => this._record.readAttribute(col),
-      // has_many_association.rb:84 `scope.count(:all)`: the `:all` keeps a
-      // `select` declared on the association off the COUNT.
-      countViaScope: () => this.count("all") as Promise<number>,
-      // Rails clamps by `association_scope.limit_value` — the association's own
-      // scope, not any in-place proxy (`whereBang`/`limitBang`) mutation. So we
-      // read the limit from the rebuilt scope even on the diverged count path,
-      // matching count_records rather than the ad-hoc query limit.
-      limitValue: () =>
-        (this.scope() as { limitValue?: number | null } | undefined)?.limitValue ?? null,
-      retainOnlyNewRecords: () => {
-        this._target = this._target.filter((r) => r.isNewRecord());
-      },
-      markLoaded: () => {
-        this._targetLoaded = true;
-      },
-    });
-  }
-
-  /**
-   * Mirrors Association#find_target? — whether the target can be fetched.
-   * False when loaded (the caller short-circuits on `_targetLoaded`) or when
-   * the owner is a new record lacking the foreign key needed to query.
-   * @internal
-   */
-  private _findTarget(): boolean {
-    if (this._targetLoaded) return false;
-    return !this._record.isNewRecord() || this._foreignKeyPresent();
-  }
-
-  /**
-   * Whether the target can be fetched for a new-record owner. A has_many :through
-   * routes through a belongs_to (`ThroughAssociation#foreign_key_present?`,
-   * through_association.rb:90); a vanilla has_many requires the owner's
-   * `active_record_primary_key` to be present (`ForeignAssociation#foreign_key_present?`,
-   * foreign_association.rb:5). The same two-branch dispatch runs in
-   * `CollectionAssociation#foreignKeyPresent`, so the proxy and the OO
-   * association agree on both the through and non-through paths.
-   * @internal
-   */
-  private _foreignKeyPresent(): boolean {
-    const reflection = this.reflection;
-    // No registered reflection: the fallback carries none of the key readers below.
-    if (reflection.klass == null) return false;
-    if (this._assocDef.options.through) {
-      return throughForeignKeyPresent({ owner: this._record, reflection });
-    }
-    return foreignKeyPresentFor(reflection as AssociationReflection, this._record);
-  }
-
-  /**
-   * Mirrors the `@association_ids` ivar read in CollectionAssociation#size —
-   * the ids cache lives on the owner's association instance (populated by a
-   * prior `collectionIds` reader), not on the proxy. Returns null when unset.
-   * @internal
-   */
-  private _cachedAssociationIds(): unknown[] | null {
-    const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
-    const ids = assocInstance?._associationIds;
-    return Array.isArray(ids) ? ids : null;
+    return this._collectionAssociation().size();
   }
 
   /**
    * Check if the collection is empty.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#empty?
+   * (collection_proxy.rb:831-833) — `@association.empty?`.
    */
   async isEmpty(): Promise<boolean> {
-    if (this._targetLoaded) return this._target.length === 0;
-    if (this._target.length > 0) return false;
-    // Through associations: #exists always loads the full target, so prefer
-    // count() which routes through AssociationScope as a SQL COUNT for the
-    // common shapes (findTarget fallback still loads for the rest).
-    if (this._isThrough) return (await this.count()) === 0;
-    // Mirrors Rails collection_association.rb#empty?:
-    //   if loaded? || @association_ids || reflection.has_active_cached_counter?
-    //     size.zero?  → count_records (reads counter cache; marks loaded when 0)
-    //   else
-    //     target.empty? && !scope.exists?  (no side effects, never marks loaded)
-    // Using _countRecords unconditionally was a regression: when count=0 it calls
-    // markLoaded(), so a later isEmpty() reads a stale empty cache instead of
-    // querying the DB again after records were created.
-    let activeCachedCounter = false;
-    try {
-      activeCachedCounter = this.reflection.hasActiveCachedCounter?.() ?? false;
-    } catch {
-      // hasActiveCachedCounter can throw when referenced models are not yet
-      // registered (e.g. inverseWhichUpdatesCounterCache calls c.klass).
-    }
-    // Rails empty? → size.zero?, and size returns @association_ids.length when
-    // a prior ids_reader cached them (no query). Only fall back to count_records
-    // when the size comes from a counter cache rather than cached ids.
-    const cachedIds = this._cachedAssociationIds();
-    if (cachedIds !== null) {
-      return cachedIds.length === 0;
-    }
-    if (activeCachedCounter) {
-      return (await this._countRecords()) === 0;
-    }
-    return !(await this.exists());
+    return this._collectionAssociation().isEmpty();
   }
 
   /**
@@ -2522,17 +2388,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152), a one-line
    * delegation to `@association.null_scope?`.
    *
-   * The body is re-expressed rather than borrowed from
-   * `CollectionAssociation.prototype.isNullScope` because the proxy's
-   * `_foreignKeyPresent` is the through-aware one (a `has_many :through` routes
-   * the check through the `belongs_to`), and — as with `isFindFromTarget` — the
-   * proxy must not resolve through `owner.association(name)`, whose state is a
-   * secondary copy.
-   *
    * @internal
    */
   isNullScope(): boolean {
-    return this._record.isNewRecord() && !this._foreignKeyPresent();
+    return this._collectionAssociation().isNullScope();
   }
 
   /**
@@ -2696,29 +2555,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#proxy_association
    */
-  get proxyAssociation(): {
-    readonly owner: Base;
-    readonly reflection: any;
-    readonly target: Base[];
-    readonly loaded: boolean;
-    reset: () => void;
-  } {
-    const proxy = this;
-    return {
-      owner: this._record,
-      reflection: this._assocDef,
-      get target() {
-        return proxy._target;
-      },
-      get loaded() {
-        return proxy._targetLoaded;
-      },
-      // reset() returns `this` (a thenable Relation); the contract here is a
-      // plain void reset, so discard the proxy return rather than leak it.
-      reset: () => {
-        this.reset();
-      },
-    };
+  get proxyAssociation(): CollectionAssociation {
+    return this._collectionAssociation();
   }
 
   /**

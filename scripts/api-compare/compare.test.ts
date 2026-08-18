@@ -39,6 +39,7 @@ import {
   callTagKey,
   splitOverriddenFileBuckets,
   resolveTsOwner,
+  ownerCallArgSites,
   ambiguousTsOwner,
   ambiguousRubyOwner,
   rubyOwnerSeat,
@@ -1880,6 +1881,68 @@ describe("ambiguousTsOwner", () => {
     expect(ambiguousTsOwner(owners, resolveTsOwner(owners, "ActiveRecord::FinderMethods"))).toBe(
       false,
     );
+  });
+});
+
+describe("ownerCallArgSites", () => {
+  // The trails mixin convention (CLAUDE.md "Module mixins"): ONE body exported
+  // free and re-exported through a grouping object, so the file records the
+  // same sites twice — under `""` and under `TimeExt`.
+  const sites = [{ name: "toTime", args: [] }];
+  const twiceDeclared = new Map([
+    [
+      "time-ext.ts",
+      new Map([
+        [
+          "toTime",
+          new Map([
+            ["", [sites]],
+            ["TimeExt", [sites]],
+          ]),
+        ],
+      ]),
+    ],
+  ]);
+  const twiceDeclaredByFile = new Map([["time-ext.ts", new Map([["toTime", [sites, sites]]])]]);
+
+  it("compares a twice-declared single body under its resolved owner", () => {
+    const owners = new Set(["", "TimeExt"]);
+    const tsClass = resolveTsOwner(owners, "Time", {
+      callSetOf: (o) => (o === "" || o === "TimeExt" ? [["toTime"]] : undefined),
+    });
+    expect(tsClass).toBe("");
+    expect(
+      ownerCallArgSites(twiceDeclared, twiceDeclaredByFile, "time-ext.ts", "toTime", tsClass),
+    ).toBe(sites);
+  });
+
+  it("still bails when the owner is ambiguous and the file declares the name twice", () => {
+    // relation.ts's `Relation#first` beside `ExplainProxy#first`: two genuinely
+    // different bodies, so `resolveTsOwner` returns undefined and there is no
+    // ground for pairing the Ruby sites against either.
+    const first = [{ name: "findNth", args: [] }];
+    const second = [{ name: "execExplain", args: [] }];
+    const byOwner = new Map([
+      [
+        "relation.ts",
+        new Map([
+          [
+            "first",
+            new Map([
+              ["Relation", [first]],
+              ["ExplainProxy", [second]],
+            ]),
+          ],
+        ]),
+      ],
+    ]);
+    const byFile = new Map([["relation.ts", new Map([["first", [first, second]]])]]);
+    expect(ownerCallArgSites(byOwner, byFile, "relation.ts", "first", undefined)).toBeUndefined();
+  });
+
+  it("compares the single whole-file entry when the file declares the name once", () => {
+    const byFile = new Map([["relation.ts", new Map([["first", [sites]]])]]);
+    expect(ownerCallArgSites(new Map(), byFile, "relation.ts", "first", "Relation")).toBe(sites);
   });
 });
 

@@ -12,5 +12,31 @@
     "rubyName": "uuid_from_hash",
     "call": "unpack",
     "reason": "Ruby core String#unpack of the digest bytes (core_ext/digest/uuid.rb:19-38), not a ported trails method."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/digest/uuid.ts",
+    "rubyName": "uuid_v3",
+    "call": "uuid_from_hash",
+    "kind": "args",
+    "rubyArgs": [
+      "const:MD5",
+      "ref:uuidNamespace",
+      "ref:name"
+    ],
+    "reason": "digest/uuid.rb:42 names the digest class `::Digest::MD5`; the port selects it by the string `\"md5\"` the Web Crypto/Node digest API takes."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/digest/uuid.ts",
+    "rubyName": "uuid_v5",
+    "call": "uuid_from_hash",
+    "kind": "args",
+    "rubyArgs": [
+      "const:SHA1",
+      "ref:uuidNamespace",
+      "ref:name"
+    ],
+    "reason": "digest/uuid.rb:47 names the digest class `::Digest::SHA1`; the port selects it by the string `\"sha1\"` the Web Crypto/Node digest API takes."
   }
 ]

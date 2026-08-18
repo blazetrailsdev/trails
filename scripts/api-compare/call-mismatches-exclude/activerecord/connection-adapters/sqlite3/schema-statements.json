@@ -2,6 +2,18 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
+    "rubyName": "data_source_sql",
+    "call": "quoted_scope",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{type=ref:type}"
+    ],
+    "reason": "sqlite3/schema_statements.rb:181 passes `type:` as a kwarg to quoted_scope; the port takes it positionally."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
     "rubyName": "indexes",
     "call": "quote_table_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -26,5 +38,17 @@
     "rubyName": "virtual_table_exists?",
     "call": "any?",
     "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails schema_statements.rb:88 ends the query_values probe with a block-less `.any?`; the port spells that emptiness test as `.length > 0` (JS arrays have no `any?`), same as the other `#any?` -> `.length > 0` entries in this baseline."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
+    "rubyName": "virtual_table_exists?",
+    "call": "data_source_sql",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName",
+      "kwargs{type=str:VIRTUAL TABLE}"
+    ],
+    "reason": "sqlite3/schema_statements.rb:87 passes `type:` as a kwarg to data_source_sql; the port takes it positionally."
   }
 ]
