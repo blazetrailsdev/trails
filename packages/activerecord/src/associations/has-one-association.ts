@@ -532,6 +532,8 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private setOwnerAttributes(record: Base): void {
+    if (this.reflection.options.through) return;
+
     const ctor = (this.owner as any).constructor;
     const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
