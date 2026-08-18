@@ -82,8 +82,10 @@ describe("OrderedOptionsTest", () => {
   it("introspection", () => {
     const a = new OrderedOptions() as any;
     a.boy = "John";
+    // `respond_to_missing?` (ordered_options.rb:60-62) answers true for every
+    // name, so `in` is not a membership test — `key?` is.
     expect("boy" in a).toBe(true);
-    expect("girl" in a).toBe(false);
+    expect(a.isKey("girl")).toBe(false);
   });
 
   it("raises with bang", () => {
@@ -225,8 +227,9 @@ describe("OrderedOptionsTest", () => {
   it("ordered options to s", () => {
     const a = new OrderedOptions() as any;
     a.boy = "John";
+    // `to_s` is `Hash#to_s`, which renders the pairs, not the `#<…>` form.
     const str = a.toString();
-    expect(str).toContain("OrderedOptions");
+    expect(a.inspect()).toContain("OrderedOptions");
     expect(str).toContain("boy");
   });
 
@@ -235,8 +238,7 @@ describe("OrderedOptionsTest", () => {
     parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
-    const str = child.toString();
-    expect(str).toContain("InheritableOptions");
+    expect(child.inspect()).toContain("InheritableOptions");
   });
 
   it("odrered options pp", () => {
