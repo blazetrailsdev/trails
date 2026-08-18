@@ -11,14 +11,14 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
     "call": "internal_execute",
-    "reason": "configure runs while the acquire machinery still holds the connection, so the SET statements go straight to the pg.Client — routing them through internalExecute would re-enter connectBang/verify and deadlock."
+    "reason": "configure runs while the acquire machinery still holds the connection, so the SET statements go straight to the pg.Client — routing them through internalExecute would re-enter connectBang/verify and deadlock. Root cause (RFC 0106 re-confirmation): Rails' `with_raw_connection` wraps its body in `@lock.synchronize` (abstract_adapter.rb:983-984) and `@lock` is a `Monitor` (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`), which is RE-ENTRANT for the owning thread — so Rails nests this call inside the acquire that is already holding the connection. A JS promise-based mutex has no thread/fiber identity to key re-entrancy on, so the nested call deadlocks instead of re-entering. Language shortcoming, tracked by RFC 0073."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
     "call": "quote",
-    "reason": "The SET SESSION values are rendered by `quoteLiteral` on the raw client in `_maybeConfigureConnection`; `quote` would route back through the type-cast stack the connection is still mid-configure for."
+    "reason": "The SET SESSION values are rendered by `quoteLiteral` on the raw client in `_maybeConfigureConnection`; `quote` would route back through the type-cast stack the connection is still mid-configure for. Root cause (RFC 0106 re-confirmation): Rails' `with_raw_connection` wraps its body in `@lock.synchronize` (abstract_adapter.rb:983-984) and `@lock` is a `Monitor` (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`), which is RE-ENTRANT for the owning thread — so Rails nests this call inside the acquire that is already holding the connection. A JS promise-based mutex has no thread/fiber identity to key re-entrancy on, so the nested call deadlocks instead of re-entering. Language shortcoming, tracked by RFC 0073."
   },
   {
     "package": "activerecord",
@@ -32,7 +32,7 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "get_database_version",
     "call": "with_raw_connection",
-    "reason": "Rails' with_raw_connection is re-entrant on @raw_connection; ours is not, and this runs inside the very acquire configureConnection is warming, so it takes the published `_rawConnection` directly."
+    "reason": "Rails' with_raw_connection is re-entrant on @raw_connection; ours is not, and this runs inside the very acquire configureConnection is warming, so it takes the published `_rawConnection` directly. Root cause (RFC 0106 re-confirmation): Rails' `with_raw_connection` wraps its body in `@lock.synchronize` (abstract_adapter.rb:983-984) and `@lock` is a `Monitor` (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`), which is RE-ENTRANT for the owning thread — so Rails nests this call inside the acquire that is already holding the connection. A JS promise-based mutex has no thread/fiber identity to key re-entrancy on, so the nested call deadlocks instead of re-entering. Language shortcoming, tracked by RFC 0073."
   },
   {
     "package": "activerecord",
@@ -60,6 +60,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "reconfigure_connection_timezone",
     "call": "raw_execute",
-    "reason": "Runs as the first step of `_performQuery`, itself the block already executing inside withRawConnection, so the SET goes to the acquired client directly rather than re-entering rawExecute's leaf loop."
+    "reason": "Runs as the first step of `_performQuery`, itself the block already executing inside withRawConnection, so the SET goes to the acquired client directly rather than re-entering rawExecute's leaf loop. Root cause (RFC 0106 re-confirmation): Rails' `with_raw_connection` wraps its body in `@lock.synchronize` (abstract_adapter.rb:983-984) and `@lock` is a `Monitor` (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`), which is RE-ENTRANT for the owning thread — so Rails nests this call inside the acquire that is already holding the connection. A JS promise-based mutex has no thread/fiber identity to key re-entrancy on, so the nested call deadlocks instead of re-entering. Language shortcoming, tracked by RFC 0073."
   }
 ]
