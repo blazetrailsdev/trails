@@ -189,9 +189,6 @@ describe("significantMissingCalls", () => {
   });
 
   it("does not let a sibling call claim a suppressed call's TS spelling", () => {
-    // delegation.rb:74-90 — `method_defined?(method)` is suppressed (no ported
-    // TS method with args), and trails spells it `this._methods.has(name)`.
-    // `include?` aliases to `has` too, so without the claim it went unflagged.
     const missing = significantMissingCalls(
       "generate_method",
       ["method_defined?", "include?"],

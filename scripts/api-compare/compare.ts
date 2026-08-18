@@ -399,11 +399,12 @@ export function narrowPredicateCandidates(
  * Entries are here rather than in {@link JS_ENUMERABLE_ALIASES} because that
  * table's contract is that an alias can only ever SILENCE a flag; these
  * spellings exist to take a name away from a sibling, which can raise one.
+ *
+ * `method_defined?` — `Module#method_defined?(name)` asks whether a name is
+ * installed on a method table; trails' generated-method tables are `Map`s, so
+ * the port is `table.has(name)`, the same JS callee `include?`/`key?` alias to.
  */
 export const SUPPRESSED_CALL_TS_SPELLINGS = new Map<string, string[]>([
-  // `Module#method_defined?(name)` asks whether a name is installed on a
-  // method table. trails' generated-method tables are `Map`s, so the port is
-  // `table.has(name)` — the same JS callee `include?`/`key?` alias to.
   ["method_defined?", ["has"]],
 ]);
 
@@ -475,9 +476,8 @@ export function significantMissingCalls(
   bodyRubyCalls: readonly string[] = rubyCalls,
 ): string[] {
   const missing: string[] = [];
-  // A TS name a SUPPRESSED Ruby call ports is not available to its siblings.
   const claimed = suppressedCallClaims(
-    rubyCalls.filter((rc) => rc !== rubyName),
+    bodyRubyCalls.filter((rc) => rc !== rubyName),
     tsCalls,
     isPortedWithArgs,
     mapCall,
