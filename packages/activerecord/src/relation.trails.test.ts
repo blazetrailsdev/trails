@@ -228,7 +228,7 @@ describe("RelationTest", () => {
   });
 
   it("constructJoinDependency handles hash spec — leftJoins({ posts: 'comments' })", () => {
-    // Hash spec { posts: "comments" } means: join posts, then join comments via posts.
+    // Hash spec { ":posts": ":comments" } means: join posts, then join comments via posts.
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -251,7 +251,7 @@ describe("RelationTest", () => {
     registerModel("HashAuthor", Author);
     registerModel("HashPost", Post);
     registerModel("HashComment", Comment);
-    const sql = Author.all().leftJoins({ posts: ":comments" }).toSql();
+    const sql = Author.all().leftJoins({ ":posts": ":comments" }).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
     // Verify comments is joined through posts: ON clause must reference the

@@ -62,16 +62,18 @@ const rule = {
     ],
     messages: {
       rawRead:
-        'Raw read of `{{name}}`: JS statics are inherited where Ruby class ivars are not, so on a subclass this serves the ancestor\'s memo — stale once an ancestor stamped `_schemaRevision`. Read it through `ownSchemaMemo(host, "{{name}}")` (or `isSchemaLoaded`), which applies the `schemaStaleAgainstAncestors` pull fallback.',
+        'Raw read of `{{name}}`: JS statics are inherited where Ruby class ivars are not, so on a subclass this serves the ancestor\'s memo — stale once an ancestor stamped `_schemaRevision`. Route it through one of: `isSchemaLoaded(host)` for the loaded flag; `ownSchemaMemo(host, "{{name}}")` outside a schema load, which adds the `schemaStaleAgainstAncestors` pull fallback; or `ownProp(host, "{{name}}")` for a reader running INSIDE the class\'s own `applyColumnsHash` / decorator replay, where `_schemaRevision` is not stamped until the end and the pull fallback would blank the hash just written.',
     },
   },
 
   create(context) {
     const options = context.options[0] ?? {};
     const memos = new Set(options.memos ?? DEFAULT_MEMOS);
-    // `ownSchemaMemo` and `schemaStaleAgainstAncestors` ARE the guard; their own
-    // reads are the sanctioned ones.
-    const allowIn = new Set(options.allowIn ?? ["ownSchemaMemo", "schemaStaleAgainstAncestors"]);
+    // `ownSchemaMemo`, `ownProp` and `schemaStaleAgainstAncestors` ARE the guard;
+    // their own reads are the sanctioned ones.
+    const allowIn = new Set(
+      options.allowIn ?? ["ownSchemaMemo", "ownProp", "schemaStaleAgainstAncestors"],
+    );
 
     /** Name of the nearest enclosing function declaration/expression, if any. */
     function enclosingFunctionNames(node) {

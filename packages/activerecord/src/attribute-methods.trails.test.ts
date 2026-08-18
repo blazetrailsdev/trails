@@ -370,4 +370,39 @@ describe("AttributeMethodsTest (trails)", () => {
     const employee = new Employee({ name: "David" });
     expect(employee.nameChanged()).toBe(true);
   });
+  it("an inherited generated attribute method does not suppress the subclass's own generation", () => {
+    // attribute_methods.rb:174-177 — the `superclass != Base` arm counts an
+    // inherited method as already-implemented ONLY when its owner is not the
+    // generated-attribute-methods module. `alias_attribute` generates into that
+    // module (attribute_methods.rb:94), so the alias inherited from Middle is
+    // regenerated on the subclass rather than treated as hand-written.
+    class Middle extends Base {
+      static {
+        this.attribute("name", "string");
+        this.aliasAttribute("nickname", "name");
+      }
+    }
+    class Leaf extends Middle {}
+
+    const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
+    expect("nickname" in (Leaf.prototype as object)).toBe(true);
+    expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(false);
+  });
+
+  it("an inherited class-body method is already implemented for the subclass", () => {
+    class HandWritten extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+      nickname(): string {
+        return "hand-written";
+      }
+    }
+    class HandWrittenLeaf extends HandWritten {}
+
+    const host = HandWrittenLeaf as unknown as {
+      isInstanceMethodAlreadyImplemented(n: string): boolean;
+    };
+    expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(true);
+  });
 });

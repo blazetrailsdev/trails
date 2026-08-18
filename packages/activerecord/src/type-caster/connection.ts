@@ -22,20 +22,6 @@ export class Connection {
   }
 
   typeForAttribute(attrName: string): Type {
-    const column = this.resolveColumn(attrName);
-    // Rails scopes the lookup to a leased connection —
-    // `@klass.with_connection { |c| c.lookup_cast_type_from_column(column) }`
-    // (type_caster/connection.rb:21). trails' `withConnection` returns a Promise
-    // (connection-handling.ts:366) and this method is sync, so it reads the
-    // adapter directly, taking a permanent checkout where Rails scopes a lease.
-    // Same RFC 0023 async/sync constraint as the `data_source_exists?` gate below.
-    const type = column
-      ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as Type | undefined)
-      : undefined;
-    return type ?? defaultValue();
-  }
-
-  private resolveColumn(attrName: string): unknown | undefined {
     // `@klass.schema_cache` (type_caster/connection.rb:17) reads the pool's cache
     // without leasing a connection (connection_handling.rb:368-369). trails'
     // `Base.schemaCache()` is that pool handle, but every read on it is async and
@@ -48,8 +34,18 @@ export class Connection {
     // the gate instead: a warmed entry implies the data source exists, and
     // `getCachedColumnsHash` is a plain map read that never triggers the async
     // cache-miss path. Converging the gate waits on RFC 0023.
-    const hash = schemaCache?.getCachedColumnsHash?.(this._tableName);
-    return hash?.[attrName];
+    const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
+    const column = columnsHash?.[attrName];
+    // Rails scopes the lookup to a leased connection —
+    // `@klass.with_connection { |c| c.lookup_cast_type_from_column(column) }`
+    // (type_caster/connection.rb:21). trails' `withConnection` returns a Promise
+    // (connection-handling.ts:366) and this method is sync, so it reads the
+    // adapter directly, taking a permanent checkout where Rails scopes a lease.
+    // Same RFC 0023 async/sync constraint as the `data_source_exists?` gate above.
+    const type = column
+      ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as Type | undefined)
+      : undefined;
+    return type ?? defaultValue();
   }
 }
 

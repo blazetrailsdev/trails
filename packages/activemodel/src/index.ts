@@ -15,6 +15,7 @@ export {
   resolveAliasNameIn,
   AttrNames,
   defineDirtyAttributeMethods,
+  isInstanceMethodAlreadyImplemented,
 } from "./attribute-methods.js";
 export type { InstanceHost } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
