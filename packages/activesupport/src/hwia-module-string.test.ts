@@ -201,7 +201,7 @@ describe("ModuleTest", () => {
     const w = new Widget() as Widget & { color: unknown };
     w.color = "red";
     expect(w.color).toBe("red");
-    expect((w as unknown as Record<string, unknown>)["_color_"]).toBe("red");
+    expect((w as unknown as Record<string, unknown>)["_color"]).toBe("red");
   });
 
   it("isAnonymous — returns true for unnamed class", () => {

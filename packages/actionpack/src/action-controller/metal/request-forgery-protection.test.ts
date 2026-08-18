@@ -46,32 +46,38 @@ function controller(overrides: Partial<CsrfController> = {}): CsrfController {
 
 describe("isProtectAgainstForgery", () => {
   it("returns true by default", () => {
-    expect(isProtectAgainstForgery(controller())).toBe(true);
+    expect(isProtectAgainstForgery.call(controller())).toBe(true);
   });
   it("returns false when allowForgeryProtection is false", () => {
-    expect(isProtectAgainstForgery(controller({ allowForgeryProtection: false }))).toBe(false);
+    expect(isProtectAgainstForgery.call(controller({ allowForgeryProtection: false }))).toBe(false);
   });
   it("delegates to session.enabled()", () => {
-    expect(isProtectAgainstForgery(controller({ session: { enabled: () => false } }))).toBe(false);
-    expect(isProtectAgainstForgery(controller({ session: { enabled: () => true } }))).toBe(true);
+    expect(isProtectAgainstForgery.call(controller({ session: { enabled: () => false } }))).toBe(
+      false,
+    );
+    expect(isProtectAgainstForgery.call(controller({ session: { enabled: () => true } }))).toBe(
+      true,
+    );
   });
 });
 
 describe("isValidRequestOrigin", () => {
   it("is true when origin check is disabled", () => {
-    expect(isValidRequestOrigin(controller({ forgeryProtectionOriginCheck: false }))).toBe(true);
+    expect(isValidRequestOrigin.call(controller({ forgeryProtectionOriginCheck: false }))).toBe(
+      true,
+    );
   });
   it("is true when origin matches base_url or is missing", () => {
-    expect(isValidRequestOrigin(controller())).toBe(true);
+    expect(isValidRequestOrigin.call(controller())).toBe(true);
     expect(
-      isValidRequestOrigin(
+      isValidRequestOrigin.call(
         controller({ request: { method: "POST", baseUrl: "https://example.com" } }),
       ),
     ).toBe(true);
   });
   it("is false when origin differs", () => {
     expect(
-      isValidRequestOrigin(
+      isValidRequestOrigin.call(
         controller({
           request: { method: "POST", origin: "https://evil.com", baseUrl: "https://example.com" },
         }),
@@ -80,7 +86,7 @@ describe("isValidRequestOrigin", () => {
   });
   it("raises InvalidAuthenticityToken for 'null' origin", () => {
     expect(() =>
-      isValidRequestOrigin(
+      isValidRequestOrigin.call(
         controller({ request: { method: "POST", origin: "null", baseUrl: "https://example.com" } }),
       ),
     ).toThrow(InvalidAuthenticityToken);
@@ -90,15 +96,15 @@ describe("isValidRequestOrigin", () => {
 describe("markForSameOriginVerificationBang / isMarkedForSameOriginVerification", () => {
   it("sets the flag based on GET", () => {
     const get = controller({ request: { method: "GET", baseUrl: "https://example.com" } });
-    markForSameOriginVerificationBang(get);
-    expect(isMarkedForSameOriginVerification(get)).toBe(true);
+    markForSameOriginVerificationBang.call(get);
+    expect(isMarkedForSameOriginVerification.call(get)).toBe(true);
 
     const post = controller({ request: { method: "POST", baseUrl: "https://example.com" } });
-    markForSameOriginVerificationBang(post);
-    expect(isMarkedForSameOriginVerification(post)).toBe(false);
+    markForSameOriginVerificationBang.call(post);
+    expect(isMarkedForSameOriginVerification.call(post)).toBe(false);
   });
   it("defaults to false", () => {
-    expect(isMarkedForSameOriginVerification(controller())).toBe(false);
+    expect(isMarkedForSameOriginVerification.call(controller())).toBe(false);
   });
 });
 
@@ -106,7 +112,7 @@ describe("isNonXhrJavascriptResponse", () => {
   it("matches text/ and application/javascript when not xhr", () => {
     for (const mediaType of ["text/javascript", "application/javascript"]) {
       expect(
-        isNonXhrJavascriptResponse(
+        isNonXhrJavascriptResponse.call(
           controller({ request: { method: "GET", baseUrl: "https://example.com", mediaType } }),
         ),
       ).toBe(true);
@@ -114,7 +120,7 @@ describe("isNonXhrJavascriptResponse", () => {
   });
   it("is false when xhr or non-js media type", () => {
     expect(
-      isNonXhrJavascriptResponse(
+      isNonXhrJavascriptResponse.call(
         controller({
           request: {
             method: "GET",
@@ -126,7 +132,7 @@ describe("isNonXhrJavascriptResponse", () => {
       ),
     ).toBe(false);
     expect(
-      isNonXhrJavascriptResponse(
+      isNonXhrJavascriptResponse.call(
         controller({
           request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/html" },
         }),
@@ -141,11 +147,11 @@ describe("verifySameOriginRequest", () => {
       _markedForSameOriginVerification: true,
       request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/javascript" },
     });
-    expect(() => verifySameOriginRequest(c)).toThrow(InvalidCrossOriginRequest);
+    expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
   });
   it("no-ops when not marked", () => {
     expect(() =>
-      verifySameOriginRequest(
+      verifySameOriginRequest.call(
         controller({
           request: {
             method: "GET",
@@ -164,7 +170,7 @@ describe("verifySameOriginRequest", () => {
       request: { method: "GET", baseUrl: "https://example.com", mediaType: "text/javascript" },
       logger: { warn: (m) => calls.push(m) },
     });
-    expect(() => verifySameOriginRequest(c)).toThrow(InvalidCrossOriginRequest);
+    expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatch(/Security warning/);
   });
@@ -177,20 +183,20 @@ describe("verifySameOriginRequest", () => {
       logger: { warn: (m) => calls.push(m) },
       logWarningOnCsrfFailure: false,
     });
-    expect(() => verifySameOriginRequest(c)).toThrow(InvalidCrossOriginRequest);
+    expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
     expect(calls).toHaveLength(0);
   });
 });
 
 describe("unverifiedRequestWarningMessage", () => {
   it("returns short message when origin is valid", () => {
-    expect(unverifiedRequestWarningMessage(controller())).toBe(
+    expect(unverifiedRequestWarningMessage.call(controller())).toBe(
       "Can't verify CSRF token authenticity.",
     );
   });
   it("returns detailed message when origin mismatches", () => {
     expect(
-      unverifiedRequestWarningMessage(
+      unverifiedRequestWarningMessage.call(
         controller({
           request: { method: "POST", origin: "https://evil.com", baseUrl: "https://example.com" },
         }),
@@ -203,20 +209,26 @@ describe("unverifiedRequestWarningMessage", () => {
 
 describe("isVerifiedRequest", () => {
   it("returns true when protection is disabled or method is GET/HEAD", () => {
-    expect(isVerifiedRequest(controller({ allowForgeryProtection: false }))).toBe(true);
+    expect(isVerifiedRequest.call(controller({ allowForgeryProtection: false }))).toBe(true);
     expect(
-      isVerifiedRequest(controller({ request: { method: "GET", baseUrl: "https://example.com" } })),
+      isVerifiedRequest.call(
+        controller({ request: { method: "GET", baseUrl: "https://example.com" } }),
+      ),
     ).toBe(true);
     expect(
-      isVerifiedRequest(
+      isVerifiedRequest.call(
         controller({ request: { method: "HEAD", baseUrl: "https://example.com" } }),
       ),
     ).toBe(true);
   });
   it("requires valid origin and token for POST", () => {
-    expect(isVerifiedRequest(controller({ isAnyAuthenticityTokenValid: () => true }))).toBe(true);
-    expect(isVerifiedRequest(controller({ isAnyAuthenticityTokenValid: () => false }))).toBe(false);
-    expect(isVerifiedRequest(controller())).toBe(false);
+    expect(isVerifiedRequest.call(controller({ isAnyAuthenticityTokenValid: () => true }))).toBe(
+      true,
+    );
+    expect(isVerifiedRequest.call(controller({ isAnyAuthenticityTokenValid: () => false }))).toBe(
+      false,
+    );
+    expect(isVerifiedRequest.call(controller())).toBe(false);
   });
 });
 
@@ -237,7 +249,7 @@ describe("P20b/P20c smoke", () => {
     const raw = decodeCsrfToken(generateCsrfToken());
     expect(unmaskToken(decodeCsrfToken(maskToken(raw))).equals(raw)).toBe(true);
     const c = tokenC();
-    expect(realCsrfToken(c).equals(realCsrfToken(c))).toBe(true);
+    expect(realCsrfToken.call(c).equals(realCsrfToken.call(c))).toBe(true);
   });
 
   it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", () => {
@@ -250,15 +262,15 @@ describe("P20b/P20c smoke", () => {
 
   it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
     const c = tokenC();
-    const masked = maskToken(globalCsrfToken(c));
-    expect(isAnyAuthenticityTokenValid({ ...c, params: { authenticity_token: masked } })).toBe(
+    const masked = maskToken(globalCsrfToken.call(c));
+    expect(isAnyAuthenticityTokenValid.call({ ...c, params: { authenticity_token: masked } })).toBe(
       true,
     );
     expect(
-      isAnyAuthenticityTokenValid({ ...c, request: { ...c.request, xCsrfToken: masked } }),
+      isAnyAuthenticityTokenValid.call({ ...c, request: { ...c.request, xCsrfToken: masked } }),
     ).toBe(true);
-    expect(isAnyAuthenticityTokenValid(c)).toBe(false);
-    expect(isValidAuthenticityToken(c, null, "")).toBe(false);
+    expect(isAnyAuthenticityTokenValid.call(c)).toBe(false);
+    expect(isValidAuthenticityToken.call(c, null, "")).toBe(false);
   });
 
   it("isValidPerFormCsrfToken + compareWith{Global,Real}Token", () => {
@@ -271,10 +283,12 @@ describe("P20b/P20c smoke", () => {
         env: { "action_controller.csrf_token": generateCsrfToken() },
       },
     });
-    expect(isValidPerFormCsrfToken(c, perFormCsrfToken(c, null, "/posts", "POST"))).toBe(true);
-    expect(compareWithGlobalToken(c, globalCsrfToken(c))).toBe(true);
-    expect(compareWithRealToken(c, realCsrfToken(c))).toBe(true);
-    expect(maskedAuthenticityToken(c, { action: "/posts", method: "POST" })).toBeTruthy();
+    expect(isValidPerFormCsrfToken.call(c, perFormCsrfToken.call(c, null, "/posts", "POST"))).toBe(
+      true,
+    );
+    expect(compareWithGlobalToken.call(c, globalCsrfToken.call(c))).toBe(true);
+    expect(compareWithRealToken.call(c, realCsrfToken.call(c))).toBe(true);
+    expect(maskedAuthenticityToken.call(c, { action: "/posts", method: "POST" })).toBeTruthy();
   });
 
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {
@@ -283,8 +297,8 @@ describe("P20b/P20c smoke", () => {
       requestForgeryProtectionToken: "my",
       request: { ...tokenC().request, xCsrfToken: "x" },
     });
-    expect(formAuthenticityParam(c)).toBe("p");
-    expect(requestAuthenticityTokens(c)).toEqual(["p", "x"]);
+    expect(formAuthenticityParam.call(c)).toBe("p");
+    expect(requestAuthenticityTokens.call(c)).toEqual(["p", "x"]);
   });
 
   it("Exception raises InvalidAuthenticityToken with its warningMessage", () => {
@@ -319,18 +333,18 @@ describe("normalizeActionPath / normalizeRelativeActionPath", () => {
     ({ request: { method: "POST", baseUrl: "https://example.com", path } }) as CsrfController;
 
   it("strips trailing slash from absolute paths", () => {
-    expect(normalizeActionPath(at("/current"), "/foo/bar/")).toBe("/foo/bar");
-    expect(normalizeActionPath(at("/current"), "/foo/bar")).toBe("/foo/bar");
+    expect(normalizeActionPath.call(at("/current"), "/foo/bar/")).toBe("/foo/bar");
+    expect(normalizeActionPath.call(at("/current"), "/foo/bar")).toBe("/foo/bar");
   });
   it("extracts path from full URL", () => {
-    expect(normalizeActionPath(at("/current"), "https://example.com/foo/")).toBe("/foo");
+    expect(normalizeActionPath.call(at("/current"), "https://example.com/foo/")).toBe("/foo");
   });
   it("extracts path from protocol-relative URL", () => {
-    expect(normalizeActionPath(at("/current"), "//example.com/foo/")).toBe("/foo");
+    expect(normalizeActionPath.call(at("/current"), "//example.com/foo/")).toBe("/foo");
   });
   it("joins relative paths onto request path and collapses /./", () => {
-    expect(normalizeActionPath(at("/foo"), "bar")).toBe("/foo/bar");
-    expect(normalizeActionPath(at("/foo"), "./bar")).toBe("/foo/bar");
-    expect(normalizeRelativeActionPath(at("/foo"), "bar/")).toBe("/foo/bar");
+    expect(normalizeActionPath.call(at("/foo"), "bar")).toBe("/foo/bar");
+    expect(normalizeActionPath.call(at("/foo"), "./bar")).toBe("/foo/bar");
+    expect(normalizeRelativeActionPath.call(at("/foo"), "bar/")).toBe("/foo/bar");
   });
 });

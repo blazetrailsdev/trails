@@ -245,7 +245,7 @@ export function configAccessor(target: any, ...namesAndOptions: (string | MattrO
   mattrAccessor(target, ...namesAndOptions);
 }
 
-let _attrInternalNamingFormat = "_%s_";
+let _attrInternalNamingFormat = "_%s";
 
 export function getAttrInternalNamingFormat(): string {
   return _attrInternalNamingFormat;

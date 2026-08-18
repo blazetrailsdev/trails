@@ -113,8 +113,13 @@ export class ResetSession implements ProtectionMethods {
 }
 
 export class Exception implements ProtectionMethods {
-  /** Mirrors `attr_accessor :warning_message` (request_forgery_protection.rb:307). */
-  warningMessage?: string;
+  /**
+   * Mirrors `attr_accessor :warning_message` (request_forgery_protection.rb:307).
+   * Initialized so the property exists on the instance, which is what
+   * `handle_unverified_request`'s `respond_to?(:warning_message)` (rb:404) is
+   * spelled as here.
+   */
+  warningMessage: string | undefined = undefined;
   constructor(_controller: Controller) {}
   handleUnverifiedRequest(): void {
     throw new InvalidAuthenticityToken(this.warningMessage);
@@ -237,6 +242,12 @@ export interface CsrfController {
   _markedForSameOriginVerification?: boolean;
   logger?: { warn(msg: string): void } | null;
   logWarningOnCsrfFailure?: boolean;
+  /**
+   * Mirrors the `forgery_protection_strategy` class_attribute
+   * (request_forgery_protection.rb:104), which `protect_from_forgery` sets to
+   * `protection_method_class(name)` (rb:207).
+   */
+  forgeryProtectionStrategy?: new (controller: CsrfController) => ProtectionMethods;
   /** Optional override used by tests/legacy callers. */
   isAnyAuthenticityTokenValid?: () => boolean;
 }
@@ -262,9 +273,9 @@ function isGetOrHead(method: string): boolean {
 }
 
 /** @internal */
-export function isProtectAgainstForgery(controller: CsrfController): boolean {
-  if (controller.allowForgeryProtection === false) return false;
-  const session = controller.session;
+export function isProtectAgainstForgery(this: CsrfController): boolean {
+  if (this.allowForgeryProtection === false) return false;
+  const session = this.session;
   if (session && typeof (session as { enabled?: unknown }).enabled === "function") {
     return (session as { enabled: () => boolean }).enabled();
   }
@@ -272,59 +283,83 @@ export function isProtectAgainstForgery(controller: CsrfController): boolean {
 }
 
 /** @internal */
-export function isValidRequestOrigin(controller: CsrfController): boolean {
-  if (controller.forgeryProtectionOriginCheck === false) return true;
-  const origin = controller.request.origin;
+export function isValidRequestOrigin(this: CsrfController): boolean {
+  if (this.forgeryProtectionOriginCheck === false) return true;
+  const origin = this.request.origin;
   if (origin === "null") throw new InvalidAuthenticityToken(NULL_ORIGIN_MESSAGE);
-  return origin == null || origin === controller.request.baseUrl;
+  return origin == null || origin === this.request.baseUrl;
 }
 
 /** @internal */
-export function markForSameOriginVerificationBang(controller: CsrfController): boolean {
-  const value = controller.request.method.toUpperCase() === "GET";
-  controller._markedForSameOriginVerification = value;
+export function markForSameOriginVerificationBang(this: CsrfController): boolean {
+  const value = this.request.method.toUpperCase() === "GET";
+  this._markedForSameOriginVerification = value;
   return value;
 }
 
 /** @internal */
-export function isMarkedForSameOriginVerification(controller: CsrfController): boolean {
-  return controller._markedForSameOriginVerification ?? false;
+export function isMarkedForSameOriginVerification(this: CsrfController): boolean {
+  return this._markedForSameOriginVerification ?? false;
 }
 
 /** @internal */
-export function isNonXhrJavascriptResponse(controller: CsrfController): boolean {
-  const mediaType = controller.request.mediaType ?? "";
-  return /^(?:text|application)\/javascript/.test(mediaType) && !controller.request.xhr;
+export function isNonXhrJavascriptResponse(this: CsrfController): boolean {
+  const mediaType = this.request.mediaType ?? "";
+  return /^(?:text|application)\/javascript/.test(mediaType) && !this.request.xhr;
 }
 
 /** @internal */
-export function verifySameOriginRequest(controller: CsrfController): void {
-  if (isMarkedForSameOriginVerification(controller) && isNonXhrJavascriptResponse(controller)) {
-    if (controller.logger && controller.logWarningOnCsrfFailure !== false) {
-      controller.logger.warn(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+export function verifySameOriginRequest(this: CsrfController): void {
+  if (isMarkedForSameOriginVerification.call(this) && isNonXhrJavascriptResponse.call(this)) {
+    if (this.logger && this.logWarningOnCsrfFailure !== false) {
+      this.logger.warn(CROSS_ORIGIN_JAVASCRIPT_WARNING);
     }
     throw new InvalidCrossOriginRequest(CROSS_ORIGIN_JAVASCRIPT_WARNING);
   }
 }
 
-/** @internal */
-export function unverifiedRequestWarningMessage(controller: CsrfController): string {
-  if (isValidRequestOrigin(controller)) {
-    return "Can't verify CSRF token authenticity.";
+/**
+ * Mirrors: `handle_unverified_request` (request_forgery_protection.rb:401-409).
+ *
+ * Ruby's `respond_to?(:warning_message)` is spelled as an `in` check: only
+ * `ProtectionMethods::Exception` carries the accessor (rb:307), and it is the
+ * strategy that turns the message into the raised `InvalidAuthenticityToken`.
+ *
+ * `forgery_protection_strategy` gets no fallback here: rb:104 declares it with
+ * no default (unlike `csrf_token_storage_strategy`, rb:100-101), so
+ * `protect_from_forgery` (rb:203) is what puts a class there and Ruby raises on
+ * nil — hence the non-null assertion rather than an invented default.
+ *
+ * @internal
+ */
+export function handleUnverifiedRequest(this: CsrfController): void {
+  const protectionStrategy = new this.forgeryProtectionStrategy!(this);
+
+  if ("warningMessage" in protectionStrategy) {
+    (protectionStrategy as Exception).warningMessage = unverifiedRequestWarningMessage.call(this);
   }
-  return `HTTP Origin header (${controller.request.origin}) didn't match request.base_url (${controller.request.baseUrl})`;
+
+  protectionStrategy.handleUnverifiedRequest();
 }
 
 /** @internal */
-export function isVerifiedRequest(controller: CsrfController): boolean {
-  if (!isProtectAgainstForgery(controller)) return true;
-  if (isGetOrHead(controller.request.method)) return true;
+export function unverifiedRequestWarningMessage(this: CsrfController): string {
+  if (isValidRequestOrigin.call(this)) {
+    return "Can't verify CSRF token authenticity.";
+  }
+  return `HTTP Origin header (${this.request.origin}) didn't match request.base_url (${this.request.baseUrl})`;
+}
+
+/** @internal */
+export function isVerifiedRequest(this: CsrfController): boolean {
+  if (!isProtectAgainstForgery.call(this)) return true;
+  if (isGetOrHead(this.request.method)) return true;
   // Rails: valid_request_origin? && any_authenticity_token_valid? — origin
   // check short-circuits so a bad origin never reaches token storage.
-  if (!isValidRequestOrigin(controller)) return false;
-  return controller.isAnyAuthenticityTokenValid
-    ? controller.isAnyAuthenticityTokenValid()
-    : isAnyAuthenticityTokenValid(controller);
+  if (!isValidRequestOrigin.call(this)) return false;
+  return this.isAnyAuthenticityTokenValid
+    ? this.isAnyAuthenticityTokenValid()
+    : isAnyAuthenticityTokenValid.call(this);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,47 +402,43 @@ export function xorByteStrings(s1: Buffer, s2: Buffer): Buffer {
 }
 
 /** @internal */
-export function realCsrfToken(controller: CsrfController, _session?: unknown): Buffer {
-  const env = (controller.request.env ??= {});
+export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer {
+  const env = (this.request.env ??= {});
   let encoded = env[CSRF_TOKEN_ENV_KEY] as string | undefined;
   if (encoded == null) {
     // Rails: csrf_token_storage_strategy defaults to SessionStore.new at the
     // class level (line 100 of request_forgery_protection.rb); mirror that
     // here so a session-backed controller without explicit config still
     // verifies tokens against its session-stored real token.
-    const strategy = (controller.csrfTokenStorageStrategy ??= storageStrategy("session"));
-    encoded = strategy.fetch(controller) ?? generateCsrfToken();
+    const strategy = (this.csrfTokenStorageStrategy ??= storageStrategy("session"));
+    encoded = strategy.fetch(this) ?? generateCsrfToken();
     env[CSRF_TOKEN_ENV_KEY] = encoded;
   }
   return decodeCsrfToken(encoded);
 }
 
 /** @internal */
-export function csrfTokenHmac(
-  controller: CsrfController,
-  session: unknown,
-  identifier: string,
-): Buffer {
+export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Buffer {
   return getCrypto()
-    .createHmac("sha256", realCsrfToken(controller, session))
+    .createHmac("sha256", realCsrfToken.call(this, session))
     .update(identifier)
     .digest()
     .subarray(0, AUTHENTICITY_TOKEN_LENGTH);
 }
 
 /** @internal */
-export function globalCsrfToken(controller: CsrfController, session?: unknown): Buffer {
-  return csrfTokenHmac(controller, session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
+export function globalCsrfToken(this: CsrfController, session?: unknown): Buffer {
+  return csrfTokenHmac.call(this, session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
 }
 
 /** @internal */
 export function perFormCsrfToken(
-  controller: CsrfController,
+  this: CsrfController,
   session: unknown,
   actionPath: string,
   method: string,
 ): Buffer {
-  return csrfTokenHmac(controller, session, `${actionPath}#${method.toLowerCase()}`);
+  return csrfTokenHmac.call(this, session, `${actionPath}#${method.toLowerCase()}`);
 }
 
 /** @internal */
@@ -426,7 +457,7 @@ export function unmaskToken(masked: Buffer): Buffer {
 
 /** @internal */
 export function maskedAuthenticityToken(
-  controller: CsrfController,
+  this: CsrfController,
   formOptions: { action?: string; method?: string } = {},
 ): string {
   const { action, method } = formOptions;
@@ -434,23 +465,23 @@ export function maskedAuthenticityToken(
   // nil/false as falsy, so an empty-string action ("submit to current path")
   // still triggers per-form generation.
   let rawToken: Buffer;
-  if (controller.perFormCsrfTokens && action != null && method != null) {
-    const actionPath = normalizeActionPath(controller, action);
-    rawToken = perFormCsrfToken(controller, null, actionPath, method);
+  if (this.perFormCsrfTokens && action != null && method != null) {
+    const actionPath = normalizeActionPath.call(this, action);
+    rawToken = perFormCsrfToken.call(this, null, actionPath, method);
   } else {
-    rawToken = globalCsrfToken(controller);
+    rawToken = globalCsrfToken.call(this);
   }
   return maskToken(rawToken);
 }
 
 /** @internal */
-export function formAuthenticityParam(controller: CsrfController): unknown {
-  return controller.params?.[controller.requestForgeryProtectionToken ?? "authenticity_token"];
+export function formAuthenticityParam(this: CsrfController): unknown {
+  return this.params?.[this.requestForgeryProtectionToken ?? "authenticity_token"];
 }
 
 /** @internal */
-export function requestAuthenticityTokens(controller: CsrfController): unknown[] {
-  return [formAuthenticityParam(controller), controller.request.xCsrfToken];
+export function requestAuthenticityTokens(this: CsrfController): unknown[] {
+  return [formAuthenticityParam.call(this), this.request.xCsrfToken];
 }
 
 function compareBuffers(a: Buffer, b: Buffer): boolean {
@@ -459,38 +490,38 @@ function compareBuffers(a: Buffer, b: Buffer): boolean {
 
 /** @internal */
 export function compareWithRealToken(
-  controller: CsrfController,
+  this: CsrfController,
   token: Buffer,
   session?: unknown,
 ): boolean {
-  return compareBuffers(token, realCsrfToken(controller, session));
+  return compareBuffers(token, realCsrfToken.call(this, session));
 }
 
 /** @internal */
 export function compareWithGlobalToken(
-  controller: CsrfController,
+  this: CsrfController,
   token: Buffer,
   session?: unknown,
 ): boolean {
-  return compareBuffers(token, globalCsrfToken(controller, session));
+  return compareBuffers(token, globalCsrfToken.call(this, session));
 }
 
 /** @internal */
 export function isValidPerFormCsrfToken(
-  controller: CsrfController,
+  this: CsrfController,
   token: Buffer,
   session?: unknown,
 ): boolean {
-  if (!controller.perFormCsrfTokens) return false;
+  if (!this.perFormCsrfTokens) return false;
   // Rails: request.path.chomp("/") — strips a single trailing slash, so "/" → "".
-  const path = (controller.request.path ?? "").replace(/\/$/, "");
-  const method = controller.request.requestMethod ?? controller.request.method;
-  return compareBuffers(token, perFormCsrfToken(controller, session, path, method));
+  const path = (this.request.path ?? "").replace(/\/$/, "");
+  const method = this.request.requestMethod ?? this.request.method;
+  return compareBuffers(token, perFormCsrfToken.call(this, session, path, method));
 }
 
 /** @internal */
 export function isValidAuthenticityToken(
-  controller: CsrfController,
+  this: CsrfController,
   session: unknown,
   encoded: unknown,
 ): boolean {
@@ -501,22 +532,22 @@ export function isValidAuthenticityToken(
   } catch {
     return false;
   }
-  if (masked.length === AUTHENTICITY_TOKEN_LENGTH) return compareWithRealToken(controller, masked);
+  if (masked.length === AUTHENTICITY_TOKEN_LENGTH) return compareWithRealToken.call(this, masked);
   if (masked.length === AUTHENTICITY_TOKEN_LENGTH * 2) {
     const csrfToken = unmaskToken(masked);
     return (
-      compareWithGlobalToken(controller, csrfToken) ||
-      compareWithRealToken(controller, csrfToken) ||
-      isValidPerFormCsrfToken(controller, csrfToken)
+      compareWithGlobalToken.call(this, csrfToken) ||
+      compareWithRealToken.call(this, csrfToken) ||
+      isValidPerFormCsrfToken.call(this, csrfToken)
     );
   }
   return false;
 }
 
 /** @internal */
-export function isAnyAuthenticityTokenValid(controller: CsrfController): boolean {
-  for (const token of requestAuthenticityTokens(controller)) {
-    if (isValidAuthenticityToken(controller, controller.session, token)) return true;
+export function isAnyAuthenticityTokenValid(this: CsrfController): boolean {
+  for (const token of requestAuthenticityTokens.call(this)) {
+    if (isValidAuthenticityToken.call(this, this.session, token)) return true;
   }
   return false;
 }
@@ -573,18 +604,15 @@ export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): 
 }
 
 /** @internal */
-export function normalizeRelativeActionPath(
-  controller: CsrfController,
-  relActionPath: string,
-): string {
-  let path = (controller.request.path ?? "/") + "/" + relActionPath;
+export function normalizeRelativeActionPath(this: CsrfController, relActionPath: string): string {
+  let path = (this.request.path ?? "/") + "/" + relActionPath;
   path = path.replace(/\/\.\//g, "/");
   // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
   return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 /** @internal */
-export function normalizeActionPath(controller: CsrfController, actionPath: string): string {
+export function normalizeActionPath(this: CsrfController, actionPath: string): string {
   // Mirrors Ruby's URI.parse: relative inputs without a leading "/" pass
   // through unparsed; absolute paths, protocol-relative ("//host/x"), and
   // absolute URLs all have their `.pathname` extracted (using a dummy base
@@ -592,7 +620,7 @@ export function normalizeActionPath(controller: CsrfController, actionPath: stri
   if (actionPath === "" || !actionPath.startsWith("/")) {
     const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
     if (!SCHEME_RE.test(actionPath)) {
-      return normalizeRelativeActionPath(controller, actionPath);
+      return normalizeRelativeActionPath.call(this, actionPath);
     }
   }
   let parsedPath: string;

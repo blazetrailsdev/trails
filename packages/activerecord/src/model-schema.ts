@@ -1107,10 +1107,6 @@ function reflectedTypeForColumn(
  * its OWN `table_name` into its own definitions and prototype
  * (model_schema.rb:587-597).
  */
-// The enum decorator calls `columnForAttribute`, which calls `loadSchema`;
-// without this guard that cycle recurses until the stack blows.
-const replayingDecorators = new WeakSet<object>();
-
 function applyColumnsHash(
   host: SchemaHost,
   adapter: { lookupCastTypeFromColumn?: (c: unknown) => unknown },
@@ -1247,20 +1243,13 @@ function applyColumnsHash(
   // columns: `_attributeDefinitions` is trails' eager type cache, not Rails'
   // `_default_attributes`, so replaying a NON-column attribute here would fire
   // guards Rails only raises when the default set is built (enum.rb:240-245).
-  if (!replayingDecorators.has(host as object)) {
-    replayingDecorators.add(host as object);
-    try {
-      const reflectedDefs = new Map(
-        Object.keys(filteredHash)
-          .filter((n) => host._attributeDefinitions.has(n))
-          .map((n) => [n, host._attributeDefinitions.get(n)] as const),
-      );
-      replayOwnPendingDecorators(host as never, reflectedDefs as never);
-      for (const [name, def] of reflectedDefs) host._attributeDefinitions.set(name, def);
-    } finally {
-      replayingDecorators.delete(host as object);
-    }
-  }
+  const reflectedDefs = new Map(
+    Object.keys(filteredHash)
+      .filter((n) => host._attributeDefinitions.has(n))
+      .map((n) => [n, host._attributeDefinitions.get(n)] as const),
+  );
+  replayOwnPendingDecorators(host as never, reflectedDefs as never);
+  for (const [name, def] of reflectedDefs) host._attributeDefinitions.set(name, def);
 
   // Reflection may change a column's type/default without changing the key set,
   // so the revision stamps cannot infer staleness from key coverage.

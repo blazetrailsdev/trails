@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { RequestForgeryProtection } from "../../action-dispatch/request-forgery-protection.js";
+import { assertRaises } from "@blazetrails/activesupport";
 import {
-  RequestForgeryProtection,
-  InvalidAuthenticityToken,
-} from "../../action-dispatch/request-forgery-protection.js";
+  Exception,
+  handleUnverifiedRequest,
+  InvalidAuthenticityToken as MetalInvalidAuthenticityToken,
+  type CsrfController,
+} from "../metal/request-forgery-protection.js";
 
 // ==========================================================================
 // controller/request_forgery_protection_test.rb
@@ -424,11 +428,21 @@ describe("ActionController::RequestForgeryProtection", () => {
 });
 
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
-  it("raised exception message explains why it occurred", () => {
-    const csrf = new RequestForgeryProtection({ strategy: "exception" });
-    const session: Record<string, unknown> = {};
-    expect(() => csrf.handleUnverified(session)).toThrow(InvalidAuthenticityToken);
-    expect(() => csrf.handleUnverified(session)).toThrow("Can't verify CSRF token authenticity.");
+  it("raised exception message explains why it occurred", async () => {
+    const controller = {
+      request: { method: "POST", origin: "http://bad.host", baseUrl: "http://test.host" },
+      forgeryProtectionOriginCheck: true,
+      forgeryProtectionStrategy: Exception,
+    } as unknown as CsrfController;
+
+    await assertRaises(
+      [MetalInvalidAuthenticityToken],
+      {
+        match:
+          "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      },
+      () => handleUnverifiedRequest.call(controller),
+    );
   });
 
   // form-rendering / full-dispatch tests (require ActionView)
