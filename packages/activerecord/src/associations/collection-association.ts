@@ -938,8 +938,10 @@ export class CollectionAssociation extends Association {
    * routes through a belongs_to (`ThroughAssociation#foreign_key_present?`,
    * through_association.rb:90); a vanilla has_many requires the owner's
    * `active_record_primary_key` to be present (`ForeignAssociation#foreign_key_present?`,
-   * foreign_association.rb:5). Mirrors the same dispatch in
-   * `CollectionProxy#_foreignKeyPresent` so the two never disagree.
+   * foreign_association.rb:5). This is the only copy of the dispatch:
+   * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152) delegates
+   * here through `isNullScope`, so the proxy and the association cannot
+   * disagree.
    */
   protected override foreignKeyPresent(): boolean {
     if (this.reflection.options.through) {

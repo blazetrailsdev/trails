@@ -1396,7 +1396,8 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
  * violation, matching `find_target?` / `null_scope?`.
  *
  * `foreign_key_present?` has the same two-branch dispatch used by the OO
- * association and `CollectionProxy._foreignKeyPresent`: a belongs_to reads the
+ * association (`CollectionAssociation#foreignKeyPresent`, which the proxy's
+ * `null_scope?` delegates to): a belongs_to reads the
  * owner-side FK columns; a `:through` routes through its belongs_to
  * (`ThroughAssociation#foreign_key_present?`); a vanilla has_one/has_many/habtm
  * requires the owner's `active_record_primary_key`

@@ -59,9 +59,9 @@ export function ownerReflectionForeignKey(
  * (foreign_association.rb:5): the owner's `active_record_primary_key` columns
  * must be present for children — which carry the FK referencing them — to be
  * fetchable, so a new-record owner with its PK assigned can still load. Returns
- * false when the associated class has no primary key. Shared by has_many's proxy
- * (`CollectionProxy#_foreignKeyPresent`) and the OO `CollectionAssociation`
- * so the two never disagree.
+ * false when the associated class has no primary key. Read by the OO
+ * `CollectionAssociation`, which has_many's proxy delegates to through
+ * `null_scope?` (collection_proxy.rb:1150-1152), so there is one copy.
  *
  * @internal
  */
