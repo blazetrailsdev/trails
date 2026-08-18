@@ -158,18 +158,6 @@ interface ThroughAssociationHandle {
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 
-/**
- * The three ivars a `CollectionProxy` reads through its association: Ruby's
- * `@target`, `@loaded` and `@replaced_or_added_targets`. `CollectionAssociation`
- * satisfies it structurally; see `_seat()`.
- * @internal
- */
-interface TargetSeat {
-  _targetStore: Base | Base[] | null;
-  _loadedStore: boolean;
-  _replacedOrAddedTargets: Set<Base>;
-}
-
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -182,9 +170,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
   private _record: Base;
-  // Seat of last resort — see `_seat()`. Never used once the association cache
-  // holds the real `CollectionAssociation`.
-  private _ownSeat?: TargetSeat;
+  /**
+   * Ruby's `@association` (collection_proxy.rb:31-35): the association object
+   * the proxy is handed at construction and reads its `@target` / `@loaded` /
+   * `@replaced_or_added_targets` off (`:33`, `:53`). Resolved once in the
+   * constructor, so a declared collection has exactly one `@target` in the
+   * system. Spelled `_targetAssociation` because `_association` on this class
+   * is the `this`-alias the `AssociationRelation` bodies invoked with the proxy
+   * as receiver read.
+   *
+   * trails' `association(record, name)` factory also builds a proxy for a
+   * declared SINGULAR name, which Rails never does: `@association` there is a
+   * `SingularAssociation` whose `@target` is one record, and folding a
+   * collection's array into it would box that record. Such a proxy gets a
+   * collection seat of its own instead.
+   */
+  private _targetAssociation!: CollectionAssociation;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
@@ -193,50 +194,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // are the association's `@target` / `@loaded` ivars, so association and proxy
   // are one seat rather than two stores to keep coherent.
   private get _target(): T[] {
-    return this._seat()._targetStore as T[];
+    return this._targetAssociation._targetStore as T[];
   }
 
   private set _target(records: T[]) {
-    this._seat()._targetStore = records;
+    this._targetAssociation._targetStore = records;
   }
 
   private get _targetLoaded(): boolean {
-    return this._seat()._loadedStore;
+    return this._targetAssociation._loadedStore;
   }
 
   private set _targetLoaded(value: boolean) {
-    this._seat()._loadedStore = value;
-  }
-
-  /**
-   * The association object holding the seat. Deliberately a raw
-   * `@association_cache` read rather than `_collectionAssociation()`:
-   * `Base#association` re-syncs the cache, which reads loadedness back off
-   * this proxy, so resolving a seat through it would recurse.
-   *
-   * Invariant for anything that writes `_target` / `_targetLoaded`: the real
-   * `CollectionAssociation` must already be registered, so the write lands on
-   * the shared seat. Every current writer satisfies it — the mutation paths
-   * reach `_collectionAssociation()` / `_staleWrapper()` first, and the
-   * preloader calls `owner.association(name)` before `_hydrateFromPreload`
-   * (`preloader/association.ts`, `preloader/batch.ts`). A new writer that runs
-   * before the association exists would strand its records on `_ownSeat`.
-   */
-  private _seat(): TargetSeat {
-    const instance = this._record._associationInstances.get(this._assocName) as
-      | (TargetSeat & { isCollection?(): boolean })
-      | undefined;
-    if (instance?.isCollection?.() === true) return instance;
-    // The cache slot is empty, or holds one of the minimal ad-hoc holders an
-    // undeclared inverse seeds (`associations.ts`, `seed-association-cache.ts`)
-    // — those are singular by construction and have no `@target` seat to share,
-    // and `Base#association` would hand one straight back. Keep the seat here
-    // until a real collection association claims the slot.
-    return (this._ownSeat ??= {
-      _targetStore: [],
-      _loadedStore: false,
-      _replacedOrAddedTargets: new Set<Base>(),
-    });
+    this._targetAssociation._loadedStore = value;
   }
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1112-1116).
@@ -246,11 +216,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // replaced on the in-memory target. `replace_on_target` consults it to
   // dedup by identity rather than appending the same record twice.
   private get _replacedOrAddedTargets(): Set<T> {
-    return this._seat()._replacedOrAddedTargets as Set<T>;
+    return this._targetAssociation._replacedOrAddedTargets as Set<T>;
   }
 
   private set _replacedOrAddedTargets(value: Set<T>) {
-    this._seat()._replacedOrAddedTargets = value as Set<Base>;
+    this._targetAssociation._replacedOrAddedTargets = value as Set<Base>;
   }
   // The JS Proxy wrapper returned by association() — methods that return
   // `self` (push / concat / append) hand this back so callers get the same
@@ -596,6 +566,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._record = record;
     this._assocName = assocName;
     this._assocDef = assocDef;
+    const instance = record.association(assocName) as unknown as CollectionAssociation & {
+      isCollection?(): boolean;
+    };
+    this._targetAssociation = instance.isCollection?.()
+      ? instance
+      : new CollectionAssociation(record, assocDef);
 
     // Seed the proxy's inherited Relation state so direct Relation calls
     // (`cp.toSql()`, `cp.where(...)`, `cp.toArray()`) scope to the owner

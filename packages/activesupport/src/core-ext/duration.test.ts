@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Duration, days } from "../duration.js";
+import { ArgumentError } from "../hash-utils.js";
 import { current, minusWithDuration, plusWithDuration } from "./date/calculations.js";
 
 function asDate(instant: Temporal.Instant): Date {
@@ -221,8 +222,8 @@ describe("DurationTest", () => {
   });
 
   it("argument error", () => {
-    // ago("") should throw
-    expect(() => Duration.seconds(1).ago("" as any)).toThrow();
+    expect(() => Duration.seconds(1).ago("" as any)).toThrow(ArgumentError);
+    expect(() => Duration.seconds(1).ago("" as any)).toThrow('expected a time or date, got ""');
   });
 
   it("fractional weeks", () => {
