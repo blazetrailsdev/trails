@@ -98,7 +98,7 @@ export class CollectionAssociation extends Association {
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
-    this.target = [];
+    this._writeTargetStore([]);
     this._sharedTargetEnabled = true;
   }
 
@@ -128,9 +128,47 @@ export class CollectionAssociation extends Association {
     return store ? store._sharedTarget : (this._targetStore as Base[]);
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#target=
+   * (`collection_association.rb:285-296`). Without `has_many_inversing` this is
+   * the plain holder write (`super`); with it, a single inverse record folds
+   * into the collection via `replace_on_target(record, true, replace: true,
+   * inversing: true)` and a `nil` is a no-op — it cannot be removed from the
+   * inverse.
+   *
+   * `associationProxy` materializes the `CollectionProxy` first because RFC
+   * 0022 makes the proxy the canonical has_many store — the trails analog of
+   * Rails' `@target` — so the `replace_on_target` write lands where readers
+   * (`size()`/`load()`) look. The `super` arms keep the pre-existing coercion
+   * of a lone record and of `null` to an array, which Rails leaves to Ruby's
+   * untyped `@target`.
+   */
   override set target(records: Base | Base[] | null) {
-    // `Association#reset` assigns `null`; a collection's empty target is `[]`.
-    const value = Array.isArray(records) ? records : records == null ? [] : [records];
+    if (!this.reflection.klass?.hasManyInversing) {
+      this._writeTargetStore(records == null ? [] : Array.isArray(records) ? records : [records]);
+      return;
+    }
+
+    if (records === null) {
+      // It's not possible to remove the record from the inverse association.
+    } else if (Array.isArray(records)) {
+      this._writeTargetStore(records);
+    } else {
+      associationProxy(this.owner, this.reflection.name);
+      void this.replaceOnTarget(records, true, { replace: true, inversing: true });
+    }
+  }
+
+  /**
+   * Ruby's `@target = …` ivar write — Rails' `super` inside `target=`, and the
+   * direct writes `reset`/`load_target`/`replace` make without going through
+   * `target=`. RFC 0022 puts the canonical has_many target on the
+   * `CollectionProxy`, so the write has to pick the shared store when one
+   * exists.
+   *
+   * @internal
+   */
+  private _writeTargetStore(value: Base[]): void {
     const store = this._sharedStore();
     if (store) store._sharedTarget = value;
     else this._targetStore = value;
@@ -381,7 +419,7 @@ export class CollectionAssociation extends Association {
 
   override reset(): void {
     super.reset();
-    this.target = [];
+    this._writeTargetStore([]);
     // Rails' `Set.new.compare_by_identity`: a JS Set already compares object
     // members by identity.
     this._replacedOrAddedTargets = new Set<Base>();
@@ -824,11 +862,11 @@ export class CollectionAssociation extends Association {
     await this.transaction(async () => {
       // replaceRecords diffs against assoc.target; restore originalTarget so
       // it sees the real DB state rather than the already-updated in-memory target
-      this.target = [...pending.originalTarget];
+      this._writeTargetStore([...pending.originalTarget]);
       try {
         await replaceRecords(this, pending.newTarget, pending.originalTarget);
       } finally {
-        this.target = currentTarget;
+        this._writeTargetStore(currentTarget);
       }
     });
   }
@@ -865,7 +903,7 @@ export class CollectionAssociation extends Association {
       // Every collection subclass overrides `findTarget` to return `Base[]`;
       // the cast only narrows the singular-shaped base signature.
       return Promise.resolve(this.findTarget()).then((findTarget) => {
-        this.target = this.mergeTargetLists(findTarget as Base[], this.target);
+        this._writeTargetStore(this.mergeTargetLists(findTarget as Base[], this.target));
         return loaded();
       });
     }
@@ -989,32 +1027,6 @@ export class CollectionAssociation extends Association {
 
   override isCollection(): boolean {
     return true;
-  }
-
-  /**
-   * Mirrors Rails' `CollectionAssociation#target=` (collection_association.rb
-   * :285-296): the inverse-wiring chain `set_inverse_instance` → `inversed_from`
-   * → `self.target =`. Under `has_many_inversing`, a single inverse record folds
-   * into the collection via `replace_on_target(record, true, replace: true,
-   * inversing: true)`; without the flag it falls back to the plain holder write
-   * (`super`). A `nil` cannot be removed from the inverse (Rails no-ops too).
-   *
-   * The trails analog of `replace_on_target`'s `@target` write is the
-   * `CollectionProxy` — the canonical has_many store surfaced via
-   * `Base#_associationCache` — reached through `_wireInverseTarget`, so a
-   * belongs_to build under `has_many_inversing` lands in the parent's collection
-   * where readers (`size()`/`load()`) see it.
-   */
-  override inversedFrom(record: Base | null): void {
-    if (!(this.klass as typeof Base | undefined)?.hasManyInversing) {
-      super.inversedFrom(record);
-      return;
-    }
-    if (record === null) return;
-    const proxy = associationProxy(this.owner, this.reflection.name) as unknown as {
-      _wireInverseTarget: (r: Base) => void;
-    };
-    proxy._wireInverseTarget(record);
   }
 
   /**
@@ -1240,7 +1252,7 @@ export class CollectionAssociation extends Association {
     this._lastRemoveAborted = false;
     // Rails' tail after `delete_records` (collection_association.rb:404-409).
     const pruned = (): boolean => {
-      this.target = this.target.filter((r) => !includesRecord(records, r));
+      this._writeTargetStore(this.target.filter((r) => !includesRecord(records, r)));
       for (const record of records) {
         // A `dependent: :destroy` record is frozen once destroyed, so clearing its
         // inverse foreign key would raise FrozenError. Rails leaves the destroyed
@@ -1369,7 +1381,7 @@ export class CollectionAssociation extends Association {
    * @internal
    */
   _mergeLoaderResults(rows: Base[]): void {
-    this.target = this.mergeTargetLists(rows, this.target);
+    this._writeTargetStore(this.mergeTargetLists(rows, this.target));
     this.loadedBang();
   }
 

@@ -35,6 +35,20 @@ export class DisabledSessionError extends Error {
   }
 }
 
+/**
+ * Mirrors: ActionDispatch::Request::Session::Options (`request/session.rb:47`).
+ */
+export class Options {
+  /**
+   * Mirrors: ActionDispatch::Request::Session::Options.set
+   * (`request/session.rb:48-50`) —
+   * `req.set_header ENV_SESSION_OPTIONS_KEY, options`.
+   */
+  static set(req: { env: Record<string, unknown> }, options: unknown): void {
+    req.env[ENV_SESSION_OPTIONS_KEY] = options;
+  }
+}
+
 export class Session {
   private store: SessionStore | null;
   private env: Record<string, unknown>;
@@ -72,11 +86,10 @@ export class Session {
     req: { env: Record<string, unknown> },
     options: Record<string, unknown> = {},
   ): Session {
-    const existing = req.env[ENV_SESSION_KEY] as Session | undefined;
-    req.env[ENV_SESSION_OPTIONS_KEY] = options;
+    const existing = Session.find(req);
     const session = new Session(store, req.env, options);
 
-    if (existing && existing instanceof Session) {
+    if (existing) {
       const oldData = existing.toHash();
       session.loadData();
       for (const [key, value] of Object.entries(oldData)) {
@@ -86,13 +99,14 @@ export class Session {
       }
     }
 
-    req.env[ENV_SESSION_KEY] = session;
+    Session.set(req, session);
+    Options.set(req, options);
     return session;
   }
 
   static disabled(req: { env: Record<string, unknown> }): Session {
     const session = new Session(null, req.env, { id: null }, false);
-    req.env[ENV_SESSION_OPTIONS_KEY] = { id: null };
+    Options.set(req, { id: null });
     return session;
   }
 
@@ -101,6 +115,22 @@ export class Session {
     if (session instanceof Session) return session;
     return null;
   }
+
+  /**
+   * Mirrors: ActionDispatch::Request::Session.set
+   * (`request/session.rb:39-41`) — `req.set_header ENV_SESSION_KEY, session`.
+   */
+  static set(req: { env: Record<string, unknown> }, session: unknown): void {
+    req.env[ENV_SESSION_KEY] = session;
+  }
+
+  /**
+   * Mirrors: ActionDispatch::Request::Session::Options
+   * (`request/session.rb:47`). Ruby nests the class inside `Session`; TS has no
+   * nested-class syntax, so it is declared alongside and re-exported as
+   * `Session.Options` so call sites read as Ruby does.
+   */
+  static Options = Options;
 
   private loadData(): void {
     if (!this.loaded && !this.destroyed && this.store) {

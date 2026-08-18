@@ -98,4 +98,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as
   // `isEmpty(collection)` and the Ruby receiver is TS argument 1.
   "empty?",
+  // Ruby core `Array#first` — a language built-in on the same receivers as
+  // `empty?` above, and the same shape: `values[0]` is an index read, not a
+  // call, so activerecord's `ruby-first.ts` exports it as `first(collection)`
+  // and the Ruby receiver is TS argument 1.
+  "first",
 ]);

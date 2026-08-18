@@ -7,6 +7,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
+import { first } from "./ruby-first.js";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
 
@@ -141,8 +142,8 @@ export class SchemaMigration {
   }
 
   /**
-   * `schema_migration.rb:91-98`. Rails ends the body in `.first`; Ruby's `Enumerable#first` has no JS
-   * array counterpart, so the single value is read as `values[0]`.
+   * `schema_migration.rb:91-98`. Rails ends the body in `.first`, ported as `ruby-first.ts`'s
+   * `first(values)` since JS arrays have no `first`.
    *
    * `COUNT(*)` always yields exactly one row, and Rails' `.first` would answer
    * `nil` for an empty set, not zero, so there is no `?? 0` fallback.
@@ -153,7 +154,6 @@ export class SchemaMigration {
    * precision and needs no such reading; this carries the bignum under a
    * `number` the way `IntegerType#narrowBigInt` (`integer.ts:218-221`) does.
    *
-   * @missingRailsCall first — Enumerable#first; a JS array indexes as values[0].
    */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
@@ -161,7 +161,7 @@ export class SchemaMigration {
     const values = await this._withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return values[0] as number;
+    return first(values) as number;
   }
 
   // Rails: connection.data_source_exists?(table_name) (schema_migration.rb:100-104).

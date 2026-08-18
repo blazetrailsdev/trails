@@ -18,6 +18,7 @@ import { Base, association } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { Human } from "../test-helpers/models/human.js";
+import { Interest } from "../test-helpers/models/interest.js";
 
 async function withHasManyInversing(model: typeof Base, fn: () => Promise<void>): Promise<void> {
   const flags = model as unknown as { hasManyInversing: boolean };
@@ -49,6 +50,41 @@ describe("replace_on_target inversing (trails)", () => {
       await association(human, "interests").push(interest);
 
       expect(interestIds()).toEqual([interest.id]);
+    });
+  });
+});
+
+/**
+ * Covers `CollectionAssociation#target=`
+ * (activerecord/lib/active_record/associations/collection_association.rb:285-296),
+ * whose `has_many_inversing` arm folds a lone record in through
+ * `replace_on_target(record, true, replace: true, inversing: true)` rather than
+ * replacing the target with it. The writer is what Rails' inverse wiring
+ * reaches (`association.rb:154` — `inversed_from` is a bare `self.target =
+ * record`), so a holder-only setter silently drops every record already in the
+ * collection.
+ */
+describe("CollectionAssociation#target= (trails)", () => {
+  const { humans, interests } = fixtures(["humans", "interests"]);
+
+  it("folds a lone record into the loaded target under has_many_inversing", async () => {
+    await withHasManyInversing(Interest, async () => {
+      const human = humans("gordon") as Base;
+      await association(human, "interests");
+      const assoc = (
+        human as unknown as { association(name: string): { target: Base[] } }
+      ).association("interests");
+
+      const loadedIds = assoc.target.map((i) => (i as Base & { id: number }).id);
+      expect(loadedIds.length).toBeGreaterThan(1);
+
+      const hunting = interests("hunting") as Base & { id: number };
+      (assoc as unknown as { target: Base }).target = hunting;
+
+      expect(assoc.target.map((i) => (i as Base & { id: number }).id)).toEqual([
+        ...loadedIds,
+        hunting.id,
+      ]);
     });
   });
 });

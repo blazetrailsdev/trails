@@ -58,20 +58,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
-    "rubyName": "session=",
-    "call": "set",
-    "reason": "Verified per-site (RFC 0106): `Session.set self, session` (request.rb:387) writes `env[\"rack.session\"]`; trails' setter performs that env write directly because there is no ported `Session.set` class method to delegate to."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "session_options=",
-    "call": "set",
-    "reason": "Verified per-site (RFC 0106): `Session::Options.set self, options` (request.rb:391) writes `env[\"rack.session.options\"]`; trails' setter performs that env write directly, there being no ported `Session::Options.set`."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
     "rubyName": "xml_http_request?",
     "call": "match?",
     "reason": "Verified per-site (RFC 0106): `/XMLHttpRequest/i.match?(get_header(\"HTTP_X_REQUESTED_WITH\"))` (request.rb:301) is spelled as a case-insensitive equality on the header value; a `Regexp#match?` against a literal-only pattern has no separate JS call form the gate credits."
