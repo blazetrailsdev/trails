@@ -23,7 +23,7 @@ export interface AttributeRegistrationClassMethods {
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
   attributeTypes(): Record<string, Type>;
-  typeForAttribute(name: string): Type;
+  typeForAttribute(name: string, block?: () => Type): Type;
 }
 
 export type AttributeRegistration = AttributeRegistrationClassMethods;
@@ -250,9 +250,21 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
  * Delegates to attributeTypes — single codepath. Returns a fallback ValueType
  * for unknown names (never null), matching Rails' Type.default_value behavior.
  */
-export function typeForAttribute(this: AttributeHostInternals, name: string): Type {
-  const resolved = resolveAttributeName.call(this, name);
-  return attributeTypes.call(this)[resolved];
+export function typeForAttribute(
+  this: AttributeHostInternals,
+  attributeName: string,
+  block?: () => Type,
+): Type {
+  attributeName = resolveAttributeName.call(this, attributeName);
+
+  const types = attributeTypes.call(this);
+  if (block) {
+    // Ruby `attribute_types.fetch(attribute_name, &block)` — the block runs only
+    // when the hash has no such KEY, so the `Type.default_value` hash default
+    // (attribute_registration.rb:37) does not pre-empt it.
+    return Object.hasOwn(types, attributeName) ? types[attributeName] : block();
+  }
+  return types[attributeName];
 }
 
 /**

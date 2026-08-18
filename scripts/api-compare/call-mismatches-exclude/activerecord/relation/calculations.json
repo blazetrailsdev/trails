@@ -4,21 +4,7 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "order:constructor,withConnection",
-    "reason": "Verified per-site (RFC 0106): calculations.rb:527 opens `model.with_connection do |connection|` around the whole remainder of the body, so `with_connection` precedes `ColumnAliasTracker.new` (:528); trails calls it at the `select_all` (:556) instead, because the calculation entry points already run inside `inQueryConnection`'s `with_connection`. Hoisting it to :527 is a whole-body reindent and rides `converge-execute-grouped-calculation-body-to-rails-source-order`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "type_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): calculations.rb:569 is `calculated_data.column_types.fetch(aliaz, Type.default_value)`. A JS record has no `fetch`, so the port spells Hash#fetch's key-presence semantics with `Object.hasOwn` (a stored value wins over the default even when it is null) — same behaviour, no call the extractor can see."
   },
   {
     "package": "activerecord",
