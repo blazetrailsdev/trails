@@ -1332,8 +1332,6 @@ describe("MigrationTest", () => {
     }
     const m = new WeNeedReminders();
     const cb = new ChangeBased();
-    // `exec_migration` clears `@connection` in its ensure (migration.rb:998-1000),
-    // so re-point the migration at the adapter for the assertions that follow.
     const runMigration = async (mig: Migration, direction: "up" | "down") => {
       await mig.execMigration(adapter, direction);
       mig.connection = adapter;

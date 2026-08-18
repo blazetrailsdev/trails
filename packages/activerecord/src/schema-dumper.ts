@@ -977,16 +977,8 @@ export abstract class SchemaDumper {
     const opclasses = conciseOptions(index.columns, index.opclasses);
     if (opclasses !== undefined) parts.push(`opclass: ${this.formatIndexParts(opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
-    // Rails: `... if !@connection.default_index_type?(index)` (schema_dumper.rb:275).
-    // A dumper built over a plain `SchemaSource` has no adapter behind it, so
-    // fall back to the abstract adapter's own body (`index.using.nil?`,
-    // abstract_adapter.rb:834-836).
-    const connection = this._adapter();
-    const defaultIndexType =
-      typeof connection?.defaultIndexType === "function"
-        ? (connection.defaultIndexType(index) as boolean)
-        : index.using == null;
-    if (!defaultIndexType) parts.push(`using: ${JSON.stringify(index.using)}`);
+    if (!this._adapter().defaultIndexType(index))
+      parts.push(`using: ${JSON.stringify(index.using)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);
