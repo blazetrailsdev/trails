@@ -153,8 +153,8 @@ const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
 /** The MIME type of the HTTP request (parsed from `CONTENT_TYPE`). */
 export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
   return this.fetchHeader("action_dispatch.request.content_type", (k) => {
-    const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
     try {
+      const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
       const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
       return this.setHeader(k, v);
     } catch (e) {
