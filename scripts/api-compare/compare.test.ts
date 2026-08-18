@@ -20,6 +20,7 @@ import {
   buildEntitiesByName,
   resolveEntityByDeclaringFile,
   significantMissingCalls,
+  suppressedCallClaims,
   narrowPredicateCandidates,
   ambiguousTsNames,
   reorderedCalls,
@@ -185,6 +186,21 @@ describe("significantMissingCalls", () => {
       sig,
     );
     expect(missing).toEqual([]);
+  });
+
+  it("does not let a sibling call claim a suppressed call's TS spelling", () => {
+    // delegation.rb:74-90 — `method_defined?(method)` is suppressed (no ported
+    // TS method with args), and trails spells it `this._methods.has(name)`.
+    // `include?` aliases to `has` too, so without the claim it went unflagged.
+    const missing = significantMissingCalls(
+      "generate_method",
+      ["method_defined?", "include?"],
+      new Set(["has"]),
+      (ts) => ts === "include",
+      (rc) => (rc === "method_defined?" ? ["methodDefined"] : ["include"]),
+      new Set(["method_defined?", "include?"]),
+    );
+    expect(missing).toEqual(["include? → include"]);
   });
 
   it("skips zero-arg readers (callee not a ported method with args)", () => {
@@ -2560,5 +2576,38 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
     expect(
       reorderedCalls("create", ["build", "save"], ["save", "build"], () => false, map, wide),
     ).toEqual([]);
+  });
+});
+
+describe("suppressedCallClaims", () => {
+  it("claims the TS spelling of a call the ported-with-args gate suppresses", () => {
+    const claimed = suppressedCallClaims(
+      ["method_defined?", "include?"],
+      new Set(["has"]),
+      (ts) => ts === "include",
+      (rc) => (rc === "method_defined?" ? ["methodDefined"] : ["include"]),
+      new Set(["method_defined?", "include?"]),
+    );
+    expect([...claimed]).toEqual(["has"]);
+  });
+
+  it("claims nothing for a NO_JS_CALL_FORM name, whose port emits no callee", () => {
+    const claimed = suppressedCallClaims(
+      ["key?"],
+      new Set(["has"]),
+      () => false,
+      () => ["key"],
+    );
+    expect([...claimed]).toEqual([]);
+  });
+
+  it("claims nothing when the suppressed call's spelling is absent from the TS body", () => {
+    const claimed = suppressedCallClaims(
+      ["method_defined?"],
+      new Set(["set"]),
+      () => false,
+      () => ["methodDefined"],
+    );
+    expect([...claimed]).toEqual([]);
   });
 });

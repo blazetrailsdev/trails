@@ -108,23 +108,17 @@ export class GeneratedRelationMethods {
    * Install `fn` as this module's `name` method — Rails'
    * `GeneratedRelationMethods#generate_method` (delegation.rb:74-90).
    *
-   * Rails' `RESERVED_METHOD_NAMES.include?` guard (delegation.rb:78, over
-   * `ActiveSupport::Delegation::RESERVED_METHOD_NAMES`, delegation.rb:18) has no
-   * arm here, and deliberately so: it selects between Ruby's two INSTALLATION
-   * spellings — `module_eval` string codegen for a name that is a safe Ruby
-   * identifier, `define_method` for everything else — and both define the same
-   * delegator. The guard's purpose is protecting the codegen path from
-   * interpolating a Ruby keyword into source; TS has no codegen-from-string
-   * path, only the `define_method` equivalent below, so there is nothing for the
-   * name test to select. Porting the Ruby keyword list (`begin`, `elsif`, …)
-   * would guard against names that are harmless in JS while missing the ones
-   * that are not.
-   *
-   * This omission cannot be carried as a `call-mismatches-exclude` row or a
-   * `@missingRailsCall` tag: `method_defined?` is a suppressed call name
-   * (lint-calls.ts) while `include?` maps to `has` (enumerable-idioms.ts), so
-   * the extractor credits `RESERVED_METHOD_NAMES.include?` to the
-   * `method_defined?` memo below and both registers go stale.
+   * @missingRailsCall include? — Verified per-site (RFC 0106): Rails'
+   * `RESERVED_METHOD_NAMES.include?(method.to_s)` guard (delegation.rb:78, over
+   * `ActiveSupport::Delegation::RESERVED_METHOD_NAMES`, delegation.rb:18)
+   * selects between Ruby's two INSTALLATION spellings — `module_eval` string
+   * codegen for a name that is a safe Ruby identifier, `define_method` for
+   * everything else — and both define the same delegator. The guard's purpose is
+   * protecting the codegen path from interpolating a Ruby keyword into source;
+   * TS has no codegen-from-string path, only the `define_method` equivalent
+   * below, so there is nothing for the name test to select. Porting the Ruby
+   * keyword list (`begin`, `elsif`, …) would guard against names that are
+   * harmless in JS while missing the ones that are not.
    */
   generateMethod(name: string, fn: AnyCallable): void {
     // Rails: `return if method_defined?(method)` (delegation.rb:76).
