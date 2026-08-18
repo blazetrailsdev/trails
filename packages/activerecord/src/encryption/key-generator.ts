@@ -31,10 +31,9 @@ export class KeyGenerator {
   }
 
   generateRandomHexKey({ length = this.keyLength() }: { length?: number } = {}): string {
-    // Rails' `generate_random_key(length: length).unpack("H*")[0]`
-    // (key_generator.rb:30-32). `generateRandomKey` hands back the raw bytes
-    // base64-encoded (Ruby returns a binary String), so the hex re-encoding
-    // goes through that buffer.
+    // `generateRandomKey` hands the raw bytes back base64-encoded where Ruby
+    // returns a binary String, so Rails' `unpack("H*")[0]` re-encodes through
+    // that buffer (key_generator.rb:31).
     return Buffer.from(this.generateRandomKey({ length }), "base64").toString("hex");
   }
 
