@@ -11,7 +11,7 @@
     "tsFile": "relation/delegation.ts",
     "rubyName": "generate_method",
     "call": "match?",
-    "reason": "Verified per-site (RFC 0106): the `/\\A[a-zA-Z_]\\w*[!?]?\\z/.match?(method)` test (delegation.rb:77) only chooses between Ruby's two INSTALLATION spellings — `module_eval` codegen vs `define_method` — which produce the same delegator. TS has one installation spelling, so there is nothing for the test to select and the `define_method` arm is what the port implements."
+    "reason": "Verified per-site (RFC 0106): the `/\\A[a-zA-Z_]\\w*[!?]?\\z/.match?(method)` test (delegation.rb:78) only chooses between Ruby's two INSTALLATION spellings — `module_eval` codegen vs `define_method` — which produce the same delegator. TS has one installation spelling, so there is nothing for the test to select and the `define_method` arm is what the port implements."
   },
   {
     "package": "activerecord",

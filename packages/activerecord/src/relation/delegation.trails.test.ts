@@ -43,6 +43,17 @@ describe("generated relation methods — per-model prototype carrier", () => {
     expect(carrier.somethingGenerated).toBe(fn);
   });
 
+  it("keeps the first generated delegator for a name (Rails' method_defined? memo)", () => {
+    // delegation.rb:76 — `return if method_defined?(method)`: once a name is
+    // generated, a later generate_method for the same name is a no-op rather
+    // than a redefinition.
+    generateRelationMethod(Post as never, "memoizedGenerated", () => "first");
+    generateRelationMethod(Post as never, "memoizedGenerated", () => "second");
+
+    const rel = Post.all() as unknown as { memoizedGenerated: () => string };
+    expect(rel.memoizedGenerated()).toBe("first");
+  });
+
   it("resolves the generated method on a constructed relation via prototype lookup", () => {
     generateRelationMethod(Post as never, "anotherGenerated", function () {
       return 42;
