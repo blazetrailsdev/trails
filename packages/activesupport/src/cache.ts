@@ -38,14 +38,15 @@ export { setFormatVersion } from "./cache/format-version-slot.js";
  * Symbol` arm reads: `:memory_store` names a store class to build, anything
  * else is returned as-is.
  *
+ * Ruby's `new(*parameters, **options)` (cache.rb:89) passes no argument at all
+ * when `options` is empty, so a store whose only positional is required still
+ * raises ArgumentError rather than receiving the empty hash as it.
+ *
  * Mirrors: ActiveSupport::Cache.lookup_store (cache.rb:85-97)
  */
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
     const [rest, options] = extractOptionsBang(parameters);
-    // Ruby's `new(*parameters, **options)` (cache.rb:89) passes no argument at
-    // all when `options` is empty, so a store whose only positional is required
-    // still raises ArgumentError rather than receiving the empty hash as it.
     return new (retrieveStoreClass(store))(
       ...rest,
       ...(Object.keys(options as object).length === 0 ? [] : [options]),

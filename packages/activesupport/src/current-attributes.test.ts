@@ -5,7 +5,7 @@ import { assertSame } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
 
 describe("CurrentAttributesTest", () => {
-  // Rails' `Person = Struct.new(:id, :name, :time_zone)`.
+  /** Rails' `Person = Struct.new(:id, :name, :time_zone)`. */
   class Person {
     constructor(
       public id: number,
@@ -46,17 +46,24 @@ describe("CurrentAttributesTest", () => {
     declare static person: Person | undefined;
     declare static request: string | undefined;
 
-    // Rails' `delegate :time_zone, to: :person`. `Delegation.generate` builds a
-    // *method* delegator, and a Struct member is a method on the Ruby side; here
-    // `Person#timeZone` is a field, so the delegator is the accessor it reads.
+    /**
+     * Rails' `delegate :time_zone, to: :person` — a Struct member is a method
+     * on the Ruby side, so the delegator here reads the `Person#timeZone` field.
+     * The tests reach this and `intro` through `Current.instance()` where Rails
+     * reaches them off the class: those class-level delegators come from the
+     * `method_added` hook (current_attributes.rb:186-193), which has no
+     * TypeScript equivalent.
+     */
     get timeZone(): string | undefined {
       return this.person?.timeZone;
     }
 
-    // Rails' overrides call `super`, which is the generated writer
-    // `attributes[:account] = value` (current_attributes.rb:120-133). TypeScript
-    // has no `super` for a member the base class does not declare, so these
-    // reach the same `attributes` hash the generated pair does.
+    /**
+     * Rails' overrides call `super`, which is the generated writer
+     * `attributes[:account] = value` (current_attributes.rb:120-133).
+     * TypeScript has no `super` for a member the base class does not declare,
+     * so these reach the same `attributes` hash the generated pair does.
+     */
     get account(): string | undefined {
       return this.attributes["account"] as string | undefined;
     }
@@ -107,9 +114,11 @@ describe("CurrentAttributesTest", () => {
     declare counterCallable: number;
   }
 
-  // Mirrors `ActiveSupport::CurrentAttributes::TestHelper`, which resets every
-  // CurrentAttributes instance around each test, plus the `before_setup` /
-  // `after_teardown` hooks that restore `Time.zone`.
+  /**
+   * Mirrors `ActiveSupport::CurrentAttributes::TestHelper`, which resets every
+   * CurrentAttributes instance around each test, plus the `before_setup` /
+   * `after_teardown` hooks that restore `Time.zone`.
+   */
   let originalTimeZone: ReturnType<typeof zone>;
 
   beforeEach(() => {
@@ -248,9 +257,6 @@ describe("CurrentAttributesTest", () => {
 
   it("delegation", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    // Rails reads `Current.time_zone` for the first assertion: its `method_added`
-    // hook (current_attributes.rb:186-193) generates a class-level delegator for
-    // every public instance method, which TypeScript has no hook to mirror.
     expect(Current.instance().timeZone).toBe("Central Time (US & Canada)");
     expect(Current.instance().timeZone).toBe("Central Time (US & Canada)");
   });

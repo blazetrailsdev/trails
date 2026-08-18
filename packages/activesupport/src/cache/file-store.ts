@@ -77,11 +77,13 @@ export class FileStore extends Store implements CacheStore {
 
   private _cachePath: string;
 
+  /**
+   * `cache_path` is a required positional (file_store.rb:19), so Ruby raises
+   * ArgumentError from arity when `Cache.lookup_store :file_store` supplies
+   * none. TypeScript passes `undefined` instead, so the arity check is explicit.
+   */
   constructor(cachePath: string, options?: CacheOptions) {
     super(options ?? {});
-    // `cache_path` is a required positional (file_store.rb:19), so Ruby raises
-    // ArgumentError from arity when `Cache.lookup_store :file_store` supplies
-    // none. TypeScript passes `undefined` instead, so the arity check is here.
     if (cachePath === undefined) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1)");
     }

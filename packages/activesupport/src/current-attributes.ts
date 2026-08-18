@@ -22,6 +22,11 @@ interface AttributeDefinition<T = AttributeValue> {
   default?: DefaultValue<T>;
 }
 
+/** Mirrors Ruby ArgumentError. @internal */
+class ArgumentError extends Error {
+  override name = "ArgumentError";
+}
+
 /** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */
 type ResetCallback = (this: CurrentAttributes) => void;
 
@@ -85,7 +90,9 @@ export abstract class CurrentAttributes {
    * `define_cached_method("#{name}=")` call for the writer. A TS attribute is
    * one accessor pair, not two methods, so the writer has no separate
    * descriptor to cache or to copy onto the owner; both Rails definitions land
-   * on the reader's entry.
+   * on the reader's entry. The same collapse applies to the two
+   * `Delegation.generate(singleton_class, …, to: :instance)` calls at
+   * current_attributes.rb:138-139, which become one class-level accessor pair.
    */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
@@ -99,7 +106,7 @@ export abstract class CurrentAttributes {
 
     const invalidAttributeNames = names.filter((name) => INVALID_ATTRIBUTE_NAMES.includes(name));
     if (invalidAttributeNames.length > 0) {
-      throw new Error(`Restricted attribute names: ${invalidAttributeNames.join(", ")}`);
+      throw new ArgumentError(`Restricted attribute names: ${invalidAttributeNames.join(", ")}`);
     }
 
     CodeGenerator.batch(generatedAttributeMethods.call(ctor), __FILE__, __LINE__, (owner) => {
@@ -120,9 +127,6 @@ export abstract class CurrentAttributes {
       }
     });
 
-    // Mirrors the two `Delegation.generate(singleton_class, …, to: :instance)`
-    // calls (current_attributes.rb:138-139): the reader and the writer are one
-    // accessor pair on this side, so one `defineProperty` covers both.
     for (const name of names) {
       Object.defineProperty(ctor, name, {
         configurable: true,
@@ -186,7 +190,7 @@ export abstract class CurrentAttributes {
   }
 
   /** Mirrors: `delegate :set, to: :instance` (current_attributes.rb:154). */
-  static set<R>(attributes: Record<string, AttributeValue>, block?: () => R): R | void {
+  static set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return this.instance().set(attributes, block);
   }
 
@@ -200,13 +204,7 @@ export abstract class CurrentAttributes {
    *
    * Mirrors: CurrentAttributes#set (current_attributes.rb:213-215)
    */
-  set<R>(attributes: Record<string, AttributeValue>, block?: () => R): R | void {
-    if (block === undefined) {
-      for (const [key, value] of Object.entries(attributes)) {
-        (this as unknown as Record<string, unknown>)[key] = value;
-      }
-      return;
-    }
+  set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return objectWith(this as unknown as Record<string, unknown>, attributes, () => block());
   }
 
