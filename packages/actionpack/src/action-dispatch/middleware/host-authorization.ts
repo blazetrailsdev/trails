@@ -224,7 +224,7 @@ export function extractHostname(host: string): string {
 
 export interface HostAuthorizationOptions {
   hosts: HostPermission[];
-  exclude?: (env: RackEnv) => boolean;
+  exclude?: (request: Request) => boolean;
   responseApp?: (env: RackEnv) => Promise<RackResponse>;
 }
 
@@ -233,7 +233,7 @@ type RackApp = (env: RackEnv) => Promise<RackResponse>;
 export class HostAuthorization {
   private app: RackApp;
   private permissions: Permissions;
-  private exclude?: (env: RackEnv) => boolean;
+  private exclude?: (request: Request) => boolean;
   private responseApp: (env: RackEnv) => Promise<RackResponse>;
 
   constructor(app: RackApp, options: HostAuthorizationOptions) {
@@ -250,8 +250,8 @@ export class HostAuthorization {
     const request = new Request(env);
     const blocked = this.blockedHosts(request);
 
-    if (blocked.length === 0 || this.isExcluded(env)) {
-      this.markAsAuthorized(env, request);
+    if (blocked.length === 0 || this.isExcluded(request)) {
+      this.markAsAuthorized(request);
       return this.app(env);
     }
 
@@ -275,30 +275,19 @@ export class HostAuthorization {
     return out;
   }
 
-  /** @internal Invokes the `exclude` predicate with the original Rack env so mutations are visible to downstream middleware (the `Request` constructed in `call` clones its env). */
-  private isExcluded(env: RackEnv): boolean {
-    return Boolean(this.exclude?.(env));
+  /**
+   * @internal Mirrors: `HostAuthorization#excluded?`
+   * (`host_authorization.rb:163-165`). `@exclude.call(request)` invokes a Proc,
+   * which carries no receiver, hence the `null` thisArg.
+   */
+  private isExcluded(request: Request): boolean {
+    return Boolean(this.exclude && this.exclude.call(null, request));
   }
 
-  /** @internal Sets `action_dispatch.authorized_host` from `Request#rawHostWithPort` (port stripped). */
-  private markAsAuthorized(env: RackEnv, request: Request): void {
-    env["action_dispatch.authorized_host"] = stripPort(request.rawHostWithPort);
+  /** @internal Mirrors: `HostAuthorization#mark_as_authorized` (`host_authorization.rb:167-169`). */
+  private markAsAuthorized(request: Request): void {
+    request.setHeader("action_dispatch.authorized_host", request.host);
   }
-}
-
-/**
- * Strip a trailing `:port` from `host` without corrupting unbracketed
- * IPv6 literals. IPv6 addresses with a port arrive bracketed
- * (`[::1]:3000`); an unbracketed multi-colon string is the IPv6 address
- * itself with no port suffix.
- *
- * @internal
- */
-function stripPort(host: string): string {
-  if (host.startsWith("[")) return host.replace(/\]:\d+$/, "]");
-  const colons = (host.match(/:/g) ?? []).length;
-  if (colons > 1) return host;
-  return host.replace(/:\d+$/, "");
 }
 
 /**

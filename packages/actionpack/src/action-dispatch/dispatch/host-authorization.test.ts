@@ -6,6 +6,7 @@ import {
   type HostPermission,
 } from "../middleware/host-authorization.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import type { Request } from "../http/request.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
@@ -162,7 +163,7 @@ describe("HostAuthorizationTest", () => {
   it("exclude callback bypasses authorization", async () => {
     const mw = new HostAuthorization(okApp, {
       hosts: ["example.com"],
-      exclude: (env) => (env["PATH_INFO"] as string) === "/health",
+      exclude: (req) => req.path === "/health",
     });
     const [status] = await mw.call({
       HTTP_HOST: "evil.com",
@@ -175,7 +176,7 @@ describe("HostAuthorizationTest", () => {
   it("exclude does not bypass non-matching paths", async () => {
     const mw = new HostAuthorization(okApp, {
       hosts: ["example.com"],
-      exclude: (env) => (env["PATH_INFO"] as string) === "/health",
+      exclude: (req) => req.path === "/health",
     });
     const [status] = await mw.call({
       HTTP_HOST: "evil.com",
@@ -285,7 +286,7 @@ const successApp = async (_env: RackEnv): Promise<RackResponse> => [
 function buildApp(
   hosts: HostPermission | HostPermission[] | null | undefined,
   opts: {
-    exclude?: (env: RackEnv) => boolean;
+    exclude?: (req: Request) => boolean;
     responseApp?: (env: RackEnv) => Promise<RackResponse>;
   } = {},
 ) {
@@ -696,7 +697,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("exclude matches allow any host", async () => {
-    const mw = buildApp("only.com", { exclude: (env) => env["PATH_INFO"] === "/foo" });
+    const mw = buildApp("only.com", { exclude: (req) => req.path === "/foo" });
     const [status, , body] = await mw.call({
       HTTP_HOST: "www.example.com",
       REQUEST_METHOD: "GET",
@@ -707,7 +708,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("exclude misses block unallowed hosts", async () => {
-    const mw = buildApp("only.com", { exclude: (env) => env["PATH_INFO"] === "/bar" });
+    const mw = buildApp("only.com", { exclude: (req) => req.path === "/bar" });
     const [status, , body] = await mw.call({
       HTTP_HOST: "www.example.com",
       REQUEST_METHOD: "GET",
