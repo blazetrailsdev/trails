@@ -86,6 +86,10 @@ export class CollectionAssociation extends Association {
   /** @internal */
   callbacksFor = callbacksFor;
 
+  // Rails has no `CollectionAssociation#initialize`: `Association#initialize`
+  // runs `reset` (association.rb:46), which seeds `@target = []`
+  // (collection_association.rb:89). trails' base constructor does not call
+  // `reset`, so the collection seat is opened here instead.
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
     this._targetStore = [];
