@@ -1,0 +1,15 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "helpers/javascript-helper.ts",
+    "rubyName": "javascript_tag",
+    "call": "content_tag",
+    "kind": "args",
+    "rubyArgs": [
+      "str:script",
+      "ref:javascriptCdataSection",
+      "ref:htmlOptions"
+    ],
+    "reason": "javascript_helper.rb:75-84 calls `content_tag(\"script\", javascript_cdata_section(content), html_options)`; the port passes a fourth `true` (the escape flag Ruby leaves to the default)."
+  }
+]

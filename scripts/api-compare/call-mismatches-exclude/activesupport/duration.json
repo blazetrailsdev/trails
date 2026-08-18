@@ -51,6 +51,19 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
+    "rubyName": "seconds",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:value",
+      "kwargs{seconds=ref:value}",
+      "bool:false"
+    ],
+    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`; the port drops the leading raw value and passes ({ seconds: n }, false) — Duration carries its value off the parts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "duration.ts",
     "rubyName": "since",
     "call": "sum",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

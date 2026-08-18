@@ -1,0 +1,47 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/calculations.ts",
+    "rubyName": "ago",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/calculations.rb:55 calls `in_time_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/calculations.ts",
+    "rubyName": "beginning_of_day",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/calculations.rb:67 calls `in_time_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/calculations.ts",
+    "rubyName": "end_of_day",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/calculations.rb:85 calls `in_time_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/calculations.ts",
+    "rubyName": "middle_of_day",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/calculations.rb:75 calls `in_time_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/calculations.ts",
+    "rubyName": "since",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/calculations.rb:61 calls `in_time_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
+  }
+]

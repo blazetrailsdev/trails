@@ -1,0 +1,11 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "interpolate/ruby.ts",
+    "rubyName": "interpolate_hash",
+    "call": "missing_interpolation_argument_handler",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "i18n interpolate/ruby.rb:34 reads the handler with no arguments and calls the returned proc; the port folds both into one call taking (key, values, string)."
+  }
+]

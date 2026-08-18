@@ -9,6 +9,26 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "compute_cache_version",
+    "call": "first",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "relation.rb:472 reads `.first` off the fetched row; the port calls a `first(selectRows)` free function over the driver rows, threading the receiver as argument 1."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "compute_cache_version",
+    "call": "to_fs",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:cacheTimestampFormat"
+    ],
+    "reason": "relation.rb:472 calls `to_fs(cache_timestamp_format)` on the timestamp; the ported toFs is a free function taking the receiver as argument 1."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "create",
     "call": "relation_class_for",
     "reason": "Verified per-site (RFC 0106): homonym. `relation_class_for` is called by `Relation::ClassMethods.create(model, ...)` (delegation.rb:139-141), the relation-class constructor; relation.ts's `create` ports the unrelated `Relation#create(attributes, &block)` (relation.rb:154-161), which makes no such call."

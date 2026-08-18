@@ -259,16 +259,18 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   it("foreignKeyPresent on the proxy agrees with the OO association (owner PK present)", async () => {
     // ForeignAssociation#foreign_key_present? — a new-record owner whose primary
-    // key is already assigned is fetchable; the proxy and the OO association must
-    // not disagree.
+    // key is already assigned is fetchable. The proxy no longer carries its own
+    // copy of the check: `null_scope?` (collection_proxy.rb:1150) delegates to
+    // `@association.null_scope?`, which is `owner.new_record? &&
+    // !foreign_key_present?`, so the two cannot disagree.
     const newWithPk = CpcAuthor.new({ name: "withpk" });
     (newWithPk as any)._writeAttribute("id", 999);
     const newWithoutPk = CpcAuthor.new({ name: "nopk" });
 
     const withPkProxy = association(newWithPk, "cpcPosts") as any;
     const withoutPkProxy = association(newWithoutPk, "cpcPosts") as any;
-    expect(withPkProxy._foreignKeyPresent()).toBe(true);
-    expect(withoutPkProxy._foreignKeyPresent()).toBe(false);
+    expect(withPkProxy.isNullScope()).toBe(false);
+    expect(withoutPkProxy.isNullScope()).toBe(true);
   });
 
   it("count_records reads the active counter cache instead of querying", async () => {

@@ -1079,6 +1079,36 @@ export function ownerRecordsNothing(
 }
 
 /**
+ * The ONE TS call-site list `checkCallArgs` compares a Ruby body against, or
+ * `undefined` when the file gives no unambiguous answer.
+ *
+ * The whole-file map holds one entry per DECLARATION, so the trails mixin
+ * convention (CLAUDE.md "Module mixins") — `export function toTime()` beside
+ * `export const TimeExt = { toTime }`, one body declared twice — always records
+ * two entries and used to be dropped by a bare `length !== 1` guard, before the
+ * resolved owner was ever consulted (RFC 0108). Prefer the owner-scoped list
+ * under the resolved owner: a single body re-exported through a grouping object
+ * records the same sites under each owner, so either is the body's own.
+ *
+ * Unresolved owner, or an owner declaring the name more than once, is the
+ * guard's original case and still records nothing.
+ */
+export function ownerCallArgSites<T>(
+  byFileNameOwner: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, readonly T[][]>>>,
+  byFileName: ReadonlyMap<string, ReadonlyMap<string, readonly T[][]>>,
+  tsFile: string,
+  tsName: string,
+  tsClass: string | undefined,
+): readonly T[] | undefined {
+  if (tsClass !== undefined) {
+    const owned = byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass);
+    if (owned !== undefined) return owned.length === 1 ? owned[0] : undefined;
+  }
+  const sites = byFileName.get(tsFile)?.get(tsName);
+  return sites?.length === 1 ? sites[0] : undefined;
+}
+
+/**
  * True when the TS file declares `tsName` on SEVERAL owners and
  * `resolveTsOwner` could not say which one this Ruby entity ported to.
  *
@@ -3160,15 +3190,21 @@ export function main() {
         if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
           return;
         }
-        const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
-        if (tsSites?.length !== 1) return;
+        const tsSites = ownerCallArgSites(
+          tsCallArgsByFileNameOwner,
+          tsCallArgsByFileName,
+          tsFile,
+          tsName,
+          tsClass,
+        );
+        if (tsSites === undefined) return;
         // `rubyOwnersByName` is built per Ruby FILE, a few lines up: its keys are
         // the names THIS file (with its included modules flattened in) declares.
-        const rubySites = comparableRubySites(rubyReadableSites, tsSites[0], (name) =>
+        const rubySites = comparableRubySites(rubyReadableSites, tsSites, (name) =>
           rubyOwnersByName.has(name),
         );
         if (rubySites.length === 0) return;
-        for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
+        for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
             ruby,
             ts,

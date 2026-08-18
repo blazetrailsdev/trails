@@ -1,0 +1,13 @@
+[
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/basic-implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "head",
+    "kind": "args",
+    "rubyArgs": [
+      "str:noContent"
+    ],
+    "reason": "basic_implicit_render.rb:14 is `head :no_content`; the port passes the numeric status 204 instead of the Symbol."
+  }
+]

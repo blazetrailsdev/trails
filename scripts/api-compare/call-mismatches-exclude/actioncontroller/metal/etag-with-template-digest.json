@@ -1,0 +1,13 @@
+[
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/etag-with-template-digest.ts",
+    "rubyName": "determine_template_etag",
+    "call": "lookup_and_digest_template",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:template"
+    ],
+    "reason": "etag_with_template_digest.rb:39 passes only the template; the port also threads the lookup context, which the ported digest helper takes explicitly."
+  }
+]
