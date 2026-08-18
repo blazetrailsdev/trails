@@ -430,13 +430,17 @@ describe("ActionController::RequestForgeryProtection", () => {
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     const controller = {
-      request: { method: "POST", origin: null, baseUrl: "http://test.host" },
+      request: { method: "POST", origin: "http://bad.host", baseUrl: "http://test.host" },
+      forgeryProtectionOriginCheck: true,
       forgeryProtectionStrategy: Exception,
     } as unknown as CsrfController;
 
     await assertRaises(
       [MetalInvalidAuthenticityToken],
-      { match: "Can't verify CSRF token authenticity." },
+      {
+        match:
+          "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      },
       () => handleUnverifiedRequest.call(controller),
     );
   });
