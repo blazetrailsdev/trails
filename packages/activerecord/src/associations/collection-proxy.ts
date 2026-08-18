@@ -178,6 +178,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * system. Spelled `_targetAssociation` because `_association` on this class
    * is the `this`-alias the `AssociationRelation` bodies invoked with the proxy
    * as receiver read.
+   *
+   * trails' `association(record, name)` factory also builds a proxy for a
+   * declared SINGULAR name, which Rails never does: `@association` there is a
+   * `SingularAssociation` whose `@target` is one record, and folding a
+   * collection's array into it would box that record. Such a proxy gets a
+   * collection seat of its own instead.
    */
   private _targetAssociation!: CollectionAssociation;
   private _assocName: string;
@@ -560,16 +566,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._record = record;
     this._assocName = assocName;
     this._assocDef = assocDef;
-    // `CollectionProxy#initialize` is handed the association
-    // (collection_proxy.rb:31-35), so `@association` is resolved once, here.
-    // For a declared collection that is the owner's own
-    // `CollectionAssociation`, giving proxy and association a single `@target`.
-    //
-    // trails' `association(record, name)` factory also builds a proxy for a
-    // declared SINGULAR name (`association(human, "autosaveFace")`), which
-    // Rails never does: `@association` there is a `SingularAssociation` whose
-    // `@target` is one record, and folding a collection's array into it would
-    // box that record. Such a proxy gets a collection seat of its own instead.
     const instance = record.association(assocName) as unknown as CollectionAssociation & {
       isCollection?(): boolean;
     };

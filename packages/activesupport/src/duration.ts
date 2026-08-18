@@ -315,64 +315,20 @@ export class Duration {
   // Date application — applies each part sequentially like Rails does
   // ---------------------------------------------------------------------------
 
-  since(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  since(date?: Date | Temporal.Instant): Temporal.Instant;
+  since(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  since(time?: Date | Temporal.Instant): Temporal.Instant;
   since(
     time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
   ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
     return this.sum(1, time);
   }
 
-  ago(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
-  ago(date?: Date | Temporal.Instant): Temporal.Instant;
+  ago(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  ago(time?: Date | Temporal.Instant): Temporal.Instant;
   ago(
     time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
   ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
     return this.sum(-1, time);
-  }
-
-  /**
-   * Mirrors: ActiveSupport::Duration#sum (duration.rb:485-510).
-   *
-   * The `acts_like?` guard is spelled as the receiver check
-   * `core-ext/date-and-time/calculations.ts:200-210` uses: neither of trails'
-   * receivers carries an `acts_like_*?` marker method, so being one IS the
-   * answer — a `Date`/`Temporal.Instant` is a moment, a `Temporal.PlainDate`
-   * is a calendar day.
-   *
-   * Each arm's per-part loop lives in a module function because the two
-   * receivers take different unit methods: {@link applyDurationToDate} is the
-   * `@parts.each` loop verbatim, {@link applyDurationPreservingNs} carries it
-   * for a moment receiver in a fixed unit order rather than `@parts` order
-   * (tracked by `duration-sum-instant-arm-ignores-part-order`).
-   */
-  private sum(
-    sign: 1 | -1,
-    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
-  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
-    if (
-      !(
-        time instanceof Date ||
-        time instanceof Temporal.Instant ||
-        time instanceof Temporal.PlainDate
-      )
-    ) {
-      throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
-    }
-
-    if (isEmpty(this._partKeys)) {
-      // `time.since(sign * value)`. An empty `@parts` here means a zero value —
-      // the constructor only leaves `_partKeys` empty when it was given no
-      // parts — so the moment receiver is unchanged, while `Date#since` still
-      // widens the calendar day into a zoned Time
-      // (`core_ext/date/calculations.rb:61-63`).
-      if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
-      return applyDurationPreservingNs(time, this.parts, sign);
-    }
-
-    if (time instanceof Temporal.PlainDate)
-      return applyDurationToDate(time, this.parts, this._partKeys, sign);
-    return applyDurationPreservingNs(time, this.parts, sign);
   }
 
   fromNow(): Temporal.Instant {
@@ -489,6 +445,51 @@ export class Duration {
       return [new Scalar(other.inSeconds()), this];
     }
     return [new Scalar(other as number), this];
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#sum (duration.rb:485-510).
+   *
+   * The `acts_like?` guard is spelled as the receiver check
+   * `core-ext/date-and-time/calculations.ts:200-210` uses: neither of trails'
+   * receivers carries an `acts_like_*?` marker method, so being one IS the
+   * answer — a `Date`/`Temporal.Instant` is a moment, a `Temporal.PlainDate`
+   * is a calendar day.
+   *
+   * `time.since(sign * value)` reads the value off `inSeconds()`, trails'
+   * `@value`; an empty `@parts` means a zero one (the constructor only leaves
+   * `_partKeys` empty when it was given no parts), so a moment receiver comes
+   * back unchanged while `Date#since` still widens the calendar day into a
+   * zoned Time (`core_ext/date/calculations.rb:61-63`).
+   *
+   * The `@parts.each` loop lives in a module function because the two receivers
+   * take different unit methods: {@link applyDurationToDate} is that loop
+   * verbatim, {@link applyDurationPreservingNs} carries it for a moment
+   * receiver in a fixed unit order rather than `@parts` order (tracked by
+   * `duration-sum-instant-arm-ignores-part-order`).
+   */
+  private sum(
+    sign: 1 | -1,
+    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (
+      !(
+        time instanceof Date ||
+        time instanceof Temporal.Instant ||
+        time instanceof Temporal.PlainDate
+      )
+    ) {
+      throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
+    }
+
+    if (isEmpty(this._partKeys)) {
+      if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
+      return applyDurationPreservingNs(time, this.parts, sign);
+    }
+
+    if (time instanceof Temporal.PlainDate)
+      return applyDurationToDate(time, this.parts, this._partKeys, sign);
+    return applyDurationPreservingNs(time, this.parts, sign);
   }
 
   /**
