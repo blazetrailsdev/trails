@@ -1126,11 +1126,117 @@ export function buildWhereClause(
   throw argumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
 }
 
+/**
+ * Add WHERE conditions. Accepts:
+ *  - a hash of column/value pairs
+ *  - a raw SQL string with optional bind values
+ *  - an Arel `Nodes.Node`
+ *  - composite-key positional form: `where(['c1','c2'], [[v1a,v1b], ...])`
+ *    (the JS analog of Rails' `where({[c1, c2] => [tuples]})` —
+ *    JS object keys can't be arrays, so columns become a leading
+ *    positional argument)
+ *
+ * Mirrors: ActiveRecord::QueryMethods#where (query_methods.rb:1033-1041)
+ *
+ * Examples:
+ *   where({ name: "dean" })
+ *   where("age > ?", 18)
+ *   where("name LIKE ?", "%dean%")
+ *   where(['shop_id', 'order_number'], [[1, 100], [2, 200]])
+ */
+function where(
+  this: QueryMethodsHost,
+  conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
+  ...rest: unknown[]
+): any {
+  if (conditionsOrSql === undefined) return new WhereChain(this.spawn());
+  // Rails: a single blank-ish argument (`args.length == 1 && args.first.blank?`,
+  // query_methods.rb:1036) makes `where` a no-op returning the relation
+  // unchanged — `where({})` / `where([])` / `where(null)` / `where("")` all
+  // match every row. This applies ONLY to the single-argument call:
+  // `where([], tuples)` (a 2-arg composite) must fall through so the empty
+  // column list raises rather than silently no-opping. Short-circuiting the
+  // empty top-level hash here (rather than in the predicate builder) is what
+  // lets a NESTED empty hash (`where(posts: {})`) still expand to the `1=0`
+  // contradiction Rails' `expand_from_hash` returns.
+  if (rest.length === 0 && isBlankArgument(conditionsOrSql)) {
+    return this;
+  }
+  // Composite-key form: array of column names + array of tuples. It is
+  // always a two-argument call (`where(cols, tuples)`), so it is
+  // disambiguated from Rails' sanitized-array conditions form
+  // (`where(["name = ?", x])`, a single array argument) by the presence of
+  // the extra `tuples` argument. A single all-strings array falls through
+  // to `buildWhereClause`, which unwraps `[head, ...tail]` and sanitizes.
+  if (
+    Array.isArray(conditionsOrSql) &&
+    rest.length > 0 &&
+    conditionsOrSql.every((c) => typeof c === "string")
+  ) {
+    if (rest.length !== 1 || !Array.isArray(rest[0])) {
+      throw argumentError(
+        "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
+      );
+    }
+    const cols = conditionsOrSql as string[];
+    const tuples = rest[0] as unknown[][];
+    // buildComposite returns the WhereClause predicates directly (the native
+    // PredicateBuilder currency); spread them into the clause exactly as
+    // buildWhereClause spreads buildFromHash's result, so a single tuple stays
+    // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
+    //
+    // Rails passes `lookup_table_klass_from_join_dependencies` as the block to
+    // `predicate_builder.build_from_hash` (query_methods.rb:1643-1645) so a
+    // qualified col naming a manual-join table binds through the joined
+    // model's column type.
+    const nodes = this.predicateBuilder.buildComposite(
+      cols,
+      tuples,
+      (tableName) =>
+        lookupTableKlassFromJoinDependencies.call(this, tableName) as
+          | QueryMethodsHost["_model"]
+          | null,
+    );
+    if (nodes.length === 0) return noneBang.call(this.spawn());
+    const rel = this.spawn();
+    rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
+    return rel;
+  }
+  return whereBang.call(
+    this.spawn(),
+    conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
+    ...rest,
+  );
+}
+
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   if (opts == null) return this;
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;
+}
+
+/**
+ * Replace all existing WHERE conditions with new ones.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#rewhere (query_methods.rb:1061-1071)
+ */
+function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | null): any {
+  // Mirrors rewhere (query_methods.rb): `return unscope(:where) if conditions.nil?`.
+  if (conditions == null) return unscope.call(this, "where");
+  conditions = sanitizeForbiddenAttributes(conditions);
+  const rel = this.spawn();
+  // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
+  // `unscope!(where: where_clause.extract_attributes)`, `where_clause += ...`.
+  // Building through the same `build_where_clause` path as `where` keeps the
+  // predicates separate (so a polymorphic `belongs_to` key like `writer`
+  // expands to distinct `writer_type`/`writer_id` predicates), and excepting by
+  // the *columns the new predicates reference* — not the hash keys — drops both
+  // of those columns before re-adding them.
+  const newClause = buildWhereClause.call(rel, conditions);
+  rel.whereClause = rel.whereClause.except(...newClause.extractAttributes());
+  rel.whereClause = rel.whereClause.plus(newClause);
+  return rel;
 }
 
 /**
@@ -1146,6 +1252,16 @@ function isRelationLike(value: unknown): boolean {
     "_model" in value &&
     typeof (value as { toArel?: unknown }).toArel === "function"
   );
+}
+
+/**
+ * Invert all existing WHERE conditions.
+ * Swaps where ↔ whereNot clauses.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#invert_where (query_methods.rb:1101-1103)
+ */
+function invertWhere(this: QueryMethodsHost): any {
+  return invertWhereBang.call(this.spawn());
 }
 
 function invertWhereBang(this: QueryMethodsHost): any {
@@ -1392,6 +1508,26 @@ export function areStructurallyCompatible(self: unknown, other: unknown): boolea
   return structurallyIncompatibleValuesFor.call(self, other).length === 0;
 }
 
+/**
+ * Check if another relation is structurally compatible for use with and()/or().
+ *
+ * Mirrors: ActiveRecord::QueryMethods#structurally_compatible?
+ * (query_methods.rb:1121-1123)
+ */
+function structurallyCompatible(this: QueryMethodsHost, other: any): boolean {
+  return structurallyIncompatibleValuesFor.call(this, other).length === 0;
+}
+
+/**
+ * Combine this relation with another using AND — merges all WHERE
+ * conditions from the other relation into this one.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#and (query_methods.rb:1135-1141)
+ */
+function and(this: QueryMethodsHost, other: any): any {
+  return andBang.call(this.spawn(), other);
+}
+
 function andBang(this: QueryMethodsHost, other: any): any {
   assertRelationForCombining(other, "and");
   assertStructurallyCompatible(this, other, "and");
@@ -1402,6 +1538,19 @@ function andBang(this: QueryMethodsHost, other: any): any {
   this.havingClause = this.havingClause.union(other.havingClause);
   this.referencesValues = unionReferences(this.referencesValues, other.referencesValues);
   return this;
+}
+
+/**
+ * Combine this relation with another using OR.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#or (query_methods.rb:1167-1177)
+ */
+function or(this: QueryMethodsHost, other: any): any {
+  // query_methods.rb:1168 — the `other.is_a?(Relation)` guard wraps BOTH arms,
+  // so `none.or(garbage)` raises rather than reaching `other.spawn`.
+  assertRelationForCombining(other, "or");
+  if (this._isNone) return other.spawn();
+  return orBang.call(this.spawn(), other);
 }
 
 function orBang(this: QueryMethodsHost, other: any): any {
@@ -1781,6 +1930,65 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
   }
   return this;
 }
+
+/**
+ * Exclude specific records from the result.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#excluding (query_methods.rb:1574-1584)
+ * and `alias :without :excluding` (query_methods.rb:1585). Ruby writes ONE
+ * body and lets `__callee__` (:1580) name whichever alias was invoked;
+ * TypeScript has no `__callee__` and a shared prototype function cannot
+ * recover the name it was reached under, so the one authored body lives in
+ * {@link excludingWithCallee} and each name is bound to a copy of it
+ * generated with its own callee — the ArgumentError then names `#excluding`
+ * or `#without` exactly as `excluding_test.rb:103-110`
+ * (`test_raises_on_record_from_different_class`) asserts, with no shared
+ * helper Rails does not have.
+ */
+function excludingWithCallee(callee: "excluding" | "without") {
+  return function (this: QueryMethodsHost, ...records: unknown[]): any {
+    // Rails `records.extract! { |element| element.is_a?(Relation) }`. The
+    // `Relation` constant itself is unreachable from here — importing it would
+    // close the relation.ts ↔ query-methods.ts cycle — so the same partition
+    // runs off the structural relation check this file already uses for
+    // `#and` / `#or`.
+    const relations = records.filter((r) => isRelationForCombining(r)) as any[];
+    records = records
+      .filter((r) => !isRelationForCombining(r))
+      .flat(1)
+      .filter((r) => r != null);
+
+    const model = this.model;
+    if (
+      !records.every((r) => r instanceof (model as any)) ||
+      !relations.every((relation) => relation.model === model)
+    ) {
+      throw new ArgumentError(
+        `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
+      );
+    }
+
+    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
+    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
+    // and re-queries otherwise. A loaded relation's records are already in
+    // memory, so spread them into the literal `records` collection to match
+    // Rails exactly (no extra query). An unloaded relation is deferred:
+    // `excludingBang` records a marker that the load pipeline materializes into a
+    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
+    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
+    const combined: unknown[] = [...records];
+    for (const relation of relations) {
+      if (relation.isLoaded) combined.push(...relation._records);
+      else combined.push(relation);
+    }
+    return excludingBang.call(this.spawn(), combined);
+  };
+}
+
+const excluding = excludingWithCallee("excluding");
+
+/** Mirrors `alias :without :excluding` (query_methods.rb:1585). */
+const without = excludingWithCallee("without");
 
 function excludingBang(this: QueryMethodsHost, records: any[]): any {
   const primaryKey = this.primaryKey;
@@ -2411,9 +2619,15 @@ export const QueryMethodBangs = {
   unscopeBang,
   joinsBang,
   leftOuterJoinsBang,
+  where,
   whereBang,
+  rewhere,
+  invertWhere,
   invertWhereBang,
+  structurallyCompatible,
+  and,
   andBang,
+  or,
   orBang,
   having,
   havingBang,
@@ -2447,6 +2661,8 @@ export const QueryMethodBangs = {
   annotate,
   annotateBang,
   uniqBang,
+  excluding,
+  without,
   excludingBang,
   constructJoinDependency,
   asyncBang,

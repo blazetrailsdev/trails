@@ -630,130 +630,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add WHERE conditions. Accepts:
-   *  - a hash of column/value pairs
-   *  - a raw SQL string with optional bind values
-   *  - an Arel `Nodes.Node`
-   *  - composite-key positional form: `where(['c1','c2'], [[v1a,v1b], ...])`
-   *    (the JS analog of Rails' `where({[c1, c2] => [tuples]})` —
-   *    JS object keys can't be arrays, so columns become a leading
-   *    positional argument)
-   *
-   * Mirrors: ActiveRecord::Relation#where
-   *
-   * Examples:
-   *   where({ name: "dean" })
-   *   where("age > ?", 18)
-   *   where("name LIKE ?", "%dean%")
-   *   where(['shop_id', 'order_number'], [[1, 100], [2, 200]])
-   */
-  where(): WhereChain<Relation<T>>;
-  where(conditions: undefined): WhereChain<Relation<T>>;
-  where(conditions: Record<string, unknown> | null): Relation<T>;
-  where(sql: string, ...binds: unknown[]): Relation<T>;
-  where(node: Nodes.Node): Relation<T>;
-  /**
-   * Sanitized-conditions array form: `where(["name = ?", x])` /
-   * `where(["name = :name", { name: x }])` / `where(["name = '%s'", x])`.
-   * A single array argument routes through `buildWhereClause`, matching Rails'
-   * `sanitize_sql(array)`; the two-argument composite form below is distinct.
-   */
-  where(conditions: unknown[]): Relation<T>;
-  /**
-   * Composite-key form: `where(['c1', 'c2'], [[v11, v12], [v21, v22]])`
-   * compiles to `(c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22)`.
-   * The Rails analog is `where({['c1', 'c2'] => [[v11, v12], ...]})` —
-   * JS object keys can't be arrays, so columns become a leading
-   * positional argument. Tuples containing null/undefined are
-   * filtered (SQL tuple-equality treats any null component as a
-   * non-match); after filtering, an empty list short-circuits via
-   * `none()`.
-   */
-  where(cols: string[], tuples: unknown[][]): Relation<T>;
-  where(
-    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
-    ...rest: unknown[]
-  ): Relation<T> | WhereChain<Relation<T>> {
-    if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this.spawn());
-    // Rails: a single blank-ish argument (`args.length == 1 && args.first.blank?`,
-    // query_methods.rb:1036) makes `where` a no-op returning the relation
-    // unchanged — `where({})` / `where([])` / `where(null)` / `where("")` all
-    // match every row. This applies ONLY to the single-argument call:
-    // `where([], tuples)` (a 2-arg composite) must fall through so the empty
-    // column list raises rather than silently no-opping. Short-circuiting the
-    // empty top-level hash here (rather than in the predicate builder) is what
-    // lets a NESTED empty hash (`where(posts: {})`) still expand to the `1=0`
-    // contradiction Rails' `expand_from_hash` returns.
-    if (rest.length === 0 && _qm.isBlankArgument(conditionsOrSql)) {
-      return this;
-    }
-    // Composite-key form: array of column names + array of tuples. It is
-    // always a two-argument call (`where(cols, tuples)`), so it is
-    // disambiguated from Rails' sanitized-array conditions form
-    // (`where(["name = ?", x])`, a single array argument) by the presence of
-    // the extra `tuples` argument. A single all-strings array falls through
-    // to `buildWhereClause`, which unwraps `[head, ...tail]` and sanitizes.
-    if (
-      Array.isArray(conditionsOrSql) &&
-      rest.length > 0 &&
-      conditionsOrSql.every((c) => typeof c === "string")
-    ) {
-      if (rest.length !== 1 || !Array.isArray(rest[0])) {
-        throw argumentError(
-          "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
-        );
-      }
-      const cols = conditionsOrSql as string[];
-      const tuples = rest[0] as unknown[][];
-      // buildComposite returns the WhereClause predicates directly (the native
-      // PredicateBuilder currency); spread them into the clause exactly as
-      // buildWhereClause spreads buildFromHash's result, so a single tuple stays
-      // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
-      //
-      // Rails passes `lookup_table_klass_from_join_dependencies` as the block to
-      // `predicate_builder.build_from_hash` (query_methods.rb:1643-1645) so a
-      // qualified col naming a manual-join table binds through the joined
-      // model's column type.
-      const nodes = this.predicateBuilder.buildComposite(
-        cols,
-        tuples,
-        (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
-      );
-      if (nodes.length === 0) return this.spawn().noneBang();
-      const rel = this.spawn();
-      rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
-      return rel;
-    }
-    return this.spawn().whereBang(
-      conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
-      ...rest,
-    );
-  }
-
-  /**
-   * Replace all existing WHERE conditions with new ones.
-   *
-   * Mirrors: ActiveRecord::Relation#rewhere
-   */
-  rewhere(conditions: Record<string, unknown> | null): Relation<T> {
-    // Mirrors rewhere (query_methods.rb): `return unscope(:where) if conditions.nil?`.
-    if (conditions == null) return this.unscope("where");
-    conditions = sanitizeForbiddenAttributes(conditions);
-    const rel = this.spawn();
-    // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
-    // `unscope!(where: where_clause.extract_attributes)`, `where_clause += ...`.
-    // Building through the same `build_where_clause` path as `where` keeps the
-    // predicates separate (so a polymorphic `belongs_to` key like `writer`
-    // expands to distinct `writer_type`/`writer_id` predicates), and excepting by
-    // the *columns the new predicates reference* — not the hash keys — drops both
-    // of those columns before re-adding them.
-    const newClause = rel.buildWhereClause(conditions);
-    rel.whereClause = rel.whereClause.except(...newClause.extractAttributes());
-    rel.whereClause = rel.whereClause.plus(newClause);
-    return rel;
-  }
-
-  /**
    * Filter for records WHERE the association IS present.
    *
    * Mirrors: ActiveRecord::QueryMethods::WhereChain#associated
@@ -914,81 +790,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Combine this relation with another using OR.
-   *
-   * Mirrors: ActiveRecord::Relation#or
-   */
-  or(other: Relation<T>): Relation<T> {
-    if (this._isNone) return other.clone();
-    return this.spawn().orBang(other);
-  }
-
-  /**
-   * Combine this relation with another using AND — merges all WHERE
-   * conditions from the other relation into this one.
-   *
-   * Mirrors: ActiveRecord::Relation#and
-   */
-  and(other: Relation<T>): Relation<T> {
-    return this.spawn().andBang(other);
-  }
-
-  /**
-   * WHERE ANY of the given conditions match (OR logic).
-   * Accepts an array of condition hashes.
-   *
-   * Mirrors: ActiveRecord::Relation#where.any (Rails 7.1)
-   */
-  whereAny(...conditions: Record<string, unknown>[]): Relation<T> {
-    if (conditions.length === 0) return this;
-    if (conditions.length === 1) return this.where(conditions[0]);
-
-    const buildClause = (cond: Record<string, unknown>): WhereClause =>
-      new WhereClause(this.predicateBuilder.buildFromHash(cond));
-
-    let combined = buildClause(conditions[0]);
-    for (let i = 1; i < conditions.length; i++) {
-      combined = combined.or(buildClause(conditions[i]));
-    }
-    const rel = this.spawn();
-    if (combined.predicates.length > 0)
-      rel.whereClause = rel.whereClause.plus(new WhereClause([combined.ast]));
-    return rel;
-  }
-
-  /**
-   * WHERE ALL of the given conditions match (AND logic).
-   * Accepts an array of condition hashes.
-   *
-   * Mirrors: ActiveRecord::Relation#where.all (Rails 7.1)
-   */
-  whereAll(...conditions: Record<string, unknown>[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const cond of conditions) {
-      rel = rel.where(cond);
-    }
-    return rel;
-  }
-
-  /**
-   * Exclude specific records from the result.
-   *
-   * Mirrors: ActiveRecord::QueryMethods#excluding (query_methods.rb:1574-1584)
-   * and `alias :without :excluding` (query_methods.rb:1585). Ruby writes ONE
-   * body and lets `__callee__` (:1580) name whichever alias was invoked;
-   * TypeScript has no `__callee__` and a shared prototype function cannot
-   * recover the name it was reached under, so the one authored body lives in
-   * {@link excludingWithCallee} and each name is bound to a copy of it
-   * generated with its own callee — the ArgumentError then names `#excluding`
-   * or `#without` exactly as `excluding_test.rb:103-110`
-   * (`test_raises_on_record_from_different_class`) asserts, with no shared
-   * helper Rails does not have.
-   */
-  declare excluding: (...records: unknown[]) => Relation<T>;
-
-  declare without: (...records: unknown[]) => Relation<T>;
-
-  /**
    * PostgreSQL DISTINCT ON — select distinct rows based on specific columns.
    *
    * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
@@ -998,16 +799,6 @@ export class Relation<T extends Base> {
     rel.distinctValue = true;
     rel._distinctOnColumns = columns;
     return rel;
-  }
-
-  /**
-   * Invert all existing WHERE conditions.
-   * Swaps where ↔ whereNot clauses.
-   *
-   * Mirrors: ActiveRecord::Relation#invert_where
-   */
-  invertWhere(): Relation<T> {
-    return this.spawn().invertWhereBang();
   }
 
   /**
@@ -1412,16 +1203,6 @@ export class Relation<T extends Base> {
    */
   async presence(): Promise<LoadedRelation<Relation<T>> | null> {
     return (await this.isPresent()) ? stripThenable(this as Relation<T>) : null;
-  }
-
-  /**
-   * Check if another relation is structurally compatible for use with or().
-   *
-   * Mirrors: ActiveRecord::Relation#structurally_compatible?
-   */
-  structurallyCompatible(other: Relation<T>): boolean {
-    if (this._model !== other._model) return false;
-    return isEmpty(this.structurallyIncompatibleValuesFor(other as never));
   }
 
   /**
@@ -3895,6 +3676,36 @@ export interface Relation<T extends Base>
   order(...args: OrderArg[]): Relation<T>;
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T>;
   reorder(...args: OrderArg[]): Relation<T>;
+  where(): WhereChain<Relation<T>>;
+  where(conditions: undefined): WhereChain<Relation<T>>;
+  where(conditions: Record<string, unknown> | null): Relation<T>;
+  where(sql: string, ...binds: unknown[]): Relation<T>;
+  where(node: Nodes.Node): Relation<T>;
+  /**
+   * Sanitized-conditions array form: `where(["name = ?", x])` /
+   * `where(["name = :name", { name: x }])` / `where(["name = '%s'", x])`.
+   * A single array argument routes through `buildWhereClause`, matching Rails'
+   * `sanitize_sql(array)`; the two-argument composite form below is distinct.
+   */
+  where(conditions: unknown[]): Relation<T>;
+  /**
+   * Composite-key form: `where(['c1', 'c2'], [[v11, v12], [v21, v22]])`
+   * compiles to `(c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22)`.
+   * The Rails analog is `where({['c1', 'c2'] => [[v11, v12], ...]})` —
+   * JS object keys can't be arrays, so columns become a leading
+   * positional argument. Tuples containing null/undefined are
+   * filtered (SQL tuple-equality treats any null component as a
+   * non-match); after filtering, an empty list short-circuits via
+   * `none()`.
+   */
+  where(cols: string[], tuples: unknown[][]): Relation<T>;
+  rewhere(conditions: Record<string, unknown> | null): Relation<T>;
+  invertWhere(): Relation<T>;
+  structurallyCompatible(other: Relation<T>): boolean;
+  and(other: Relation<T>): Relation<T>;
+  or(other: Relation<T>): Relation<T>;
+  excluding(...records: unknown[]): Relation<T>;
+  without(...records: unknown[]): Relation<T>;
   having(condition: string, ...binds: unknown[]): Relation<T>;
   having(condition: Record<string, unknown>): Relation<T>;
   having(condition: Nodes.Node): Relation<T>;
@@ -4052,46 +3863,3 @@ async function computeCacheVersion(
 ): Promise<string> {
   return rel.computeCacheVersion(timestampColumn);
 }
-
-/**
- * The one authored `excluding` body (query_methods.rb:1574-1584), generated per
- * callee so `alias :without :excluding` (:1585) keeps its own `__callee__` in
- * the ArgumentError. See {@link Relation.excluding}.
- */
-function excludingWithCallee(callee: "excluding" | "without") {
-  return function (this: Relation<Base>, ...records: unknown[]): Relation<Base> {
-    const relations = records.filter((r) => r instanceof Relation) as Relation<Base>[];
-    records = records
-      .filter((r) => !(r instanceof Relation))
-      .flat(1)
-      .filter((r) => r != null);
-
-    const model = this.model;
-    if (
-      !records.every((r) => r instanceof model) ||
-      !relations.every((relation) => relation.model === model)
-    ) {
-      throw new ArgumentError(
-        `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
-      );
-    }
-
-    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
-    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
-    // and re-queries otherwise. A loaded relation's records are already in
-    // memory, so spread them into the literal `records` collection to match
-    // Rails exactly (no extra query). An unloaded relation is deferred:
-    // `excludingBang` records a marker that the load pipeline materializes into a
-    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
-    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
-    const combined: unknown[] = [...records];
-    for (const relation of relations) {
-      if (relation.isLoaded) combined.push(...(relation as any)._records);
-      else combined.push(relation);
-    }
-    return this.spawn().excludingBang(combined);
-  };
-}
-
-Relation.prototype.excluding = excludingWithCallee("excluding");
-Relation.prototype.without = excludingWithCallee("without");
