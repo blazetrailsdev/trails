@@ -532,6 +532,8 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private setOwnerAttributes(record: Base): void {
+    if (this.reflection.options.through) return;
+
     const ctor = (this.owner as any).constructor;
     const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
@@ -552,16 +554,19 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
 
-    if (this.reflection.options.as) {
-      const typeCol =
-        this.reflection.options.foreignType ?? `${underscore(this.reflection.options.as)}_type`;
+    // `reflection.type` (foreign_association.rb:35) lives on the rich
+    // reflection, which the Association is not constructed with.
+    const type =
+      (ctor._reflectOnAssociation?.(this.reflection.name) as { type?: string | null } | null)
+        ?.type ?? null;
+    if (type) {
       // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
       // subclasses store their base class name in the `as:` type column.
       const typeName = (ctor as typeof Base).polymorphicName();
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, typeName);
+        (record as any)._writeAttribute(type, typeName);
       } else {
-        (record as any)[typeCol] = typeName;
+        (record as any)[type] = typeName;
       }
     }
   }

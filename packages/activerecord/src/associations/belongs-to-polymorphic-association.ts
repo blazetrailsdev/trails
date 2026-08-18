@@ -34,19 +34,19 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * Also check if the type column has changed, not just the FK.
    */
   override isTargetChanged(): boolean {
-    return super.isTargetChanged() || this.ownerAttributeChanged(this.foreignTypeName());
+    return super.isTargetChanged() || this.owner.attributeChanged(this.foreignTypeName());
   }
 
   override isTargetPreviouslyChanged(): boolean {
     return (
       super.isTargetPreviouslyChanged() ||
-      this.ownerAttributePreviouslyChanged(this.foreignTypeName())
+      this.owner.attributePreviouslyChanged(this.foreignTypeName())
     );
   }
 
   override isSavedChangeToTarget(): boolean {
     return (
-      super.isSavedChangeToTarget() || this.ownerSavedChangeToAttribute(this.foreignTypeName())
+      super.isSavedChangeToTarget() || this.owner.savedChangeToAttribute(this.foreignTypeName())
     );
   }
 

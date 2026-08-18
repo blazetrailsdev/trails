@@ -715,12 +715,13 @@ export class Associations {
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
-    BelongsToBuilder.build(
+    const reflection = BelongsToBuilder.build(
       this,
       name,
       scope as ((...args: any[]) => any) | Record<string, unknown> | null,
       options as Record<string, unknown>,
     );
+    Reflection.addReflection(this as any, name, reflection);
   }
 
   /**
@@ -733,12 +734,13 @@ export class Associations {
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
-    HasOneBuilder.build(
+    const reflection = HasOneBuilder.build(
       this,
       name,
       scope as ((...args: any[]) => any) | Record<string, unknown> | null,
       options as Record<string, unknown>,
     );
+    Reflection.addReflection(this as any, name, reflection);
   }
 
   /**
@@ -751,12 +753,13 @@ export class Associations {
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
-    HasManyBuilder.build(
+    const reflection = HasManyBuilder.build(
       this,
       name,
       scope as ((...args: any[]) => any) | Record<string, unknown> | null,
       options as Record<string, unknown>,
     );
+    Reflection.addReflection(this as any, name, reflection);
   }
 
   /**

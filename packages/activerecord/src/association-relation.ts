@@ -393,5 +393,10 @@ _registerRelationFamily(
 );
 setAssociationRelationFactory((klass, assoc) => {
   const Ctor = associationRelationClassFor(klass as typeof Base);
-  return new Ctor(klass as typeof Base, assoc as Association);
+  // Rails' `AssociationRelation.create` yields a relation that answers the
+  // model's named scopes and association extensions through `method_missing`
+  // (relation/delegation.rb). trails supplies that with the scope proxy, which
+  // `spawn` also applies — so wrap here, or a `merge!`-based `target_scope`
+  // (which does not spawn) would hand back a relation without them.
+  return wrapWithScopeProxy(new Ctor(klass as typeof Base, assoc as Association));
 });

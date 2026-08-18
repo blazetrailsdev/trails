@@ -174,18 +174,18 @@ export class BelongsToAssociation extends SingularAssociation {
    * target is an unsaved new record.
    */
   isTargetChanged(): boolean {
-    const changed = this.foreignKeyNames().some((fk) => this.ownerAttributeChanged(fk));
+    const changed = this.foreignKeyNames().some((fk) => this.owner.attributeChanged(fk));
     return (
       changed || (!this.foreignKeyPresent() && this.target != null && this.target.isNewRecord())
     );
   }
 
   isTargetPreviouslyChanged(): boolean {
-    return this.foreignKeyNames().some((fk) => this.ownerAttributePreviouslyChanged(fk));
+    return this.foreignKeyNames().some((fk) => this.owner.attributePreviouslyChanged(fk));
   }
 
   isSavedChangeToTarget(): boolean {
-    return this.foreignKeyNames().some((fk) => this.ownerSavedChangeToAttribute(fk));
+    return this.foreignKeyNames().some((fk) => this.owner.savedChangeToAttribute(fk));
   }
 
   // --- Protected ---
@@ -450,30 +450,6 @@ export class BelongsToAssociation extends SingularAssociation {
         await scope.updateCounters({ [counterCol]: by, touch });
       }
     }
-  }
-
-  protected ownerAttributeChanged(attr: string): boolean {
-    if (typeof (this.owner as any).attributeChanged === "function")
-      return (this.owner as any).attributeChanged(attr);
-    if (typeof (this.owner as any).isAttributeChanged === "function")
-      return (this.owner as any).isAttributeChanged(attr);
-    return false;
-  }
-
-  protected ownerAttributePreviouslyChanged(attr: string): boolean {
-    if (typeof (this.owner as any).attributePreviouslyChanged === "function")
-      return (this.owner as any).attributePreviouslyChanged(attr);
-    if (typeof (this.owner as any).isAttributePreviouslyChanged === "function")
-      return (this.owner as any).isAttributePreviouslyChanged(attr);
-    return false;
-  }
-
-  protected ownerSavedChangeToAttribute(attr: string): boolean {
-    if (typeof (this.owner as any).savedChangeToAttribute === "function")
-      return (this.owner as any).savedChangeToAttribute(attr);
-    if (typeof (this.owner as any).isSavedChangeToAttribute === "function")
-      return (this.owner as any).isSavedChangeToAttribute(attr);
-    return false;
   }
 }
 

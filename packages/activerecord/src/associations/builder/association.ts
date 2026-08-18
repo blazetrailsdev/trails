@@ -145,8 +145,6 @@ export class Association {
       options: { ...options },
     });
 
-    Reflection.addReflection(model, name, reflection as any);
-
     return reflection;
   }
 
