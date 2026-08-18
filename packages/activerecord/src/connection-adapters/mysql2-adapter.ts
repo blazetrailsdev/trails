@@ -100,6 +100,12 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * connection — no inner pool layer.
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
+  static readonly ER_BAD_DB_ERROR = 1049;
+  static readonly ER_DBACCESS_DENIED_ERROR = 1044;
+  static readonly ER_ACCESS_DENIED_ERROR = 1045;
+  static readonly ER_CONN_HOST_ERROR = 2003;
+  static readonly ER_UNKNOWN_HOST_ERROR = 2005;
+
   /**
    * Mirrors: Mysql2Adapter#initialize_type_map (mysql2_adapter.rb:40-49).
    *
@@ -742,7 +748,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // ConnectionNotEstablished in every branch but NoDatabaseError; use its
         // dedicated setPool (which flips the `_poolSet` guard) so a later
         // setPool on the same object can't silently overwrite it.
-        const translated = translateConnectError(err, this._database, this._poolConfig);
+        // `new_client` has already mapped the errno to its typed error
+        // (mysql2_adapter.rb:24-37); Rails' `connect` only re-raises it with
+        // the pool attached.
+        const translated = err instanceof Error ? err : new ConnectionNotEstablished(String(err));
         if (translated instanceof ConnectionNotEstablished) {
           translated.setPool(this.pool);
         } else if (translated instanceof AdapterError) {
@@ -1719,11 +1728,40 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             )
         : TEMPORAL_POOL_OPTIONS.typeCast;
 
-    const conn = await mysql.createConnection({
-      supportBigNumbers: true,
-      ...(connOptions as mysql.ConnectionOptions),
-      typeCast: composedTypeCast,
-    });
+    // Rails' `new_client` is `::Mysql2::Client.new(config)` with the errno
+    // rescue attached to the method itself (mysql2_adapter.rb:24-37), so the
+    // typed NoDatabaseError / DatabaseConnectionError is raised from here
+    // rather than from `connect`.
+    let conn: mysql.Connection;
+    try {
+      conn = await mysql.createConnection({
+        supportBigNumbers: true,
+        ...(connOptions as mysql.ConnectionOptions),
+        typeCast: composedTypeCast,
+      });
+    } catch (err) {
+      if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
+      // Rails: `rescue ::Mysql2::Error => error; case error.error_number`
+      // (mysql2_adapter.rb:26-36).
+      switch ((err as { errno?: number }).errno) {
+        case Mysql2Adapter.ER_BAD_DB_ERROR:
+          throw NoDatabaseError.dbError(
+            (connOptions as { database?: string }).database ?? "unknown",
+          );
+        case Mysql2Adapter.ER_DBACCESS_DENIED_ERROR:
+        case Mysql2Adapter.ER_ACCESS_DENIED_ERROR:
+          throw DatabaseConnectionError.usernameError(
+            config.user ?? parseUriField(config, "username") ?? "unknown",
+          );
+        case Mysql2Adapter.ER_CONN_HOST_ERROR:
+        case Mysql2Adapter.ER_UNKNOWN_HOST_ERROR:
+          throw DatabaseConnectionError.hostnameError(
+            config.host ?? parseUriField(config, "hostname") ?? "unknown",
+          );
+        default:
+          throw new ConnectionNotEstablished(err.message, { cause: err });
+      }
+    }
 
     if (initSql) {
       try {
@@ -1911,52 +1949,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
 
     return `SET ${namesPart}time_zone = '+00:00', ${sessionClauses}`;
-  }
-}
-
-/**
- * Translate a connection-establishment error to the matching Rails exception.
- * Mirrors `Mysql2Adapter.new_client`'s rescue block — maps specific MySQL
- * errnos to typed AR errors so callers get the same exception hierarchy as
- * Rails.
- * @internal
- */
-function translateConnectError(
-  err: unknown,
-  database: string | undefined,
-  config: mysql.PoolOptions & MysqlAdapterOptions,
-): Error {
-  if (!(err instanceof Error)) return new ConnectionNotEstablished(String(err));
-  const errno = (err as { errno?: number }).errno;
-  switch (errno) {
-    case 1049: {
-      // ER_BAD_DB_ERROR
-      const db = database ?? "unknown";
-      return new NoDatabaseError(
-        `We could not find your database: ${db}. Available database configurations can be found in config/database.yml.`,
-        { cause: err },
-      );
-    }
-    case 1044: // ER_DBACCESS_DENIED_ERROR
-    case 1045: {
-      // ER_ACCESS_DENIED_ERROR
-      const user = config.user ?? parseUriField(config, "username") ?? "unknown";
-      return new DatabaseConnectionError(
-        `There is an issue connecting to your database with your username/password, username: ${user}.\n\nPlease check your database configuration to ensure the username/password are valid.`,
-        { cause: err },
-      );
-    }
-    case 2003: // ER_CONN_HOST_ERROR
-    case 2005: {
-      // ER_UNKNOWN_HOST_ERROR
-      const host = config.host ?? parseUriField(config, "hostname") ?? "unknown";
-      return new DatabaseConnectionError(
-        `There is an issue connecting with your hostname: ${host}.\n\nPlease check your database configuration and ensure there is a valid connection to your database.`,
-        { cause: err },
-      );
-    }
-    default:
-      return new ConnectionNotEstablished(err.message, { cause: err });
   }
 }
 

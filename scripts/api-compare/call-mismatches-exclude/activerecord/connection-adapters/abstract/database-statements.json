@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "initialize",
     "call": "reset_transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): abstract/database_statements.rb:12 is `reset_transaction` inside `initialize`; trails' DatabaseStatements is a mixin with no constructor of its own — the adapter's own constructor calls `resetTransaction()` (abstract-adapter.ts), so the call happens, just not from a body matched to this Ruby method."
   }
 ]

@@ -109,7 +109,7 @@ describe("PostgreSQL SchemaCreation", () => {
 
   it("visitAddExclusionConstraint / visitAddUniqueConstraint", async () => {
     expect(
-      s().visitAddExclusionConstraint(
+      await s().visitAddExclusionConstraint(
         new ExclusionConstraintDefinition("t", "e WITH &&", { name: "c" }),
       ),
     ).toMatch(/^ADD CONSTRAINT/);

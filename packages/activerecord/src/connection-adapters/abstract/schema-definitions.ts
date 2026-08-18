@@ -539,6 +539,11 @@ export interface ColumnOptions {
   ifNotExists?: boolean;
   autoIncrement?: boolean;
   unsigned?: boolean;
+  // MySQL column placement (Rails: `t.column x, :string, first: true`/`after:`),
+  // read by `add_column_options!` and carried through `ReferenceDefinition`'s
+  // `options.slice(:null, :first, :after)` (schema_definitions.rb:259).
+  first?: boolean;
+  after?: string;
   // MySQL blob/text sizing (Rails: `t.binary x, size: :tiny`). Maps to the
   // tiny/medium/long type prefix; ignored on adapters without sized blobs.
   size?: "tiny" | "medium" | "long";
@@ -872,6 +877,8 @@ export class ReferenceDefinition {
       ...this.asOptions(this.polymorphic),
       ...this.conditionalOptions(),
       ...(this.options.null !== undefined ? { null: this.options.null } : {}),
+      ...(this.options.first !== undefined ? { first: this.options.first } : {}),
+      ...(this.options.after !== undefined ? { after: this.options.after } : {}),
     };
   }
 
@@ -1666,26 +1673,15 @@ export class Table {
 
   async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("changeColumn").call(this._schema, this.name, columnName, type, options);
+    return this._schema.changeColumn(this.name, columnName, type, options);
   }
 
   async changeDefault(columnName: string, defaultOrChanges: unknown): Promise<void> {
-    return this._require("changeColumnDefault").call(
-      this._schema,
-      this.name,
-      columnName,
-      defaultOrChanges,
-    );
+    return this._schema.changeColumnDefault(this.name, columnName, defaultOrChanges);
   }
 
   async changeNull(columnName: string, isNull: boolean, defaultValue?: unknown): Promise<void> {
-    return this._require("changeColumnNull").call(
-      this._schema,
-      this.name,
-      columnName,
-      isNull,
-      defaultValue,
-    );
+    return this._schema.changeColumnNull(this.name, columnName, isNull, defaultValue);
   }
 
   async removeTimestamps(options?: ColumnOptions): Promise<void> {
@@ -1700,7 +1696,7 @@ export class Table {
     const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     for (const refName of names) {
-      await this._require("removeReference").call(this._schema, this.name, refName, options);
+      await this._schema.removeReference(this.name, refName, options);
     }
   }
   async removeBelongsTo(...refNames: string[]): Promise<void>;
@@ -1837,18 +1833,18 @@ export interface SchemaStatementsLike {
     options?: Record<string, unknown>,
   ): Promise<boolean>;
   renameIndex?(tableName: string, oldName: string, newName: string): Promise<void>;
-  changeColumn?(
+  changeColumn(
     tableName: string,
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions,
   ): Promise<void>;
-  changeColumnDefault?(
+  changeColumnDefault(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void>;
-  changeColumnNull?(
+  changeColumnNull(
     tableName: string,
     columnName: string,
     isNull: boolean,

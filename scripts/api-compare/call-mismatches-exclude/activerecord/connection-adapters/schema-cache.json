@@ -4,14 +4,14 @@
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "_load_from",
     "call": "load",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:228-242 dispatches to `Marshal.load` or `YAML.unsafe_load` by extension; trails dumps and loads the cache as JSON (schema-cache.ts:134-146), so neither Ruby deserializer has a counterpart to call."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "cached?",
     "call": "load_cache",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:79-89 may `load_cache(nil)` inline; trails' `isCached` is synchronous while `loadCache` is promise-returning, so the load is performed by `ensureSyncCache()` from the already-resolved dump (schema-cache.ts:839-842)."
   },
   {
     "package": "activerecord",
@@ -25,27 +25,27 @@
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "derive_columns_hash_and_deduplicate_values",
     "call": "deep_deduplicate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with Ruby's `-@`; JS has no string-interning primitive and identical string literals are already shared, so trails derives `columnsHash` only (schema-cache.ts:617-627)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "open",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:466 is `Zlib::GzipWriter.new file`; trails compresses with the pure `Gzip.compress` and writes the result, so no writer is allocated."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "read",
     "call": "open",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:246 is `Zlib::GzipReader.open(filename) { |gz| ... }`; trails reads the bytes and calls the pure `Gzip.decompress` (schema-cache.ts:149-156) — there is no reader object to open."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "size",
     "call": "cache",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:69-71 is `cache(pool).size`; trails' `cache(pool)` is promise-returning while `size` is synchronous, so it reads the resolved `_cache` via `ensureSyncCache()` (schema-cache.ts:827-830). Tracked with the rest of the sync/async schema-reflection surface."
   }
 ]

@@ -23,7 +23,11 @@ const READ_QUERY =
 
 type ExecutableAdapter = {
   execute(sql: string, binds?: unknown[]): Promise<unknown>;
-  executeMutation(sql: string, binds?: unknown[]): Promise<unknown>;
+  internalExecute(
+    sql: string,
+    name?: string | null,
+    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown>;
 };
 
 export interface DatabaseStatements {
@@ -63,11 +67,17 @@ export async function beginIsolatedDbTransaction(
 }
 
 export async function commitDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.executeMutation("COMMIT TRANSACTION");
+  await adapter.internalExecute("COMMIT TRANSACTION", "TRANSACTION", {
+    allowRetry: true,
+    materializeTransactions: false,
+  });
 }
 
 export async function execRollbackDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.executeMutation("ROLLBACK TRANSACTION");
+  await adapter.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", {
+    allowRetry: true,
+    materializeTransactions: false,
+  });
 }
 
 export function highPrecisionCurrentTimestamp(): string {
@@ -87,12 +97,20 @@ export async function resetIsolationLevel(
   previousReadUncommitted: number | null,
 ): Promise<void> {
   if (previousReadUncommitted !== null) {
-    await adapter.executeMutation(`PRAGMA read_uncommitted=${previousReadUncommitted}`);
+    await adapter.internalExecute(
+      `PRAGMA read_uncommitted=${previousReadUncommitted}`,
+      "TRANSACTION",
+      { allowRetry: true, materializeTransactions: false },
+    );
   }
 }
 
 interface InternalBeginTransactionHost {
-  executeMutation(sql: string): Promise<unknown>;
+  internalExecute(
+    sql: string,
+    name?: string | null,
+    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown>;
   queryValue(sql: string, name?: string): Promise<unknown>;
   isSharedCache?(): boolean;
   _previousReadUncommitted?: unknown;
@@ -156,10 +174,16 @@ export async function internalBeginTransaction(
       );
     }
   }
-  await this.executeMutation(`BEGIN ${mode.toUpperCase()} TRANSACTION`);
+  await this.internalExecute(`BEGIN ${mode.toUpperCase()} TRANSACTION`, "TRANSACTION", {
+    allowRetry: true,
+    materializeTransactions: false,
+  });
   if (isolation) {
     this._previousReadUncommitted = await this.queryValue("PRAGMA read_uncommitted");
-    await this.executeMutation("PRAGMA read_uncommitted=ON");
+    await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
   }
 }
 

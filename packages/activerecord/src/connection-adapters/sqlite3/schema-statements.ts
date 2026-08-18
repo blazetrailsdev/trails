@@ -230,7 +230,7 @@ export function newColumnFromField(
   if (generatedType) {
     defaultFunction = dfltValue;
   } else {
-    defaultFunction = _extractDefaultFunction(defaultValue, dfltValue);
+    defaultFunction = extractDefaultFunction(defaultValue, dfltValue);
   }
 
   const rowid = isColumnTheRowid(field, definitions);
@@ -354,7 +354,7 @@ export function extractValueFromDefault(dfltValue: string | null): unknown {
 
 export { extractValueFromDefault as _extractValueFromDefault };
 
-function _extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
+function extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
   // Mirrors Rails' SQLite3Adapter#has_default_function? regex
   // (sqlite3_adapter.rb): a call, CURRENT_* keyword, or `||` concat.
   if (

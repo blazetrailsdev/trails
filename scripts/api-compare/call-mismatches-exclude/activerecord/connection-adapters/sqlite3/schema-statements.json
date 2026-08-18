@@ -4,21 +4,14 @@
     "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
     "rubyName": "indexes",
     "call": "quote_table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
-    "rubyName": "new_column_from_field",
-    "call": "extract_default_function",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/schema_statements.rb:9 is `PRAGMA index_list(#{quote_table_name(table_name)})`; trails splits an attached-schema-qualified name first and quotes the two halves with `quoteColumnName` (sqlite3/schema-statements.ts:109-116), because PRAGMA takes `schema.table` as two separately-quoted identifiers, not one quoted string."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/schema-statements.ts",
     "rubyName": "quoted_scope",
     "call": "quote",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/schema_statements.rb:202 is `quote(name)`; trails' `quote` is a `this`-typed dispatch function needing the adapter as receiver, and `quotedScope` is a free function with no adapter in hand, so it applies the same `''`-doubling inline (sqlite3/schema-statements.ts:293)."
   },
   {
     "package": "activerecord",

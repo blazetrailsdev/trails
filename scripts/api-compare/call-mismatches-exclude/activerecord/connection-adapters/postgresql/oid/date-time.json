@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/postgresql/oid/date-time.ts",
     "rubyName": "cast_value",
     "call": "format",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/date_time.rb's `value.format` is Ruby's DateTime formatting; trails' cast returns a Temporal value formatted through Temporal's own API, which has no `format` method."
   }
 ]

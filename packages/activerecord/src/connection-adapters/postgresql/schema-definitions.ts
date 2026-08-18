@@ -191,6 +191,24 @@ export class UniqueConstraintDefinition {
   }
 }
 
+/**
+ * The PG-only slice of `@conn` that `TableDefinition#new_exclusion_constraint_definition`
+ * / `#new_unique_constraint_definition` read (postgresql/schema_definitions.rb:265-273).
+ * @internal
+ */
+type PgConstraintOptionsConn = {
+  exclusionConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+  uniqueConstraintOptions(
+    tableName: string,
+    columnName: string | string[],
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+};
+
 export class TableDefinition extends AbstractTableDefinition {
   readonly exclusionConstraints: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraints: UniqueConstraintDefinition[] = [];
@@ -227,14 +245,30 @@ export class TableDefinition extends AbstractTableDefinition {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): ExclusionConstraintDefinition {
-    return new ExclusionConstraintDefinition(this.name, expression, options);
+    // Rails: `options = @conn.exclusion_constraint_options(name, expression, options)`
+    // (postgresql/schema_definitions.rb:265-268) — this is where a constraint
+    // declared inside `create_table` gets its generated name and its
+    // `deferrable` validation.
+    const opts = (this._adapter as unknown as PgConstraintOptionsConn).exclusionConstraintOptions(
+      this.name,
+      expression,
+      options as Record<string, unknown>,
+    ) as ExclusionConstraintOptions;
+    return new ExclusionConstraintDefinition(this.name, expression, opts);
   }
 
   newUniqueConstraintDefinition(
     columnName: string | string[],
     options: UniqueConstraintOptions = {},
   ): UniqueConstraintDefinition {
-    return new UniqueConstraintDefinition(this.name, columnName, options);
+    // Rails: `options = @conn.unique_constraint_options(name, column_name, options)`
+    // (postgresql/schema_definitions.rb:270-273).
+    const opts = (this._adapter as unknown as PgConstraintOptionsConn).uniqueConstraintOptions(
+      this.name,
+      columnName,
+      options as Record<string, unknown>,
+    ) as UniqueConstraintOptions;
+    return new UniqueConstraintDefinition(this.name, columnName, opts);
   }
 
   /**

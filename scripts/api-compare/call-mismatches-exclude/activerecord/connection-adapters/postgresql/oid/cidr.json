@@ -4,6 +4,6 @@
     "tsFile": "connection-adapters/postgresql/oid/cidr.ts",
     "rubyName": "cast_value",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/cidr.rb builds an `IPAddr.new(...)`; Ruby's IPAddr has no port in trails, so the cast returns the normalized CIDR string. Tracked as the PG address-type gap, not a dropped delegation."
   }
 ]

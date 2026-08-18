@@ -5,7 +5,7 @@
  */
 
 export class StatementPool<T = unknown> {
-  private _statements = new Map<string, T>();
+  private _cache = new Map<string, T>();
   private _maxSize: number;
 
   constructor(maxSize = 1000) {
@@ -13,7 +13,7 @@ export class StatementPool<T = unknown> {
   }
 
   get length(): number {
-    return this._statements.size;
+    return this.cache.size;
   }
 
   get maxSize(): number {
@@ -33,11 +33,11 @@ export class StatementPool<T = unknown> {
     }
     this._maxSize = maxSize;
     const deallocating: Array<Promise<void>> = [];
-    while (this._statements.size > this._maxSize) {
-      const firstKey = this._statements.keys().next().value;
+    while (this.cache.size > this._maxSize) {
+      const firstKey = this.cache.keys().next().value;
       if (firstKey === undefined) break;
-      const evicted = this._statements.get(firstKey)!;
-      this._statements.delete(firstKey);
+      const evicted = this.cache.get(firstKey)!;
+      this.cache.delete(firstKey);
       const pending = this.dealloc(evicted);
       if (pending) deallocating.push(pending);
     }
@@ -45,35 +45,35 @@ export class StatementPool<T = unknown> {
   }
 
   get(key: string): T | undefined {
-    if (!this._statements.has(key)) return undefined;
-    const stmt = this._statements.get(key) as T;
+    if (!this.cache.has(key)) return undefined;
+    const stmt = this.cache.get(key) as T;
     // Move to end for LRU
-    this._statements.delete(key);
-    this._statements.set(key, stmt);
+    this.cache.delete(key);
+    this.cache.set(key, stmt);
     return stmt;
   }
 
   set(key: string, stmt: T): void | Promise<void> {
-    this._statements.delete(key);
+    this.cache.delete(key);
     const deallocating: Array<Promise<void>> = [];
-    while (this._maxSize <= this._statements.size) {
+    while (this._maxSize <= this.cache.size) {
       // `dealloc(cache.shift.last)` (statement_pool.rb:32). The non-null
       // assertion carries Rails' failure mode rather than papering over it: at
       // `statement_limit` 0 the loop runs on an empty cache, Ruby's
       // `Hash#shift` returns nil and `nil.last` raises NoMethodError. A limit
       // of 0 is unsupported in Rails, and the destructure raises here for the
       // same reason at the same point.
-      const [firstKey, evicted] = this._statements.entries().next().value!;
-      this._statements.delete(firstKey);
+      const [firstKey, evicted] = this.cache.entries().next().value!;
+      this.cache.delete(firstKey);
       const pending = this.dealloc(evicted);
       if (pending) deallocating.push(pending);
     }
-    this._statements.set(key, stmt);
+    this.cache.set(key, stmt);
     if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
   }
 
   has(key: string): boolean {
-    return this._statements.has(key);
+    return this.cache.has(key);
   }
 
   /** Alias for has() — mirrors Ruby's key? */
@@ -82,20 +82,20 @@ export class StatementPool<T = unknown> {
   }
 
   delete(key: string): T | undefined | Promise<T | undefined> {
-    if (!this._statements.has(key)) return undefined;
-    const stmt = this._statements.get(key) as T;
-    this._statements.delete(key);
+    if (!this.cache.has(key)) return undefined;
+    const stmt = this.cache.get(key) as T;
+    this.cache.delete(key);
     const pending = this.dealloc(stmt);
     return pending ? pending.then(() => stmt) : stmt;
   }
 
   clear(): void | Promise<void> {
     const deallocating: Array<Promise<void>> = [];
-    for (const stmt of this._statements.values()) {
+    for (const stmt of this.cache.values()) {
       const pending = this.dealloc(stmt);
       if (pending) deallocating.push(pending);
     }
-    this._statements.clear();
+    this.cache.clear();
     if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
   }
 
@@ -106,7 +106,7 @@ export class StatementPool<T = unknown> {
    * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#reset
    */
   reset(): void {
-    this._statements.clear();
+    this.cache.clear();
   }
 
   /**
@@ -115,13 +115,24 @@ export class StatementPool<T = unknown> {
    * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#each (Enumerable)
    */
   each(fn: (key: string, stmt: T) => void): void {
-    for (const [key, stmt] of this._statements) {
+    for (const [key, stmt] of this.cache) {
       fn(key, stmt);
     }
   }
 
   get keys(): string[] {
-    return [...this._statements.keys()];
+    return [...this.cache.keys()];
+  }
+
+  /**
+   * Rails scopes the statement cache by `Process.pid` so a forked child starts
+   * with an empty cache (statement_pool.rb:60-62). Node is single-process, so
+   * the one map is returned directly.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#cache (private)
+   */
+  private get cache(): Map<string, T> {
+    return this._cache;
   }
 
   /**
@@ -138,17 +149,4 @@ export class StatementPool<T = unknown> {
   protected dealloc(_stmt: T): void | Promise<void> {
     // Base implementation is a no-op; adapter-specific pools override.
   }
-}
-
-/**
- * Returns the per-process statement cache. Rails scopes this by Process.pid so
- * forked child processes start with an empty cache; Node is single-process so
- * the internal Map is returned directly.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#cache (private)
- *
- * @internal
- */
-export function cache<T>(pool: StatementPool<T>): Map<string, T> {
-  return (pool as any)._statements as Map<string, T>;
 }

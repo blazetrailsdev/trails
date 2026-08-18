@@ -2,34 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "change",
-    "call": "change_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "change_default",
-    "call": "change_column_default",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "change_null",
-    "call": "change_column_null",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "concise_options",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "conditional_options",
     "call": "slice",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:254-256 is `options.slice(:if_exists, :if_not_exists)`; trails schema-definitions.ts:675-680 picks the two keys explicitly."
@@ -46,35 +18,35 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "foreign_key_options",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:277 is `as_options(foreign_key).merge(column: column_name, **conditional_options)`; trails spells the same merge as an object spread (schema-definitions.ts:896-902). `Hash#merge` has no ported analogue for a plain object."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "foreign_table_name",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:297-299 is `foreign_key_options.fetch(:to_table) { ... }`; `to_table` is a declared optional property on trails' ReferenceForeignKeyOptions, so the block default is spelled `?? (...)` (schema-definitions.ts:922-925). The Ruby fetch/`??` difference (a STORED nil) cannot arise: the key is only ever written with a table name."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "index_options",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:267 is `as_options(index).merge(conditional_options)`, spelled as an object spread in trails (schema-definitions.ts:884-895). Same keys, same precedence."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "polymorphic_options",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:259 chains two `merge`s, spelled as one object spread in trails (schema-definitions.ts:870-878). Same keys, same precedence."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "polymorphic_options",
     "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:259's `options.slice(:null, :first, :after)` is spelled as three presence-guarded spreads in trails (schema-definitions.ts:874-876) — `Hash#slice` has no ported analogue for a plain object, and a bare spread would introduce the keys as `undefined`."
   },
   {
     "package": "activerecord",
@@ -86,16 +58,9 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "remove_references",
-    "call": "remove_reference",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "set_primary_key",
     "call": "get_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): schema_definitions.rb:397 is `Base.get_primary_key(...)`; importing `Base` from the connection-adapter layer is a module cycle, so trails reads it through the `table-name-options.ts` registration slot as `globalGetPrimaryKey` (schema-definitions.ts:1058). Same value, same fallback."
   },
   {
     "package": "activerecord",

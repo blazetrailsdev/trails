@@ -4,13 +4,13 @@
     "tsFile": "connection-adapters/postgresql/schema-dumper.ts",
     "rubyName": "exclusion_constraints_in_create",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/schema_dumper.rb's `return unless (exclusion_constraints = ...).any?`; trails guards with `.length === 0` on the JS array — `Enumerable#any?` without a block is not a ported method name."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/schema-dumper.ts",
     "rubyName": "unique_constraints_in_create",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-site verified (RFC 0106 wave 4b): same site — `Enumerable#any?` without a block is a `.length` check on the JS array."
   }
 ]
