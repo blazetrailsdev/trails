@@ -6,7 +6,7 @@
  * scoping mechanism and the UnknownPrimaryKey error message.
  */
 import { describe, it, expect } from "vitest";
-import { Base, UnknownPrimaryKey } from "./index.js";
+import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { registerSubclass } from "./inheritance.js";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
@@ -103,12 +103,11 @@ describe("_applyScopeAttributes — multiparameter path", () => {
 });
 
 describe("_applyScopeAttributes — a scope that sets type wins over the STI default", () => {
-  // Rails' MRO decides this. base.rb:303-304 includes Inheritance before
-  // Scoping, so Scoping is nearer, and both bodies are `super; <contribution>`
-  // (inheritance.rb:349-352, scoping.rb:53-56) — the unwind runs
-  // ensure_proper_type first and populate_with_current_scope_attributes last,
-  // so the scope's type overwrites the STI class name. This test used to
-  // assert the reverse, pinning the port's hand-rolled composition order.
+  // The scope source is not special: ClassMethods#new feeds scope attributes to
+  // the same subclass_from_attributes as the explicit ones (inheritance.rb:56-78),
+  // and find_sti_class raises unless the resolved constant is self or in
+  // descendants (:242-265). An STI ancestor is neither, so the type never
+  // reaches the column — this test used to assert the port's build-as-is escape.
   it("scope that sets type overwrites the STI type column", async () => {
     class Vehicle extends Base {
       static {
@@ -119,11 +118,12 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
     }
     Vehicle.inheritanceColumn = "type";
     class Car extends Vehicle {}
+    registerModel("ScopeStiVehicle", Vehicle);
+    registerSubclass(Car);
 
-    const rel = Vehicle.where({ type: "Vehicle" });
+    const rel = Vehicle.where({ type: "ScopeStiVehicle" });
     await Vehicle.scoping(rel, async () => {
-      const car = new Car({});
-      expect(car.readAttribute("type")).toBe("Vehicle");
+      expect(() => new Car({})).toThrow(SubclassNotFound);
     });
   });
 });
