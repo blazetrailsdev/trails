@@ -303,30 +303,9 @@ export class ExplainProxy<T extends Base> {
    * `exec_explain { @relation.send(:exec_queries) }`, private-bypass included.
    */
   inspect(): Promise<string> {
-    return this.execExplain(async () => {
-      // Rails' `exec_queries` leaves `@records` alone — the assignment lives in
-      // `#load` — so explaining a relation never loads it. trails' `exec_queries`
-      // ends in `loadRecords`, so the load-cache state is snapshotted and
-      // restored around the call to keep `.explain` side-effect-free, and the
-      // `@none` arm of `exec_main_query` (relation.rb:1424-1429) short-circuits
-      // before any query is issued. Both ride
-      // `split-load-records-out-of-exec-queries`.
-      const relation = this._relation as unknown as {
-        _isNone: boolean;
-        _loaded: boolean;
-        _records: T[];
-        execQueries(): Promise<T[]>;
-      };
-      if (relation._isNone) return [];
-      const wasLoaded = relation._loaded;
-      const priorRecords = relation._records;
-      try {
-        return await relation.execQueries();
-      } finally {
-        relation._loaded = wasLoaded;
-        relation._records = priorRecords;
-      }
-    });
+    return this.execExplain(() =>
+      (this._relation as unknown as { execQueries(): Promise<T[]> }).execQueries(),
+    );
   }
 
   /** Mirrors: ActiveRecord::Relation::ExplainProxy#average (relation.rb:16-18) */
@@ -1128,7 +1107,17 @@ export class Relation<T extends Base> {
     // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
     // Mirrors Rails, whose read paths run inside `with_connection` and thread the
     // yielded connection.
-    return this.withConnection(() => this.execQueries());
+    // Mirrors: ActiveRecord::Relation#load (relation.rb:1179-1186) —
+    // `@records = exec_queries; @loaded = true`. The assignment lives HERE, not
+    // in `exec_queries`, which is what makes `.explain` (which calls
+    // `exec_queries` directly, relation.rb:13) side-effect-free.
+    const token = this._loadToken;
+    const records = await this.withConnection(() => this.execQueries());
+    // A reset() landed while the query was in flight: return the rows we got
+    // without clobbering the fresh state.
+    if (token !== this._loadToken) return records;
+    this.loadRecords(records);
+    return [...this._records];
   }
 
   /**
@@ -1145,19 +1134,9 @@ export class Relation<T extends Base> {
       // Rails materializes a `distinct_relation_for_primary_key` subquery value
       // (an eager-loading relation with limit/offset over a collection reflection)
       // into a literal id list inside `.where()`. trails' `.where()` is sync, so
-      // the materialization is deferred to here — run it before the contradiction
-      // check so an empty id set becomes an empty `IN` (no-query empty result).
+      // the materialization is deferred to here — run it before `exec_main_query`
+      // so an empty id set becomes an empty `IN` (contradiction, no query).
       await this._materializeDeferredDistinctPkPredicates();
-
-      // Rails Relation#exec_main_query short-circuits a contradictory
-      // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
-      // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
-      // SELECT is sent and `.explain` collects zero queries. Distinct from
-      // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
-      if (this.whereClause.isContradiction()) {
-        this.loadRecords([]);
-        return [];
-      }
 
       // Capture the load token before any await so we can detect if a
       // reset() landed while the query was in flight and bail without
@@ -1166,19 +1145,7 @@ export class Relation<T extends Base> {
 
       const rows = await this.execMainQuery();
       if (token !== this._loadToken) return [];
-      this.loadRecords(this.instantiateRecords(rows));
-
-      // Apply readonly and strict_loading flags to loaded records
-      if (this.readonlyValue) {
-        for (const record of this._records) {
-          (record as any)._readonly = true;
-        }
-      }
-      if (this.strictLoadingValue != null) {
-        for (const record of this._records) {
-          (record as any)._strictLoading = this.strictLoadingValue;
-        }
-      }
+      const records = this.instantiateRecords(rows);
 
       // Preload associations via separate queries. Rails builds this list as
       // `preload = preload_values; preload += includes_values unless eager_loading?`
@@ -1193,12 +1160,24 @@ export class Relation<T extends Base> {
         ...(this.isEagerLoading ? [] : this.includesValues),
         ...bypassPreloads.filter((n) => !this.preloadValues.includes(n)),
       ];
-      if (preloadAssocs.length > 0 && this._records.length > 0) {
-        await this.preloadAssociations(this._records, preloadAssocs);
+      if (preloadAssocs.length > 0 && records.length > 0) {
+        await this.preloadAssociations(records, preloadAssocs);
         if (token !== this._loadToken) return [];
       }
 
-      return [...this._records];
+      // Rails applies both flags AFTER `preload_associations` (relation.rb:1417-1418).
+      if (this.readonlyValue) {
+        for (const record of records) {
+          (record as any)._readonly = true;
+        }
+      }
+      if (this.strictLoadingValue != null) {
+        for (const record of records) {
+          (record as any)._strictLoading = this.strictLoadingValue;
+        }
+      }
+
+      return records;
     });
   }
 
@@ -1213,9 +1192,17 @@ export class Relation<T extends Base> {
     // the eager-loading `select_all(relation.arel, "SQL", async: async)`
     // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
     // querying.rb:67-68).
+    // Mirrors relation.rb:1424-1429: the `@none` arm short-circuits before the
+    // query cache block and before any SQL is issued.
+    if (this._isNone) return Result.empty();
+
     const c = this._conn();
     const async =
       this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+
+    // Mirrors relation.rb:1432: a contradictory where-clause (e.g. `where(id: [])`,
+    // which compiles to an empty `IN`) returns `[].freeze` before any SELECT.
+    if (this.whereClause.isContradiction()) return Result.empty();
 
     // Rails' `eager_loading?`, which `exec_main_query` reads for itself
     // (relation.rb:1428) exactly as `exec_queries` does for its preload list.
