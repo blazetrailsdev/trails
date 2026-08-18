@@ -9,7 +9,7 @@
       "ref:k",
       "ref:v"
     ],
-    "reason": "Extractor residue: Ruby's reader `formats` and writer `formats=` share the TS name `formats`, so the comparator reads the class's `set formats` (which mirrors mime_negotiation.rb:142's `set_header `action_dispatch.request.formats`, extensions.collect { … }`) against the READER's `set_header k, v` at mime_negotiation.rb:82. The reader function itself already forwards (k, v)."
+    "reason": "Extractor residue: Ruby's reader `formats` and writer `formats=` share the TS name `formats`, so the comparator reads the class's `set formats` (which mirrors mime_negotiation.rb:137's `set_header `action_dispatch.request.formats`, extensions.collect { … }`) against the READER's `set_header k, v` at mime_negotiation.rb:85. The reader function itself already forwards (k, v)."
   },
   {
     "package": "actiondispatch",
@@ -18,6 +18,6 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Extractor residue, same reader/writer name collision as the `formats` row above: Ruby's `variant` reader (mime_negotiation.rb:96) is compared against the TS `set variant`, whose `new` builds the error that `variant=` raises at mime_negotiation.rb:92."
+    "reason": "Extractor residue, same reader/writer name collision as the `formats` row above: Ruby's `variant` reader (mime_negotiation.rb:100) is compared against the TS `set variant`, whose `new` builds the error that `variant=` raises at mime_negotiation.rb:96."
   }
 ]
