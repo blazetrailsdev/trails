@@ -367,3 +367,10 @@ export function ordinal(number: number): string {
 export function ordinalize(number: number): string {
   return String(I18n.translate("number.nth.ordinalized", { number }));
 }
+
+// `String#parameterize` (core_ext/string/inflections.rb:184-186) is one line:
+// `ActiveSupport::Inflector.parameterize(self, ...)`. Ruby's own definition
+// lives in `inflector/transliterate.rb:87`, and so does trails' — this
+// re-export is the delegation, keeping the String bucket's member where the
+// mapping expects it without a second body.
+export { parameterize } from "./transliterate.js";

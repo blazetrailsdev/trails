@@ -653,7 +653,7 @@ export class TimeZone {
    * (time_zone.rb:223-225), sorted by `<=>` (time_zone.rb:333-337).
    */
   static all(): TimeZone[] {
-    zones ??= Object.values(TimeZone.#zonesMap()).sort((a, b) => a.compareTo(b) ?? 0);
+    zones ??= Object.values(TimeZone.zonesMap()).sort((a, b) => a.compareTo(b) ?? 0);
     return zones;
   }
 
@@ -1196,7 +1196,7 @@ export class TimeZone {
     const code = countryCode.toUpperCase();
     let memo = countryZonesMemo.get(code);
     if (memo === undefined) {
-      memo = TimeZone.#loadCountryZones(code);
+      memo = TimeZone.loadCountryZones(code);
       countryZonesMemo.set(code, memo);
     }
     return memo;
@@ -1235,7 +1235,7 @@ export class TimeZone {
    * {@link TimeZone.create} — trails resolves zones through `Intl`, which has
    * no TZInfo error hierarchy to port.
    */
-  static #loadCountryZones(code: string): TimeZone[] {
+  private static loadCountryZones(code: string): TimeZone[] {
     // `getTimeZones` reports an unknown region as no zones rather than by
     // raising, and rejects a malformed one with a `RangeError`; every real
     // Alpha2 code has at least one zone, so both are the raise `Country.get`
@@ -1275,7 +1275,7 @@ export class TimeZone {
    * keyed by that name — `zones[name] = timezone if timezone`, hence the
    * nullish guard — under the `@zones_map` memo `all` reads through.
    */
-  static #zonesMap(): Record<string, TimeZone> {
+  private static zonesMap(): Record<string, TimeZone> {
     zonesMapMemo ??= Object.keys(MAPPING).reduce<Record<string, TimeZone>>((zones, name) => {
       const timezone = TimeZone.find(name);
       if (timezone != null) zones[name] = timezone;
