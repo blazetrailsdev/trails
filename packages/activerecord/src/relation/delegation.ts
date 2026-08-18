@@ -897,6 +897,7 @@ interface XmlSerializable {
  * (async, self-loading) and `delegateRecordMethodSync` (sync, loaded proxy).
  */
 const RECORD_DELEGATES: Record<string, RecordDelegate> = {
+  length: (records) => records.length,
   each: (records, fn: (record: Base, index: number) => void) => {
     records.forEach(fn);
     return records;
@@ -1001,6 +1002,11 @@ export class DelegationMethods {
   // Each loads via `toArray()` (trails has no blocking IO) then applies the
   // shared `RECORD_DELEGATES` helper — the same pure function the synchronous
   // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses.
+
+  /** `Array#length` — the number of loaded records. */
+  async length(this: DelegationHost): Promise<number> {
+    return RECORD_DELEGATES.length(await this.toArray()) as number;
+  }
 
   /** `Array#each` — yields each loaded record, returning the records. */
   async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {

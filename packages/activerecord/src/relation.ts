@@ -1019,17 +1019,6 @@ export class Relation<T extends Base> {
     return (await this.isPresent()) ? stripThenable(this as Relation<T>) : null;
   }
 
-  /**
-   * Return the number of loaded records — `delegate :length, to: :records`
-   * (delegation.rb:101), not an Enumerable member.
-   *
-   * Mirrors: ActiveRecord::Relation#length
-   */
-  async length(): Promise<number> {
-    const records = await this.toArray();
-    return records.length;
-  }
-
   // ---- include Enumerable (relation.rb:67) — see ENUMERABLE_DELEGATES ----
 
   /** `Enumerable#detect` / `#find` — `find` on a Relation is the AR PK finder. */
@@ -3615,6 +3604,7 @@ export interface Relation<T extends Base>
 // is a class-body method (its signature must stay override-compatible with
 // `CollectionProxy#slice`).
 export interface Relation<T extends Base> {
+  length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
   isIntersect(other: T[]): Promise<boolean>;
