@@ -562,11 +562,8 @@ describe("AdapterForeignKeyTest", () => {
         this.tableName = "fk_test_has_fk";
       }
     }
-    // Ruby loads the schema lazily on first attribute access (Class.new with
-    // nothing but `self.table_name`); trails' lazy load is the SYNC cache read
-    // in `loadSchema`, which answers nothing for a table no query has warmed
-    // yet, so reflect once up front. Unlike an `attribute()` declaration this
-    // keeps the column DB-reflected.
+    // Ruby loads the schema on first attribute access; trails' `loadSchema` is
+    // sync and answers only from a cache no query has warmed for this table.
     await KlassHasFk.ensureSchemaLoaded();
     const hasFk = new KlassHasFk();
     (hasFk as unknown as { fk_id: number }).fk_id = 1231231231;

@@ -571,19 +571,17 @@ export function narrowToProjectedColumns(
   // default for a still-declared-and-ignored attribute (Rails' AttributedDeveloper
   // `name`) would otherwise survive narrowing as an initialized value.
   //
-  // Rails does NOT leave a declared attribute's default uninitialized, contrary
-  // to what this comment used to claim: `attribute :x, :string` with no default
-  // records only a PendingType, which applies `Attribute::Null#with_type` →
-  // `with_cast_value(name, nil, type)` (attribute.rb:231-233) — an INITIALIZED
-  // slot, in AR as in plain ActiveModel. A load that doesn't project it then
-  // takes `LazyAttributeSet#default_attribute`'s `types.key?(name)` arm
-  // (attribute_set/builder.rb:81-85) and dups that initialized default. What
-  // Rails' own test asserts is narrower — an ignored REAL column
-  // (`Developer#first_name`, base_test.rb:1825-1834) is never in `types` at all,
-  // so it lands on `Attribute.null` and stays out of `@attributes`.
-  // The narrowing below is kept for the trails-only shape base.test.ts pins (a
-  // column both `attribute()`-declared and ignored); an ignored column present
-  // in a raw `SELECT *` row (in rowKeys) is untouched and keeps its loaded value.
+  // Rails does NOT leave such a slot uninitialized, contrary to what this
+  // comment used to claim: a defaultless `attribute` records only a PendingType,
+  // and `Attribute::Null#with_type` → `with_cast_value(name, nil, type)`
+  // (attribute.rb:231-233) is initialized; a load that skips the column then
+  // dups that default via `default_attribute`'s `types.key?` arm
+  // (attribute_set/builder.rb:81-85). Rails' own test is narrower — an ignored
+  // REAL column (`Developer#first_name`, base_test.rb:1825-1834) is not in
+  // `types`, lands on `Attribute.null`, and stays out of `@attributes`. The
+  // narrowing is kept for the trails-only shape base.test.ts pins (a column both
+  // declared and ignored); an ignored column present in a raw `SELECT *` row (in
+  // rowKeys) is untouched and keeps its loaded value.
   const ignoredColumns = (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [];
   for (const c of ignoredColumns) {
     if (!pkSet.has(c) && !rowKeys.has(c)) narrowable.push(c);
@@ -1028,10 +1026,8 @@ function castStiValueFromAttrs(
     attrsHash[inheritCol] ?? attrsHash[snakeCol] ?? attrsHash[camelCol] ?? undefined;
   if (!isPresent(subclassValue)) return { found: false };
   // Rails reaches this through `subclass_from_attributes` → `find_sti_class`
-  // (inheritance.rb:312), which casts through `base_class`, not the receiver —
-  // as {@link discriminateClassForRecord} does on the row path. Only the
-  // subclass lookup and its `subclass == self || descendants.include?` check
-  // stay on the receiver.
+  // (inheritance.rb:312), which casts through `base_class`, not the receiver.
+  // Only the subclass lookup and its `subclass == self` check stay on it.
   return {
     found: true,
     value: castInheritanceColumnValue(baseClass.call(modelClass), inheritCol, subclassValue),

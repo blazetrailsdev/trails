@@ -1204,6 +1204,10 @@ export interface RubyOwnerResolution {
   rubyOwnersOnTsSeat?: number;
 }
 
+/** A Ruby `name=` writer, as opposed to an operator method that merely ends in
+ *  `=` (`==`, `<=`, `!=`) — those port to a named method, never a `set` accessor. */
+const RUBY_WRITER_NAME = /^[A-Za-z_]\w*=$/;
+
 /**
  * True when a Ruby WRITER resolved to the TS READER's body.
  *
@@ -3060,7 +3064,7 @@ export function main() {
           callSetOf: (tsOwner) => tsCallsByFileNameOwner.get(tsFile)?.get(tsName)?.get(tsOwner),
           writerOf: (tsOwner) =>
             tsWriterOwnersByFileName.get(tsFile)?.get(tsName)?.has(tsOwner) ?? false,
-          rubyIsWriter: rubyName.endsWith("="),
+          rubyIsWriter: RUBY_WRITER_NAME.test(rubyName),
         });
         const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
         const ambiguous =
