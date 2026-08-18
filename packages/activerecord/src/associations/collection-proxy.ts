@@ -201,6 +201,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `@association_cache` read rather than `_collectionAssociation()`:
    * `Base#association` re-syncs the cache, which reads loadedness back off
    * this proxy, so resolving a seat through it would recurse.
+   *
+   * Invariant for anything that writes `_target` / `_targetLoaded`: the real
+   * `CollectionAssociation` must already be registered, so the write lands on
+   * the shared seat. Every current writer satisfies it — the mutation paths
+   * reach `_collectionAssociation()` / `_staleWrapper()` first, and the
+   * preloader calls `owner.association(name)` before `_hydrateFromPreload`
+   * (`preloader/association.ts`, `preloader/batch.ts`). A new writer that runs
+   * before the association exists would strand its records on `_ownSeat`.
    */
   private _seat(): CollectionAssociation {
     const instance = this._record._associationInstances.get(this._assocName) as
