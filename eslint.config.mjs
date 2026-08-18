@@ -15,6 +15,7 @@ import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
+import schemaMemoReadThroughGuard from "./eslint/schema-memo-read-through-guard.mjs";
 import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
@@ -240,6 +241,7 @@ export default defineConfig(
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
           "no-getter-called-as-method": noGetterCalledAsMethod,
+          "schema-memo-read-through-guard": schemaMemoReadThroughGuard,
           "async-querying-empty": asyncQueryingEmpty,
           "sqlite-driver-await": sqliteDriverAwait,
           "prefer-await-relation": preferAwaitRelation,
@@ -325,6 +327,21 @@ export default defineConfig(
     files: ["packages/*/src/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
+    },
+  },
+
+  // ── schema-memo-read-through-guard ──
+  // trails has no `inherited` hook, so `reloadSchemaFromCache`'s Rails-shaped
+  // recursive push reaches only subclasses that happened to call
+  // `registerSubclass`. The rest are covered by `schemaStaleAgainstAncestors`'s
+  // pull fallback, which is only sound while every read of the memoized schema
+  // state goes through `ownSchemaMemo` / `isSchemaLoaded`. This makes that
+  // invariant enforced rather than hand-verified.
+  {
+    files: ["packages/activerecord/src/*.ts"],
+    ignores: ["packages/activerecord/src/*.test.ts"],
+    rules: {
+      "blazetrails/schema-memo-read-through-guard": "error",
     },
   },
 

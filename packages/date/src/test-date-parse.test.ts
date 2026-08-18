@@ -328,6 +328,120 @@ describe("TestDateParse", () => {
     expect(rescueArgumentError(() => DateTime.parse("")) instanceof Date.Error).toBeTruthy();
   });
 
+  it(" iso8601", () => {
+    let h = Date._iso8601("01-02-03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("2001-02-03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("--02-03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([null, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("---03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([null, null, 3, 4, 5, 6, 0]);
+
+    h = Date._iso8601("2001-02-03T04:05");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, null, null]);
+    h = Date._iso8601("2001-02-03T04:05:06");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("2001-02-03T04:05:06,07");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("2001-02-03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("2001-02-03T04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+    h = Date._iso8601("2001-02");
+    expect(valuesAt(h, "year", "mon")).toEqual([2001, 2]);
+
+    h = Date._iso8601("010203T040506Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("20010203T040506Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("--0203T040506Z");
+    expect(ymdhms(h)).toEqual([null, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("---03T040506Z");
+    expect(ymdhms(h)).toEqual([null, null, 3, 4, 5, 6, 0]);
+
+    h = Date._iso8601("010203T0405");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, null, null]);
+    h = Date._iso8601("20010203T0405");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, null, null]);
+    h = Date._iso8601("20010203T040506");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("20010203T040506,07");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("20010203T040506Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("20010203T040506.07+0100");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._iso8601("200102030405");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, null, null]);
+    h = Date._iso8601("20010203040506");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("20010203040506,07");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._iso8601("20010203040506Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("20010203040506.07+0100");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._iso8601("01-023T04:05:06Z");
+    expect(ydhms(h)).toEqual([2001, 23, 4, 5, 6, 0]);
+    h = Date._iso8601("2001-023T04:05:06Z");
+    expect(ydhms(h)).toEqual([2001, 23, 4, 5, 6, 0]);
+    h = Date._iso8601("-023T04:05:06Z");
+    expect(ydhms(h)).toEqual([null, 23, 4, 5, 6, 0]);
+
+    h = Date._iso8601("01023T040506Z");
+    expect(ydhms(h)).toEqual([2001, 23, 4, 5, 6, 0]);
+    h = Date._iso8601("2001023T040506Z");
+    expect(ydhms(h)).toEqual([2001, 23, 4, 5, 6, 0]);
+    h = Date._iso8601("-023T040506Z");
+    expect(ydhms(h)).toEqual([null, 23, 4, 5, 6, 0]);
+
+    h = Date._iso8601("01-w02-3T04:05:06Z");
+    expect(cwhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("2001-w02-3T04:05:06Z");
+    expect(cwhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("-w02-3T04:05:06Z");
+    expect(cwhms(h)).toEqual([null, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("-w-3T04:05:06Z");
+    expect(cwhms(h)).toEqual([null, null, 3, 4, 5, 6, 0]);
+
+    h = Date._iso8601("01w023T040506Z");
+    expect(cwhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("2001w023T040506Z");
+    expect(cwhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("-w023T040506Z");
+    expect(cwhms(h)).toEqual([null, 2, 3, 4, 5, 6, 0]);
+    h = Date._iso8601("-w-3T040506Z");
+    expect(cwhms(h)).toEqual([null, null, 3, 4, 5, 6, 0]);
+
+    h = Date._iso8601("04:05");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, null, null]);
+    h = Date._iso8601("04:05:06");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, null]);
+    h = Date._iso8601("04:05:06,07");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, null]);
+    h = Date._iso8601("04:05:06Z");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, 0]);
+    h = Date._iso8601("04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, 3600]);
+
+    h = Date._iso8601("040506,07");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, null]);
+    h = Date._iso8601("040506.07+0100");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, 3600]);
+
+    h = Date._iso8601("");
+    expect(h).toEqual({});
+
+    h = Date._iso8601(null as unknown as string);
+    expect(h).toEqual({});
+
+    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
+    expect(() => Date._iso8601(1 as unknown as string)).toThrow(TypeError);
+  });
+
   it(" rfc3339", () => {
     let h = Date._rfc3339("2001-02-03T04:05:06Z");
     expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
@@ -344,6 +458,71 @@ describe("TestDateParse", () => {
 
     // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._rfc3339(1 as unknown as string)).toThrow(TypeError);
+  });
+
+  it(" xmlschema", () => {
+    let h = Date._xmlschema("2001-02-03");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, null, null, null, null]);
+    h = Date._xmlschema("2001-02-03Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, null, null, null, 0]);
+    h = Date._xmlschema("2001-02-03+01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, null, null, null, 3600]);
+
+    h = Date._xmlschema("2001-02-03T04:05:06");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._xmlschema("2001-02-03T04:05:06.07");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._xmlschema("2001-02-03T04:05:06.07Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._xmlschema("2001-02-03T04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._xmlschema("04:05:06");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, null]);
+    h = Date._xmlschema("04:05:06Z");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, 0]);
+    h = Date._xmlschema("04:05:06+01:00");
+    expect(ymdhms(h)).toEqual([null, null, null, 4, 5, 6, 3600]);
+
+    h = Date._xmlschema("2001-02");
+    expect(ymdhms(h)).toEqual([2001, 2, null, null, null, null, null]);
+    h = Date._xmlschema("2001-02Z");
+    expect(ymdhms(h)).toEqual([2001, 2, null, null, null, null, 0]);
+    h = Date._xmlschema("2001-02+01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, null, null, null, null, 3600]);
+    h = Date._xmlschema("2001-02-01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, null, null, null, null, -3600]);
+
+    h = Date._xmlschema("2001");
+    expect(ymdhms(h)).toEqual([2001, null, null, null, null, null, null]);
+    h = Date._xmlschema("2001Z");
+    expect(ymdhms(h)).toEqual([2001, null, null, null, null, null, 0]);
+    h = Date._xmlschema("2001+01:00");
+    expect(ymdhms(h)).toEqual([2001, null, null, null, null, null, 3600]);
+    h = Date._xmlschema("2001-01:00");
+    expect(ymdhms(h)).toEqual([2001, null, null, null, null, null, -3600]);
+
+    h = Date._xmlschema("--02");
+    expect(ymdhms(h)).toEqual([null, 2, null, null, null, null, null]);
+    h = Date._xmlschema("--02Z");
+    expect(ymdhms(h)).toEqual([null, 2, null, null, null, null, 0]);
+    h = Date._xmlschema("--02+01:00");
+    expect(ymdhms(h)).toEqual([null, 2, null, null, null, null, 3600]);
+
+    h = Date._xmlschema("92001-02-03T04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([92001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._xmlschema("-92001-02-03T04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([-92001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._xmlschema("");
+    expect(h).toEqual({});
+
+    h = Date._xmlschema(null as unknown as string);
+    expect(h).toEqual({});
+
+    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
+    expect(() => Date._xmlschema(1 as unknown as string)).toThrow(TypeError);
   });
 
   it(" rfc2822", () => {
@@ -402,6 +581,79 @@ describe("TestDateParse", () => {
     expect(() => Date._httpdate(1 as unknown as string)).toThrow(TypeError);
   });
 
+  it(" jisx0301", () => {
+    let h = Date._jisx0301("13.02.03");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, null, null, null, null]);
+    h = Date._jisx0301("H13.02.03");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, null, null, null, null]);
+    h = Date._jisx0301("S63.02.03");
+    expect(ymdhms(h)).toEqual([1988, 2, 3, null, null, null, null]);
+    h = Date._jisx0301("H31.04.30");
+    expect(ymdhms(h)).toEqual([2019, 4, 30, null, null, null, null]);
+    h = Date._jisx0301("H31.05.01");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, null, null, null, null]);
+    h = Date._jisx0301("R01.05.01");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, null, null, null, null]);
+
+    h = Date._jisx0301("H13.02.03T04:05:06");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._jisx0301("H13.02.03T04:05:06,07");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._jisx0301("H13.02.03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._jisx0301("H13.02.03T04:05:06.07+0100");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._jisx0301("H31.04.30T04:05:06");
+    expect(ymdhms(h)).toEqual([2019, 4, 30, 4, 5, 6, null]);
+    h = Date._jisx0301("H31.04.30T04:05:06,07");
+    expect(ymdhms(h)).toEqual([2019, 4, 30, 4, 5, 6, null]);
+    h = Date._jisx0301("H31.04.30T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2019, 4, 30, 4, 5, 6, 0]);
+    h = Date._jisx0301("H31.04.30T04:05:06.07+0100");
+    expect(ymdhms(h)).toEqual([2019, 4, 30, 4, 5, 6, 3600]);
+
+    h = Date._jisx0301("H31.05.01T04:05:06");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, null]);
+    h = Date._jisx0301("H31.05.01T04:05:06,07");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, null]);
+    h = Date._jisx0301("H31.05.01T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, 0]);
+    h = Date._jisx0301("H31.05.01T04:05:06.07+0100");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, 3600]);
+
+    h = Date._jisx0301("R01.05.01T04:05:06");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, null]);
+    h = Date._jisx0301("R01.05.01T04:05:06,07");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, null]);
+    h = Date._jisx0301("R01.05.01T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, 0]);
+    h = Date._jisx0301("R01.05.01T04:05:06.07+0100");
+    expect(ymdhms(h)).toEqual([2019, 5, 1, 4, 5, 6, 3600]);
+
+    h = Date._jisx0301("");
+    expect(h).toEqual({});
+
+    h = Date._jisx0301(null as unknown as string);
+    expect(h).toEqual({});
+
+    // See ` rfc2822` above for why the Ruby Symbol is spelled as a non-string.
+    expect(() => Date._jisx0301(1 as unknown as string)).toThrow(TypeError);
+  });
+
+  it("iso8601", () => {
+    expect(Date.iso8601()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.iso8601()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    const d = Date.iso8601("2001-02-03", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._iso8601("2001-02-03"))).toBe(Date.ITALY + 10);
+
+    const dt = DateTime.iso8601("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._iso8601("2001-02-03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+  });
+
   it("rfc3339", () => {
     expect(Date.rfc3339()).toBeInstanceOf(Temporal.PlainDate);
     expect(DateTime.rfc3339()).toBeInstanceOf(Temporal.PlainDateTime);
@@ -413,6 +665,19 @@ describe("TestDateParse", () => {
     const dt = DateTime.rfc3339("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
     expect(dtStartOf(Date._rfc3339("2001-02-03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+  });
+
+  it("xmlschema", () => {
+    expect(Date.xmlschema()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.xmlschema()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    const d = Date.xmlschema("2001-02-03", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._xmlschema("2001-02-03"))).toBe(Date.ITALY + 10);
+
+    const dt = DateTime.xmlschema("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._xmlschema("2001-02-03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
   });
 
   it("rfc2822", () => {
@@ -447,6 +712,92 @@ describe("TestDateParse", () => {
     const dt = DateTime.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+00:00").toDatetime())).toBe(true);
     expect(dtStartOf(Date._httpdate("Sat, 03 Feb 2001 04:05:06 GMT"))).toBe(Date.ITALY + 10);
+  });
+
+  it("jisx0301", () => {
+    expect(Date.jisx0301()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.jisx0301()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    let d = Date.jisx0301("H13.02.03", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._jisx0301("H13.02.03"))).toBe(Date.ITALY + 10);
+
+    d = Date.jisx0301("H31.04.30", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2019, 4, 30))).toBe(true);
+    expect(startOf(Date._jisx0301("H31.04.30"))).toBe(Date.ITALY + 10);
+
+    d = Date.jisx0301("H31.05.01", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2019, 5, 1))).toBe(true);
+    expect(startOf(Date._jisx0301("H31.05.01"))).toBe(Date.ITALY + 10);
+
+    d = Date.jisx0301("R01.05.01", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2019, 5, 1))).toBe(true);
+    expect(startOf(Date._jisx0301("R01.05.01"))).toBe(Date.ITALY + 10);
+
+    let dt = DateTime.jisx0301("H13.02.03T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._jisx0301("H13.02.03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+
+    dt = DateTime.jisx0301("H31.04.30T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2019, 4, 30, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._jisx0301("H31.04.30T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+
+    dt = DateTime.jisx0301("H31.05.01T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2019, 5, 1, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._jisx0301("H31.05.01T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+
+    dt = DateTime.jisx0301("R01.05.01T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2019, 5, 1, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._jisx0301("R01.05.01T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+  });
+
+  /**
+   * Ruby also asserts the argument came back unmutated (`assert_equal(s0, s)`)
+   * after each parse; a JS string is immutable, so those arms read the same
+   * assertion against the untouched local.
+   */
+  it("given string", () => {
+    let s = "2001-02-03T04:05:06Z";
+    let s0 = s;
+
+    expect(Date._parse(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    expect(Date._iso8601(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    expect(Date._rfc3339(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    expect(Date._xmlschema(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    s = "Sat, 3 Feb 2001 04:05:06 UT";
+    s0 = s;
+    expect(Date._rfc2822(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+    expect(Date._rfc822(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    s = "Sat, 03 Feb 2001 04:05:06 GMT";
+    s0 = s;
+    expect(Date._httpdate(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    s = "H13.02.03T04:05:06,07Z";
+    s0 = s;
+    expect(Date._jisx0301(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    s = "H31.04.30T04:05:06,07Z";
+    s0 = s;
+    expect(Date._jisx0301(s)).not.toEqual({});
+    expect(s).toEqual(s0);
+
+    s = "H31.05.01T04:05:06,07Z";
+    s0 = s;
+    expect(Date._jisx0301(s)).not.toEqual({});
+    expect(s).toEqual(s0);
   });
 
   /**
@@ -523,6 +874,16 @@ function startOf(h: DateParts): number {
 /** {@link startOf}, for the `DateTime` arms. */
 function dtStartOf(h: DateParts): number {
   return dtNewByFrags(h, Date.ITALY + 10).start;
+}
+
+/** Ruby `h.values_at(:year, :yday, :hour, :min, :sec, :offset)`. */
+function ydhms(h: DateParts): unknown[] {
+  return valuesAt(h, "year", "yday", "hour", "min", "sec", "offset");
+}
+
+/** Ruby `h.values_at(:cwyear, :cweek, :cwday, :hour, :min, :sec, :offset)`. */
+function cwhms(h: DateParts): unknown[] {
+  return valuesAt(h, "cwyear", "cweek", "cwday", "hour", "min", "sec", "offset");
 }
 
 /** Ruby `h.values_at(:hour, :min, :sec, :sec_fraction)`. */
