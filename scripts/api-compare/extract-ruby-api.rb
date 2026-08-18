@@ -10,6 +10,7 @@ require "pathname"
 require "time"
 require "set"
 require "digest"
+require "date"
 
 SCRIPT_DIR = File.dirname(__FILE__)
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
@@ -2331,6 +2332,56 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@ident
   end
 
+  # RFC 0108: inside a `core_ext/**` body, `self` IS the Ruby core object being
+  # reopened, so a call naming a Ruby CORE method is a call to Ruby, not to a
+  # ported trails collaborator — the gate matches a body call by NAME only, so
+  # `size.div` collided with `Duration#div`, `count`/`first` with
+  # `Relation#count`/`#first`, `unpack` with `Cache::Entry.unpack`. Same shape
+  # as inert_receiver?: the RECEIVER says the call is not a ported-method call.
+  #
+  # Membership is asked of Ruby itself rather than hard-coded — the extractor
+  # loads no Rails, so these classes are pristine core here — which keeps the
+  # set exact as Ruby versions move. A core_ext body calling a SIBLING
+  # ActiveSupport extension (`blank?`, `in_groups`, `to_fs`) names no core
+  # method and is still recorded.
+  CORE_MONKEY_PATCH_CLASSES = [
+    Array, Hash, String, Symbol, Integer, Float, Numeric, Rational, Complex,
+    Range, Regexp, Enumerable, Comparable, Module, Class, Object, Kernel,
+    NilClass, TrueClass, FalseClass, Proc, Method, Exception, Struct,
+    Time, Date, DateTime, File, IO, Dir, Marshal, Math, Process, Thread,
+    Random, Encoding,
+  ].freeze
+
+  CORE_METHOD_NAMES = CORE_MONKEY_PATCH_CLASSES.flat_map { |klass|
+    klass.public_instance_methods(true) + klass.singleton_methods(true)
+  }.map(&:to_s).to_set.freeze
+
+  # Ruby core/stdlib class constants no trails file ports as a class of its own,
+  # so `File.stat` / `Module.new` is Ruby, not a ported collaborator, wherever it
+  # appears. `Time`, `Date`, `String`, `Array`, … are deliberately absent: trails
+  # does port those concepts, so a call on that constant can be a real port call.
+  CORE_CLASS_RECEIVERS = %w[
+    File Dir IO Module Class Proc Kernel Marshal ObjectSpace GC Process Thread
+    Mutex Encoding Random Signal Struct Method
+  ].to_set.freeze
+
+  def core_ext_file?
+    !@current_file.nil? && @current_file.include?("core_ext/")
+  end
+
+  def core_class_receiver?(recv)
+    return false unless recv.is_a?(Array) && recv[0] == :var_ref
+
+    inner = recv[1]
+    inner.is_a?(Array) && inner[0] == :@const && CORE_CLASS_RECEIVERS.include?(inner[1])
+  end
+
+  def core_receiver_call?(name, recv)
+    return false unless CORE_METHOD_NAMES.include?(name)
+
+    core_ext_file? || (!recv.nil? && core_class_receiver?(recv))
+  end
+
   # `Proc.new { ... }` ports to an arrow function, which names no callee at all,
   # so the `new` recorded here could never be satisfied by any TS body. The
   # discriminator is the RECEIVER, not the name: `Foo.new` is a real call the TS
@@ -2425,7 +2476,7 @@ class ApiExtractor
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
-      weak << name if recv && inert_receiver?(recv)
+      weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
     end
 
     lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
@@ -2605,8 +2656,9 @@ class ApiExtractor
       # name that is weak at one site can be a genuine ported-collaborator call
       # at another (`Nodes::Union.new` in select_manager.rb#union), and a name
       # filter drops both.
-      site_flags << "weak" if (callee[0] == :call || callee[0] == :command_call) &&
-                              inert_receiver?(callee[1])
+      qualified = callee[0] == :call || callee[0] == :command_call
+      site_flags << "weak" if (qualified && inert_receiver?(callee[1])) ||
+                              core_receiver_call?(name, qualified ? callee[1] : nil)
       descriptors = describe_args(args, site_flags)
       site = { name: name, args: descriptors, flags: site_flags.uniq }
       if callee[0] == :call || callee[0] == :command_call

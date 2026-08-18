@@ -5,11 +5,7 @@
     "rubyName": "visualizer",
     "call": "join",
     "kind": "args",
-    "rubyArgs": [
-      "ref:__dir__",
-      "str:..",
-      "str:visualizer"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "rubyArgs": [],
+    "reason": "Ruby's argument-less Array#join (journey/gtg/transition_table.rb:148) joins with the empty string; JS Array#join defaults to \",\", so the port has to spell the \"\" Rails leaves implicit."
   }
 ]

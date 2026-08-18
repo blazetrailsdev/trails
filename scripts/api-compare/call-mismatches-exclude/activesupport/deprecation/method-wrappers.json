@@ -10,13 +10,6 @@
     "package": "activesupport",
     "tsFile": "deprecation/method-wrappers.ts",
     "rubyName": "deprecate_methods",
-    "call": "new",
-    "reason": "Module.new for the prepended shim module (deprecation/method_wrappers.rb:35-49), a Ruby prepend shape TS has no counterpart for."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "deprecation/method-wrappers.ts",
-    "rubyName": "deprecate_methods",
     "call": "redefine_method",
     "reason": "Module#redefine_method inside module_eval (deprecation/method_wrappers.rb:35-49), Ruby metaprogramming — the port assigns the wrapper onto the object."
   }

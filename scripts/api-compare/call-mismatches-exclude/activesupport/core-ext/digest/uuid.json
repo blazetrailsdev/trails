@@ -2,20 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/digest/uuid.ts",
-    "rubyName": "pack_uuid_namespace",
-    "call": "map",
-    "reason": "Ruby core Array#map over the packed namespace (core_ext/digest/uuid.rb:52-58), not a ported trails method."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/digest/uuid.ts",
-    "rubyName": "uuid_from_hash",
-    "call": "unpack",
-    "reason": "Ruby core String#unpack of the digest bytes (core_ext/digest/uuid.rb:19-38), not a ported trails method."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/digest/uuid.ts",
     "rubyName": "uuid_v3",
     "call": "uuid_from_hash",
     "kind": "args",

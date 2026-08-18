@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "dump_schema",
-    "call": "open",
-    "reason": "Verified per-site (RFC 0106): `File.open(filename, \"w:utf-8\") { |file| ... }` (`database_tasks.rb:439`) — the fs port models no open-file handle, so the dumper writes into a line buffer that `writeFileSync` flushes; there is no TS call spelling for the block form."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "for_each",
     "call": "new",
     "reason": "Verified per-site (RFC 0106): `ActiveRecord::DatabaseConfigurations.new(databases)` (`database_tasks.rb:144`) — the TS signature takes the already-built `DatabaseConfigurations`, because the Rails caller is the railtie hash and trails has no `Rails` constant to branch on at `:142`."
@@ -19,13 +12,6 @@
     "rubyName": "load_schema",
     "call": "load",
     "reason": "Verified per-site (RFC 0106): Ruby's `load(file)` (`database_tasks.rb:386`) evaluates a Ruby schema file; a TS/JS schema file is an ES module, so the port awaits a dynamic `import()` of its file URL. `load` has no TS call spelling."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "schema_sha1",
-    "call": "read",
-    "reason": "Verified per-site (RFC 0106): `File.read(file)` (`database_tasks.rb:616`) — the fs port spells a whole-file read `getFs().readFileSync(file)`, which is not a `read` call the comparator can credit."
   },
   {
     "package": "activerecord",

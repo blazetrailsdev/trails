@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "future-result.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "reason": "future_result.rb:64 `@mutex = Mutex.new`. There is no mutex on a single-threaded event loop — the in-flight query promise (`#executing`) is the lock, as the FutureResult class comment records."
-  }
-]

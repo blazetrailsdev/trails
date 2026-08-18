@@ -36,9 +36,6 @@ export class NameError extends ReferenceError {
    * branch — the message regex — which yields the same qualified path Ruby's
    * receiver branch builds. Deliberately not {@link constantName}, which is the
    * unqualified `name`.
-   *
-   * @missingRailsCall receiver — a JS `Error` carries no receiver, so the
-   * branches guarded by `receiver` (`name_error.rb:29-38`) are unreachable.
    */
   missingName(): string | undefined {
     if (!this.message.startsWith("uninitialized constant ")) return undefined;

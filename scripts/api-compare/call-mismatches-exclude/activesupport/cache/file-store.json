@@ -2,41 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_empty_directories",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_empty_directories",
-    "call": "realpath",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_entry",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_entry",
-    "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "ensure_cache_path",
-    "call": "exist?",
-    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
     "rubyName": "file_path_key",
     "call": "decode_www_form_component",
     "kind": "args",
@@ -78,37 +43,5 @@
     "rubyName": "modify_value",
     "call": "merged_options",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "read_serialized_entry",
-    "call": "exist?",
-    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "search_dir",
-    "call": "directory?",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name"
-    ],
-    "reason": "Ruby's `File.directory?(name)` module function is `getFs().statSync(name).isDirectory()` through the fs adapter — the path is `statSync`'s argument, so the `isDirectory` call itself takes none."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "search_dir",
-    "call": "exist?",
-    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "write_serialized_entry",
-    "call": "exist?",
-    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
   }
 ]
