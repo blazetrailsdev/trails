@@ -2,44 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/mime-negotiation.ts",
-    "rubyName": "accepts",
-    "call": "fetch_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-negotiation.ts",
-    "rubyName": "accepts",
-    "call": "set_header",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:k",
-      "ref:v"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-negotiation.ts",
-    "rubyName": "content_mime_type",
-    "call": "fetch_header",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-negotiation.ts",
-    "rubyName": "content_mime_type",
-    "call": "set_header",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:k",
-      "ref:v"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-negotiation.ts",
     "rubyName": "formats",
     "call": "set_header",
     "kind": "args",
@@ -47,7 +9,7 @@
       "ref:k",
       "ref:v"
     ],
-    "reason": "mime_negotiation.rb:67 forwards the (k, v) pair; the port names the header constant and the computed map directly."
+    "reason": "Extractor residue: Ruby's reader `formats` and writer `formats=` share the TS name `formats`, so the comparator reads the class's `set formats` (which mirrors mime_negotiation.rb:137's `set_header `action_dispatch.request.formats`, extensions.collect { … }`) against the READER's `set_header k, v` at mime_negotiation.rb:85. The reader function itself already forwards (k, v)."
   },
   {
     "package": "actiondispatch",
@@ -56,6 +18,6 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "mime_negotiation.rb:90 constructs the variant collection with no arguments; the port's `new` at this site builds the ArgumentError the same guard raises."
+    "reason": "Extractor residue, same reader/writer name collision as the `formats` row above: Ruby's `variant` reader (mime_negotiation.rb:100) is compared against the TS `set variant`, whose `new` builds the error that `variant=` raises at mime_negotiation.rb:96."
   }
 ]

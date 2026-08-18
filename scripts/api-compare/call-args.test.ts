@@ -387,6 +387,25 @@ describe("compareCallArgs ported-private receiver argument", () => {
     ).toBe("match");
   });
 
+  // request_forgery_protection.rb:519 `compare_with_real_token masked_token`,
+  // whose port keeps Rails' defaulted `session = nil`.
+  it("drops the receiver when the site omits the callee's trailing optional parameters", () => {
+    expect(
+      compareCallArgs(
+        site("compare_with_real_token", ["id:masked_token"]),
+        site("compareWithRealToken", ["id:controller", "id:maskedToken"]),
+        undefined,
+        [
+          [
+            required("controller", "CsrfController"),
+            required("token", "Buffer"),
+            { name: "session", kind: "optional", default: "..." },
+          ],
+        ],
+      ).verdict,
+    ).toBe("match");
+  });
+
   it("keeps flagging an extra argument the callee declares as a value", () => {
     expect(
       compareCallArgs(
