@@ -2,43 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/static.ts",
-    "rubyName": "attempt",
-    "call": "find_file",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:pathInfo",
-      "kwargs{acceptEncoding=ref:acceptEncoding}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/static.ts",
-    "rubyName": "find_file",
-    "call": "try_files",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:filepath",
-      "ref:contentType",
-      "kwargs{acceptEncoding=ref:acceptEncoding}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/static.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:path",
-      "kwargs{headers=ref:headers,index=ref:index}"
-    ],
-    "reason": "middleware/static.rb:21 builds `::Rack::Files.new(path, headers:, index:)`; the port passes (root, rest) — the options object it forwards unsplit."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/static.ts",
     "rubyName": "serve",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -49,18 +12,5 @@
     "rubyName": "serve",
     "call": "escape_path",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/static.ts",
-    "rubyName": "try_files",
-    "call": "try_precompressed_files",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:filepath",
-      "ref:headers",
-      "kwargs{acceptEncoding=ref:acceptEncoding}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

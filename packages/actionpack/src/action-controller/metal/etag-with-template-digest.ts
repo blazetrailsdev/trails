@@ -56,32 +56,41 @@ export function templateDigest(template: string): string {
 
 export type TemplateLookupContext = { digestFor?(template: string): string | null };
 
+/**
+ * The controller state `EtagWithTemplateDigest`'s privates read off `self`.
+ *
+ * @internal
+ */
+export interface EtagWithTemplateDigestHost {
+  actionName?: string;
+  lookupContext?: TemplateLookupContext;
+}
+
 /** @internal */
 export function pickTemplateForEtag(
+  this: EtagWithTemplateDigestHost,
   options: { template?: string | false } | undefined,
-  controller: { actionName?: string },
 ): string | undefined {
   if (options?.template === false) return undefined;
-  return options?.template ?? controller.actionName;
+  return options?.template ?? this.actionName;
 }
 
 /** @internal */
 export function lookupAndDigestTemplate(
+  this: EtagWithTemplateDigestHost,
   template: string,
-  lookupContext: TemplateLookupContext,
 ): string | undefined {
-  return lookupContext.digestFor?.(template) ?? undefined;
+  return this.lookupContext?.digestFor?.(template) ?? undefined;
 }
 
 /** @internal */
 export function determineTemplateEtag(
+  this: EtagWithTemplateDigestHost,
   options: { template?: string | false } | undefined,
-  controller: { actionName?: string },
-  lookupContext: TemplateLookupContext,
 ): string | undefined {
-  const template = pickTemplateForEtag(options, controller);
+  const template = pickTemplateForEtag.call(this, options);
   if (template === undefined) return undefined;
-  return lookupAndDigestTemplate(template, lookupContext);
+  return lookupAndDigestTemplate.call(this, template);
 }
 
 export function templateEtagger(
@@ -90,5 +99,5 @@ export function templateEtagger(
   options?: { template?: string | false },
 ): string | undefined {
   if (!lookupContext) return undefined;
-  return determineTemplateEtag(options, controller, lookupContext);
+  return determineTemplateEtag.call({ ...controller, lookupContext }, options);
 }

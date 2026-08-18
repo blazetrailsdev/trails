@@ -9,6 +9,6 @@
       "ref:string",
       "kwargs{locale=ref:locale}"
     ],
-    "reason": "inflector/transliterate.rb:123 calls `transliterate(string, locale: locale)`; the port passes the replacement `\"?\"` positionally between them."
+    "reason": "inflector/transliterate.rb:123 calls `transliterate(string, locale: locale)`, skipping the middle positional `replacement` (default \"?\"). TypeScript cannot omit a middle positional argument: passing `undefined` still records a 3-argument call, so every spelling diverges from the 2-argument Ruby site."
   }
 ]

@@ -13,11 +13,8 @@ async function* bodyFromBytes(bytes: Uint8Array): RackBody {
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
 export interface StaticOptions {
-  root: string;
   index?: string;
   headers?: Record<string, string>;
-  gzip?: boolean;
-  brotli?: boolean;
 }
 
 export interface FileHandlerOptions {
@@ -44,10 +41,9 @@ export class Static {
   /** @internal */
   private fileHandler: FileHandler;
 
-  constructor(app: RackApp, options: StaticOptions) {
+  constructor(app: RackApp, path: string, { index = "index", headers = {} }: StaticOptions = {}) {
     this.app = app;
-    const { root, ...rest } = options;
-    this.fileHandler = new FileHandler(root, rest);
+    this.fileHandler = new FileHandler(path, { index, headers });
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
@@ -69,7 +65,7 @@ export class FileHandler {
 
   constructor(root: string, options: FileHandlerOptions = {}) {
     this.root = getPath().resolve(root.replace(/\/$/, ""));
-    this.index = options.index ?? "index.html";
+    this.index = options.index ?? "index";
     this.headers = options.headers ?? {};
     const enabled: string[] = [];
     if (options.brotli !== false) enabled.push("br");
@@ -88,7 +84,7 @@ export class FileHandler {
 
     const pathInfo = (env["PATH_INFO"] as string) || "/";
     const acceptEncoding = parseAcceptEncoding((env["HTTP_ACCEPT_ENCODING"] as string) ?? "");
-    const found = this.findFile(pathInfo, acceptEncoding);
+    const found = this.findFile(pathInfo, { acceptEncoding });
     if (!found) return null;
     const [filepath, contentHeaders] = found;
     return this.serve(env, filepath, contentHeaders);
@@ -111,10 +107,10 @@ export class FileHandler {
   }
 
   /** @internal */
-  findFile(pathInfo: string, acceptEncoding: AcceptEncoding): Found | null {
+  findFile(pathInfo: string, { acceptEncoding }: { acceptEncoding: AcceptEncoding }): Found | null {
     let result: Found | null = null;
     this.eachCandidateFilepath(pathInfo, (filepath, contentType) => {
-      const response = this.tryFiles(filepath, contentType, acceptEncoding);
+      const response = this.tryFiles(filepath, contentType, { acceptEncoding });
       if (response) {
         result = response;
         return true;
@@ -125,10 +121,14 @@ export class FileHandler {
   }
 
   /** @internal */
-  tryFiles(filepath: string, contentType: string, acceptEncoding: AcceptEncoding): Found | null {
+  tryFiles(
+    filepath: string,
+    contentType: string,
+    { acceptEncoding }: { acceptEncoding: AcceptEncoding },
+  ): Found | null {
     const headers: Record<string, string> = { "content-type": contentType };
     if (this.isCompressible(contentType)) {
-      return this.tryPrecompressedFiles(filepath, headers, acceptEncoding);
+      return this.tryPrecompressedFiles(filepath, headers, { acceptEncoding });
     }
     if (this.isFileReadable(filepath)) return [filepath, headers];
     return null;
@@ -138,7 +138,7 @@ export class FileHandler {
   tryPrecompressedFiles(
     filepath: string,
     headers: Record<string, string>,
-    acceptEncoding: AcceptEncoding,
+    { acceptEncoding }: { acceptEncoding: AcceptEncoding },
   ): Found | null {
     // Mirrors Rails' shared `headers` mutation so Vary sticks through to
     // the identity fallback.
@@ -208,9 +208,7 @@ export class FileHandler {
         const defaultContentType = MIME_TYPES[defaultExt] ?? "text/plain";
         if (block(`${path}${defaultExt}`, defaultContentType)) return;
         const sep = path.endsWith("/") ? "" : "/";
-        const indexCt =
-          MIME_TYPES[getPath().extname(this.index).toLowerCase()] ?? defaultContentType;
-        if (block(`${path}${sep}${this.index}`, indexCt)) return;
+        if (block(`${path}${sep}${this.index}${defaultExt}`, defaultContentType)) return;
       }
     }
   }
