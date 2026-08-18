@@ -118,7 +118,7 @@ export interface ColumnExistsOptions {
 }
 
 // Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
-function _crc32(str: string): number {
+function crc32(str: string): number {
   const bytes = new TextEncoder().encode(str);
   let crc = 0xffffffff;
   for (const byte of bytes) {
@@ -1165,7 +1165,7 @@ export class Migration {
     if (migrationOrFn === undefined) return;
     if (migrationOrFn instanceof Migration) {
       // Mirrors Rails `revert(*migration_classes)` -> `run(..., revert: true)`.
-      await this._run(migrationOrFn, { revert: true });
+      await this.run(migrationOrFn, { revert: true });
       return;
     }
     const fn = migrationOrFn;
@@ -1201,13 +1201,18 @@ export class Migration {
   }
 
   /**
-   * Run another migration in a direction, flipping it under `revert`.
+   * Runs the given migration classes.
    *
-   * Mirrors: ActiveRecord::Migration#run — when the current migration is itself
-   * reverting, running a sub-migration `:up` means executing it `:down` without
-   * reverting, so it wraps the call in a nested `revert`.
+   * Last argument can specify options:
+   * - `direction` - Default is `up`.
+   * - `revert` - Default is `false`.
+   *
+   * Mirrors: ActiveRecord::Migration#run (`migration.rb:937-949`) — when the
+   * current migration is itself reverting, running a sub-migration `up` means
+   * executing it `down` without reverting, so it wraps the call in a nested
+   * `revert`.
    */
-  private async _run(
+  async run(
     migration: Migration,
     opts: { direction?: "up" | "down"; revert?: boolean } = {},
   ): Promise<void> {
@@ -1215,7 +1220,7 @@ export class Migration {
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {
       await this.revert(async () => {
-        await this._run(migration, { direction: dir, revert: true });
+        await this.run(migration, { direction: dir, revert: true });
       });
     } else if (this._recording) {
       // Recording (but not reverting): route the sub-migration's ops into the
@@ -1315,18 +1320,6 @@ export class Migration {
    */
   static get(_version: string): Migration | null {
     return null;
-  }
-
-  /**
-   * Execute the migration on a given adapter.
-   */
-  async run(adapter?: DatabaseAdapter, direction: "up" | "down" = "up"): Promise<void> {
-    if (adapter) this.connection = adapter;
-    if (direction === "up") {
-      await this.up();
-    } else {
-      await this.down();
-    }
   }
 
   /**
@@ -2639,7 +2632,7 @@ export class Migrator {
     // Rails sends `current_database` unconditionally; an adapter that does not
     // define it raises NoMethodError. The `!` reproduces that unconditional
     // send — it is not a claim that the member is always present.
-    const dbNameHash = _crc32(await this.connection.currentDatabase!());
+    const dbNameHash = crc32(await this.connection.currentDatabase!());
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 

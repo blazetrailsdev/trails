@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.enableExtension("citext");
         }
       }
-      await new EnableCitext().run(adapter, "up");
+      await new EnableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
     it("disable extension", async () => {
@@ -34,7 +34,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.disableExtension("citext", { force: "cascade" });
         }
       }
-      await new DisableCitext().run(adapter, "up");
+      await new DisableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("enable extension idempotent", async () => {
@@ -44,8 +44,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new EnableCitext();
-      await m.run(adapter, "up");
-      await expect(m.run(adapter, "up")).resolves.toBeUndefined();
+      await m.execMigration(adapter, "up");
+      await expect(m.execMigration(adapter, "up")).resolves.toBeUndefined();
       expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
     it("disable extension idempotent", async () => {
@@ -55,8 +55,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new DisableCitext();
-      await m.run(adapter, "up");
-      await expect(m.run(adapter, "up")).resolves.toBeUndefined();
+      await m.execMigration(adapter, "up");
+      await expect(m.execMigration(adapter, "up")).resolves.toBeUndefined();
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("extension schema dump", async () => {
@@ -65,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.enableExtension("citext");
         }
       }
-      await new EnableCitext().run(adapter, "up");
+      await new EnableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
       const dump = (await adapter.createSchemaDumper(adapter).dump()).join("\n");
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
@@ -82,7 +82,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.enableExtension("citext");
         }
       }
-      await new EnableCitext().run(adapter, "up");
+      await new EnableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
     it("enable extension migration with schema", async () => {
@@ -94,10 +94,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new EnableCitext();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
       // Down must strip schema and call DROP EXTENSION IF EXISTS "citext" (not "public.citext")
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("disable extension migration ignores prefix and suffix", async () => {
@@ -107,7 +107,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.disableExtension("citext", { force: "cascade" });
         }
       }
-      await new DisableCitext().run(adapter, "up");
+      await new DisableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("disable extension raises when dependent objects exist", async () => {

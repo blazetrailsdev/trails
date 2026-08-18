@@ -98,7 +98,7 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
 function isMigrationClass(value: unknown): boolean {
   if (typeof value !== "function") return false;
   const proto = (value as any).prototype;
-  return proto && typeof proto.run === "function";
+  return proto && typeof proto.execMigration === "function";
 }
 
 async function loadMigrationClass(
@@ -132,6 +132,6 @@ async function loadMigrationClass(
 
   throw new Error(
     `No migration class found in ${filePath}. ` +
-      `Expected a class extending Migration with a run(adapter, direction) method.`,
+      `Expected a class extending Migration with an execMigration(connection, direction) method.`,
   );
 }

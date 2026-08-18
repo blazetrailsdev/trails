@@ -8,7 +8,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+
+const EMPTY_SOURCE = {
+  tables: () => [],
+  columns: () => [],
+  indexes: () => [],
+  adapter: { defaultIndexType: AbstractAdapter.prototype.defaultIndexType },
+};
 
 describe("SchemaDumper trails-only cases", () => {
   it("schema dump emits defaultFunction as arrow for non-PK columns", async () => {
@@ -108,7 +116,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("indexParts emits include for covering indexes", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
-    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const emptySource = { ...EMPTY_SOURCE };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({ columns: ["a"], unique: false, include: ["b", "c"] });
     expect(parts.join(", ")).toContain(`include: ["b","c"]`);
@@ -117,7 +125,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("indexParts emits NULLS FIRST/LAST order strings verbatim", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
-    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const emptySource = { ...EMPTY_SOURCE };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
       columns: ["created_at"],
@@ -130,7 +138,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("indexParts collapses uniform multi-column orders to a scalar", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
-    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const emptySource = { ...EMPTY_SOURCE };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
       columns: ["name", "rating"],
@@ -143,7 +151,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("indexParts keeps mixed multi-column orders as a map", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
-    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const emptySource = { ...EMPTY_SOURCE };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
       columns: ["name", "rating"],
@@ -156,7 +164,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("indexParts collapses uniform multi-column opclasses to a scalar", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
-    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const emptySource = { ...EMPTY_SOURCE };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
       columns: ["name", "description"],
@@ -164,6 +172,24 @@ describe("SchemaDumper trails-only cases", () => {
       opclasses: { name: "varchar_pattern_ops", description: "varchar_pattern_ops" },
     });
     expect(parts.join(", ")).toContain(`opclass: "varchar_pattern_ops"`);
+  });
+
+  it("indexParts routes using: through the connection's defaultIndexType predicate", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
+    const { AbstractMysqlAdapter } =
+      await import("./connection-adapters/abstract-mysql-adapter.js");
+    const index = { columns: ["name"], unique: false, using: "btree" };
+
+    const sqliteLike = new (TopLevelDumper as any)({ ...EMPTY_SOURCE });
+    expect(sqliteLike.indexParts(index).join(", ")).toContain(`using: "btree"`);
+
+    const mysqlLike = new (TopLevelDumper as any)({
+      ...EMPTY_SOURCE,
+      adapter: { defaultIndexType: AbstractMysqlAdapter.prototype.defaultIndexType },
+    });
+    expect(mysqlLike.indexParts(index).join(", ")).not.toContain("using:");
+    expect(mysqlLike.indexParts({ ...index, using: "hash" }).join(", ")).toContain(`using: "hash"`);
   });
 
   it("fkIgnorePattern suppresses name for matching FK names, includes name for non-matching", async () => {

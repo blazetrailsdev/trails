@@ -1332,8 +1332,12 @@ describe("MigrationTest", () => {
     }
     const m = new WeNeedReminders();
     const cb = new ChangeBased();
+    const runMigration = async (mig: Migration, direction: "up" | "down") => {
+      await mig.execMigration(adapter, direction);
+      mig.connection = adapter;
+    };
     try {
-      await m.run(adapter, "up");
+      await runMigration(m, "up");
       // Use adapter quoting so MySQL (no ANSI_QUOTES) works alongside PG/SQLite.
       const qt = adapter.quoteTableName("prefix_reminders_suffix");
       const qc = adapter.quoteColumnName("content");
@@ -1341,13 +1345,13 @@ describe("MigrationTest", () => {
       const rows = await adapter.execute(`SELECT * FROM ${qt}`);
       expect(rows).toHaveLength(1);
 
-      await m.run(adapter, "down");
+      await runMigration(m, "down");
       expect(await m.tableExists("reminders")).toBe(false);
 
-      await cb.run(adapter, "up");
+      await runMigration(cb, "up");
       expect(await cb.tableExists("gadgets")).toBe(true);
       expect(await cb.columnExists("gadgets", "price")).toBe(true);
-      await cb.run(adapter, "down");
+      await runMigration(cb, "down");
       expect(await cb.tableExists("gadgets")).toBe(false);
       expect(await cb.tableExists("widgets")).toBe(false);
     } finally {

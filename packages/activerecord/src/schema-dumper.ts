@@ -977,7 +977,8 @@ export abstract class SchemaDumper {
     const opclasses = conciseOptions(index.columns, index.opclasses);
     if (opclasses !== undefined) parts.push(`opclass: ${this.formatIndexParts(opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
-    if (index.using && index.using !== "btree") parts.push(`using: ${JSON.stringify(index.using)}`);
+    if (!this._adapter().defaultIndexType(index))
+      parts.push(`using: ${JSON.stringify(index.using)}`);
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);
