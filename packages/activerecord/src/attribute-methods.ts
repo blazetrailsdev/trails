@@ -538,13 +538,13 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
  * ancestry the way method lookup does — `include()` splices a module's carrier
  * into the prototype chain directly below the including class's prototype, so
  * per ancestor the class body outranks its generated module — and report which
- * kind of link defines the name first.
+ * kind of link defines the name first: `is_a?(GeneratedAttributeMethods)` reads
+ * as "the owner IS the `_generatedAttributeMethods` field", since ActiveModel's
+ * lazy `generated_attribute_methods` seats a plain `Module` there where
+ * ActiveRecord seats the subclass — the field, not the constructor, is the
+ * discriminator.
  */
 function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
-  // `is_a?(GeneratedAttributeMethods)`: the `_generatedAttributeMethods` field
-  // IS that module. ActiveModel's lazy `generated_attribute_methods` seats a
-  // plain `Module` there where ActiveRecord seats the subclass, so the field,
-  // not the constructor, is the discriminator.
   return instanceMethodOwner(klass, name) instanceof Module;
 }
 

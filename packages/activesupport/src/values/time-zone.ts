@@ -578,18 +578,17 @@ export class TimeZone {
    * `find_tzinfo(name)` — `TZInfo::Timezone.get(MAPPING[name] || name)`
    * (time_zone.rb:207-209). trails has no `TZInfo::Timezone` object, so the
    * zone IS its IANA identifier and `Timezone.get`'s resolve-or-raise is an
-   * `Intl.DateTimeFormat` probe.
+   * `Intl.DateTimeFormat` probe. ECMA-402 mandates a RangeError for a `timeZone`
+   * the runtime does not know, and only for that, so it is the one failure
+   * standing in for `Timezone.get`'s InvalidTimezoneIdentifier; anything else
+   * out of the probe is a different fault and propagates, as a non-TZInfo error
+   * would through `find_tzinfo`.
    */
   static findTzinfo(name: string): string {
     const ianaName = MAPPING[name] ?? name;
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
     } catch (error) {
-      // ECMA-402 mandates a RangeError for a `timeZone` the runtime does not
-      // know, and only for that — so it is the one failure standing in for
-      // `Timezone.get`'s InvalidTimezoneIdentifier. Anything else out of the
-      // probe is a different fault and propagates, as a non-TZInfo error would
-      // through `find_tzinfo` (time_zone.rb:208).
       if (!(error instanceof RangeError)) throw error;
       throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
     }
