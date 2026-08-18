@@ -202,6 +202,11 @@ describe("arityMatches", () => {
     expect(arityMatches([], [req("date", "Date")]).ok).toBe(true);
   });
 
+  it("strips a leading core-extension receiver by type (dateOrTime: DateOrTime)", () => {
+    // ruby DateAndTime::Calculations#next_weekday  vs  nextWeekday(dateOrTime: DateOrTime)
+    expect(arityMatches([], [req("dateOrTime", "DateOrTime")]).ok).toBe(true);
+  });
+
   it("strips a leading `validator` receiver", () => {
     // ruby UniquenessValidator#covered_by_unique_index?(klass, record, attribute, scope)
     // vs isCoveredByUniqueIndex(validator, klass, record, attribute, scope)

@@ -1210,7 +1210,6 @@ function where(
 }
 
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
-  if (opts == null) return this;
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;
