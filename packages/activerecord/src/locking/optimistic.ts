@@ -127,10 +127,11 @@ export class ClassMethods {
     (this as any)._lockingColumn = column == null ? "" : String(column);
   }
 
-  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? */
+  /** Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled? (optimistic.rb:160-162)
+   *  — `lock_optimistically && columns_hash[locking_column]`. */
   static get lockingEnabled(): boolean {
     const self = this as unknown as typeof Base;
-    return self.lockOptimistically && self._attributeDefinitions.has(self.lockingColumn);
+    return self.lockOptimistically && self.columnsHash()[self.lockingColumn] != null;
   }
 
   /** Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically */

@@ -1603,17 +1603,12 @@ describe("BasicsTest", () => {
     expect(User.ignoredColumns).toEqual(["col1", "col2"]);
   });
   it("when #reload called, ignored columns' attribute methods are not defined", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
-      }
-    }
-    const u = await User.create({ name: "test" });
-    await u.reload();
-    expect(User.columnNames()).not.toContain("secret");
-    expect("secret" in u).toBe(false);
+    const developer = await CanonicalDeveloper.create({ name: "Developer" });
+    expect("first_name" in developer).toBe(false);
+
+    await developer.reload();
+
+    expect("first_name" in developer).toBe(false);
   });
   it("when ignored attribute is loaded, cast type should be preferred over DB type", async () => {
     const developer = await AttributedDeveloper.create();

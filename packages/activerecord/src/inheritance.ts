@@ -567,25 +567,6 @@ export function narrowToProjectedColumns(
   const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
   const rowKeys = new Set(Object.keys(row));
   const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
-  // An ignored column is dropped from columnNames(), so a `new` record's seeded
-  // default for a still-declared-and-ignored attribute (Rails' AttributedDeveloper
-  // `name`) would otherwise survive narrowing as an initialized value.
-  //
-  // Rails does NOT leave such a slot uninitialized, contrary to what this
-  // comment used to claim: a defaultless `attribute` records only a PendingType,
-  // and `Attribute::Null#with_type` → `with_cast_value(name, nil, type)`
-  // (attribute.rb:231-233) is initialized; a load that skips the column then
-  // dups that default via `default_attribute`'s `types.key?` arm
-  // (attribute_set/builder.rb:81-85). Rails' own test is narrower — an ignored
-  // REAL column (`Developer#first_name`, base_test.rb:1825-1834) is not in
-  // `types`, lands on `Attribute.null`, and stays out of `@attributes`. The
-  // narrowing is kept for the trails-only shape base.test.ts pins (a column both
-  // declared and ignored); an ignored column present in a raw `SELECT *` row (in
-  // rowKeys) is untouched and keeps its loaded value.
-  const ignoredColumns = (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [];
-  for (const c of ignoredColumns) {
-    if (!pkSet.has(c) && !rowKeys.has(c)) narrowable.push(c);
-  }
   // Hot path: a full SELECT projects every column, so there is nothing to
   // narrow — skip the attribute-set scan entirely.
   if (narrowable.length === 0) return;
