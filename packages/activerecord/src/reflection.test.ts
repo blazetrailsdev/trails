@@ -454,7 +454,7 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(RfSubscriber, "subBooks");
     expect(ref).toBeInstanceOf(ThroughReflection);
     expect((ref as ThroughReflection).through).toBe("subscriptions");
-    expect((ref as ThroughReflection).source).toBe("subBook");
+    expect((ref as ThroughReflection).sourceReflectionName()).toBe("subBook");
     expect(ref!.isThrough()).toBe(true);
   });
 
