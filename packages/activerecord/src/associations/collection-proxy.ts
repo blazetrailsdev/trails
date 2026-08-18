@@ -170,6 +170,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
   private _record: Base;
+  // Seat of last resort — see `_seat()`. Never used once the association cache
+  // holds the real `CollectionAssociation`.
+  private _ownSeat?: CollectionAssociation;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
@@ -204,22 +207,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       | (CollectionAssociation & { isCollection?(): boolean })
       | undefined;
     if (instance?.isCollection?.() === true) return instance;
-    // The cache slot holds one of the minimal ad-hoc holders an undeclared
-    // inverse seeds (`associations.ts`, `seed-association-cache.ts`), which has
-    // no `@target` seat of its own. Build the real association object for the
-    // reflection and carry that holder's target onto it — `Base#association`
-    // would hand the ad-hoc holder straight back.
-    const built = _buildAssociationInstance.call(
-      this._record,
-      this._assocDef as never,
-    ) as unknown as CollectionAssociation;
-    if (instance) {
-      const seeded = (instance as unknown as { target?: Base | Base[] | null }).target;
-      built._targetStore = Array.isArray(seeded) ? seeded : seeded ? [seeded] : [];
-      built._loadedStore = instance.isLoaded?.() === true;
-    }
-    this._record._associationInstances.set(this._assocName, built as never);
-    return built;
+    // The cache slot is empty, or holds one of the minimal ad-hoc holders an
+    // undeclared inverse seeds (`associations.ts`, `seed-association-cache.ts`)
+    // — those are singular by construction and have no `@target` seat to share,
+    // and `Base#association` would hand one straight back. Keep the seat here
+    // until a real collection association claims the slot.
+    return (this._ownSeat ??= {
+      _targetStore: [],
+      _loadedStore: false,
+      _replacedOrAddedTargets: new Set<Base>(),
+    } as unknown as CollectionAssociation);
   }
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1112-1116).
