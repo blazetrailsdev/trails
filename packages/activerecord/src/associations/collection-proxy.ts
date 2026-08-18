@@ -158,6 +158,18 @@ interface ThroughAssociationHandle {
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 
+/**
+ * The three ivars a `CollectionProxy` reads through its association: Ruby's
+ * `@target`, `@loaded` and `@replaced_or_added_targets`. `CollectionAssociation`
+ * satisfies it structurally; see `_seat()`.
+ * @internal
+ */
+interface TargetSeat {
+  _targetStore: Base | Base[] | null;
+  _loadedStore: boolean;
+  _replacedOrAddedTargets: Set<Base>;
+}
+
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -172,7 +184,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _record: Base;
   // Seat of last resort — see `_seat()`. Never used once the association cache
   // holds the real `CollectionAssociation`.
-  private _ownSeat?: CollectionAssociation;
+  private _ownSeat?: TargetSeat;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
@@ -210,9 +222,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (`preloader/association.ts`, `preloader/batch.ts`). A new writer that runs
    * before the association exists would strand its records on `_ownSeat`.
    */
-  private _seat(): CollectionAssociation {
+  private _seat(): TargetSeat {
     const instance = this._record._associationInstances.get(this._assocName) as
-      | (CollectionAssociation & { isCollection?(): boolean })
+      | (TargetSeat & { isCollection?(): boolean })
       | undefined;
     if (instance?.isCollection?.() === true) return instance;
     // The cache slot is empty, or holds one of the minimal ad-hoc holders an
@@ -224,7 +236,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _targetStore: [],
       _loadedStore: false,
       _replacedOrAddedTargets: new Set<Base>(),
-    } as unknown as CollectionAssociation);
+    });
   }
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1112-1116).
@@ -238,7 +250,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private set _replacedOrAddedTargets(value: Set<T>) {
-    this._seat()._replacedOrAddedTargets = value as unknown as Set<Base>;
+    this._seat()._replacedOrAddedTargets = value as Set<Base>;
   }
   // The JS Proxy wrapper returned by association() — methods that return
   // `self` (push / concat / append) hand this back so callers get the same
