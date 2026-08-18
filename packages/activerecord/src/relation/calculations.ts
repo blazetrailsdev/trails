@@ -111,7 +111,7 @@ interface CalculationRelation {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
-    typeForAttribute?(name: string): ColumnType;
+    typeForAttribute?(name: string, block?: () => ColumnType): ColumnType;
     /** Mirrors `Model.attribute_types` (attribute_registration.rb) — Rails' hash-with-default. */
     attributeTypes(): Record<string, ColumnType>;
     _attributeDefinitions?: { has(name: string): boolean };
@@ -350,225 +350,6 @@ function isBigintColumn(
     typeForAttribute?(col: string): unknown;
   };
   return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
-}
-
-/**
- * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
- * (calculations.rb:514-593)
- * @internal
- */
-export async function executeGroupedCalculation(
-  rel: CalculationRelation,
-  operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
-  distinct: boolean | null,
-): Promise<Map<unknown, unknown>> {
-  const fn = operation.toLowerCase() as AggFn;
-  const column = aggregateTarget(columnName);
-  rel._checkEagerLoadable();
-  // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
-  // group field, uniq'ing only when there is more than one. A belongs_to
-  // reflection is attempted from a LONE field, which then expands to that
-  // association's foreign key; the result is keyed by the loaded associated
-  // records rather than by the raw key values.
-  let groupFields: unknown[] = rel.groupValues;
-  // `uniq` — spelled as a filter rather than `new Set(...)` so the body's first
-  // constructor call stays `ColumnAliasTracker.new` (calculations.rb:528), as it
-  // is in Rails.
-  if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
-  const association =
-    groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
-  // calculations.rb:521 — `Array(association.foreign_key)` expands a
-  // composite-key belongs_to to every FK column; the rest of the body carries
-  // whatever arity that produces.
-  if (association) {
-    groupFields = Array.isArray(association.foreignKey)
-      ? [...(association.foreignKey as string[])]
-      : [association.foreignKey as string];
-  }
-  // Mirror Rails `execute_grouped_calculation`, which resolves group fields via
-  // the plural `arel_columns` — so a `from(subquery, alias)` leaves the group
-  // column unqualified (matching the subquery alias) instead of pinning it to
-  // the original model table, and a raw Arel node passes straight through.
-  // calculations.rb:524: `relation = except(:group).distinct!(false)`, with the
-  // eager JoinDependency already folded into joins_values by
-  // `apply_join_dependency` (calculations.rb:232) — `eager_loading: false`,
-  // since this arm only ever runs grouped.
-  // calculations.rb:524 takes `except(:group).distinct!(false)` on a relation
-  // `apply_join_dependency` (calculations.rb:232) has already folded the eager
-  // JoinDependency into. trails re-derives it here, capturing the yielded
-  // relation out of the block because a `Relation` is thenable; `eager_loading:
-  // false`, since this arm only ever runs grouped.
-  let joined = rel;
-  if (rel.isEagerLoading) {
-    await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
-      joined = r;
-    });
-  }
-  const relation = joined.except("group").distinctBang(false) as CalculationRelation;
-  const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
-  const columnAliasTracker = new ColumnAliasTracker(rel._conn());
-  const aliases = groupNodes.map((field) =>
-    columnAliasTracker.aliasFor(
-      (field instanceof Nodes.Node
-        ? (rel._conn().visitor?.compile(field) ?? String(field))
-        : String(field)
-      ).toLowerCase(),
-    ),
-  );
-  const aggNode = operationOverAggregateColumn(
-    aggregateColumn(relation, column),
-    fn,
-    distinct ?? false,
-  ) as any;
-  const groupKeyAliases = groupNodes.map(
-    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(rel._conn().quoteColumnName(aliases[i]))),
-  );
-  const aggAlias = columnAliasTracker.aliasFor(
-    `${fn} ${(column == null ? "" : String(column)).toLowerCase()}`,
-  );
-  // calculations.rb:541-551: the aggregate, then the relation's own
-  // `select_values` whenever the having clause is non-empty — that is what makes
-  // an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
-  // referencable from HAVING — then the aliased group columns. Grouped only:
-  // `execute_simple_calculation` REPLACES `select_values` with the lone
-  // aggregate (calculations.rb:484).
-  const selectValues: Nodes.Node[] = [aggNode.as(rel._conn().quoteColumnName(aggAlias))];
-  if (!rel.havingClause.isEmpty()) {
-    selectValues.push(
-      ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
-    );
-  }
-  selectValues.push(...groupKeyAliases);
-  // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
-  // `from(subquery)` group column stays unqualified instead of being re-pinned
-  // to the model's table by `build_group`.
-  relation.groupValues = groupNodes as unknown as string[];
-  relation.selectValues = selectValues as (string | Nodes.Node)[];
-
-  // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
-  // own type caster, then a type discovered through the join dependencies, then
-  // Type.default_value, with an EnumType unwrapped to its subtype.
-  let type: unknown;
-  if (fn !== "count") {
-    type =
-      typeCasterFor(aggregateColumn(rel, column)) ??
-      lookupCastTypeFromJoinDependencies(rel, String(column)) ??
-      defaultValue();
-    if (type instanceof EnumType) type = type.subtypeType();
-  }
-  const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
-  const sql =
-    isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(rawSql, aliases, aggAlias)
-      : rawSql;
-  const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  // calculations.rb:521: the grouped SELECT runs inside
-  // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
-  // bypass the query cache exactly as the simple arm does.
-  const queryResult = await (
-    rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
-  ).skipQueryCacheIfNecessary(() =>
-    // calculations.rb:527/556 — `model.with_connection { |connection|
-    // connection.select_all(...) }`.
-    rel.withConnection((connection) =>
-      connection.selectAll(sql, `${rel.model.name} ${opName}`, binds),
-    ),
-  );
-  const rows = queryResult.toArray();
-
-  // calculations.rb:591: every group's aggregate folds through the same
-  // type_cast_calculated_value the ungrouped arm uses.
-  const aggOf = (val: unknown): unknown => typeCastCalculatedValue(val ?? null, fn, type);
-
-  if (association) {
-    // Rails keys the result hash by the associated record objects, looked up by
-    // foreign-key value. JS Map keys compare by reference, so callers locate a
-    // key by its `id` rather than by holding the same instance.
-    const klass = association.klass.baseClass ?? association.klass;
-    const primaryKey = (
-      Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
-    ) as string[];
-    // NUL-join so string-valued key components cannot collide across the tuple
-    // boundary (e.g. ["a b","c"] vs ["a","b c"]).
-    const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-    const keyIds = rows
-      .map((row) => aliases.map((a) => row[a]))
-      .filter((vals) => vals.every((v) => v != null));
-    // `where(cols, tuples)` is the trails spelling of the Array-key hash Rails
-    // passes here (calculations.rb:562-563), one-column key included
-    // (predicate_builder.rb:87-90).
-    const keyRecords: any[] = await klass.where(primaryKey, keyIds).toArray();
-    // The composite-PK `id` accessor returns an array, so key the lookup map by
-    // the raw per-column attribute values to match the SQL group-key tuple.
-    const byKey = new Map(
-      keyRecords.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
-    );
-    const result = new Map<unknown, unknown>();
-    for (const row of rows) {
-      const vals = aliases.map((a) => row[a]);
-      const record = vals.every((v) => v != null) ? (byKey.get(keyOf(vals)) ?? null) : null;
-      result.set(record, aggOf(row[aggAlias]));
-    }
-    return result;
-  }
-
-  // Rails: `col_name.try(:type_caster) || type_for(col_name) { column_types.fetch(...) }`
-  // (calculations.rb:567-570), resolved per group field — an Arel attribute group
-  // field carries its own table's type caster, ahead of the model lookup and the
-  // result's column types.
-  const keyTypes = groupNodes.map((node, i) => {
-    const fieldName = qualifiedGroupFieldForModel(rel, groupFields[i]);
-    return ((node instanceof Nodes.Attribute ? node.typeCaster : null) ??
-      (fieldName === null ? null : pluckCastTypeForKnownColumn(rel.model, fieldName)) ??
-      queryResult.columnTypes?.[aliases[i]] ??
-      null) as { deserialize?(v: unknown): unknown } | null;
-  });
-  const result = new Map<unknown, unknown>();
-  for (const row of rows) {
-    // Rails `key = group_aliases.map { ... }; key = key.first if key.size == 1`
-    // (calculations.rb:583-584). JS arrays compare by reference as Map keys, so
-    // callers locate a multi-field key by its component values, not identity.
-    const key = aliases.map((alias, i) => {
-      const raw = row[alias];
-      const keyType = keyTypes[i];
-      return raw == null
-        ? null
-        : typeof keyType?.deserialize === "function"
-          ? keyType.deserialize(raw)
-          : raw;
-    });
-    result.set(key.length === 1 ? key[0] : key, aggOf(row[aggAlias]));
-  }
-  return result;
-}
-
-/**
- * The model-attribute name a group field resolves its key type through, or null
- * when it must fall through to the result's column types. Mirrors Rails'
- * `col_name.try(:type_caster) || type_for(col_name)`: a field qualified to a
- * DIFFERENT table keeps that table's type (grouping Company by "accounts.status"
- * keys by accounts' strings, not Company's integer enum), while a bare or
- * self-qualified field resolves through the model by its last `.`-segment.
- */
-function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): string | null {
-  if (typeof field !== "string") return null;
-  const dot = field.indexOf(".");
-  if (dot === -1) return field;
-  const [table, column] = [field.slice(0, dot), field.slice(dot + 1)];
-  return table === (rel._model as { tableName?: string }).tableName ? column : null;
-}
-
-/**
- * Resolve a single grouped field to its belongs_to reflection, or null. Mirrors
- * Rails' `model._reflect_on_association(field).belongs_to?` guard — only
- * belongs_to associations are grouped by foreign key and keyed by record.
- */
-function resolveGroupAssociation(rel: CalculationRelation, groupCol: unknown): any {
-  if (typeof groupCol !== "string") return null;
-  const reflection = (rel.model as any)._reflectOnAssociation?.(groupCol);
-  if (!reflection || !reflection.belongsTo?.()) return null;
-  return reflection;
 }
 
 /**
@@ -1415,6 +1196,211 @@ export async function executeSimpleCalculation(
 }
 
 /**
+ * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
+ * (calculations.rb:514-593)
+ * @internal
+ */
+export async function executeGroupedCalculation(
+  rel: CalculationRelation,
+  operation: string,
+  columnName: string | string[] | Nodes.Node | number | null,
+  distinct: boolean | null,
+): Promise<Map<unknown, unknown>> {
+  const fn = operation.toLowerCase() as AggFn;
+  columnName = aggregateTarget(columnName);
+  rel._checkEagerLoadable();
+  // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
+  // group field, uniq'ing only when there is more than one. A belongs_to
+  // reflection is attempted from a LONE field, which then expands to that
+  // association's foreign key; the result is keyed by the loaded associated
+  // records rather than by the raw key values.
+  let groupFields: unknown[] = rel.groupValues;
+  // `uniq` — spelled as a filter rather than `new Set(...)` so the body's first
+  // constructor call stays `ColumnAliasTracker.new` (calculations.rb:528), as it
+  // is in Rails.
+  if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
+  // calculations.rb:518-522 — `group_fields.first.respond_to?(:to_sym)` is the
+  // String/Symbol arm. `association` holds ANY reflection and `associated` the
+  // narrower belongs_to gate: the key-records query below runs for either
+  // (:561), while only `associated` expands the foreign key and re-keys the
+  // result (:589).
+  let association: any = null;
+  let associated = false;
+  if (groupFields.length === 1 && typeof groupFields[0] === "string") {
+    association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
+    // only count belongs_to associations
+    associated = association != null && association.belongsTo?.() === true;
+    // calculations.rb:521 — `Array(association.foreign_key)` expands a
+    // composite-key belongs_to to every FK column; the rest of the body
+    // carries whatever arity that produces.
+    if (associated) {
+      groupFields = Array.isArray(association.foreignKey)
+        ? [...(association.foreignKey as string[])]
+        : [association.foreignKey as string];
+    }
+  }
+  // calculations.rb:524 takes `except(:group).distinct!(false)` on a relation
+  // `apply_join_dependency` (calculations.rb:232) has already folded the eager
+  // JoinDependency into. trails re-derives it here, capturing the yielded
+  // relation out of the block because a `Relation` is thenable; `eager_loading:
+  // false`, since this arm only ever runs grouped.
+  let joined = rel;
+  if (rel.isEagerLoading) {
+    await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
+      joined = r;
+    });
+  }
+  const relation = joined.except("group").distinctBang(false) as CalculationRelation;
+  // calculations.rb:525 resolves the group fields through the plural
+  // `arel_columns` — so a `from(subquery, alias)` leaves the group column
+  // unqualified (matching the subquery alias) instead of pinning it to the
+  // original model table, and a raw Arel node passes straight through.
+  const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
+
+  return rel.withConnection(async (connection) => {
+    const columnAliasTracker = new ColumnAliasTracker(connection);
+
+    const groupAliases = groupNodes.map((field) =>
+      columnAliasTracker.aliasFor(
+        (field instanceof Nodes.Node
+          ? (connection.visitor?.compile(field) ?? String(field))
+          : String(field)
+        ).toLowerCase(),
+      ),
+    );
+    const groupColumns = groupAliases.map((aliaz, i) => [aliaz, groupNodes[i]] as const);
+
+    const column = aggregateColumn(relation, columnName);
+    const columnAlias = columnAliasTracker.aliasFor(
+      `${fn} ${(columnName == null ? "" : String(columnName)).toLowerCase()}`,
+    );
+    const selectValue = operationOverAggregateColumn(column, fn, distinct ?? false) as any;
+
+    // calculations.rb:541-551: the aggregate, then the relation's own
+    // `select_values` whenever the having clause is non-empty — that is what
+    // makes an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
+    // referencable from HAVING — then the aliased group columns. Grouped only:
+    // `execute_simple_calculation` REPLACES `select_values` with the lone
+    // aggregate (calculations.rb:484).
+    const selectValues: Nodes.Node[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
+    if (!rel.havingClause.isEmpty()) {
+      selectValues.push(
+        ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
+      );
+    }
+    selectValues.push(
+      ...groupColumns.map(
+        ([aliaz, field]) =>
+          new Nodes.As(field, new Nodes.SqlLiteral(connection.quoteColumnName(aliaz))),
+      ),
+    );
+
+    // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
+    // `from(subquery)` group column stays unqualified instead of being re-pinned
+    // to the model's table by `build_group`.
+    relation.groupValues = groupNodes as unknown as string[];
+    relation.selectValues = selectValues as (string | Nodes.Node)[];
+
+    const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
+    const sql =
+      isBigintColumn(rel, fn, columnName) && needsBigintCast(rel)
+        ? wrapBigintAgg(rawSql, groupAliases, columnAlias)
+        : rawSql;
+    const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
+    // calculations.rb:555-557: the grouped SELECT runs inside
+    // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
+    // bypass the query cache exactly as the simple arm does.
+    const calculatedData = await (
+      rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
+    ).skipQueryCacheIfNecessary(() =>
+      connection.selectAll(sql, `${rel.model.name} ${opName}`, binds),
+    );
+    const rows = calculatedData.toArray();
+
+    // NUL-join so string-valued key components cannot collide across the tuple
+    // boundary (e.g. ["a b","c"] vs ["a","b c"]) — Ruby compares the Array key
+    // itself, JS Maps compare by reference.
+    const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
+    // calculations.rb:559-565: gated on `association`, not `associated` — a
+    // single-field group naming a non-belongs_to association still runs this
+    // query in Rails; only `associated` re-keys the result by the record.
+    let keyRecords: Map<string, unknown> | null = null;
+    if (association) {
+      const klass = association.klass.baseClass ?? association.klass;
+      const primaryKey = (
+        Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
+      ) as string[];
+      const keyIds = rows
+        .map((row) => groupAliases.map((aliaz) => row[aliaz]))
+        .filter((vals) => vals.every((v) => v != null));
+      // `where(cols, tuples)` is the trails spelling of the Array-key hash Rails
+      // passes here (calculations.rb:562-563), one-column key included
+      // (predicate_builder.rb:87-90).
+      const records: any[] = await klass.where(primaryKey, keyIds).toArray();
+      // The composite-PK `id` accessor returns an array, so `index_by(&:id)` is
+      // keyed by the raw per-column attribute values to match the group-key tuple.
+      keyRecords = new Map(
+        records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
+      );
+    }
+
+    // calculations.rb:567-570 — `col_name.try(:type_caster) || type_for(col_name)
+    // { calculated_data.column_types.fetch(aliaz, Type.default_value) }`.
+    const keyTypes = groupColumns.map(
+      ([aliaz, colName]) =>
+        (typeCasterFor(colName) ??
+          typeFor(
+            rel,
+            colName,
+            // Ruby `column_types.fetch(aliaz, Type.default_value)` — the STORED
+            // value whenever the key exists, the default only when it does not.
+            () =>
+              Object.hasOwn(calculatedData.columnTypes, aliaz)
+                ? calculatedData.columnTypes[aliaz]
+                : defaultValue(),
+          )) as { deserialize?(v: unknown): unknown } | null,
+    );
+
+    // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
+    // own type caster, then a type discovered through the join dependencies, then
+    // Type.default_value, with an EnumType unwrapped to its subtype.
+    let type: unknown;
+    if (fn !== "count") {
+      type =
+        typeCasterFor(column) ??
+        lookupCastTypeFromJoinDependencies(rel, String(columnName)) ??
+        defaultValue();
+      if (type instanceof EnumType) type = type.subtypeType();
+    }
+
+    const result = new Map<unknown, unknown>();
+    for (const row of rows) {
+      // Rails `key = group_aliases.map { ... }; key = key.first if key.size == 1;
+      // key = key_records[key] if associated` (calculations.rb:586-589). JS arrays
+      // compare by reference as Map keys, so callers locate a multi-field key by
+      // its component values, not identity.
+      const key = groupAliases.map((aliaz, i) => {
+        const raw = row[aliaz];
+        const keyType = keyTypes[i];
+        return raw == null
+          ? null
+          : typeof keyType?.deserialize === "function"
+            ? keyType.deserialize(raw)
+            : raw;
+      });
+      let resultKey: unknown = key.length === 1 ? key[0] : key;
+      if (associated) {
+        resultKey = key.every((v) => v != null) ? (keyRecords?.get(keyOf(key)) ?? null) : null;
+      }
+      // calculations.rb:591: every group's aggregate folds through the same
+      // type_cast_calculated_value the ungrouped arm uses.
+      result.set(resultKey, typeCastCalculatedValue(row[columnAlias] ?? null, fn, type));
+    }
+    return result;
+  });
+}
+
+/**
  * Ruby `column.try(:type_caster)` (calculations.rb:505). An Arel attribute
  * carries its relation's caster and a SqlLiteral does not, so `tryCall` covers
  * Rails' `try` — except that a join-built `Table` is constructed with no caster
@@ -1428,12 +1414,19 @@ function typeCasterFor(column: unknown): unknown {
 }
 
 /** @internal */
-export function typeFor(rel: CalculationRelation, field: string | Nodes.Node | number): unknown {
+export function typeFor(
+  rel: CalculationRelation,
+  field: string | Nodes.Node | number,
+  block?: () => ColumnType,
+): unknown {
+  // Ruby `field.respond_to?(:name)` (calculations.rb:595): an Arel attribute
+  // answers its column name; a SqlLiteral (a String) does not and falls to the
+  // last `.`-segment.
   const fieldName =
-    field instanceof Nodes.Node
-      ? String((field as unknown as { name?: string }).name ?? "")
+    (field as unknown as { name?: unknown }).name != null
+      ? String((field as unknown as { name: unknown }).name)
       : (String(field).split(".").pop() ?? "");
-  return rel.model.typeForAttribute?.(fieldName);
+  return rel.model.typeForAttribute?.(fieldName, block);
 }
 
 /** @internal */

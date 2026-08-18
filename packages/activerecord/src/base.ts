@@ -1252,7 +1252,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::ModelSchema::ClassMethods#type_for_attribute
    */
-  static override typeForAttribute(name: string): Type {
+  static override typeForAttribute(name: string, block?: () => Type): Type {
     (ModelSchema.loadSchema as any).call(this);
     // Check the *un-resolved* name first: an `enum` declared before its
     // `alias_attribute` keys a phantom attribute under the un-aliased name, and
@@ -1277,6 +1277,14 @@ export class Base extends Model {
     // an unknown name) rather than `attributeTypes()[name]` — even though the
     // cast-types record + Proxy are now memoized, this avoids the record's
     // full-set iteration on the cold call in a hot per-bind path.
+    // Ruby `attribute_types.fetch(name, &block)` (attribute_registration.rb:47).
+    // `attribute_types` is `_default_attributes.cast_types` (:36-40), so the
+    // block answers on a plain hash-KEY miss — not on `AttributeSet#key?`,
+    // which additionally requires the attribute to be initialized.
+    if (block) {
+      const attributeTypes = this.attributeTypes();
+      return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
+    }
     return this._defaultAttributes().getAttribute(resolved).type;
   }
 
