@@ -17,7 +17,7 @@ import { sendAction as _sendAction } from "./basic-implicit-render.js";
  * @internal
  */
 export function sendAction(
-  controller: { performed: boolean; head(status: number): void },
+  controller: { performed: boolean; head(status: number | string): void },
   method: () => unknown,
 ): unknown {
   return _sendAction(controller, method);
@@ -33,10 +33,12 @@ interface ImplicitRenderHost {
     format?: { ref?: string; symbol?: string | null };
     isXhr?(): boolean;
     xhr?: boolean;
+    variant?: unknown;
   };
+  _prefixes?: string[];
   templateExists?(action: string, prefixes?: unknown, opts?: unknown): boolean;
   anyTemplates?(action: string, prefixes?: unknown): boolean;
-  head(status: number): void;
+  head(status: number | string): void;
   render(): void;
   logger?: { info(msg: string): void };
 }
@@ -48,11 +50,15 @@ interface ImplicitRenderHost {
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void {
-  if (this.templateExists?.(this.actionName)) {
+  if (
+    this.templateExists?.(String(this.actionName), this._prefixes, {
+      variants: this.request?.variant,
+    })
+  ) {
     this.render();
     return;
   }
-  if (this.anyTemplates?.(this.actionName)) {
+  if (this.anyTemplates?.(String(this.actionName), this._prefixes)) {
     const name = this.controllerName ?? "";
     throw new UnknownFormat(
       `${name}#${this.actionName} is missing a template for this request format and variant.`,
@@ -86,7 +92,7 @@ export function methodForAction(
 ): string | undefined {
   const sup = this._superMethodForAction?.(actionName);
   if (sup) return sup;
-  if (this.templateExists?.(actionName)) return "defaultRender";
+  if (this.templateExists?.(String(actionName), this._prefixes)) return "defaultRender";
   return undefined;
 }
 

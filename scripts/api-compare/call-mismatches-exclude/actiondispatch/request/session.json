@@ -27,18 +27,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "request/session.ts",
-    "rubyName": "disabled",
-    "call": "set",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:req",
-      "ref:constructor"
-    ],
-    "reason": "Verified per-site: `Session::Options.set(req, Session::Options.new(nil, { id: nil }))` (request/session.rb:29) stores an Options INSTANCE; trails stores the bare `{ id: null }` hash because `Options`' instance surface (`[]`, `[]=`, `to_hash`, `id(req)`, request/session.rb:56-72) is not ported yet and its readers index the env value as a plain object. Tracked by 0106-wide-call-set-direct-burndown/port-request-session-options-instance; the delegating `Options.set` call itself is converged."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "request/session.ts",
     "rubyName": "load!",
     "call": "replace",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

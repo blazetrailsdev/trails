@@ -14,6 +14,9 @@ function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = 
     deleteSession() {
       return 123;
     },
+    extractSessionId() {
+      return 1;
+    },
   };
 }
 

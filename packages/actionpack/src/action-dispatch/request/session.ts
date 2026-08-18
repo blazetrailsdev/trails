@@ -21,6 +21,7 @@ export interface SessionStore {
     id: unknown,
     options: Record<string, unknown>,
   ): unknown;
+  extractSessionId(req: { env: Record<string, unknown> }): unknown;
 }
 
 const ENV_SESSION_KEY = "rack.session";
@@ -39,6 +40,9 @@ export class DisabledSessionError extends Error {
  * Mirrors: ActionDispatch::Request::Session::Options (`request/session.rb:47`).
  */
 export class Options {
+  private by: SessionStore | null;
+  private delegate: Record<string, unknown>;
+
   /**
    * Mirrors: ActionDispatch::Request::Session::Options.set
    * (`request/session.rb:48-50`) —
@@ -46,6 +50,48 @@ export class Options {
    */
   static set(req: { env: Record<string, unknown> }, options: unknown): void {
     req.env[ENV_SESSION_OPTIONS_KEY] = options;
+  }
+
+  /**
+   * Mirrors: ActionDispatch::Request::Session::Options.find
+   * (`request/session.rb:52-54`) — `req.get_header ENV_SESSION_OPTIONS_KEY`.
+   */
+  static find(req: { env: Record<string, unknown> }): unknown {
+    return req.env[ENV_SESSION_OPTIONS_KEY];
+  }
+
+  constructor(by: SessionStore | null, defaultOptions: Record<string, unknown>) {
+    this.by = by;
+    this.delegate = { ...defaultOptions };
+  }
+
+  /** Mirrors: `Options#[]` (`request/session.rb:61-63`). */
+  get(key: string): unknown {
+    return this.delegate[key];
+  }
+
+  /** Mirrors: `Options#id` (`request/session.rb:65-69`). */
+  id(req: { env: Record<string, unknown> }): unknown {
+    // Ruby's `fetch` with a block returns the STORED value whenever the key
+    // exists — including a stored `nil`, which is how a disabled session
+    // short-circuits the `@by` lookup.
+    if (Object.hasOwn(this.delegate, "id")) return this.delegate["id"];
+    return this.by!.extractSessionId(req);
+  }
+
+  /** Mirrors: `Options#[]=` (`request/session.rb:71`). */
+  set(k: string, v: unknown): void {
+    this.delegate[k] = v;
+  }
+
+  /** Mirrors: `Options#to_hash` (`request/session.rb:72`). */
+  toHash(): Record<string, unknown> {
+    return { ...this.delegate };
+  }
+
+  /** Mirrors: `Options#values_at` (`request/session.rb:73`). */
+  valuesAt(...args: string[]): unknown[] {
+    return args.map((key) => this.delegate[key]);
   }
 }
 
@@ -84,10 +130,10 @@ export class Session {
   static create(
     store: SessionStore,
     req: { env: Record<string, unknown> },
-    options: Record<string, unknown> = {},
+    defaultOptions: Record<string, unknown> = {},
   ): Session {
     const existing = Session.find(req);
-    const session = new Session(store, req.env, options);
+    const session = new Session(store, req.env, defaultOptions);
 
     if (existing) {
       const oldData = existing.toHash();
@@ -100,13 +146,13 @@ export class Session {
     }
 
     Session.set(req, session);
-    Options.set(req, options);
+    Options.set(req, new Options(store, defaultOptions));
     return session;
   }
 
   static disabled(req: { env: Record<string, unknown> }): Session {
     const session = new Session(null, req.env, { id: null }, false);
-    Options.set(req, { id: null });
+    Options.set(req, new Options(null, { id: null }));
     return session;
   }
 
