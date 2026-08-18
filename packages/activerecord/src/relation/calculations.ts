@@ -1220,17 +1220,20 @@ export async function executeGroupedCalculation(
   // is in Rails.
   if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
   // calculations.rb:518-522 — `group_fields.first.respond_to?(:to_sym)` is the
-  // String/Symbol arm; only a belongs_to expands to its foreign key.
+  // String/Symbol arm. `association` holds ANY reflection and `associated` the
+  // narrower belongs_to gate: the key-records query below runs for either
+  // (:561), while only `associated` expands the foreign key and re-keys the
+  // result (:589).
   let association: any = null;
+  let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
-    const reflection = (rel.model as any)._reflectOnAssociation?.(groupFields[0]);
+    association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
     // only count belongs_to associations
-    const associated = reflection != null && reflection.belongsTo?.() === true;
+    associated = association != null && association.belongsTo?.() === true;
+    // calculations.rb:521 — `Array(association.foreign_key)` expands a
+    // composite-key belongs_to to every FK column; the rest of the body
+    // carries whatever arity that produces.
     if (associated) {
-      association = reflection;
-      // calculations.rb:521 — `Array(association.foreign_key)` expands a
-      // composite-key belongs_to to every FK column; the rest of the body
-      // carries whatever arity that produces.
       groupFields = Array.isArray(association.foreignKey)
         ? [...(association.foreignKey as string[])]
         : [association.foreignKey as string];
@@ -1318,9 +1321,9 @@ export async function executeGroupedCalculation(
     // boundary (e.g. ["a b","c"] vs ["a","b c"]) — Ruby compares the Array key
     // itself, JS Maps compare by reference.
     const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-    // calculations.rb:561-565: with a belongs_to group, Rails loads the
-    // associated records and keys the result hash by the record, not the raw
-    // foreign-key value.
+    // calculations.rb:559-565: gated on `association`, not `associated` — a
+    // single-field group naming a non-belongs_to association still runs this
+    // query in Rails; only `associated` re-keys the result by the record.
     let keyRecords: Map<string, unknown> | null = null;
     if (association) {
       const klass = association.klass.baseClass ?? association.klass;
@@ -1386,8 +1389,8 @@ export async function executeGroupedCalculation(
             : raw;
       });
       let resultKey: unknown = key.length === 1 ? key[0] : key;
-      if (keyRecords) {
-        resultKey = key.every((v) => v != null) ? (keyRecords.get(keyOf(key)) ?? null) : null;
+      if (associated) {
+        resultKey = key.every((v) => v != null) ? (keyRecords?.get(keyOf(key)) ?? null) : null;
       }
       // calculations.rb:591: every group's aggregate folds through the same
       // type_cast_calculated_value the ungrouped arm uses.

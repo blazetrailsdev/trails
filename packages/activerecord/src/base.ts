@@ -1277,11 +1277,15 @@ export class Base extends Model {
     // an unknown name) rather than `attributeTypes()[name]` — even though the
     // cast-types record + Proxy are now memoized, this avoids the record's
     // full-set iteration on the cold call in a hot per-bind path.
-    // Ruby `attribute_types.fetch(name, &block)` (attribute_registration.rb:47):
-    // the block answers only for a name the set has no KEY for.
-    const defaultAttributes = this._defaultAttributes();
-    if (block && !defaultAttributes.isKey(resolved)) return block();
-    return defaultAttributes.getAttribute(resolved).type;
+    // Ruby `attribute_types.fetch(name, &block)` (attribute_registration.rb:47).
+    // `attribute_types` is `_default_attributes.cast_types` (:36-40), so the
+    // block answers on a plain hash-KEY miss — not on `AttributeSet#key?`,
+    // which additionally requires the attribute to be initialized.
+    if (block) {
+      const attributeTypes = this.attributeTypes();
+      return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
+    }
+    return this._defaultAttributes().getAttribute(resolved).type;
   }
 
   /**
