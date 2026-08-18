@@ -94,15 +94,16 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      // Rails compares `reflection.name`, a Symbol, against joins_values, which
-      // also holds Symbols. Ours spells a Symbol join value with its leading
-      // colon (`":author"`), so the reflection's bare name is colonized here.
+      // Rails compares and re-joins `reflection.name` / `association`, both
+      // Symbols, against joins_values, which also holds Symbols. Ours spells a
+      // Symbol join value with its leading colon (`":author"`), so the bare
+      // reflection name is colonized for both the test and the join it pushes.
       const reflectionName = `:${reflection.name}`;
       if (
         !scope.joinsValues.includes(reflectionName) &&
         !scope.leftOuterJoinsValues.includes(reflectionName)
       ) {
-        joinsBang.call(scope, association);
+        joinsBang.call(scope, reflectionName);
       }
 
       const associationConditions = Object.fromEntries(
@@ -125,7 +126,7 @@ export class WhereChain<R = any> {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      leftOuterJoinsBang.call(scope, association);
+      leftOuterJoinsBang.call(scope, `:${reflection.name}`);
       const associationConditions = Object.fromEntries(
         wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
       );
