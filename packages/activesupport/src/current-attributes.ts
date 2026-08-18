@@ -1,10 +1,7 @@
 /**
- * CurrentAttributes — thread-isolated attribute store.
- * Mirrors ActiveSupport::CurrentAttributes behavior.
- *
- * Each subclass maintains its own isolated storage using AsyncLocalStorage
- * (when available) or falling back to a module-level store. In Node.js
- * tests, we use a simple synchronous store (no async context).
+ * Mirrors: ActiveSupport::CurrentAttributes (current_attributes.rb). Rails keeps
+ * the singletons in `IsolatedExecutionState`, which trails has no counterpart
+ * for, so `currentInstances` is module-level and its entries process-wide.
  */
 
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
@@ -30,10 +27,7 @@ class ArgumentError extends Error {
 /** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */
 type ResetCallback = (this: CurrentAttributes) => void;
 
-/**
- * Mirrors: ActiveSupport::CurrentAttributes::INVALID_ATTRIBUTE_NAMES
- * (current_attributes.rb:95), camelCased by the usual rules.
- */
+/** Mirrors: ActiveSupport::CurrentAttributes::INVALID_ATTRIBUTE_NAMES (:95). */
 const INVALID_ATTRIBUTE_NAMES = [
   "set",
   "reset",
@@ -45,11 +39,7 @@ const INVALID_ATTRIBUTE_NAMES = [
   "clearAll",
 ];
 
-/**
- * Mirrors: ActiveSupport::CurrentAttributes::NOT_SET (current_attributes.rb:97)
- * — the sentinel that tells `resolve_defaults` an attribute was declared
- * without a `default:`, which is distinct from a default of `nil`.
- */
+/** Mirrors: ActiveSupport::CurrentAttributes::NOT_SET (current_attributes.rb:97). */
 const NOT_SET: unknown = Object.freeze({});
 
 /**
@@ -57,13 +47,8 @@ const NOT_SET: unknown = Object.freeze({});
  * `static attribute(name, options?)` to define attributes.
  */
 export abstract class CurrentAttributes {
-  /**
-   * Mirrors: `class_attribute :defaults, instance_writer: false, default: {}.freeze`
-   * (current_attributes.rb:196) — name → default value (or `NOT_SET`).
-   */
+  /** Mirrors: `class_attribute :defaults` (current_attributes.rb:196). */
   public static defaults: Record<string, AttributeValue> = {};
-  /** @internal per-class instance storage (one per class, reset on each "request") */
-  public static _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes> = new WeakMap();
 
   static {
     // Mirrors `include ActiveSupport::Callbacks; define_callbacks :reset` — the
@@ -86,13 +71,9 @@ export abstract class CurrentAttributes {
   /**
    * Mirrors: CurrentAttributes.attribute (current_attributes.rb:113-140).
    *
-   * current_attributes.rb:128 makes a second
-   * `define_cached_method("#{name}=")` call for the writer. A TS attribute is
-   * one accessor pair, not two methods, so the writer has no separate
-   * descriptor to cache or to copy onto the owner; both Rails definitions land
-   * on the reader's entry. The same collapse applies to the two
-   * `Delegation.generate(singleton_class, …, to: :instance)` calls at
-   * current_attributes.rb:138-139, which become one class-level accessor pair.
+   * A TS attribute is one accessor pair, not two methods, so the writer
+   * `define_cached_method` (:128) lands on the reader's entry, as do the two
+   * `Delegation.generate(singleton_class, …, to: :instance)` calls (:138-139).
    */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
@@ -145,13 +126,20 @@ export abstract class CurrentAttributes {
     };
   }
 
-  /** Returns the singleton instance for this class (creates one if needed). */
+  /** Mirrors: CurrentAttributes.instance (current_attributes.rb:101-103) */
   static instance<T extends typeof CurrentAttributes>(this: T): InstanceType<T> {
-    const ctor = this as unknown as CurrentAttributesClass;
-    if (!ctor._instances.has(ctor)) {
-      ctor._instances.set(ctor, new (ctor as unknown as new () => CurrentAttributes)());
+    const key = (this as typeof CurrentAttributes).currentInstancesKey();
+    let instance = currentInstances.get(key);
+    if (instance === undefined) {
+      instance = new (this as unknown as new () => CurrentAttributes)();
+      currentInstances.set(key, instance);
     }
-    return ctor._instances.get(ctor) as InstanceType<T>;
+    return instance as InstanceType<T>;
+  }
+
+  /** Mirrors: CurrentAttributes.current_instances_key (:176-178) @internal */
+  private static currentInstancesKey(): string {
+    return this.name;
   }
 
   /**
@@ -198,33 +186,19 @@ export abstract class CurrentAttributes {
   // Instance-level API
   // -------------------------------------------------------------------------
 
-  /**
-   * Expose one or more attributes within a block. Old values are returned
-   * after the block concludes.
-   *
-   * Mirrors: CurrentAttributes#set (current_attributes.rb:213-215)
-   */
+  /** Expose attributes within a block. Mirrors: CurrentAttributes#set (:213-215) */
   set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return objectWith(this as unknown as Record<string, unknown>, attributes, () => block());
   }
 
-  /**
-   * Reset all attributes. Should be called before and after actions, when used
-   * as a per-request singleton.
-   *
-   * Mirrors: CurrentAttributes#reset (current_attributes.rb:218-222)
-   */
+  /** Reset all attributes. Mirrors: CurrentAttributes#reset (:218-222) */
   reset(): void {
     runCallbacks(this, "reset", () => {
       this.attributes = this.resolveDefaults();
     });
   }
 
-  /**
-   * Mirrors: CurrentAttributes#resolve_defaults (current_attributes.rb:225-231)
-   *
-   * @internal
-   */
+  /** Mirrors: CurrentAttributes#resolve_defaults (:225-231) @internal */
   private resolveDefaults(): Record<string, AttributeValue> {
     const ctor = this.constructor as CurrentAttributesClass;
     const result: Record<string, AttributeValue> = {};
@@ -237,13 +211,7 @@ export abstract class CurrentAttributes {
   }
 }
 
-/**
- * Mirrors Ruby's `Object#dup` for the values `resolve_defaults` copies: a
- * shallow copy for the mutable literals Rails' `default:` accepts, and the
- * value itself for the immutable ones Ruby returns unchanged.
- *
- * @internal
- */
+/** Ruby's `Object#dup` over the values `resolve_defaults` copies. @internal */
 function dup(value: unknown): unknown {
   if (Array.isArray(value)) return [...value];
   if (value !== null && typeof value === "object") {
@@ -252,10 +220,12 @@ function dup(value: unknown): unknown {
   return value;
 }
 
+/** Mirrors: CurrentAttributes.current_instances (:170-172) @internal */
+const currentInstances = new Map<string, CurrentAttributes>();
+
 // Internal alias for static method use
 type CurrentAttributesClass = typeof CurrentAttributes & {
   defaults: Record<string, AttributeValue>;
-  _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes>;
   _generatedAttributeMethods?: Module;
 };
 

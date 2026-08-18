@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { CurrentAttributes } from "./current-attributes.js";
+import { methodMissingProxy } from "./method-missing-proxy.js";
 import { assertSame } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
 
@@ -22,7 +23,7 @@ describe("CurrentAttributesTest", () => {
     declare static previous: number | null | undefined;
   }
 
-  class Current extends CurrentAttributes {
+  const CurrentClass = class Current extends CurrentAttributes {
     static {
       this.attribute("counterInteger", { default: 0 });
       this.attribute("counterCallable", { default: () => 0 });
@@ -39,21 +40,7 @@ describe("CurrentAttributesTest", () => {
       this.resets(":clearTimeZone");
     }
 
-    declare static counterInteger: number;
-    declare static counterCallable: number;
-    declare static world: string | undefined;
-    declare static account: string | undefined;
-    declare static person: Person | undefined;
-    declare static request: string | undefined;
-
-    /**
-     * Rails' `delegate :time_zone, to: :person` — a Struct member is a method
-     * on the Ruby side, so the delegator here reads the `Person#timeZone` field.
-     * The tests reach this and `intro` through `Current.instance()` where Rails
-     * reaches them off the class: those class-level delegators come from the
-     * `method_added` hook (current_attributes.rb:186-193), which has no
-     * TypeScript equivalent.
-     */
+    /** Rails' `delegate :time_zone, to: :person` (a Struct member is a method). */
     get timeZone(): string | undefined {
       return this.person?.timeZone;
     }
@@ -112,12 +99,21 @@ describe("CurrentAttributesTest", () => {
     declare world: string | undefined;
     declare counterInteger: number;
     declare counterCallable: number;
-  }
+  };
 
   /**
-   * Mirrors `ActiveSupport::CurrentAttributes::TestHelper`, which resets every
-   * CurrentAttributes instance around each test, plus the `before_setup` /
-   * `after_teardown` hooks that restore `Time.zone`.
+   * Rails answers every public instance method off the class, via
+   * `method_missing` / `respond_to_missing?` (current_attributes.rb:180-184) and
+   * the `method_added` hook generating the same delegators (:186-193) — Ruby
+   * language hooks whose trails idiom is `methodMissingProxy`.
+   */
+  const Current = methodMissingProxy(CurrentClass, {
+    delegate: (klass) => klass.instance(),
+  }) as typeof CurrentClass & InstanceType<typeof CurrentClass>;
+
+  /**
+   * `ActiveSupport::CurrentAttributes::TestHelper` resets every instance around
+   * each test; `before_setup` / `after_teardown` restore `Time.zone`.
    */
   let originalTimeZone: ReturnType<typeof zone>;
 
@@ -229,13 +225,13 @@ describe("CurrentAttributesTest", () => {
   });
 
   it("using keyword arguments", () => {
-    Current.instance().setWorldAndAccount({ world: "world/1", account: "account/1" });
+    Current.setWorldAndAccount({ world: "world/1", account: "account/1" });
 
     expect(Current.world).toBe("world/1");
     expect(Current.account).toBe("account/1");
 
     const hash: Record<string, unknown> = {};
-    assertSame(hash, Current.instance().getWorldAndAccount(hash));
+    assertSame(hash, Current.getWorldAndAccount(hash));
     expect(hash["world"]).toBe("world/1");
     expect(hash["account"]).toBe("account/1");
   });
@@ -257,18 +253,18 @@ describe("CurrentAttributesTest", () => {
 
   it("delegation", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(Current.instance().timeZone).toBe("Central Time (US & Canada)");
+    expect(Current.timeZone).toBe("Central Time (US & Canada)");
     expect(Current.instance().timeZone).toBe("Central Time (US & Canada)");
   });
 
   it("all methods forward to the instance", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(Current.instance().intro()).toBe("David, in Central Time (US & Canada)");
+    expect(Current.intro()).toBe("David, in Central Time (US & Canada)");
     expect(Current.instance().intro()).toBe("David, in Central Time (US & Canada)");
   });
 
   it("respond_to? for methods that have not been called", () => {
-    expect("respondToTest" in Current.instance()).toBe(true);
+    expect("respondToTest" in Current).toBe(true);
   });
 
   it("CurrentAttributes defaults do not leak between classes", () => {
@@ -286,7 +282,7 @@ describe("CurrentAttributesTest", () => {
   it.skip("CurrentAttributes can use thread-local variables");
 
   it("CurrentAttributes doesn't populate #attributes when not using defaults", () => {
-    expect(Current.instance().attributes).toEqual({ counterInteger: 0, counterCallable: 0 });
+    expect(Current.attributes).toEqual({ counterInteger: 0, counterCallable: 0 });
   });
 
   it("CurrentAttributes restricted attribute names", () => {
