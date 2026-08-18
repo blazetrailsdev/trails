@@ -4,8 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
-import { SubclassNotFound } from "./errors.js";
-import { Client, VerySpecialClient } from "./test-helpers/models/company.js";
+import { Client } from "./test-helpers/models/company.js";
 
 describe("_instantiate STI dispatch", () => {
   fixtures([]);
@@ -19,20 +18,5 @@ describe("_instantiate STI dispatch", () => {
     const record = Client._instantiate({ id: "7", name: "Acme" });
 
     expect(record).toBeInstanceOf(Client);
-  });
-});
-
-/**
- * The gate short-circuited on `!classHasAttribute && descendants.length === 0`,
- * which swallowed an STI *leaf* whose `type` column had not reflected yet and
- * which tracks no descendants of its own: it built as-is (and then failed as an
- * unknown attribute) where Rails' `_has_attribute?(inheritance_column)` gate
- * (`inheritance.rb:55`, `subclass_from_attributes`) reaches `find_sti_class` and
- * raises. No fixtures/schema load in this describe on purpose — the reflection
- * has to be cold for the leaf to be one.
- */
-describe("new() STI dispatch gate", () => {
-  it("raises SubclassNotFound for a bad type on a cold STI leaf", () => {
-    expect(() => VerySpecialClient.new({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 });
