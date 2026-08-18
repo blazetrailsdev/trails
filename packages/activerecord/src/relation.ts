@@ -1195,15 +1195,17 @@ export class Relation<T extends Base> {
     const async =
       this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
 
-    // Mirrors relation.rb:1432: a contradictory where-clause (e.g. `where(id: [])`,
-    // which compiles to an empty `IN`) returns `[].freeze` before any SELECT.
-    if (this.whereClause.isContradiction()) return Result.empty();
+    // Mirrors relation.rb:1431-1451: ONE `skip_query_cache_if_necessary` over
+    // the contradiction / eager_loading? / plain arms, not one per arm.
+    return this.skipQueryCacheIfNecessary(async () => {
+      // relation.rb:1432-1433: a contradictory where-clause (e.g. `where(id: [])`,
+      // which compiles to an empty `IN`) returns `[].freeze` before any SELECT.
+      if (this.whereClause.isContradiction()) return Result.empty();
 
-    // Rails' `eager_loading?`, which `exec_main_query` reads for itself
-    // (relation.rb:1428) exactly as `exec_queries` does for its preload list.
-    if (this.isEagerLoading) {
-      const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-      return this.skipQueryCacheIfNecessary(async () => {
+      // Rails' `eager_loading?`, which `exec_main_query` reads for itself
+      // (relation.rb:1434) exactly as `exec_queries` does for its preload list.
+      if (this.isEagerLoading) {
+        const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
         // trails' remaining capability gap: a composite-PK/CTE/FROM-override
         // eager load can't emit the aliased JOIN, so it degrades to a preload
         // (`_eagerLoadBypassesJoinDependency`). Rails always JOINs.
@@ -1212,21 +1214,19 @@ export class Relation<T extends Base> {
           this._eagerBypassPreloads = allEager;
           return result;
         }
-        // Mirrors: relation.rb:1432-1443.
+        // Mirrors: relation.rb:1435-1446.
         return this.applyJoinDependency({}, async (relation, joinDependency) => {
           if (relation.isNullRelation()) return Result.empty();
           joinDependency.applyColumnAliases(relation);
           this._joinDependency = joinDependency;
           return this._conn().selectAll(relation.toArel(), "SQL", [], { async });
         });
-      });
-    }
+      }
 
-    // Awaiting the FutureResult here is trails' `future.result` in
-    // `exec_queries` (relation.rb:1408).
-    return this.skipQueryCacheIfNecessary(() =>
-      c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
-    );
+      // Awaiting the FutureResult here is trails' `future.result` in
+      // `exec_queries` (relation.rb:1408).
+      return c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async });
+    });
   }
 
   /**
