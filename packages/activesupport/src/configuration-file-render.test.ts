@@ -48,3 +48,55 @@ describe("ConfigurationFile render", () => {
     expect(ConfigurationFile.parse(path)).toEqual({ ok: 42 });
   });
 });
+
+/**
+ * trails-only coverage for `parse`'s `**options` passthrough
+ * (configuration_file.rb:17-34). Rails' own `ConfigurationFileTest` never
+ * passes a loader option; `Rails::Application::Configuration#database_configuration`
+ * does (`aliases: true`).
+ */
+describe("ConfigurationFile loader options", () => {
+  let dir: string | undefined;
+
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  function writeYaml(content: string): string {
+    dir = mkdtempSync(join(tmpdir(), "config-options-"));
+    const path = join(dir, "database.yml");
+    writeFileSync(path, content);
+    return path;
+  }
+
+  const merged =
+    "default: &default\n  adapter: sqlite3\ndevelopment:\n  <<: *default\n  database: dev\n";
+
+  it("forwards loader options to the YAML load", () => {
+    const path = writeYaml(merged);
+
+    expect(ConfigurationFile.parse(path, { merge: true })).toEqual({
+      default: { adapter: "sqlite3" },
+      development: { adapter: "sqlite3", database: "dev" },
+    });
+  });
+
+  it("forwards loader options through the rendered branch", () => {
+    const path = writeYaml(`<% /* nothing */ %>${merged}`);
+
+    expect(ConfigurationFile.parse(path, { merge: true }).development).toEqual({
+      adapter: "sqlite3",
+      database: "dev",
+    });
+  });
+
+  it("without the option the merge key is an ordinary key", () => {
+    const path = writeYaml(merged);
+
+    expect(ConfigurationFile.parse(path).development).toEqual({
+      "<<": { adapter: "sqlite3" },
+      database: "dev",
+    });
+  });
+});

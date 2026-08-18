@@ -24,12 +24,12 @@ describe("AttrInternalTest", () => {
     attrInternalReader(Target.prototype, "foo");
     const instance = new Target() as any;
 
-    expect(instance._foo_).toBeUndefined();
+    expect(instance._foo).toBeUndefined();
     expect(() => {
       instance.foo = 1;
     }).toThrow();
 
-    instance._foo_ = 1;
+    instance._foo = 1;
     expect(instance.foo).toBe(1);
   });
 
@@ -38,9 +38,9 @@ describe("AttrInternalTest", () => {
     attrInternalWriter(Target.prototype, "foo");
     const instance = new Target() as any;
 
-    expect(instance._foo_).toBeUndefined();
+    expect(instance._foo).toBeUndefined();
     instance.foo = 1;
-    expect(instance._foo_).toBe(1);
+    expect(instance._foo).toBe(1);
     // In JS, accessing a setter-only property returns undefined (not an error like Ruby's NoMethodError)
     expect(instance.foo).toBeUndefined();
   });
@@ -50,14 +50,14 @@ describe("AttrInternalTest", () => {
     attrInternalAccessor(Target.prototype, "foo");
     const instance = new Target() as any;
 
-    expect(instance._foo_).toBeUndefined();
+    expect(instance._foo).toBeUndefined();
     instance.foo = 1;
-    expect(instance._foo_).toBe(1);
+    expect(instance._foo).toBe(1);
     expect(instance.foo).toBe(1);
   });
 
   it("invalid naming format", () => {
-    expect(getAttrInternalNamingFormat()).toBe("_%s_");
+    expect(getAttrInternalNamingFormat()).toBe("_%s");
     expect(() => {
       setAttrInternalNamingFormat("@___%s");
     }).toThrow();
@@ -69,10 +69,10 @@ describe("AttrInternalTest", () => {
     attrInternal(Target.prototype, "foo");
     const instance = new Target() as any;
 
-    expect(instance._foo_).toBeUndefined();
+    expect(instance._foo).toBeUndefined();
     expect(instance.abcfoodef).toBeUndefined();
     instance.foo = 1;
-    expect(instance._foo_).toBeUndefined();
+    expect(instance._foo).toBeUndefined();
     expect(instance.abcfoodef).toBe(1);
   });
 

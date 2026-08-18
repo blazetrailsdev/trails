@@ -112,8 +112,8 @@ describe("ModuleTest", () => {
     const w = new Widget() as Widget & { color: unknown };
     w.color = "red";
     expect(w.color).toBe("red");
-    // Stored in _color_
-    expect((w as unknown as Record<string, unknown>)["_color_"]).toBe("red");
+    // Stored in _color
+    expect((w as unknown as Record<string, unknown>)["_color"]).toBe("red");
   });
 
   it("attr_internal writer method — sets value via assignment method", () => {

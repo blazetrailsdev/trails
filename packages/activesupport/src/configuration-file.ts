@@ -20,7 +20,7 @@ export class ConfigurationFile {
 
   static parse(
     contentPath: string,
-    options: { context?: Record<string, unknown> } = {},
+    options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
   ): Record<string, unknown> {
     return new ConfigurationFile(contentPath).parse(options);
   }
@@ -31,11 +31,29 @@ export class ConfigurationFile {
    * one `yamlParse(source)` covers both, since the content is already read. The
    * `render` call stays outside the `try` because Rails' rescue names
    * `Psych::SyntaxError` alone, so a template error escapes unwrapped.
+   *
+   * Rails' `**options` are Psych loader options, forwarded verbatim to the
+   * `yaml` package's own loader options. Three Psych keys have no analogue
+   * there and are inert rather than dropped in silence: `aliases:` (the `yaml`
+   * loader always resolves aliases, so Rails' `aliases: true` — the form
+   * `Rails::Application::Configuration#database_configuration` passes — is
+   * already the behaviour, and `aliases: false` has no off switch short of
+   * `maxAliasCount: 0`), `permitted_classes:` / `permitted_symbols:` (the
+   * `yaml` loader builds only JSON-shaped values, never arbitrary class
+   * instances or Symbols, so there is nothing to permit), and `freeze:` (no
+   * deep-freeze pass). Everything else — `merge:`, `version:`, `schema:`,
+   * `maxAliasCount:` — reaches the loader.
    */
-  parse({ context }: { context?: Record<string, unknown> } = {}): Record<string, unknown> {
+  parse({
+    context,
+    ...options
+  }: { context?: Record<string, unknown>; [option: string]: unknown } = {}): Record<
+    string,
+    unknown
+  > {
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
-      const parsed = yamlParse(source);
+      const parsed = yamlParse(source, options);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         return parsed as Record<string, unknown>;
       }
