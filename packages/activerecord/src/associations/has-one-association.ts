@@ -552,10 +552,8 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
 
-    // Rails reads the polymorphic type column off `reflection.type`
-    // (foreign_association.rb:35), which is `foreign_type` — already resolved
-    // from `options[:foreign_type]` / `"#{options[:as]}_type"` by the rich
-    // reflection, so the derivation is not repeated here.
+    // `reflection.type` (foreign_association.rb:35) lives on the rich
+    // reflection, which the Association is not constructed with.
     const type =
       (ctor._reflectOnAssociation?.(this.reflection.name) as { type?: string | null } | null)
         ?.type ?? null;
