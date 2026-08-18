@@ -114,12 +114,12 @@ function classNameOf(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
-/** Ruby's `self.class` for `Session#inspect`, which prints the Ruby class path. */
-const SESSION_CLASS_NAME = "ActionDispatch::Request::Session";
-
-// Ruby's `object_id` — a per-object identity number JS does not expose, handed
-// out lazily and remembered on a WeakMap. Same shape as `KeyGenerator#inspect`
-// in activesupport, which is the settled trails spelling for `(object_id << 1)`.
+/**
+ * Ruby's `object_id` — a per-object identity number JS does not expose, handed
+ * out lazily and remembered on a WeakMap, shifted and hexed the way
+ * `(object_id << 1).to_s(16)` renders it. Same spelling as
+ * `KeyGenerator#inspect` (`activesupport/src/key-generator.ts:69`).
+ */
 const objectIds = new WeakMap<object, number>();
 let nextObjectId = 1;
 
@@ -388,9 +388,9 @@ export class Session {
    */
   inspect(): string {
     if (this.isLoaded()) {
-      return `#<${SESSION_CLASS_NAME}:0x${objectIdHex(this)}>`;
+      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
     } else {
-      return `#<${SESSION_CLASS_NAME}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 
