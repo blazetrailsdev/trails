@@ -4,6 +4,6 @@
     "tsFile": "encryption/configurable.ts",
     "rubyName": "on_encrypted_attribute_declared",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`Concurrent::Array.new` (configurable.rb:48): the lazily-allocated listener list is `_listeners ??= []` in TS, an array literal with no constructor call, and Concurrent:: collections have no analogue on a single-threaded event loop."
   }
 ]

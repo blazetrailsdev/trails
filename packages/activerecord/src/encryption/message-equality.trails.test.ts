@@ -6,17 +6,17 @@ describe("MessageEqualityTrails", () => {
   it("compares payload and headers", () => {
     const build = () => {
       const message = new Message({ payload: "some payload" });
-      message.addHeader("key_1", "1");
+      message.headers.set("key_1", "1");
       return message;
     };
     expect(build().equals(build())).toBe(true);
 
     const otherPayload = new Message({ payload: "other payload" });
-    otherPayload.addHeader("key_1", "1");
+    otherPayload.headers.set("key_1", "1");
     expect(build().equals(otherPayload)).toBe(false);
 
     const otherHeaderValue = new Message({ payload: "some payload" });
-    otherHeaderValue.addHeader("key_1", "2");
+    otherHeaderValue.headers.set("key_1", "2");
     expect(build().equals(otherHeaderValue)).toBe(false);
 
     expect(build().equals(new Message({ payload: "some payload" }))).toBe(false);
@@ -33,7 +33,7 @@ describe("MessageEqualityTrails", () => {
 
   it("compares any message-like object, without a class guard", () => {
     const message = new Message({ payload: "x" });
-    message.addHeader("iv", "some iv");
+    message.headers.set("iv", "some iv");
     expect(message.equals({ payload: "x", headers: new Properties({ iv: "some iv" }) })).toBe(true);
     expect(message.equals({ payload: "x", headers: { iv: "some iv" } })).toBe(true);
     expect(message.equals({ payload: "y", headers: { iv: "some iv" } })).toBe(false);
@@ -49,7 +49,7 @@ describe("MessageEqualityTrails", () => {
     const build = () => {
       const message = new Message({ payload: "outer" });
       const nested = new Message({ payload: "inner" });
-      nested.addHeader("some_header", "some value");
+      nested.headers.set("some_header", "some value");
       message.headers.set("other_message", nested);
       return message;
     };
@@ -57,7 +57,7 @@ describe("MessageEqualityTrails", () => {
 
     const differentNested = new Message({ payload: "outer" });
     const nested = new Message({ payload: "inner" });
-    nested.addHeader("some_header", "other value");
+    nested.headers.set("some_header", "other value");
     differentNested.headers.set("other_message", nested);
     expect(build().equals(differentNested)).toBe(false);
   });

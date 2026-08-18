@@ -4,6 +4,6 @@
     "tsFile": "encryption/key-provider.ts",
     "rubyName": "encryption_key",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`@keys.last` (key_provider.rb:21) on a plain Array — the faithful port is index access, which emits no call name (compare.ts's `first`/`last` note)."
   }
 ]

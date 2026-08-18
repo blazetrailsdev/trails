@@ -30,14 +30,6 @@ export class Message {
     );
   }
 
-  addHeader(key: string, value: unknown): void {
-    this.headers.set(key, value);
-  }
-
-  addHeaders(props: Record<string, unknown> | Properties): void {
-    this.headers.add(props);
-  }
-
   /** @internal */
   private validatePayloadType(payload: unknown): void {
     // Rails payloads are binary Strings; in TS, raw cipher bytes are a Buffer and

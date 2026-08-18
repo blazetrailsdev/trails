@@ -4,6 +4,6 @@
     "tsFile": "encryption/contexts.ts",
     "rubyName": "current_custom_context",
     "call": "last",
-    "reason": "Verified per-site (RFC 0106): `self.custom_contexts&.last` (`encryption/contexts.rb:67`) — the TS body reads the last custom context, returning null when the stack is empty (Ruby's `&.` arm). `first`/`last`/`size` are positional/property idioms with no JS call form, deliberately left uncredited by RFC 0092 (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment) so the reason-text route is the sanctioned one; nothing was dropped from the TS body."
+    "reason": "`custom_contexts&.last` (contexts.rb:67) on a plain Array — the faithful port is index access, which emits no call name (compare.ts's `first`/`last` note)."
   }
 ]

@@ -7,7 +7,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages", () => {
     const serializer = new MessageSerializer();
     const message = new Message({ payload: "hello" });
-    message.addHeader("iv", "test-iv");
+    message.headers.set("iv", "test-iv");
     const serialized = serializer.dump(message);
     const loaded = serializer.load(serialized);
     // load returns decoded raw bytes (Buffers), mirroring Rails' ASCII-8BIT
@@ -20,7 +20,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages with nested messages in their headers", () => {
     const serializer = new MessageSerializer();
     const inner = new Message({ payload: "inner-payload" });
-    inner.addHeader("iv", "inner-iv");
+    inner.headers.set("iv", "inner-iv");
 
     const outer = new Message({ payload: "outer-payload" });
     outer.headers.set("nested", inner);
@@ -76,7 +76,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     // code points > 0xFF (e.g. emoji).
     const serializer = new MessageSerializer();
     const message = new Message({ payload: "payload" });
-    message.addHeader("tag", "café 😀");
+    message.headers.set("tag", "café 😀");
     const dumped = serializer.dump(message);
     const parsed = JSON.parse(dumped) as { h: { tag: string } };
     expect(parsed.h.tag).toBe(Buffer.from("café 😀", "utf-8").toString("base64"));

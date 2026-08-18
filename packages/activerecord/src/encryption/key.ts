@@ -5,7 +5,8 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
-import { KeyGenerator } from "./key-generator.js";
+import { Configurable } from "./configurable-slot.js";
+import type { KeyGenerator } from "./key-generator.js";
 import { Properties } from "./properties.js";
 
 export class Key {
@@ -22,8 +23,7 @@ export class Key {
   }
 
   static deriveFrom(password: string): Key {
-    const generator = new KeyGenerator();
-    const secret = generator.deriveKey(password);
+    const secret = (Configurable.keyGenerator as KeyGenerator).deriveKeyFrom(password);
     return new Key(secret);
   }
 }

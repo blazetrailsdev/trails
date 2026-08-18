@@ -103,6 +103,14 @@ export class Properties {
     this.set("i", value);
   }
 
+  get compressed(): boolean | undefined {
+    return this.get("c") as boolean | undefined;
+  }
+
+  set compressed(value: boolean | undefined) {
+    this.set("c", value);
+  }
+
   get iv(): string | undefined {
     return this.get("iv") as string | undefined;
   }
