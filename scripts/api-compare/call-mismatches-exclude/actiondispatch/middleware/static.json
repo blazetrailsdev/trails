@@ -14,13 +14,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/static.ts",
-    "rubyName": "each_precompressed_filepath",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/static.ts",
     "rubyName": "find_file",
     "call": "try_files",
     "kind": "args",

@@ -232,10 +232,6 @@ export abstract class Store {
    * key, so the read is `"pool" in options`, not `?? true`. Ruby's
    * `Integer()`/`Float()` (cache.rb:213-214) raise on a value they cannot
    * convert rather than yielding NaN the way `Number()` does.
-   *
-   * @missingRailsCall merge — `DEFAULT_POOL_OPTIONS.merge(pool_options)`
-   * (cache.rb:215) is the object spread here; a plain Hash#merge has no named
-   * counterpart in the package.
    */
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
     let poolOptions: unknown;

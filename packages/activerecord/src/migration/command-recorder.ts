@@ -51,8 +51,7 @@ export class CommandRecorder {
    */
   record(cmd: string, args: unknown[]): void {
     if (this._reverting) {
-      const [iCmd, iArgs] = this._dispatchInvert(cmd, args);
-      this._commands.push({ cmd: iCmd, args: iArgs });
+      this._commands.push(this.inverseOf(cmd, args));
     } else {
       this._commands.push({ cmd, args });
     }

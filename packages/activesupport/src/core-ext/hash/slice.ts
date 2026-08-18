@@ -10,11 +10,6 @@ type AnyObject = Record<string, unknown>;
  * no default-value seat, so slice.rb:13-14 has nothing to copy over.
  * `replace(hash)` (slice.rb:15) is the own-key clear plus `Object.assign` —
  * JS objects carry no `replace`.
- *
- * @missingRailsCall default — `hash.default = default` (slice.rb:13) reads a
- * seat a plain JS object does not have.
- * @missingRailsCall replace — Ruby's `Hash#replace` (slice.rb:15) has no JS
- * analogue; the own-key delete loop plus `Object.assign` IS that call.
  */
 export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T> {
   const omit = slice(hash, ...(Object.keys(hash).filter((k) => !keys.includes(k)) as (keyof T)[]));
@@ -27,12 +22,6 @@ export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Part
 /**
  * Removes and returns the key/value pairs matching the given keys, mutating
  * the receiver — Ruby's `Hash#extract!` (core_ext/hash/slice.rb:24-26).
- *
- * @missingRailsCall delete — Ruby's `delete(key)` is a Hash METHOD returning
- * the removed value; JS spells the same operation as the `delete` OPERATOR,
- * which reads the value first because it returns only a boolean.
- * @missingRailsCall new — `self.class.new` (slice.rb:25) builds the receiver's
- * own subclass; a plain object has no class seat, so the accumulator is `{}`.
  */
 export function extractBang<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
   const result: Partial<T> = {};

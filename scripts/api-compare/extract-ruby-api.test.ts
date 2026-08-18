@@ -334,6 +334,54 @@ describe("Ruby extractor inert-receiver call suppression", () => {
     expect(c["Relation#sole"].weakCalls ?? []).toEqual([]);
   });
 
+  it("drops a Ruby core call on an Array-literal constant receiver", () => {
+    const c = rubyWeakCalls({
+      "lib/active_support/inflector/transliterate.rb": `
+        class Inflector
+          ALLOWED = [Encoding::UTF_8, Encoding::US_ASCII].freeze
+
+          def transliterate(string)
+            raise ArgumentError unless ALLOWED.include?(string)
+          end
+
+          def rules(string)
+            I18N_RULES.include?(string)
+          end
+        end
+      `,
+    });
+    // `ALLOWED` is an Array literal, so its `include?` is Array#include?;
+    // `I18N_RULES` is not a literal collection in this file, so its `include?`
+    // is still a call to a ported collaborator.
+    expect(c["Inflector#transliterate"].weakCalls).toEqual(["include?"]);
+    expect(c["Inflector#rules"].weakCalls ?? []).toEqual([]);
+  });
+
+  it("drops a Module method called unqualified inside a module_eval block", () => {
+    const c = rubyWeakCalls({
+      "lib/active_support/deprecation/method_wrappers.rb": `
+        class MethodWrappers
+          def deprecate_methods(target_module, method_name)
+            target_module.module_eval do
+              redefine_method(method_name) { deprecation_warning(method_name) }
+              define_method(method_name) { }
+            end
+            define_method(method_name)
+          end
+        end
+      `,
+    });
+    // `self` inside the block is the module, so `define_method` /
+    // `redefine_method` there are Ruby metaprogramming; the same names outside
+    // the block, and the ported `deprecation_warning`, stay significant.
+    expect(c["MethodWrappers#deprecate_methods"].weakCalls?.sort()).toEqual([
+      "module_eval",
+      "redefine_method",
+    ]);
+    expect(c["MethodWrappers#deprecate_methods"].calls).toContain("define_method");
+    expect(c["MethodWrappers#deprecate_methods"].calls).toContain("deprecation_warning");
+  });
+
   it("drops a call on a Ruby core class constant receiver", () => {
     const c = rubyWeakCalls({
       "lib/active_support/file_utils.rb": `
@@ -1814,6 +1862,29 @@ describe("Ruby extractor call-argument capture", () => {
     // weak-NAME set cannot tell them apart; the per-site flag can.
     expect(sites.filter((s) => s.name === "new").map((s) => s.flags)).toEqual([["weak"], []]);
     expect(sites.filter((s) => s.name === "ast").every((s) => s.flags.includes("weak"))).toBe(true);
+  });
+
+  it("flags a Module metaprogramming site inside a module_eval block as weak", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(target_module, method_name)
+            target_module.module_eval do
+              define_method(method_name) { warn(method_name) }
+            end
+            define_method(method_name)
+          end
+        end
+      `,
+    });
+    const sites = c["Foo#m"] ?? [];
+    // Inside the block `self` is the module, so that `define_method` is Ruby
+    // metaprogramming; the same name outside it, and the ported `warn`, are not.
+    expect(sites.filter((s) => s.name === "define_method").map((s) => s.flags)).toEqual([
+      ["block", "weak"],
+      [],
+    ]);
+    expect(sites.find((s) => s.name === "warn")?.flags).toEqual([]);
   });
 
   it("records bare super as a zsuper site and super(args) with its arguments", () => {

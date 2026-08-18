@@ -332,6 +332,13 @@ class ApiExtractor
     # the map is a complete declared-constant *name* index for extra-surface
     # scoring; the literal-value diff (compare.ts) skips "expr" on either side.
     @file_constants = {}
+    # rel_path → Set of constant names whose RHS is an Array or Hash LITERAL,
+    # whatever its elements are (see collection_constant_receiver?).
+    @file_collection_constants = {}
+    # >0 while walking the body of a `module_eval` / `class_eval` /
+    # `Module.new` block, where `self` is a Ruby Module (see
+    # module_eval_self_call?).
+    @module_eval_depth = 0
     @namespace_stack = []
     @visibility_stack = [:public]
     # Tracks whether the current module-scope is under a bare `module_function`
@@ -2223,9 +2230,21 @@ class ApiExtractor
     const = lhs[1]
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
+    maybe_record_collection_constant(const[1], rhs)
     lit = literal_value(rhs)
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
+  end
+
+  # An Array/Hash literal RHS, recorded by SYNTACTIC kind rather than through
+  # literal_value — that folds every non-empty collection to {kind: "expr"},
+  # and what the receiver verdict below needs is the collection type, not the
+  # elements (`[Encoding::UTF_8, …]` is still an Array).
+  COLLECTION_LITERAL_NODES = %i[array hash].freeze
+
+  def maybe_record_collection_constant(name, rhs)
+    return unless rhs.is_a?(Array) && COLLECTION_LITERAL_NODES.include?(rhs[0])
+    (@file_collection_constants[@current_file] ||= Set.new) << name
   end
 
   def unwrap_freeze(node) # `[...].freeze` → receiver node; otherwise unchanged
@@ -2376,10 +2395,73 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && CORE_CLASS_RECEIVERS.include?(inner[1])
   end
 
+  # A CONSTANT whose value is an Array or Hash literal in the same file is as
+  # inert a receiver as the literal written in place (INERT_RECEIVER_LITERALS):
+  # `ALLOWED_ENCODINGS_FOR_TRANSLITERATE.include?(string.encoding)`
+  # (inflector/transliterate.rb:66, constant at :12) is Array#include?, not a
+  # call to a ported trails `include?`.
+  def collection_constant_receiver?(recv)
+    return false unless recv.is_a?(Array) && recv[0] == :var_ref
+
+    inner = recv[1]
+    return false unless inner.is_a?(Array) && inner[0] == :@const
+
+    (@file_collection_constants[@current_file] || Set.new).include?(inner[1])
+  end
+
+  # Inside a `module_eval` / `class_eval` / `Module.new { … }` block, `self` is
+  # a Ruby Module, so an UNQUALIFIED call naming a Module method is Ruby
+  # metaprogramming rather than a ported collaborator —
+  # `deprecate_methods` (deprecation/method_wrappers.rb:35-49) calls
+  # `define_method` / `redefine_method` there, and the port assigns the wrapper
+  # onto the object instead. `redefine_method` and
+  # `silence_redefinition_of_method` are ActiveSupport's own Module extensions
+  # (core_ext/module/redefine_method.rb), so Ruby cannot be asked for them.
+  # Module's OWN methods only (`false`): the inherited half is Object/Kernel,
+  # whose names (`raise`, `send`, `respond_to?`) a block body calls for the
+  # ordinary reasons any body does.
+  MODULE_EVAL_SELF_METHODS = (
+    Module.instance_methods(false) + Module.private_instance_methods(false)
+  ).map(&:to_s).to_set.merge(%w[redefine_method silence_redefinition_of_method]).freeze
+
+  MODULE_EVAL_CALL_NAMES = %w[module_eval class_eval module_exec class_exec].to_set.freeze
+
+  def module_eval_self_call?(name, recv)
+    recv.nil? && @module_eval_depth > 0 && MODULE_EVAL_SELF_METHODS.include?(name)
+  end
+
+  # The callee of a `:method_add_block` whose block body runs with a Module as
+  # `self`: `x.module_eval do … end`, a bare `class_eval { … }`, `Module.new { … }`.
+  def module_eval_block?(callee)
+    return false unless callee.is_a?(Array)
+
+    call = callee[0] == :method_add_arg ? callee[1] : callee
+    return false unless call.is_a?(Array)
+
+    case call[0]
+    when :call, :command_call
+      name = ident_name(call[3])
+      return true if MODULE_EVAL_CALL_NAMES.include?(name)
+      name == "new" && const_name(call[1]) == "Module"
+    when :fcall, :vcall, :command
+      MODULE_EVAL_CALL_NAMES.include?(ident_name(call[1]))
+    else
+      false
+    end
+  end
+
+  def with_module_eval(entering)
+    @module_eval_depth += 1 if entering
+    yield
+  ensure
+    @module_eval_depth -= 1 if entering
+  end
+
   def core_receiver_call?(name, recv)
+    return true if module_eval_self_call?(name, recv)
     return false unless CORE_METHOD_NAMES.include?(name)
 
-    core_ext_file? || (!recv.nil? && core_class_receiver?(recv))
+    core_ext_file? || (!recv.nil? && (core_class_receiver?(recv) || collection_constant_receiver?(recv)))
   end
 
   # `Proc.new { ... }` ports to an arrow function, which names no callee at all,
@@ -2414,6 +2496,15 @@ class ApiExtractor
       node.drop(1).each { |child| walk_arg_node(child, calls, weak, lambdas) }
       calls << "super"
       lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
+      return
+    when :method_add_block
+      # Same order as the plain child walk this used to fall through to — the
+      # call first, then its block body — but the body is walked knowing whose
+      # `self` it runs under (module_eval_self_call?).
+      walk_for_calls(node[1], calls, weak)
+      with_module_eval(module_eval_block?(node[1])) do
+        node.drop(2).each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+      end
       return
     end
 
@@ -2626,7 +2717,9 @@ class ApiExtractor
       # `each { … }` — the block flags the call it wraps, and its body is walked
       # after the site so the stream stays in source order.
       record_call_site(node[1], sites, flags + ["block"])
-      node.drop(2).each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+      with_module_eval(module_eval_block?(node[1])) do
+        node.drop(2).each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+      end
       return
     when :method_add_arg then callee, args = node[1], node[2]
     when :command then callee, args = node, node[2]

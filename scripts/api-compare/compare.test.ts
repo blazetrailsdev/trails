@@ -303,6 +303,18 @@ describe("significantMissingCalls", () => {
     expect(dropWeakCalls(undefined, weak)).toEqual([]);
   });
 
+  it("compares a fully-weak Ruby body clean instead of dropping it", () => {
+    // RFC 0108: every call weak leaves `dropWeakCalls` empty, and checkCalls no
+    // longer returns before counting the pair — significantMissingCalls says
+    // "nothing missing" for that set, so the pair stays in the population.
+    const calls = ["first", "fetch"];
+    const rubyCalls = dropWeakCalls(calls, calls);
+    expect(rubyCalls).toEqual([]);
+    expect(significantMissingCalls("parse", rubyCalls, new Set(), () => true, map, sig)).toEqual(
+      [],
+    );
+  });
+
   it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {
     // Rails `options.key?(:status)` ports to `"status" in options` / `options.status
     // !== undefined`; the idiom table's only JS form is Map#has, which an object

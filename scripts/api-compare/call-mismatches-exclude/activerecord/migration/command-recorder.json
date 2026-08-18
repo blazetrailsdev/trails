@@ -4,7 +4,7 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "change_table",
     "call": "bulk_change_table",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails records the bulk path as a lambda `-> t { bulk_change_table(table_name, commands) }` (migration/command_recorder.rb:142); the port's command tuple carries no block seat, so it records `[tableName, commands]` and `replay` re-dispatches each sub-command (command-recorder.ts:138,152-160)."
   },
   {
     "package": "activerecord",
@@ -22,14 +22,14 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_add_foreign_key",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `Hash#delete(:validate)` (migration/command_recorder.rb:288); JS spells the same operation as the `delete` OPERATOR (command-recorder.ts:326), which records no callee."
   },
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_create_table",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `Hash#delete(:if_not_exists)` (migration/command_recorder.rb:199); JS spells the same operation as the `delete` OPERATOR (command-recorder.ts:192), which records no callee."
   },
   {
     "package": "activerecord",
@@ -41,12 +41,5 @@
       "ref:delegate"
     ],
     "reason": "RFC 0099 bucket (c) tooling noise, verified at migration/command_recorder.rb:187 `sub_recorder = CommandRecorder.new(delegate)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "record",
-    "call": "inverse_of",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

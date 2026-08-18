@@ -693,16 +693,14 @@ export abstract class SchemaDumper {
 
   /** @internal */
   isIgnored(tableName: string): boolean {
-    const stripped = this.removePrefixAndSuffix(tableName);
-    for (const pattern of this._ignoreTables) {
-      if (typeof pattern === "string") {
-        if (stripped === pattern) return true;
-      } else if (pattern instanceof RegExp) {
-        pattern.lastIndex = 0;
-        if (pattern.test(stripped)) return true;
-      }
-    }
-    return false;
+    // Ruby's `ignored === remove_prefix_and_suffix(table_name)` (schema_dumper.rb:378)
+    // is String equality for a string pattern and a match for a Regexp one.
+    return this._ignoreTables.some((ignored) => {
+      const stripped = this.removePrefixAndSuffix(tableName);
+      if (typeof ignored === "string") return stripped === ignored;
+      ignored.lastIndex = 0;
+      return ignored.test(stripped);
+    });
   }
 
   /** @internal */
