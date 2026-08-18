@@ -198,7 +198,7 @@ describe("RelationTest", () => {
   });
 
   it("constructJoinDependency handles array-form spec — joins(['posts','comments'])", () => {
-    // leftJoins(["posts", "comments"]) is equivalent to chaining leftJoins("posts").leftJoins(":comments").
+    // leftJoins([":posts", ":comments"]) is equivalent to chaining leftJoins(":posts").leftJoins(":comments").
     class Author extends Base {
       static {
         this.tableName = "authors";
