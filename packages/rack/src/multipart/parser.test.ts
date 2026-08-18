@@ -29,10 +29,21 @@ const fixDir = path.join(
   "test",
   "multipart",
 );
+const tempfileFactory = (_filename: string, _contentType: string) => {
+  let buffer = "";
+  return {
+    write: (s: string) => {
+      buffer += s;
+    },
+    read: () => buffer,
+    close: () => {},
+  };
+};
+
 function fix(
   name: string,
   boundary = "AaB03x",
-  tf: ((f: string, ct: string) => any) | null = null,
+  tf: (f: string, ct: string) => any = tempfileFactory,
 ) {
   const c = fs.readFileSync(path.join(fixDir, name), "binary");
   let done = false;
@@ -129,17 +140,7 @@ describe("Rack::Multipart::Parser", () => {
     const prev = getMultipartFileLimit();
     try {
       setMultipartFileLimit(1);
-      expect(() =>
-        fix("text", "AaB03x", (_f, _ct) => {
-          let b = "";
-          return {
-            write: (s: string) => {
-              b += s;
-            },
-            read: () => b,
-          };
-        }),
-      ).toThrow(MultipartPartLimitError);
+      expect(() => fix("text")).toThrow(MultipartPartLimitError);
     } finally {
       setMultipartFileLimit(prev);
     }

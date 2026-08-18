@@ -3,6 +3,13 @@
     "package": "rack",
     "tsFile": "static.ts",
     "rubyName": "applicable_rules",
+    "call": "find_all",
+    "reason": "rack static.rb:168 selects with Enumerable#find_all over the header-rules Array; JS arrays have only `filter`, its exact equivalent (static.ts:112). Pre-existing shape, surfaced when multipart/parser.ts gained a `findAll` (Collector's `include Enumerable`) that made the Ruby name resolvable in this package."
+  },
+  {
+    "package": "rack",
+    "tsFile": "static.ts",
+    "rubyName": "applicable_rules",
     "call": "unescape",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
