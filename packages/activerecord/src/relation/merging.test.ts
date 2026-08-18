@@ -459,14 +459,16 @@ describe("MergingDifferentRelationsTest", () => {
   it("merging order relations", async () => {
     let postsByAuthorName = await Post.limit(3)
       .joins("author")
-      .whereNot({ "authors.name": "David" })
+      .where()
+      .not({ "authors.name": "David" })
       .merge(Author.order("name"))
       .pluck("authors.name");
     expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
 
     postsByAuthorName = await Post.limit(3)
       .joins("author")
-      .whereNot({ "authors.name": "David" })
+      .where()
+      .not({ "authors.name": "David" })
       .merge(Author.order("name"))
       .pluck("authors.name");
     expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
@@ -475,7 +477,8 @@ describe("MergingDifferentRelationsTest", () => {
   it("merging order relations (using a hash argument)", async () => {
     const postsByAuthorName = await Post.limit(4)
       .joins("author")
-      .whereNot({ "authors.name": "David" })
+      .where()
+      .not({ "authors.name": "David" })
       .merge(Author.order({ name: "desc" }))
       .pluck("authors.name");
 

@@ -838,7 +838,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("join middle table alias", async () => {
     const records = await (Project as any)
       .includes("developers_projects")
-      .whereNot({ "developers_projects.joined_on": null })
+      .where()
+      .not({ "developers_projects.joined_on": null })
       .toArray();
     expect(records.length).toBe(2);
   });
@@ -846,7 +847,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("join table alias", async () => {
     const records = await (Developer as any)
       .includes({ projects: "developers" })
-      .whereNot({ "developers_projects_projects_join.joined_on": null })
+      .where()
+      .not({ "developers_projects_projects_join.joined_on": null })
       .toArray();
     expect(records.length).toBe(3);
   });
@@ -861,7 +863,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     const records = await (Developer as any)
       .includes({ projects: "developers" })
-      .whereNot({ "developers_projects_projects_join.joined_on": null })
+      .where()
+      .not({ "developers_projects_projects_join.joined_on": null })
       .group(group.join(","))
       .toArray();
     expect(records.length).toBe(3);

@@ -817,7 +817,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   it("conditions", async () => {
     Topic.validatesUniqueness("title", {
       conditions: function (this: any) {
-        return this.whereNot({ author_name: null });
+        return this.where().not({ author_name: null });
       },
     });
     await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });

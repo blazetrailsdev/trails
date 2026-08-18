@@ -508,7 +508,8 @@ describe("EagerAssociationTest", () => {
   });
   it("three level nested preloading does not raise exception when association does not exist", async () => {
     const nullAuthorComment = await Comment.where({ author_id: null })
-      .whereNot({ post_id: null })
+      .where()
+      .not({ post_id: null })
       .first();
     const postId = (nullAuthorComment as any).post_id;
     await expect(
@@ -1797,7 +1798,8 @@ describe("EagerAssociationTest", () => {
     let author!: Author;
     await assertQueriesCount(2, false, async () => {
       author = (await Author.includes("posts")
-        .whereNot({ posts: { title: "Welcome to the weblog" } })
+        .where()
+        .not({ posts: { title: "Welcome to the weblog" } })
         .last()) as Author;
     });
     await assertNoQueries(false, async () => {

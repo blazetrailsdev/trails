@@ -158,7 +158,7 @@ describe("query chaining DX", () => {
     assertType(Article);
   });
 
-  it("Post.all() / Post.from(...) / Post.whereNot(...) preserve the generic", () => {
+  it("Post.all() / Post.from(...) / Post.where().not(...) preserve the generic", () => {
     expectTypeOf(Post.all()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.from("posts")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.where().not({ published: false })).toMatchTypeOf<Relation<Post>>();

@@ -15,7 +15,6 @@ import {
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
-import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -33,8 +32,6 @@ export { Range };
 import {
   WhereChain,
   QueryMethodBangs,
-  argumentError,
-  referencesFromConditions,
   defineValueMethods,
   type UnscopeType,
   type ExceptSkip,
@@ -149,16 +146,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
  * used by where.associated / where.missing — one `{ pk: null }` entry per
  * association-primary-key column (query_methods.rb:92 / 128).
  */
-function whereChainNullConditions(reflection: {
-  associationPrimaryKey: string | string[];
-}): Record<string, null> {
-  const pk = reflection.associationPrimaryKey;
-  const pks = Array.isArray(pk) ? pk : [pk];
-  const conditions: Record<string, null> = {};
-  for (const col of pks) conditions[col] = null;
-  return conditions;
-}
-
 function validateExplainOptions(options: ExplainOption[]): void {
   let seenHash = false;
   for (let i = 0; i < options.length; i++) {
@@ -542,7 +529,7 @@ export class Relation<T extends Base> {
     quoted?: boolean;
     as?: string;
     // The association this join was derived from (when added via
-    // whereAssociated/whereMissing), so a repeat of the same association reuses
+    // where.associated/where.missing), so a repeat of the same association reuses
     // the existing join instead of minting a duplicate alias.
     assoc?: string;
     // The base alias candidate a self-join alias was minted from (see
@@ -627,166 +614,6 @@ export class Relation<T extends Base> {
     if (predicateBuilder) {
       this._predicateBuilder = predicateBuilder;
     }
-  }
-
-  /**
-   * Filter for records WHERE the association IS present.
-   *
-   * Mirrors: ActiveRecord::QueryMethods::WhereChain#associated
-   * (query_methods.rb:88-92) — `@scope.joins!(association)` (unless the
-   * association is already joined) then `self.not(pk => nil)`. Building the
-   * join through JoinDependency means through / HABTM / composite-key shapes
-   * work for free.
-   */
-  whereAssociated(...assocNames: string[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const assocName of assocNames) {
-      const reflection = rel._whereChainReflection(assocName);
-      const scope = rel.clone();
-      // Rails query_methods.rb:89-91: `@scope.joins!(association)` unless it is
-      // already present in joins_values / left_outer_joins_values. Routing the
-      // join through JoinDependency (joins!) rather than a bespoke resolver is
-      // what makes through / HABTM / composite-key shapes work for free.
-      const reflectionName = reflection.name ?? assocName;
-      if (
-        !rel.joinsValues.includes(reflectionName) &&
-        !rel.leftOuterJoinsValues.includes(reflectionName)
-      ) {
-        QueryMethodBangs.joinsBang.call(scope as any, assocName);
-      }
-      // Rails: `self.not(reflection.table_name => Array(pk).index_with(nil))`,
-      // or `self.not(association => …)` when a `:class_name` option is present
-      // (self-joins) so the predicate resolves to the aliased join table.
-      const key = reflection.options.className ? assocName : reflection.tableName;
-      rel = scope.whereNot({ [key]: whereChainNullConditions(reflection) });
-    }
-    return rel;
-  }
-
-  /**
-   * Filter for records WHERE the association IS missing.
-   *
-   * Mirrors: ActiveRecord::QueryMethods::WhereChain#missing — emits a
-   * LEFT OUTER JOIN on the association then WHERE assoc_pk IS NULL.
-   */
-  whereMissing(...assocNames: string[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const assocName of assocNames) {
-      const reflection = rel._whereChainReflection(assocName);
-      const scope = rel.clone();
-      // Rails query_methods.rb:126-128: `@scope.left_outer_joins!(association)`
-      // then `@scope.where!(reflection.table_name => Array(pk).index_with(nil))`
-      // (or `association => …` for a `:class_name` self-join).
-      QueryMethodBangs.leftOuterJoinsBang.call(scope as any, assocName);
-      const key = reflection.options.className ? assocName : reflection.tableName;
-      rel = scope.where({ [key]: whereChainNullConditions(reflection) });
-    }
-    return rel;
-  }
-
-  /**
-   * Resolve the reflection for a where.associated / where.missing association,
-   * mirroring Rails' `WhereChain#scope_association_reflection`. Throws the same
-   * ArgumentError shape when the association does not exist.
-   *
-   * @internal
-   */
-  private _whereChainReflection(assocName: string): {
-    name: string;
-    tableName: string;
-    options: Record<string, unknown>;
-    associationPrimaryKey: string | string[];
-  } {
-    const modelClass = this._model as any;
-    const reflection = modelClass._reflectOnAssociation?.(assocName);
-    if (!reflection) {
-      throw argumentError(
-        `An association named \`:${assocName}\` does not exist on the model \`${modelClass.name}\`.`,
-      );
-    }
-    return reflection;
-  }
-
-  /**
-   * Add NOT WHERE conditions. Accepts a hash of column/value pairs,
-   * or the composite-key positional form (mirrors `where(cols, tuples)`).
-   *
-   * Mirrors: ActiveRecord::Relation#where.not
-   */
-  whereNot(conditions: Record<string, unknown>): Relation<T>;
-  whereNot(conditions: unknown[]): Relation<T>;
-  whereNot(cols: string[], tuples: unknown[][]): Relation<T>;
-  whereNot(
-    conditions: Record<string, unknown> | string[] | unknown[],
-    tuples?: unknown[][],
-  ): Relation<T> {
-    // Mirrors WhereChain#not → build_where_clause: unwrap/forbid strong-params
-    // before deriving references or predicates.
-    conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
-      | Record<string, unknown>
-      | string[];
-    const rel = this.spawn();
-    rel.referencesBang(...referencesFromConditions(conditions));
-    if (
-      Array.isArray(conditions) &&
-      tuples !== undefined &&
-      conditions.every((c) => typeof c === "string")
-    ) {
-      // Composite-key form: `whereNot(cols, tuples)`. Present only when the
-      // second (tuples) argument is supplied AND the column list is all
-      // strings — kept symmetric with `where`'s composite guard so a
-      // mixed-type array (`whereNot(["a", 5], ...)`) routes to the
-      // sanitized-conditions path below instead of building a bogus
-      // predicate off a non-string column name.
-      if (!Array.isArray(tuples)) {
-        throw argumentError(
-          "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
-        );
-      }
-      // The `lookup_table_klass_from_join_dependencies` block (see `where`'s
-      // composite branch) so a qualified col naming a manual-join table binds
-      // through the joined model's type rather than the generic
-      // `TypeCasterConnection` (query_methods.rb:1643-1645).
-      const nodes = this.predicateBuilder.buildComposite(
-        conditions as string[],
-        tuples,
-        (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
-      );
-      // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
-      // (matches Rails' `where.not(...)` no-op for empty hashes).
-      if (nodes.length > 0) {
-        // Rails builds the positive predicates as a WhereClause and inverts the
-        // whole clause (`build_where_clause(...).invert`): one predicate flips
-        // in place (`IN` → `NOT IN`, `Grouping(Or)` → `NOT (...)`), while a flat
-        // multi-predicate single tuple ANDs then negates → `NOT (c1 = ? AND
-        // c2 = ?)` — the same shape as inverting the hash-key `where.not`.
-        rel.whereClause = rel.whereClause.plus(new WhereClause(nodes).invert());
-      }
-      return rel;
-    }
-    if (Array.isArray(conditions)) {
-      // Rails: `where.not(["name = ?", x])` → `build_where_clause(opts, rest).invert`
-      // (query_methods.rb:49). Route the single-array sanitized-conditions form
-      // through the same builder as `where` (it unwraps `[head, ...tail]`), then
-      // invert. An empty array has no `head`; Rails likewise raises on
-      // `where.not([])` (build_where_clause reassigns `opts = nil`).
-      if (conditions.length === 0) {
-        throw argumentError("Relation#whereNot: unsupported argument (empty array)");
-      }
-      const clause = rel.buildWhereClause(conditions);
-      rel.whereClause = rel.whereClause.plus(clause.invert());
-      return rel;
-    }
-    // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
-    // (query_methods.rb:49): the hash routes through the same
-    // `build_where_clause` as `where` — which resolves attribute aliases and
-    // passes the join-dependency lookup block before `build_from_hash`
-    // (query_methods.rb:1631-1644) — then a single WhereClause#invert over the
-    // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
-    // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
-    const clause = rel.buildWhereClause(conditions);
-    rel.whereClause = rel.whereClause.plus(clause.invert());
-    return rel;
   }
 
   /**

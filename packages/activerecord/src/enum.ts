@@ -503,7 +503,7 @@ export class EnumMethods {
     }
     if (scopes) {
       klass.scope(valueMethodName, (rel: any) => rel.where({ [name]: value }));
-      klass.scope(notName, (rel: any) => rel.whereNot({ [name]: value }));
+      klass.scope(notName, (rel: any) => rel.where().not({ [name]: value }));
     }
   }
 }

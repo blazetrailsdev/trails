@@ -269,7 +269,8 @@ describe("HasManyThroughAssociationsTest", () => {
       specialDeveloper: developer,
     });
     const result = await (company as any).specialDevelopers
-      .whereNot({ "contracts.id": null })
+      .where()
+      .not({ "contracts.id": null })
       .toArray();
     expect(result.map((d: any) => d.id)).toEqual([developer.id]);
   });

@@ -1232,7 +1232,10 @@ describe("HasOneAssociationsTest", () => {
     // is a string column (schema.rb:1178-1181) while `books.id` is bigint, so
     // the has_one join renders `varchar = bigint`, which PostgreSQL rejects at
     // query time. Rails never runs into that because the test only builds.
-    const relation = (SpecialAuthor as any).joins({ book: "subscription" }).whereNot(whereClause);
+    const relation = (SpecialAuthor as any)
+      .joins({ book: "subscription" })
+      .where()
+      .not(whereClause);
     expect(typeof relation.toSql()).toBe("string");
   });
 
