@@ -4420,6 +4420,14 @@ function encodeYear(nth: bigint, y: number, style: number): number | bigint {
  * MRI narrows it. Ruby's `RangeError` is JS's, and the message is MRI's own
  * (`bignum too big to convert into 'long'`, `numeric.c`).
  */
+function realYearToLong(year: number | bigint): number {
+  if (typeof year === "number") return year;
+  if (year < BigInt(Number.MIN_SAFE_INTEGER) || year > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new RangeError("bignum too big to convert into `long'");
+  }
+  return Number(year);
+}
+
 /**
  * @internal MRI's `NUM2LONG` where `dt_lite_iso8601` (`date_core.c:8754-8766`)
  * and `dt_lite_jisx0301` (`:8794-8805`) apply it to the fractional-digit
@@ -4428,14 +4436,6 @@ function encodeYear(nth: bigint, y: number, style: number): number | bigint {
  */
 function num2long(n: number): number {
   return Math.trunc(n);
-}
-
-function realYearToLong(year: number | bigint): number {
-  if (typeof year === "number") return year;
-  if (year < BigInt(Number.MIN_SAFE_INTEGER) || year > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new RangeError("bignum too big to convert into `long'");
-  }
-  return Number(year);
 }
 
 /**

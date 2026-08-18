@@ -93,7 +93,6 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   refute_match: "noMatch",
   assert_raises: "raises",
   assert_raise: "raises",
-  // ruby/test-unit's core_assertions.rb: `assert_raise` plus a message match.
   assert_raise_with_message: "raises",
   assert_nothing_raised: "nothingRaised",
   assert_same: "same",

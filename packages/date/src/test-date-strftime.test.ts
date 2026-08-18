@@ -9,6 +9,10 @@
  * through the exported `dtNewByFrags`/`dNewByFrags` builders those statics
  * themselves call — the gem-shaped object that carries `strftime`.
  *
+ * `test__different_format`'s `limit:` arms go through the statics, which answer
+ * `Temporal` under RFC 0088, so where Ruby compares the parsed `DateTime` to
+ * `d2` directly this file compares the seat each side names.
+ *
  * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm goes through
  * {@link assertWarning}, which sets `$VERBOSE` for the block the way Ruby's
  * does — `rb_warning("invalid offset is ignored")` (`date_core.c:8304`) is
@@ -489,9 +493,6 @@ describe("TestDateStrftime", () => {
     expect(gemDateParse("2019-04-30").jisx0301()).toEqual("H31.04.30");
     expect(gemDateParse("2019-05-01").jisx0301()).toEqual("R01.05.01");
 
-    // The gem's statics answer `Temporal` under RFC 0088 (see this file's
-    // header), so where Ruby compares the parsed `DateTime` to `d2` directly
-    // this compares the seat each side names.
     expect(
       RubyDateTime.iso8601("2001-02-03T04:05:06.123456+00:00", RubyDate.ITALY, { limit: 64 }),
     ).toEqual(d2.toDatetime());
