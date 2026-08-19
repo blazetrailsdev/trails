@@ -371,7 +371,20 @@ write.
 ## Module mixins (Ruby `include` → TypeScript)
 
 Rails uses `include`/`extend` to mix module methods into a class. TS has no
-equivalent, so we use **`this`-typed functions assigned directly to the class**.
+language-level equivalent, so `@blazetrails/activesupport` supplies one for
+each Ruby construct. **Pick by what the Ruby does** — the whole point is that
+the TS reads back as the same mixin.
+
+| Ruby                                | TypeScript                           |
+| ----------------------------------- | ------------------------------------ |
+| `include SomeModule`                | `include()` / `Included<>`           |
+| `extend SomeModule`, `ClassMethods` | `extend()` / `Extended<>`            |
+| `included do ... end`               | the `included` / `extended` hooks    |
+| `class_attribute :foo`              | `classAttribute()`                   |
+| one method, no module               | a `this`-typed function on the class |
+
+**One method, no module.** Where Rails defines a single method rather than
+mixing a module, assign a `this`-typed function directly:
 
 ```ts
 // attribute-methods.ts
@@ -390,35 +403,58 @@ Why: code lives in the file that matches Rails' layout (so `parity:api`
 finds it), no delegation wrappers, type-checked via the host interface,
 and `this` resolves to the actual subclass at runtime.
 
-For **instance methods mixed in bulk** (like Rails' `include QueryMethods`),
-use `include()` / `Included<>` from `@blazetrails/activesupport`. See
-`activesupport/src/include.ts` and `relation.ts` + `relation/query-methods.ts`.
+This form is for an _individual_ method. A run of `static X = X` lines
+standing in for one Ruby `extend SomeModule` is a hand-rolled `extend` — use
+`extend()` instead, so the mixin survives as one construct.
 
-When NOT to use this:
+**Instance methods mixed in bulk** (Rails' `include QueryMethods`) —
+`include()` / `Included<>`. See `activesupport/src/include.ts` and
+`relation.ts` + `relation/query-methods.ts`.
+
+**Class methods mixed in bulk** (Rails' `extend SomeModule`, and the
+`ClassMethods` half of an `ActiveSupport::Concern`) — `extend()` /
+`Extended<>`, which copies the module's methods onto the class object.
+
+**An `included do ... end` block** — key a property on the module by the
+`included` symbol `@blazetrails/activesupport` exports, and `include()` calls
+it with the including class after the module's methods are installed, which is
+where Ruby runs the block. `extend()` does the same with `extended`.
+
+```ts
+import { classAttribute, include, included } from "@blazetrails/activesupport";
+
+// activemodel/src/validations.ts — mirrors `validations.rb:40-50`
+const Validations = {
+  // Ruby: `included do class_attribute :_validators, instance_writer: false, ... end`
+  [included](base: AnyClass) {
+    classAttribute.call(base, "_validators", { instanceWriter: false });
+  },
+};
+include(Model, Validations);
+```
+
+The hooks are covered in `activesupport/src/include.test.ts` — "fires the
+included callback after methods are copied" (`:111`) and "does not copy the
+included symbol onto the prototype" (`:128`), plus the `extended` pair.
+
+**`class_attribute :foo`** — `classAttribute()`, which already implements the
+Rails semantics (reads walk the constructor chain, writes are local to the
+class). Don't hand-roll copy-on-first-write per call site; a Ruby
+`class_attribute` is one construct and must stay one.
+
+When NOT to use these:
 
 - A **string-named** `extended` / `included` / `inherited` method. Those names
   are Ruby lifecycle hooks; a TS method spelled that way is drift, not a
   mirror, which is why `SKIP_GROUPS` in `scripts/parity/conventions.ts` marks
-  them `tsMirrorIsDrift: true` and `parity:api:extra` keeps flagging them.
+  them `tsMirrorIsDrift: true` and `parity:api:extra` keeps flagging them. The
+  hooks above are symbol-keyed, so they are not string-named members and never
+  collide with that entry.
+- `inherited` — unlike the other two it has **no** equivalent at all. JS has no
+  hook that fires when a subclass is defined, so its Rails semantics have to be
+  arranged some other way; say which, at the call site.
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
-
-`included` and `extended` themselves **do** have a TS equivalent, and the
-sentence above is only about the spelling. `include()` / `extend()` fire
-callbacks keyed by the exported `included` / `extended` symbols
-(`Symbol.for("@blazetrails/activesupport:included")`, see
-`activesupport/src/include.ts`), which is how you port an
-`included do ... end` block. Because they are symbol-keyed they are not public
-string-named members, so they never collide with the `SKIP_GROUPS` entry above.
-Only `inherited` has no equivalent — JS has no hook that fires when a subclass
-is defined, so its Rails semantics have to be deferred some other way.
-
-The class-method half of a Concern is `extend()` / `Extended<>`, the mirror of
-Ruby `extend SomeModule` — reach for it instead of hand-assigning
-`static x = x` onto the class. And an `included do class_attribute :foo ... end`
-is `classAttribute()` from `@blazetrails/activesupport`, which already gives
-Rails' semantics (reads walk the constructor chain, writes are local to the
-class); do not hand-roll copy-on-first-write per call site.
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 
