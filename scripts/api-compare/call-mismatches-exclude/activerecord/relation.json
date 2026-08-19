@@ -42,6 +42,15 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
+    "call": "exec_main_query",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "relation.rb:1408 calls `exec_main_query` bare because `load_async` (relation.rb:1142) calls it directly with `async:`; trails' loadAsync is synchronous and reaches the query through toArray/execQueries, so the flag is threaded down that path as the same `async` argument instead."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exec_queries",
     "call": "preload_associations",
     "kind": "args",
     "rubyArgs": [

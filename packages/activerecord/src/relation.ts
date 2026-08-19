@@ -485,7 +485,6 @@ export class Relation<T extends Base> {
    * with the rest of the receiver's ivars rather than through `@values`.
    */
   _withIsRecursive = false;
-  private _distinctOnColumns: string[] = [];
   private _isNone = false;
   /**
    * @internal True when this relation's WHERE base is the stale new-owner
@@ -552,21 +551,6 @@ export class Relation<T extends Base> {
    */
   private _loadAsyncPromise?: Promise<T[]>;
   /**
-   * Set by `loadAsync()` so `execMainQuery` issues its SELECT with `async:` on, the way Rails' `load_async` calls
-   * `exec_main_query(async: ...)` (relation.rb:1142).
-   *
-   * **No Rails equivalent — NOT PERMANENT.** A shape deviation with a convergence
-   * target, not a language shortcoming. Rails threads this as a method
-   * ARGUMENT: `load_async` calls `exec_main_query(async: ...)` directly
-   * (relation.rb:1142) while `exec_queries` calls it with the default
-   * (`async: false`, relation.rb:1423). trails stores it as a field because
-   * `loadAsync()` reaches `execMainQuery` through `toArray()`/`execQueries()`,
-   * which take no such parameter. Converging means threading `async` down that
-   * whole path — or having `loadAsync` drive `execMainQuery` itself the way
-   * Rails does — and retiring this field.
-   */
-  private _asyncLoad = false;
-  /**
    * Monotonic token bumped on reset()/reload() so an in-flight toArray()
    * that started before the reset can detect it lost the race and skip
    * committing stale records/loaded state.
@@ -610,18 +594,6 @@ export class Relation<T extends Base> {
     if (predicateBuilder) {
       this._predicateBuilder = predicateBuilder;
     }
-  }
-
-  /**
-   * PostgreSQL DISTINCT ON — select distinct rows based on specific columns.
-   *
-   * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
-   */
-  distinctOn(...columns: string[]): Relation<T> {
-    const rel = this.spawn();
-    rel.distinctValue = true;
-    rel._distinctOnColumns = columns;
-    return rel;
   }
 
   /**
@@ -742,9 +714,6 @@ export class Relation<T extends Base> {
     // load can't re-populate records after a reset.
     this._loadToken += 1;
     this._loadAsyncPromise = undefined;
-    // Rails' reset also drops the scheduled query (`@future_result&.cancel;
-    // @future_result = nil`, relation.rb:1195-1196).
-    this._asyncLoad = false;
     return this;
   }
 
@@ -802,10 +771,8 @@ export class Relation<T extends Base> {
     // instead of racing to fire additional ones.
     if (!this._loadAsyncPromise && !this._loaded) {
       // Rails' `unless loaded?` guards the async query too (relation.rb:1141).
-      this._asyncLoad = true;
-      const loadPromise = this.toArray().finally(() => {
+      const loadPromise = this.toArray(true).finally(() => {
         this._loadAsyncPromise = undefined;
-        this._asyncLoad = false;
       });
       // Attach a no-op rejection handler so a failure here isn't treated
       // as an unhandled rejection if nothing else awaits the relation.
@@ -1064,8 +1031,14 @@ export class Relation<T extends Base> {
    * Execute the query and return all records.
    *
    * Mirrors: ActiveRecord::Relation#to_a / #load
+   *
+   * `async` is Rails' `exec_main_query(async:)` keyword (relation.rb:1423),
+   * threaded from `loadAsync()` — trails' `load_async` reaches the query
+   * through this method rather than calling `exec_main_query` itself, because
+   * instantiation, eager loading and preloading are all awaited inside
+   * `execQueries`.
    */
-  async toArray(): Promise<T[]> {
+  async toArray(async = false): Promise<T[]> {
     if (this.isNullRelation()) return [];
     if (this._loaded) return [...this._records];
     if (this._loadAsyncPromise) {
@@ -1092,7 +1065,7 @@ export class Relation<T extends Base> {
     // in `exec_queries`, which is what makes `.explain` (which calls
     // `exec_queries` directly, relation.rb:13) side-effect-free.
     const token = this._loadToken;
-    const records = await this.withConnection(() => this.execQueries());
+    const records = await this.withConnection(() => this.execQueries(async));
     // A reset() landed while the query was in flight: return the rows we got
     // without clobbering the fresh state.
     if (token !== this._loadToken) return records;
@@ -1103,7 +1076,7 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1403-1421).
    */
-  private async execQueries(): Promise<T[]> {
+  private async execQueries(async = false): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
@@ -1123,7 +1096,7 @@ export class Relation<T extends Base> {
       // clobbering the fresh state.
       const token = this._loadToken;
 
-      const rows = await this.execMainQuery();
+      const rows = await this.execMainQuery(async);
       if (token !== this._loadToken) return [];
       const records = this.instantiateRecords(rows);
 
@@ -1165,7 +1138,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#exec_main_query (relation.rb:1423-1452).
    * Returns rows; `instantiateRecords` turns them into records.
    */
-  private async execMainQuery(): Promise<Result> {
+  private async execMainQuery(async = false): Promise<Result> {
     // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
     // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
     // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
@@ -1177,8 +1150,12 @@ export class Relation<T extends Base> {
     if (this._isNone) return Result.empty();
 
     const c = this._conn();
-    const async =
-      this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+    // Rails computes `async: !c.current_transaction.joinable?` in `load_async`,
+    // where the connection is already in hand, and bails to a plain `load`
+    // unless `c.async_enabled?` (relation.rb:1140-1142). trails' `loadAsync` is
+    // synchronous and has no connection yet, so it passes `async: true` and the
+    // connection-dependent half of Rails' condition is applied here.
+    async = async && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
 
     // Mirrors relation.rb:1431-1451: ONE `skip_query_cache_if_necessary` over
     // the contradiction / eager_loading? / plain arms, not one per arm.
@@ -3083,7 +3060,6 @@ export class Relation<T extends Base> {
     this._values = { ...source._values };
     this._rawOrderClauses = [...source._rawOrderClauses];
     this._withIsRecursive = source._withIsRecursive;
-    this._distinctOnColumns = [...source._distinctOnColumns];
     this._isNone = source._isNone;
     this._joinClauses = [...source._joinClauses];
     // Rebind extension-module methods onto this clone. Ruby's `extend`
