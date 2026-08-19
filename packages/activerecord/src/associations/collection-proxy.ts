@@ -565,19 +565,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? instance
       : new CollectionAssociation(record, assocDef);
 
-    // `extensions = association.extensions; extend(*extensions) if extensions.any?`
-    // (collection_proxy.rb:35-37). Ruby's `extend` mixes the modules into this
-    // object only — it does NOT touch relation state; the scope gets the same
-    // modules independently through `scope.extending! reflection.extensions`
-    // (association_scope.rb:28), which is what carries them onto chained
-    // relations. So the TS spelling of `extend` is a method copy onto the
-    // instance.
+    // `extend(*extensions)` (collection_proxy.rb:35-37) mixes into this object
+    // only; chained relations get the same modules independently through
+    // `scope.extending! reflection.extensions` (association_scope.rb:28).
     const extensions = this._targetAssociation.extensions;
     if (extensions.length > 0) {
-      // `self` inside an extension body is the extended proxy, which answers a
-      // named scope through `method_missing` (`has_many :comments do; def
-      // newest; created.last; end; end`). The trails equivalent of that lookup
-      // is the scope proxy, so extension methods bind to the wrapped proxy.
+      // `self` in an extension body answers a named scope through
+      // `method_missing` on the extended proxy; the scope proxy is that lookup.
       const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
       for (const mod of extensions) {
         if (typeof mod === "function") {
