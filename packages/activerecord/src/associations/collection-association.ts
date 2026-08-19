@@ -813,7 +813,7 @@ export class CollectionAssociation extends Association {
     if (!(record instanceof klass)) return false;
 
     if (record.isNewRecord()) {
-      return isIncludeInMemory(this, record);
+      return await isIncludeInMemory(this, record);
     } else if (this.isLoaded()) {
       return this.target.includes(record);
     } else {
@@ -1695,28 +1695,38 @@ export function callbacksFor(this: CallbackHost, callbackName: string): unknown[
   return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
 }
 
-/** @internal */
-function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean {
-  // For through reflections, also check through the source chain.
-  const refl = assoc.reflection as any;
-  if (refl.isThroughReflection?.()) {
-    const name = refl.options?.through;
-    if (name) {
-      const throughAssoc = (assoc.owner as any).association?.(name);
-      const sourceRefl = refl.sourceReflection?.();
-      if (throughAssoc && sourceRefl) {
-        const sourceName = sourceRefl.name;
-        const reader = throughAssoc.target as Base[];
-        if (Array.isArray(reader)) {
-          const found = reader.some((source: any) => {
-            const targetRefl = source[sourceName];
-            if (Array.isArray(targetRefl)) return targetRefl.includes(record);
-            return targetRefl === record;
-          });
-          if (found) return true;
-        }
+/**
+ * Mirrors: ActiveRecord::Associations::CollectionAssociation#include_in_memory?
+ * (collection_association.rb:507-519).
+ * @internal
+ */
+async function isIncludeInMemory(assoc: CollectionAssociation, record: Base): Promise<boolean> {
+  const reflection = assoc.reflection as unknown as {
+    isThroughReflection?: () => boolean;
+    throughReflection?: { name: string } | null;
+    sourceReflection?: { name: string } | null;
+  };
+  if (reflection.isThroughReflection?.()) {
+    const throughReflection = reflection.throughReflection;
+    const sourceReflection = reflection.sourceReflection;
+    if (!throughReflection || !sourceReflection) return assoc.target.includes(record);
+    const throughAssoc = (
+      assoc.owner as unknown as { association: (n: string) => Association }
+    ).association(throughReflection.name);
+    const sources = ((await throughAssoc.reader) ?? []) as Base[];
+    for (const source of sources) {
+      const targetReflection = await (source as unknown as Record<string, unknown>)[
+        sourceReflection.name
+      ];
+      // Rails' `respond_to?(:include?)` — a collection source answers
+      // `include?`, a singular one is compared by identity.
+      if (Array.isArray(targetReflection)) {
+        if (targetReflection.includes(record)) return true;
+      } else if (targetReflection === record) {
+        return true;
       }
     }
+    return assoc.target.includes(record);
   }
   return assoc.target.includes(record);
 }

@@ -1443,40 +1443,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
   }
 
-  /**
-   * Walk the through-chain looking for `record` via the source reflection.
-   * Mirrors the through branch of
-   * `CollectionAssociation#include_in_memory?` —
-   * `assoc.reader.any? { |source| source.send(source_reflection.name)... }`.
-   */
-  private async _includeInMemoryThrough(record: T): Promise<boolean> {
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughName = this._assocDef.options.through!;
-    const throughAssoc = associations.find((a: any) => a.name === throughName);
-    if (!throughAssoc) return false;
-    // Rails reads `reflection.source_reflection.name` — the *actual* source
-    // association name, which for a collection source (e.g. `has_many :comments
-    // through: :posts`, source `Post#comments`) is plural. `singularize` would
-    // mis-guess `comment`, so prefer the resolved source reflection.
-    const sourceRefl = (this.reflection as { sourceReflection?: { name?: string } })
-      .sourceReflection;
-    const sourceName =
-      sourceRefl?.name ?? this._assocDef.options.source ?? singularize(this._assocName);
-    const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
-    if (!sources) return false;
-    for (const joinRecord of sources) {
-      const source = await (joinRecord as any)[sourceName];
-      if (source == null) continue;
-      if (Array.isArray(source)) {
-        if (source.includes(record)) return true;
-      } else if (source === record) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private _raiseOnTypeMismatch(records: T[]): void {
     const opts = this._assocDef.options;
     // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
@@ -1527,77 +1493,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return removed;
   }
 
-  private _removeFromTarget(records: Base[]): void {
-    const pkIdentities = new Set<string>();
-    const nullPkRecords = new Set<Base>();
-    for (const r of records) {
-      const id = this._identityFor(r);
-      if (id == null) {
-        nullPkRecords.add(r);
-      } else {
-        pkIdentities.add(id);
-      }
-    }
-
-    this._target = this._target.filter((r) => {
-      const id = this._identityFor(r);
-      if (id != null) return !pkIdentities.has(id);
-      return !nullPkRecords.has(r);
-    });
-    this._invalidateAssociationIds();
-  }
-
-  /**
-   * Decrement the owner's counter cache by `count`, mirroring Rails
-   * `CollectionAssociation#update_counter` for the bulk delete/nullify path.
-   */
-  private async _decrementCounterCache(count: number): Promise<void> {
-    let column: string | null = this._assocDef.options.counterCache
-      ? String(this._assocDef.options.counterCache)
-      : null;
-    // A has_many without an explicit `counter_cache:` may still update a counter
-    // through the child's belongs_to inverse (e.g. Car.engines ← Engine
-    // belongs_to :my_car, counter_cache: :engines_count). The bulk delete path
-    // bypasses the child callbacks, so resolve the reflection's cached-counter
-    // column and decrement it here, matching Rails' `update_counter(-count)`.
-    if (!column) {
-      const refl = this.reflection;
-      if (refl.hasCachedCounter?.()) column = refl.counterCacheColumn?.() ?? null;
-    }
-    if (!column) return;
-    const owner = this._record as any;
-    if (typeof owner.incrementBang === "function") {
-      await owner.incrementBang(column, -count);
-    } else if (typeof owner.updateCounters === "function") {
-      await owner.updateCounters({ [column]: -count });
-    } else if (typeof owner.increment === "function") {
-      owner.increment(column, -count);
-    }
-  }
-
-  private _buildNullifyUpdates(): Record<string, null> {
-    const ctor = this._record.constructor as typeof Base;
-    const asName = this._assocDef.options.as;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-    const foreignKey =
-      this._assocDef.options.foreignKey ??
-      this._reflectionForeignKey() ??
-      this._assocDef.options.queryConstraints ??
-      (asName
-        ? `${underscore(asName)}_id`
-        : Array.isArray(primaryKey)
-          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-          : `${underscore(ctor.name)}_id`);
-    const updates: Record<string, null> = {};
-    if (Array.isArray(foreignKey)) {
-      for (const fk of foreignKey) updates[fk] = null;
-    } else {
-      updates[foreignKey] = null;
-    }
-    if (asName) updates[this._assocDef.options.foreignType ?? `${underscore(asName)}_type`] = null;
-    return updates;
-  }
-
   /**
    * Destroys the `records` supplied and removes them from the collection,
    * always removing the row from the database regardless of `:dependent`.
@@ -1620,153 +1515,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Remove all records from the collection by nullifying FKs.
+   * Equivalent to `deleteAll`. The difference is that it returns `this`,
+   * instead of an array of the deleted objects, so methods can be chained.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#clear
+   * (collection_proxy.rb:1066-1069) — `delete_all; self`. The `:dependent`
+   * collapse, the delete/nullify dispatch, the counter-cache update and the
+   * target reset all live once on `CollectionAssociation#delete_all` /
+   * `#delete_or_nullify_all_records` (collection_association.rb:150-176).
    */
-  async clear(): Promise<void> {
-    // Rails' `clear` → `delete_all` → through `delete_records` runs through
-    // `ensure_mutable` / the nested-through readonly check; mirror `deleteAll`
-    // and the prior per-record `delete` path by enforcing the same guard
-    // before touching join rows.
-    this._ensureThroughWritable();
-    return this._withoutStrictLoading(async () => {
-      // A new-record owner whose scope is a `null_scope?` has no persisted
-      // children to delete or nullify, so Rails' `scope.none!`
-      // (collection_association.rb:300-305) makes the delete/nullify a no-op.
-      // `null_scope?` is `owner.new_record? && !foreign_key_present?`, so a new
-      // owner WITH the owner PK present (e.g. a client-assigned UUID) still
-      // queries — only the genuinely keyless new owner short-circuits. Reset
-      // the in-memory target without touching the DB in that case.
-      if (this.isNullScope()) {
-        this._target = [];
-        this._targetLoaded = true;
-        this._invalidateAssociationIds();
-        return;
-      }
-      // Rails' `clear` routes through `delete_all`, which removes the rows in
-      // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
-      // live in `remove_records`, not the delete path) — unlike per-record
-      // `delete`.
-      if (this._isThrough) {
-        // Mirror `delete_or_nullify_all_records` → `delete_records(load_target,
-        // method)` (has_many_through_association.rb:136-175): destroy the join
-        // rows for the loaded target so the join model's `belongsTo`
-        // counter-cache callbacks still fire, without the collection
-        // before/after-remove callbacks. Like Rails, this follows the
-        // association-layer `load_target` (the full association target), not
-        // the proxy's in-place relation state.
-        const assoc = this._record.association(this._assocName) as unknown as {
-          loadTarget: () => Promise<Base[]>;
-          deleteRecords: (records: Base[], method: string) => Promise<number>;
-        };
-        const target = await assoc.loadTarget();
-        if (target.length > 0) {
-          await assoc.deleteRecords(target, (this._assocDef.options.dependent as string) ?? "");
-        }
-        // The whole association target was cleared (load_target, not the
-        // diverged proxy scope), so reset the full in-memory target the way
-        // `deleteAll` does — pruning only the pre-clear `toArray()` subset
-        // would leave stale records for `size()`/`isEmpty()` to read.
-        this._target = [];
-        this._targetLoaded = true;
-        this._invalidateAssociationIds();
-        return;
-      }
-      // Capture the records to prune BEFORE removing — afterwards a delete /
-      // nullified FK makes a reload return nothing. Only the non-through path
-      // needs this; the through branch returns early after a full reset, so its
-      // `toArray()` load is avoided entirely.
-      const records = await this.toArray();
-      // Honor the association's `:dependent` like Rails `delete_all` (nil arg):
-      // `dependent == :destroy` collapses to `:delete_all`, so
-      // destroy/delete/delete_all bulk-DELETE the child rows while
-      // nullify/default nullify the owner FK — all without per-record remove
-      // callbacks (collection_association.rb:150-167 + has_many_association.rb:112-118).
-      const dep = this._assocDef.options.dependent as string | undefined;
-      const deleteRows =
-        dep === "destroy" || dep === "delete" || dep === "delete_all" || dep === "deleteAll";
-      let count: number;
-      if (deleteRows) {
-        count = await this.scope().deleteAll();
-      } else {
-        count = await this.scope().updateAll(this._buildNullifyUpdates());
-      }
-      // Rails `delete_records` else-branch: update_counter(-delete_count). The
-      // bulk DELETE/UPDATE bypasses the child's belongs_to callbacks, so decrement
-      // the owner's counter cache by the affected count here (matching the
-      // per-record `delete` path). `clear` collapses `:destroy` to a bulk delete,
-      // so this fires for delete_all/nullify alike, never the gated destroy branch.
-      if (count > 0) await this._decrementCounterCache(count);
-      this._removeFromTarget(records);
-      this._invalidateAssociationIds();
-    });
+  async clear(): Promise<Omit<this, "then">> {
+    await this.deleteAll();
+    return stripThenable(this._proxySelf ?? this);
   }
 
   /**
    * Check if a record is in the collection.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
+   * (collection_proxy.rb:927-929) — `!!@association.include?(record)`. The
+   * `reflection.klass` guard, the `include_in_memory?` scan (through arm
+   * included) and the `scope.exists?` fallback all live on
+   * `CollectionAssociation#include?` (collection_association.rb:258-270).
    */
   async isInclude(record: T): Promise<boolean> {
-    // Rails `include?` short-circuits on type mismatch — a record whose
-    // class is unrelated to the reflection's `klass` can never be in the
-    // target. Without this guard, a bogus record would issue a needless
-    // `exists?` query and might silently match a row with the same PK on
-    // the wrong table.
-    // Mirrors `ActiveRecord::Associations::CollectionAssociation#include?`
-    // (`return false unless record.is_a?(reflection.klass)`).
-    if (!this._assocDef.options.polymorphic) {
-      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-      const klass = resolveAssocClass(this._record, this._assocName, className);
-      if (!(record instanceof klass)) return false;
-    }
-    if (record.isNewRecord()) {
-      // Mirrors `CollectionAssociation#include_in_memory?`: for through
-      // associations, walk the through target looking for `record` via the
-      // source reflection; OR fall back to the local target. For
-      // non-through associations, just check the local target.
-      if (this._assocDef.options.through) {
-        if (await this._includeInMemoryThrough(record)) return true;
-      }
-      return this._target.includes(record);
-    }
-
-    if (this._targetLoaded) {
-      const targetId = this._identityFor(record);
-      if (targetId != null) {
-        return this._target.some((r) => this._identityFor(r) === targetId);
-      }
-      return this._target.includes(record);
-    }
-
-    const primaryKey = (record.constructor as typeof Base).primaryKey;
-    const s = this.scope();
-    if (typeof s.exists === "function") {
-      if (Array.isArray(primaryKey)) {
-        const condition: Record<string, unknown> = {};
-        let allPresent = true;
-        for (const key of primaryKey) {
-          const value = record._readAttribute(key);
-          if (value == null) {
-            allPresent = false;
-            break;
-          }
-          condition[key] = value;
-        }
-        if (allPresent) return s.exists(condition);
-      } else {
-        const pkValue = record._readAttribute(primaryKey);
-        if (pkValue != null) return s.exists({ [primaryKey]: pkValue });
-      }
-    }
-
-    const loaded = await this.loadTarget();
-    const targetId = this._identityFor(record);
-    if (targetId != null) {
-      return loaded.some((r) => this._identityFor(r) === targetId);
-    }
-    return loaded.includes(record);
+    return !!(await this._collectionAssociation().isInclude(record));
   }
 
   /**
@@ -1998,8 +1771,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * plain `Array#-`, which drops EVERY occurrence of a deleted record, not the
    * `difference` hook's per-occurrence count. For a `:through` reflection that
    * is what makes `[david, david].replace([david])` delete both join rows and
-   * re-concat a fresh one, exactly as Rails does — and it matches what
-   * `_removeFromTarget` does to the real `_target`.
+   * re-concat a fresh one, exactly as Rails does.
    * @internal
    */
   private async _replaceRecords(newTarget: T[], originalTarget: T[]): Promise<T[]> {
