@@ -939,7 +939,7 @@ describe("TimeWithZoneTest", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
     const json = JSON.stringify({
       utc: twz.utc().toString(),
-      timeZone: twz.timeZone.tzinfo,
+      timeZone: twz.timeZone.tzinfo.identifier,
     });
     const parsed = JSON.parse(json);
     const restored = new TimeWithZone(
@@ -1270,7 +1270,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     setZone("America/New_York");
     const zone = timeZone()!;
     expect(zone).toBeInstanceOf(TimeZone);
-    expect(zone.tzinfo).toBe("America/New_York");
+    expect(zone.tzinfo.identifier).toBe("America/New_York");
     expect(zone.name).toBe("America/New_York");
   });
 
@@ -1278,7 +1278,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     setZone("America/New_York");
     const zone = timeZone()!;
     expect(zone).toBeInstanceOf(TimeZone);
-    expect(zone.tzinfo).toBe("America/New_York");
+    expect(zone.tzinfo.identifier).toBe("America/New_York");
     expect(zone.name).toBe("America/New_York");
   });
 

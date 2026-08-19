@@ -1,8 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { TimeZone, InvalidTimezoneIdentifier } from "./values/time-zone.js";
+import { TimeZone, InvalidTimezoneIdentifier, TimezonePeriod } from "./values/time-zone.js";
+import {
+  utcToLocalReturnsUtcOffsetTimes,
+  setUtcToLocalReturnsUtcOffsetTimes,
+} from "./core-ext/date-and-time/compatibility.js";
 import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
-import { instantFromDate } from "./testing/temporal-helpers.js";
+import { Temporal } from "@blazetrails/date";
+
+/** Mirrors `TimeZoneTestHelpers#with_utc_to_local_returns_utc_offset_times`
+ * (time_zone_test_helpers.rb:46-52). */
+function withUtcToLocalReturnsUtcOffsetTimes(value: boolean, block: () => void): void {
+  const oldTzinfo2Format = utcToLocalReturnsUtcOffsetTimes();
+  setUtcToLocalReturnsUtcOffsetTimes(value);
+  try {
+    block();
+  } finally {
+    setUtcToLocalReturnsUtcOffsetTimes(oldTzinfo2Format);
+  }
+}
 
 describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
@@ -10,44 +26,73 @@ describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
   it("utc to local", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const utcDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
-    const twz = new TimeWithZone(instantFromDate(utcDate), zone);
-    expect(twz.year).toBe(1999);
-    expect(twz.month).toBe(12);
-    expect(twz.day).toBe(31);
-    expect(twz.hour).toBe(19);
-    expect(twz.min).toBe(0);
-    expect(twz.sec).toBe(0);
+
+    withUtcToLocalReturnsUtcOffsetTimes(false, () => {
+      // standard offset -0500
+      expect(zone.utcToLocal(new Date(Date.UTC(2000, 0, 1)))).toEqual(
+        new Date(Date.UTC(1999, 11, 31, 19)),
+      );
+      // dst offset -0400
+      expect(zone.utcToLocal(new Date(Date.UTC(2000, 6, 1)))).toEqual(
+        new Date(Date.UTC(2000, 5, 30, 20)),
+      );
+    });
+
+    withUtcToLocalReturnsUtcOffsetTimes(true, () => {
+      const standard = zone.utcToLocal(new Date(Date.UTC(2000, 0, 1))) as Temporal.ZonedDateTime;
+      expect([standard.year, standard.month, standard.day, standard.hour]).toEqual([
+        1999, 12, 31, 19,
+      ]);
+      expect(standard.offsetNanoseconds / 1_000_000_000).toBe(-18000);
+
+      const dst = zone.utcToLocal(new Date(Date.UTC(2000, 6, 1))) as Temporal.ZonedDateTime;
+      expect([dst.year, dst.month, dst.day, dst.hour]).toEqual([2000, 6, 30, 20]);
+      expect(dst.offsetNanoseconds / 1_000_000_000).toBe(-14400);
+    });
   });
 
   it("utc to local with fractional seconds", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const utcDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 500));
-    const twz = new TimeWithZone(instantFromDate(utcDate), zone);
-    expect(twz.msec).toBe(500);
-    expect(twz.hour).toBe(19);
+
+    withUtcToLocalReturnsUtcOffsetTimes(false, () => {
+      expect(zone.utcToLocal(new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1)))).toEqual(
+        new Date(Date.UTC(1999, 11, 31, 19, 0, 0, 1)),
+      );
+      expect(zone.utcToLocal(new Date(Date.UTC(2000, 6, 1, 0, 0, 0, 1)))).toEqual(
+        new Date(Date.UTC(2000, 5, 30, 20, 0, 0, 1)),
+      );
+    });
+
+    withUtcToLocalReturnsUtcOffsetTimes(true, () => {
+      const standard = zone.utcToLocal(
+        new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1)),
+      ) as Temporal.ZonedDateTime;
+      expect(standard.millisecond).toBe(1);
+      expect(standard.offsetNanoseconds / 1_000_000_000).toBe(-18000);
+    });
   });
 
   it("local to utc", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.local(1999, 12, 31, 19, 0, 0);
-    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    // standard offset -0500
+    expect(zone.localToUtc(new Date(Date.UTC(2000, 0, 1)))).toEqual(
+      new Date(Date.UTC(2000, 0, 1, 5)),
+    );
+    // dst offset -0400
+    expect(zone.localToUtc(new Date(Date.UTC(2000, 6, 1)))).toEqual(
+      new Date(Date.UTC(2000, 6, 1, 4)),
+    );
   });
 
   it("period for local", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.local(2024, 1, 15, 12, 0, 0);
-    expect(twz.utcOffset).toBe(-5 * 3600);
-    expect(twz.dst()).toBe(false);
+    expect(zone.periodForLocal(new Date(Date.UTC(2000, 0, 1)))).toBeInstanceOf(TimezonePeriod);
   });
 
   it("period for local with ambiguous time", () => {
-    // 1AM during fall DST transition is ambiguous
-    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.local(2006, 10, 29, 1);
-    expect(twz.hour).toBe(1);
-    // Rails resolves ambiguous time to DST (first occurrence)
-    expect(twz.dst()).toBe(true);
+    const zone = TimeZone.find("Moscow")!;
+    const period = zone.periodForLocal(new Date(Date.UTC(2015, 0, 1)));
+    expect(zone.periodForLocal(new Date(Date.UTC(2014, 9, 26, 1, 0, 0)))).toEqual(period);
   });
 
   // ---------------------------------------------------------------------------
@@ -63,7 +108,7 @@ describe("TimeZoneTest", () => {
 
   it("from tzinfo to map", () => {
     const zone = TimeZone.find("America/New_York")!;
-    expect(zone.tzinfo).toBe("America/New_York");
+    expect(zone.tzinfo.identifier).toBe("America/New_York");
   });
 
   // ---------------------------------------------------------------------------
@@ -705,7 +750,7 @@ describe("TimeZoneTest", () => {
   it("index", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     expect(zone.name).toBe("Eastern Time (US & Canada)");
-    expect(zone.tzinfo).toBe("America/New_York");
+    expect(zone.tzinfo.identifier).toBe("America/New_York");
   });
 
   it("unknown zone raises exception", () => {

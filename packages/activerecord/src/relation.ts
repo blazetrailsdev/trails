@@ -2101,8 +2101,9 @@ export class Relation<T extends Base> {
     _qm.buildJoins.call(joined as any, idSubquery);
     if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
     this.buildOrder(idSubquery);
-    if (this.limitValue !== null) idSubquery.take(this.limitValue);
-    if (this.offsetValue !== null) idSubquery.skip(this.offsetValue);
+    const connection = this._resolveAdapter() ?? { sanitizeLimit };
+    if (this.limitValue !== null) idSubquery.take(connection.sanitizeLimit(this.limitValue));
+    if (this.offsetValue !== null) idSubquery.skip(_qm.toI(this.offsetValue));
     return idSubquery;
   }
 

@@ -119,7 +119,7 @@ export function userInputInTimeZone(
   try {
     const timeZone = zone();
     const time = Temporal.PlainDateTime.from(str.replace(" ", "T"));
-    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
+    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo.identifier);
     return time;
   } catch {
     return null;

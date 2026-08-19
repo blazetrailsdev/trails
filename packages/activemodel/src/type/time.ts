@@ -99,7 +99,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
     if (cast === null) return null;
     const timeZone = zone();
     const time = cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime();
-    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
+    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo.identifier);
     return time;
   }
 

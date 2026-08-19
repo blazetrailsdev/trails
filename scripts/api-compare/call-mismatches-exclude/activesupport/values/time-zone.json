@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
-    "rubyName": "find_tzinfo",
-    "call": "get",
-    "reason": "`TZInfo::Timezone.get(MAPPING[name] || name)` (time_zone.rb:208): trails has no TZInfo, so a zone IS its IANA identifier and `get`'s resolve-or-raise is an `Intl.DateTimeFormat` probe raising the same InvalidTimezoneIdentifier. Converges when trails grows a tzinfo object (the `time-with-zone-residue-structural-blockers` seam)."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
     "rubyName": "iso8601",
     "call": "ordinal",
     "reason": "Rails' iso8601 resolves an ordinal date through `Date.ordinal(year, parts.fetch(:yday))` (time_zone.rb:405) after `Date._iso8601` has parsed the string into parts; trails has neither `Date._iso8601` nor `Date.ordinal`, so the ordinal `YYDDD` form is recognised by its own regex arm and converted with day-of-year arithmetic. Blocked on porting `Date._iso8601`/`Date.ordinal`."

@@ -53,8 +53,7 @@ export class Default {
     // proc/method form, `def self.default_scope`) rather than registering via
     // the `default_scope { }` macro, call that method with the base relation
     // installed as the current scope (`relation.scoping { default_scope }`).
-    const override = this.defaultScopeOverride ? defaultScopeMethod(this) : undefined;
-    if (override) {
+    if (this.defaultScopeOverride) {
       return evaluateDefaultScope.call(this, () => {
         const prev = ScopeRegistry.currentScope(this);
         this.setCurrentScope(relation);
@@ -62,7 +61,7 @@ export class Default {
           // Return the override's value unchanged (nullish included), mirroring
           // Rails' `relation.scoping { default_scope }`; the `|| scope` fallback
           // lives at the call site (`?? buildBase()` / `?? rel`).
-          return override.call(this);
+          return this.defaultScope();
         } finally {
           this.setCurrentScope(prev);
         }
