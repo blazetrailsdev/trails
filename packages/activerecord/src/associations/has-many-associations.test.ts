@@ -3574,8 +3574,14 @@ describe("HasManyAssociationsTest", () => {
     expect(await ReLocalePost.all().count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
+    // `cpk_books.id` is not auto-increment under its composite PK, so the id
+    // part is assigned explicitly — MariaDB rejects the insert otherwise.
     const greatAuthor = await CpkAuthor.create({ name: "Alice" });
-    await CpkBook.create({ author_id: greatAuthor.id, title: "The first book", revision: 1 });
+    await CpkBook.create({
+      id: [greatAuthor.id as number, 1],
+      title: "The first book",
+      revision: 1,
+    });
 
     // Rails reads `great_author.books.first`, which does NOT mark the
     // association loaded, so `include?` takes the `scope.exists?(record_id)`
