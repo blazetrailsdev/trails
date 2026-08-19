@@ -98,7 +98,7 @@ export class TimeWithZone {
   private _period?: TimezonePeriod;
 
   constructor(instant: Temporal.Instant, timeZone: TimeZone) {
-    this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo);
+    this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo.identifier);
     this._timeZone = timeZone;
   }
 
@@ -169,7 +169,7 @@ export class TimeWithZone {
 
   /** Whether the timezone is UTC */
   isUtc(): boolean {
-    const tz = this._timeZone.tzinfo;
+    const tz = this._timeZone.tzinfo.identifier;
     return (
       this.utcOffset === 0 &&
       (tz === "Etc/UTC" ||
@@ -372,7 +372,7 @@ export class TimeWithZone {
       zone = currentZone;
     }
     const tz = findZoneBang(zone) as TimeZone;
-    if (tz.tzinfo === this._timeZone.tzinfo) return this;
+    if (tz.tzinfo.identifier === this._timeZone.tzinfo.identifier) return this;
     return new TimeWithZone(this._zoned.toInstant(), tz);
   }
 

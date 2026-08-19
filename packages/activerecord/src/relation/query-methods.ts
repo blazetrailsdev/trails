@@ -146,10 +146,6 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
-  exists(conditions?: unknown): Promise<boolean> {
-    return (this._scope as any).exists(conditions);
-  }
-
   /** Mirrors: WhereChain#scope_association_reflection (query_methods.rb:140-147). */
   private scopeAssociationReflection(association: string): WhereChainReflection {
     const model = (this._scope as unknown as QueryMethodsHost).model as any;
@@ -2286,7 +2282,8 @@ export function processWithArgs(
 }
 
 /** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
-function toI(value: unknown): number {
+/** @internal */
+export function toI(value: unknown): number {
   if (value == null) return 0;
   if (typeof value === "number") return Math.trunc(value);
   if (typeof value === "bigint") return Number(value);

@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
-    "rubyName": "find_tzinfo",
-    "call": "get",
-    "reason": "`TZInfo::Timezone.get(MAPPING[name] || name)` (time_zone.rb:208): trails has no TZInfo, so a zone IS its IANA identifier and `get`'s resolve-or-raise is an `Intl.DateTimeFormat` probe raising the same InvalidTimezoneIdentifier. Converges when trails grows a tzinfo object (the `time-with-zone-residue-structural-blockers` seam)."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
     "rubyName": "iso8601",
     "call": "ordinal",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

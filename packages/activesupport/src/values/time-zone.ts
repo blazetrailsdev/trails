@@ -15,6 +15,7 @@ import { ArgumentError } from "../hash-utils.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
+import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
 
 // Rails maps friendly names to IANA zones
 const MAPPING: Record<string, string> = {
@@ -557,9 +558,175 @@ export class TimezonePeriod {
   }
 }
 
+/**
+ * Stands in for `TZInfo::PeriodNotFound` (`tzinfo/timezone.rb`), which
+ * `TZInfo::Timezone#period_for_local` raises for a local time that does not
+ * exist in the zone (the spring-forward gap) — the failure Rails'
+ * `period_for_local` (time_zone.rb:559-561) lets through.
+ *
+ * @noRailsEquivalent PERMANENT — the class belongs to the TZInfo gem, not to
+ *   Rails, exactly as {@link InvalidTimezoneIdentifier} above does.
+ */
+export class PeriodNotFound extends Error {
+  override name = "PeriodNotFound";
+}
+
+/**
+ * Stands in for `TZInfo::Timezone`, the object `TimeZone#tzinfo` holds
+ * (time_zone.rb:312) and delegates every period lookup and conversion to
+ * (`utc_to_local` :541, `local_to_utc` :552, `period_for_utc` :555,
+ * `period_for_local` :559, `periods_for_local` :563, `abbr` :567, `dst?` :571).
+ * trails resolves zones through the runtime's own `Intl` database rather than
+ * TZInfo, so a zone is its IANA identifier plus the lookups computed off it.
+ *
+ * @noRailsEquivalent PERMANENT — TZInfo is a gem, not Rails, so there is no
+ *   file under vendor/rails for `Timezone` to be ported from; Rails names the
+ *   object and calls these methods on it, so the port needs a stand-in, the
+ *   same position {@link TimezonePeriod} and {@link InvalidTimezoneIdentifier}
+ *   are in.
+ */
+export class Timezone {
+  /**
+   * `TZInfo::Timezone.get(identifier)` — resolve-or-raise. ECMA-402 mandates a
+   * RangeError for a `timeZone` the runtime does not know, and only for that,
+   * so it is the one failure standing in for `InvalidTimezoneIdentifier`
+   * (`tzinfo/data_source.rb:321`, whence the message); anything else out of the
+   * probe is a different fault and propagates.
+   */
+  static get(identifier: string): Timezone {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: identifier });
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
+    }
+    return new Timezone(identifier);
+  }
+
+  readonly identifier: string;
+
+  constructor(identifier: string) {
+    this.identifier = identifier;
+  }
+
+  /** `TZInfo::Timezone#name`, which `encode_with` reads (time_zone.rb:579). */
+  get name(): string {
+    return this.identifier;
+  }
+
+  toString(): string {
+    return this.identifier;
+  }
+
+  /** `TZInfo::Timezone#abbr`. */
+  abbr(time: Date | Temporal.Instant): string {
+    return getZoneInfo(this.identifier, toDate(time)).abbreviation;
+  }
+
+  /** The observed offset, in seconds, at a UTC instant. */
+  observedUtcOffset(time: Date | Temporal.Instant): number {
+    return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
+  }
+
+  /** `TZInfo::Timezone#dst?`. */
+  isDst(time: Date | Temporal.Instant): boolean {
+    // Compare offset at this date vs January (standard time for Northern hemisphere)
+    // and July (standard time for Southern hemisphere). If current offset differs
+    // from the minimum offset, DST is in effect.
+    const d = toDate(time);
+    const jan = new Date(d.getFullYear(), 0, 1);
+    const jul = new Date(d.getFullYear(), 6, 1);
+    const janOffset = getZoneInfo(this.identifier, jan).utcOffsetSeconds;
+    const julOffset = getZoneInfo(this.identifier, jul).utcOffsetSeconds;
+    const currentOffset = getZoneInfo(this.identifier, d).utcOffsetSeconds;
+    const standardOffset = Math.min(janOffset, julOffset);
+    return currentOffset !== standardOffset;
+  }
+
+  /** `TZInfo::Timezone#period_for_utc`. */
+  periodForUtc(time: Date | Temporal.Instant): TimezonePeriod {
+    const d = toDate(time);
+    return new TimezonePeriod(this.abbr(d), this.observedUtcOffset(d), this.isDst(d));
+  }
+
+  /**
+   * `TZInfo::Timezone#periods_for_local`: the periods a LOCAL time falls in —
+   * one ordinarily, two where the clocks went back and the local time is
+   * ambiguous, none where they went forward and it does not exist. `time`
+   * carries the wall clock in its UTC fields, the shape `local_to_utc` and
+   * `period_for_local` take.
+   */
+  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
+    const localMs = toDate(time).getTime();
+    const DAY = 86_400_000;
+    const around = [
+      getZoneInfo(this.identifier, new Date(localMs - DAY)).utcOffsetSeconds,
+      getZoneInfo(this.identifier, new Date(localMs + DAY)).utcOffsetSeconds,
+    ];
+    // Ordered by the UTC instant each candidate offset implies, which is the
+    // order TZInfo hands them back in: the larger offset is the earlier UTC.
+    const candidates = [...new Set(around)].sort((a, b) => b - a);
+    const periods: TimezonePeriod[] = [];
+    for (const offset of candidates) {
+      const utc = new Date(localMs - offset * 1000);
+      if (getZoneInfo(this.identifier, utc).utcOffsetSeconds === offset) {
+        periods.push(this.periodForUtc(utc));
+      }
+    }
+    return periods;
+  }
+
+  /**
+   * `TZInfo::Timezone#period_for_local(time, dst, &block)`: a single period is
+   * returned as is; a local time in the gap raises; an ambiguous one is
+   * resolved by `dst` when exactly one period matches it, and otherwise handed
+   * to the block — which is how Rails' `periods.last` (time_zone.rb:560) gets
+   * called.
+   */
+  periodForLocal(
+    time: Date | Temporal.Instant,
+    dst: boolean | null = true,
+    block?: (periods: TimezonePeriod[]) => TimezonePeriod,
+  ): TimezonePeriod {
+    const periods = this.periodsForLocal(time);
+    if (periods.length === 1) return periods[0];
+    if (periods.length === 0) {
+      throw new PeriodNotFound(
+        `${toDate(time).toISOString().slice(0, 19)} is not valid for ${this.identifier}`,
+      );
+    }
+    if (dst !== null) {
+      const matching = periods.filter((period) => period.isDst() === dst);
+      if (matching.length === 1) return matching[0];
+    }
+    if (block) return block(periods);
+    throw new PeriodNotFound(
+      `${toDate(time).toISOString().slice(0, 19)} is ambiguous for ${this.identifier}`,
+    );
+  }
+
+  /**
+   * `TZInfo::Timezone#utc_to_local`: as of tzinfo 2 this is the local time
+   * carrying a non-zero UTC offset, which a `Temporal.ZonedDateTime` is.
+   */
+  utcToLocal(time: Date | Temporal.Instant): Temporal.ZonedDateTime {
+    return instantFrom(toDate(time)).toZonedDateTimeISO(this.identifier);
+  }
+
+  /**
+   * `TZInfo::Timezone#local_to_utc`: the UTC instant simultaneous with the
+   * wall clock `time` carries, disambiguated through `period_for_local`.
+   */
+  localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
+    const localMs = toDate(time).getTime();
+    const period = this.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
+    return new Date(localMs - period.observedUtcOffset * 1000);
+  }
+}
+
 export class TimeZone {
   readonly name: string;
-  readonly tzinfo: string; // IANA name
+  readonly tzinfo: Timezone;
   /** `@utc_offset` (time_zone.rb:311), which {@link utcOffset} reads first. */
   readonly #utcOffset: number | null;
 
@@ -568,7 +735,7 @@ export class TimeZone {
    * a caller holding the resolved zone hands it over rather than making
    * `find_tzinfo` re-resolve it (`load_country_zones`, time_zone.rb:278).
    */
-  constructor(name: string, utcOffset: number | null = null, tzinfo: string | null = null) {
+  constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     this.name = name;
     this.#utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -633,23 +800,10 @@ export class TimeZone {
 
   /**
    * `find_tzinfo(name)` — `TZInfo::Timezone.get(MAPPING[name] || name)`
-   * (time_zone.rb:207-209). trails has no `TZInfo::Timezone` object, so the
-   * zone IS its IANA identifier and `Timezone.get`'s resolve-or-raise is an
-   * `Intl.DateTimeFormat` probe. ECMA-402 mandates a RangeError for a `timeZone`
-   * the runtime does not know, and only for that, so it is the one failure
-   * standing in for `Timezone.get`'s InvalidTimezoneIdentifier; anything else
-   * out of the probe is a different fault and propagates, as a non-TZInfo error
-   * would through `find_tzinfo`.
+   * (time_zone.rb:207-209), through the {@link Timezone} stand-in.
    */
-  static findTzinfo(name: string): string {
-    const ianaName = MAPPING[name] ?? name;
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
-    } catch (error) {
-      if (!(error instanceof RangeError)) throw error;
-      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
-    }
-    return ianaName;
+  static findTzinfo(name: string): Timezone {
+    return Timezone.get(MAPPING[name] ?? name);
   }
   /**
    * `alias_method :create, :new` (time_zone.rb:211) — the allocator, whose
@@ -663,7 +817,7 @@ export class TimeZone {
   static create(
     name: string,
     utcOffset: number | null = null,
-    tzinfo: string | null = null,
+    tzinfo: Timezone | null = null,
   ): TimeZone {
     return new TimeZone(name, utcOffset, tzinfo);
   }
@@ -702,9 +856,9 @@ export class TimeZone {
     const guess = new Date(wantedMs);
 
     // Get the offset at two candidate UTC times to handle DST transitions
-    const info1 = getZoneInfo(this.tzinfo, guess);
+    const info1 = getZoneInfo(this.tzinfo.identifier, guess);
     const utc1 = new Date(wantedMs - info1.utcOffsetSeconds * 1000);
-    const local1 = getLocalComponents(this.tzinfo, utc1);
+    const local1 = getLocalComponents(this.tzinfo.identifier, utc1);
 
     // Check if utc1 maps back to the requested local time
     if (
@@ -718,9 +872,9 @@ export class TimeZone {
     }
 
     // The offset at the computed UTC may differ — try with that offset
-    const info2 = getZoneInfo(this.tzinfo, utc1);
+    const info2 = getZoneInfo(this.tzinfo.identifier, utc1);
     const utc2 = new Date(wantedMs - info2.utcOffsetSeconds * 1000);
-    const local2 = getLocalComponents(this.tzinfo, utc2);
+    const local2 = getLocalComponents(this.tzinfo.identifier, utc2);
 
     if (
       local2.year === year &&
@@ -1032,8 +1186,14 @@ export class TimeZone {
   get utcOffset(): number {
     if (this.#utcOffset !== null) return this.#utcOffset;
     const now = new Date();
-    const jan = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 0, 1)).utcOffsetSeconds;
-    const jul = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 6, 1)).utcOffsetSeconds;
+    const jan = getZoneInfo(
+      this.tzinfo.identifier,
+      new Date(now.getFullYear(), 0, 1),
+    ).utcOffsetSeconds;
+    const jul = getZoneInfo(
+      this.tzinfo.identifier,
+      new Date(now.getFullYear(), 6, 1),
+    ).utcOffsetSeconds;
     return Math.min(jan, jul);
   }
 
@@ -1041,7 +1201,7 @@ export class TimeZone {
    * UTC offset at a specific instant.
    */
   utcOffsetAt(date: Date | Temporal.Instant): number {
-    return getZoneInfo(this.tzinfo, toDate(date)).utcOffsetSeconds;
+    return getZoneInfo(this.tzinfo.identifier, toDate(date)).utcOffsetSeconds;
   }
 
   /**
@@ -1081,24 +1241,14 @@ export class TimeZone {
    * lives here.
    */
   abbr(time: Date | Temporal.Instant): string {
-    return getZoneInfo(this.tzinfo, toDate(time)).abbreviation;
+    return this.tzinfo.abbr(time);
   }
 
   /**
    * Whether DST is in effect at the given instant.
    */
   isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
-    // Compare offset at this date vs January (standard time for Northern hemisphere)
-    // and July (standard time for Southern hemisphere). If current offset differs
-    // from the minimum offset, DST is in effect.
-    const d = toDate(date);
-    const jan = new Date(d.getFullYear(), 0, 1);
-    const jul = new Date(d.getFullYear(), 6, 1);
-    const janOffset = getZoneInfo(this.tzinfo, jan).utcOffsetSeconds;
-    const julOffset = getZoneInfo(this.tzinfo, jul).utcOffsetSeconds;
-    const currentOffset = getZoneInfo(this.tzinfo, d).utcOffsetSeconds;
-    const standardOffset = Math.min(janOffset, julOffset);
-    return currentOffset !== standardOffset;
+    return this.tzinfo.isDst(date);
   }
 
   /**
@@ -1107,7 +1257,44 @@ export class TimeZone {
    * `dst?` / `observed_utc_offset` / `abbreviation` off.
    */
   periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
-    return new TimezonePeriod(this.abbr(date), this.utcOffsetAt(date), this.isDst(date));
+    return this.tzinfo.periodForUtc(date);
+  }
+
+  /**
+   * `period_for_local(time, dst = true)` (time_zone.rb:559-561) —
+   * `tzinfo.period_for_local(time, dst) { |periods| periods.last }`: the block
+   * settles an ambiguous local time `dst` could not, by taking the last period.
+   */
+  periodForLocal(time: Date | Temporal.Instant, dst: boolean | null = true): TimezonePeriod {
+    return this.tzinfo.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
+  }
+
+  /** `periods_for_local(time)` (time_zone.rb:563-565). */
+  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
+    return this.tzinfo.periodsForLocal(time);
+  }
+
+  /**
+   * `utc_to_local(time)` (time_zone.rb:541-546). As of tzinfo 2,
+   * `tzinfo.utc_to_local` returns a time carrying a non-zero UTC offset — a
+   * `Temporal.ZonedDateTime` here. The
+   * `ActiveSupport.utc_to_local_returns_utc_offset_times` arm hands that back
+   * as is; the legacy arm rebuilds `Time.utc(...)` from its parts, which is a
+   * `Date` whose UTC fields carry the local wall clock.
+   */
+  utcToLocal(time: Date | Temporal.Instant): Temporal.ZonedDateTime | Date {
+    const t = this.tzinfo.utcToLocal(time);
+    return utcToLocalReturnsUtcOffsetTimes()
+      ? t
+      : new Date(Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute, t.second, t.millisecond));
+  }
+
+  /**
+   * Adjust the given time to the simultaneous time in UTC
+   * (`local_to_utc`, time_zone.rb:550-552) — `tzinfo.local_to_utc(time, dst)`.
+   */
+  localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
+    return this.tzinfo.localToUtc(time, dst);
   }
 
   /**
@@ -1190,7 +1377,7 @@ export class TimeZone {
    * Whether this timezone matches a given identifier.
    */
   match(identifier: string): boolean {
-    return this.name === identifier || this.tzinfo === identifier;
+    return this.name === identifier || this.tzinfo.identifier === identifier;
   }
 
   /**
@@ -1279,7 +1466,7 @@ export class TimeZone {
           }
           return memo;
         }
-        return [TimeZone.create(tzId, null, tzId)];
+        return [TimeZone.create(tzId, null, Timezone.get(tzId))];
       })
       .sort((a, b) => a.compareTo(b) ?? 0);
   }
