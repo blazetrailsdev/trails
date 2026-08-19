@@ -7,6 +7,8 @@ import {
   newTime,
   userInputInTimeZone,
 } from "./time-value.js";
+import { DateTimeType } from "../date-time.js";
+import { TimeType } from "../time.js";
 
 // Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
 // (time_value.rb:24-34). Truncation, not rounding — verify each
@@ -129,6 +131,20 @@ describe("fastStringToTime", () => {
   it("normalizes Postgres short offset (+00) to (+00:00)", () => {
     const i = fastStringToTime("2026-04-26 14:23:55.123456+00");
     expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
+  });
+
+  // `value.change(nsec: value.nsec - rounded_off_nsec)` (time_value.rb:31)
+  // operates on `nsec`, which is always in `0...1_000_000_000`, so a pre-1970
+  // instant truncates DOWN the same way a post-1970 one does. `Type::Time` and
+  // `Type::DateTime` both `include Helpers::TimeValue` (time.rb, date_time.rb:47)
+  // and so must agree.
+  it("truncates a pre-1970 sub-second instant on nsec, not toward zero", () => {
+    const inst = Temporal.Instant.from("1969-12-31T23:59:59.123456789Z");
+    const time = new TimeType({ precision: 3 });
+    const dateTime = new DateTimeType({ precision: 3 });
+
+    expect(String(time.serializeCastValue(inst))).toBe("1969-12-31T23:59:59.123Z");
+    expect(String(dateTime.serializeCastValue(inst))).toBe("1969-12-31T23:59:59.123Z");
   });
 });
 

@@ -702,7 +702,7 @@ export function scope(
 
   const targetModel = resolveAssocClass(record, assocName, className);
 
-  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
+  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 

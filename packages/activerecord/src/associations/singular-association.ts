@@ -479,7 +479,7 @@ function _validateHasOnePolymorphicKeys(
   if (!options.as) return;
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
+  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
   if (!Array.isArray(foreignKey) && !(Array.isArray(primaryKey) && !primaryKey.includes("id"))) {

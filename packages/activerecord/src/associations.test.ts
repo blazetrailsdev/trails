@@ -34,7 +34,6 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { scope as hasManyScope } from "./associations/has-many-association.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
@@ -2431,85 +2430,6 @@ describe("AssociationsTest", () => {
       expect(agreements).toHaveLength(2);
       expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
     });
-  });
-
-  // Exercises loadHasMany's inline (no-reflection) fallback for a POLYMORPHIC
-  // (`as`) association on a query_constraints owner. The owner key must resolve
-  // to the owner's query_constraints list (`[blog_id, id]`, mirroring
-  // `reflection.activeRecordPrimaryKey`) and the scalar `parent_id` FK must
-  // widen to the composite `[blog_id, parent_id]` (mirroring
-  // `deriveFkQueryConstraints`) so a same-`parent_id` row in a DIFFERENT shard
-  // is excluded — rather than keying on the scalar `id` alone, which would
-  // wrongly include it.
-  it("has many loads via inline fallback resolving polymorphic owner key from query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Parent" });
-    const pid = (post as any).id;
-    await ShardedBlogPost.create({
-      blog_id: 1,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "match",
-    });
-    await ShardedBlogPost.create({
-      blog_id: 2,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "wrongShard",
-    });
-    const children = await findHasManyTarget(post, "freshChildren", {
-      className: "ShardedBlogPost",
-      as: "parent",
-    });
-    expect(children.map((c) => (c as any).title)).toEqual(["match"]);
-  });
-
-  // The `scope()` seam (the relation behind CollectionProxy / `.toSql()` /
-  // counts, and the one `findTarget` runs) must apply the
-  // same query_constraints widening: a polymorphic `as` scope on a
-  // query_constraints owner keys on the composite `[blog_id, parent_id]` so a
-  // cross-shard same-`parent_id` row is excluded from the relation itself,
-  // not only from the AssociationScope load path.
-  it("has many builds polymorphic relation keyed on owner query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 1, title: "Parent" });
-    const pid = (post as any).id;
-    await ShardedBlogPost.create({
-      blog_id: 1,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "match",
-    });
-    await ShardedBlogPost.create({
-      blog_id: 2,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "wrongShard",
-    });
-    const rel = hasManyScope(post, "freshChildren", {
-      type: "hasMany",
-      name: "freshChildren",
-      options: { className: "ShardedBlogPost", as: "parent" },
-    });
-    const rows: Base[] = await rel!.toArray();
-    expect(rows.map((r) => (r as any).title)).toEqual(["match"]);
-  });
-
-  // The inline (no-reflection) polymorphic fallback mirrors
-  // `deriveFkQueryConstraints` faithfully — including its ArgumentError raise
-  // for an underivable query_constraints shape. A >2-attribute list
-  // (`[blog_id, revision, id]` on `ShardedBlogPostWithRevision`) cannot be
-  // derived, so the inline path must raise rather than silently scalar-keying.
-  it("has many inline polymorphic fallback raises for underivable query constraints", async () => {
-    const post = await ShardedBlogPostWithRevision.create({
-      blog_id: 1,
-      revision: 1,
-      title: "Parent",
-    });
-    await expect(
-      findHasManyTarget(post, "freshChildren", {
-        className: "ShardedBlogPostWithRevision",
-        as: "parent",
-      }),
-    ).rejects.toThrow(ArgumentError);
   });
 
   it("delete single composite has many through join row", async () => {

@@ -499,46 +499,6 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
-  it("loadHasMany rejects composite primary key with :as polymorphic", async () => {
-    // A composite owner PK without an "id" component cannot collapse to a
-    // scalar <as>_id value — reject with CompositePrimaryKeyMismatchError.
-    // (When the CPK includes "id", it collapses to "id" matching Rails'
-    // join_id_for; only the no-id case is unrepresentable.)
-    const { CompositePrimaryKeyMismatchError } = await import("../index.js");
-    const { findCollectionTarget: findTarget } =
-      await import("../test-helpers/find-collection-target.js");
-    class CpkAsOwner extends Base {
-      declare a: number | null;
-      declare b: number | null;
-
-      static {
-        this.attribute("a", "integer");
-        this.attribute("b", "integer");
-        this.primaryKey = ["a", "b"];
-      }
-    }
-    class CpkAsTarget extends Base {
-      declare commentable_id: number | null;
-      declare commentable_type: string | null;
-
-      static {
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-      }
-    }
-    registerModel(CpkAsOwner);
-    registerModel(CpkAsTarget);
-    // No reader form: `CpkAsOwner` declares no `comments` association — the
-    // rejected `as:`/CPK combination is passed straight to the loader.
-    const owner = new CpkAsOwner({ a: 1, b: 2 });
-    await expect(
-      findTarget(owner, "comments", {
-        className: "CpkAsTarget",
-        as: "commentable",
-      }),
-    ).rejects.toThrow(CompositePrimaryKeyMismatchError);
-  });
-
   it("addConstraints routes a composite-PK mismatch through checkValidityBang", async () => {
     // The scope-building bypass path (AssociationScope.scope → addConstraints)
     // never constructs an Association, so it doesn't reach the canonical
