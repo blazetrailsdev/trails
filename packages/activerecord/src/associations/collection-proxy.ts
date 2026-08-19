@@ -227,15 +227,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // object they hold, since `this` is the raw target, not the wrapper.
   private _proxySelf?: this;
 
-  // An `ArgumentError` raised while deriving the has_many foreign key
-  // (e.g. an owner whose `query_constraints` list has >2 attributes, so the FK
-  // is underivable). Rails surfaces this only when the association is *loaded*
-  // (`blog_post.comments.to_a`), not when the proxy is constructed — the
-  // reflection's `foreign_key` is computed lazily inside the scope build that
-  // `load_target` runs. We mirror that: catch the error during construction,
-  // stash it here, and re-throw from the single load chokepoint (`_execLoad`).
-  private _deferredFkError?: Error;
-
   /**
    * Mirrors: ActiveRecord::Associations::CollectionProxy#loaded?
    * (`@association.loaded?`, collection_proxy.rb:53) — the proxy's loadedness is
@@ -574,126 +565,40 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? instance
       : new CollectionAssociation(record, assocDef);
 
-    // Seed the proxy's inherited Relation state so direct Relation calls
-    // (`cp.toSql()`, `cp.where(...)`, `cp.toArray()`) scope to the owner
-    // — matches Rails, where CollectionProxy IS the scoped Relation.
-    //
-    // Non-through path delegates to the `scope()` seam (the same relation
-    // `findTarget` runs, and what `countHasMany()` counts) so CP
-    // gets identical semantics: the relation starts from
-    // `targetModel.all()` (default scope applied), is scope-proxied
-    // (so the definition's scope callbacks can call named scopes / generated
-    // methods on it), and composite-PK mismatches throw
-    // `CompositePrimaryKeyMismatchError`. State is then copied onto
-    // `this` so the inherited Relation methods observe the same scope.
-    //
-    // Through path copies state from `_buildThroughScope()`. Config
-    // errors (missing through assoc, unregistered target model) are
-    // validated upfront; only adapter/schema failures fall to the
-    // fail-closed `_isNone` path.
-    const ctor = record.constructor as typeof Base;
-    // The seeding bangs must land on the proxy's OWN inherited Relation state,
-    // not on the memoized `scope()` the prototype delegation would forward them
-    // to (collection_proxy.rb:1128-1137) — and `scope()` is not even buildable
-    // yet mid-construction. Invoke them through `Relation.prototype` directly.
-    const proxySelf = this as unknown as {
-      initializeCopy: (other: Relation<T>) => void;
-    };
-    const relationProto = Relation.prototype as unknown as {
-      extendingBang: (this: unknown, ...mods: unknown[]) => unknown;
-    };
-    // `none!` reads `where_clause` (query_methods.rb) — a reader delegated to
-    // `scope` — so it is applied to a plain relation and copied onto the
-    // proxy's own inherited state rather than called on the proxy.
-    const seedNone = (): void => {
-      proxySelf.initializeCopy((targetModel as any).all().noneBang() as Relation<T>);
-      // Rails never sets `@none` on a CollectionProxy: `none!` is one of the
-      // methods delegated to `scope` (collection_proxy.rb:1128-1137), so it
-      // flips the SCOPE's flag and the proxy sees the `1=0` only through the
-      // delegated `where_clause` reader. Copying the seed's predicates onto our
-      // own inherited state must not also copy that flag, or the inherited
-      // `update_all`'s `return 0 if @none` (relation.rb:1013) — and every other
-      // `@none` short-circuit — fires on the proxy itself.
-      (this as unknown as { _isNone: boolean })._isNone = false;
-    };
-    if (assocDef.options.through) {
-      // Config validation FIRST, outside the try — missing through
-      // association or unregistered target model are deterministic
-      // bugs that must surface immediately, not silently fall to
-      // `_isNone`. The try only wraps the schema/adapter-dependent
-      // parts (join resolution, subquery build).
-      const ownerAssociations: AssociationDefinition[] =
-        (ctor as unknown as { _associations?: AssociationDefinition[] })._associations ?? [];
-      const throughAssoc = ownerAssociations.find((a) => a.name === assocDef.options.through);
-      if (!throughAssoc) {
-        throw new ConfigurationError(
-          `Through association "${assocDef.options.through}" not found on ${ctor.name}`,
-        );
-      }
-      // No try/catch: if `_buildThroughScope()` throws, the caller
-      // sees the real error (composite-PK mismatch, join resolution
-      // failure, etc.) instead of a silently `none`-coerced proxy.
-      // Previous fail-closed catch swallowed deterministic config
-      // errors — worse than letting construction fail.
-      const throughRel = this._buildThroughScope() as Relation<T>;
-      proxySelf.initializeCopy(throughRel);
-    } else {
-      // Build via the `scope()` seam so CP's inherited Relation
-      // state matches `scope()` / direct Relation callers: default
-      // scope from `targetModel.all()` is applied, the relation is
-      // scope-proxied (so the definition's scope can call named scopes /
-      // generated methods on it), and composite-PK validation runs.
-      // Then `initializeCopy` onto `this`. Missing owner PK →
-      // `_isNone = true` (Rails' NullRelation fallback).
-      // `scope()` derives the foreign key, which can raise a
-      // `ArgumentError` when the owner's `query_constraints` make the FK
-      // underivable. Rails defers that error to load time (the FK is computed
-      // lazily inside `load_target`'s scope build), so catch it here, seed a
-      // none relation to keep construction valid, and re-throw on load via
-      // `_execLoad`. Other errors (composite-PK mismatch guards, etc.) still
-      // surface eagerly — they are not part of Rails' lazy-FK contract.
-      let seedRel: Relation<T> | null;
-      try {
-        seedRel = hasManyScope(record, assocName, assocDef) as Relation<T> | null;
-      } catch (err) {
-        if (err instanceof ArgumentError) {
-          this._deferredFkError = err;
-          seedNone();
-          seedRel = null;
+    // `extensions = association.extensions; extend(*extensions) if extensions.any?`
+    // (collection_proxy.rb:35-37). Ruby's `extend` mixes the modules into this
+    // object only — it does NOT touch relation state; the scope gets the same
+    // modules independently through `scope.extending! reflection.extensions`
+    // (association_scope.rb:28), which is what carries them onto chained
+    // relations. So the TS spelling of `extend` is a method copy onto the
+    // instance.
+    const extensions = this._targetAssociation.extensions;
+    if (extensions.length > 0) {
+      // `self` inside an extension body is the extended proxy, which answers a
+      // named scope through `method_missing` (`has_many :comments do; def
+      // newest; created.last; end; end`). The trails equivalent of that lookup
+      // is the scope proxy, so extension methods bind to the wrapped proxy.
+      const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
+      for (const mod of extensions) {
+        if (typeof mod === "function") {
+          (mod as (rel: unknown) => void)(wrapped);
         } else {
-          throw err;
+          for (const [name, fn] of Object.entries(
+            mod as Record<string, (...args: unknown[]) => unknown>,
+          )) {
+            (this as unknown as Record<string, unknown>)[name] = fn.bind(wrapped);
+          }
         }
       }
-      if (seedRel === null) {
-        if (this._deferredFkError === undefined) {
-          seedNone();
-        }
-      } else {
-        proxySelf.initializeCopy(seedRel);
-      }
-    }
-
-    // Apply the `extend:` option — mirrors Rails
-    // `CollectionProxy#initialize`, which does `extend(*extensions)` with
-    // `association.extensions` (`reflection.extensions` =
-    // `Array(options[:extend])`). Routing through `extendingBang` (rather
-    // than binding methods directly onto the instance) records the
-    // modules in `extendingValues`, so extension methods survive every spawned
-    // scope (`owner.things.where(...).fooExtension()`) via the rebinding
-    // in `initializeCopy`.
-    const ext = assocDef.options.extend;
-    if (ext) {
-      const extensions = Array.isArray(ext) ? ext : [ext];
-      relationProto.extendingBang.call(this, ...extensions);
     }
   }
 
   /**
    * Shared execution core for `toArray()` and `load()`. Routes both the
    * unmutated and mutated (whereBang / orderBang / ...) proxy through a
-   * single `findTarget` call. When the proxy state has diverged from the
-   * seed, a `queryExecutor` callback is passed so `findTarget` skips cache
-   * and scope rebuild and runs the mutated Relation directly — mirrors Rails'
+   * single `findTarget` call. A mutating bang lands on the memoized `scope`
+   * (collection_proxy.rb:1128-1137), so `findTarget` picks the mutation up
+   * from the scope rebuild — mirrors Rails'
    * `CollectionProxy → AssociationRelation#exec_queries → loadTarget` path
    * which always routes through the OO association regardless of scope state.
    *
@@ -702,10 +607,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * applies `strict_loading_value` after `set_strict_loading` per record).
    */
   private async _execLoad(): Promise<T[]> {
-    // Re-throw a foreign-key derivation error deferred from construction, so
-    // the underivable-FK `ArgumentError` surfaces at load time (Rails'
-    // `load_target`), not when the proxy was built.
-    if (this._deferredFkError !== undefined) throw this._deferredFkError;
     const results = (await this._findTargetViaAssociation()) as T[];
     this._cascadeStrictLoading(results);
     // Relation's strict_loading wins over cascade — applied last to match
@@ -1425,7 +1326,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (typeof assocInstance.resetScope === "function") {
         assocInstance.resetScope();
       }
-      assocInstance._namedScopeRelations = undefined;
     }
   }
 
@@ -1928,47 +1828,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
-    // Drop the OO association's memoized named-scope relations (Rails'
-    // `reset_scope`) so the next `things.someScope()` rebuilds. Only an
-    // already-built instance can hold a cache, so don't construct one here.
-    const assoc = (this._record as any)._associationInstances?.get(this._assocName) as
-      | { _namedScopeRelations?: Map<string, unknown> }
-      | undefined;
-    if (assoc) assoc._namedScopeRelations = undefined;
     this.resetScope();
     return this;
-  }
-
-  /**
-   * Build (or return the memoized) named-scope relation for `name`. This memo
-   * is trails-specific (RFC 0030): Rails' `scope :name` rebuilds a fresh
-   * relation on every call (named.rb:174-178) — it does NOT cache the named-
-   * scope return value (only `@association_scope` inside `Association#scope` is
-   * memoized). We cache per scope name so two consecutive zero-arg calls within
-   * one association load return the same object. The cache lives on the OO
-   * `CollectionAssociation` so a reset driven through
-   * `owner.association(:things)` invalidates it even though the proxy and the
-   * association are distinct objects here. Only zero-arg scope calls are
-   * memoized — arg'd calls vary per invocation and rebuild fresh, sidestepping
-   * any need to key on (potentially unserializable) arguments. The memo is safe
-   * because the underlying `scope()` is stable within one load: every owner-
-   * state change that would alter it (reload / insert / remove / destroy_all /
-   * delete_all / reset) routes through `CollectionAssociation#reset`, which
-   * clears this cache.
-   * @internal
-   */
-  _cachedNamedScopeRelation(name: string, args: unknown[]): unknown {
-    if (args.length > 0) {
-      return (this.scope() as Record<string, (...a: unknown[]) => unknown>)[name](...args);
-    }
-    const assoc = this._record.association(this._assocName) as unknown as {
-      _namedScopeRelations?: Map<string, unknown>;
-    };
-    const cache = (assoc._namedScopeRelations ??= new Map());
-    if (cache.has(name)) return cache.get(name);
-    const built = (this.scope() as Record<string, () => unknown>)[name]();
-    cache.set(name, built);
-    return built;
   }
 
   /**
