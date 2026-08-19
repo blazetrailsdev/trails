@@ -1039,20 +1039,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Owner FK column(s) from the reflection, which derives them from the class
-   * that *declared* the association (`reflection.active_record`), not the owner
-   * instance's class. For an STI subclass owner (e.g. a `SpecialPost` whose
-   * `has_many :special_comments` is declared on `Post`) this yields `post_id`,
-   * not `special_post_id` — mirrors Rails `reflection.foreign_key`. Returns
-   * undefined for anonymous inline associations with no registered reflection,
-   * so callers fall back to the owner-class derivation.
-   * @internal
-   */
-  private _reflectionForeignKey(): string | string[] | undefined {
-    return this.reflection.foreignKey ?? undefined;
-  }
-
-  /**
    * Bulk insert/upsert through a collection association. Mirrors
    * ActiveRecord::AssociationRelation, which guards `insert`, `insert_all`,
    * `insert!`, `insert_all!`, `upsert`, and `upsert_all`: when the
