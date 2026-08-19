@@ -176,10 +176,7 @@ export class HasOneAssociation extends SingularAssociation {
 
       case "nullify":
         if (target.isPersisted()) {
-          this.nullifyOwnerAttributes(target);
-          if (typeof (target as any).save === "function") {
-            await (target as any).save();
-          }
+          await (target as any).updateColumns(nullifiedOwnerAttributes(this));
         }
         break;
 
