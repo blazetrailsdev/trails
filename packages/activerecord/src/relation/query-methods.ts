@@ -330,7 +330,6 @@ interface QueryMethodsHost {
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
   _rawOrderClauses: string[];
-  _distinctOnColumns: string[];
   _isNone: boolean;
   _joinClauses: Array<{
     type: "inner" | "left";
