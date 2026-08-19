@@ -396,11 +396,29 @@ use `include()` / `Included<>` from `@blazetrails/activesupport`. See
 
 When NOT to use this:
 
-- Ruby lifecycle hooks (`extended`, `included`, `inherited`) — no TS
-  equivalent. Don't stub them; add them to a `SKIP_GROUPS` entry (with a
-  reason) in `scripts/parity/conventions.ts`.
+- A **string-named** `extended` / `included` / `inherited` method. Those names
+  are Ruby lifecycle hooks; a TS method spelled that way is drift, not a
+  mirror, which is why `SKIP_GROUPS` in `scripts/parity/conventions.ts` marks
+  them `tsMirrorIsDrift: true` and `parity:api:extra` keeps flagging them.
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
+
+`included` and `extended` themselves **do** have a TS equivalent, and the
+sentence above is only about the spelling. `include()` / `extend()` fire
+callbacks keyed by the exported `included` / `extended` symbols
+(`Symbol.for("@blazetrails/activesupport:included")`, see
+`activesupport/src/include.ts`), which is how you port an
+`included do ... end` block. Because they are symbol-keyed they are not public
+string-named members, so they never collide with the `SKIP_GROUPS` entry above.
+Only `inherited` has no equivalent — JS has no hook that fires when a subclass
+is defined, so its Rails semantics have to be deferred some other way.
+
+The class-method half of a Concern is `extend()` / `Extended<>`, the mirror of
+Ruby `extend SomeModule` — reach for it instead of hand-assigning
+`static x = x` onto the class. And an `included do class_attribute :foo ... end`
+is `classAttribute()` from `@blazetrails/activesupport`, which already gives
+Rails' semantics (reads walk the constructor chain, writes are local to the
+class); do not hand-roll copy-on-first-write per call site.
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 
