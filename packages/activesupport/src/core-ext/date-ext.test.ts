@@ -341,8 +341,12 @@ describe("DateExtCalculationsTest", () => {
 
   it("xmlschema when zone is set", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
-    expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00-05:?00$/);
-    expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00-04:?00$/);
+    try {
+      expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00-05:?00$/);
+      expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00-04:?00$/);
+    } finally {
+      setZone(null);
+    }
   });
 
   // Rails stubs `Date.current` to 2000-01-01 and reads the day before, the day

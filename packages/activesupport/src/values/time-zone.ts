@@ -1384,7 +1384,10 @@ export class TimeZone {
     return (
       re === this.name ||
       re === MAPPING[this.name] ||
-      (re instanceof RegExp && (re.test(this.name) || re.test(MAPPING[this.name])))
+      (re instanceof RegExp &&
+        // `Regexp#match?(nil)` is false in Ruby; `RegExp#test` coerces
+        // `undefined` to the string "undefined" and would match on it.
+        (re.test(this.name) || (MAPPING[this.name] != null && re.test(MAPPING[this.name]))))
     );
   }
 
