@@ -2,7 +2,11 @@ import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
-import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
+import {
+  queryConstraintsList,
+  incrementBang as persistenceIncrementBang,
+  _updateRecord as persistenceUpdateRecord,
+} from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import { reloadSchemaFromCache } from "../model-schema.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
@@ -80,6 +84,19 @@ function buildBaseConstraints(
 
 const DEFAULT_LOCKING_COLUMN = "lock_version";
 
+/** Receiver shape Locking::Optimistic's instance methods read. */
+interface LockingRecord {
+  constructor: { lockingEnabled: boolean; lockingColumn: string };
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+  clearAttributeChange(name: string): void;
+}
+
+/** Mirrors: ActiveRecord::Locking::Optimistic#locking_enabled? (optimistic.rb:59-61) */
+export function lockingEnabled(this: LockingRecord): boolean {
+  return this.constructor.lockingEnabled;
+}
+
 interface LockingHost {
   _lockingColumn: string;
   lockOptimistically?: boolean;
@@ -90,20 +107,27 @@ interface LockingHost {
 }
 
 /**
- * Mirrors: ActiveRecord::Locking::Optimistic#increment!
+ * Mirrors: ActiveRecord::Locking::Optimistic#increment! (optimistic.rb:63-70)
+ *
+ * `super.tap { ... }` — Persistence#increment! runs first, then the locking
+ * arm bumps the in-memory lock_version and rebinds its dirty baseline so the
+ * next save() doesn't re-persist it. trails has no cross-mixin `super`, so the
+ * Persistence body is invoked by name; `include()` orders this override last.
  */
 export async function incrementBang(
-  this: {
-    increment(attr: string, by?: number): any;
-    updateColumn(attr: string, value: unknown): Promise<any>;
-    readAttribute(attr: string): unknown;
-  },
-  attribute: string,
-  by: number = 1,
-): Promise<any> {
-  this.increment(attribute, by);
-  await this.updateColumn(attribute, this.readAttribute(attribute));
-  return this;
+  this: LockingRecord & { lockingEnabled(): boolean },
+  ...args: Parameters<typeof persistenceIncrementBang>
+): Promise<unknown> {
+  const result = await (persistenceIncrementBang as (...a: unknown[]) => Promise<unknown>).apply(
+    this,
+    args,
+  );
+  if (this.lockingEnabled()) {
+    const lockingColumn = this.constructor.lockingColumn;
+    this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn)) + 1);
+    this.clearAttributeChange(lockingColumn);
+  }
+  return result;
 }
 
 /**
@@ -335,6 +359,8 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Typ
 }
 
 export const InstanceMethods = {
+  lockingEnabled,
+  incrementBang,
   _lockValueForDatabase,
   _clearLockingColumn,
   _queryConstraintsHash,

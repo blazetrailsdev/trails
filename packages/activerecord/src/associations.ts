@@ -1983,38 +1983,6 @@ function wrapCollectionProxy<T extends Base = Base>(
 }
 
 /**
- * Sync a record's optimistic lock column in memory after a counter-cache UPDATE
- * advanced it in the database. Uses `writeFromDatabase` so the new value is a
- * clean, DB-sourced attribute (not dirty, not diffed against a stale baseline).
- *
- * Coupling note: callers invoke this immediately after `parent.incrementBang(...)`.
- * The wired instance `incrementBang` is `Persistence#incrementBang`
- * (`persistence.ts`, registered in `base.ts`), which persists via
- * `this.constructor.updateCounters` → the `Locking::Optimistic#updateCounters`
- * override that merges `locking_column => 1` into the DB statement — and it does
- * NOT write `lock_version` into memory (it only clears the counter column's
- * change). So this +1 is the sole in-memory lock write and exactly mirrors the
- * DB. (The separate `Locking::Optimistic#incrementBang` in `locking/optimistic.ts`,
- * which uses `updateColumn` and would bypass that override, is intentionally not
- * wired for instance dispatch; if a future change routes instance dispatch
- * through it, the DB bump disappears and this sync must be revisited.)
- *
- * @internal No Rails counterpart. Rails never needs an in-memory
- * `lock_version` sync here: `Locking::Optimistic#update_counters` merges the
- * locking-column bump into the same UPDATE, and the in-memory record is
- * reconciled by the `_update_record` lock-version write rather than by a
- * separate reflect step. This function only exists to close the in-memory gap
- * described above and has no Rails method to converge onto.
- */
-export function reflectLockVersionBump(record: Base): void {
-  const ctor = record.constructor as typeof Base;
-  if (!ctor.lockingEnabled) return;
-  const lc = ctor.lockingColumn;
-  const bumped = (Number((record as any).readAttribute?.(lc)) || 0) + 1;
-  (record as any)._attributes?.writeFromDatabase(lc, bumped);
-}
-
-/**
  * Per-instance association-cache reset hook. Rails initializes
  * `@association_cache = {}` here; our equivalents are pre-allocated by the
  * `Base` class fields, so this only needs to clear them when called on an

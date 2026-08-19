@@ -274,7 +274,12 @@ export class DirtyTracker {
    * of `[originalFromFirstSnapshot, next]`.
    *
    * Mirrors: ActiveModel::Dirty#clear_attribute_change
-   * -> `mutation_tracker.forget_change(name)`.
+   * -> `mutation_tracker.forget_change(name)`, whose body is
+   * `attributes[name] = attributes[name].forgetting_assignment`
+   * (attribute_mutation_tracker.rb:33-35) — so the assigned value becomes the
+   * new from-database seat and `original_value_for_database` moves with it, not
+   * just the dirty baseline. A plain-Map baseline carries no Attribute to
+   * forget.
    *
    * @internal
    */
@@ -310,6 +315,10 @@ export class DirtyTracker {
     } else {
       this._originalAttributes.delete(name);
       this._originalHas.delete(name);
+    }
+    const forgetful = attributes as { forgetAttributeAssignment?: (n: string) => void };
+    if (typeof forgetful.forgetAttributeAssignment === "function") {
+      forgetful.forgetAttributeAssignment(name);
     }
   }
 

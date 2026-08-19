@@ -1,6 +1,5 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
@@ -426,11 +425,6 @@ export class BelongsToAssociation extends SingularAssociation {
     const target = this.target as any;
     if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
       await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
-      // The counter UPDATE advanced the target's lock_version in the DB; sync it
-      // on the in-memory record so a read without a reload sees it and it isn't
-      // left dirty (Rails keeps the loaded record consistent with the row it
-      // just wrote).
-      reflectLockVersionBump(target as Base);
       return;
     }
 
