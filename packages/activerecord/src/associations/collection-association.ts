@@ -60,18 +60,6 @@ export class CollectionAssociation extends Association {
   // CollectionProxy through-branch reads this to avoid pruning its loaded
   // target when the removal was actually aborted. Read externally by the proxy.
   _lastRemoveAborted = false;
-  // trails-specific (RFC 0030): memoized named-scope relations built off the
-  // proxy (`things.someScope()`). Rails has NO such cache — `scope :name`
-  // rebuilds a fresh relation on every call (named.rb:174-178), so two
-  // consecutive `things.someScope()` are distinct objects there. We memoize per
-  // scope name so they're identical within one association load, which is what
-  // gives `named_scoping_test`'s post-reset `assert_not_same` real teeth. Held
-  // on the association (not the proxy) so a reset driven through
-  // `owner.association(:things)` clears it; invalidated by `reset` (reset /
-  // destroy_all / delete_all / reload / insert / remove). Read/written by
-  // `CollectionProxy`.
-  _namedScopeRelations?: Map<string, unknown>;
-
   /**
    * Mirrors: `CollectionAssociation#callback` / `#callbacks_for`
    * (collection_association.rb:492-505) — instance methods on the association,
@@ -355,11 +343,6 @@ export class CollectionAssociation extends Association {
     // members by identity.
     this._replacedOrAddedTargets = new Set<Base>();
     this._associationIds = null;
-    // Drop the trails-specific named-scope memo (see `_namedScopeRelations`) so
-    // the next `things.someScope()` rebuilds against the reset collection. (This
-    // sits alongside Rails' `reset`, which clears @target/@association_ids; the
-    // named-scope cache itself has no Rails counterpart.)
-    this._namedScopeRelations = undefined;
   }
 
   /**

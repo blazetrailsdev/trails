@@ -1491,6 +1491,16 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.options;
   }
 
+  // `extensions` is in `AssociationReflection.public_instance_methods`, so
+  // ThroughReflection's blanket `delegate(*delegate_methods, to:
+  // :delegate_reflection)` (reflection.rb:1221-1225) routes it to the delegate.
+  // This is how a HABTM's `extend:` — forwarded onto the generated
+  // `has_many :through` (associations.rb:1900) — reaches
+  // `Association#extensions` (association.rb:170).
+  extensions(): any[] {
+    return this.delegateReflection.extensions();
+  }
+
   // Rails ThroughReflection delegates `autosave=` to the delegate reflection
   // (delegate_methods), where the setter writes `options[:autosave]`. Mirror it
   // so `accepts_nested_attributes_for` on a HABTM/through association flips
