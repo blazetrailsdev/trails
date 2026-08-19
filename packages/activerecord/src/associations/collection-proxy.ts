@@ -62,6 +62,8 @@ import {
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
 import { scope as hasManyScope, setDifference, setIntersection } from "./has-many-association.js";
+import { QueryMethodBangs } from "../relation/query-methods.js";
+import { SpawnMethods } from "../relation/spawn-methods.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -2499,112 +2501,85 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   ]
 //   delegate(*delegate_methods, to: :scope)
 //
-// trails mixes QueryMethods / SpawnMethods into `Relation` itself rather than
-// keeping them as standalone modules, so their `public_instance_methods(false)`
-// can't be reflected off a module object — the two name lists below stand in for
-// that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
-// Both halves of each module are listed: `public_instance_methods(false)` includes
-// the bang builders (`where!`, `limit!`, `none!`, …), so Rails delegates those to
-// `scope` too — a Rails `CollectionProxy` owns no relation state of its own. The
-// constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
-// prototype delegation is consulted only in the sense that they must target the
-// proxy's inherited state, so they are invoked through `Relation.prototype`
-// directly (see the ctor).
-const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "includes",
-  "all",
-  "eagerLoad",
-  "preload",
-  "extractAssociated",
-  "references",
-  "select",
-  "with",
-  "withRecursive",
-  "reselect",
-  "group",
-  "regroup",
-  "order",
-  "inOrderOf",
-  "reorder",
-  "unscope",
-  "joins",
-  "leftOuterJoins",
-  "where",
-  "rewhere",
-  "invertWhere",
-  "structurallyCompatible",
-  "and",
-  "or",
-  "having",
-  "limit",
-  "offset",
-  "lock",
-  "none",
-  "isNullRelation",
-  "readonly",
-  "strictLoading",
-  "createWith",
-  "from",
-  "distinct",
-  "extending",
-  "optimizerHints",
-  "reverseOrder",
-  "annotate",
-  "excluding",
-  "arel",
-  "constructJoinDependency",
-  // The bang half of `QueryMethods.public_instance_methods(false)`
-  // (query_methods.rb) — Rails delegates these to `scope` as well.
-  "includesBang",
-  "eagerLoadBang",
-  "preloadBang",
-  "referencesBang",
-  "selectBang",
-  "withBang",
-  "withRecursiveBang",
-  "reselectBang",
-  "groupBang",
-  "regroupBang",
-  "orderBang",
-  "reorderBang",
-  "unscopeBang",
-  "joinsBang",
-  "leftOuterJoinsBang",
-  "whereBang",
-  "rewhereBang",
-  "invertWhereBang",
-  "havingBang",
-  "limitBang",
-  "offsetBang",
-  "lockBang",
-  "noneBang",
-  "nullBang",
-  "readonlyBang",
-  "strictLoadingBang",
-  "createWithBang",
-  "fromBang",
-  "distinctBang",
-  "extendingBang",
-  "optimizerHintsBang",
-  "reverseOrderBang",
-  "annotateBang",
-  "excludingBang",
-  "uniqBang",
-  "skipQueryCacheBang",
-  "skipPreloadingBang",
-  "andBang",
-  "orBang",
-] as const;
+// trails mixes `QueryMethods` and `SpawnMethods` into `Relation` as standalone
+// mixin objects (`QueryMethodBangs`, `SpawnMethods` — relation.ts:3624-3628),
+// so `Object.keys()` on those objects IS `public_instance_methods(false)`:
+// see `QUERY_METHODS_PUBLIC_INSTANCE_METHODS` and
+// `SPAWN_METHODS_PUBLIC_INSTANCE_METHODS` below. `public_instance_methods(false)`
+// includes the bang builders (`where!`, `limit!`, `none!`, …), so Rails
+// delegates those to `scope` too — a Rails `CollectionProxy` owns no relation
+// state of its own. The constructor's own seeding calls (`noneBang` /
+// `extendingBang`) run BEFORE the prototype delegation is consulted only in
+// the sense that they must target the proxy's inherited state, so they are
+// invoked through `Relation.prototype` directly (see the ctor).
+//
+// `QueryMethodBangs`' keys also carry `query_methods.rb`'s `protected` and
+// `private` sections (the `build_*` / `arel_column*` / order-parsing helpers,
+// plus `async`, `async!`, `assert_modifiable!`, `check_if_method_has_arguments!`)
+// — those are excluded here by name since neither is in
+// `public_instance_methods(false)`.
+const QUERY_METHODS_NON_PUBLIC_INSTANCE_METHODS = new Set<keyof typeof QueryMethodBangs>([
+  "async",
+  "asyncBang",
+  "assertModifiableBang",
+  "checkIfMethodHasArgumentsBang",
+  "buildSubquery",
+  "buildWhereClause",
+  "buildHavingClause",
+  "arelColumns",
+  "buildNamedBoundSqlLiteral",
+  "buildBoundSqlLiteral",
+  "lookupTableKlassFromJoinDependencies",
+  "eachJoinDependencies",
+  "buildJoinDependencies",
+  "buildArel",
+  "buildCastValue",
+  "buildFrom",
+  "selectNamedJoins",
+  "selectAssociationList",
+  "buildJoinBuckets",
+  "buildJoins",
+  "buildSelect",
+  "buildWith",
+  "buildWithValueFromHash",
+  "buildWithExpressionFromValue",
+  "buildWithJoinNode",
+  "arelColumnsFromHash",
+  "arelColumnWithTable",
+  "arelColumn",
+  "isTableNameMatches",
+  "reverseSqlOrder",
+  "isDoesNotSupportReverse",
+  "buildOrder",
+  "validateOrderArgs",
+  "flattenedArgs",
+  "preprocessOrderArgs",
+  "sanitizeOrderArguments",
+  "columnReferences",
+  "extractTableNameFrom",
+  "orderColumn",
+  "buildCaseForValuePosition",
+  "resolveArelAttributes",
+  "processSelectArgs",
+  "arelColumnAliasesFromHash",
+  "processWithArgs",
+  "structurallyIncompatibleValuesFor",
+]);
 
-const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "spawn",
-  "merge",
-  "mergeBang",
-  "except",
-  "only",
-] as const;
+/** @internal */
+export const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = (
+  Object.keys(QueryMethodBangs) as (keyof typeof QueryMethodBangs)[]
+).filter((name) => !QUERY_METHODS_NON_PUBLIC_INSTANCE_METHODS.has(name));
 
-const delegateMethods = (
+// `SpawnMethods.public_instance_methods(false)` (spawn_methods.rb), derived
+// from `SpawnMethods`' own keys. `relation_with` is `private`
+// (spawn_methods.rb:71) so it is excluded from `public_instance_methods(false)`.
+const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = (
+  Object.keys(SpawnMethods) as (keyof typeof SpawnMethods)[]
+).filter((name) => name !== "relationWith");
+
+/** @internal */
+export const delegateMethods = (
   [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]
 )
   .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
