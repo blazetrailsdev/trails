@@ -6,11 +6,7 @@ import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
 
-// Rails' private `store` reader is
-// `IsolatedExecutionState[:active_support_execution_context] ||= {}`
-// (execution_context.rb:47-49) — the context is per-execution state, not a
-// process global.
-/** @internal */
+/** Mirrors ActiveSupport::ExecutionContext.store (execution_context.rb:47-49). @internal */
 function store(): Map<string, unknown> {
   return IsolatedExecutionState.fetch(
     ACTIVE_SUPPORT_EXECUTION_CONTEXT,
@@ -33,19 +29,21 @@ function saveAndApply(
   attrs: Record<string, unknown>,
 ): Map<string, { hadKey: boolean; value: unknown }> {
   const saved = new Map<string, { hadKey: boolean; value: unknown }>();
+  const s = store();
   for (const key of Object.keys(attrs)) {
-    saved.set(key, { hadKey: store().has(key), value: store().get(key) });
-    store().set(key, attrs[key]);
+    saved.set(key, { hadKey: s.has(key), value: s.get(key) });
+    s.set(key, attrs[key]);
   }
   return saved;
 }
 
 function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void {
+  const s = store();
   for (const [key, entry] of saved) {
     if (entry.hadKey) {
-      store().set(key, entry.value);
+      s.set(key, entry.value);
     } else {
-      store().delete(key);
+      s.delete(key);
     }
   }
 }
