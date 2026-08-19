@@ -678,13 +678,11 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 export function hasTransactionalCallbacks(this: Base): boolean {
   const proto = (this.constructor as any).prototype;
   const rollback = asPeekCallbackChain(proto, "rollback");
+  if (rollback && !rollback.isEmpty) return true;
   const commit = asPeekCallbackChain(proto, "commit");
+  if (commit && !commit.isEmpty) return true;
   const beforeCommitChain = asPeekCallbackChain(proto, "before_commit");
-  return (
-    !(rollback == null || rollback.isEmpty) ||
-    !(commit == null || commit.isEmpty) ||
-    !(beforeCommitChain == null || beforeCommitChain.isEmpty)
-  );
+  return !!(beforeCommitChain && !beforeCommitChain.isEmpty);
 }
 
 // ---------------------------------------------------------------------------
