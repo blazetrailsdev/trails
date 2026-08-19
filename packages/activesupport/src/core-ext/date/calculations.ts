@@ -18,22 +18,8 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
+import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
-
-/**
- * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
- * (`core_ext/date_and_time/calculations.rb:8-16`) — the week-start day names
- * `Date.beginning_of_week=` validates against.
- */
-const DAYS_INTO_WEEK: Record<string, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-};
 
 const BEGINNING_OF_WEEK = "beginning_of_week";
 

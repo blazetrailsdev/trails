@@ -66,21 +66,16 @@ describe("AttributeAssignmentTest", () => {
 
   it("assign non-existing attribute by overriding #attribute_writer_missing", () => {
     class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-      _customAttrs: Record<string, unknown> = {};
-      writeAttribute(name: string, value: unknown): void {
-        if (!(this.constructor as typeof Model)._attributeDefinitions.has(name)) {
-          this._customAttrs[name] = value;
-        } else {
-          super.writeAttribute(name, value);
-        }
+      assignedAttributes: Record<string, unknown> = {};
+      override attributeWriterMissing(name: string, value: unknown): void {
+        this.assignedAttributes[name] = value;
       }
     }
-    const p = new Person({});
-    p.assignAttributes({ unknown_field: "hello" });
-    expect(p._customAttrs["unknown_field"]).toBe("hello");
+    const model = new Person({});
+
+    model.assignAttributes({ unknown: "attribute" });
+
+    expect(model.assignedAttributes).toEqual({ unknown: "attribute" });
   });
 
   it("assign private attribute", () => {

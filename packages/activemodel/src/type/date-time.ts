@@ -13,13 +13,16 @@ import { toS } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
-import { fastStringToTime, newTime } from "./helpers/time-value.js";
+import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
+
+  /** Mixed in from Helpers::TimeValue (time_value.rb:24-34). @internal Rails-private helper. */
+  protected applySecondsPrecision = applySecondsPrecision;
 
   /** Mixed in from Helpers::TimeValue (time_value.rb:79-89). @internal Rails-private helper. */
   protected fastStringToTime = fastStringToTime;
@@ -214,49 +217,16 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   /**
-   * Mirrors: Helpers::TimeValue#apply_seconds_precision (time_value.rb:24-34).
-   * `return value unless precision && value.respond_to?(:nsec)` — `Instant` is
-   * the receiver carrying nanoseconds here; everything else passes through.
+   * Mirrors: ActiveModel::Type::Value#changed? (value.rb:84-86) — `old_value !=
+   * new_value`. Ruby's `!=` on a `::Time` is value equality; `!==` on a
+   * `Temporal.Instant` is reference identity, so the receiver's own `equals`
+   * stands in for it.
    */
-  private applySecondsPrecision<T>(value: T): T {
-    if (
-      this.precision == null ||
-      !Number.isInteger(this.precision) ||
-      this.precision < 0 ||
-      this.precision > 9 ||
-      !(value instanceof Temporal.Instant)
-    )
-      return value;
-    const mod = 10n ** BigInt(9 - this.precision);
-    let subsec = value.epochNanoseconds % 1_000_000_000n;
-    if (subsec < 0n) subsec += 1_000_000_000n;
-    const roundedOff = subsec % mod;
-    if (roundedOff === 0n) return value;
-    return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds - roundedOff) as T;
-  }
-
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
     if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
-      return (
-        this._nsAtPrecision(oldValue.epochNanoseconds) !==
-        this._nsAtPrecision(newValue.epochNanoseconds)
-      );
+      return !oldValue.equals(newValue);
     }
     return oldValue !== newValue;
-  }
-
-  // Truncate epoch nanoseconds to column precision, matching applySecondsPrecision /
-  // Temporal.toString() floor-style sub-second truncation. Used by isChanged so that
-  // sub-precision nanosecond noise from Temporal.Now (when precision=null) doesn't
-  // produce spurious dirty marks after serialize → cast round-trips.
-  private _nsAtPrecision(ns: bigint): bigint {
-    const raw = this.precision ?? 6;
-    const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
-    const mod = 10n ** BigInt(9 - p);
-    let subsec = ns % 1_000_000_000n;
-    if (subsec < 0n) subsec += 1_000_000_000n;
-    const roundedOff = subsec % mod;
-    return ns - roundedOff;
   }
 
   /**
@@ -273,7 +243,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return this.serializeCastValue(this.cast(value));
   }
 
-  // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
+  /**
+   * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
+   * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
+   * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by
+   * `serialize-cast-value-drops-is-utc-normalization`.
+   */
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null {
     return this.applySecondsPrecision(value);
   }

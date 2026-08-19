@@ -91,6 +91,7 @@ import {
   attributeMethodPatterns,
   isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
+  type InstanceHost,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -111,7 +112,12 @@ import { FormatValidator } from "./validations/format.js";
 import { AcceptanceValidator } from "./validations/acceptance.js";
 import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
-import { type AttributeDefinition, attribute, setDefineMethodAttribute } from "./attributes.js";
+import {
+  type AttributeDefinition,
+  attribute,
+  matchedAttributeMethod as _matchedAttributeMethod,
+  setDefineMethodAttribute,
+} from "./attributes.js";
 import {
   _defaultAttributes,
   attributeTypes,
@@ -1794,6 +1800,22 @@ export class Model {
    */
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
     return attributeMissing.call(this as Record<string, unknown>, match, ...args);
+  }
+
+  /**
+   * Mirrors: ActiveModel::AttributeMethods#matched_attribute_method
+   * (attribute_methods.rb:530-533) — the pattern lookup `method_missing` uses
+   * to recognize an attribute method that has not been generated.
+   *
+   * @internal Rails-private helper.
+   */
+  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null {
+    return _matchedAttributeMethod.call(this as unknown as InstanceHost, methodName);
+  }
+
+  /** Mirrors: ActiveModel::Attributes `alias :attribute= :_write_attribute` (attributes.rb:159). */
+  "attribute="(name: string, value: unknown): void {
+    this._writeAttribute(name, value);
   }
 
   writeAttribute(name: string, value: unknown): void {

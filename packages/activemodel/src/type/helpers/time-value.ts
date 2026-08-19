@@ -20,13 +20,20 @@ export interface TimeValue {
   applySecondsPrecision<T>(this: TimeValue, value: T): T;
 }
 
-type Roundable<T> = {
-  round: (options: {
-    smallestUnit: "second" | "millisecond" | "microsecond" | "nanosecond";
-    roundingIncrement?: number;
-    roundingMode: "trunc";
-  }) => T;
-};
+/**
+ * Ruby's `apply_seconds_precision` reads `value.nsec` and `value.change(nsec:)`
+ * off the receiver, which is a `::Time`. The port's time receivers are the
+ * Temporal types that carry sub-second fields, so `nsec` and `changeNsec` are
+ * module-private dispatchers over exactly those — everything else is the
+ * `respond_to?(:nsec)` else arm and passes through.
+ */
+type NsecBearing =
+  | Temporal.Instant
+  | Temporal.PlainDateTime
+  | Temporal.ZonedDateTime
+  | Temporal.PlainTime;
+
+const NANOS_PER_SECOND = 1_000_000_000n;
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
@@ -44,52 +51,24 @@ type Roundable<T> = {
  *     end
  *   end
  *
- * Truncates sub-second precision on Temporal types that expose a
- * `round({ smallestUnit, roundingIncrement, roundingMode })` method —
- * Instant, PlainDateTime, PlainTime, and ZonedDateTime. Values without
- * sub-second resolution (PlainDate, primitives) lack `.round` and pass
- * through unchanged.
+ * Ruby needs no guard past `precision` itself: for precision > 9,
+ * `10 ** (9 - precision)` is a Rational, `nsec % (1/10)` is `(0/1)`, and the
+ * `> 0` arm is false, so the value comes back unchanged (verified against
+ * MRI). BigInt exponentiation throws on a negative exponent instead, so the
+ * same answer is reached by an explicit early return.
  */
 export function applySecondsPrecision<T>(this: { precision?: number }, value: T): T {
   const precision = this.precision;
-  if (precision === undefined || precision === null) return value;
-  // Rails' guard only covers nil/falsey precision (and values that do
-  // not respond to `nsec`). This additional pass-through for invalid
-  // numeric precision is trails-specific and preserves the current
-  // behavior instead of coercing to a default — Temporal#round would
-  // otherwise reject a non-integer or out-of-range roundingIncrement.
+  if (precision == null || !respondToNsec(value)) return value;
   if (!Number.isInteger(precision) || precision < 0 || precision > 9) return value;
-  if (value === null || value === undefined) return value;
-  // Temporal types (Instant, PlainDateTime, PlainTime, ZonedDateTime)
-  // expose a `round` method that accepts `roundingIncrement` and
-  // `roundingMode: "trunc"`, which together match Rails' "drop the
-  // insignificant trailing nanos" semantics. Values without `.round`
-  // (PlainDate, primitives) lack sub-second resolution and pass
-  // through unchanged.
-  const roundable = value as unknown as Partial<Roundable<T>>;
-  if (typeof roundable.round !== "function") return value;
-  if (precision >= 9) return value;
-  const opts =
-    precision <= 0
-      ? { smallestUnit: "second" as const, roundingMode: "trunc" as const }
-      : precision <= 3
-        ? {
-            smallestUnit: "millisecond" as const,
-            roundingIncrement: 10 ** (3 - precision),
-            roundingMode: "trunc" as const,
-          }
-        : precision <= 6
-          ? {
-              smallestUnit: "microsecond" as const,
-              roundingIncrement: 10 ** (6 - precision),
-              roundingMode: "trunc" as const,
-            }
-          : {
-              smallestUnit: "nanosecond" as const,
-              roundingIncrement: 10 ** (9 - precision),
-              roundingMode: "trunc" as const,
-            };
-  return (roundable as Roundable<T>).round(opts);
+  const numberOfInsignificantDigits = 9 - precision;
+  const roundPower = 10n ** BigInt(numberOfInsignificantDigits);
+  const roundedOffNsec = nsec(value) % roundPower;
+  if (roundedOffNsec > 0n) {
+    return changeNsec(value, nsec(value) - roundedOffNsec) as T;
+  } else {
+    return value;
+  }
 }
 
 /**
@@ -265,6 +244,41 @@ export function fastStringToTime(this: TimezoneAware | void, s: string): Tempora
   } catch {
     return null;
   }
+}
+
+function respondToNsec(value: unknown): value is NsecBearing {
+  return (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Temporal.PlainTime
+  );
+}
+
+/** `Time#nsec` — the fraction of the second, always in `0...1_000_000_000`. */
+function nsec(value: NsecBearing): bigint {
+  if (value instanceof Temporal.Instant) {
+    return ((value.epochNanoseconds % NANOS_PER_SECOND) + NANOS_PER_SECOND) % NANOS_PER_SECOND;
+  }
+  return (
+    BigInt(value.millisecond) * 1_000_000n +
+    BigInt(value.microsecond) * 1_000n +
+    BigInt(value.nanosecond)
+  );
+}
+
+/** `Time#change(nsec:)` — replaces the sub-second fraction, leaving the second. */
+function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
+  if (value instanceof Temporal.Instant) {
+    return Temporal.Instant.fromEpochNanoseconds(
+      value.epochNanoseconds - nsec(value) + newNsec,
+    ) as T;
+  }
+  return value.with({
+    millisecond: Number(newNsec / 1_000_000n),
+    microsecond: Number((newNsec / 1_000n) % 1_000n),
+    nanosecond: Number(newNsec % 1_000n),
+  }) as T;
 }
 
 export function serializeTimeValue(value: unknown): string | null {

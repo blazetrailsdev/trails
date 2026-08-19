@@ -1,6 +1,5 @@
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { UnknownAttributeError } from "./errors.js";
-import { MissingAttributeError } from "./attribute-methods.js";
 
 interface PermittedAttributes {
   permitted?: boolean | (() => boolean);
@@ -33,37 +32,73 @@ export function _assignAttributes(
   }
 }
 
-/** @internal Rails-private helper. */
+/**
+ * Mirrors: ActiveModel::AttributeAssignment#_assign_attribute
+ * (attribute_assignment.rb:67-75)
+ *
+ *   def _assign_attribute(k, v)
+ *     setter = :"#{k}="
+ *     public_send(setter, v)
+ *   rescue NoMethodError
+ *     if respond_to?(setter)
+ *       raise
+ *     else
+ *       attribute_writer_missing(k.to_s, v)
+ *     end
+ *   end
+ *
+ * There is no `write_attribute` on this path: the only write Rails makes is
+ * `public_send(setter, v)`.
+ *
+ * That send takes two spellings here because one Ruby method name reaches TS
+ * two ways. Rails' generated writer is a real method named `name=`
+ * (attributes.rb:92-102) and is reachable by that key; a user-authored
+ * `def name=` ported as a TS `set` accessor is the same Ruby method under the
+ * spelling docs/ruby-ts-conventions.md gives it, which `findSetter` resolves.
+ * The accessor is tried first because Ruby finds a class's own `name=` before
+ * the generated methods module's.
+ *
+ * Ruby reaches the `rescue NoMethodError` arm through
+ * AttributeMethods#method_missing (attribute_methods.rb:508-517), which routes
+ * a name matching an attribute-method pattern to `attribute_missing` before any
+ * NoMethodError escapes — that is how assignment still works after
+ * `undefine_attribute_methods`. TS has no `method_missing`, so that dispatch is
+ * explicit; a name with no pattern match is the `respond_to?(setter)` false arm
+ * and goes to `attribute_writer_missing`. The remaining arm — the setter exists
+ * and itself raised NoMethodError, so Rails re-raises at :70-71 — is tracked by
+ * `assign-attribute-respond-to-setter-reraise-arm`. Resolving the setter before
+ * dispatching means there is no rescue to re-enter: a NoMethodError from inside
+ * a setter propagates out of the send above, which is what the re-raise does,
+ * but Ruby's `respond_to?` consults the receiver's full method table where the
+ * ladder above consults only what it can resolve.
+ *
+ * @internal Rails-private helper.
+ */
 export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
-  const setter = findSetter(model, k);
-  if (setter) {
-    setter.call(model, v);
+  const setter = `${k}=`;
+  const own = findSetter(model, k);
+  if (own) {
+    own.call(model, v);
     return;
   }
-  try {
-    model.writeAttribute(k, v);
-  } catch (error) {
-    // Rails `_assign_attribute` only writes through a setter; a key with no
-    // setter goes straight to `attribute_writer_missing` → UnknownAttributeError.
-    // trails routes the write through `writeAttribute`, which now raises
-    // `MissingAttributeError` for an unknown name (the strict `write_from_user`
-    // path). Either way — an explicit UnknownAttributeError or a strict
-    // MissingAttributeError with no setter — surface it as Rails does.
-    if (error instanceof UnknownAttributeError || error instanceof MissingAttributeError) {
-      if (typeof model.attributeWriterMissing === "function") {
-        model.attributeWriterMissing(k, v);
-      } else {
-        attributeWriterMissing(model, k, v);
-      }
-    } else {
-      throw error;
-    }
+  const generated = (model as unknown as Record<string, unknown>)[setter];
+  if (typeof generated === "function") {
+    (generated as (this: AttributeAssignment, value: unknown) => void).call(model, v);
+    return;
   }
+  const match = model.matchedAttributeMethod(setter);
+  if (match) {
+    model.attributeMissing(match, v);
+    return;
+  }
+  model.attributeWriterMissing(k, v);
 }
 
 export interface AttributeAssignment {
   writeAttribute(name: string, value: unknown): void;
-  attributeWriterMissing?(name: string, value: unknown): void;
+  attributeWriterMissing(name: string, value: unknown): void;
+  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
 }
 
 /**

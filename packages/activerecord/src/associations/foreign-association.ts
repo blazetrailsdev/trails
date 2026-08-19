@@ -1,57 +1,37 @@
-import { underscore } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/activemodel";
 
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
 /**
- * Mirrors `reflection.foreign_key` (reflection.rb `compute_foreign_key`),
- * keyed on `reflection.active_record` — the class that *declared* the
- * association. The rungs below the reflection serve trails' inline
- * (unregistered) association fallbacks, which have no Rails counterpart.
+ * Mirrors `options[:foreign_key] || reflection.foreign_key` — the two rungs
+ * Rails has, the second being `compute_foreign_key` (reflection.rb) keyed on
+ * `reflection.active_record`, the class that *declared* the association.
+ *
+ * In Rails an association always has a registered reflection, so
+ * `reflection.foreign_key` has nothing to fall through to; reaching the third
+ * rung here means the receiver is `nil`, which is Ruby's NoMethodError.
  *
  * @internal
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,
   assocName: string,
-  options: {
-    foreignKey?: string | string[];
-    as?: string;
-    primaryKey?: string | string[];
-    queryConstraints?: string[];
-  },
+  options: { foreignKey?: string | string[] },
 ): string[] {
   const fk = options.foreignKey;
   if (typeof fk === "string") return [fk];
   if (Array.isArray(fk)) return fk;
 
-  const reflectionFk = ownerReflectionForeignKey(ctor, assocName);
-  if (typeof reflectionFk === "string") return [reflectionFk];
-  if (Array.isArray(reflectionFk)) return reflectionFk;
-
-  if (options.as) return [`${underscore(options.as)}_id`];
-  if (options.queryConstraints) return options.queryConstraints;
-
-  const pk = options.primaryKey ?? ctor.primaryKey ?? "id";
-  if (Array.isArray(pk)) return pk.map((col) => `${underscore(ctor.name)}_${col}`);
-  return [`${underscore(ctor.name)}_id`];
-}
-
-/**
- * Mirrors `reflection.foreign_key`, returning `undefined` for an unregistered
- * association so `ownerForeignKeyColumns` falls through to its inline rungs.
- *
- * @internal
- */
-export function ownerReflectionForeignKey(
-  ctor: typeof Base,
-  assocName: string,
-): string | string[] | undefined {
-  return (
+  const reflectionFk = (
     ctor as unknown as {
       _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
     }
   )._reflectOnAssociation?.(assocName)?.foreignKey;
+  if (typeof reflectionFk === "string") return [reflectionFk];
+  if (Array.isArray(reflectionFk)) return reflectionFk;
+
+  throw new NoMethodError(`undefined method 'foreign_key' for nil`);
 }
 
 /**
