@@ -311,6 +311,15 @@ export class DirtyTracker {
       this._originalAttributes.delete(name);
       this._originalHas.delete(name);
     }
+    // `forget_change` is `attributes[name] = attributes[name].forgetting_assignment`
+    // (attribute_mutation_tracker.rb:33-35): the assigned value becomes the new
+    // from-database seat, so `original_value_for_database` moves with it. Without
+    // this an optimistic-lock UPDATE would still key its WHERE off the pre-clear
+    // value. Plain-Map baselines have no Attribute to forget.
+    const forgetful = attributes as { forgetAttributeAssignment?: (n: string) => void };
+    if (has && typeof forgetful.forgetAttributeAssignment === "function") {
+      forgetful.forgetAttributeAssignment(name);
+    }
   }
 
   /**

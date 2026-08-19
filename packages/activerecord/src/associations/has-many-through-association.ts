@@ -501,11 +501,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // falls to the own branch, so a distinct own counter (`tags_with_destroy_count`)
     // still decrements.
     if (count > 0) {
-      const throughRefl = throughCounterReflection(this);
-      if (throughRefl?.isCollection?.() && updateThroughCounter.call(this, method)) {
-        await updateThroughCounterCache(this.owner, throughRefl, -count);
+      const throughReflection = this.throughReflection() as
+        | (AssociationDefinition & RichCounterReflection)
+        | null;
+      if (throughReflection?.isCollection?.() && updateThroughCounter.call(this, method)) {
+        await this.updateCounter(-count, throughReflection);
       } else {
-        await updateThroughCounterCache(this.owner, ownRefl, -count);
+        await this.updateCounter(-count);
       }
     }
 
@@ -767,43 +769,10 @@ interface RichCounterReflection {
  * @internal
  */
 function updateThroughCounter(this: HasManyThroughAssociation, method: string): boolean {
-  const through = throughCounterReflection(this);
-  if (method === "destroy") return !through?.isInverseUpdatesCounterCache?.();
+  const throughReflection = this.throughReflection() as RichCounterReflection | null;
+  if (method === "destroy") return !throughReflection?.isInverseUpdatesCounterCache?.();
   if (method === "nullify") return false;
   return true;
-}
-
-/**
- * Ruby reads `through_reflection` (ThroughAssociation) straight off the
- * association; our reflection objects reach the through step through the
- * owner's registry, so resolve it here for both the counter-cache branch and
- * `update_through_counter?`. Routes through the file's `throughReflection`
- * walker, which mirrors `ThroughAssociation#through_reflection`
- * (through_association.rb:14-24) by recursing to the innermost non-through
- * reflection — a single `_reflectOnAssociation(options.through)` lookup would
- * stop at the intermediate reflection for a nested `through:` chain.
- * @internal
- */
-function throughCounterReflection(
-  assoc: HasManyThroughAssociation,
-): RichCounterReflection | undefined {
-  return (assoc.throughReflection() as RichCounterReflection | null) ?? undefined;
-}
-
-/**
- * Mirrors Rails' `HasManyAssociation#update_counter(difference, reflection)`:
- * bump the owner's cached counter column when the reflection has one.
- * @internal
- */
-async function updateThroughCounterCache(
-  owner: Base,
-  reflection: RichCounterReflection | undefined,
-  difference: number,
-): Promise<void> {
-  if (!reflection?.hasCachedCounter?.()) return;
-  const column = reflection.counterCacheColumn?.();
-  if (!column) return;
-  await (owner as any).incrementBang?.(column, difference);
 }
 
 /** @internal */

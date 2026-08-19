@@ -6,7 +6,7 @@
 
 import { Temporal } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { squish, parameterize, truncate } from "@blazetrails/activesupport";
+import { squish, parameterize, toFs, truncate } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";
 
 interface Identifiable {
@@ -18,49 +18,7 @@ interface Identifiable {
   cameFromUser(name: string): boolean;
 }
 
-// ──────────────────────────────────────────────
-// Timestamp formatting  (mirrors Time#to_fs)
-// ──────────────────────────────────────────────
-
 type TemporalTimestamp = Temporal.Instant;
-
-// Mirrors: Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars)
-// Temporal has microsecond precision; the last 3 digits are microseconds (not zeros).
-function toFsUsec(ts: TemporalTimestamp): string {
-  const dt = ts.toZonedDateTimeISO("UTC");
-  const y = dt.year.toString().padStart(4, "0");
-  const mo = dt.month.toString().padStart(2, "0");
-  const d = dt.day.toString().padStart(2, "0");
-  const h = dt.hour.toString().padStart(2, "0");
-  const mi = dt.minute.toString().padStart(2, "0");
-  const s = dt.second.toString().padStart(2, "0");
-  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
-  return `${y}${mo}${d}${h}${mi}${s}${us}`;
-}
-
-// Mirrors: Time#to_fs(:number) → "YYYYMMDDHHMMSS" (14 chars)
-function toFsNumber(ts: TemporalTimestamp): string {
-  const dt = ts.toZonedDateTimeISO("UTC");
-  const y = dt.year.toString().padStart(4, "0");
-  const mo = dt.month.toString().padStart(2, "0");
-  const d = dt.day.toString().padStart(2, "0");
-  const h = dt.hour.toString().padStart(2, "0");
-  const mi = dt.minute.toString().padStart(2, "0");
-  const s = dt.second.toString().padStart(2, "0");
-  return `${y}${mo}${d}${h}${mi}${s}`;
-}
-
-type CacheTimestampFormat = "usec" | "number";
-
-function formatTimestamp(ts: TemporalTimestamp, format: CacheTimestampFormat | string): string {
-  if (format === "number") return toFsNumber(ts);
-  if (format !== "usec") {
-    throw new Error(
-      `Unknown cacheTimestampFormat: ${JSON.stringify(format)}. Supported values: "usec", "number".`,
-    );
-  }
-  return toFsUsec(ts);
-}
 
 // ──────────────────────────────────────────────
 // to_param helpers
@@ -135,8 +93,8 @@ export function cacheKey(this: Identifiable): string {
 
   const timestamp = maxUpdatedColumnTimestamp(this);
   if (timestamp) {
-    const fmt: string = klass.cacheTimestampFormat ?? "usec";
-    return `${modelKey}/${idStr}-${formatTimestamp(timestamp, fmt)}`;
+    const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
+    return `${modelKey}/${idStr}-${toFs(timestamp, cacheTimestampFormat)}`;
   }
 
   return `${modelKey}/${idStr}`;
@@ -164,8 +122,8 @@ export function cacheVersion(this: Identifiable): string | null {
     }
     const val = this.readAttribute("updated_at");
     if (val instanceof Temporal.Instant) {
-      const fmt: string = klass.cacheTimestampFormat ?? "usec";
-      return formatTimestamp(val, fmt);
+      const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
+      return toFs(val, cacheTimestampFormat);
     }
     return null;
   }
