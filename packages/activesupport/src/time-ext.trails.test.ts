@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { toTime } from "./time-ext.js";
+import { toTime } from "./core-ext/time/compatibility.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "./core-ext/date-time/conversions.js";
 import { setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 

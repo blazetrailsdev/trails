@@ -13,7 +13,7 @@ import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Rational, cCivilToJd, strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
-import { DATE_FORMATS, toFs } from "./time-ext.js";
+import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
