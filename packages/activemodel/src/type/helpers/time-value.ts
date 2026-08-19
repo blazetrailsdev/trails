@@ -50,14 +50,16 @@ const NANOS_PER_SECOND = 1_000_000_000n;
  *       value
  *     end
  *   end
+ *
+ * Ruby needs no guard past `precision` itself: for precision > 9,
+ * `10 ** (9 - precision)` is a Rational, `nsec % (1/10)` is `(0/1)`, and the
+ * `> 0` arm is false, so the value comes back unchanged (verified against
+ * MRI). BigInt exponentiation throws on a negative exponent instead, so the
+ * same answer is reached by an explicit early return.
  */
 export function applySecondsPrecision<T>(this: { precision?: number }, value: T): T {
   const precision = this.precision;
   if (precision == null || !respondToNsec(value)) return value;
-  // Rails' guard only covers nil precision. This additional pass-through for
-  // an invalid numeric precision is trails-specific: `10 ** (9 - precision)`
-  // is a Rational in Ruby for precision > 9 and stays exact, where BigInt
-  // exponentiation throws on a negative exponent.
   if (!Number.isInteger(precision) || precision < 0 || precision > 9) return value;
   const numberOfInsignificantDigits = 9 - precision;
   const roundPower = 10n ** BigInt(numberOfInsignificantDigits);

@@ -91,6 +91,7 @@ import {
   attributeMethodPatterns,
   isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
+  type InstanceHost,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1809,7 +1810,7 @@ export class Model {
    * @internal Rails-private helper.
    */
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null {
-    return _matchedAttributeMethod.call(this as never, methodName);
+    return _matchedAttributeMethod.call(this as unknown as InstanceHost, methodName);
   }
 
   /** Mirrors: ActiveModel::Attributes `alias :attribute= :_write_attribute` (attributes.rb:159). */

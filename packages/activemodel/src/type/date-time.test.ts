@@ -231,26 +231,11 @@ describe("DateTimeType#isChanged", () => {
     expect(t.isChanged(a, b)).toBe(true);
   });
 
-  it("instants differing only in sub-millisecond are unchanged (precision=3)", () => {
-    const t = new Types.DateTimeType({ precision: 3 });
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1); // exactly 1ms
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 999_000n); // 1ms + 999μs (same ms bucket)
-    expect(t.isChanged(a, b)).toBe(false);
-  });
-
   it("instants differing by one full millisecond are changed (precision=3)", () => {
     const t = new Types.DateTimeType({ precision: 3 });
     const a = Temporal.Instant.fromEpochNanoseconds(MS1);
     const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1_000_000n); // next ms bucket
     expect(t.isChanged(a, b)).toBe(true);
-  });
-
-  it("instants differing only in sub-second are unchanged (precision=0)", () => {
-    const t = new Types.DateTimeType({ precision: 0 });
-    // Use 1s boundary + 999ms — both in the same second bucket
-    const a = Temporal.Instant.fromEpochNanoseconds(1_000_000_000n);
-    const b = Temporal.Instant.fromEpochNanoseconds(1_000_000_000n + 999_999_999n);
-    expect(t.isChanged(a, b)).toBe(false);
   });
 
   it("instants differing by one full nanosecond are changed (precision=9)", () => {

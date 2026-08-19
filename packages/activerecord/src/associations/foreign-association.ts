@@ -23,28 +23,15 @@ export function ownerForeignKeyColumns(
   if (typeof fk === "string") return [fk];
   if (Array.isArray(fk)) return fk;
 
-  const reflectionFk = ownerReflectionForeignKey(ctor, assocName);
-  if (typeof reflectionFk === "string") return [reflectionFk];
-  if (Array.isArray(reflectionFk)) return reflectionFk;
-
-  throw new NoMethodError(`undefined method 'foreign_key' for nil`);
-}
-
-/**
- * Mirrors `reflection.foreign_key`, answering `undefined` when the association
- * has no registered reflection — a state Rails cannot be in.
- *
- * @internal
- */
-export function ownerReflectionForeignKey(
-  ctor: typeof Base,
-  assocName: string,
-): string | string[] | undefined {
-  return (
+  const reflectionFk = (
     ctor as unknown as {
       _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
     }
   )._reflectOnAssociation?.(assocName)?.foreignKey;
+  if (typeof reflectionFk === "string") return [reflectionFk];
+  if (Array.isArray(reflectionFk)) return reflectionFk;
+
+  throw new NoMethodError(`undefined method 'foreign_key' for nil`);
 }
 
 /**

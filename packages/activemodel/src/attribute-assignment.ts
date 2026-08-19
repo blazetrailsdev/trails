@@ -48,22 +48,31 @@ export function _assignAttributes(
  *   end
  *
  * There is no `write_attribute` on this path: the only write Rails makes is
- * `public_send(setter, v)`, and a key with no setter goes straight to
- * `attribute_writer_missing`. `findSetter` stands in for the `respond_to?`
- * half of the send, so the rescue arm's re-raise for a setter that exists but
- * itself raised `NoMethodError` is the one branch not modelled here — a
- * `NoMethodError` from inside the setter propagates, which is what the
- * re-raise arm does anyway.
+ * `public_send(setter, v)`.
+ *
+ * That send takes two spellings here because one Ruby method name reaches TS
+ * two ways. Rails' generated writer is a real method named `name=`
+ * (attributes.rb:92-102) and is reachable by that key; a user-authored
+ * `def name=` ported as a TS `set` accessor is the same Ruby method under the
+ * spelling docs/ruby-ts-conventions.md gives it, which `findSetter` resolves.
+ * The accessor is tried first because Ruby finds a class's own `name=` before
+ * the generated methods module's.
+ *
+ * Ruby reaches the `rescue NoMethodError` arm through
+ * AttributeMethods#method_missing (attribute_methods.rb:508-517), which routes
+ * a name matching an attribute-method pattern to `attribute_missing` before any
+ * NoMethodError escapes — that is how assignment still works after
+ * `undefine_attribute_methods`. TS has no `method_missing`, so that dispatch is
+ * explicit; a name with no pattern match is the `respond_to?(setter)` false arm
+ * and goes to `attribute_writer_missing`. The remaining arm — the setter exists
+ * and itself raised NoMethodError, so Rails re-raises at :70-71 — is tracked by
+ * `ar-assign-attribute-bypasses-attribute-writer-missing`; such an error
+ * propagates out of the send above, which is what the re-raise does.
  *
  * @internal Rails-private helper.
  */
 export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
   const setter = `${k}=`;
-  // `public_send(setter, v)`. Rails' generated writer is a real method named
-  // `name=` (attributes.rb:92-102), so it is reachable by that key; a
-  // user-authored `def name=` ported as a TS `set` accessor is the same Ruby
-  // method under the spelling docs/ruby-ts-conventions.md gives it, and
-  // `findSetter` is that half of the send.
   const own = findSetter(model, k);
   if (own) {
     own.call(model, v);
@@ -74,15 +83,8 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
     (generated as (this: AttributeAssignment, value: unknown) => void).call(model, v);
     return;
   }
-  // The `rescue NoMethodError` arm. Ruby reaches it through
-  // AttributeMethods#method_missing (attribute_methods.rb:508-517), which
-  // routes a name matching an attribute-method pattern to `attribute_missing`
-  // before any NoMethodError escapes — that is how assignment still works
-  // after `undefine_attribute_methods`. TS has no `method_missing`, so the
-  // dispatch is explicit; a name with no pattern match is the
-  // `respond_to?(setter)` false arm and goes to `attribute_writer_missing`.
-  const match = model.matchedAttributeMethod?.(setter);
-  if (match && model.attributeMissing) {
+  const match = model.matchedAttributeMethod(setter);
+  if (match) {
     model.attributeMissing(match, v);
     return;
   }
@@ -92,8 +94,8 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
 export interface AttributeAssignment {
   writeAttribute(name: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
-  matchedAttributeMethod?(methodName: string): { proxyTarget: string; attrName: string } | null;
-  attributeMissing?(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
+  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
 }
 
 /**

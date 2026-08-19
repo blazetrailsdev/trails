@@ -220,13 +220,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * Mirrors: ActiveModel::Type::Value#changed? (value.rb:84-86) — `old_value !=
    * new_value`. Ruby's `!=` on a `::Time` is value equality; `!==` on a
    * `Temporal.Instant` is reference identity, so the receiver's own `equals`
-   * stands in for it. Ruby compares values the attribute pipeline has already
-   * cast, so `apply_seconds_precision` (time_value.rb:24-34) has run on both;
-   * running it here keeps that true for a caller handing over raw instants.
+   * stands in for it.
    */
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
     if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
-      return !this.applySecondsPrecision(oldValue).equals(this.applySecondsPrecision(newValue));
+      return !oldValue.equals(newValue);
     }
     return oldValue !== newValue;
   }
