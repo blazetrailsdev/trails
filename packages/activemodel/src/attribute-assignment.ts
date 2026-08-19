@@ -66,8 +66,11 @@ export function _assignAttributes(
  * explicit; a name with no pattern match is the `respond_to?(setter)` false arm
  * and goes to `attribute_writer_missing`. The remaining arm — the setter exists
  * and itself raised NoMethodError, so Rails re-raises at :70-71 — is tracked by
- * `ar-assign-attribute-bypasses-attribute-writer-missing`; such an error
- * propagates out of the send above, which is what the re-raise does.
+ * `assign-attribute-respond-to-setter-reraise-arm`. Resolving the setter before
+ * dispatching means there is no rescue to re-enter: a NoMethodError from inside
+ * a setter propagates out of the send above, which is what the re-raise does,
+ * but Ruby's `respond_to?` consults the receiver's full method table where the
+ * ladder above consults only what it can resolve.
  *
  * @internal Rails-private helper.
  */

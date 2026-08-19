@@ -243,7 +243,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return this.serializeCastValue(this.cast(value));
   }
 
-  // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
+  /**
+   * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
+   * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
+   * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by
+   * `serialize-cast-value-drops-is-utc-normalization`.
+   */
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null {
     return this.applySecondsPrecision(value);
   }
