@@ -4,6 +4,10 @@
     "tsFile": "environment-inquirer.ts",
     "rubyName": "initialize",
     "call": "in?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "kind": "args",
+    "rubyArgs": [
+      "const:LOCAL_ENVIRONMENTS"
+    ],
+    "reason": "Ruby receiver becomes the first TS argument: `env.in? LOCAL_ENVIRONMENTS` (environment_inquirer.rb:25) is an `Object#in?` call on `env`, and trails' port is the standalone `isIn(value, collection)` in enumerable-utils.ts whose leading parameter is that receiver."
   }
 ]

@@ -4,7 +4,7 @@
     "tsFile": "values/time-zone.ts",
     "rubyName": "at",
     "call": "in_time_zone",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`Time.at(*args).utc.in_time_zone(self)` (time_zone.rb:379-381) round-trips through the `Time` core-ext to land in `self`; trails builds the `TimeWithZone` directly from the epoch instant, and `in_time_zone`'s own `TimeZone` arm is that same constructor call (core-ext/date-and-time/zones.ts `timeWithZone`). Routing through it would close a `values/time-zone` -> `zones` -> `values/time-zone` module cycle for no behavioural difference."
   },
   {
     "package": "activesupport",
@@ -18,20 +18,20 @@
     "tsFile": "values/time-zone.ts",
     "rubyName": "iso8601",
     "call": "ordinal",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' iso8601 resolves an ordinal date through `Date.ordinal(year, parts.fetch(:yday))` (time_zone.rb:405) after `Date._iso8601` has parsed the string into parts; trails has neither `Date._iso8601` nor `Date.ordinal`, so the ordinal `YYDDD` form is recognised by its own regex arm and converted with day-of-year arithmetic. Blocked on porting `Date._iso8601`/`Date.ordinal`."
   },
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
     "rubyName": "now",
     "call": "in_time_zone",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Same round trip as the `at` row above: `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518) reaches the same `new TimeWithZone(instant, self)` that this body already performs, and going through `in_time_zone` would close the `values/time-zone` -> `core-ext/date-and-time/zones` import cycle."
   },
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
     "rubyName": "today",
     "call": "to_date",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "`tzinfo.now.to_date` (time_zone.rb:521-523) answers a `::Date`; trails has no `Date` value type on this seam and `today()` returns the `{ year, month, day }` triple its callers (`tomorrow`, `yesterday`) consume, read off `now()`. Converging is the `Date` port, not the missing call."
   }
 ]
