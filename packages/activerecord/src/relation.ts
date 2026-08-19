@@ -32,6 +32,7 @@ import {
   type JoinSpec,
   type OrderArg,
 } from "./relation/query-methods.js";
+export { QueryMethodBangs };
 import * as _qm from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import {
@@ -54,6 +55,7 @@ import { include, type Included } from "@blazetrails/activesupport";
 import { Calculations, type CalculationMethods } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
+export { SpawnMethods };
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
 import { WhereClause } from "./relation/where-clause.js";

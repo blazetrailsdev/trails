@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import { Relation } from "../relation.js";
+import { Relation, QueryMethodBangs, SpawnMethods } from "../relation.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
@@ -2500,112 +2500,59 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   delegate(*delegate_methods, to: :scope)
 //
 // trails mixes QueryMethods / SpawnMethods into `Relation` itself rather than
-// keeping them as standalone modules, so their `public_instance_methods(false)`
-// can't be reflected off a module object — the two name lists below stand in for
-// that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
-// Both halves of each module are listed: `public_instance_methods(false)` includes
-// the bang builders (`where!`, `limit!`, `none!`, …), so Rails delegates those to
-// `scope` too — a Rails `CollectionProxy` owns no relation state of its own. The
-// constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
-// prototype delegation is consulted only in the sense that they must target the
-// proxy's inherited state, so they are invoked through `Relation.prototype`
+// keeping them as standalone modules. The bang half of QueryMethods and all of
+// SpawnMethods are exported as mixin objects, so we derive those from
+// Object.keys(). Non-bang QueryMethods that still live on Relation are kept as
+// a residual hand-list to be shrunk by RFC 0107's fan-out-query-methods-* stories.
+// The constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE
+// the prototype delegation is consulted only in the sense that they must target
+// the proxy's inherited state, so they are invoked through `Relation.prototype`
 // directly (see the ctor).
-const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "includes",
-  "all",
-  "eagerLoad",
-  "preload",
-  "extractAssociated",
-  "references",
-  "select",
-  "with",
-  "withRecursive",
-  "reselect",
-  "group",
-  "regroup",
-  "order",
-  "inOrderOf",
-  "reorder",
-  "unscope",
-  "joins",
-  "leftOuterJoins",
-  "where",
-  "rewhere",
-  "invertWhere",
-  "structurallyCompatible",
-  "and",
-  "or",
-  "having",
-  "limit",
-  "offset",
-  "lock",
-  "none",
-  "isNullRelation",
-  "readonly",
-  "strictLoading",
-  "createWith",
-  "from",
-  "distinct",
-  "extending",
-  "optimizerHints",
-  "reverseOrder",
-  "annotate",
-  "excluding",
-  "arel",
-  "constructJoinDependency",
-  // The bang half of `QueryMethods.public_instance_methods(false)`
-  // (query_methods.rb) — Rails delegates these to `scope` as well.
-  "includesBang",
-  "eagerLoadBang",
-  "preloadBang",
-  "referencesBang",
-  "selectBang",
-  "withBang",
-  "withRecursiveBang",
-  "reselectBang",
-  "groupBang",
-  "regroupBang",
-  "orderBang",
-  "reorderBang",
-  "unscopeBang",
-  "joinsBang",
-  "leftOuterJoinsBang",
-  "whereBang",
-  "rewhereBang",
-  "invertWhereBang",
-  "havingBang",
-  "limitBang",
-  "offsetBang",
-  "lockBang",
-  "noneBang",
-  "nullBang",
-  "readonlyBang",
-  "strictLoadingBang",
-  "createWithBang",
-  "fromBang",
-  "distinctBang",
-  "extendingBang",
-  "optimizerHintsBang",
-  "reverseOrderBang",
-  "annotateBang",
-  "excludingBang",
-  "uniqBang",
-  "skipQueryCacheBang",
-  "skipPreloadingBang",
-  "andBang",
-  "orBang",
+
+// Non-bang query methods still on Relation (not yet in a mixin).
+// This shrinks as RFC 0107 fan-out-query-methods-* stories move methods to mixins.
+// Do NOT add names to this list that are already exported from SpawnMethods or QueryMethodBangs.
+const residualQueryMethods = [
+  // All query methods have been extracted to QueryMethodBangs mixin now.
+  // This list will shrink to empty as RFC 0107 fan-out-query-methods-* moves them.
 ] as const;
 
-const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "spawn",
-  "merge",
-  "mergeBang",
-  "except",
-  "only",
-] as const;
+// Derive public methods from QueryMethodBangs mixin, filtering to only delegable methods.
+// Excludes private/internal helpers (starting with _ or matching known patterns).
+const queryMethodsFromMixin = Object.keys(QueryMethodBangs).filter((name) => {
+  if (name.startsWith("_")) return false;
+  // Exclude known private helpers from query_methods.rb
+  const privateHelpers = new Set([
+    "assertModifiableBang",
+    "checkIfMethodHasArgumentsBang",
+    "arelColumns",
+    "arelColumnsFromHash",
+    "isTableNameMatches",
+    "arelColumn",
+    "arelColumnWithTable",
+    "async",
+    "buildWhereClause",
+    "buildHavingClause",
+    "buildNamedBoundSqlLiteral",
+    "buildBoundSqlLiteral",
+    "buildSubquery",
+    "buildCastValue",
+    "flattenedArgs",
+    "validateOrderArgs",
+    "processWithArgs",
+    "isDoesNotSupportReverse",
+    "reverseSqlOrder",
+    "extractTableNameFrom",
+    "columnReferences",
+  ]);
+  return !privateHelpers.has(name);
+});
+
+// Derive spawn methods from SpawnMethods mixin, filtering out private methods.
+const spawnMethodsNames = Object.keys(SpawnMethods).filter((name) => !name.startsWith("_"));
 
 const delegateMethods = (
-  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]
+  [...residualQueryMethods, ...queryMethodsFromMixin, ...spawnMethodsNames] as string[]
 )
   .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
   .concat([
