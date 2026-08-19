@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "transactions.ts",
-    "rubyName": "has_transactional_callbacks?",
-    "call": "empty?",
-    "reason": "Reviewed (RFC 0106 wave 4c): trails has no `CallbackChain#empty?` — `peekCallbackChain` returns the raw chain, so emptiness is spelled `entries.length > 0`. Converges when the chain object grows the Rails predicate."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "transactions.ts",
     "rubyName": "restore_transaction_record_state",
     "call": "map",
     "reason": "Reviewed (RFC 0106 wave 4c): Rails `map`s the composite primary key back onto the restored attributes; trails restores the snapshot object wholesale, so there is no per-key projection to spell."
