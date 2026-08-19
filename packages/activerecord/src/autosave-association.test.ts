@@ -700,7 +700,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("assign ids", async () => {
     const firm = new Firm({ name: "Apple" });
-    await firm.clients.setIds([
+    await firm.clients.idsWriter([
       companies("first_client").id as number,
       companies("second_client").id as number,
     ]);
@@ -759,7 +759,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const proxy = association(order, "orderAgreements");
     expect(await proxy).toHaveLength(0);
 
-    await proxy.setIds(orderAgreements as number[]);
+    await proxy.idsWriter(orderAgreements as number[]);
     await order.save();
     await order.reload();
 
@@ -833,7 +833,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const proxy = association(order, "books");
     expect(await proxy).toHaveLength(0);
 
-    await proxy.setIds(bookIds as number[][]);
+    await proxy.idsWriter(bookIds as number[][]);
     await order.save();
     await order.reload();
 
@@ -892,7 +892,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
   it("assign ids for through a belongs to", async () => {
     const firm = new Firm({ name: "Apple" });
-    await firm.developers.setIds([
+    await firm.developers.idsWriter([
       developers("david").id as number,
       developers("jamis").id as number,
     ]);

@@ -40,7 +40,6 @@ import {
   AssociationTypeMismatch,
   RecordNotFound,
 } from "../errors.js";
-import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import {
@@ -934,66 +933,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Bulk insert/upsert through a collection association. Mirrors
-   * ActiveRecord::AssociationRelation, which guards `insert`, `insert_all`,
-   * `insert!`, `insert_all!`, `upsert`, and `upsert_all`: when the
-   * association is `has_many :through`, it raises ArgumentError because the
-   * join records can't be built from the bulk path. Non-through associations
-   * fall through to the inherited Relation implementation.
-   */
-  private _assertBulkInsertable(): void {
-    if (this.isThrough) {
-      throw new ArgumentError(
-        "Bulk insert or upsert is currently not supported for has_many through association",
-      );
-    }
-  }
-
-  async insert(
-    attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): ReturnType<Relation<T>["insert"]> {
-    this._assertBulkInsertable();
-    return super.insert(attrs, options);
-  }
-
-  async insertBang(
-    ...args: Parameters<Relation<T>["insertBang"]>
-  ): ReturnType<Relation<T>["insertBang"]> {
-    this._assertBulkInsertable();
-    return super.insertBang(...args);
-  }
-
-  async insertAll(
-    ...args: Parameters<Relation<T>["insertAll"]>
-  ): ReturnType<Relation<T>["insertAll"]> {
-    this._assertBulkInsertable();
-    return super.insertAll(...args);
-  }
-
-  async insertAllBang(
-    ...args: Parameters<Relation<T>["insertAllBang"]>
-  ): ReturnType<Relation<T>["insertAllBang"]> {
-    this._assertBulkInsertable();
-    return super.insertAllBang(...args);
-  }
-
-  async upsert(
-    attrs: Record<string, unknown>,
-    options?: { uniqueBy?: string | string[] },
-  ): ReturnType<Relation<T>["upsert"]> {
-    this._assertBulkInsertable();
-    return super.upsert(attrs, options);
-  }
-
-  async upsertAll(
-    ...args: Parameters<Relation<T>["upsertAll"]>
-  ): ReturnType<Relation<T>["upsertAll"]> {
-    this._assertBulkInsertable();
-    return super.upsertAll(...args);
-  }
-
-  /**
    * Mirrors `CollectionProxy#create` (collection_proxy.rb:334-336): a plain
    * delegation to `@association.create(attributes, &block)`. The persisted-owner
    * guard, the Array arm, `build_record`, and the
@@ -1768,12 +1707,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Set the collection to exactly the records identified by ids, e.g.
    * `order.book_ids = [...]`.
    *
-   * Delegates to `CollectionAssociation#idsWriter` — the same method the
-   * generated `<name>_ids=` writer calls — so there is one Rails-faithful
-   * `ids_writer` and tests exercise the real writer path. Mirrors Rails'
-   * `CollectionProxy`, which forwards `ids_writer` to its `@association`.
+   * Delegates to `CollectionAssociation#idsWriter`
+   * (collection_association.rb:62-85) — the same method the generated
+   * `<name>_ids=` writer calls (builder/collection_association.rb:73) — so
+   * there is one Rails-faithful `ids_writer` and tests exercise the real
+   * writer path. Rails reaches it as `record.association(:name).ids_writer`;
+   * a JS property assignment cannot be awaited, so the Rails name lives here
+   * as the awaitable entry point.
+   *
+   * @noRailsEquivalent collection_proxy.rb writes no `ids_writer`; the Ruby
+   *   spelling of this call site is the generated `<name>_ids=` setter, which
+   *   TypeScript cannot make awaitable.
    */
-  async setIds(ids: (number | string | (number | string)[])[]): Promise<void> {
+  async idsWriter(ids: (number | string | (number | string)[])[]): Promise<void> {
     await (
       this._record.association(this._assocName) as unknown as {
         idsWriter(ids: unknown[]): Promise<void>;
@@ -1814,7 +1760,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   override reset(): this {
     // Call Relation.reset() so inherited query state (_records,
-    // _loaded, _loadToken, _loadAsyncPromise) is cleared alongside the
+    // _loaded, _loadToken, _futureResult) is cleared alongside the
     // association-specific target cache. Without super, callers using
     // Relation#load() / Relation#loadAsync() patterns on the proxy
     // would see stale results after reset.

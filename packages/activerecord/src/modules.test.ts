@@ -66,8 +66,8 @@ describe("ModulesTest", () => {
     const firm = await MyAppBusinessFirm.first();
     const client = await MyAppBusinessClient.first();
     await assertNothingRaised(async () => {
-      type WithClients = { clients: { setIds(ids: number[]): Promise<void> } };
-      await (firm as unknown as WithClients).clients.setIds([client!.id as number]);
+      type WithClients = { clients: { idsWriter(ids: number[]): Promise<void> } };
+      await (firm as unknown as WithClients).clients.idsWriter([client!.id as number]);
     });
   });
 

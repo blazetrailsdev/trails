@@ -537,19 +537,20 @@ export class Relation<T extends Base> {
    */
   _instantiateBlock?: (record: T) => void;
   /**
-   * The in-flight handle `loadAsync()` leaves behind so a later awaiter joins
-   * the running query instead of issuing a second one.
+   * Mirrors Rails' `@future_result` (relation.rb:91, :1148) — the handle
+   * `loadAsync` parks so the foreground `execQueries` pass drains the ROWS
+   * (relation.rb:1405-1409) instead of issuing the query itself.
    *
-   * **No Rails equivalent — PERMANENT.** Rails' counterpart state is `@future_result`
-   * (relation.rb:91, :1148), a `Concurrent::FutureResult` posted to a
-   * `Concurrent::ThreadPoolExecutor` (connection_pool.rb:717). Concurrent-ruby
-   * is a gem, not a Rails class, so there is no Ruby file to mirror, and JS has
-   * one thread: the only handle to background work is a Promise. Same decision,
-   * same reason, as the `@noRailsEquivalent PERMANENT` tag on `ar-config.ts:55`
-   * — spelled as prose here because `parity:api:extra` never scores a
-   * `_`-prefixed private member, so a real tag on one reads back as stale.
+   * Rails holds a `Concurrent`-backed `FutureResult`; trails holds the promise
+   * `execMainQuery` returns. `FutureResult` is a thenable, so an `async` method
+   * that returns one already resolves it — that promise IS trails' handle to
+   * the same scheduled query, and it is what `isScheduled` reads. Same
+   * decision, same reason, as the `@noRailsEquivalent PERMANENT` tag on
+   * `ar-config.ts:55` — spelled as prose here because `parity:api:extra` never
+   * scores a `_`-prefixed private member, so a real tag on one reads back as
+   * stale.
    */
-  private _loadAsyncPromise?: Promise<T[]>;
+  private _futureResult?: Promise<Result>;
   /**
    * Monotonic token bumped on reset()/reload() so an in-flight toArray()
    * that started before the reset can detect it lost the race and skip
@@ -708,12 +709,13 @@ export class Relation<T extends Base> {
     this._shouldEagerLoad = undefined;
     this._cacheKeys = undefined;
     this._cacheVersions = undefined;
-    // Bump the load token and drop any in-flight loadAsync() promise —
-    // an already-running toArray() checks the token after its await and
-    // will skip committing if it lost the race, so a stale background
-    // load can't re-populate records after a reset.
+    // Mirrors relation.rb:1195-1196 (`@future_result&.cancel; @future_result =
+    // nil`). A JS promise has no `cancel`, so the load token stands in: an
+    // already-running toArray() checks it after its await and skips committing
+    // if it lost the race, so a stale background load can't re-populate
+    // records after a reset.
     this._loadToken += 1;
-    this._loadAsyncPromise = undefined;
+    this._futureResult = undefined;
     return this;
   }
 
@@ -751,35 +753,21 @@ export class Relation<T extends Base> {
     // (relation.rb:1138-1154). Both of those reads need the connection that
     // will run the query, so trails makes them where it is in hand — in
     // `execMainQuery` — and marks the load async here.
-    //
-    // The `_loadAsyncPromise` memoization is retained in place of Rails'
-    // `@future_result` + `scheduled?`: Rails' foreground `exec_queries` reads
-    // `future.result` for the ROWS and still instantiates records itself, so
-    // the future is all it has to hold. trails' loading path is a promise the
-    // whole way down — instantiation, eager loading and preloading are awaited
-    // inside `execQueries` — so the in-flight handle a second caller must
-    // join is that promise, not the FutureResult, which covers only the first
-    // of those steps.
-    // Kick off the load in the background and stash the in-flight promise.
-    // toArray() already caches _loaded/_records when it resolves, so no
-    // .then bookkeeping is needed. A later `await rel.toArray()` drains
-    // the stashed promise instead of issuing a second query — and carries
-    // any rejection to the awaiter, matching Rails' load_async behavior.
-    //
-    // Keep the promise cached for the full lifetime of the load (clear
-    // in finally) so concurrent callers share the one in-flight query
-    // instead of racing to fire additional ones.
-    if (!this._loadAsyncPromise && !this._loaded) {
-      // Rails' `unless loaded?` guards the async query too (relation.rb:1141).
-      const loadPromise = this.toArray(true).finally(() => {
-        this._loadAsyncPromise = undefined;
-      });
-      // Attach a no-op rejection handler so a failure here isn't treated
-      // as an unhandled rejection if nothing else awaits the relation.
-      // The stored promise still carries the rejection to explicit
-      // awaiters (.toArray(), etc.) via a separate chain.
-      void loadPromise.catch(() => {});
-      this._loadAsyncPromise = loadPromise;
+    if (!this._loaded && !this._futureResult) {
+      // Rails' `unless loaded?` (relation.rb:1141). trails also guards on the
+      // parked handle so a second `loadAsync()` joins the scheduled query
+      // rather than issuing another one; Rails cannot reach that state because
+      // its `load_async` sets `@loaded` in the same breath (relation.rb:1149),
+      // which trails leaves to `toArray` — its `_loaded` fast paths, and
+      // `size`/`isEmpty`'s, read `_records` directly rather than routing
+      // through `load` the way Rails' do.
+      const futureResult = this.execMainQuery(true);
+      // Attach a no-op rejection handler so a failure here isn't treated as an
+      // unhandled rejection if nothing else awaits the relation. The stored
+      // promise still carries the rejection to `execQueries` through a separate
+      // chain.
+      void futureResult.catch(() => {});
+      this._futureResult = futureResult;
     }
     return this;
   }
@@ -1031,28 +1019,10 @@ export class Relation<T extends Base> {
    * Execute the query and return all records.
    *
    * Mirrors: ActiveRecord::Relation#to_a / #load
-   *
-   * `async` is Rails' `exec_main_query(async:)` keyword (relation.rb:1423),
-   * threaded from `loadAsync()` — trails' `load_async` reaches the query
-   * through this method rather than calling `exec_main_query` itself, because
-   * instantiation, eager loading and preloading are all awaited inside
-   * `execQueries`.
    */
-  async toArray(async = false): Promise<T[]> {
+  async toArray(): Promise<T[]> {
     if (this.isNullRelation()) return [];
     if (this._loaded) return [...this._records];
-    if (this._loadAsyncPromise) {
-      // A prior loadAsync() kicked off the query — share the in-flight
-      // promise so callers drain the same query (and carry its errors)
-      // instead of racing to issue additional ones. The promise clears
-      // itself in loadAsync's .finally once the load settles.
-      //
-      // This check must stay synchronous (before any await): loadAsync
-      // calls toArray() and only assigns _loadAsyncPromise once it
-      // returns. Awaiting earlier would let this call resume after the
-      // assignment and return the promise derived from itself, deadlocking.
-      return this._loadAsyncPromise;
-    }
     // Run the query inside `with_connection` so the pool releases the connection
     // afterwards instead of holding it permanently. The build / execute path
     // reads the threaded connection via `_conn()` (see {@link withConnection})
@@ -1065,7 +1035,7 @@ export class Relation<T extends Base> {
     // in `exec_queries`, which is what makes `.explain` (which calls
     // `exec_queries` directly, relation.rb:13) side-effect-free.
     const token = this._loadToken;
-    const records = await this.withConnection(() => this.execQueries(async));
+    const records = await this.withConnection(() => this.execQueries());
     // A reset() landed while the query was in flight: return the rows we got
     // without clobbering the fresh state.
     if (token !== this._loadToken) return records;
@@ -1076,7 +1046,7 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1403-1421).
    */
-  private async execQueries(async = false): Promise<T[]> {
+  private async execQueries(): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
@@ -1096,7 +1066,17 @@ export class Relation<T extends Base> {
       // clobbering the fresh state.
       const token = this._loadToken;
 
-      const rows = await this.execMainQuery(async);
+      // Mirrors relation.rb:1405-1409: when `load_async` already scheduled the
+      // query, the foreground pass drains that handle instead of issuing its
+      // own.
+      let rows: Result;
+      if (this.isScheduled) {
+        const future = this._futureResult!;
+        this._futureResult = undefined;
+        rows = await future;
+      } else {
+        rows = await this.execMainQuery();
+      }
       if (token !== this._loadToken) return [];
       const records = this.instantiateRecords(rows);
 
@@ -1185,8 +1165,9 @@ export class Relation<T extends Base> {
         });
       }
 
-      // Awaiting the FutureResult here is trails' `future.result` in
-      // `exec_queries` (relation.rb:1408).
+      // Mirrors relation.rb:1449 (`_query_by_sql` → querying.rb:67-68). A
+      // scheduled FutureResult is a thenable, so the promise this returns
+      // settles to the same rows `future.result` yields in `execQueries`.
       return c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async });
     });
   }
@@ -2704,8 +2685,13 @@ export class Relation<T extends Base> {
     return pb;
   }
 
+  /**
+   * Returns true if the relation was scheduled on the background thread pool.
+   *
+   * Mirrors: ActiveRecord::Relation#scheduled? (relation.rb:1170-1172)
+   */
   get isScheduled(): boolean {
-    return false;
+    return !!this._futureResult;
   }
 
   /**
