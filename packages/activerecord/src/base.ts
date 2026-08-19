@@ -2398,9 +2398,9 @@ export class Base extends Model {
       if (scope._model === this) {
         return scope.clone();
       }
-      return this._buildUnscopedRelation().merge(scope);
+      return this._buildUnscopedRelation().mergeBang(scope);
     }
-    return this._buildDefaultRelation(options?.allQueries);
+    return this.defaultScoped({ allQueries: options?.allQueries });
   }
 
   /**

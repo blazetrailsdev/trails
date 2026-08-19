@@ -22,6 +22,7 @@ import { getCrypto } from "./crypto-adapter.js";
 import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
+import { chomp } from "./string-utils.js";
 
 const CIPHER = "aes-128-gcm";
 
@@ -135,7 +136,8 @@ export class EncryptedFile {
     const fs = await getFsAsync();
     const path = await getPathAsync();
     const contentPath = await this.resolveContentPath();
-    const base = path.basename(contentPath).replace(/\.enc$/, "");
+    // `content_path.basename.to_s.chomp(".enc")` (encrypted_file.rb:89).
+    const base = chomp(path.basename(contentPath), ".enc");
     const dir = await fs.mkdtemp!(`${path.dirname(contentPath)}${path.sep}encfile-`);
     const tmpPath = path.join(dir, `-${base}`);
     try {

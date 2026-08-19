@@ -16,14 +16,14 @@
     "tsFile": "encrypted-file.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "encrypted_file.rb:42-43 `Pathname.new(content_path)` / `Pathname.new(key_path)` — Ruby's Pathname has no port; trails keeps paths as strings and reaches the filesystem through the async fs/path adapters, so there is no Pathname to construct."
   },
   {
     "package": "activesupport",
     "tsFile": "encrypted-file.ts",
     "rubyName": "read",
     "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "encrypted_file.rb:71 `content_path.exist?` — `Pathname#exist?` with no Pathname to call it on; the same predicate is `await fs.exists(path)` on the async fs adapter. See the `initialize -> new` row above."
   },
   {
     "package": "activesupport",
@@ -37,20 +37,24 @@
     "tsFile": "encrypted-file.ts",
     "rubyName": "read_key_file",
     "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "encrypted_file.rb:121 `key_path.exist?` — same Pathname substitution as `read -> exist?` above: `await fs.exists(this.keyPath)`."
   },
   {
     "package": "activesupport",
     "tsFile": "encrypted-file.ts",
     "rubyName": "writing",
     "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "kind": "args",
+    "rubyArgs": [
+      "str:.enc"
+    ],
+    "reason": "encrypted_file.rb:89 `content_path.basename.to_s.chomp(\".enc\")` — trails ports Ruby's String methods as free functions rather than String.prototype patches, so the receiver is argument 1: `chomp(path.basename(contentPath), \".enc\")`. Receiver-as-argument-1 shape, matching the reviewed `integration.ts` `toFs` rows."
   },
   {
     "package": "activesupport",
     "tsFile": "encrypted-file.ts",
     "rubyName": "writing",
     "call": "create",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "encrypted_file.rb:89 `Tempfile.create([...]) do |tmp_file|` — Ruby's Tempfile is stdlib, not Rails, and has no port; the block-scoped temp file is spelled as `fs.mkdtemp` plus an explicit `finally` unlink/rmdir, which is what Tempfile.create's block form does."
   }
 ]

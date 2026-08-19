@@ -4,7 +4,7 @@
     "tsFile": "log-subscriber.ts",
     "rubyName": "silenced?",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "log_subscriber.rb:143 `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc invoked through `#call`; the JS callable it ports to is invoked as `check(l)`, so there is no `call` to make. Same substitution as the `cache.ts key_matcher -> call` row. Language shortcoming."
   },
   {
     "package": "activesupport",

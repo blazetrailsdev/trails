@@ -32,6 +32,16 @@
  * asserts. The `DateTime.new` arm is the one that reaches `canon24oc`
  * (`date_core.c:7885-7888`) on the gem-shaped object, so it keeps the Ruby's
  * full reader tuple.
+ *
+ * `test_commercial` and `test_fractional` assert through the seat's `toString`
+ * rather than through `yearOfWeek` / `weekOfYear` / `dayOfWeek` for the reason
+ * documented on `Date#toDate` (`date.ts`): the seat renders the receiver's
+ * CIVIL triple into an ISO `Temporal.PlainDate`, so for a Julian-side day
+ * every reader Temporal derives from the ABSOLUTE day disagrees with MRI —
+ * `Date.commercial(-4712, 1, 1)` has `cwday` 1 in Ruby and `dayOfWeek` 4 here.
+ * That is a ratified RFC 0088 decision, so asserting the week readers would
+ * enshrine the wrong weekday; `toString` asserts the triple the seat is
+ * actually faithful to.
  */
 
 import { describe, it, expect } from "vitest";

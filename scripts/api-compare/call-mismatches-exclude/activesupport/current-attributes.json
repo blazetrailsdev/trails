@@ -4,20 +4,20 @@
     "tsFile": "current-attributes.ts",
     "rubyName": "attribute",
     "call": "generate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "current_attributes.rb:136-137 `Delegation.generate(singleton_class, names, to: :instance, ...)` — Rails generates the class-level readers/writers by compiling Ruby source onto the singleton class. trails has no singleton class and `Delegation.generate` compiles method source strings, so the port defines the same accessors with `Object.defineProperty` on the constructor. Language shortcoming."
   },
   {
     "package": "activesupport",
     "tsFile": "current-attributes.ts",
     "rubyName": "attribute",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "current_attributes.rb:139 `self.defaults = defaults.merge(names.index_with { default })` — Ruby Hash#merge returning a new hash is JS object spread; there is no Hash to call `merge` on. Same substitution as the `cache.ts merged_options -> merge` row."
   },
   {
     "package": "activesupport",
     "tsFile": "current-attributes.ts",
     "rubyName": "set",
     "call": "with",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "current_attributes.rb:214 `with(**attributes, &block)` — `with` is a JS reserved word, so trails' port of `Object#with` is exported as `objectWith` and `set` calls that. Language shortcoming; the Rails name cannot be spelled."
   }
 ]

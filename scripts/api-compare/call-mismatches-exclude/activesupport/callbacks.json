@@ -4,14 +4,14 @@
     "tsFile": "callbacks.ts",
     "rubyName": "__update_callbacks",
     "call": "descendants",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "callbacks.rb:687 `self.descendants.prepend(self)` — trails' `__updateCallbacks` takes the target list as its `targets` parameter because the callers hold it (a TS class has no DescendantsTracker registration at this layer). Converging means giving the callbacks host a `descendants` reader and changing every caller; tracked, not ratified."
   },
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
     "rubyName": "__update_callbacks",
     "call": "prepend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "callbacks.rb:687 `descendants.prepend(self)` — the same one call as the `descendants` row above: with `targets` handed in, there is no receiver list to prepend `self` onto. Converges with that row."
   },
   {
     "package": "activesupport",
@@ -24,15 +24,8 @@
     "package": "activesupport",
     "tsFile": "callbacks.ts",
     "rubyName": "merge_conditional_options",
-    "call": "build",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "merge_conditional_options",
     "call": "concat",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "callbacks.rb:262-263 `options[:if].concat Array(unless_option)` — Ruby Array#concat mutates in place; the port builds the array in the object literal it passes to `Callback.build` (`[...existingIf, ...kernelArray(unlessOption)]`), so there is no separate array to concat onto. Language shortcoming."
   },
   {
     "package": "activesupport",

@@ -4,14 +4,14 @@
     "tsFile": "inheritance.ts",
     "rubyName": "descends_from_active_record?",
     "call": "columns_hash",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "inheritance.rb:88 `!columns_hash.include?(inheritance_column)` — trails reads `classHasAttribute` (declared attribute or reflected column) instead, because schema reflection is lazy and async here so `columnsHash` is not guaranteed populated at this synchronous call. Documented at inheritance.ts:137-142."
   },
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "rubyName": "discriminate_class_for_record",
     "call": "find_sti_class",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "inheritance.rb:301 `find_sti_class(record[inheritance_column])` — trails routes through `findStiClassForRow` (inheritance.ts:867), the registry-safe variant that matches only within `baseClass`'s tracked subtree; the bare `findStiClass` is Rails' autoloader analog and is reached from there when STI is explicitly enabled (inheritance.ts:1075-1078). Documented at inheritance.ts:1050-1059."
   },
   {
     "package": "activerecord",

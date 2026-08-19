@@ -857,7 +857,22 @@ export class TimeZone {
   }
 
   /**
-   * Create a TimeWithZone from local time components.
+   * `local(*args)` (time_zone.rb:363-366): build the wall clock with
+   * `Time.utc(*args)` and hand it to `TimeWithZone.new(nil, self, time)`, which
+   * resolves the LOCAL time through `get_period_and_ensure_valid_local_time`
+   * (time_with_zone.rb:570-581) — `period_for_local`, moving the time forward
+   * an hour and retrying when it lands in the spring-forward gap — and whose
+   * `utc` (time_with_zone.rb:63) is then `incorporate_utc_offset(@time,
+   * -utc_offset)`. So the DST-gap and ambiguity policy comes from
+   * `periodForLocal` alone, never from a second search here.
+   *
+   * The constructor call here is the two-argument `(instant, zone)` arm, not
+   * Rails' `(nil, self, time)` one: widening `TimeWithZone`'s constructor onto
+   * Rails' four-argument shape is
+   * `widen-time-with-zone-ctor-onto-rails-four-argument-shape` (RFC 0098),
+   * after which this body collapses into that single call. Until then it
+   * inlines exactly what that constructor path does, over the same ported
+   * members — no second search lives here.
    */
   local(
     year: number,
@@ -868,45 +883,21 @@ export class TimeZone {
     second = 0,
     millisecond = 0,
   ): TimeWithZone {
-    // We need to find the UTC instant that corresponds to these local components.
-    const wantedMs = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
-    const guess = new Date(wantedMs);
-
-    // Get the offset at two candidate UTC times to handle DST transitions
-    const info1 = getZoneInfo(this.tzinfo.identifier, guess);
-    const utc1 = new Date(wantedMs - info1.utcOffsetSeconds * 1000);
-    const local1 = getLocalComponents(this.tzinfo.identifier, utc1);
-
-    // Check if utc1 maps back to the requested local time
-    if (
-      local1.year === year &&
-      local1.month === month &&
-      local1.day === day &&
-      local1.hour === hour &&
-      local1.minute === minute
-    ) {
-      return new TimeWithZone(instantFrom(utc1), this);
+    let time = new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
+    let period: TimezonePeriod;
+    for (;;) {
+      try {
+        period = this.periodForLocal(time);
+        break;
+      } catch (error) {
+        if (!(error instanceof PeriodNotFound)) throw error;
+        time = new Date(time.getTime() + 3_600_000);
+      }
     }
-
-    // The offset at the computed UTC may differ — try with that offset
-    const info2 = getZoneInfo(this.tzinfo.identifier, utc1);
-    const utc2 = new Date(wantedMs - info2.utcOffsetSeconds * 1000);
-    const local2 = getLocalComponents(this.tzinfo.identifier, utc2);
-
-    if (
-      local2.year === year &&
-      local2.month === month &&
-      local2.day === day &&
-      local2.hour === hour &&
-      local2.minute === minute
-    ) {
-      return new TimeWithZone(instantFrom(utc2), this);
-    }
-
-    // Neither candidate maps back — the requested time is in a DST gap.
-    // Spring forward: use the earlier UTC (utc1), which the Intl API already
-    // adjusted to the post-transition time (e.g., 2:00 AM → 3:00 AM EDT).
-    return new TimeWithZone(instantFrom(utc1), this);
+    return new TimeWithZone(
+      instantFrom(new Date(time.getTime() - period.observedUtcOffset * 1000)),
+      this,
+    );
   }
 
   /**
