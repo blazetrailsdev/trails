@@ -307,28 +307,15 @@ import {
   rememberTransactionRecordState as _rememberTransactionRecordState,
   restoreTransactionRecordState as _restoreTransactionRecordState,
   isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
-  synthOnCondition as _synthOnCondition,
-  afterSaveCommitMethod as _afterSaveCommitMethod,
-  afterCreateCommitMethod as _afterCreateCommitMethod,
-  afterUpdateCommitMethod as _afterUpdateCommitMethod,
-  afterDestroyCommitMethod as _afterDestroyCommitMethod,
+  beforeCommit as _beforeCommit,
+  afterCommit as _afterCommit,
+  afterRollback as _afterRollback,
+  setCallback as _txSetCallback,
+  afterSaveCommit as _afterSaveCommit,
+  afterCreateCommit as _afterCreateCommit,
+  afterUpdateCommit as _afterUpdateCommit,
+  afterDestroyCommit as _afterDestroyCommit,
 } from "./transactions.js";
-import { ActiveRecord } from "./ar-config.js";
-
-/**
- * Threads ActiveRecord.run_after_transaction_callbacks_in_order_defined into a
- * commit/rollback callback's conditions as `prepend`. When true the callback is
- * prepended so it runs in definition order; when false (the framework default)
- * it is appended so it runs in reverse definition order. Mirrors Rails'
- * `prepend_option` (transactions.rb:320-327).
- *
- * @internal
- */
-function _withTransactionCallbackOrder(
-  conditions: Record<string, unknown> | undefined,
-): Record<string, unknown> {
-  return { ...conditions, prepend: ActiveRecord.runAfterTransactionCallbacksInOrderDefined };
-}
 
 import {
   Default as DefaultScoping,
@@ -4225,48 +4212,49 @@ export class Base extends Model {
     return _currentTransactionPublic();
   }
 
+  static beforeCommit = _beforeCommit;
+
   /**
-   * Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback
+   * Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit
    *
-   * Intercepts `on:` before it reaches the activemodel chain, synthesizing it
-   * into an `if:` predicate that closes over `isTransactionIncludeAnyAction`.
-   * Rails does the same in transactions.rb#set_callback (lines 304–319).
+   * The body lives in transactions.ts at the Rails name; this is the `include`
+   * point. It cannot be a plain `static override afterCommit = _afterCommit`
+   * assignment the way the non-overriding members above are: a `this`-typed
+   * function assigned as a *property* over an inherited *method* is checked
+   * contravariantly, which drops `typeof Base` out of `typeof Model` and reds
+   * every `this.beforeDestroy(...)` in a subclass body.
    */
   static override afterCommit<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
     conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
-    super.afterCommit(
-      fn,
-      _withTransactionCallbackOrder(
-        _synthOnCondition(conditions as Record<string, unknown>),
-      ) as TransactionalCallbackConditions<InstanceType<T>>,
-    );
+    _afterCommit.call(this, fn as (...args: any[]) => any, conditions as never);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback (rollback variant)
-   *
-   * Same `on:` synthesis as afterCommit.
-   */
+  /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
   static override afterRollback<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
     conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
-    super.afterRollback(
-      fn,
-      _withTransactionCallbackOrder(
-        _synthOnCondition(conditions as Record<string, unknown>),
-      ) as TransactionalCallbackConditions<InstanceType<T>>,
-    );
+    _afterRollback.call(this, fn as (...args: any[]) => any, conditions as never);
   }
 
-  static afterSaveCommit = _afterSaveCommitMethod;
-  static afterCreateCommit = _afterCreateCommitMethod;
-  static afterUpdateCommit = _afterUpdateCommitMethod;
-  static afterDestroyCommit = _afterDestroyCommitMethod;
+  /** Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback */
+  static override setCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "before" | "after" | "around",
+    fn: (...args: any[]) => any,
+    options?: Record<string, unknown>,
+  ): void {
+    _txSetCallback.call(this, event, timing, fn, options);
+  }
+  static afterSaveCommit = _afterSaveCommit;
+  static afterCreateCommit = _afterCreateCommit;
+  static afterUpdateCommit = _afterUpdateCommit;
+  static afterDestroyCommit = _afterDestroyCommit;
 
   /**
    * Run validations and return self.

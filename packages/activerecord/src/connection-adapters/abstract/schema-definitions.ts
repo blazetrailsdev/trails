@@ -1649,26 +1649,18 @@ export class Table {
   }
 
   async columnExists(columnName: string, type?: ColumnType): Promise<boolean> {
-    return this._require("columnExists").call(this._schema, this.name, columnName, type);
-  }
-
-  private _require<K extends keyof SchemaStatementsLike>(
-    method: K,
-  ): NonNullable<SchemaStatementsLike[K]> {
-    const fn = this._schema[method];
-    if (!fn) throw new Error(`${method} is not supported by the current schema backend`);
-    return fn;
+    return this._schema.columnExists(this.name, columnName, type);
   }
 
   async indexExists(
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    return this._require("indexExists").call(this._schema, this.name, columnName, options);
+    return this._schema.indexExists(this.name, columnName, options);
   }
 
   async renameIndex(oldName: string, newName: string): Promise<void> {
-    return this._require("renameIndex").call(this._schema, this.name, oldName, newName);
+    return this._schema.renameIndex(this.name, oldName, newName);
   }
 
   async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
@@ -1685,7 +1677,7 @@ export class Table {
   }
 
   async removeTimestamps(options?: ColumnOptions): Promise<void> {
-    return this._require("removeTimestamps").call(this._schema, this.name, options);
+    return this._schema.removeTimestamps(this.name, options);
   }
 
   async removeReferences(...refNames: string[]): Promise<void>;
@@ -1718,7 +1710,7 @@ export class Table {
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("addForeignKey").call(this._schema, this.name, toTable, options);
+    return this._schema.addForeignKey(this.name, toTable, options);
   }
 
   async removeForeignKey(
@@ -1727,15 +1719,15 @@ export class Table {
     this.raiseOnIfExistOptions(
       (typeof toTableOrOptions === "object" ? toTableOrOptions : {}) as Record<string, unknown>,
     );
-    return this._require("removeForeignKey").call(this._schema, this.name, toTableOrOptions);
+    return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
   async foreignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
-    return this._require("foreignKeyExists").call(this._schema, this.name, toTableOrOptions);
+    return this._schema.foreignKeyExists(this.name, toTableOrOptions);
   }
 
   async checkConstraint(expression: string, options?: Record<string, unknown>): Promise<void> {
-    return this._require("addCheckConstraint").call(this._schema, this.name, expression, options);
+    return this._schema.addCheckConstraint(this.name, expression, options);
   }
 
   async removeCheckConstraint(
@@ -1743,23 +1735,18 @@ export class Table {
     options?: { name?: string },
   ): Promise<void> {
     if (typeof expressionOrOptions === "string") {
-      return this._require("removeCheckConstraint").call(
-        this._schema,
+      return this._schema.removeCheckConstraint(
         this.name,
         options?.name ? options : expressionOrOptions,
       );
     }
-    return this._require("removeCheckConstraint").call(
-      this._schema,
-      this.name,
-      expressionOrOptions,
-    );
+    return this._schema.removeCheckConstraint(this.name, expressionOrOptions);
   }
 
   async checkConstraintExists(
     options: { name?: string; expression?: string } = {},
   ): Promise<boolean> {
-    return this._require("checkConstraintExists").call(this._schema, this.name, options);
+    return this._schema.checkConstraintExists(this.name, options);
   }
 
   async primaryKey(
@@ -1826,13 +1813,13 @@ export interface SchemaStatementsLike {
   removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
   removeTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  columnExists?(tableName: string, columnName: string, type?: ColumnType): Promise<boolean>;
-  indexExists?(
+  columnExists(tableName: string, columnName: string, type?: ColumnType): Promise<boolean>;
+  indexExists(
     tableName: string,
     columnName: string | string[],
     options?: Record<string, unknown>,
   ): Promise<boolean>;
-  renameIndex?(tableName: string, oldName: string, newName: string): Promise<void>;
+  renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   changeColumn(
     tableName: string,
     columnName: string,
@@ -1850,31 +1837,31 @@ export interface SchemaStatementsLike {
     isNull: boolean,
     defaultValue?: unknown,
   ): Promise<void>;
-  addForeignKey?(
+  addForeignKey(
     tableName: string,
     toTable: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  removeForeignKey?(
+  removeForeignKey(
     tableName: string,
     toTableOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  foreignKeyExists?(
+  foreignKeyExists(
     tableName: string,
     toTableOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<boolean>;
-  addCheckConstraint?(
+  addCheckConstraint(
     tableName: string,
     expression: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  removeCheckConstraint?(
+  removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  checkConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
+  checkConstraintExists(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
   primaryKey?(tableName: string): Promise<string | string[] | null>;
 }
