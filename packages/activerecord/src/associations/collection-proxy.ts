@@ -2518,7 +2518,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 // plus `async`, `async!`, `assert_modifiable!`, `check_if_method_has_arguments!`)
 // — those are excluded here by name since neither is in
 // `public_instance_methods(false)`.
+//
+// `leftJoins` and `without` (query_methods.rb:887,1585, both public aliases)
+// ARE in `public_instance_methods(false)` and belong in the delegated set,
+// but adding them changes the delegated set from what it was before this
+// story, which this story's acceptance criteria pin byte-identical — tracked
+// in `collection-proxy-delegate-leftjoins-without-fix` instead of bundled
+// here.
 const QUERY_METHODS_NON_PUBLIC_INSTANCE_METHODS = new Set<keyof typeof QueryMethodBangs>([
+  "leftJoins",
+  "without",
   "async",
   "asyncBang",
   "assertModifiableBang",
@@ -2593,6 +2602,15 @@ export const delegateMethods = (
     "upsert",
     "upsertAll",
     "loadAsync",
+    // `nullBang`, `rewhereBang`, and `selectBang` match no real Rails or
+    // trails method (no `null!`/`rewhere!`; the real select alias is
+    // `_select!`, not `select!`) and calling any of them throws. Kept here,
+    // unreachable, only so this story's delegated set stays byte-identical to
+    // before it — dropping them is tracked in
+    // `collection-proxy-delegate-leftjoins-without-fix`.
+    "nullBang",
+    "rewhereBang",
+    "selectBang",
   ]);
 
 // The VALUE_METHODS accessors `query_methods.rb:162-183` generates
