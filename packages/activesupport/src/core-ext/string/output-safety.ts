@@ -73,7 +73,7 @@ export class SafeBuffer {
 
   /** safeConcat — appends without escaping. Raises if this buffer is not safe. */
   safeConcat(other: string | SafeBuffer): SafeBuffer {
-    if (!this._safe) {
+    if (!isHtmlSafe(this)) {
       throw new SafeConcatError();
     }
     const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
@@ -111,7 +111,7 @@ export class SafeBuffer {
   /** chr — returns first character as a SafeBuffer with same safety. */
   chr(): SafeBuffer {
     const first = Array.from(this._value)[0] ?? "";
-    return new SafeBuffer(first, this._safe);
+    return new SafeBuffer(first, isHtmlSafe(this));
   }
 
   /** repeat — repeats the string n times, preserving safety status. */

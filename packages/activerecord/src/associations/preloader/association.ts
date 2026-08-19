@@ -1,3 +1,4 @@
+import { wrap } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { ConnectionNotDefined } from "../../errors.js";
@@ -130,9 +131,7 @@ export class Association {
 
   targetFor(owner: Base): Base[] {
     try {
-      const target = (owner as any).association(this.reflection.name).target;
-      if (target == null) return [];
-      return Array.isArray(target) ? target : [target];
+      return wrap((owner as any).association(this.reflection.name).target);
     } catch {
       return [];
     }

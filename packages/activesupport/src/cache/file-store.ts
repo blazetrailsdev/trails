@@ -344,6 +344,7 @@ export class FileStore extends Store implements CacheStore {
   // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
   // the entry's expiresAt/version.
   private modifyValue(name: string, amount: number, options: StoreOptions): number {
+    options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
     // Rails coerces `amount = Integer(amount)` once (file_store.rb:226) and uses

@@ -36,12 +36,5 @@
       "num:4"
     ],
     "reason": "Ruby's `split(File::SEPARATOR, 4)` limit keeps the remainder joined, which the following `delete` then concatenates; JS' split limit discards the remainder instead, so the port splits unlimited and slices off the first three fields (justified at the call site, file-store.ts:261-264)."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "modify_value",
-    "call": "merged_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

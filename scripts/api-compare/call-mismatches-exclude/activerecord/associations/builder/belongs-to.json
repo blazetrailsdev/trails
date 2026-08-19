@@ -4,13 +4,13 @@
     "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "define_validations",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Hash#delete returns the DELETED value: `!reflection.options.delete(:required)` (builder/belongs_to.rb:115) ports to reading `options.required` and then `delete options.required` — JS `delete` returns a boolean, so the two steps cannot fold."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "touch_record",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#first on the [old, new] change pair: `changes[foreign_key].first` (builder/belongs_to.rb:45) ports to `change[0]`."
   }
 ]

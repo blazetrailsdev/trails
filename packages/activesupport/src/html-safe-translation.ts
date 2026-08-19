@@ -1,5 +1,4 @@
 /** @internal */
-import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { SafeBuffer, isHtmlSafe } from "./core-ext/string/output-safety.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
@@ -14,29 +13,32 @@ export const HtmlSafeTranslation = {
       const htmlSafeOptions = htmlEscapeTranslationOptions({ ...options });
 
       let exception = false;
-      const origRaise = htmlSafeOptions.raise === true;
-      delete htmlSafeOptions.raise;
 
-      let translation: unknown;
-      try {
-        translation = I18n.translate(key, { ...htmlSafeOptions, raise: true } as Parameters<
-          typeof I18n.translate
-        >[1]);
-      } catch (e) {
-        if (!(e instanceof MissingTranslationData)) throw e;
+      const exceptionHandler = (...args: unknown[]): unknown => {
         exception = true;
-        translation = I18n.translate(key, htmlSafeOptions as Parameters<typeof I18n.translate>[1]);
-      }
+        // Ruby's `I18n.exception_handler.call(*args)` is uniform over a Proc
+        // and a callable object (html_safe_translation.rb:15). JS
+        // `Function.prototype.call` is not — it would bind args[0] as `this` —
+        // so the two arms are split here exactly as i18n.ts:508-511 splits them.
+        const handler = I18n.exceptionHandler();
+        return typeof handler === "function"
+          ? (handler as (...a: unknown[]) => unknown)(...args)
+          : (handler as { call: (...a: unknown[]) => unknown }).call(...args);
+      };
+
+      const translation = I18n.translate(key, {
+        ...htmlSafeOptions,
+        exceptionHandler,
+      } as Parameters<typeof I18n.translate>[1]);
 
       if (exception) {
-        if (origRaise) {
-          I18n.translate(key, { ...options, raise: true } as Parameters<typeof I18n.translate>[1]);
-        }
         return translation;
+      } else {
+        return htmlSafeTranslation(translation);
       }
-      return htmlSafeTranslationResult(translation);
+    } else {
+      return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
     }
-    return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
   },
 
   isHtmlSafeTranslationKey: isHtmlSafeTranslationKey,
@@ -45,7 +47,7 @@ export const HtmlSafeTranslation = {
   /** @internal */
   isI18nOption: isI18nOption,
   /** @internal */
-  htmlSafeTranslation: htmlSafeTranslationResult,
+  htmlSafeTranslation,
 };
 
 function isHtmlSafeTranslationKey(key: string): boolean {
@@ -74,7 +76,8 @@ function htmlEscapeTranslationOptions(options: Record<string, unknown>): Record<
   return options;
 }
 
-function htmlSafeTranslationResult(translation: unknown): unknown {
+/** @internal */
+function htmlSafeTranslation(translation: unknown): unknown {
   if (Array.isArray(translation)) {
     return translation.map((el) => (typeof el === "string" ? new SafeBuffer(el, true) : el));
   }

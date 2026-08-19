@@ -11,6 +11,6 @@
     "tsFile": "log-subscriber.ts",
     "rubyName": "subscribe_log_level",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Hash#merge returns a NEW hash assigned back through the class_attribute writer: `self.log_levels = log_levels.merge(...)` (log_subscriber.rb:128); trails' logLevels getter already copy-on-writes the parent's Map per class, so the port sets the key on that Map instead."
   }
 ]

@@ -4,6 +4,6 @@
     "tsFile": "number-helper/rounding-helper.ts",
     "rubyName": "round",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Hash#fetch with a default: `options.fetch(:round_mode, :default)` (number_helper/rounding_helper.rb:16) ports to the `\"roundMode\" in this.options` check, which keeps fetch's stored-value-wins semantics that `??` would not."
   }
 ]

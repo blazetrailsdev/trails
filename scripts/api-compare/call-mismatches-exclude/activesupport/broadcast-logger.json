@@ -2,15 +2,8 @@
   {
     "package": "activesupport",
     "tsFile": "broadcast-logger.ts",
-    "rubyName": "initialize",
-    "call": "broadcast_to",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "broadcast-logger.ts",
     "rubyName": "stop_broadcasting_to",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#delete removes by value: `@broadcasts.delete(logger)` (broadcast_logger.rb:105) ports to the `filter`ed reassignment in stopBroadcastingTo — JS arrays have no delete-by-value."
   }
 ]

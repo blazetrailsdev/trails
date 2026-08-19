@@ -109,7 +109,7 @@ export class Entry {
   dupValueBang(): void {
     if (
       this._value != null &&
-      !this._compressed &&
+      !this.isCompressed() &&
       !(typeof this._value === "number" || typeof this._value === "boolean")
     ) {
       if (typeof this._value !== "string") {
