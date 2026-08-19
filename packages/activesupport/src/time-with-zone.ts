@@ -72,6 +72,13 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+/**
+ * Mirrors: `TimeWithZone::PRECISIONS` (`time_with_zone.rb:45-46`). Ruby's
+ * `Hash.new` default block generates and stores the format on first read for
+ * an unseen width; `??=` at the read site in `xmlschema` is that same store.
+ */
+const PRECISIONS: Record<number, string> = { 0: "%FT%T" };
+
 const NS_PER_SECOND = 1_000_000_000n;
 
 /** Sign of a BigInt as a Number-typed -1 / 0 / 1. */
@@ -388,14 +395,17 @@ export class TimeWithZone {
     return TimeZone.secondsToUtcOffset(this.utcOffset, colon);
   }
 
+  /**
+   * Returns a string of the object's date and time.
+   *
+   * Mirrors: `TimeWithZone#to_s` (`time_with_zone.rb:200-202`). Ruby formats
+   * through `time.strftime`; `time` is the local wall clock, which is what
+   * this receiver's own `strftime` formats (the `%Z` gsub it runs first has
+   * nothing to substitute in this literal).
+   */
   toString(): string {
-    const l = this._local();
-    // mimicking Ruby Time#to_s format (time_with_zone.rb:200-202)
-    return (
-      `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
-      `${this.formattedOffset(false, "UTC")}`
-    );
+    // mimicking Ruby Time#to_s format
+    return `${this.strftime("%Y-%m-%d %H:%M:%S")} ${this.formattedOffset(false, "UTC")}`;
   }
 
   inspect(): string {
@@ -446,17 +456,8 @@ export class TimeWithZone {
    * ISO 8601 / xmlschema / rfc3339 format.
    */
   xmlschema(fractionDigits = 0): string {
-    const l = this._local();
-    let base =
-      `${l.year}-${pad2(l.month)}-${pad2(l.day)}T` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}`;
-
-    if (fractionDigits > 0) {
-      base += `.${String(l.nsec).padStart(9, "0").slice(0, fractionDigits).padEnd(fractionDigits, "0")}`;
-    }
-
-    base += this.formattedOffset(true, "Z");
-    return base;
+    PRECISIONS[fractionDigits] ??= `%FT%T.%${fractionDigits}N`;
+    return `${this.strftime(PRECISIONS[fractionDigits])}${this.formattedOffset(true, "Z")}`;
   }
 
   /** Alias for xmlschema() */
@@ -469,14 +470,14 @@ export class TimeWithZone {
     return this.xmlschema(fractionDigits);
   }
 
-  /** RFC 2822 format */
+  /**
+   * Returns a string of the object's date and time in the RFC 2822 standard
+   * format.
+   *
+   * Mirrors: `TimeWithZone#rfc2822` (`time_with_zone.rb:194-196`).
+   */
   rfc2822(): string {
-    const l = this._local();
-    return (
-      `${SHORT_DAY_NAMES[this.wday]}, ${pad2(l.day)} ${SHORT_MONTH_NAMES[l.month - 1]} ${l.year} ` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
-      `${this.formattedOffset(false)}`
-    );
+    return this.toFs("rfc822");
   }
 
   /** `alias_method :rfc822, :rfc2822` (time_with_zone.rb:197). */
@@ -530,12 +531,7 @@ export class TimeWithZone {
     if (Encoding.useStandardJsonTimeFormat) {
       return this.xmlschema(Encoding.timePrecision);
     }
-    const l = this._local();
-    return (
-      `${l.year}/${pad2(l.month)}/${pad2(l.day)} ` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
-      `${this.formattedOffset(false)}`
-    );
+    return `${this.strftime("%Y/%m/%d %H:%M:%S")} ${this.formattedOffset(false)}`;
   }
 
   toJSON(): string {
@@ -611,9 +607,14 @@ export class TimeWithZone {
     return this.plus(seconds);
   }
 
-  /** Alias for minus with seconds */
-  ago(seconds: number): TimeWithZone {
-    return this.plus(-seconds);
+  /**
+   * Subtracts an interval of time from the current object's time and returns
+   * the result as a new TimeWithZone object.
+   *
+   * Mirrors: `TimeWithZone#ago` (`time_with_zone.rb:369-371`).
+   */
+  ago(other: number): TimeWithZone {
+    return this.since(-other);
   }
 
   /** Alias for since — matches Rails `in` method */
