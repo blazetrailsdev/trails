@@ -10,8 +10,11 @@ export class Vegetable extends Base {
   declare seller_id: number;
 
   static {
-    this.inheritanceColumn = "custom_type";
     this.validates("name", { presence: true });
+  }
+
+  static override get inheritanceColumn(): string {
+    return "custom_type";
   }
 }
 

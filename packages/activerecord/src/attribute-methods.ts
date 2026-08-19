@@ -538,21 +538,31 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
  * ancestry the way method lookup does — `include()` splices a module's carrier
  * into the prototype chain directly below the including class's prototype, so
  * per ancestor the class body outranks its generated module — and report which
- * kind of link defines the name first.
+ * kind of link defines the name first: `is_a?(GeneratedAttributeMethods)` reads
+ * as "the owner IS the `_generatedAttributeMethods` field", since ActiveModel's
+ * lazy `generated_attribute_methods` seats a plain `Module` there where
+ * ActiveRecord seats the subclass — the field, not the constructor, is the
+ * discriminator.
  */
 function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
+  return instanceMethodOwner(klass, name) instanceof Module;
+}
+
+/**
+ * Ruby's `klass.instance_method(name).owner` — the ancestor that defines
+ * `name`, or `undefined` when none does. A class prototype outranks the class's
+ * own generated-attribute-methods module, matching how `include()` splices a
+ * module's carrier directly below the including class's prototype.
+ */
+function instanceMethodOwner(klass: any, name: string): unknown {
   for (let c = klass; typeof c === "function"; c = Object.getPrototypeOf(c)) {
-    if (c.prototype && Object.prototype.hasOwnProperty.call(c.prototype, name)) return false;
+    if (c.prototype && Object.prototype.hasOwnProperty.call(c.prototype, name)) return c.prototype;
     const mod = Object.prototype.hasOwnProperty.call(c, "_generatedAttributeMethods")
       ? c._generatedAttributeMethods
       : undefined;
-    // `is_a?(GeneratedAttributeMethods)`: the `_generatedAttributeMethods`
-    // field IS that module. ActiveModel's lazy `generated_attribute_methods`
-    // seats a plain `Module` there where ActiveRecord seats the subclass, so
-    // the field, not the constructor, is the discriminator.
-    if (mod instanceof Module && mod.isMethodDefined(name)) return true;
+    if (mod instanceof Module && mod.isMethodDefined(name)) return mod;
   }
-  return false;
+  return undefined;
 }
 
 /**
@@ -607,15 +617,28 @@ export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: str
   return dangerousAttributeMethods().has(name);
 }
 
+/**
+ * Mirrors: ClassMethods#method_defined_within?
+ * (attribute_methods.rb:187-198). Ruby's `method_defined?` /
+ * `private_method_defined?` pair is one `name in klass.prototype` here — JS has
+ * no private-method reflection over the prototype chain, so the `in` test
+ * already covers both Ruby visibilities.
+ */
 export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
-  superklass?: any,
+  superklass: any = Object.getPrototypeOf(klass),
 ): boolean {
-  if (!(name in klass.prototype)) return false;
-  if (!superklass) return true;
-  return !(name in superklass.prototype);
+  if (name in klass.prototype) {
+    if (superklass?.prototype != null && name in superklass.prototype) {
+      return instanceMethodOwner(klass, name) !== instanceMethodOwner(superklass, name);
+    } else {
+      return true;
+    }
+  } else {
+    return false;
+  }
 }
 
 export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: string): boolean {

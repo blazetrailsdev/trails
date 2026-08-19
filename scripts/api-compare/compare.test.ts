@@ -2583,6 +2583,42 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
     ).toEqual([`${ORDER_PREFIX}validate,defineNonCyclicMethod → defineNonCyclicMethod,validate`]);
   });
 
+  it("drops a TS name a suppressed Ruby call claims as its own spelling", () => {
+    // `method_defined?` maps to nothing ported-with-args, so this check never
+    // reaches it — but trails spells it `has`, so `include?` must not be
+    // credited with that position (RFC 0106 Open Question 1).
+    const claimMap = (c: string) =>
+      c === "method_defined?"
+        ? ["methodDefined"]
+        : c === "include?"
+          ? ["includes", "has"]
+          : c === "define_method"
+            ? ["defineMethod"]
+            : null;
+    const notMethodDefined = (ts: string) => ts !== "methodDefined";
+    expect(
+      reorderedCalls(
+        "generate_method",
+        ["define_method", "include?"],
+        ["has", "defineMethod"],
+        notMethodDefined,
+        claimMap,
+        wide,
+        ["method_defined?", "define_method", "include?"],
+      ),
+    ).toEqual([]);
+    expect(
+      reorderedCalls(
+        "generate_method",
+        ["define_method", "include?"],
+        ["has", "defineMethod"],
+        notMethodDefined,
+        claimMap,
+        wide,
+      ),
+    ).toEqual([`${ORDER_PREFIX}has,defineMethod → defineMethod,has`]);
+  });
+
   it("respects the ported-with-args gate the missing-call check uses", () => {
     // A zero-arg reader Ruby records as a call but TS reads as `this.x` must not
     // manufacture a position — same gate 2 as significantMissingCalls.

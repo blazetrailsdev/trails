@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
-import { GeneratedAttributeMethods } from "./attribute-methods.js";
+import { GeneratedAttributeMethods, isMethodDefinedWithin } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
 
@@ -404,5 +404,42 @@ describe("AttributeMethodsTest (trails)", () => {
       isInstanceMethodAlreadyImplemented(n: string): boolean;
     };
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(true);
+  });
+});
+
+describe("methodDefinedWithin (trails)", () => {
+  class Super {
+    greet(): string {
+      return "super";
+    }
+  }
+  class Redefines extends Super {
+    override greet(): string {
+      return "sub";
+    }
+  }
+  class Inherits extends Super {}
+  const within = (name: string, klass: unknown, superklass?: unknown) =>
+    isMethodDefinedWithin.call({} as never, name, klass, superklass);
+
+  it("is true when both classes define the name and the subclass redefines it", () => {
+    expect(within("greet", Redefines, Super)).toBe(true);
+  });
+
+  it("is false when both classes define the name and the subclass inherits it", () => {
+    expect(within("greet", Inherits, Super)).toBe(false);
+  });
+
+  it("is true when only the class defines the name", () => {
+    expect(within("greet", Redefines, class {})).toBe(true);
+  });
+
+  it("is false when the class does not define the name", () => {
+    expect(within("missing", Redefines, Super)).toBe(false);
+  });
+
+  it("defaults superklass to the class's superclass", () => {
+    expect(within("greet", Redefines)).toBe(true);
+    expect(within("greet", Inherits)).toBe(false);
   });
 });
