@@ -333,10 +333,10 @@ describe("DateExtCalculationsTest", () => {
 
   it("xmlschema", () => {
     // Rails wraps this in `with_env_tz "US/Eastern"`; the port reads the
-    // ambient zone, so the offset is asserted against the one the day's
-    // midnight sits at in whatever zone the process runs in.
-    expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00[+-]\d{2}:?\d{2}$/);
-    expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00[+-]\d{2}:?\d{2}$/);
+    // ambient zone, so the offset is whatever the day's midnight sits at in
+    // the zone the process runs in — `Z` where that zone is UTC, as on CI.
+    expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
+    expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
   });
 
   it("xmlschema when zone is set", () => {
