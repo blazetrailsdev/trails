@@ -151,9 +151,11 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!counterCol) return;
     if (typeof klass.unscoped !== "function") return;
 
-    const configuredPk = (this.reflection.options as any).primaryKey;
-    const rawPk = configuredPk ?? klass.primaryKey ?? "id";
-    const pks = Array.isArray(rawPk) ? rawPk : [rawPk];
+    // Rails' `update_counters_via_scope` keys on `primary_key(klass)` —
+    // `reflection.association_primary_key(klass)` (belongs_to_association.rb:119,
+    // :151-153) — not on `klass.primary_key`, so query_constraints and the
+    // `[<tenant>, :id]` composite inference apply here too.
+    const pks = this.associationPrimaryKeys(klass);
     if (pks.length !== foreignKeyValues.length) return;
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < pks.length; i++) {
@@ -311,7 +313,7 @@ export class BelongsToAssociation extends SingularAssociation {
     return Array.isArray(fk) ? fk : [fk];
   }
 
-  protected associationPrimaryKeys(record: Base | null): string[] {
+  protected associationPrimaryKeys(klass: typeof Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) {
       return Array.isArray(configured) ? configured : [configured];
@@ -324,7 +326,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // the right target columns (e.g. `[blog_id, blog_post_id]` ← target
     // `[blog_id, id]`, not `[id, id]`). Gate on the target, not the owner, exactly
     // as Rails branches on `(klass || self.klass).has_query_constraints?`.
-    const targetCtor = (record?.constructor ?? this.klass) as never;
+    const targetCtor = (klass ?? this.klass) as never;
     // A composite (array) `foreign_key` is normalized into `query_constraints`
     // on the *rich* reflection (Rails reflection.rb:533 deletes
     // `options[:foreign_key]`), so the lightweight `this.reflection.options`
@@ -347,7 +349,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // key; only when the composite PK lacks an `"id"` column does it keep the
     // full array. Without this, the composite FK zip in `replaceKeys` would line
     // a scalar `<name>_id` FK up against a 2-column target PK.
-    const pk = ((record?.constructor ?? this.klass) as any)?.primaryKey;
+    const pk = ((klass ?? this.klass) as any)?.primaryKey;
     if (pk) return inferCompositePrimaryKey(pk);
     return ["id"];
   }
@@ -359,7 +361,7 @@ export class BelongsToAssociation extends SingularAssociation {
    */
   protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
     const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(record);
+    const pks = this.associationPrimaryKeys((record?.constructor as typeof Base) ?? null);
 
     const targetKeyValues = fks.map((_fk, i) => {
       const pkCol = pks[i] ?? pks[0];
@@ -404,44 +406,38 @@ export class BelongsToAssociation extends SingularAssociation {
     );
   }
 
+  /**
+   * Mirrors Rails `BelongsToAssociation#require_counter_update?`
+   * (belongs_to_association.rb:127-129).
+   */
+  private requireCounterUpdate(): boolean {
+    return this.counterCacheColumn() != null && this.owner.isPersisted();
+  }
+
+  /**
+   * Mirrors Rails `BelongsToAssociation#update_counters`
+   * (belongs_to_association.rb:109-117): the guard is
+   * `require_counter_update? && foreign_key_present?`; the loaded-and-fresh
+   * target is bumped in memory through `increment!` (so
+   * `Locking::Optimistic#update_counters` bumps the lock version), otherwise
+   * the write goes through `update_counters_via_scope`.
+   *
+   * `_cacheSingularTarget` routes singular inverse writes through
+   * `inversedFrom` (→ `replace_keys` → `loadedBang`), so `isStaleTarget()` is
+   * authoritative here just as Rails' `stale_target?` is.
+   */
   private async updateCounters(by: number): Promise<void> {
-    const counterCol = this.counterCacheColumn();
-    if (!counterCol) return;
-    if (!this.owner.isPersisted()) return;
-    if (!this.foreignKeyPresent()) return;
-
-    const touch = (this.reflection.options as any).touch;
-
-    // Mirrors Rails belongs_to_association.rb#update_counters: when the target is
-    // loaded and still the owner's current parent (`target && !stale_target?`),
-    // dispatch through `target.increment!(col, by, touch:)` so the class-level
-    // Locking::Optimistic#update_counters override bumps the lock version (and
-    // applies `touch`) on the in-memory record. Otherwise fall back to an
-    // in-place relation `update_counters`.
-    //
-    // `_cacheSingularTarget` now routes singular inverse writes through
-    // `inversedFrom` (→ `replace_keys` → `loadedBang`), so `isStaleTarget()` is
-    // authoritative here just as Rails' `stale_target?` is.
-    const target = this.target as any;
-    if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
-      await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
-      return;
-    }
-
-    const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(null);
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < fks.length; i++) {
-      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
-      if (fkValue == null) return;
-      conditions[pks[i] ?? pks[0]] = fkValue;
-    }
-
-    const Klass = this.klass;
-    if (Klass && typeof (Klass as any).where === "function") {
-      const scope = (Klass as any).where(conditions);
-      if (typeof scope.updateCounters === "function") {
-        await scope.updateCounters({ [counterCol]: by, touch });
+    if (this.requireCounterUpdate() && this.foreignKeyPresent()) {
+      const target = this.target as any;
+      if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
+        const counterCol = this.counterCacheColumn()!;
+        const touch = (this.reflection.options as any).touch;
+        await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
+      } else {
+        const foreignKey = this.foreignKeyNames().map((fk) =>
+          (this.owner as any)._readAttribute?.(fk),
+        );
+        await this.updateCountersViaScope(this.klass, foreignKey, by);
       }
     }
   }
@@ -457,20 +453,4 @@ export class BelongsToAssociation extends SingularAssociation {
 export function inferCompositePrimaryKey(pk: string | string[]): string[] {
   if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;
   return [pk];
-}
-
-/** @internal */
-function isRequireCounterUpdate(assoc: BelongsToAssociation): boolean {
-  const col = (assoc as any).counterCacheColumn?.();
-  return !!(col && assoc.owner.isPersisted());
-}
-
-/** @internal */
-function primaryKey(assoc: BelongsToAssociation, klass: unknown): string | string[] {
-  // Rails: reflection.association_primary_key(klass)
-  const refl = assoc.reflection as any;
-  if (typeof refl.associationPrimaryKey === "function") {
-    return refl.associationPrimaryKey(klass);
-  }
-  return refl.options?.primaryKey ?? (klass as any)?.primaryKey ?? "id";
 }

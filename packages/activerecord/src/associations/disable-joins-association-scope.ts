@@ -1,3 +1,4 @@
+import { any } from "@blazetrails/activesupport";
 import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
@@ -21,7 +22,7 @@ type ChainEntry = AbstractReflection | ReflectionProxy;
  * Join-id accumulator shape across the chain walk. Single-column keys
  * carry a flat list of scalars (`unknown[]`); composite keys carry a
  * list of tuples (`unknown[][]`). The shape per iteration is decided
- * by the step's key arity in `_addConstraintsDj` / `_lastScopeChain`.
+ * by the step's key arity in `_addConstraintsDj` / `lastScopeChain`.
  */
 type JoinIds = unknown[] | unknown[][];
 
@@ -127,7 +128,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const reverseChain = this.getChain(sourceReflection, association, unscoped.aliasTracker())
         .slice()
         .reverse();
-      const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(
+      const [lastReflection, lastOrdered, lastJoinIds] = await this.lastScopeChain(
         reverseChain,
         owner,
       );
@@ -163,8 +164,13 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    * join_foreign_key, and forwards the resulting IDs.
    *
    * Mirrors: DisableJoinsAssociationScope#last_scope_chain (lines 18-31).
+   *
+   * @missingRailsCall add_constraints — see `_addConstraintsDj` below: the
+   * subclass cannot reuse Rails' name because the base class declares it
+   * `private` with an incompatible signature. This body calls it at Rails'
+   * call site (disable_joins_association_scope.rb:23).
    */
-  private async _lastScopeChain(
+  private async lastScopeChain(
     reverseChain: ChainEntry[],
     owner: Base,
   ): Promise<[ChainEntry, boolean, JoinIds]> {
@@ -211,8 +217,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // invisible to the public getter. Check both so chain steps with
       // raw orders trigger the DJAR wrapping branch correctly.
       const ord = records as { orderValues?: unknown[]; _rawOrderClauses?: unknown[] };
-      const recordsOrdered =
-        (ord.orderValues?.length ?? 0) > 0 || (ord._rawOrderClauses?.length ?? 0) > 0;
+      const recordsOrdered = any(ord.orderValues ?? []) || any(ord._rawOrderClauses ?? []);
       acc = [nextReflection, recordsOrdered, recordIds];
     }
     return acc;
@@ -229,6 +234,13 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    * back in IN-list order.
    *
    * Mirrors: DisableJoinsAssociationScope#add_constraints (lines 33-56).
+   *
+   * @missingRailsCall add_constraints — Rails' subclass method shadows
+   * `AssociationScope#add_constraints` with a different arity, which Ruby
+   * permits. TypeScript rejects a derived declaration of a name the base
+   * declares `private` (TS2415), and the two signatures are not
+   * override-compatible, so the `Dj` suffix is the only spelling available;
+   * `scope()` still calls it at both of Rails' call sites.
    */
   private _addConstraintsDj(
     reflection: ChainEntry,
@@ -356,27 +368,6 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     }
     return scope;
   }
-}
-
-/** @internal */
-function lastScopeChain(
-  scope: DisableJoinsAssociationScope,
-  reverseChain: unknown[],
-  owner: unknown,
-): Promise<unknown> {
-  return (scope as any)._lastScopeChain(reverseChain, owner);
-}
-
-/** @internal */
-function addConstraints(
-  scope: DisableJoinsAssociationScope,
-  reflection: unknown,
-  key: unknown,
-  joinIds: unknown[],
-  owner: unknown,
-  ordered: boolean,
-): unknown {
-  return (scope as any)._addConstraintsDj(reflection, key, joinIds, owner, ordered);
 }
 
 setDjasScopeBuilder((assoc) =>

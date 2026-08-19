@@ -118,12 +118,12 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
 
   /**
    * Polymorphic belongs_to has no static target class, so when neither an
-   * explicit `primaryKey` option nor an owning record is given we fall
+   * explicit `primaryKey` option nor a target class is given we fall
    * back to the loaded target's class (the generic
    * `BelongsToAssociation` path can't do this — it has no polymorphic
    * type column to consult).
    */
-  protected override associationPrimaryKeys(record: Base | null): string[] {
+  protected override associationPrimaryKeys(klass: typeof Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) return Array.isArray(configured) ? configured : [configured];
     // Mirrors Rails `BelongsToReflection#association_primary_key`
@@ -132,8 +132,8 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     // array). The `klass` argument Rails passes is the runtime polymorphic
     // target, so this branch applies to polymorphic belongs_to too — without it
     // a scalar `<name>_id` FK would zip against the 2-column target PK.
-    if (record) {
-      const recordPk = (record.constructor as any).primaryKey;
+    if (klass) {
+      const recordPk = (klass as any).primaryKey;
       if (recordPk) return inferCompositePrimaryKey(recordPk);
     }
     // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime

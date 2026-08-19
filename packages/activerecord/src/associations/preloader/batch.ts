@@ -1,8 +1,8 @@
-import { groupBy } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
 import type { Branch } from "./branch.js";
+import { groupBy } from "@blazetrails/activesupport";
 import { ThroughAssociation } from "./through-association.js";
 
 /**
@@ -57,7 +57,7 @@ export class Batch {
         let targetLoaders = loaders.filter((l) => !futureTables.has(l.tableName));
         if (targetLoaders.length === 0) targetLoaders = loaders;
 
-        await this._groupAndLoadSimilar(targetLoaders);
+        await this.groupAndLoadSimilar(targetLoaders);
         for (const loader of targetLoaders) {
           await loader.run();
         }
@@ -115,36 +115,17 @@ export class Batch {
     }
   }
 
-  private async _groupAndLoadSimilar(loaders: Association[]): Promise<void> {
+  private async groupAndLoadSimilar(loaders: Association[]): Promise<void> {
     const nonThroughLoaders = loaders.filter((l) => !(l instanceof ThroughAssociation));
-
-    const groups = new Map<
-      string,
-      { query: ReturnType<Association["loaderQuery"]>; loaders: Association[] }
-    >();
-    for (const loader of nonThroughLoaders) {
-      const query = loader.loaderQuery();
-      const key = query.hashKey();
-      const existing = groups.get(key);
-      if (existing) {
-        existing.loaders.push(loader);
-      } else {
-        groups.set(key, { query, loaders: [loader] });
-      }
-    }
-
-    for (const { query, loaders: similarLoaders } of groups.values()) {
+    // Rails groups on the LoaderQuery objects themselves
+    // (`group_by(&:loader_query)`, batch.rb:41) and relies on
+    // `LoaderQuery#hash`/`#eql?` for value equality. A JS Map keys by
+    // identity, so group on the digest those two are ported as —
+    // `LoaderQuery#hashKey` — and recover the query from the group.
+    const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hashKey());
+    for (const similarLoaders of groups.values()) {
+      const query = similarLoaders[0].loaderQuery();
       await query.loadRecordsInBatch(similarLoaders);
     }
   }
-}
-
-/** @internal */
-function loaders(batch: Batch): unknown[] {
-  return (batch as any)._preloaders ?? [];
-}
-
-/** @internal */
-function groupAndLoadSimilar(batch: Batch, loaderList: unknown[]): Promise<void> {
-  return (batch as any)._groupAndLoadSimilar?.(loaderList) ?? Promise.resolve();
 }
