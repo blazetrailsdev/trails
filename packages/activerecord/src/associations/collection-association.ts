@@ -817,7 +817,13 @@ export class CollectionAssociation extends Association {
     } else if (this.isLoaded()) {
       return this.target.includes(record);
     } else {
-      const recordId = this.primaryKeyValue(record);
+      // Rails: `klass.primary_key.zip(record.id).to_h` for a composite key —
+      // `exists?` needs the column=>value hash, not a bare tuple.
+      const recordId = klass.compositePrimaryKey
+        ? Object.fromEntries(
+            (klass.primaryKey as string[]).map((key, i) => [key, (record.id as unknown[])[i]]),
+          )
+        : record.id;
       return await this.scope().exists(recordId);
     }
   }
