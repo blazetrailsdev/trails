@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/cidr_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { Cidr, IPAddr } from "../../connection-adapters/postgresql/oid/cidr.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
@@ -33,20 +34,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("changed? with nil values", async () => {
       const type = new Cidr();
 
-      expect(type.isChanged(null, null, "")).toBe(false);
-      expect(type.isChanged("192.168.0.0/24", null, "")).toBe(true);
-      expect(type.isChanged(null, "192.168.0.0/24", "")).toBe(true);
-      expect(type.isChanged("192.168.0.0/24", "192.168.0.0/25", "")).toBe(true);
-      expect(type.isChanged(new IPAddr("192.168.0.0", 24), null, "")).toBe(true);
-      expect(type.isChanged(null, new IPAddr("192.168.0.0", 24), "")).toBe(true);
-      expect(type.isChanged(new IPAddr("192.168.0.0", 24), new IPAddr("192.168.0.0", 25), "")).toBe(
-        true,
-      );
+      assertNot(type.isChanged(null, null, ""));
+      expect(type.isChanged("192.168.0.0/24", null, "")).toBeTruthy();
+      expect(type.isChanged(null, "192.168.0.0/24", "")).toBeTruthy();
+      expect(type.isChanged("192.168.0.0/24", "192.168.0.0/25", "")).toBeTruthy();
+      expect(type.isChanged(new IPAddr("192.168.0.0", 24), null, "")).toBeTruthy();
+      expect(type.isChanged(null, new IPAddr("192.168.0.0", 24), "")).toBeTruthy();
+      expect(
+        type.isChanged(new IPAddr("192.168.0.0", 24), new IPAddr("192.168.0.0", 25), ""),
+      ).toBeTruthy();
 
-      expect(type.isChanged(new IPAddr("0.0.0.0", 32), null, "")).toBe(true);
-      expect(type.isChanged(null, new IPAddr("0.0.0.0", 32), "")).toBe(true);
-      expect(type.isChanged(new IPAddr("::", 128), null, "")).toBe(true);
-      expect(type.isChanged(null, new IPAddr("::", 128), "")).toBe(true);
+      expect(type.isChanged(new IPAddr("0.0.0.0", 32), null, "")).toBeTruthy();
+      expect(type.isChanged(null, new IPAddr("0.0.0.0", 32), "")).toBeTruthy();
+      expect(type.isChanged(new IPAddr("::", 128), null, "")).toBeTruthy();
+      expect(type.isChanged(null, new IPAddr("::", 128), "")).toBeTruthy();
     });
   });
 });

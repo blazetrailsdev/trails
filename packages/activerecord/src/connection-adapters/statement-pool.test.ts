@@ -1,19 +1,23 @@
 import { describe, it, expect, vi } from "vitest";
+import { ArgumentError, assertSame } from "@blazetrails/activesupport";
 import { StatementPool } from "./statement-pool.js";
 import { isSqliteRun } from "../support/sqlite-template.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 
 describe("StatementPoolTest", () => {
   it("#delete doesn't call dealloc if the statement didn't exist", async () => {
-    const dealloced: string[] = [];
-    class TestPool extends StatementPool<string> {
-      protected dealloc(stmt: string): void {
-        dealloced.push(stmt);
+    class TestPool extends StatementPool<object> {
+      protected dealloc(stmt: object): void {
+        if (!stmt) throw new ArgumentError();
       }
     }
     const pool = new TestPool();
-    await pool.delete("nonexistent");
-    expect(dealloced).toHaveLength(0);
+    const stmt = {};
+    const sql = "SELECT 1";
+    await pool.set(sql, stmt);
+    assertSame(stmt, pool.get(sql));
+    assertSame(stmt, await pool.delete(sql));
+    expect(await pool.delete(sql)).toBeUndefined();
   });
 
   it("#delete calls dealloc when statement exists", async () => {

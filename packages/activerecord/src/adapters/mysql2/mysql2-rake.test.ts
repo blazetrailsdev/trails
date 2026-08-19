@@ -105,8 +105,8 @@ describeIfMysqlAdapter("MysqlDBCreateTest", () => {
     });
 
     expect(establishConnection).toHaveBeenCalledTimes(2);
-    expect(establishConnection.mock.calls[0][0]).toEqual({ adapter: "mysql2", database: null });
-    expect(establishConnection.mock.calls[1][0]).toEqual({
+    expect(establishConnection).toHaveBeenNthCalledWith(1, { adapter: "mysql2", database: null });
+    expect(establishConnection).toHaveBeenNthCalledWith(2, {
       adapter: "mysql2",
       database: "my-app-db",
     });

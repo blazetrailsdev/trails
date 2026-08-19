@@ -38,15 +38,15 @@ describe("TypeTest", () => {
 
   it("registering a new type", () => {
     register("foo", ArgType);
-    expect(lookup("foo")).toBeInstanceOf(ArgType);
+    expect(lookup("foo")).toStrictEqual(new ArgType());
   });
 
   it("looking up a type for a specific adapter", () => {
     register("foo", ArgType, { override: false });
     register("foo", PgArgType, { adapter: "postgres" });
 
-    expect(lookup("foo", { adapter: "sqlite" })).toBeInstanceOf(ArgType);
-    expect(lookup("foo", { adapter: "postgres" })).toBeInstanceOf(PgArgType);
+    expect(lookup("foo", { adapter: "sqlite" })).toStrictEqual(new ArgType());
+    expect(lookup("foo", { adapter: "postgres" })).toStrictEqual(new PgArgType());
   });
 
   it("lookup defaults to the current adapter", () => {
@@ -54,6 +54,6 @@ describe("TypeTest", () => {
     register("foo", ArgType, { override: false });
     register("foo", PgArgType, { adapter: currentAdapter });
 
-    expect(lookup("foo")).toBeInstanceOf(PgArgType);
+    expect(lookup("foo")).toStrictEqual(new PgArgType());
   });
 });

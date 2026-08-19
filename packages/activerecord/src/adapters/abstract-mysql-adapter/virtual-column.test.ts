@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/virtual_column_test.rb
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
+import { assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -48,7 +49,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("virtual column", async () => {
       const column = await findColumn("upper_name");
-      expect(column!.isVirtual()).toBe(true);
+      assertPredicate(column!, (c) => c.isVirtual());
       expect(column!.extra).toMatch(/\bVIRTUAL\b/);
       const value = await adapter.selectValue("SELECT upper_name FROM virtual_columns LIMIT 1");
       expect(value).toBe("RAILS");
@@ -56,7 +57,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("stored column", async () => {
       const column = await findColumn("name_length");
-      expect(column!.isVirtual()).toBe(true);
+      assertPredicate(column!, (c) => c.isVirtual());
       expect(column!.extra).toMatch(/\b(?:STORED|PERSISTENT)\b/);
       const value = await adapter.selectValue("SELECT name_length FROM virtual_columns LIMIT 1");
       expect(value).toBe(5);

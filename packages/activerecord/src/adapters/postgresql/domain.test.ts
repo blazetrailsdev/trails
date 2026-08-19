@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/domain_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { assertNotPredicate, BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
@@ -58,11 +58,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: assert_equal "custom_money", column.sql_type
       expect(column.sqlType).toBe("custom_money");
       // Rails: assert_not_predicate column, :array?
-      expect(column.isArray()).toBe(false);
+      assertNotPredicate(column, (c) => c.isArray());
       // Rails: type = PostgresqlDomain.type_for_attribute("price")
       const type = PostgresqlDomain.typeForAttribute("price");
       // Rails: assert_not_predicate type, :binary?
-      expect(type.isBinary()).toBe(false);
+      assertNotPredicate(type, (t) => t.isBinary());
     });
 
     it("domain acts like basetype", async () => {

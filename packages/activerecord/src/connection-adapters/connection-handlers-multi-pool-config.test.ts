@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
@@ -60,8 +61,8 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
     // connect to default
     await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();
 
-    expect(handler.isConnected("primary")).toBe(true);
-    expect(handler.isConnected("primary", { shard: "default" })).toBe(true);
-    expect(handler.isConnected("primary", { shard: "pool_config_two" })).toBe(false);
+    expect(handler.isConnected("primary")).toBeTruthy();
+    expect(handler.isConnected("primary", { shard: "default" })).toBeTruthy();
+    assertNot(handler.isConnected("primary", { shard: "pool_config_two" }));
   });
 });

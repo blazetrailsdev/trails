@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/unsigned_type_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertDeprecated, assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";
@@ -77,27 +78,19 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const columns = await adapter.columns("unsigned_types");
       const unsignedColumns = columns.filter((c) => /^unsigned_/.test(c.name));
       for (const column of unsignedColumns) {
-        expect((column as any).isUnsigned()).toBe(true);
+        assertPredicate(column, (c) => (c as any).isUnsigned());
       }
     });
 
     it("deprecate unsigned_float and unsigned_decimal", async () => {
-      const warnings: string[] = [];
-      const dep = deprecator();
-      const prev = dep.behavior;
-      dep.behavior = (msg: unknown) => {
-        warnings.push(String(msg));
-      };
-      try {
-        await adapter.changeTable("unsigned_types", async (t: any) => {
+      await adapter.changeTable("unsigned_types", async (t: any) => {
+        await assertDeprecated(/unsigned_float/, deprecator(), async () => {
           await t.unsignedFloat("unsigned_float_t");
+        });
+        await assertDeprecated(/unsigned_decimal/, deprecator(), async () => {
           await t.unsignedDecimal("unsigned_decimal_t");
         });
-      } finally {
-        dep.behavior = prev;
-      }
-      expect(warnings.some((w) => /unsigned_float/.test(w))).toBe(true);
-      expect(warnings.some((w) => /unsigned_decimal/.test(w))).toBe(true);
+      });
     });
 
     it("schema dump includes unsigned option", async () => {

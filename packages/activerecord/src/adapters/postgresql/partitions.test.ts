@@ -32,7 +32,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           t.column("issued_at", "timestamp");
         },
       );
-      expect(await adapter.tableExists("partitioned_events")).toBe(true);
+      expect(await adapter.tableExists("partitioned_events")).toBeTruthy();
     });
   });
 });

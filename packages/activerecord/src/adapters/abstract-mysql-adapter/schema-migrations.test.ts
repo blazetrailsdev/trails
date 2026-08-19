@@ -47,7 +47,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const tableName = schemaMigration.tableName;
         await adapter.dropTable(tableName, { ifExists: true });
         await schemaMigration.createTable();
-        expect(await adapter.columnExists(tableName, "version")).toBe(true);
+        expect(await adapter.columnExists(tableName, "version")).toBeTruthy();
       });
     });
 
@@ -57,7 +57,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const tableName = internalMetadata.tableName;
         await adapter.dropTable(tableName, { ifExists: true });
         await internalMetadata.createTable();
-        expect(await adapter.columnExists(tableName, "key")).toBe(true);
+        expect(await adapter.columnExists(tableName, "key")).toBeTruthy();
         // Restore environment entry so other tests don't see a missing metadata row
         await internalMetadata.createTableAndSetFlags("test");
       });

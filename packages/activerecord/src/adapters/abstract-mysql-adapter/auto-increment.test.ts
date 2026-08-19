@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/auto_increment_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
@@ -51,14 +52,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
       const columns = await adapter.columns("auto_increments");
       const col = (columns as any[]).find((c) => c.name === "id");
-      expect(col.autoIncrement).toBe(false);
+      assertNotPredicate(col, (c) => c.autoIncrement);
     });
 
     it("auto increment false with create table", async () => {
       await adapter.createTable("auto_increments", { autoIncrement: false, force: "cascade" });
       const columns = await adapter.columns("auto_increments");
       const col = (columns as any[]).find((c) => c.name === "id");
-      expect(col.autoIncrement).toBe(false);
+      assertNotPredicate(col, (c) => c.autoIncrement);
     });
   });
 });
