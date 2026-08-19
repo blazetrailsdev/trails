@@ -14,6 +14,8 @@ import {
   wrapWithScopeProxy,
 } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
+import { SpawnMethods } from "../relation/spawn-methods.js";
+import { QueryMethodBangs } from "../relation/query-methods.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
 // (association-relation.ts extends Relation, which would otherwise
@@ -2356,111 +2358,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //
 // trails mixes QueryMethods / SpawnMethods into `Relation` itself rather than
 // keeping them as standalone modules, so their `public_instance_methods(false)`
-// can't be reflected off a module object — the two name lists below stand in for
-// that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
-// Both halves of each module are listed: `public_instance_methods(false)` includes
-// the bang builders (`where!`, `limit!`, `none!`, …), so Rails delegates those to
-// `scope` too — a Rails `CollectionProxy` owns no relation state of its own. The
-// constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
-// prototype delegation is consulted only in the sense that they must target the
-// proxy's inherited state, so they are invoked through `Relation.prototype`
-// directly (see the ctor).
-const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "includes",
-  "all",
-  "eagerLoad",
-  "preload",
-  "extractAssociated",
-  "references",
-  "select",
-  "with",
-  "withRecursive",
-  "reselect",
-  "group",
-  "regroup",
-  "order",
-  "inOrderOf",
-  "reorder",
-  "unscope",
-  "joins",
-  "leftOuterJoins",
-  "where",
-  "rewhere",
-  "invertWhere",
-  "structurallyCompatible",
-  "and",
-  "or",
-  "having",
-  "limit",
-  "offset",
-  "lock",
-  "none",
-  "isNullRelation",
-  "readonly",
-  "strictLoading",
-  "createWith",
-  "from",
-  "distinct",
-  "extending",
-  "optimizerHints",
-  "reverseOrder",
-  "annotate",
-  "excluding",
-  "arel",
-  "constructJoinDependency",
-  // The bang half of `QueryMethods.public_instance_methods(false)`
-  // (query_methods.rb) — Rails delegates these to `scope` as well.
-  "includesBang",
-  "eagerLoadBang",
-  "preloadBang",
-  "referencesBang",
-  "selectBang",
-  "withBang",
-  "withRecursiveBang",
-  "reselectBang",
-  "groupBang",
-  "regroupBang",
-  "orderBang",
-  "reorderBang",
-  "unscopeBang",
-  "joinsBang",
-  "leftOuterJoinsBang",
-  "whereBang",
-  "rewhereBang",
-  "invertWhereBang",
-  "havingBang",
-  "limitBang",
-  "offsetBang",
-  "lockBang",
-  "noneBang",
-  "nullBang",
-  "readonlyBang",
-  "strictLoadingBang",
-  "createWithBang",
-  "fromBang",
-  "distinctBang",
-  "extendingBang",
-  "optimizerHintsBang",
-  "reverseOrderBang",
-  "annotateBang",
-  "excludingBang",
-  "uniqBang",
-  "skipQueryCacheBang",
-  "skipPreloadingBang",
-  "andBang",
-  "orBang",
-] as const;
-
-const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "spawn",
-  "merge",
-  "mergeBang",
-  "except",
-  "only",
-] as const;
-
+// can't be reflected off a module object — we derive these from the mixin objects
+// directly instead of maintaining hand-transcribed arrays. The two halves are:
+// 1. `Object.keys(SpawnMethods)` - the non-bang methods from SpawnMethods
+// 2. `Object.keys(QueryMethodBangs)` - the bang methods (the first half of QueryMethods)
+// Rails delegates both to `scope` in collection_proxy.rb:1128-1137.
+// The residual hand-list (non-bang names not in QueryMethodBangs) is maintained
+// to cover the non-bang methods still hanging on `Relation` itself.
 const delegateMethods = (
-  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]
+  [...Object.keys(SpawnMethods), ...Object.keys(QueryMethodBangs)] as string[]
 )
   .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
   .concat([
