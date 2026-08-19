@@ -444,15 +444,6 @@ export class AttributeSet {
   }
 
   /**
-   * Apply `forgettingAssignment()` to each attribute in place so that shared
-   * references (as in `becomes()`) see the updated baseline.
-   *
-   * Mirrors: ActiveModel::AttributeSet#map(&:forgetting_assignment) assigned
-   * back to `@attributes` in `forget_attribute_assignments`.
-   *
-   * @internal
-   */
-  /**
    * Mirrors: `attributes[name] = attributes[name].forgetting_assignment`, the
    * body of ActiveModel::AttributeMutationTracker#forget_change
    * (attribute_mutation_tracker.rb:33-35).
@@ -467,6 +458,15 @@ export class AttributeSet {
     if (next !== attr) this._attributes.set(name, next);
   }
 
+  /**
+   * Apply `forgettingAssignment()` to each attribute in place so that shared
+   * references (as in `becomes()`) see the updated baseline.
+   *
+   * Mirrors: ActiveModel::AttributeSet#map(&:forgetting_assignment) assigned
+   * back to `@attributes` in `forget_attribute_assignments`.
+   *
+   * @internal
+   */
   forgetAssignmentsBang(): void {
     this.assertNotFrozen();
     for (const [name, attr] of this._attributes) {

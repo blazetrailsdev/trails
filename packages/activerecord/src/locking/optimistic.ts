@@ -84,11 +84,17 @@ function buildBaseConstraints(
 
 const DEFAULT_LOCKING_COLUMN = "lock_version";
 
-/** Receiver shape Locking::Optimistic#increment! touches beyond Persistence's. */
-interface LockingIncrementRecord {
+/** Receiver shape Locking::Optimistic's instance methods read. */
+interface LockingRecord {
+  constructor: { lockingEnabled: boolean; lockingColumn: string };
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
+}
+
+/** Mirrors: ActiveRecord::Locking::Optimistic#locking_enabled? (optimistic.rb:59-61) */
+export function lockingEnabled(this: LockingRecord): boolean {
+  return this.constructor.lockingEnabled;
 }
 
 interface LockingHost {
@@ -109,16 +115,16 @@ interface LockingHost {
  * Persistence body is invoked by name; `include()` orders this override last.
  */
 export async function incrementBang(
-  this: LockingIncrementRecord,
+  this: LockingRecord & { lockingEnabled(): boolean },
   ...args: Parameters<typeof persistenceIncrementBang>
 ): Promise<unknown> {
   const result = await (persistenceIncrementBang as (...a: unknown[]) => Promise<unknown>).apply(
     this,
     args,
   );
-  if ((this.constructor as unknown as { lockingEnabled: boolean }).lockingEnabled) {
-    const lockingColumn = (this.constructor as unknown as { lockingColumn: string }).lockingColumn;
-    this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn) ?? 0) + 1);
+  if (this.lockingEnabled()) {
+    const lockingColumn = this.constructor.lockingColumn;
+    this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn)) + 1);
     this.clearAttributeChange(lockingColumn);
   }
   return result;
@@ -353,6 +359,7 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Typ
 }
 
 export const InstanceMethods = {
+  lockingEnabled,
   incrementBang,
   _lockValueForDatabase,
   _clearLockingColumn,
