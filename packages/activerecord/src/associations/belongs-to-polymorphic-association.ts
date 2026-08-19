@@ -3,7 +3,11 @@ import type { AssociationDefinition } from "../associations.js";
 import { modelRegistry } from "../associations.js";
 import { baseClass, demodulize } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
-import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
+import {
+  associationPrimaryKeyKlass,
+  BelongsToAssociation,
+  inferCompositePrimaryKey,
+} from "./belongs-to-association.js";
 
 /**
  * Extends BelongsToAssociation to handle polymorphic type columns.
@@ -123,7 +127,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * `BelongsToAssociation` path can't do this — it has no polymorphic
    * type column to consult).
    */
-  protected override associationPrimaryKeys(record: Base | null): string[] {
+  protected override associationPrimaryKeys(record: Base | typeof Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) return Array.isArray(configured) ? configured : [configured];
     // Mirrors Rails `BelongsToReflection#association_primary_key`
@@ -132,8 +136,9 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     // array). The `klass` argument Rails passes is the runtime polymorphic
     // target, so this branch applies to polymorphic belongs_to too — without it
     // a scalar `<name>_id` FK would zip against the 2-column target PK.
-    if (record) {
-      const recordPk = (record.constructor as any).primaryKey;
+    const recordKlass = associationPrimaryKeyKlass(record) as any;
+    if (recordKlass) {
+      const recordPk = recordKlass.primaryKey;
       if (recordPk) return inferCompositePrimaryKey(recordPk);
     }
     // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime
