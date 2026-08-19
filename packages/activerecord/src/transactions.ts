@@ -2,16 +2,16 @@ import type { Base } from "./base.js";
 
 import {
   ArgumentError,
-  _registerCallbackOnProto,
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
+  Model,
   type CallbackConditions,
-  type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import {
   IsolatedExecutionState,
   peekCallbackChain as asPeekCallbackChain,
 } from "@blazetrails/activesupport";
+import { ActiveRecord } from "./ar-config.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 import { threadedConnectionFor } from "./connection-handling.js";
@@ -146,8 +146,8 @@ export async function savepoint<T>(
 
 // ---------------------------------------------------------------------------
 // ClassMethods — mirrors ActiveRecord::Transactions::ClassMethods
-// These are standalone functions that take the model class as first arg,
-// following the codebase mixin pattern.
+// `this`-typed functions assigned to Base, so `this` is the model class the
+// way `self` is in the Ruby ClassMethods module.
 // ---------------------------------------------------------------------------
 
 type CallbackFn = (...args: any[]) => any;
@@ -158,153 +158,128 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit
- * Registers directly on the model callback chain (ActiveModel does not
- * provide a `beforeCommit` class helper).
- */
-export function beforeCommit(
-  modelClass: typeof Base,
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
+export function beforeCommit<T extends typeof Base>(
+  this: T,
   fn: CallbackFn,
   options?: CallbackOptions,
 ): void {
-  _registerCallbackOnProto(
-    (modelClass as unknown as { prototype: object }).prototype,
-    "before",
-    "commit",
-    fn,
-    synthOnCondition(options as Record<string, unknown>),
+  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined);
+  setCallback.call(this, "before_commit", "before", fn, args);
+}
+
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
+export function afterCommit<T extends typeof Model>(
+  this: T,
+  fn: CallbackFn,
+  options?: CallbackOptions,
+): void {
+  const args = setOptionsForCallbacksBang(
+    options as Record<string, unknown> | undefined,
+    prependOption(),
   );
+  setCallback.call(this, "commit", "after", fn, args);
 }
 
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit
- */
-export function afterCommit(
-  modelClass: typeof Base,
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
+export function afterSaveCommit<T extends typeof Base>(
+  this: T,
   fn: CallbackFn,
   options?: CallbackOptions,
 ): void {
-  (modelClass as any).afterCommit(fn, options);
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit
- */
-export function afterSaveCommit(modelClass: typeof Base, fn: CallbackFn): void {
-  afterCommit(modelClass, fn, { on: ["create", "update"] });
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit
- */
-export function afterCreateCommit(modelClass: typeof Base, fn: CallbackFn): void {
-  afterCommit(modelClass, fn, { on: "create" });
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit
- */
-export function afterUpdateCommit(modelClass: typeof Base, fn: CallbackFn): void {
-  afterCommit(modelClass, fn, { on: "update" });
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit
- */
-export function afterDestroyCommit(modelClass: typeof Base, fn: CallbackFn): void {
-  afterCommit(modelClass, fn, { on: "destroy" });
-}
-
-// ---------------------------------------------------------------------------
-// this-typed class method implementations for Base static assignment.
-// Each mirrors a Rails ClassMethods shortcut that delegates to after_commit
-// with an enforced `on:` option.
-// ---------------------------------------------------------------------------
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit
- */
-export function afterSaveCommitMethod<T extends typeof Base>(
-  this: T,
-  fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-  conditions?: CallbackConditions<InstanceType<T>>,
-): void {
-  this.afterCommit(fn, {
-    ...conditions,
+  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
     on: ["create", "update"],
-  } as TransactionalCallbackConditions<InstanceType<T>>);
+    ...prependOption(),
+  });
+  setCallback.call(this, "commit", "after", fn, args);
 }
 
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit
- */
-export function afterCreateCommitMethod<T extends typeof Base>(
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
+export function afterCreateCommit<T extends typeof Base>(
   this: T,
-  fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-  conditions?: CallbackConditions<InstanceType<T>>,
-): void {
-  this.afterCommit(fn, {
-    ...conditions,
-    on: "create",
-  } as TransactionalCallbackConditions<InstanceType<T>>);
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit
- */
-export function afterUpdateCommitMethod<T extends typeof Base>(
-  this: T,
-  fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-  conditions?: CallbackConditions<InstanceType<T>>,
-): void {
-  this.afterCommit(fn, {
-    ...conditions,
-    on: "update",
-  } as TransactionalCallbackConditions<InstanceType<T>>);
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit
- */
-export function afterDestroyCommitMethod<T extends typeof Base>(
-  this: T,
-  fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-  conditions?: CallbackConditions<InstanceType<T>>,
-): void {
-  this.afterCommit(fn, {
-    ...conditions,
-    on: "destroy",
-  } as TransactionalCallbackConditions<InstanceType<T>>);
-}
-
-/**
- * Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback
- */
-export function afterRollback(
-  modelClass: typeof Base,
   fn: CallbackFn,
   options?: CallbackOptions,
 ): void {
-  (modelClass as any).afterRollback(fn, options);
+  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+    on: "create",
+    ...prependOption(),
+  });
+  setCallback.call(this, "commit", "after", fn, args);
+}
+
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
+export function afterUpdateCommit<T extends typeof Base>(
+  this: T,
+  fn: CallbackFn,
+  options?: CallbackOptions,
+): void {
+  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+    on: "update",
+    ...prependOption(),
+  });
+  setCallback.call(this, "commit", "after", fn, args);
+}
+
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
+export function afterDestroyCommit<T extends typeof Base>(
+  this: T,
+  fn: CallbackFn,
+  options?: CallbackOptions,
+): void {
+  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+    on: "destroy",
+    ...prependOption(),
+  });
+  setCallback.call(this, "commit", "after", fn, args);
+}
+
+/** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
+export function afterRollback<T extends typeof Model>(
+  this: T,
+  fn: CallbackFn,
+  options?: CallbackOptions,
+): void {
+  const args = setOptionsForCallbacksBang(
+    options as Record<string, unknown> | undefined,
+    prependOption(),
+  );
+  setCallback.call(this, "rollback", "after", fn, args);
 }
 
 /**
  * Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback
+ *
+ * Rails' `super` is ActiveSupport::Callbacks' `set_callback`, reached here as
+ * ActiveModel's `Model.setCallback` — a `this`-typed function assigned to a
+ * class cannot spell `super`, so the inherited implementation is named.
  */
-export function setCallback(
-  modelClass: typeof Base,
-  name: "commit" | "rollback" | "before_commit",
+export function setCallback<T extends typeof Model>(
+  this: T,
+  name: string,
+  timing: "before" | "after" | "around",
   fn: CallbackFn,
-  options?: CallbackOptions,
+  options?: Record<string, unknown>,
 ): void {
-  if (name === "commit") {
-    afterCommit(modelClass, fn, options);
-  } else if (name === "rollback") {
-    afterRollback(modelClass, fn, options);
-  } else if (name === "before_commit") {
-    beforeCommit(modelClass, fn, options);
+  let filterList = options;
+  if ((name === "commit" || name === "rollback") && options?.on !== undefined) {
+    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+    assertValidTransactionAction(fireOn);
+    const { on: _on, if: existingIf, ...rest } = options;
+    filterList = {
+      ...rest,
+      if: [
+        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ],
+    };
   }
+  (Model.setCallback as CallbackFn).call(
+    this,
+    name,
+    timing,
+    fn,
+    filterList as CallbackConditions | undefined,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +294,7 @@ export function setCallback(
  */
 export async function beforeCommittedBang(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  await runBeforeCallbacksOnProto((ctor as any).prototype, "commit", record);
+  await runBeforeCallbacksOnProto((ctor as any).prototype, "before_commit", record);
 }
 
 /**
@@ -702,10 +677,12 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 /** @internal */
 export function hasTransactionalCallbacks(this: Base): boolean {
   const proto = (this.constructor as any).prototype;
+  const rollback = asPeekCallbackChain(proto, "rollback");
+  if (rollback && rollback.entries.length > 0) return true;
   const commit = asPeekCallbackChain(proto, "commit");
   if (commit && commit.entries.length > 0) return true;
-  const rollback = asPeekCallbackChain(proto, "rollback");
-  return !!(rollback && rollback.entries.length > 0);
+  const beforeCommitChain = asPeekCallbackChain(proto, "before_commit");
+  return !!(beforeCommitChain && beforeCommitChain.entries.length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -714,40 +691,50 @@ export function hasTransactionalCallbacks(this: Base): boolean {
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#prepend_option
 /** @internal */
-function prependOption(this: unknown): Record<string, unknown> {
-  return {};
+function prependOption(): Record<string, unknown> {
+  if (ActiveRecord.runAfterTransactionCallbacksInOrderDefined) {
+    return { prepend: true };
+  } else {
+    return {};
+  }
 }
 
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
 /**
- * Synthesize an `on:` option into an `if:` predicate before the conditions
- * reach the activemodel chain. Mirrors the transformation Rails performs in
- * `ActiveRecord::Transactions::ClassMethods#set_callback` (transactions.rb:308-315).
+ * Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
  *
- * Returns a new conditions object with `on:` removed and a synthesized `if:`
- * prepended, or the original conditions unchanged when `on:` is absent.
+ * Ruby mutates `args` in place; TS returns the merged option hash instead —
+ * the callers bind it straight back into the `set_callback` call, so the
+ * mutation is not observable. `on:` is dropped from the returned hash rather
+ * than left in place as Ruby leaves it: ActiveModel's chain validates `on:`
+ * itself and has no ActiveRecord `transaction_include_any_action?` to build,
+ * so a surviving `on:` would be re-validated against the `before_commit`
+ * event and rejected.
  *
  * @internal
  */
-export function synthOnCondition(
-  conditions: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (!conditions || conditions.on === undefined) return conditions;
-  const fireOn = (Array.isArray(conditions.on) ? conditions.on : [conditions.on]) as string[];
-  assertValidTransactionAction(fireOn);
-  const { on: _on, if: existingIf, ...rest } = conditions;
-  const synthIf = (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn);
-  return {
-    ...rest,
-    if: existingIf
-      ? (record: Base) => synthIf(record) && (existingIf as CallbackFn)(record)
-      : synthIf,
-  };
-}
+export function setOptionsForCallbacksBang(
+  options: Record<string, unknown> | undefined,
+  enforcedOptions: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const merged = { ...options, ...enforcedOptions };
 
-/** @internal Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks! */
-export const setOptionsForCallbacksBang = synthOnCondition;
+  if (merged.on !== undefined) {
+    const fireOn = (Array.isArray(merged.on) ? merged.on : [merged.on]) as string[];
+    assertValidTransactionAction(fireOn);
+    const { on: _on, if: existingIf, ...rest } = merged;
+    return {
+      ...rest,
+      if: [
+        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ],
+    };
+  }
+
+  return merged;
+}
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action
 /** @internal */

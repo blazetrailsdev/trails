@@ -9,17 +9,9 @@ import {
   ActiveRecord,
   Base,
   transaction,
-  beforeCommit,
-  afterCommit,
-  afterSaveCommit,
-  afterCreateCommit,
-  afterUpdateCommit,
-  afterDestroyCommit,
-  afterRollback,
   currentTransaction,
   Rollback,
   registerModel,
-  setCallback,
 } from "./index.js";
 import { skipCallbackOnProto } from "@blazetrails/activemodel";
 import { Owner } from "./test-helpers/models/owner.js";
@@ -32,16 +24,16 @@ function defineBehaviourTopic() {
     static {
       this._tableName = "topics";
       this.attribute("title", "string");
-      afterCommit(this, (r: any) => r.history.push(3));
-      afterCommit(this, (r: any) => r.history.push(4));
-      afterSaveCommit(this, (r: any) => r.history.push("save"));
-      afterCreateCommit(this, (r: any) => r.history.push("create"));
-      afterUpdateCommit(this, (r: any) => r.history.push("update"));
-      afterDestroyCommit(this, (r: any) => r.history.push("destroy"));
-      afterRollback(this, (r: any) => r.history.push("rollback1"));
-      afterRollback(this, (r: any) => r.history.push("rollback2"));
-      beforeCommit(this, (r: any) => r.history.push(1));
-      beforeCommit(this, (r: any) => r.history.push(2));
+      this.afterCommit((r: any) => r.history.push(3));
+      this.afterCommit((r: any) => r.history.push(4));
+      this.afterSaveCommit((r: any) => r.history.push("save"));
+      this.afterCreateCommit((r: any) => r.history.push("create"));
+      this.afterUpdateCommit((r: any) => r.history.push("update"));
+      this.afterDestroyCommit((r: any) => r.history.push("destroy"));
+      this.afterRollback((r: any) => r.history.push("rollback1"));
+      this.afterRollback((r: any) => r.history.push("rollback2"));
+      this.beforeCommit((r: any) => r.history.push(1));
+      this.beforeCommit((r: any) => r.history.push(2));
     }
   };
 }
@@ -80,7 +72,7 @@ describe("TransactionCallbacksTest", () => {
         this.attribute("title", "string");
       }
     }
-    beforeCommit(Topic, function () {
+    Topic.beforeCommit(function () {
       throw new Error("better pop this txn from the stack!");
     });
     const originalTxn = currentTransaction();
@@ -1126,7 +1118,7 @@ describe("TransactionCallbacksTest", () => {
           this.afterCommit((record: any) => record.history.push("update_and_destroy"), {
             on: ["update", "destroy"],
           });
-          beforeCommit(this, (record: any) => record.history.push("before_commit"), {
+          this.beforeCommit((record: any) => record.history.push("before_commit"), {
             if: (record: any) => record.saveBeforeCommitHistory,
           });
         }
@@ -1149,7 +1141,7 @@ describe("TransactionCallbacksTest", () => {
           this.attribute("title", "string");
         }
       }
-      beforeCommit(TopicBC, async function (record: any) {
+      TopicBC.beforeCommit(async function (record: any) {
         if (record.updateTitle) {
           await record.update({ title: "before commit title" });
         }
@@ -1216,8 +1208,8 @@ describe("TransactionCallbacksTest", () => {
           this._tableName = "topics";
           this.attribute("title", "string");
           this.attribute("author_name", "string");
-          afterCommit(this, () => history.push("commit_on_destroy"), { on: "destroy" });
-          afterRollback(this, () => history.push("rollback_on_destroy"), { on: "destroy" });
+          this.afterCommit(() => history.push("commit_on_destroy"), { on: "destroy" });
+          this.afterRollback(() => history.push("rollback_on_destroy"), { on: "destroy" });
           this.beforeDestroy((record: any) => record.beforeDestroyForTransaction());
         }
       };
@@ -1233,7 +1225,7 @@ describe("TransactionCallbacksTest", () => {
           this._tableName = "topics";
           this.attribute("title", "string");
           this.attribute("author_name", "string");
-          afterCommit(this, () => history.push("commit_on_update"), { on: "update" });
+          this.afterCommit(() => history.push("commit_on_update"), { on: "update" });
           this.beforeSave((record: any) => record.beforeSaveForTransaction());
         }
       };
@@ -1347,7 +1339,7 @@ describe("TransactionCallbacksTest", () => {
           this._tableName = "topics";
           this.attribute("title", "string");
           this.attribute("approved", "boolean", { default: true });
-          afterCommit(this, (record: any) => record.history.push("create_or_update"), {
+          this.afterCommit((record: any) => record.history.push("create_or_update"), {
             on: ["create", "update"],
             if: (record: any) => record.runCallback(),
           });
@@ -1381,13 +1373,13 @@ describe("TransactionCallbacksTest", () => {
           this._tableName = "topics";
           this.attribute("title", "string");
           (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = firstSaved;
-          afterCreateCommit(this, (record: any) =>
+          this.afterCreateCommit((record: any) =>
             history.push(`Created (title = ${JSON.stringify(record.title)})`),
           );
-          afterUpdateCommit(this, (record: any) =>
+          this.afterUpdateCommit((record: any) =>
             history.push(`Updated (title = ${JSON.stringify(record.title)})`),
           );
-          afterDestroyCommit(this, (record: any) =>
+          this.afterDestroyCommit((record: any) =>
             history.push(`Destroyed (title = ${JSON.stringify(record.title)})`),
           );
         }
@@ -1517,8 +1509,8 @@ describe("TransactionCallbacksTest", () => {
         static {
           this._tableName = "topics";
           this.attribute("title", "string");
-          afterCommit(this, afterCommitOnUpdate1, { on: "update" });
-          afterUpdateCommit(this, afterCommitOnUpdate2);
+          this.afterCommit(afterCommitOnUpdate1, { on: "update" });
+          this.afterUpdateCommit(afterCommitOnUpdate2);
         }
       }
       let topic = await TopicWithCallbacksOnUpdate.create({ title: "New topic" });
@@ -1538,7 +1530,9 @@ describe("TransactionCallbacksTest", () => {
       expectedHistory.push("after_commit_on_update_1");
       expect(history).toEqual(expectedHistory);
 
-      setCallback(TopicWithCallbacksOnUpdate, "commit", afterCommitOnUpdate2, { on: "update" });
+      TopicWithCallbacksOnUpdate.setCallback("commit", "after", afterCommitOnUpdate2, {
+        on: "update",
+      });
       topic = await TopicWithCallbacksOnUpdate.create({ title: "New topic" });
       await topic.update({ title: "Updated topic 3" });
       expectedHistory.push("after_commit_on_update_2");
@@ -1558,7 +1552,7 @@ describe("hasTransactionalCallbacks regression", () => {
         this.attribute("title", "string");
       }
     }
-    beforeCommit(Widget, () => {});
+    Widget.beforeCommit(() => {});
     const w = new Widget({});
     expect(w.hasTransactionalCallbacks()).toBe(true);
   });

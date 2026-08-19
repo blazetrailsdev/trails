@@ -402,6 +402,46 @@ When NOT to use this:
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
 
+## Generated attribute readers are properties (`define_method_attribute`)
+
+Ruby's `attr_reader`-shaped API is a zero-arg method, so `person.name` and
+`person.name()` are the same call. TypeScript has no such equivalence: a
+zero-arg Ruby reader **ports as an accessor property**, never as a method the
+caller has to invoke. `person.name` is the whole surface a trails user sees,
+and every consumer in the repo — serialization, dirty tracking, `toJSON`,
+association writers — reads it that way.
+
+That one decision has a fixed set of consequences, and they are ratified here,
+repo-wide, so no port re-derives them at its own call site:
+
+- **Every package that generates readers needs a `define_method_attribute`
+  hook**, including ActiveModel — where Rails has none. Rails' bare
+  `define_attribute_method_pattern`
+  (`activemodel/lib/active_model/attribute_methods.rb:333-346`) falls through to
+  `define_proxy_call`, which emits `def name; attribute("name"); end`; that
+  shape cannot produce a property, so `respond_to?("define_method_attribute",
+true)` must be true in trails wherever it is false in Ruby. Only ActiveRecord
+  defines the hook upstream
+  (`activerecord/lib/active_record/attribute_methods/read.rb:11`).
+- **One descriptor carries both halves.** A `MethodSet` applies one descriptor
+  per generated name (`code_generator.rb:32-36`) and a JS property cannot take
+  its `get` from one and its `set` from another, so a generated reader property
+  also carries the write half, and `define_method_attribute=`'s generated
+  `name=` (`attributes.rb:92`) sits beside it rather than being its setter.
+- **A generated reader must not shadow an inherited method.** Rails may freely
+  let a reader shadow `to_json`, because a Ruby reader is still an ordinary
+  method; a generated `toJSON` _property_ hands `JSON.stringify` a string where
+  the runtime demands a function. So reader generation skips a name a class
+  body already answers — the JS spelling of Rails'
+  `!superclass.instance_method(name).owner.is_a?(GeneratedAttributeMethods)`
+  (`activerecord/attribute_methods.rb:170-176`), which ActiveRecord gets from
+  its `instance_method_already_implemented?` override.
+
+This is a genuine language shortcoming, not a preference. Code implementing any
+of the three cites **this section** — `@noRailsEquivalent` there is a pointer to
+a ratified repo-wide rule, not a local justification, and a new instance is not
+a new decision to argue.
+
 ## Call-time constant resolution (Ruby autoload → the zero-import slot)
 
 Ruby resolves a constant named inside a method body when the method **runs**,

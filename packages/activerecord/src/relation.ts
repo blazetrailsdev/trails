@@ -1140,7 +1140,7 @@ export class Relation<T extends Base> {
         ...(this.isEagerLoading ? [] : this.includesValues),
         ...bypassPreloads.filter((n) => !this.preloadValues.includes(n)),
       ];
-      if (preloadAssocs.length > 0 && records.length > 0) {
+      if (!this.skipPreloadingValue) {
         await this.preloadAssociations(records, preloadAssocs);
         if (token !== this._loadToken) return [];
       }

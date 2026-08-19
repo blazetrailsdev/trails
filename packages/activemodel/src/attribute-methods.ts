@@ -666,12 +666,10 @@ function extractParameters(affixes: Array<string | { parameters?: string | null 
  * Rails' `!superclass.instance_method(name).owner.is_a?(GeneratedAttributeMethods)`
  * (activerecord/attribute_methods.rb:170-176).
  *
- * @noRailsEquivalent PERMANENT. Rails' ActiveModel happily generates a reader
- * over an inherited method, because a Ruby reader is an ordinary method and
- * nothing in the runtime depends on `to_json` staying callable. A trails reader
- * is an accessor property, so generating one for `attribute("toJSON")` would
- * leave `JSON.stringify` with a string where the runtime demands a function —
- * pinned by "attribute named toJSON does not shadow Model#toJSON". ActiveRecord
+ * @noRailsEquivalent PERMANENT. The shadowing consequence of the repo-wide
+ * "generated attribute readers are properties" rule (CLAUDE.md, "Generated
+ * attribute readers are properties"); see there rather than re-deriving it.
+ * Pinned by "attribute named toJSON does not shadow Model#toJSON". ActiveRecord
  * needs none of this: its `instance_method_already_implemented?` override
  * (attribute_methods.rb:165-179) rejects such a name before the hook runs.
  */
@@ -696,15 +694,11 @@ function isDefinedByAClassBody(klass: unknown, name: string): boolean {
  * `define_proxy_call` generates the ordinary method
  * `def name; attribute("name"); end`, dispatching to the private instance
  * method `attribute(attr_name)` (attributes.rb:161). Only ActiveRecord defines
- * the hook (attribute_methods/read.rb:11). This is invented surface, taking
- * that hook's name so `define_attribute_method_pattern` reaches it, because
- * trails spells an attribute reader as an accessor property (`person.name`,
- * not `person.name()`) and `define_proxy_call` emits an ordinary method. The
- * descriptor also carries the `set` half, since a `MethodSet` applies one
- * descriptor per generated name (code_generator.rb:32-36) and a property
- * cannot take its halves from two — so `define_method_attribute=`'s generated
- * `name=` (attributes.rb:92) is a method beside it rather than this property's
- * setter.
+ * the hook (attribute_methods/read.rb:11). trails needs it in ActiveModel too,
+ * and this descriptor carries the `set` half as well — both are consequences of
+ * the repo-wide "generated attribute readers are properties" rule (CLAUDE.md,
+ * "Generated attribute readers are properties"), which is where that decision
+ * is ratified; it is not re-argued here.
  */
 export function defineMethodAttribute(
   this: unknown,

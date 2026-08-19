@@ -1,7 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { afterCreateCommit } from "../../transactions.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /**
@@ -202,7 +201,7 @@ export class HasOne extends SingularAssociation {
     // Mirrors Rails `after_create_commit { association(name).reset_negative_cache }`:
     // once the create transaction commits, drop the negative (nil) target cache
     // so a subsequent read re-queries and sees the freshly persisted child.
-    afterCreateCommit(model, async (record: any) => {
+    model.afterCreateCommit(async (record: any) => {
       record.association(name).resetNegativeCache();
     });
     afterUpdate(model, callback, { if: savedChangesQ });
