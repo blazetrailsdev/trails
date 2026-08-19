@@ -427,6 +427,18 @@ export {
 
 export * from "./time-ext.js";
 export * from "./core-ext/time/conversions.js";
+// Two Ruby methods, one TS spelling: the class-side parser `Time.rfc3339(str)`
+// (`core_ext/time/calculations.rb:69-83`) lives in `time-ext.js`, and the
+// instance-side alias `Time#rfc3339` (`core_ext/time/conversions.rb:74`, an
+// `alias_method` of `xmlschema`) lives in `core-ext/time/conversions.js`. In
+// Ruby they never collide; in a flat ESM namespace the two star exports make
+// the name ambiguous and ESM drops it silently, taking `Time.rfc3339` down
+// too. The explicit re-export below pins the class-side one, and the
+// instance-side alias is reached through the subpath
+// `@blazetrails/activesupport/core-ext/time/conversions` -- the same shape the
+// comment below documents for core-ext/range's and core-ext/date's
+// conversions.
+export { rfc3339 } from "./time-ext.js";
 export * from "./core-ext/time/compatibility.js";
 export * from "./core-ext/string/zones.js";
 // MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:

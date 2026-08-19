@@ -137,68 +137,42 @@ export class AliasTracker {
   }
 
   /**
-   * Return `arelTable` unaliased on first visit, or a freshly
-   * aliased Arel table on repeat visits. The alias candidate is
-   * provided by `aliasCandidate` (a string — or a thunk, which is
-   * only invoked when the base name is already taken; Rails uses a
-   * block so the candidate string isn't built when it isn't needed).
+   * Returns `arelTable` under the name this join must answer to: the real (or
+   * `references`-supplied) `tableName` on its first visit, else a fresh alias
+   * built from the block's candidate and `_N`-suffixed on repeats.
    *
-   * Mirrors: ActiveRecord::Associations::AliasTracker#aliased_table_for
-   * (alias_tracker.rb) — keyed off `arelTable.name`, not the candidate.
+   * Mirrors: `AliasTracker#aliased_table_for`
+   * (`associations/alias_tracker.rb:58-75`). Ruby's block is a trailing
+   * parameter here; it is only invoked on the collision arm, exactly as
+   * `yield` is.
    */
-  aliasedTableFor(arelTable: Table | any, aliasCandidate?: string | (() => string)): Table | any {
-    const tableName = arelTable.name ?? String(arelTable);
-    const count = this._getCount(tableName);
-    if (count === 0) {
-      this.aliases.set(tableName, 1);
-      return arelTable;
-    }
+  aliasedTableFor(
+    arelTable: Table | any,
+    tableName: string | null = null,
+    block?: () => string,
+  ): Table | any {
+    tableName = (tableName ?? arelTable.name ?? String(arelTable)) as string;
 
-    const candidate =
-      typeof aliasCandidate === "function" ? aliasCandidate() : (aliasCandidate ?? tableName);
-    const aliasedName = this.tableAliasFor(candidate);
-
-    const newCount = this._getCount(aliasedName) + 1;
-    this.aliases.set(aliasedName, newCount);
-
-    const finalName = newCount > 1 ? `${this.truncate(aliasedName)}_${newCount}` : aliasedName;
-
-    return typeof arelTable.alias === "function" ? arelTable.alias(finalName) : arelTable;
-  }
-
-  /**
-   * Compute a non-colliding SQL alias for `candidate`, bumping its count so
-   * repeat candidates get a numeric suffix. Mirrors the aliased-name branch
-   * of `aliased_table_for` (alias_tracker.rb) without needing an Arel table —
-   * used by JoinDependency to name self-joined HABTM-through tables with the
-   * Rails `{plural_name}_{owner_table}_join` scheme.
-   *
-   * @internal
-   */
-  aliasNameFor(candidate: string): string {
-    const aliasedName = this.tableAliasFor(candidate);
-    const count = this._getCount(aliasedName) + 1;
-    this.aliases.set(aliasedName, count);
-    return count > 1 ? `${this.truncate(aliasedName)}_${count}` : aliasedName;
-  }
-
-  /**
-   * Claim a join target `tableName` and return the SQL alias to use: `undefined`
-   * on its first use (the real name is kept), else the `candidate` aliased and
-   * `_N`-suffixed on repeats. Unlike `aliasNameFor`, the collision decision runs
-   * through `_getCount`, so a table already present in the seeded `joins`
-   * (`initialCountFor`) or `aliases` map counts as taken. Mirrors the real-table
-   * branch of `aliased_table_for` (alias_tracker.rb:58-77) without needing an
-   * Arel table.
-   *
-   * @internal
-   */
-  aliasNameForTable(tableName: string, candidate: string | (() => string)): string | undefined {
     if (this._getCount(tableName) === 0) {
+      // If it's zero, we can have our table_name
       this.aliases.set(tableName, 1);
-      return undefined;
+      if (arelTable.name !== tableName && typeof arelTable.alias === "function") {
+        arelTable = arelTable.alias(tableName);
+      }
+    } else {
+      // Otherwise, we need to use an alias
+      let aliasedName = this.tableAliasFor(block ? block() : tableName);
+
+      // Update the count
+      const count = this._getCount(aliasedName) + 1;
+      this.aliases.set(aliasedName, count);
+
+      if (count > 1) aliasedName = `${this.truncate(aliasedName)}_${count}`;
+
+      if (typeof arelTable.alias === "function") arelTable = arelTable.alias(aliasedName);
     }
-    return this.aliasNameFor(typeof candidate === "function" ? candidate() : candidate);
+
+    return arelTable;
   }
 
   aliasFor(tableName: string): string {

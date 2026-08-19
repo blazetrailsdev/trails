@@ -927,7 +927,9 @@ describe("aliasTracker (trails)", () => {
     const table = new ArelTable("comments");
     const join = new Nodes.InnerJoin(table, new Nodes.On(new Nodes.SqlLiteral("1=1")));
     const seeded = CanonPost.all().aliasTracker([join]);
-    expect(seeded.aliasedTableFor(table, "comments_posts").right).toBe("comments_posts");
+    expect(seeded.aliasedTableFor(table, null, () => "comments_posts").right).toBe(
+      "comments_posts",
+    );
   });
 });
 

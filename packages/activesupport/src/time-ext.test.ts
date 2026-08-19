@@ -52,11 +52,10 @@ import {
   secFraction,
   subsec,
   rfc3339,
-  xmlschema,
   lastWeek,
   toDate,
 } from "./time-ext.js";
-import { toFs, formattedOffset } from "./core-ext/time/conversions.js";
+import { toFs, formattedOffset, xmlschema } from "./core-ext/time/conversions.js";
 import { toTime } from "./core-ext/time/compatibility.js";
 import { toTime as dateToTime } from "./core-ext/date/conversions.js";
 

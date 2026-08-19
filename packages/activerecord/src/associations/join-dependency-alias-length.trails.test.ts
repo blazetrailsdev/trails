@@ -31,15 +31,21 @@ describe("JoinDependency AliasTracker seeding", () => {
   it("caps aliases at the base connection's tableAliasLength (256 on MySQL)", () => {
     const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
-    tracker.aliasNameFor("posts"); // claim once so a repeat aliases + truncates
-    expect(tracker.aliasNameFor("a".repeat(300))).toBe("a".repeat(256));
+    const posts = new Table("posts");
+    tracker.aliasedTableFor(posts); // claim once so a repeat aliases + truncates
+    expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(300)).name)).toBe(
+      "a".repeat(256),
+    );
   });
 
   it("caps aliases at the base connection's tableAliasLength (63 on PostgreSQL)", () => {
     const jd = new JoinDependency(stubBaseModel(63), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
-    tracker.aliasNameFor("posts");
-    expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(63));
+    const posts = new Table("posts");
+    tracker.aliasedTableFor(posts);
+    expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(200)).name)).toBe(
+      "a".repeat(63),
+    );
   });
 
   it("threads the connection length through the suffix-truncation branch (256 - 2)", () => {
@@ -48,8 +54,14 @@ describe("JoinDependency AliasTracker seeding", () => {
     const candidate = "a".repeat(300);
     // First claim keeps the full 256-slice; the repeat aliases through
     // `truncate` (slice to tableAliasLength - 2) with a `_2` suffix.
-    expect(tracker.aliasNameFor(candidate)).toBe("a".repeat(256));
-    expect(tracker.aliasNameFor(candidate)).toBe(`${"a".repeat(254)}_2`);
+    const posts = new Table("posts");
+    tracker.aliasedTableFor(posts);
+    expect(String(tracker.aliasedTableFor(posts, null, () => candidate).name)).toBe(
+      "a".repeat(256),
+    );
+    expect(String(tracker.aliasedTableFor(posts, null, () => candidate).name)).toBe(
+      `${"a".repeat(254)}_2`,
+    );
   });
 
   it("falls back to the default cap when the base connection getter throws", () => {
@@ -63,7 +75,11 @@ describe("JoinDependency AliasTracker seeding", () => {
     const jd = new JoinDependency(noConnModel, null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     // maxIdentifierLength default is 64.
-    expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(64));
+    const posts = new Table("posts");
+    tracker.aliasedTableFor(posts);
+    expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(200)).name)).toBe(
+      "a".repeat(64),
+    );
   });
 
   it("propagates a genuine connection error instead of swallowing it", () => {

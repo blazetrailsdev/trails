@@ -483,7 +483,7 @@ export class AssociationScope {
         // `aliasCandidate` is only invoked on repeat visits — first
         // visits return the base arel table without ever building
         // the candidate string.
-        aliasedTable = tracker.aliasedTableFor(klass.arelTable, () => {
+        aliasedTable = tracker.aliasedTableFor(klass.arelTable, null, () => {
           const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
           return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
         });
