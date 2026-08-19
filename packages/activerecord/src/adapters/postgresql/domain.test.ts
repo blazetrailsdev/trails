@@ -2,8 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/domain_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNotPredicate } from "@blazetrails/activesupport";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { assertNotPredicate, BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
