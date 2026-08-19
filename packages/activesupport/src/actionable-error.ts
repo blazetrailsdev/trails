@@ -62,9 +62,6 @@ export class ActionableError extends Error {
 
   static dispatch(error: any, name: string): void {
     const actions = this.actions(error);
-    // `actions(error).fetch(name)` (actionable_error.rb:30) raises KeyError for
-    // a name that is not a key — not for one whose stored block is falsy — and
-    // the `rescue KeyError` turns that into NonActionable.
     if (!(name in actions)) {
       throw new NonActionable(`Cannot find action "${name}"`);
     }

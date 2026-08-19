@@ -709,7 +709,27 @@ export class TimeWithZone {
       ms = 0;
     }
 
-    return this._timeZone.local(year, month, day, hour, min, sec, ms);
+    // `periods = new_zone.periods_for_local(new_time)` then
+    // `self.class.new(nil, new_zone, new_time, periods.include?(period) ? period : nil)`
+    // (time_with_zone.rb:404-406): the receiver's own period wins whenever the
+    // new wall clock still falls in it, so a `change` that lands on an
+    // ambiguous local time stays on the side of the transition it started on
+    // rather than being re-resolved by `period_for_local`'s `dst` preference.
+    const newTime = Temporal.Instant.fromEpochMilliseconds(
+      Date.UTC(year, month - 1, day, hour, min, sec, ms),
+    );
+    const periods = this._timeZone.periodsForLocal(newTime);
+    const period = periods.find(
+      (p) =>
+        p.observedUtcOffset === this.period.observedUtcOffset && p.isDst() === this.period.isDst(),
+    );
+    if (!period) return this._timeZone.local(year, month, day, hour, min, sec, ms);
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochMilliseconds(
+        newTime.epochMilliseconds - period.observedUtcOffset * 1000,
+      ),
+      this._timeZone,
+    );
   }
 
   // ---------------------------------------------------------------------------

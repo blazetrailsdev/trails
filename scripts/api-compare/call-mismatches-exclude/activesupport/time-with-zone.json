@@ -23,13 +23,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-with-zone.ts",
-    "rubyName": "change",
-    "call": "new",
-    "reason": "Same gap as the `find_zone` row above: the `TimeWithZone.new(..., new_zone, ...)` construction at time_with_zone.rb:406-410 exists only to re-seat the result in the zone `:zone`/`:offset` named, and trails' `change` accepts neither option yet."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-with-zone.ts",
     "rubyName": "localtime",
     "call": "getlocal",
     "reason": "`utc.getlocal(utc_offset)` (time_with_zone.rb:83-85) is Ruby `Time#getlocal`; trails' `utc()` answers a `Temporal.Instant`, which has no `getlocal` — the shifted wall clock is built with `toZonedDateTimeISO(\"UTC\").toPlainDateTime()`, and `getlocal` is the alias of THIS method, not a call it can make."

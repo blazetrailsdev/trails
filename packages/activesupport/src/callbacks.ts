@@ -701,7 +701,6 @@ export class Callback {
       : this.options.unless
         ? [this.options.unless]
         : [];
-    // `self.class.build chain, @filter, @kind, options` (callbacks.rb:265).
     return Callback.build(chain, this.filter, this.kind, {
       if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
       unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
@@ -1432,8 +1431,7 @@ export namespace Callbacks {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
     // Rails hands the callback object straight to Callback.build, which compiles
-    // it to an ObjectCall honouring the chain scope — no function-wrapping
-    // (`Callback.build(self_chain, filter, type, options)`, callbacks.rb:740).
+    // it to an ObjectCall honouring the chain scope — no function-wrapping.
     const mapped = filters.map((filter) =>
       Callback.build(
         chain,

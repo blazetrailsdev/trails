@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { ArgumentError, type Store, type StoreOptions } from "../store.js";
-import { assert, assertNot, assertSame } from "../../testing/assertions.js";
+import { ArgumentError, Store as CacheStore, type Store, type StoreOptions } from "../store.js";
+import { assertErrorReported } from "../../testing/error-reporter-assertions.js";
+import { assert, assertNot, assertRaises, assertSame } from "../../testing/assertions.js";
 
 // Mirrors Rails `CacheStoreBehavior`
 // (activesupport/test/cache/behaviors/cache_store_behavior.rb) — "the base
@@ -238,4 +239,61 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("delete multi empty list", () => {
     expect(cache.deleteMulti([])).toBe(0);
   });
+
+  it("invalid expiration time raises an error when raise on invalid cache expiration time is true", async () => {
+    await withRaiseOnInvalidCacheExpirationTime(true, async () => {
+      const key = crypto.randomUUID();
+      const error = await assertRaises([ArgumentError], {}, () => {
+        cache.write(key, "bar", { expiresIn: -60 });
+      });
+      assertSame("Cache expiration time is invalid, cannot be negative: -60", error.message);
+      assert(cache.read(key) == null);
+    });
+  });
+
+  it("invalid expiration time reports and logs when raise on invalid cache expiration time is false", async () => {
+    await withRaiseOnInvalidCacheExpirationTime(false, async () => {
+      const errorMessage = "Cache expiration time is invalid, cannot be negative: -60";
+      const report = await assertErrorReported(ArgumentError, () => {
+        const logs = captureLogs(() => {
+          const key = crypto.randomUUID();
+          cache.write(key, "bar", { expiresIn: -60 });
+          assertSame("bar", cache.read(key));
+        });
+        assert(logs.includes(`ArgumentError: ${errorMessage}`));
+      });
+      assert(report!.error.message.includes(errorMessage));
+    });
+  });
+}
+
+/** Mirrors Rails' private `with_raise_on_invalid_cache_expiration_time`
+ * (cache_store_behavior.rb:746-753). */
+function withRaiseOnInvalidCacheExpirationTime<T>(newValue: boolean, block: () => T): T {
+  const oldValue = CacheStore.raiseOnInvalidCacheExpirationTime;
+  CacheStore.raiseOnInvalidCacheExpirationTime = newValue;
+  try {
+    return block();
+  } finally {
+    CacheStore.raiseOnInvalidCacheExpirationTime = oldValue;
+  }
+}
+
+/** Mirrors Rails' private `capture_logs` (cache_store_behavior.rb:755-765).
+ * Ruby writes an `ActiveSupport::Logger` into a `StringIO` and answers its
+ * contents; the JS logger is a plain object, so the lines are collected and
+ * joined. */
+function captureLogs(block: () => void): string {
+  const oldLogger = CacheStore.logger;
+  const log: string[] = [];
+  CacheStore.logger = {
+    warn: (message) => log.push(message),
+    error: (message) => log.push(message),
+  };
+  try {
+    block();
+    return log.join("\n");
+  } finally {
+    CacheStore.logger = oldLogger;
+  }
 }

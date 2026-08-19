@@ -136,7 +136,6 @@ export class EncryptedFile {
     const fs = await getFsAsync();
     const path = await getPathAsync();
     const contentPath = await this.resolveContentPath();
-    // `content_path.basename.to_s.chomp(".enc")` (encrypted_file.rb:89).
     const base = chomp(path.basename(contentPath), ".enc");
     const dir = await fs.mkdtemp!(`${path.dirname(contentPath)}${path.sep}encfile-`);
     const tmpPath = path.join(dir, `-${base}`);

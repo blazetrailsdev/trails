@@ -653,9 +653,6 @@ export abstract class Store {
       const entry = this.readEntry(key, options);
       if (!entry) continue;
 
-      // `version` is computed BEFORE the expired?/mismatched? branch
-      // (cache.rb:830), so the call order is normalize_version then
-      // delete_entry, not the reverse.
       const version = this.normalizeVersion(name, options) ?? null;
 
       if (entry.isExpired()) {
