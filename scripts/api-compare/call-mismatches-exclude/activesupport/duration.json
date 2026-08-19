@@ -11,7 +11,7 @@
     "tsFile": "duration.ts",
     "rubyName": "iso8601",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails builds the string via ISO8601Serializer.new(self, precision:) (duration.rb:474); trails inlines the serializer in iso8601 (the `serialize` half of the same call is already baselined above)."
   },
   {
     "package": "activesupport",

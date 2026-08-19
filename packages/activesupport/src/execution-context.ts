@@ -1,12 +1,22 @@
 /**
  * ExecutionContext — per-request key/value store.
  * Mirrors ActiveSupport::ExecutionContext.
- *
- * Note: This uses a process-global Map. In production with concurrent async
- * requests, consider integrating with AsyncLocalStorage for isolation.
- * Rails itself resets ExecutionContext via executor hooks per request.
  */
-const _store = new Map<string, unknown>();
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
+
+const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
+
+// Rails' private `store` reader is
+// `IsolatedExecutionState[:active_support_execution_context] ||= {}`
+// (execution_context.rb:47-49) — the context is per-execution state, not a
+// process global.
+/** @internal */
+function store(): Map<string, unknown> {
+  return IsolatedExecutionState.fetch(
+    ACTIVE_SUPPORT_EXECUTION_CONTEXT,
+    () => new Map<string, unknown>(),
+  );
+}
 
 // Callbacks fired whenever the context mutates. Mirrors Rails'
 // `@after_change_callbacks` (execution_context.rb). ActiveRecord::QueryLogs
@@ -24,8 +34,8 @@ function saveAndApply(
 ): Map<string, { hadKey: boolean; value: unknown }> {
   const saved = new Map<string, { hadKey: boolean; value: unknown }>();
   for (const key of Object.keys(attrs)) {
-    saved.set(key, { hadKey: _store.has(key), value: _store.get(key) });
-    _store.set(key, attrs[key]);
+    saved.set(key, { hadKey: store().has(key), value: store().get(key) });
+    store().set(key, attrs[key]);
   }
   return saved;
 }
@@ -33,9 +43,9 @@ function saveAndApply(
 function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void {
   for (const [key, entry] of saved) {
     if (entry.hadKey) {
-      _store.set(key, entry.value);
+      store().set(key, entry.value);
     } else {
-      _store.delete(key);
+      store().delete(key);
     }
   }
 }
@@ -54,7 +64,7 @@ export const ExecutionContext = {
   set<T = void>(attrs: Record<string, unknown>, fn?: () => T): T | void {
     if (!fn) {
       for (const key of Object.keys(attrs)) {
-        _store.set(key, attrs[key]);
+        store().set(key, attrs[key]);
       }
       runAfterChange();
       return;
@@ -92,16 +102,16 @@ export const ExecutionContext = {
   },
 
   get(key: string): unknown {
-    return _store.get(key);
+    return store().get(key);
   },
 
   setKey(key: string, value: unknown): void {
-    _store.set(key, value);
+    store().set(key, value);
     runAfterChange();
   },
 
   toH(): Record<string, unknown> {
-    return Object.fromEntries(_store);
+    return Object.fromEntries(store());
   },
 
   // Rails' `clear` does NOT fire after_change (execution_context.rb:43-45) —
@@ -109,6 +119,6 @@ export const ExecutionContext = {
   // (QueryLogs' cached comment) is re-cleared by the next `set`/`setKey`. We
   // match that exactly rather than firing here.
   clear(): void {
-    _store.clear();
+    store().clear();
   },
 };

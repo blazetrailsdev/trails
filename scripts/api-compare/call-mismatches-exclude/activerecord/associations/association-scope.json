@@ -11,6 +11,6 @@
     "tsFile": "associations/association-scope.ts",
     "rubyName": "get_chain",
     "call": "drop",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#drop: `reflection.chain.drop(1)` (association_scope.rb:115) ports to `reflection.chain.slice(1)`."
   }
 ]

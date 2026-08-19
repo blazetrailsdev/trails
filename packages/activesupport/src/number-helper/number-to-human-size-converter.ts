@@ -33,7 +33,10 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   }
 
   private conversionFormat(): string {
-    return this.translateInLocale("human.storage_units.format", { raise: true }) as string;
+    return this.translateNumberValueWithDefault("human.storage_units.format", {
+      locale: this.options.locale as string | undefined,
+      raise: true,
+    }) as string;
   }
 
   private unit(): unknown {

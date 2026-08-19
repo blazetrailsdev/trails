@@ -4,6 +4,6 @@
     "tsFile": "notifications/fanout.ts",
     "rubyName": "groups_for",
     "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Hash#transform_values: `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }` (notifications/fanout.rb:189-191) is folded into the local groupBy helper, which emits the delegate lists directly."
   }
 ]

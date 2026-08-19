@@ -4,20 +4,20 @@
     "tsFile": "inflector/inflections.ts",
     "rubyName": "human",
     "call": "prepend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#prepend is the alias of #unshift: `@humans.prepend([rule, replacement])` (inflector/inflections.rb:221) ports to `this.humans.unshift({ rule, replacement })`."
   },
   {
     "package": "activesupport",
     "tsFile": "inflector/inflections.ts",
     "rubyName": "plural",
     "call": "prepend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#prepend is the alias of #unshift: `@plurals.prepend([rule, replacement])` (inflector/inflections.rb:154) ports to `this.plurals.unshift({ rule, replacement })`."
   },
   {
     "package": "activesupport",
     "tsFile": "inflector/inflections.ts",
     "rubyName": "singular",
     "call": "prepend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#prepend is the alias of #unshift: `@singulars.prepend([rule, replacement])` (inflector/inflections.rb:165) ports to `this.singulars.unshift({ rule, replacement })`."
   }
 ]

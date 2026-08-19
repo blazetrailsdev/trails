@@ -34,7 +34,7 @@ export const HtmlSafeTranslation = {
         }
         return translation;
       }
-      return htmlSafeTranslationResult(translation);
+      return htmlSafeTranslation(translation);
     }
     return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
   },
@@ -45,7 +45,7 @@ export const HtmlSafeTranslation = {
   /** @internal */
   isI18nOption: isI18nOption,
   /** @internal */
-  htmlSafeTranslation: htmlSafeTranslationResult,
+  htmlSafeTranslation,
 };
 
 function isHtmlSafeTranslationKey(key: string): boolean {
@@ -74,7 +74,8 @@ function htmlEscapeTranslationOptions(options: Record<string, unknown>): Record<
   return options;
 }
 
-function htmlSafeTranslationResult(translation: unknown): unknown {
+/** @internal */
+function htmlSafeTranslation(translation: unknown): unknown {
   if (Array.isArray(translation)) {
     return translation.map((el) => (typeof el === "string" ? new SafeBuffer(el, true) : el));
   }

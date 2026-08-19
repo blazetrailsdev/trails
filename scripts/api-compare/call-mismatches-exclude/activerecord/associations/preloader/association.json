@@ -18,6 +18,6 @@
     "tsFile": "associations/preloader/association.ts",
     "rubyName": "target_for",
     "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `Array.wrap(...)` (preloader/association.rb:181) ports to the inline null/array normalization in targetFor; ActiveSupport's Array.wrap has no trails counterpart for a bare value."
   }
 ]

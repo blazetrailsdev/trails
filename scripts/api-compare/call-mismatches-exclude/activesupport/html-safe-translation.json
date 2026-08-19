@@ -4,13 +4,6 @@
     "tsFile": "html-safe-translation.ts",
     "rubyName": "translate",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "html-safe-translation.ts",
-    "rubyName": "translate",
-    "call": "html_safe_translation",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails routes the missing-translation signal through an `exception_handler` lambda that calls `I18n.exception_handler.call` (html_safe_translation.rb:14-16); trails' I18n has no swappable exception handler, so translate catches MissingTranslationData directly and there is no `call` to make."
   }
 ]

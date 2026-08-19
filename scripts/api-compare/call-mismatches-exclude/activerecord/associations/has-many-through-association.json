@@ -11,7 +11,7 @@
     "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "delete_records",
     "call": "count",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby Array#count with a block: `scope.destroy_all.count(&:destroyed?)` (has_many_through_association.rb:150) ports to `destroyed.filter((r) => r.isDestroyed?.()).length`."
   },
   {
     "package": "activerecord",

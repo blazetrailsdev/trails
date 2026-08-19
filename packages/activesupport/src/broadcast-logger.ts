@@ -20,8 +20,10 @@ export class BroadcastLogger extends Logger {
 
   constructor(...loggers: Logger[]) {
     super(null);
+    this.broadcasts = [];
     this.progname = "Broadcast";
-    this.broadcasts = [...loggers];
+
+    this.broadcastTo(...loggers);
   }
 
   broadcastTo(...loggers: Logger[]): this {
