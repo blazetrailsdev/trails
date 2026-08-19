@@ -313,7 +313,7 @@ export class BelongsToAssociation extends SingularAssociation {
     return Array.isArray(fk) ? fk : [fk];
   }
 
-  protected associationPrimaryKeys(record: Base | typeof Base | null): string[] {
+  protected associationPrimaryKeys(klass: typeof Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) {
       return Array.isArray(configured) ? configured : [configured];
@@ -326,7 +326,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // the right target columns (e.g. `[blog_id, blog_post_id]` ← target
     // `[blog_id, id]`, not `[id, id]`). Gate on the target, not the owner, exactly
     // as Rails branches on `(klass || self.klass).has_query_constraints?`.
-    const targetCtor = (associationPrimaryKeyKlass(record) ?? this.klass) as never;
+    const targetCtor = (klass ?? this.klass) as never;
     // A composite (array) `foreign_key` is normalized into `query_constraints`
     // on the *rich* reflection (Rails reflection.rb:533 deletes
     // `options[:foreign_key]`), so the lightweight `this.reflection.options`
@@ -349,7 +349,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // key; only when the composite PK lacks an `"id"` column does it keep the
     // full array. Without this, the composite FK zip in `replaceKeys` would line
     // a scalar `<name>_id` FK up against a 2-column target PK.
-    const pk = (associationPrimaryKeyKlass(record) ?? (this.klass as any))?.primaryKey;
+    const pk = ((klass ?? this.klass) as any)?.primaryKey;
     if (pk) return inferCompositePrimaryKey(pk);
     return ["id"];
   }
@@ -361,7 +361,7 @@ export class BelongsToAssociation extends SingularAssociation {
    */
   protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
     const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys(record);
+    const pks = this.associationPrimaryKeys((record?.constructor as typeof Base) ?? null);
 
     const targetKeyValues = fks.map((_fk, i) => {
       const pkCol = pks[i] ?? pks[0];
@@ -441,18 +441,6 @@ export class BelongsToAssociation extends SingularAssociation {
       }
     }
   }
-}
-
-/**
- * Rails' `primary_key(klass)` helper takes the target *class*; trails' callers
- * pass either a record or a class, so normalize to the class.
- * @internal
- */
-export function associationPrimaryKeyKlass(
-  record: Base | typeof Base | null | undefined,
-): unknown | null {
-  if (record == null) return null;
-  return typeof record === "function" ? record : record.constructor;
 }
 
 /**
