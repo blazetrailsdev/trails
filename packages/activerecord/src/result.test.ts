@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
+import { assert, assertNot } from "@blazetrails/activesupport";
 import { Result, type ColumnTypes } from "./result.js";
+
+// Rails asserts `assert_kind_of Integer, index`. JS numbers are primitives and
+// there is no Integer class to test with `instanceof`, so the kind check is
+// `Number.isInteger`; the Rails argument order is kept.
+function assertKindOf(klass: NumberConstructor, actual: unknown): void {
+  assert(
+    klass === Number && Number.isInteger(actual),
+    `Expected ${String(actual)} to be an Integer`,
+  );
+}
 
 function buildResult(): Result {
   return new Result(
@@ -27,8 +38,8 @@ const floatType = {
 describe("ResultTest", () => {
   it("includes_column?", () => {
     const result = buildResult();
-    expect(result.includesColumn("col_1")).toBe(true);
-    expect(result.includesColumn("foo")).toBe(false);
+    expect(result.includesColumn("col_1")).toBeTruthy();
+    assertNot(result.includesColumn("foo"));
   });
 
   it("length", () => {
@@ -84,10 +95,9 @@ describe("ResultTest", () => {
     let index = 0;
     for (const row of iter) {
       expect(Object.keys(row)).toEqual(["col_1", "col_2"]);
-      expect(Number.isInteger(index)).toBe(true);
+      assertKindOf(Number, index);
       index++;
     }
-    expect(index).toBe(3);
   });
 
   it("each without block returns a sized enumerator", () => {

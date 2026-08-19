@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/prepared_statements_disabled_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import "../../index.js";
 import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";
@@ -42,7 +43,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("select query works even when prepared statements are disabled", async () => {
-      expect(ps(Developer.connection).preparedStatements).toBe(false);
+      assertNot(ps(Developer.connection).preparedStatements);
 
       const david = developers("david");
 

@@ -97,8 +97,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       i.maximum_term = "P1YT2M";
       i.minimum_term = "PT10H";
       i.legacy_term = "P1DT1H";
-      expect(i.maximum_term).toBeInstanceOf(Duration);
-      expect(typeof i.legacy_term).toBe("string");
+      expect(i.maximum_term instanceof Duration).toBeTruthy();
+      expect(typeof i.legacy_term === "string").toBeTruthy();
       expect((i.maximum_term as Duration).iso8601()).toBe("P1YT2M");
       expect((i.minimum_term as Duration).iso8601()).toBe("PT10H");
       expect(i.legacy_term).toBe("P1DT1H");

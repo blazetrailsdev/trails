@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/change_schema_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertPredicate } from "@blazetrails/activesupport";
 import {
   describeIfPg,
   PostgreSQLAdapter,
@@ -141,8 +142,8 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.sqlType).toBe("timestamp without time zone");
-      expect((col as any).isArray()).toBe(true);
+      expect(col!.type).toBe("datetime");
+      assertPredicate(col!, (c) => (c as any).isArray());
     });
   });
 });

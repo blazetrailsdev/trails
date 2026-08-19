@@ -37,13 +37,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       // INSERT has to run on a connection other than the one issuing the DELETE.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
-        const [deleteResult, _createResult] = await Promise.allSettled([
+        const [deleteResult] = await Promise.all([
           adapter.executeMutation("DELETE FROM `test_bulbs`"),
           adapter2.executeMutation("INSERT INTO `test_authors` (name) VALUES ('Tommy')"),
         ]);
 
-        expect(deleteResult.status).toBe("fulfilled");
-        expect((deleteResult as PromiseFulfilledResult<number>).value).toBe(1);
+        expect(deleteResult).toBe(1);
       } finally {
         await adapter2.close();
       }

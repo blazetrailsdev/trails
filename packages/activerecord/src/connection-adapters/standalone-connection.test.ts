@@ -7,6 +7,7 @@
  * `loadAdapter()` because ESM adapter resolution is async.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 
@@ -37,11 +38,11 @@ describe("StandaloneConnectionTest", () => {
 
   it("can throw away", async () => {
     connection.throwAwayBang();
-    expect(await connection.active()).toBe(false);
+    assertNot(await connection.active());
   });
 
   it("can close", async () => {
     await connection.close();
-    expect(await connection.active()).toBe(false);
+    assertNot(await connection.active());
   });
 });

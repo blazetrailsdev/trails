@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/transaction_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { assertDifference, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
 import {
   describeIfMysqlAdapter,
   isMariaDb,
@@ -59,13 +60,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         })();
 
         try {
-          await adapter.transaction(async () => {
-            await latch1;
-            await adapter.execute("SET max_execution_time = 1");
-            await adapter.execute(`SELECT * FROM \`samples\` WHERE id = ${id} FOR UPDATE`);
-          });
-        } catch (e) {
-          error = e;
+          error = await assertRaises([StatementTimeout], {}, () =>
+            adapter.transaction(async () => {
+              await latch1;
+              await adapter.execute("SET max_execution_time = 1");
+              await adapter.execute(`SELECT * FROM \`samples\` WHERE id = ${id} FOR UPDATE`);
+            }),
+          );
         } finally {
           await adapter.execute("SET max_execution_time = DEFAULT").catch(() => {});
           latch2Resolve();
@@ -75,7 +76,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await adapter2.close();
       }
 
-      expect(error).toBeInstanceOf(StatementTimeout);
       expect(error).toBeInstanceOf(QueryAborted);
     });
 
@@ -92,19 +92,17 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         // 1. Default (REPEATABLE READ): INSERT by another connection is not visible
         await adapter.transaction(async () => {
           await adapter.materializeTransactions();
-          const countBefore = await sampleCount();
-          await adapter2.execute("INSERT INTO `samples` (value) VALUES (1)");
-          const countAfter = await sampleCount();
-          expect(countAfter).toBe(countBefore);
+          await assertNoDifference(sampleCount, null, () =>
+            adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
+          );
         });
 
         // 2. READ COMMITTED: INSERT by another connection is visible mid-transaction
         await adapter.transaction({ isolation: "read_committed" }, async () => {
           await adapter.materializeTransactions();
-          const countBefore = await sampleCount();
-          await adapter2.execute("INSERT INTO `samples` (value) VALUES (1)");
-          const countAfter = await sampleCount();
-          expect(countAfter).toBe(countBefore + 1);
+          await assertDifference(sampleCount, +1, null, () =>
+            adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
+          );
         });
 
         // 3. Retry preserves isolation: fail the first BEGIN, verify READ COMMITTED survives the retry
@@ -120,15 +118,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         try {
           await adapter.transaction({ isolation: "read_committed" }, async () => {
             await adapter.materializeTransactions();
-            const countBefore = await sampleCount();
-            await adapter2.execute("INSERT INTO `samples` (value) VALUES (1)");
-            const countAfter = await sampleCount();
-            expect(countAfter).toBe(countBefore + 1);
+            await assertDifference(sampleCount, +1, null, () =>
+              adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
+            );
           });
         } finally {
           delete (adapter as any).internalExecute;
         }
-        expect(firstBeginFailed).toBe(true);
+        expect(firstBeginFailed).toBeTruthy();
       } finally {
         await adapter2.close();
       }

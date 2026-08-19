@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot, assertNothingRaised } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import {
@@ -64,14 +65,10 @@ describe("ModulesTest", () => {
   it("assign ids", async () => {
     const firm = await MyAppBusinessFirm.first();
     const client = await MyAppBusinessClient.first();
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       type WithClients = { clients: { setIds(ids: number[]): Promise<void> } };
       await (firm as unknown as WithClients).clients.setIds([client!.id as number]);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it.skip("eager loading in modules", () => {
@@ -163,14 +160,8 @@ describe("ModulesTest", () => {
     Base.storeFullStiClass = true;
     try {
       const collection = await ShopCollection.first();
-      expect(await collection!.products).not.toEqual([]);
-      let error: unknown;
-      try {
-        await collection!.destroy();
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeUndefined();
+      assertNot((await collection!.products).length === 0, "Collection should have products");
+      await assertNothingRaised(() => collection!.destroy());
     } finally {
       Base.storeFullStiClass = prev;
     }
@@ -181,14 +172,8 @@ describe("ModulesTest", () => {
     Base.storeFullStiClass = true;
     try {
       const product = await ShopProduct.first();
-      expect(await product!.variants).not.toEqual([]);
-      let error: unknown;
-      try {
-        await product!.destroy();
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeUndefined();
+      assertNot((await product!.variants).length === 0, "Product should have variants");
+      await assertNothingRaised(() => product!.destroy());
     } finally {
       Base.storeFullStiClass = prev;
     }

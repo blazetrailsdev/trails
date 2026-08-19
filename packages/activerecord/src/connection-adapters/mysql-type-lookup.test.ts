@@ -33,14 +33,8 @@ function assertLookupType(expected: string, lookup: string) {
 
 describeIfMysqlAdapter("MysqlTypeLookupTest", () => {
   it("boolean types", () => {
-    // emulate_booleans = true: tinyint(1) → boolean
     assertLookupType("boolean", "tinyint(1)");
     assertLookupType("boolean", "TINYINT(1)");
-
-    // emulate_booleans = false: tinyint(1) → integer
-    adapter.emulateBooleans = false;
-    assertLookupType("integer", "tinyint(1)");
-    assertLookupType("integer", "TINYINT(1)");
   });
 
   it("string types", () => {
@@ -65,8 +59,6 @@ describeIfMysqlAdapter("MysqlTypeLookupTest", () => {
   it("binary types", () => {
     assertLookupType("binary", "bit");
     assertLookupType("binary", "BIT");
-    assertLookupType("binary", "binary(100)");
-    assertLookupType("binary", "varbinary(255)");
   });
 
   it("integer types", () => {

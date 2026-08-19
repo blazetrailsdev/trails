@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/case_sensitivity_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { captureSql } from "../../testing/sql-capture.js";
@@ -38,8 +39,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("case sensitive", async () => {
       const columns = await adapter.columns("collation_tests");
       const byName = (n: string) => columns.find((c) => c.name === n)! as any;
-      expect(byName("string_ci_column").isCaseSensitive()).toBe(false);
-      expect(byName("string_cs_column").isCaseSensitive()).toBe(true);
+      assertNotPredicate(byName("string_ci_column"), (c) => c.isCaseSensitive());
+      assertPredicate(byName("string_cs_column"), (c) => c.isCaseSensitive());
     });
 
     it("case insensitive comparison for ci column", async () => {

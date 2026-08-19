@@ -1,5 +1,6 @@
 import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
+import { assertNot, assertRaises } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
@@ -36,28 +37,27 @@ describe("StatementInvalidTest", () => {
   it("message contains no sql", async () => {
     const conn = Base.connection as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
-    const error: StatementInvalid = await conn
-      .log(sql, "Book", [], [], false, () =>
+    const error = (await assertRaises([StatementInvalid], {}, () =>
+      conn.log(sql, "Book", [], [], false, () =>
         conn.withRawConnection(() => {
           throw mockDatabaseError();
         }),
-      )
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(StatementInvalid);
-    expect(error.message.includes("SELECT")).toBe(false);
+      ),
+    )) as StatementInvalid;
+    assertNot(error.message.includes("SELECT"));
   });
 
   it("statement and binds are set on select", async () => {
     const conn = Base.connection as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
     const binds = [{}, {}];
-    const error: StatementInvalid = await conn
-      .log(sql, "Book", binds, [], false, () =>
+    const error = (await assertRaises([StatementInvalid], {}, () =>
+      conn.log(sql, "Book", binds, [], false, () =>
         conn.withRawConnection(() => {
           throw mockDatabaseError();
         }),
-      )
-      .catch((e: unknown) => e);
+      ),
+    )) as StatementInvalid;
     expect(error.sql).toEqual(sql);
     expect(error.binds).toEqual(binds);
   });

@@ -231,7 +231,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("url removed from hash", () => {
     const config = { default_env: { url: "postgres://localhost/foo" } };
     const actual = resolveDbConfig(DEFAULT_ENV, config);
-    expect(actual.configurationHash).not.toHaveProperty("url");
+    expect(Object.keys(actual.configurationHash)).not.toContain("url");
   });
 
   it("url with equals in query value", () => {

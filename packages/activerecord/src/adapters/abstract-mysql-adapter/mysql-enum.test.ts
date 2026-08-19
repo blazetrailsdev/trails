@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_enum_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -24,13 +25,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("should not be unsigned", async () => {
       const columns = await adapter.columns("enum_tests");
       const column = columns.find((c) => c.name === "enum_column");
-      expect((column as any).isUnsigned()).toBe(false);
+      assertNotPredicate(column, (c) => (c as any).isUnsigned());
     });
 
     it("should not be bigint", async () => {
       const columns = await adapter.columns("enum_tests");
       const column = columns.find((c) => c.name === "enum_column");
-      expect((column as any).isBigint()).toBe(false);
+      assertNotPredicate(column, (c) => (c as any).isBigint());
     });
 
     it("schema dumping", async () => {
