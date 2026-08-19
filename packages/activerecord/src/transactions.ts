@@ -262,7 +262,16 @@ export function setCallback<T extends typeof Model>(
 ): void {
   let filterList = options;
   if ((name === "commit" || name === "rollback") && options?.on !== undefined) {
-    filterList = synthOnCondition(options);
+    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+    assertValidTransactionAction(fireOn);
+    const { on: _on, if: existingIf, ...rest } = options;
+    filterList = {
+      ...rest,
+      if: [
+        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ],
+    };
   }
   (Model.setCallback as CallbackFn).call(
     this,
@@ -693,49 +702,38 @@ function prependOption(): Record<string, unknown> {
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
 /**
- * Synthesize an `on:` option into an `if:` predicate before the conditions
- * reach the activemodel chain. Mirrors the transformation Rails performs in
- * `ActiveRecord::Transactions::ClassMethods#set_callback` (transactions.rb:308-315).
- *
- * Returns a new conditions object with `on:` removed and a synthesized `if:`
- * prepended, or the original conditions unchanged when `on:` is absent.
- *
- * @internal
- */
-export function synthOnCondition(
-  conditions: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (!conditions || conditions.on === undefined) return conditions;
-  const fireOn = (Array.isArray(conditions.on) ? conditions.on : [conditions.on]) as string[];
-  assertValidTransactionAction(fireOn);
-  const { on: _on, if: existingIf, ...rest } = conditions;
-  const synthIf = (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn);
-  return {
-    ...rest,
-    if: existingIf
-      ? (record: Base) => synthIf(record) && (existingIf as CallbackFn)(record)
-      : synthIf,
-  };
-}
-
-/**
  * Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
  *
  * Ruby mutates `args` in place; TS returns the merged option hash instead —
- * the callers here bind it straight back into the `set_callback` call, so the
- * mutation is not observable.
+ * the callers bind it straight back into the `set_callback` call, so the
+ * mutation is not observable. `on:` is dropped from the returned hash rather
+ * than left in place as Ruby leaves it: ActiveModel's chain validates `on:`
+ * itself and has no ActiveRecord `transaction_include_any_action?` to build,
+ * so a surviving `on:` would be re-validated against the `before_commit`
+ * event and rejected.
  *
  * @internal
  */
 export function setOptionsForCallbacksBang(
   options: Record<string, unknown> | undefined,
   enforcedOptions: Record<string, unknown> = {},
-): Record<string, unknown> | undefined {
+): Record<string, unknown> {
   const merged = { ...options, ...enforcedOptions };
+
   if (merged.on !== undefined) {
-    return synthOnCondition(merged);
+    const fireOn = (Array.isArray(merged.on) ? merged.on : [merged.on]) as string[];
+    assertValidTransactionAction(fireOn);
+    const { on: _on, if: existingIf, ...rest } = merged;
+    return {
+      ...rest,
+      if: [
+        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ],
+    };
   }
-  return options === undefined && Object.keys(merged).length === 0 ? undefined : merged;
+
+  return merged;
 }
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action

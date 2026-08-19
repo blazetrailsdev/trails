@@ -4219,7 +4219,7 @@ export class Base extends Model {
    *
    * The body lives in transactions.ts at the Rails name; this is the `include`
    * point. It cannot be a plain `static override afterCommit = _afterCommit`
-   * assignment the way the non-overriding members above are: a `this`-typed
+   * assignment the way the non-overriding members here are: a `this`-typed
    * function assigned as a *property* over an inherited *method* is checked
    * contravariantly, which drops `typeof Base` out of `typeof Model` and reds
    * every `this.beforeDestroy(...)` in a subclass body.
@@ -4231,6 +4231,14 @@ export class Base extends Model {
   ): void {
     _afterCommit.call(this, fn as (...args: any[]) => any, conditions as never);
   }
+
+  static afterSaveCommit = _afterSaveCommit;
+
+  static afterCreateCommit = _afterCreateCommit;
+
+  static afterUpdateCommit = _afterUpdateCommit;
+
+  static afterDestroyCommit = _afterDestroyCommit;
 
   /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
   static override afterRollback<T extends typeof Model>(
@@ -4251,10 +4259,6 @@ export class Base extends Model {
   ): void {
     _txSetCallback.call(this, event, timing, fn, options);
   }
-  static afterSaveCommit = _afterSaveCommit;
-  static afterCreateCommit = _afterCreateCommit;
-  static afterUpdateCommit = _afterUpdateCommit;
-  static afterDestroyCommit = _afterDestroyCommit;
 
   /**
    * Run validations and return self.
