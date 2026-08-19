@@ -426,6 +426,9 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
+export * from "./core-ext/time/conversions.js";
+export * from "./core-ext/time/compatibility.js";
+export * from "./core-ext/string/zones.js";
 // MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:
 //   import { MessageVerifier } from "@blazetrails/activesupport/message-verifier"
 //   import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor"

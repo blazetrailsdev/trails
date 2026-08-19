@@ -704,15 +704,16 @@ describe("TimeZoneTest", () => {
 
   it("zone match", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect(zone.match("Eastern Time (US & Canada)")).toBe(true);
-    expect(zone.match("America/New_York")).toBe(true);
-    expect(zone.match("Pacific Time (US & Canada)")).toBe(false);
+    expect(zone.isMatch(/Eastern/)).toBe(true);
+    expect(zone.isMatch(/New_York/)).toBe(true);
+    expect(zone.isMatch(/Nonexistent_Place/)).toBe(false);
   });
 
   it("zone match?", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect(zone.match("Eastern Time (US & Canada)")).toBe(true);
-    expect(zone.match("bogus")).toBe(false);
+    expect(zone.isMatch(/Eastern/)).toBe(true);
+    expect(zone.isMatch(/New_York/)).toBe(true);
+    expect(zone.isMatch(/Nonexistent_Place/)).toBe(false);
   });
 
   // ---------------------------------------------------------------------------

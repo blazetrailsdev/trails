@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
 import { Temporal } from "@blazetrails/date";
-import { DATE_FORMATS } from "./time-ext.js";
+import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 
 // Ruby's Time carries full nanosecond precision, so %N answers nine significant
 // digits (time_with_zone.rb:223-227 delegates strftime to that Time). These

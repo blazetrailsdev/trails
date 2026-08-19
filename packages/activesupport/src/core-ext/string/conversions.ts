@@ -10,7 +10,7 @@
 
 import { Date as RubyDate, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
 import { isBlank } from "../object/blank.js";
-import { preserveTimezone } from "../../time-ext.js";
+import { preserveTimezone } from "../time/compatibility.js";
 
 /**
  * The keys `to_time` reads out of `Date._parse`, in Ruby's spelling

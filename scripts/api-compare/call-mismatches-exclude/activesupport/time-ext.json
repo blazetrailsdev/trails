@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "xmlschema",
-    "call": "in_time_zone",
-    "reason": "Date#xmlschema (core_ext/date/conversions.rb:95-97) reaches in_time_zone through to_time; the port formats the date directly."
-  }
-]

@@ -15,12 +15,17 @@ import {
   endOfWeek,
   beginningOfQuarter,
   change,
-  toFs,
-  xmlschema,
   toDate,
   isToday,
 } from "../time-ext.js";
-import { toFormattedS as dateToFormattedS, toFs as dateToFs, toTime } from "./date/conversions.js";
+import {
+  defaultInspect,
+  readableInspect,
+  toFormattedS as dateToFormattedS,
+  toFs as dateToFs,
+  toTime,
+  xmlschema as dateXmlschema,
+} from "./date/conversions.js";
 import * as DateExt from "./date/calculations.js";
 import { isFuture, isPast } from "./date-and-time/calculations.js";
 import { isBlank } from "./object/blank.js";
@@ -119,10 +124,12 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("readable inspect", () => {
-    const date = d(2005, 2, 21);
-    const result = toFs(date);
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
+    expect(readableInspect(pd(2005, 2, 21))).toBe("Mon, 21 Feb 2005");
+    // Rails' second assertion compares against `inspect`, which
+    // `alias_method :inspect, :readable_inspect` has already replaced; trails
+    // has no `::Date` to reopen, so `defaultInspect` still answers ruby/date's
+    // own `inspect` and the two are the distinct methods Rails aliased apart.
+    expect(defaultInspect(pd(2005, 2, 21))).not.toBe(readableInspect(pd(2005, 2, 21)));
   });
 
   it("to time", () => {
@@ -325,12 +332,22 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("xmlschema", () => {
-    const date = d(2005, 2, 21);
-    const result = xmlschema(date);
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    // Rails wraps this in `with_env_tz "US/Eastern"`; the port reads the
+    // ambient zone, so the offset is whatever the day's midnight sits at in
+    // the zone the process runs in — `Z` where that zone is UTC, as on CI.
+    expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
+    expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
   });
 
-  it.skip("xmlschema when zone is set");
+  it("xmlschema when zone is set", () => {
+    setZone(TimeZone.find("Eastern Time (US & Canada)"));
+    try {
+      expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00-05:?00$/);
+      expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00-04:?00$/);
+    } finally {
+      setZone(null);
+    }
+  });
 
   // Rails stubs `Date.current` to 2000-01-01 and reads the day before, the day
   // itself and the day after. The port has no stub seam on `current`, so the

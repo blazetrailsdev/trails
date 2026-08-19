@@ -34,7 +34,6 @@ import { setFrozenTime } from "../time-travel.js";
 import { setZone } from "../time-zone-config.js";
 import { ArgumentError } from "../hash-utils.js";
 import {
-  DATE_FORMATS,
   advance as timeAdvance,
   beginningOfQuarter,
   endOfMonth,
@@ -47,9 +46,10 @@ import {
   nextDay,
   prevDay,
   toDate,
-  toTime,
   xmlschema,
 } from "../time-ext.js";
+import { DATE_FORMATS } from "./time/conversions.js";
+import { toTime } from "./time/compatibility.js";
 
 afterEach(() => {
   setFrozenTime(null);

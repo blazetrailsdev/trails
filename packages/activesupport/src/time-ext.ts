@@ -9,16 +9,11 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
-import { ordinalize } from "./inflector.js";
-import { formattedOffset as dateTimeFormattedOffset } from "./core-ext/date-time/conversions.js";
 import { ArgumentError } from "./hash-utils.js";
-import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
+import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
-import { TimeZone } from "./values/time-zone.js";
-import { toTime as stringToTime } from "./core-ext/string/conversions.js";
-import { preserveTimezone as compatibilityPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -666,131 +661,6 @@ export function secFraction(
 export { secFraction as subsec };
 
 /**
- * The receivers `Time::DATE_FORMATS`' lambdas duck-type: a ruby/date `Time`,
- * the `PlainDateTime | ZonedDateTime` seat a Ruby `DateTime` stands on, and a
- * `TimeWithZone` — `time_with_zone.rb:212-220` resolves the same hash and
- * passes `self`. All three answer `day`, `strftime`, `formatted_offset`,
- * `rfc2822` and `iso8601`, which is every member those lambdas call.
- */
-type DateFormatsReceiver =
-  | RubyTime
-  | TimeWithZone
-  | Temporal.PlainDateTime
-  | Temporal.ZonedDateTime;
-
-/**
- * The named formats `to_fs` resolves, either a `strftime` string or a callable
- * taking the receiver.
- *
- * Mirrors: `Time::DATE_FORMATS` (`core_ext/time/conversions.rb:8-27`). The
- * Ruby keys are Symbols and the four lambdas duck-type their argument — a
- * `Time`, a `Date` or a `DateTime` all answer `day`, `strftime`,
- * `formatted_offset`, `rfc2822` and `iso8601` — so the hash is shared by every
- * `to_fs` in ActiveSupport. TS has no open classes, so the duck typing is the
- * `DateFormatsReceiver` union below and an explicit dispatch inside each
- * lambda: a ruby/date `Time` — the receiver `toFs` bridges a JS `Date` onto —
- * answers `strftime`/`rfc2822`/`iso8601` itself, and the `DateTime` seat
- * reaches the same names through `RubyDateTime`.
- *
- * `rfc822`'s `time.formatted_offset(false)` is the `Time` arm this file
- * declares for a `Time` receiver and `dateTimeFormattedOffset`
- * (`core_ext/date_time/conversions.rb`'s arm of the same Rails name) for the
- * `DateTime` one.
- *
- * That import closes a cycle with `core-ext/date-time/conversions.ts`, which
- * reads `DATE_FORMATS` back for its `to_fs`. Neither side touches the other at
- * module-eval time — the read is inside a lambda here and inside `toFs` there,
- * and neither file declares a `class ... extends` across the edge — so no
- * binding is in TDZ when either module body runs. Verified by importing the
- * built `dist/time-ext.js`, `dist/core-ext/date-time/conversions.js` and
- * `dist/index.js` as entry modules under plain node, per CLAUDE.md's
- * call-time-constant section; a vitest run enters through a funnel module and
- * would mask it.
- */
-export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) => string)> = {
-  db: "%Y-%m-%d %H:%M:%S",
-  inspect: "%Y-%m-%d %H:%M:%S.%9N %z",
-  number: "%Y%m%d%H%M%S",
-  nsec: "%Y%m%d%H%M%S%9N",
-  usec: "%Y%m%d%H%M%S%6N",
-  time: "%H:%M",
-  short: "%d %b %H:%M",
-  long: "%B %d, %Y %H:%M",
-  long_ordinal: (time) => {
-    const dayFormat = ordinalize(time.day);
-    return (
-      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
-    ).strftime(`%B ${dayFormat}, %Y %H:%M`);
-  },
-  rfc822: (time) => {
-    const offsetFormat =
-      time instanceof RubyTime
-        ? formattedOffset(time, false)
-        : time instanceof TimeWithZone
-          ? time.formattedOffset(false)
-          : dateTimeFormattedOffset(time, false);
-    return (
-      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
-    ).strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
-  },
-  rfc2822: (time) =>
-    (time instanceof RubyTime || time instanceof TimeWithZone
-      ? time
-      : new RubyDateTime(time)
-    ).rfc2822(),
-  iso8601: (time) =>
-    (time instanceof RubyTime || time instanceof TimeWithZone
-      ? time
-      : new RubyDateTime(time)
-    ).iso8601(),
-};
-
-/**
- * Converts to a formatted string. See {@link DATE_FORMATS} for built-in
- * formats.
- *
- *     toFs(time, "time")   // => "06:10"
- *     toFs(time, "db")     // => "2007-01-18 06:10:17"
- *     toFs(time, "short")  // => "18 Jan 06:10"
- *
- * Mirrors: `Time#to_fs` (`core_ext/time/conversions.rb:55-61`) —
- * `formatter.respond_to?(:call) ? formatter.call(self).to_s : strftime(formatter)`,
- * else `to_s`, which for a `Time` is ruby/time.c's `time_to_s`.
- *
- * A JS `Date` is an instant with no zone of its own, so it is bridged onto the
- * ruby/date `Time` the Rails body formats as a `Time.utc` — the reading
- * `Date#toISOString` answers, and the receiver Rails' own tests of this
- * method's callers build (`range_ext_test.rb`'s `Time.utc` endpoints). A
- * `Temporal.Instant` is the same receiver with sub-millisecond precision — the
- * seat an ActiveRecord datetime attribute's cast value sits on — and is bridged
- * the same way, so `:usec`/`:nsec` still read the microseconds a `Date` cannot
- * carry.
- */
-export function toFs(date: Date | Temporal.Instant, format: string = "default"): string {
-  const utc =
-    date instanceof Date
-      ? Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO("UTC")
-      : date.toZonedDateTimeISO("UTC");
-  const time = RubyTime.utc(
-    utc.year,
-    utc.month,
-    utc.day,
-    utc.hour,
-    utc.minute,
-    utc.second,
-    utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
-  );
-  const formatter = DATE_FORMATS[format];
-  if (formatter != null) {
-    return typeof formatter === "function" ? String(formatter(time)) : time.strftime(formatter);
-  }
-  return time.toS();
-}
-
-/** Mirrors: `alias_method :to_formatted_s, :to_fs` (`core_ext/time/conversions.rb:62`). */
-export { toFs as toFormattedS };
-
-/**
  * Creates a Time instance from an RFC 3339 string — time/calculations.rb:68-81.
  *
  *   rfc3339("1999-12-31T14:00:00-10:00") // => 2000-01-01 00:00:00 UTC
@@ -835,95 +705,6 @@ export function toDate(date: Date): Temporal.PlainDate {
 }
 
 /**
- * Either return `self` or the time in the local system timezone depending on
- * the setting of `ActiveSupport.to_time_preserves_timezone`.
- *
- * Mirrors: `Time#to_time` (`core_ext/time/compatibility.rb:13-15`) —
- * `preserve_timezone ? self : getlocal` — over a ruby/date `Time`, and
- * `DateTime#to_time` (`core_ext/date_time/compatibility.rb:15-17`) —
- * `preserve_timezone ? getlocal(utc_offset) : getlocal` — over the
- * `PlainDateTime | ZonedDateTime` `@blazetrails/date`'s `DateTime` answers.
- * Both receivers carry an offset, which is what the switch chooses between;
- * `getlocal` re-reads the same instant in the system zone, and
- * `getlocal(utc_offset)` in the receiver's own offset.
- */
-export function toTime(
-  time: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): Temporal.ZonedDateTime {
-  if (time instanceof RubyTime) {
-    const self = time.toTime();
-    return preserveTimezone(time) ? self : self.withTimeZone(Temporal.Now.timeZoneId());
-  }
-
-  // A Ruby `DateTime` without an explicit offset is `+00:00` (date.rb's
-  // `civil`), which is the offset a `PlainDateTime` stands in for here.
-  const zoned = time instanceof Temporal.PlainDateTime ? time.toZonedDateTime("UTC") : time;
-  return compatibilityPreserveTimezone()
-    ? zoned.withTimeZone(zoned.offset)
-    : zoned.withTimeZone(Temporal.Now.timeZoneId());
-}
-
-/**
- * Either return `self` or the time in the local system timezone depending on
- * the setting of `ActiveSupport.to_time_preserves_timezone`.
- *
- * Mirrors: `Time#preserve_timezone` (`core_ext/time/compatibility.rb:17-19`) —
- * `system_local_time? || super`, where `super` is the module-level switch
- * `DateAndTime::Compatibility` mixes in.
- */
-export function preserveTimezone(time: RubyTime): boolean | string {
-  return isSystemLocalTime(time) || compatibilityPreserveTimezone();
-}
-
-/**
- * Mirrors: `Time#system_local_time?` (`core_ext/time/compatibility.rb:22-27`).
- * Ruby's `::Time.equal?(self.class)` guard is what keeps `DateTime` and
- * `TimeWithZone` — which reach the method through the same include — out; the
- * `RubyTime` parameter is that guard, since neither is one.
- */
-export function isSystemLocalTime(time: RubyTime): boolean {
-  const zone = time.zone;
-  return typeof zone === "string" && (zone !== "UTC" || activeSupportLocalZone() === "UTC");
-}
-
-let _activeSupportLocalTz: string | null = null;
-let _activeSupportLocalZone: string | null = null;
-
-/**
- * Mirrors: `Time#active_support_local_zone` (`core_ext/time/compatibility.rb:31-38`)
- * — `Time.new.zone`, memoized and dropped again when the zone the process runs
- * in changes. Ruby keys that memo on `ENV["TZ"]`; the environment is not
- * readable here, and `Temporal.Now.timeZoneId()` is the zone `TZ` selects, so
- * it is both the key and where the zone is read from.
- */
-export function activeSupportLocalZone(): string | null {
-  if (_activeSupportLocalTz !== Temporal.Now.timeZoneId()) _activeSupportLocalZone = null;
-  if (_activeSupportLocalZone == null) {
-    _activeSupportLocalTz = Temporal.Now.timeZoneId();
-    _activeSupportLocalZone = RubyTime.now().zone;
-  }
-  return _activeSupportLocalZone;
-}
-
-/**
- * inTimeZone — Rails `String#in_time_zone`. Converts a String to a
- * TimeWithZone in the current zone if `Time.zone` or `Time.zone_default` is
- * set, otherwise converts the String to a Time.
- *
- * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`).
- */
-export function inTimeZone(
-  str: string,
-  zone: unknown = timeZone(),
-): TimeWithZone | Temporal.ZonedDateTime | undefined {
-  if (zone != null && zone !== false) {
-    return (findZoneBang(zone) as TimeZone).parse(str);
-  } else {
-    return stringToTime(str);
-  }
-}
-
-/**
  * instantToS — Rails `Time#to_s` for a UTC `Temporal.Instant`.
  * Returns `"YYYY-MM-DD HH:MM:SS UTC"` — the default Ruby format for UTC times.
  * @internal
@@ -936,28 +717,4 @@ export function instantToS(instant: Temporal.Instant): string {
     `${year}-${pad2(zdt.month)}-${pad2(zdt.day)} ` +
     `${pad2(zdt.hour)}:${pad2(zdt.minute)}:${pad2(zdt.second)} UTC`
   );
-}
-
-/**
- * Returns a formatted string of the offset from UTC, or an alternative string
- * if the time zone is already UTC.
- *
- * Mirrors: `Time#formatted_offset` (`core_ext/time/conversions.rb:69-71`) —
- * `utc? && alternate_utc_string || ActiveSupport::TimeZone.seconds_to_utc_offset(utc_offset, colon)`.
- * A `Date` is an instant read in the system zone, so `utc?` is that zone's
- * offset being zero and `utc_offset` is the offset itself, in seconds; a
- * ruby/date `Time` — the receiver `Time::DATE_FORMATS`' `rfc822` lambda hands
- * over — answers both readers itself.
- * Ruby's `alternate_utc_string` is any non-nil String — `""` included — so the
- * arm is chosen on presence rather than on truthiness.
- */
-export function formattedOffset(
-  date: Date | RubyTime,
-  colon = true,
-  alternateUtcString: string | null = null,
-): string {
-  const isUtc = date instanceof RubyTime ? date.isUtc() : -date.getTimezoneOffset() * 60 === 0;
-  if (isUtc && alternateUtcString != null) return alternateUtcString;
-  const utcOffset = date instanceof RubyTime ? date.utcOffset : -date.getTimezoneOffset() * 60;
-  return TimeZone.secondsToUtcOffset(utcOffset, colon);
 }

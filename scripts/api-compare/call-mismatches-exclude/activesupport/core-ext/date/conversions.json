@@ -1,0 +1,11 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date/conversions.ts",
+    "rubyName": "xmlschema",
+    "call": "in_time_zone",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "core_ext/date/conversions.rb:96 calls `in_time_zone` on implicit self; `Date` is a receiver TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1 — the same shape as the `core-ext/date/calculations.ts` rows."
+  }
+]

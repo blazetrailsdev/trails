@@ -13,13 +13,9 @@ import {
   floor,
   ceil,
   change,
-  toFs,
-  DATE_FORMATS,
   xmlschema,
   lastWeek,
   toDate,
-  toTime,
-  formattedOffset,
   daysInMonth,
   daysInYear,
   allDay,
@@ -30,6 +26,8 @@ import {
   isFuture,
   nextWeek,
 } from "../time-ext.js";
+import { toFs, DATE_FORMATS, formattedOffset } from "./time/conversions.js";
+import { toTime } from "./time/compatibility.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);

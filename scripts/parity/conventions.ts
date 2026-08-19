@@ -242,18 +242,19 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // default rule — but Range's home bucket is `core_ext/range/each.rb`, so the
   // reopening still needs the entry.
   "activesupport:core_ext/range/overlap.rb": "core-ext/range/overlap.ts",
-  // The conversions cluster. `toFs` / `toTime` / `toDate` / `xmlschema` take an
-  // instant receiver, so Time, Date and DateTime all read them off `time-ext.ts`;
-  // only `date/calculations.rb`'s Date arm has its own receiver and file.
-  "activesupport:core_ext/time/conversions.rb": "time-ext.ts",
-  "activesupport:core_ext/date/conversions.rb": "time-ext.ts",
+  // The conversions cluster. Each reopening has its own receiver and its own
+  // file, at the path the default rule already produces: `Time#to_fs` and
+  // `Date#to_fs` are two different Ruby methods and can only both be ported
+  // once they no longer share one TS file.
+  "activesupport:core_ext/time/conversions.rb": "core-ext/time/conversions.ts",
+  "activesupport:core_ext/date/conversions.rb": "core-ext/date/conversions.ts",
   // The DateTime arm reads the receiver's own `offset` and Julian day rather
   // than an instant, so it sits on the DateTime receiver next to
   // `date_time/calculations.rb`'s members, at the path the default rule
   // already produces.
   "activesupport:core_ext/date_time/conversions.rb": "core-ext/date-time/conversions.ts",
-  "activesupport:core_ext/time/compatibility.rb": "time-ext.ts",
-  "activesupport:core_ext/date_time/compatibility.rb": "time-ext.ts",
+  "activesupport:core_ext/time/compatibility.rb": "core-ext/time/compatibility.ts",
+  "activesupport:core_ext/date_time/compatibility.rb": "core-ext/time/compatibility.ts",
   // `date_time/acts_like.rb:6` is DateTime's FIRST reopening, so the whole
   // `DateTime` bucket — `preserve_timezone` and
   // `utc_to_local_returns_utc_offset_times`, which `DateAndTime::Compatibility`
@@ -267,7 +268,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `time-ext.ts`'s `Time` names on a different receiver, so pointing the
   // bucket here masked the String ports behind the Time ones.
   "activesupport:core_ext/string/conversions.rb": "core-ext/string/conversions.ts",
-  "activesupport:core_ext/string/zones.rb": "time-ext.ts",
+  "activesupport:core_ext/string/zones.rb": "core-ext/string/zones.ts",
   "activesupport:core_ext/time/zones.rb": "time-zone-config.ts",
   "activesupport:core_ext/numeric/time.rb": "duration.ts",
   "activesupport:core_ext/integer/time.rb": "duration.ts",

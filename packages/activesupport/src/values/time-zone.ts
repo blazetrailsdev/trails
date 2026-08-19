@@ -1293,12 +1293,9 @@ export class TimeZone {
     return this.tzinfo.abbr(time);
   }
 
-  /**
-   * Whether DST is in effect at the given instant
-   * (`dst?`, time_zone.rb:571-573).
-   */
-  isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
-    return this.tzinfo.isDst(date);
+  /** `dst?(time)` (time_zone.rb:571-573) — `tzinfo.dst?(time)`. */
+  isDst(time: Date | Temporal.Instant): boolean {
+    return this.tzinfo.isDst(time);
   }
 
   /**
@@ -1378,10 +1375,20 @@ export class TimeZone {
   }
 
   /**
-   * Whether this timezone matches a given identifier.
+   * Compare #name and TZInfo identifier to a supplied regexp, returning `true`
+   * if a match is found (`match?`, time_zone.rb:348-351). Ruby's `re == name`
+   * arm is a plain equality against a String `re`; the `Regexp === re` arm
+   * tests both spellings.
    */
-  match(identifier: string): boolean {
-    return this.name === identifier || this.tzinfo.identifier === identifier;
+  isMatch(re: string | RegExp): boolean {
+    return (
+      re === this.name ||
+      re === MAPPING[this.name] ||
+      (re instanceof RegExp &&
+        // `Regexp#match?(nil)` is false in Ruby; `RegExp#test` coerces
+        // `undefined` to the string "undefined" and would match on it.
+        (re.test(this.name) || (MAPPING[this.name] != null && re.test(MAPPING[this.name]))))
+    );
   }
 
   /**
