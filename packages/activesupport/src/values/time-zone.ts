@@ -654,7 +654,10 @@ export class Timezone {
    * one ordinarily, two where the clocks went back and the local time is
    * ambiguous, none where they went forward and it does not exist. `time`
    * carries the wall clock in its UTC fields, the shape `local_to_utc` and
-   * `period_for_local` take.
+   * `period_for_local` take. Candidate offsets are ordered by the UTC instant
+   * each implies — the larger offset is the earlier UTC — which is the order
+   * TZInfo hands the periods back in, and what makes Rails' `periods.last` the
+   * standard-time one.
    */
   periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
     const localMs = toDate(time).getTime();
@@ -663,8 +666,6 @@ export class Timezone {
       getZoneInfo(this.identifier, new Date(localMs - DAY)).utcOffsetSeconds,
       getZoneInfo(this.identifier, new Date(localMs + DAY)).utcOffsetSeconds,
     ];
-    // Ordered by the UTC instant each candidate offset implies, which is the
-    // order TZInfo hands them back in: the larger offset is the earlier UTC.
     const candidates = [...new Set(around)].sort((a, b) => b - a);
     const periods: TimezonePeriod[] = [];
     for (const offset of candidates) {
@@ -1234,47 +1235,6 @@ export class TimeZone {
   }
 
   /**
-   * `abbr(time)` (time_zone.rb:567) — `tzinfo.abbr(time)`, the abbreviation the
-   * zone is observing at `time`. trails' `tzinfo` is the IANA name rather than a
-   * `TZInfo::Timezone`, so the delegation goes through the same `getZoneInfo`
-   * shim `dst?`'s port reads, which is where `TZInfo::TimezonePeriod#abbr`
-   * lives here.
-   */
-  abbr(time: Date | Temporal.Instant): string {
-    return this.tzinfo.abbr(time);
-  }
-
-  /**
-   * Whether DST is in effect at the given instant.
-   */
-  isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
-    return this.tzinfo.isDst(date);
-  }
-
-  /**
-   * The `TZInfo::TimezonePeriod` covering the given UTC instant, which
-   * `TimeWithZone#period` memoizes (time_with_zone.rb:72-74) and reads
-   * `dst?` / `observed_utc_offset` / `abbreviation` off.
-   */
-  periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
-    return this.tzinfo.periodForUtc(date);
-  }
-
-  /**
-   * `period_for_local(time, dst = true)` (time_zone.rb:559-561) —
-   * `tzinfo.period_for_local(time, dst) { |periods| periods.last }`: the block
-   * settles an ambiguous local time `dst` could not, by taking the last period.
-   */
-  periodForLocal(time: Date | Temporal.Instant, dst: boolean | null = true): TimezonePeriod {
-    return this.tzinfo.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
-  }
-
-  /** `periods_for_local(time)` (time_zone.rb:563-565). */
-  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
-    return this.tzinfo.periodsForLocal(time);
-  }
-
-  /**
    * `utc_to_local(time)` (time_zone.rb:541-546). As of tzinfo 2,
    * `tzinfo.utc_to_local` returns a time carrying a non-zero UTC offset — a
    * `Temporal.ZonedDateTime` here. The
@@ -1295,6 +1255,43 @@ export class TimeZone {
    */
   localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
     return this.tzinfo.localToUtc(time, dst);
+  }
+
+  /**
+   * The `TZInfo::TimezonePeriod` covering the given UTC instant
+   * (`period_for_utc`, time_zone.rb:555-557), which `TimeWithZone#period`
+   * memoizes (time_with_zone.rb:72-74) and reads `dst?` /
+   * `observed_utc_offset` / `abbreviation` off.
+   */
+  periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
+    return this.tzinfo.periodForUtc(date);
+  }
+
+  /**
+   * `period_for_local(time, dst = true)` (time_zone.rb:559-561) —
+   * `tzinfo.period_for_local(time, dst) { |periods| periods.last }`: the block
+   * settles an ambiguous local time `dst` could not, by taking the last period.
+   */
+  periodForLocal(time: Date | Temporal.Instant, dst: boolean | null = true): TimezonePeriod {
+    return this.tzinfo.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
+  }
+
+  /** `periods_for_local(time)` (time_zone.rb:563-565). */
+  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
+    return this.tzinfo.periodsForLocal(time);
+  }
+
+  /** `abbr(time)` (time_zone.rb:567) — `tzinfo.abbr(time)`. */
+  abbr(time: Date | Temporal.Instant): string {
+    return this.tzinfo.abbr(time);
+  }
+
+  /**
+   * Whether DST is in effect at the given instant
+   * (`dst?`, time_zone.rb:571-573).
+   */
+  isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
+    return this.tzinfo.isDst(date);
   }
 
   /**

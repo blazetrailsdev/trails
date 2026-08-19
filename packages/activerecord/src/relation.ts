@@ -2101,9 +2101,6 @@ export class Relation<T extends Base> {
     _qm.buildJoins.call(joined as any, idSubquery);
     if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
     this.buildOrder(idSubquery);
-    // Same sanitizers `buildArel` applies (query_methods.rb:1757-1758) — the
-    // limited-ids subquery is a second arel-building path over the same raw
-    // `limit!`/`offset!` values, so it must make them safe identically.
     const connection = this._resolveAdapter() ?? { sanitizeLimit };
     if (this.limitValue !== null) idSubquery.take(connection.sanitizeLimit(this.limitValue));
     if (this.offsetValue !== null) idSubquery.skip(_qm.toI(this.offsetValue));
