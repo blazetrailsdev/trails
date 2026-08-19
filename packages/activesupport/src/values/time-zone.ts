@@ -572,6 +572,20 @@ export class PeriodNotFound extends Error {
 }
 
 /**
+ * Stands in for `TZInfo::AmbiguousTime`, which `TZInfo::Timezone#period_for_local`
+ * raises for a local time the `dst` argument does not resolve and no block was
+ * given for — the failure `local_to_utc` (time_zone.rb:551-552, which passes no
+ * block) lets through, and which `period_for_local` (:559-561) deliberately
+ * avoids by passing `{ |periods| periods.last }`.
+ *
+ * @noRailsEquivalent PERMANENT — the class belongs to the TZInfo gem, not to
+ *   Rails, exactly as {@link PeriodNotFound} above does.
+ */
+export class AmbiguousTime extends Error {
+  override name = "AmbiguousTime";
+}
+
+/**
  * Stands in for `TZInfo::Timezone`, the object `TimeZone#tzinfo` holds
  * (time_zone.rb:312) and delegates every period lookup and conversion to
  * (`utc_to_local` :541, `local_to_utc` :552, `period_for_utc` :555,
@@ -701,8 +715,8 @@ export class Timezone {
       if (matching.length === 1) return matching[0];
     }
     if (block) return block(periods);
-    throw new PeriodNotFound(
-      `${toDate(time).toISOString().slice(0, 19)} is ambiguous for ${this.identifier}`,
+    throw new AmbiguousTime(
+      `${toDate(time).toISOString().slice(0, 19)} is an ambiguous local time for ${this.identifier}`,
     );
   }
 
@@ -716,11 +730,13 @@ export class Timezone {
 
   /**
    * `TZInfo::Timezone#local_to_utc`: the UTC instant simultaneous with the
-   * wall clock `time` carries, disambiguated through `period_for_local`.
+   * wall clock `time` carries. No block, as Rails' `local_to_utc`
+   * (time_zone.rb:551-552) passes none — an ambiguity `dst` cannot resolve
+   * raises {@link AmbiguousTime} rather than being settled for the caller.
    */
   localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
     const localMs = toDate(time).getTime();
-    const period = this.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
+    const period = this.periodForLocal(time, dst);
     return new Date(localMs - period.observedUtcOffset * 1000);
   }
 }

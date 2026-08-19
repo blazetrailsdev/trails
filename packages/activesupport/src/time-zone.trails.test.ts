@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TimeZone, PeriodNotFound } from "./values/time-zone.js";
+import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {
@@ -155,6 +155,15 @@ describe("TimeZoneLocalPeriodsTest", () => {
   it("period_for_local raises for a nonexistent local time", () => {
     expect(() => zone().periodForLocal(new Date(Date.UTC(2024, 2, 10, 2, 30)))).toThrow(
       PeriodNotFound,
+    );
+  });
+
+  it("local_to_utc raises for an ambiguity dst does not resolve", () => {
+    expect(() => zone().localToUtc(new Date(Date.UTC(2006, 9, 29, 1, 30)), null)).toThrow(
+      AmbiguousTime,
+    );
+    expect(zone().localToUtc(new Date(Date.UTC(2006, 9, 29, 1, 30)))).toEqual(
+      new Date(Date.UTC(2006, 9, 29, 5, 30)),
     );
   });
 });
