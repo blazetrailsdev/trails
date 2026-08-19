@@ -4,7 +4,7 @@
     "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "define_validations",
     "call": "delete",
-    "reason": "Ruby Hash#delete returns the DELETED value: `!reflection.options.delete(:required)` (builder/belongs_to.rb:59) ports to reading `options.required` and then `delete options.required` — JS `delete` returns a boolean, so the two steps cannot fold."
+    "reason": "Ruby Hash#delete returns the DELETED value: `!reflection.options.delete(:required)` (builder/belongs_to.rb:115) ports to reading `options.required` and then `delete options.required` — JS `delete` returns a boolean, so the two steps cannot fold."
   },
   {
     "package": "activerecord",

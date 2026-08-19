@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "html-safe-translation.ts",
-    "rubyName": "translate",
-    "call": "call",
-    "reason": "Rails routes the missing-translation signal through an `exception_handler` lambda that calls `I18n.exception_handler.call` (html_safe_translation.rb:14-16); trails' I18n has no swappable exception handler, so translate catches MissingTranslationData directly and there is no `call` to make."
-  }
-]
