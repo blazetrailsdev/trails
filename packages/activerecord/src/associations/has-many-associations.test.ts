@@ -94,6 +94,7 @@ import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import {
+  CpkAuthor,
   CpkBook,
   CpkOrder,
   CpkBrokenOrder,
@@ -3573,33 +3574,21 @@ describe("HasManyAssociationsTest", () => {
     expect(await ReLocalePost.all().count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
-    class InclAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InclPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InclAuthor);
-    registerModel(InclPost);
-    const author = await InclAuthor.create({ name: "Alice" });
-    const post = await InclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "incl_posts", {
-      className: "InclPost",
-      foreignKey: "author_id",
+    // `cpk_books.id` is not auto-increment under its composite PK, so the id
+    // part is assigned explicitly — MariaDB rejects the insert otherwise.
+    const greatAuthor = await CpkAuthor.create({ name: "Alice" });
+    await CpkBook.create({
+      id: [greatAuthor.id as number, 1],
+      title: "The first book",
+      revision: 1,
     });
-    expect(posts.some((p: any) => p.id === post.id)).toBe(true);
+
+    // Rails reads `great_author.books.first`, which does NOT mark the
+    // association loaded, so `include?` takes the `scope.exists?(record_id)`
+    // branch — the one that needs the composite key as a column=>value hash.
+    const book = await (await CpkAuthor.find(greatAuthor.id)).books.first();
+
+    expect(await greatAuthor.books.isInclude(book!)).toBe(true);
   });
   it("adding array and collection", async () => {
     class ArrAuthor extends Base {

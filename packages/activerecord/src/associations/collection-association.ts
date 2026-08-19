@@ -813,13 +813,49 @@ export class CollectionAssociation extends Association {
     if (!(record instanceof klass)) return false;
 
     if (record.isNewRecord()) {
-      return isIncludeInMemory(this, record);
+      return await this.isIncludeInMemory(record);
     } else if (this.isLoaded()) {
       return this.target.includes(record);
     } else {
-      const recordId = this.primaryKeyValue(record);
+      // Rails: `klass.primary_key.zip(record.id).to_h` for a composite key —
+      // `exists?` needs the column=>value hash, not a bare tuple.
+      const recordId = klass.compositePrimaryKey
+        ? Object.fromEntries(
+            (klass.primaryKey as string[]).map((key, i) => [key, (record.id as unknown[])[i]]),
+          )
+        : record.id;
       return await this.scope().exists(recordId);
     }
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#include_in_memory?
+   * (collection_association.rb:507-519).
+   */
+  private async isIncludeInMemory(record: Base): Promise<boolean> {
+    const reflection = this.reflection as unknown as {
+      isThroughReflection?: () => boolean;
+      throughReflection?: { name: string } | null;
+      sourceReflection?: { name: string } | null;
+    };
+    if (reflection.isThroughReflection?.()) {
+      const assoc = (
+        this.owner as unknown as { association: (n: string) => Association }
+      ).association(reflection.throughReflection!.name);
+      const sourceName = reflection.sourceReflection!.name;
+      const reader = (await assoc.reader) as Base[];
+      const targetReflections = await Promise.all(
+        reader.map((source) => (source as unknown as Record<string, unknown>)[sourceName]),
+      );
+      return (
+        targetReflections.some((targetReflection) =>
+          Array.isArray(targetReflection)
+            ? targetReflection.includes(record)
+            : targetReflection === record,
+        ) || this.target.includes(record)
+      );
+    }
+    return this.target.includes(record);
   }
 
   /**
@@ -1693,32 +1729,6 @@ export function callbacksFor(this: CallbackHost, callbackName: string): unknown[
   if (Array.isArray(stored)) return stored;
   const fromOptions = (this.reflection.options as Record<string, unknown>)[callbackName];
   return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
-}
-
-/** @internal */
-function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean {
-  // For through reflections, also check through the source chain.
-  const refl = assoc.reflection as any;
-  if (refl.isThroughReflection?.()) {
-    const name = refl.options?.through;
-    if (name) {
-      const throughAssoc = (assoc.owner as any).association?.(name);
-      const sourceRefl = refl.sourceReflection?.();
-      if (throughAssoc && sourceRefl) {
-        const sourceName = sourceRefl.name;
-        const reader = throughAssoc.target as Base[];
-        if (Array.isArray(reader)) {
-          const found = reader.some((source: any) => {
-            const targetRefl = source[sourceName];
-            if (Array.isArray(targetRefl)) return targetRefl.includes(record);
-            return targetRefl === record;
-          });
-          if (found) return true;
-        }
-      }
-    }
-  }
-  return assoc.target.includes(record);
 }
 
 function arraysEqual(a: Base[], b: Base[]): boolean {
