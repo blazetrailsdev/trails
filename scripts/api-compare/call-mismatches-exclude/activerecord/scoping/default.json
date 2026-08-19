@@ -4,7 +4,7 @@
     "tsFile": "scoping/default.ts",
     "rubyName": "build_default_scope",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "default.rb:157 `elsif default_scopes.any?` — Ruby Array#any? on a plain array has no trails port; the port spells it `scopes.length === 0` and inverts it into an early return (default.ts:71-72), so the `elsif` becomes a guard. Same predicate, inverted branch shape; tracked."
   },
   {
     "package": "activerecord",

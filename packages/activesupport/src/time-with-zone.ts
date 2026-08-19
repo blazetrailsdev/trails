@@ -709,7 +709,25 @@ export class TimeWithZone {
       ms = 0;
     }
 
-    return this._timeZone.local(year, month, day, hour, min, sec, ms);
+    // `periods.include?(period) ? period : nil` (time_with_zone.rb:406): the
+    // receiver's own period wins while the new wall clock still falls in it, so
+    // an ambiguous result stays on the side of the transition it started on.
+    // Ruby compares TimezonePeriod objects; here that is (offset, dst).
+    const newTime = Temporal.Instant.fromEpochMilliseconds(
+      Date.UTC(year, month - 1, day, hour, min, sec, ms),
+    );
+    const periods = this._timeZone.periodsForLocal(newTime);
+    const period = periods.find(
+      (p) =>
+        p.observedUtcOffset === this.period.observedUtcOffset && p.isDst() === this.period.isDst(),
+    );
+    if (!period) return this._timeZone.local(year, month, day, hour, min, sec, ms);
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochMilliseconds(
+        newTime.epochMilliseconds - period.observedUtcOffset * 1000,
+      ),
+      this._timeZone,
+    );
   }
 
   // ---------------------------------------------------------------------------

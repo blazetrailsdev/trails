@@ -62,10 +62,10 @@ export class ActionableError extends Error {
 
   static dispatch(error: any, name: string): void {
     const actions = this.actions(error);
-    const action = actions[name];
-    if (!action) {
+    if (!(name in actions)) {
       throw new NonActionable(`Cannot find action "${name}"`);
     }
+    const action = actions[name];
     action();
   }
 

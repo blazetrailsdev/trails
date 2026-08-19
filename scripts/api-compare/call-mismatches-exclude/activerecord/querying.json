@@ -4,20 +4,20 @@
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
     "call": "inheritance_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "querying.rb:88 `result_set.includes_column?(inheritance_column)` — trails' `_loadFromSql` (querying.ts:147) receives plain rows, not the `Result`, so it has no `includes_column?` to ask. `_instantiate` short-circuits the STI lookup when the column value is absent, covering both Rails arms. Converges once `_loadFromSql` takes the Result."
   },
   {
     "package": "activerecord",
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
     "call": "instantiate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "querying.rb:89 — the STI arm of the branch the `inheritance_column` row above describes; with no result-set column check, trails takes one `_instantiate` path for both arms. Converges with that row."
   },
   {
     "package": "activerecord",
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
     "call": "instantiate_instance_of",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "querying.rb:92 — the homogeneous arm of the same branch. Routing it through `instantiateInstanceOf` would also change which of `_instantiate`'s two type maps the column types land in (see the `persistence.ts instantiate -> instantiate_instance_of` row). Converges with the `inheritance_column` row."
   }
 ]

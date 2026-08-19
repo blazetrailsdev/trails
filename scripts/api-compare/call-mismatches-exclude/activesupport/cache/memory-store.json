@@ -4,6 +4,6 @@
     "tsFile": "cache/memory-store.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "memory_store.rb:83 `@monitor = Monitor.new` — Ruby's Monitor is a reentrant mutex guarding the store against other THREADS. JS has one thread and the store's mutations are synchronous, so there is nothing to construct and nothing to lock. Language shortcoming."
   }
 ]

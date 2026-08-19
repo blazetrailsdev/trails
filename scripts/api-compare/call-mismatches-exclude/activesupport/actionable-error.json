@@ -4,6 +4,6 @@
     "tsFile": "actionable-error.ts",
     "rubyName": "dispatch",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "actionable_error.rb:30 `actions(error).fetch(name).call` — Ruby Hash#fetch raises KeyError, which the method's own `rescue KeyError` turns into NonActionable; JS object indexing cannot raise, so the port spells the same pair as an explicit `name in actions` guard (key presence, exactly as fetch tests it) plus the NonActionable throw. Language shortcoming."
   }
 ]

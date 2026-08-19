@@ -2,22 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "base.ts",
-    "rubyName": "all",
-    "call": "default_scoped",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "all",
-    "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
     "rubyName": "destroy",
     "call": "with_transaction_returning_status",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "File-mapping artifact: `base.ts`'s `destroy` is the instance-method table entry `destroy: _Persistence.destroy` (base.ts:4609), not a body. Rails' `Transactions#destroy` (transactions.rb:356-358) maps to persistence.ts `destroy`, which does call `withTransactionReturningStatus` (persistence.ts:855)."
   }
 ]

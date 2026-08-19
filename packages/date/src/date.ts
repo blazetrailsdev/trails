@@ -8109,6 +8109,43 @@ export class Date {
    * All of them end at `d_simple_new_internal` (`date_core.c:3036`) exactly as
    * `date_s_jd` (`:3377-3387`) does; the overload adds an entry point to that
    * seat, not a seat.
+   *
+   * ## The seat renders the CIVIL triple, and loses the absolute day
+   *
+   * A `Temporal.PlainDate` is built from this receiver's civil year/month/day
+   * read in the ISO calendar. For a receiver whose `sg` puts the day on the
+   * JULIAN side of the reform, that triple names a DIFFERENT absolute day than
+   * the one MRI holds, so every Temporal reader derived from the absolute day
+   * disagrees with the gem: `dayOfWeek`, `dayOfYear`, and the commercial
+   * triple (`yearOfWeek` / `weekOfYear`). MRI computes those from the Julian
+   * day itself — `c_jd_to_commercial` / `c_valid_commercial_p`
+   * (`vendor/date/ext/date/date_core.c`) — so `Date.commercial(-4712, 1, 1)`
+   * has `cwday` 1 in Ruby while the seat reads `dayOfWeek` 4. `dayOfYear`
+   * happens to agree wherever the ISO and Julian leap rules coincide, and has
+   * the same defect where they do not (1900 under `Date::JULIAN`).
+   *
+   * **No seat can satisfy both.** Temporal has no Julian calendar —
+   * `@js-temporal/polyfill` rejects `calendar: "julian"` and CLDR ships only
+   * `gregory` and `iso8601` — so a `PlainDate` reads as exactly one absolute
+   * day. A seat for a Julian-side day can carry the civil triple MRI spells OR
+   * the absolute day MRI derives the weekday from, never both. Ruby has no
+   * counterpart decision to port: `Date#to_date` returns `self`, and the gem
+   * never renders into a second calendar system, so this is a seam trails
+   * invents because Temporal exists.
+   *
+   * This is a **ratified RFC 0088 decision (2026-08-18), not an oversight**:
+   * the civil spelling is kept and the divergence accepted. Raising on every
+   * Julian-side day was tried and withdrawn — jd 0 (`-4712-01-01`) is
+   * Julian-side under the default `ITALY` reform, i.e. the base case of
+   * `Date.jd` / `Date.ordinal` / `Date.commercial`, and the guard reddened 30
+   * ported gem tests. The narrower raise for a civil spelling ISO rejects
+   * outright (`Date.civil(1500, 2, 29)`, above) is untouched.
+   *
+   * Reopen this if either changes: a Temporal calendar admitting Julian
+   * appears, or RFC 0088 decides to seat Julian-side days on the gem-shaped
+   * `Date` instead. `test-switch-hitter.test.ts` records the test-side
+   * consequence — `test_commercial` / `test_fractional` assert through
+   * `toString` rather than the week readers for exactly this reason.
    */
   toDate(): Temporal.PlainDate {
     return plainDateFromJd(encodeJd(this.nth, this.mLocalJd()), this.sg);

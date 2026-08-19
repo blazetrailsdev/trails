@@ -2,20 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
-    "rubyName": "expanded_key",
-    "call": "to_param",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "handle_invalid_expires_in",
-    "call": "report",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
     "rubyName": "initialize",
     "call": "delete",
     "reason": "`@options.delete(:coder)` (cache.rb:301) is the JS `delete` operator here, a statement rather than a call the extractor can see."
@@ -25,27 +11,20 @@
     "tsFile": "cache.ts",
     "rubyName": "key_matcher",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "cache.rb:780 `options[:namespace].is_a?(Proc) ? options[:namespace].call : ...` — a Ruby Proc is invoked through `#call`; the JS callable it ports to is invoked as `ns()`, so there is no `call` to make. Language shortcoming."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "merged_options",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "cache.rb:883 `options.merge(call_options)` — Ruby Hash#merge returns a new hash, which JS object spread (`{ ...this.options, ...call }`) is; trails has no Hash object to call `merge` on. Language shortcoming."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "normalize_version",
     "call": "try",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "read_multi_entries",
-    "call": "order:deleteEntry,normalizeVersion",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "cache.rb:991 `options[:version].try(:to_param)` — Ruby's `to_param` is an Object core_ext method every receiver responds to, so `try` guards only nil; trails ports `to_param` as the free function `toParam`, so the guard is the explicit `!= null` check and there is no method to `try`. Language shortcoming."
   }
 ]

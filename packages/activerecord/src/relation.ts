@@ -537,15 +537,46 @@ export class Relation<T extends Base> {
    * the exact relation that will execute.
    */
   _instantiateBlock?: (record: T) => void;
+  /**
+   * The in-flight handle `loadAsync()` leaves behind so a later awaiter joins
+   * the running query instead of issuing a second one.
+   *
+   * **No Rails equivalent — PERMANENT.** Rails' counterpart state is `@future_result`
+   * (relation.rb:91, :1148), a `Concurrent::FutureResult` posted to a
+   * `Concurrent::ThreadPoolExecutor` (connection_pool.rb:717). Concurrent-ruby
+   * is a gem, not a Rails class, so there is no Ruby file to mirror, and JS has
+   * one thread: the only handle to background work is a Promise. Same decision,
+   * same reason, as the `@noRailsEquivalent PERMANENT` tag on `ar-config.ts:55`
+   * — spelled as prose here because `parity:api:extra` never scores a
+   * `_`-prefixed private member, so a real tag on one reads back as stale.
+   */
   private _loadAsyncPromise?: Promise<T[]>;
   /**
    * Set by `loadAsync()` so `execMainQuery` issues its SELECT with `async:` on, the way Rails' `load_async` calls
    * `exec_main_query(async: ...)` (relation.rb:1142).
+   *
+   * **No Rails equivalent — NOT PERMANENT.** A shape deviation with a convergence
+   * target, not a language shortcoming. Rails threads this as a method
+   * ARGUMENT: `load_async` calls `exec_main_query(async: ...)` directly
+   * (relation.rb:1142) while `exec_queries` calls it with the default
+   * (`async: false`, relation.rb:1423). trails stores it as a field because
+   * `loadAsync()` reaches `execMainQuery` through `toArray()`/`execQueries()`,
+   * which take no such parameter. Converging means threading `async` down that
+   * whole path — or having `loadAsync` drive `execMainQuery` itself the way
+   * Rails does — and retiring this field.
    */
   private _asyncLoad = false;
-  // Monotonic token bumped on reset()/reload() so an in-flight toArray()
-  // that started before the reset can detect it lost the race and skip
-  // committing stale records/loaded state.
+  /**
+   * Monotonic token bumped on reset()/reload() so an in-flight toArray()
+   * that started before the reset can detect it lost the race and skip
+   * committing stale records/loaded state.
+   *
+   * **No Rails equivalent — PERMANENT.** Rails has no analogue and cannot have one:
+   * `exec_queries` (relation.rb:1416-1421) is synchronous, so `reset`
+   * (relation.rb:1190-1200) can never land midway through a load. The race
+   * this guards exists only because trails' load path is a chain of awaits, a
+   * direct consequence of the async port rather than a choice.
+   */
   private _loadToken = 0;
 
   /**
@@ -2670,28 +2701,6 @@ export class Relation<T extends Base> {
       return !(await this.toArray()).some(matches);
     }
     return this.isEmpty();
-  }
-
-  /**
-   * The single none-short-circuit chokepoint consulted by every query terminal
-   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and by the mutation
-   * terminals (`updateAll`/`deleteAll`) BEFORE returning an empty result.
-   * `touchAll`/`updateCounters` reach it by delegating to `updateAll`, as they
-   * do in Rails.
-   *
-   * On a plain relation this is just `_isNone`; the override in
-   * `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
-   * live association scope, so a relation SPAWNED off a new owner
-   * (`owner.things.where(...)`) resolves the persisted FK once the owner is
-   * saved — mirroring Rails' CollectionProxy delegating every query to
-   * `association.scope`, rather than each terminal carrying its own rebase hook.
-   * `CollectionProxy` needs no rebase at all: it is never `@none` itself, and
-   * its value readers are delegated to `scope` (collection_proxy.rb:1128-1137).
-   *
-   * @internal
-   */
-  _isEmptyRelation(): boolean {
-    return this._isNone;
   }
 
   // ---------------------------------------------------------------------------

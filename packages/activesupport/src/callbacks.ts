@@ -654,6 +654,32 @@ export class Callback {
     void this.compiled;
   }
 
+  /**
+   * Mirrors: ActiveSupport::Callbacks::Callback.build (callbacks.rb:231-240) —
+   * `new chain.name, filter, kind, options, chain.config`. The String-filter
+   * ArgumentError Rails raises here is raised by the constructor instead, which
+   * is where trails' eager `compiled` build already sits.
+   *
+   * `originalObject` has no Rails counterpart — it is derived here rather than
+   * passed, so `build` keeps Rails' four-argument shape.
+   */
+  static build(
+    chain: { name: string; config: DefineCallbacksOptions },
+    filter: AnyCallback | string | symbol | CallbackObject,
+    kind: CallbackKind,
+    options: CallbackOptions,
+  ): Callback {
+    const isObj = typeof filter === "object" && filter !== null;
+    return new Callback(
+      chain.name,
+      filter,
+      kind,
+      options,
+      chain.config,
+      isObj ? filter : undefined,
+    );
+  }
+
   matches(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): boolean {
     if (this.kind !== kind) return false;
     if (filter === undefined) return true;
@@ -675,17 +701,10 @@ export class Callback {
       : this.options.unless
         ? [this.options.unless]
         : [];
-    return new Callback(
-      chain.name,
-      this.filter,
-      this.kind,
-      {
-        if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
-        unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
-      },
-      chain.config,
-      this.originalObject,
-    );
+    return Callback.build(chain, this.filter, this.kind, {
+      if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
+      unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
+    });
   }
 
   isDuplicates(other: Callback): boolean {
@@ -1411,19 +1430,16 @@ export namespace Callbacks {
     if (!chain) {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
-    const mapped = filters.map((filter) => {
-      // Rails hands the callback object straight to Callback.build, which compiles
-      // it to an ObjectCall honouring the chain scope — no function-wrapping.
-      const isObj = typeof filter === "object" && filter !== null;
-      return new Callback(
-        name,
+    // Rails hands the callback object straight to Callback.build, which compiles
+    // it to an ObjectCall honouring the chain scope — no function-wrapping.
+    const mapped = filters.map((filter) =>
+      Callback.build(
+        chain,
         filter as AnyCallback | CallbackObject,
         type,
         options as CallbackOptions,
-        chain.config,
-        isObj ? (filter as CallbackObject) : undefined,
-      );
-    });
+      ),
+    );
     if (options.prepend) {
       chain.prepend(...mapped);
     } else {

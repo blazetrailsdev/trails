@@ -4,41 +4,41 @@
     "tsFile": "persistence.ts",
     "rubyName": "_delete_record",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:294-296 `with_connection { |c| c.delete(dm, ...) }` — trails resolves the adapter through `threadedConnectionFor(...) ?? this.connection` (persistence.ts:366) rather than the block form; converging the whole package onto `withConnection` is RFC 0073's permanent-connection-checkout flip, tracked there."
   },
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "_in_memory_query_constraints_hash",
     "call": "attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:842 `index_with { |column_name| attribute(column_name) }` — Rails reads the PRIVATE `attribute` reader; trails' equivalent is the public `readAttribute` (persistence.ts:1846), since the port has no private/public attribute-reader pair. Same value, different spelling; tracked."
   },
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "_insert_record",
     "call": "with_cast_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:245 `_default_attributes[primary_key].with_cast_value(primary_key_value)` — the prefetch arm. `prefetch_primary_key?` is false for every adapter trails ships, so no `_default_attributes` Attribute exists to re-cast; the branch is mirrored structurally (persistence.ts:249-256) and assigns the raw sequence value. Converges when an adapter prefetches."
   },
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "instantiate",
     "call": "instantiate_instance_of",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:102 `instantiate_instance_of(klass, attributes, column_types, &block)`. trails' `instantiateInstanceOf` (persistence.ts:2174) passes its third argument as `_instantiate`'s `columnTypes`, which known columns IGNORE; the public `instantiate` entry must pass its `types` map as `overrideTypes` so it beats the schema cast type (Rails' `LazyAttributeHash` `additional_types[name] || types[name]`). Routing through the helper would silently drop that override — see the comment at persistence.ts:161-167."
   },
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "query_constraints_list",
     "call": "base_class?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:223 `base_class? || primary_key != base_class.primary_key`. trails walks the prototype chain instead (persistence.ts:199-215) because `baseClass` is itself derived from that walk. Note Ruby's `!=` on the primary-key ARRAY is value equality, so the converged port needs an element-wise compare, not `!==`; tracked."
   },
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "reload",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "persistence.rb:746 `(options || {}).merge(all_queries: true)` — Ruby Hash#merge returning a new hash is JS object spread (`{ ...findOptions, allQueries: true }`, persistence.ts:1422); there is no Hash object to call `merge` on. Language shortcoming."
   }
 ]

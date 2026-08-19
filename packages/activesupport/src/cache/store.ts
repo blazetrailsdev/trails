@@ -6,6 +6,7 @@ import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
+import { currentErrorReporter } from "../error-reporter.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { isEmpty } from "../ruby-empty.js";
 
@@ -651,11 +652,12 @@ export abstract class Store {
       const key = this.normalizeKey(name, options);
       const entry = this.readEntry(key, options);
       if (!entry) continue;
+
+      const version = this.normalizeVersion(name, options) ?? null;
+
       if (entry.isExpired()) {
         this.deleteEntry(key, options);
-        continue;
-      }
-      if (!entry.isMismatched(this.normalizeVersion(name, options) ?? null)) {
+      } else if (!entry.isMismatched(version)) {
         results[name] = entry.value;
       }
     }
@@ -754,8 +756,10 @@ export abstract class Store {
     const error = new ArgumentError(message);
     if (Store.raiseOnInvalidCacheExpirationTime) {
       throw error;
+    } else {
+      currentErrorReporter.report(error, { handled: true, severity: "warning" });
+      Store.logger?.error?.(`${error.name}: ${error.message}`);
     }
-    Store.logger?.error?.(`${error.name}: ${error.message}`);
   }
 
   protected normalizeKey(key: unknown, options?: StoreOptions): string {
@@ -799,16 +803,27 @@ export abstract class Store {
     return namespace ? `${namespace}:${key}` : key;
   }
 
+  /**
+   * Mirrors Rails `Cache::Store#expanded_key` (cache.rb:973-988): the `case`
+   * picks the shape and the single trailing `to_param` renders it, so an Array
+   * of expansions joins with `/` exactly as {@link toParam} does.
+   */
   protected expandedKey(key: unknown): string {
-    if (key != null && typeof key === "object") {
-      if ("cacheKey" in key) return String((key as { cacheKey(): string }).cacheKey());
-      if (Array.isArray(key)) return key.map((element) => this.expandedKey(element)).join("/");
-      return Object.entries(key as Record<string, unknown>)
+    if (key != null && typeof key === "object" && "cacheKey" in key)
+      return String((key as { cacheKey(): string }).cacheKey());
+
+    let expanded: unknown;
+    if (Array.isArray(key)) {
+      expanded =
+        key.length > 1 ? key.map((element) => this.expandedKey(element)) : this.expandedKey(key[0]);
+    } else if (key != null && typeof key === "object") {
+      expanded = Object.entries(key as Record<string, unknown>)
         .map(([k, v]) => `${k}=${v}`)
-        .sort()
-        .join("/");
+        .sort();
+    } else {
+      expanded = key;
     }
-    return String(key ?? "");
+    return String(toParam(expanded) ?? "");
   }
 
   /** Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991). */

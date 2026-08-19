@@ -4,20 +4,20 @@
     "tsFile": "delegated-type.ts",
     "rubyName": "define_delegated_type_methods",
     "call": "define_method",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "delegated_type.rb:246-251 `define_method \"#{role}_class\"` etc. — Ruby's `define_method` is a prototype assignment in JS, and in trails those assignments live in `delegatedType` (see the row above). Same language shortcoming as the `autosave-association.ts define_non_cyclic_method -> define_method` row."
   },
   {
     "package": "activerecord",
     "tsFile": "delegated-type.ts",
     "rubyName": "define_delegated_type_methods",
     "call": "scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "delegated_type.rb — the `scope \"#{type}\"` macro calls made per delegated type; in trails they live in `delegatedType` rather than `defineDelegatedTypeMethods` (see the `delegated_type -> define_delegated_type_methods` row above), so this body registers none. Converges with that row."
   },
   {
     "package": "activerecord",
     "tsFile": "delegated-type.ts",
     "rubyName": "delegated_type",
     "call": "define_delegated_type_methods",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "delegated_type.rb:233 — trails inverts Rails' decomposition: `delegatedType` (delegated-type.ts:64) does the whole job and `defineDelegatedTypeMethods` (:236) delegates BACK to it, so the Rails-direction call is never made. A real decomposition divergence, not a language shortcoming; converging means moving the method-definition half into `defineDelegatedTypeMethods`. Tracked."
   }
 ]
