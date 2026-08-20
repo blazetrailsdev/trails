@@ -311,8 +311,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * Implementation: use `Relation#merge` for state where overlay
    * REPLACES walker (limit / offset / wheres get the standard merger
    * semantics), then selectively recompose fields whose normal chain
-   * behavior is additive (`orderValues`, `_rawOrderClauses`,
-   * `selectValues`). `Relation#merge` replaces orders/select
+   * behavior is additive (`orderValues`, `selectValues`). `Relation#merge` replaces orders/select
    * outright (relation/merger.ts:21-32), but `.order(...)` /
    * `.select(...)` chains conventionally APPEND elsewhere — so a
    * blanket merge would drop the walker's existing orders/projection
@@ -322,40 +321,26 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
     type ComposeFields = {
       orderValues?: unknown[];
-      _rawOrderClauses?: unknown[];
       selectValues?: unknown[];
     };
     // Snapshot walker's pre-merge order/select state — the merge
     // would otherwise replace these.
     const source = walkerResult as unknown as ComposeFields;
     const sourceOrders = [...(source.orderValues ?? [])];
-    const sourceRawOrders = [...(source._rawOrderClauses ?? [])];
     const sourceSelects = [...(source.selectValues ?? [])];
 
     const merged = (walkerResult as unknown as { merge: (o: unknown) => Relation<T> }).merge(this);
     const target = merged as unknown as ComposeFields;
     const overlay = this as unknown as ComposeFields & { reorderingValue?: boolean };
     const overlayOrders = overlay.orderValues ?? [];
-    const overlayRawOrders = overlay._rawOrderClauses ?? [];
     const overlaySelects = overlay.selectValues ?? [];
     const isReordering = overlay.reorderingValue ?? false;
 
     if (isReordering) {
       // `reorder()` signals "replace, don't append": use overlay's orders only.
       target.orderValues = [...overlayOrders];
-      target._rawOrderClauses = [...overlayRawOrders];
-    } else if (overlayRawOrders.length > 0 && overlayOrders.length === 0) {
-      // `inOrderOf(column, values)` is the only `_rawOrderClauses`
-      // producer today; it CLEARS `orderValues` to express
-      // "replace existing order with this CASE order"
-      // (relation.ts:610). Honor that reset: drop BOTH walker's
-      // parsed orders AND any pre-existing raw orders so the
-      // overlay's CASE order wins outright (not as a tiebreaker).
-      target.orderValues = [];
-      target._rawOrderClauses = [...overlayRawOrders];
     } else {
       target.orderValues = [...sourceOrders, ...overlayOrders];
-      target._rawOrderClauses = [...sourceRawOrders, ...overlayRawOrders];
     }
 
     // Selects: append-and-dedupe so the walker's projection survives

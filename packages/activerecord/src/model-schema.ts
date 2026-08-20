@@ -6,7 +6,6 @@ import {
   AttributeSetBuilder,
   YAMLEncoder,
   typeRegistry,
-  defineDirtyAttributeMethods,
   replayOwnPendingDecorators,
   type Type,
 } from "@blazetrails/activemodel";
@@ -1194,19 +1193,6 @@ function applyColumnsHash(
       ...(colLimit != null ? { limit: colLimit } : {}),
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });
-
-    // `id` is excluded from dirty-method generation here; its accessor (and any
-    // stale own `id` property) is handled by defineAttributeMethods below.
-    if (name === "id") continue;
-    const proto = host.prototype;
-    // The main attribute accessor and the *BeforeTypeCast / *ForDatabase
-    // accessors are generated through defineAttributeMethods (invalidated +
-    // regenerated below), not installed inline — mirroring Rails' single
-    // define_attribute_methods generation path.
-    // Per-attribute dirty methods (nameChanged, nameWas, nameChange, …).
-    // Mirrors the call in activemodel's `attribute()` for user-declared attrs.
-    // Guards inside defineDirtyAttributeMethods skip already-defined methods.
-    defineDirtyAttributeMethods(proto, name);
   }
 
   // Regenerate attribute accessors through the single define_attribute_methods

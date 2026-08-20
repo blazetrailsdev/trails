@@ -389,6 +389,34 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(false);
   });
 
+  it("an inherited generated dirty accessor does not suppress the subclass's own generation", () => {
+    class Middle extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Leaf extends Middle {}
+
+    const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
+    expect("nameChanged" in (Leaf.prototype as object)).toBe(true);
+    expect(host.isInstanceMethodAlreadyImplemented("nameChanged")).toBe(false);
+  });
+
+  it("undefineAttributeMethods clears the generated dirty accessors", () => {
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(typeof (new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBe(
+      "function",
+    );
+
+    (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
+
+    expect((new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBeUndefined();
+  });
+
   it("an inherited class-body method is already implemented for the subclass", () => {
     class HandWritten extends Base {
       static {

@@ -358,7 +358,6 @@ function makeFindSomeRel(
     offsetValue: opts.offset ?? null,
     // ordered=true simulates a relation with ORDER BY (findSome stays in the accounting path)
     orderValues: opts.ordered !== false ? ["id ASC"] : [],
-    _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
     whereClause: { isEmpty: () => true },
@@ -423,7 +422,6 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
       limitValue: null,
       offsetValue: null,
       orderValues: ["id ASC"],
-      _rawOrderClauses: [],
       selectValues: ["title"],
       where(_cond: any) {
         const inner: any = {
@@ -471,7 +469,6 @@ function makeFindSomeOrderedRel(
     limitValue: opts.limit ?? null,
     offsetValue: opts.offset ?? null,
     orderValues: [],
-    _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
     whereClause: { isEmpty: () => true },

@@ -8,6 +8,7 @@ import {
   MissingAttributeError,
   missingAttribute,
   resolveAliasNameIn,
+  defineDirtyAttributeMethods,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   type InstanceHost as AttributeMethodsInstanceHost,
 } from "@blazetrails/activemodel";
@@ -488,6 +489,7 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
         configurable: true,
       });
     }
+    defineDirtyAttributeMethods.call(this as any, name);
   }
   // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` — inside the
   // `unless abstract_class?` block, so it only runs for concrete classes (this

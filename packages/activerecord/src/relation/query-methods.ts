@@ -329,7 +329,6 @@ interface QueryMethodsHost {
   distinctValue: boolean | null;
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
-  _rawOrderClauses: string[];
   _isNone: boolean;
   _joinClauses: Array<{
     type: "inner" | "left";
@@ -806,7 +805,6 @@ function reorder(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   preprocessOrderArgs.call(this, args as unknown[]);
-  this._rawOrderClauses = [];
   this.reorderingValue = true;
   this.orderValues = dedupeOrderClauses(args as unknown[]) as typeof this.orderValues;
   return this;
@@ -969,9 +967,6 @@ export type ExceptSkip = ExceptKey | (string & {});
 export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): void {
   delete host._values[scope];
   switch (scope) {
-    case "order":
-      host._rawOrderClauses = [];
-      break;
     case "joins":
       host._joinClauses = [];
       break;
@@ -985,7 +980,7 @@ export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): vo
  * The value keys whose trails representation spills outside `@values` into a
  * sidecar store, so replacing the hash wholesale has to clear them too.
  */
-const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = ["order", "joins", "leftOuterJoins"];
+const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = ["joins", "leftOuterJoins"];
 
 /**
  * Replace `@values` wholesale.
@@ -1896,25 +1891,11 @@ function reverseOrderBang(this: QueryMethodsHost): any {
   // false for an Arel node (it has no #empty?), so routing clauses through it
   // would drop every Ordering. Only nil/blank-string clauses are blank in this
   // list; Arel nodes never are.
-  //
-  // `_rawOrderClauses` is the trails-side carrier for order SQL Rails keeps in
-  // the same `order_values` list, so `reverse_sql_order`'s String branch owns
-  // them here rather than at a caller-side "is this order reversible" branch.
-  const rawClauses = this._rawOrderClauses;
-  if (rawClauses.length > 0) {
-    this._rawOrderClauses = (reverseSqlOrder.call(this, rawClauses) as string[]).map((clause) =>
-      String(clause),
-    );
-  }
   const clauses = this.orderValues.filter(
     (clause) => clause != null && !(typeof clause === "string" && /^\s*$/.test(clause)),
   );
   if (clauses.length === 0) {
-    // A raw order clause is still an order_values entry in Rails, so the
-    // default ORDER BY <pk> DESC branch does not apply when one is present.
-    if (rawClauses.length === 0) {
-      this.orderValues = reverseSqlOrder.call(this, []) as typeof this.orderValues;
-    }
+    this.orderValues = reverseSqlOrder.call(this, []) as typeof this.orderValues;
     return this;
   }
   this.orderValues = clauses.map((clause) => {
@@ -2593,11 +2574,6 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
 
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): void {
-  // `_rawOrderClauses` is the trails-side carrier for `inOrderOf`'s generated
-  // SQL, which Rails keeps inside order_values as an Arel CASE node.
-  for (const rawClause of ((this as any)._rawOrderClauses ?? []) as string[]) {
-    arel.order?.(new Nodes.SqlLiteral(rawClause));
-  }
   const orders = compactBlank(((this as any).orderValues ?? []) as unknown[]);
   if (orders.length > 0) arel.order?.(...orders);
 }
