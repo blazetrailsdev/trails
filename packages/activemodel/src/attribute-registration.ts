@@ -271,20 +271,23 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#apply_pending_attribute_modifications
  *
+ * Ruby's `superclass.respond_to?(:apply_pending_attribute_modifications, true)`
+ * (attribute_registration.rb:80) tests for a private method of the module; a TS
+ * module function is not a member of the class, so the participation test is
+ * the public entry point every AttributeRegistration includer answers.
+ *
+ * `host` is the class whose AttributeSet is being materialized, threaded down
+ * the recursion so a superclass's PendingDecorator resolves against the
+ * subclass it is replaying into — the same `host` thread AttributeDecorator
+ * documents, which Ruby gets from `self` inside the `decorate_attributes` block.
+ *
  * @internal
  */
 export function applyPendingAttributeModifications(
   cls: AttributeHostInternals,
   attributeSet: AttributeSet,
-  // The class whose AttributeSet is being materialized, threaded down the
-  // recursion so a superclass's PendingDecorator resolves against the subclass
-  // it is replaying into — the `host` thread documented on AttributeDecorator.
   host: AttributeHostInternals = cls,
 ): void {
-  // Ruby `superclass.respond_to?(:apply_pending_attribute_modifications, true)`
-  // (attribute_registration.rb:80). The module function is not a member of the
-  // class in TS, so the participation test is the public entry point every
-  // AttributeRegistration includer answers.
   const superclass = Object.getPrototypeOf(cls) as
     | (AttributeHostInternals & { _defaultAttributes?: unknown })
     | null;
