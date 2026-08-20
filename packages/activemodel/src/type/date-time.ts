@@ -17,7 +17,12 @@ import {
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
-import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
+import {
+  applySecondsPrecision,
+  fastStringToTime,
+  newTime,
+  typeCastForSchema,
+} from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
@@ -238,3 +243,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
  */
 const acceptsMultiparameterTime = new AcceptsMultiparameterTime({ defaults: { "4": 0, "5": 0 } });
 include(DateTimeType, acceptsMultiparameterTime);
+
+/**
+ * Ruby `include Helpers::TimeValue` (date_time.rb:47) for the one member of that module
+ * the class does not carry as a field: `type_cast_for_schema`
+ * (time_value.rb:36-38) is public and `PostgreSQL::OID::DateTime` overrides it
+ * with a `super` call (postgresql/oid/date_time.rb:21-27), so it has to land
+ * on the prototype rather than on each instance.
+ */
+include(DateTimeType, { typeCastForSchema });

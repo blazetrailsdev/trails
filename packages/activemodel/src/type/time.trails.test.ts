@@ -49,3 +49,16 @@ describe("TimeType serialize_cast_value_compatible?", () => {
     expect(type.itselfIfSerializeCastValueCompatible()).toBe(type);
   });
 });
+
+// `type_cast_for_schema` comes from Helpers::TimeValue (time_value.rb:36-38) —
+// `value.to_fs(:db).inspect` — where without the mixin the class would inherit
+// `Type::Value`'s `value.inspect` (value.rb:71-73). Verified against MRI:
+// `ActiveModel::Type::Time.new.type_cast_for_schema(cast)` answers
+// `"2000-01-01 10:20:30"` (quoted) — the 2000-01-01 dummy date is the one
+// `AcceptsMultiparameterTime`'s defaults give a bare time (time.rb:40-42).
+describe("TimeType type_cast_for_schema", () => {
+  it("answers the to_fs(:db) form, quoted", () => {
+    const type = new Types.TimeType();
+    expect(type.typeCastForSchema(type.cast("10:20:30"))).toBe('"2000-01-01 10:20:30"');
+  });
+});

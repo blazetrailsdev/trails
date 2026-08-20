@@ -4,7 +4,7 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Rational, Temporal } from "@blazetrails/date";
-import { zone } from "@blazetrails/activesupport";
+import { toFs, zone } from "@blazetrails/activesupport";
 
 import { isUtc } from "./timezone.js";
 
@@ -69,6 +69,24 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   } else {
     return value;
   }
+}
+
+/**
+ * Mirrors: ActiveModel::Type::Helpers::TimeValue#type_cast_for_schema
+ * (time_value.rb:36-38)
+ *
+ *   def type_cast_for_schema(value)
+ *     value.to_fs(:db).inspect
+ *   end
+ *
+ * Ruby dispatches `to_fs` on the receiver. The cast value of a datetime/time
+ * attribute is a `Temporal.Instant` here — the seat `Time#to_fs`
+ * (`core_ext/time/conversions.rb:55-61`) reads — and `String#inspect` of the
+ * `:db` form is its quoted spelling, the same one `Type::Value` and
+ * `Type::Date` reach through `JSON.stringify` (value.rb:71-73, date.rb:34-36).
+ */
+export function typeCastForSchema(value: unknown): string {
+  return JSON.stringify(toFs(value as Temporal.Instant, "db"));
 }
 
 /**
