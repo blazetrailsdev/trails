@@ -40,9 +40,10 @@ export abstract class JoinPart {
   isThroughNode = false;
   /**
    * Set on the tree nodes of a `has_many :through` chain (target + `_through_`
-   * leaves) — the shared emit-time state that resolves the whole chain's aliases
-   * against the AliasTracker and rebuilds the joins in one pass
-   * (`JoinDependency#_resolveThroughGroup`). Null for non-through nodes.
+   * leaves). Rails keeps the whole chain inside the one JoinAssociation, whose
+   * `joinConstraints` resolves and joins every link in one call; the group is
+   * how `JoinDependency#makeConstraints` finds the tree nodes those joins and
+   * tables belong to. Null for non-through nodes.
    * @internal
    */
   throughGroup: ThroughJoinGroup | null = null;

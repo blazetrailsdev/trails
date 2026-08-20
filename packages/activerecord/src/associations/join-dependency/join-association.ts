@@ -102,6 +102,12 @@ export class JoinAssociation extends JoinPart {
     const joins: Nodes.Node[] = [];
     const chain: [AbstractReflection, TableRef][] = [];
 
+    // Ruby rebuilds the scope's join sources on every call; the accumulators
+    // below are trails-side state, so clear them so a re-emit doesn't inherit
+    // the previous emit's sources (or shift their per-join buckets).
+    this.joinSources.length = 0;
+    this.joinSourcesByJoin.length = 0;
+
     const reflectionChain = this.reflection.chain;
 
     for (let index = 0; index < reflectionChain.length; index++) {

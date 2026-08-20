@@ -44,6 +44,9 @@ describe("JoinDependency AliasTracker wiring", () => {
 
   it("uses an AliasTracker instance for collision tracking", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    // Tables are claimed when the joins are built (`aliased_table_for`), not at
+    // construction — Rails' `make_constraints` (join_dependency.rb:189-211).
+    jd.joinConstraints([]);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker).toBeInstanceOf(AliasTracker);
     // base table + joined table registered
@@ -72,6 +75,7 @@ describe("JoinDependency AliasTracker wiring", () => {
 
   it("tracks multiple associations — each table counted once", () => {
     const jd = new JoinDependency(Post, null, ["comments", "tags"], Nodes.OuterJoin);
+    jd.joinConstraints([]);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker.aliases.get("comments") ?? 0).toBeGreaterThan(0);
     expect(tracker.aliases.get("tags") ?? 0).toBeGreaterThan(0);

@@ -67,6 +67,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
 
   it("uses real table names for through+target when no collision", () => {
     const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    jd.joinConstraints([]);
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
     expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
@@ -122,6 +123,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
 
   it("builds tree with through node as child of root and target as sibling", () => {
     const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    jd.joinConstraints([]);
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
 
@@ -220,8 +222,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     const node = nodeAt(jd, "similarPosts");
     expect(node).not.toBeNull();
 
-    // Aliasing is deferred to emit: resolve the whole chain against the shared
-    // AliasTracker (_resolveThroughGroup).
+    // Aliasing is deferred to emit: the one `joinConstraints` call resolves the
+    // whole chain against the shared AliasTracker.
     jd.joinConstraints([]);
     const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
     // A twice-visited table keeps its real name on first encounter and is
@@ -334,6 +336,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // ONE `jdt_posts` join instead of minting a second
     // `jdt_posts_jdt_authors_join` alias.
     const jd = new JoinDependency(JdtAuthor, null, ["jdtPosts", "jdtComments"], Nodes.OuterJoin);
+    jd.joinConstraints([]);
     const directNode = nodeAt(jd, "jdtPosts");
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
