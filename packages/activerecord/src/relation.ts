@@ -561,6 +561,7 @@ export class Relation<T extends Base> {
    * eager arm and consumed — then cleared — by `instantiate_records` (:1457-1459).
    */
   private _joinDependency: JoinDependency | null = null;
+
   private _table: Table | null = null;
 
   constructor(
@@ -2014,8 +2015,8 @@ export class Relation<T extends Base> {
       distinctSelectSql !== undefined
         ? [new Nodes.SqlLiteral(distinctSelectSql)]
         : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => this.table.get(column));
-    const limited = (relation as any).reselect(...values) as Relation<T>;
-    (limited as any).distinctBang();
+    const limited = relation.reselect(...values);
+    QueryMethodBangs.distinctBang.call(limited as any);
     return limited;
   }
 
