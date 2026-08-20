@@ -13,14 +13,6 @@ import {
   throughTargetScope,
 } from "./through-association.js";
 
-function safeKlass(refl: { klass?: unknown } | null | undefined): any {
-  try {
-    return refl?.klass ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation
  */

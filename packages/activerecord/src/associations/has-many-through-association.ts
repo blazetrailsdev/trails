@@ -22,14 +22,6 @@ import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
 import { runAllCallbacks } from "@blazetrails/activemodel";
 
-function safeKlass(refl: { klass?: unknown } | null | undefined): any {
-  try {
-    return refl?.klass ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation
  */
@@ -464,15 +456,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // for every method except `:destroy` (whose per-record callbacks handle it).
     // `klass` is the ASSOCIATION's klass (the target model), not the source
     // reflection's — a polymorphic source belongs_to has none, and taggings'
-    // `taggable` is exactly such a source. `safeKlass` stays defensive
-    // (a polymorphic source has no klass at all).
     const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      const klass = safeKlass({ klass: this.klass }) as {
+      const klass = this.klass as unknown as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
-      } | null;
+      };
       if (typeof counter === "string" && klass?.decrementCounter) {
         await klass.decrementCounter(
           counter,
@@ -687,7 +677,7 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
   // model on a secondary connection (HABTM "alternate database") has not been
   // reflected by the time we get here — assigning its FK would raise
   // UnknownAttributeError. No Rails counterpart; purely the async-schema seam.
-  const throughKlass = safeKlass(this.throughReflection() as { klass?: unknown } | null);
+  const throughKlass = (this.throughReflection() as { klass?: any } | null)?.klass;
   if (typeof throughKlass?.ensureSchemaLoaded === "function") {
     await throughKlass.ensureSchemaLoaded();
   }

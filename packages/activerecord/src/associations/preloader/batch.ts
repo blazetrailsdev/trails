@@ -36,7 +36,10 @@ export class Batch {
     let branches: Branch[] = this._preloaders.flatMap((p) => p.branches);
 
     while (branches.length > 0) {
-      const loaders = branches.flatMap((b) => b.runnableLoaders());
+      const loaders: Association[] = [];
+      for (const branch of branches) {
+        loaders.push(...(await branch.runnableLoaders()));
+      }
 
       for (const loader of loaders) {
         const available = this._availableRecords.get(loader.klass.baseClass);
@@ -44,15 +47,14 @@ export class Batch {
       }
 
       if (loaders.length > 0) {
-        const futureTables = new Set(
-          branches.flatMap((branch) => {
-            const futureClasses = branch.futureClasses();
-            const runnableClasses = branch.runnableLoaders().map((l) => l.klass);
-            return futureClasses
-              .filter((k) => !runnableClasses.includes(k))
-              .map((k) => k.tableName);
-          }),
-        );
+        const futureTables = new Set<string>();
+        for (const branch of branches) {
+          const futureClasses = await branch.futureClasses();
+          const runnableClasses = (await branch.runnableLoaders()).map((l) => l.klass);
+          for (const k of futureClasses) {
+            if (!runnableClasses.includes(k)) futureTables.add(k.tableName);
+          }
+        }
 
         let targetLoaders = loaders.filter((l) => !futureTables.has(l.tableName));
         if (targetLoaders.length === 0) targetLoaders = loaders;
@@ -67,7 +69,7 @@ export class Batch {
       const inProgress: Branch[] = [];
       for (const branch of branches) {
         if (branch.isDone()) {
-          this._setDefaultsForUncoveredRecords(branch);
+          await this._setDefaultsForUncoveredRecords(branch);
           finished.push(branch);
         } else {
           inProgress.push(branch);
@@ -78,17 +80,17 @@ export class Batch {
     }
   }
 
-  private _setDefaultsForUncoveredRecords(branch: Branch): void {
+  private async _setDefaultsForUncoveredRecords(branch: Branch): Promise<void> {
     if (branch.isRoot() || !branch.association) return;
 
     const coveredRecords = new Set<Base>();
-    for (const loader of branch.loaders) {
+    for (const loader of await branch.loaders()) {
       for (const owner of loader.owners) {
         coveredRecords.add(owner);
       }
     }
 
-    for (const record of branch.sourceRecords) {
+    for (const record of await branch.sourceRecords()) {
       if (coveredRecords.has(record)) continue;
       // Record a preloaded-nil default on the real holder so readers gating on
       // `holder.isLoaded() && _loadedFromPreload` see it (RFC 0022).

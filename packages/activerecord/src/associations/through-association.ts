@@ -37,19 +37,6 @@ export interface ThroughAssociationHost {
   ensureMutable(): void;
 }
 
-// A third copy of the subclass files' `safeKlass`: `constructJoinAttributes`
-// needs `reflection.klass` before `checkValidityBang` has run, where the getter
-// throws. Not a Rails member, so hoisting it to a shared home would be new
-// non-Rails surface in a file `parity:api` scores — it stays file-local until
-// the guard itself is retired.
-function safeKlass(refl: { klass?: unknown } | null | undefined): any {
-  try {
-    return refl?.klass ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Wrap `block` in a transaction on the through-reflection's class.
  *
@@ -146,7 +133,7 @@ export function constructJoinAttributes(
   const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
-  const reflKlass = safeKlass(refl);
+  const reflKlass = refl.klass;
   const assocPk =
     (typeof sourceRefl.associationPrimaryKeyFor === "function"
       ? sourceRefl.associationPrimaryKeyFor(reflKlass)
@@ -160,9 +147,7 @@ export function constructJoinAttributes(
   // FK value. That form carries the (possibly unsaved) source record itself, so
   // owner autosave cascades to persist it — the FK-value form would stamp a nil
   // id for a new source record.
-  const compositeConstraints: string[] = reflKlass
-    ? compositeQueryConstraintsList.call(reflKlass)
-    : [];
+  const compositeConstraints: string[] = compositeQueryConstraintsList.call(reflKlass);
 
   let joinAttributes: Record<string, unknown>;
   if (
@@ -200,11 +185,6 @@ export function constructJoinAttributes(
  * @internal
  */
 export function ensureMutable(this: ThroughAssociationHost): void {
-  // HABTM associations are always mutable: the join model's right side is an
-  // implicit belongsTo, but our habtm reflection doesn't expose that chain.
-  // Rails reaches the same conclusion via source_reflection.belongs_to?.
-  if (this.reflection.macro === "hasAndBelongsToMany") return;
-
   const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   // Rails' `reflection.has_one?`; the lightweight definition is the fallback

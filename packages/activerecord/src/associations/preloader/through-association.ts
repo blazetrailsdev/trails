@@ -47,9 +47,15 @@ export class ThroughAssociation extends Association {
     super(klass, owners, reflection, preloadScope, reflectionScope, associateByDefault);
   }
 
-  get preloadedRecords(): Base[] {
+  /** Mirrors: Preloader::ThroughAssociation#preloaded_records
+   *  (`preloader/through_association.rb:7-9`). */
+  async preloadedRecords(): Promise<Base[]> {
     if (this._throughPreloadedRecords !== undefined) return this._throughPreloadedRecords;
-    this._throughPreloadedRecords = this.sourcePreloaders().flatMap((l) => l.preloadedRecords);
+    const records: Base[] = [];
+    for (const loader of await this.sourcePreloaders()) {
+      records.push(...(await loader.preloadedRecords()));
+    }
+    this._throughPreloadedRecords = records;
     return this._throughPreloadedRecords;
   }
 
@@ -83,11 +89,11 @@ export class ThroughAssociation extends Association {
     // which cannot await — so the forcing happens here, on the one path that
     // can. Through loaders first: `source_preloaders` is derived from the
     // middle records they produce.
-    await Promise.all(this.throughPreloaders().map((l) => l.recordsByOwner()));
-    await Promise.all(this.sourcePreloaders().map((l) => l.recordsByOwner()));
+    await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()));
+    await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()));
 
-    const throughRecordsByOwner = this.throughRecordsByOwner();
-    const sourceRecordsByOwner = this.sourceRecordsByOwner();
+    const throughRecordsByOwner = await this.throughRecordsByOwner();
+    const sourceRecordsByOwner = await this.sourceRecordsByOwner();
 
     const throughRefl = this.throughReflection;
     const firstOwner = this.owners[0] as any;
@@ -126,7 +132,7 @@ export class ThroughAssociation extends Association {
 
       // Preserve scope ordering via preload index
       if (this.scope?.orderValues?.length > 0) {
-        const index = this.preloadIndex();
+        const index = await this.preloadIndex();
         records.sort((a, b) => (index.get(a) ?? 0) - (index.get(b) ?? 0));
       }
 
@@ -147,35 +153,48 @@ export class ThroughAssociation extends Association {
     return result;
   }
 
-  runnableLoaders(): Association[] {
-    if (this.dataAvailable()) {
+  async runnableLoaders(): Promise<Association[]> {
+    if (await this.dataAvailable()) {
       return [this];
     }
 
-    const throughPreloaders = this.throughPreloaders();
+    const throughPreloaders = await this.throughPreloaders();
     if (throughPreloaders.every((l) => l.isRun())) {
-      return this.sourcePreloaders().flatMap((l) => l.runnableLoaders());
+      const runnable: Association[] = [];
+      for (const loader of await this.sourcePreloaders()) {
+        runnable.push(...(await loader.runnableLoaders()));
+      }
+      return runnable;
     }
 
-    return throughPreloaders.flatMap((l) => l.runnableLoaders());
+    const runnable: Association[] = [];
+    for (const loader of throughPreloaders) {
+      runnable.push(...(await loader.runnableLoaders()));
+    }
+    return runnable;
   }
 
-  futureClasses(): (typeof Base)[] {
+  async futureClasses(): Promise<(typeof Base)[]> {
     if (this.isRun()) return [];
 
-    const throughPreloaders = this.throughPreloaders();
+    const throughPreloaders = await this.throughPreloaders();
     if (throughPreloaders.every((l) => l.isRun())) {
+      const sourceClasses: (typeof Base)[] = [];
+      for (const loader of await this.sourcePreloaders()) {
+        sourceClasses.push(...(await loader.futureClasses()));
+      }
       const seen = new Set<typeof Base>();
-      return this.sourcePreloaders()
-        .flatMap((l) => l.futureClasses())
-        .filter((k) => {
-          if (seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
+      return sourceClasses.filter((k) => {
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
     }
 
-    const throughClasses = throughPreloaders.flatMap((l) => l.futureClasses());
+    const throughClasses: (typeof Base)[] = [];
+    for (const loader of throughPreloaders) {
+      throughClasses.push(...(await loader.futureClasses()));
+    }
     const sourceRefl = this.sourceReflection;
     const sourceClasses: (typeof Base)[] = [];
     if (sourceRefl) {
@@ -202,18 +221,18 @@ export class ThroughAssociation extends Association {
     });
   }
 
-  private dataAvailable(): boolean {
+  private async dataAvailable(): Promise<boolean> {
     return (
       this.owners.every((owner) => this.isLoaded(owner)) ||
-      (this.throughPreloaders().every((l) => l.isRun()) &&
-        this.sourcePreloaders().every((l) => l.isRun()))
+      ((await this.throughPreloaders()).every((l) => l.isRun()) &&
+        (await this.sourcePreloaders()).every((l) => l.isRun()))
     );
   }
 
-  private sourcePreloaders(): Association[] {
+  private async sourcePreloaders(): Promise<Association[]> {
     if (this._sourcePreloaders !== undefined) return this._sourcePreloaders;
 
-    const middleRecords = this.middleRecords();
+    const middleRecords = await this.middleRecords();
     const sourceRefl = this.sourceReflection;
     if (!sourceRefl || middleRecords.length === 0) {
       return [];
@@ -266,11 +285,11 @@ export class ThroughAssociation extends Association {
       scope: sourceScope,
       associateByDefault: false,
     });
-    this._sourcePreloaders = preloader.loaders;
+    this._sourcePreloaders = await preloader.loaders();
     return this._sourcePreloaders;
   }
 
-  private throughPreloaders(): Association[] {
+  private async throughPreloaders(): Promise<Association[]> {
     if (this._throughPreloaders !== undefined) return this._throughPreloaders;
 
     const throughRefl = this.throughReflection;
@@ -285,32 +304,32 @@ export class ThroughAssociation extends Association {
       scope: this.throughScope(),
       associateByDefault: false,
     });
-    this._throughPreloaders = preloader.loaders;
+    this._throughPreloaders = await preloader.loaders();
     return this._throughPreloaders;
   }
 
-  private middleRecords(): Base[] {
-    return [...this.throughRecordsByOwner().values()].flat();
+  private async middleRecords(): Promise<Base[]> {
+    return [...(await this.throughRecordsByOwner()).values()].flat();
   }
 
-  private sourceRecordsByOwner(): Map<Base, Base[]> {
-    this._sourceRecordsByOwner ??= this.sourcePreloaders()
+  private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
+    this._sourceRecordsByOwner ??= (await this.sourcePreloaders())
       .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
       .reduce(merge, new Map<Base, Base[]>());
     return this._sourceRecordsByOwner ?? new Map();
   }
 
-  private throughRecordsByOwner(): Map<Base, Base[]> {
-    this._throughRecordsByOwner ??= this.throughPreloaders()
+  private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
+    this._throughRecordsByOwner ??= (await this.throughPreloaders())
       .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
       .reduce(merge, new Map<Base, Base[]>());
     return this._throughRecordsByOwner ?? new Map();
   }
 
-  private preloadIndex(): Map<Base, number> {
+  private async preloadIndex(): Promise<Map<Base, number>> {
     if (this._preloadIndex !== undefined) return this._preloadIndex;
     this._preloadIndex = new Map();
-    this.preloadedRecords.forEach((record, index) => {
+    (await this.preloadedRecords()).forEach((record, index) => {
       this._preloadIndex!.set(record, index);
     });
     return this._preloadIndex;

@@ -53,20 +53,20 @@ interface ThroughScopeProbe {
 describe("Preloader::ThroughAssociation#through_scope composite-PK through", () => {
   const { cpkOrders } = fixtures(["cpkOrders", "cpkTags", "cpkOrderTags"]);
 
-  function throughLoader(owners: CpkOrder[], name: string): ThroughAssociation {
-    const loaders = new Preloader({
+  async function throughLoader(owners: CpkOrder[], name: string): Promise<ThroughAssociation> {
+    const loaders = await new Preloader({
       records: owners,
       associations: [name],
       associateByDefault: false,
-    }).loaders;
+    }).loaders();
     const loader = loaders.find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return loader;
   }
 
-  it("JOINs the source and copies a mixed through+source predicate onto the composite-PK through query", () => {
+  it("JOINs the source and copies a mixed through+source predicate onto the composite-PK through query", async () => {
     const order = cpkOrders("cpk_groceries_order_1");
-    const loader = throughLoader([order], "tagsWithMixedCondition");
+    const loader = await throughLoader([order], "tagsWithMixedCondition");
     const sql = (loader as unknown as ThroughScopeProbe).throughScope().toSql();
     // The whole mixed predicate rides the through query (both column references
     // are the verbatim raw-SQL string, adapter-quoting-independent), and the

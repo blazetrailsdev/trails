@@ -4,9 +4,8 @@
  * Rails reaches `through_records_by_owner` / `source_records_by_owner` through
  * the public `records_by_owner` reader, which forces `load_records` before
  * answering (preloader/association.rb:148-151), so neither reader can observe
- * an unloaded child loader. trails' readers are synchronous — `middle_records`
- * is reached from `runnable_loaders` / `future_classes`, which cannot await —
- * so `recordsByOwner` awaits the children itself.
+ * an unloaded child loader. trails' `loadRecords` is async, so `recordsByOwner`
+ * awaits the children itself.
  *
  * The `Batch` runner always runs the through and source loaders before calling
  * `recordsByOwner`, so this pins the *direct* call, which nothing else covers:
@@ -29,19 +28,21 @@ registerModel(Organization);
 describe("Preloader::ThroughAssociation#records_by_owner child forcing", () => {
   const { members, memberDetails } = fixtures(["members", "organizations", "memberDetails"]);
 
-  function throughLoader(owners: Member[], name: string): ThroughAssociation {
-    const loader = new Preloader({
-      records: owners,
-      associations: [name],
-      associateByDefault: false,
-    }).loaders.find((l) => l instanceof ThroughAssociation);
+  async function throughLoader(owners: Member[], name: string): Promise<ThroughAssociation> {
+    const loader = (
+      await new Preloader({
+        records: owners,
+        associations: [name],
+        associateByDefault: false,
+      }).loaders()
+    ).find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return loader;
   }
 
   it("loads the through and source records when called before the batch runs them", async () => {
     const groucho = members("groucho");
-    const loader = throughLoader([groucho], "organizationMemberDetails_2");
+    const loader = await throughLoader([groucho], "organizationMemberDetails_2");
 
     expect(loader.isRun()).toBe(false);
 
