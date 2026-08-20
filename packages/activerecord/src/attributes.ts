@@ -245,13 +245,16 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         attributesHash.set(name, base.withUserDefault(def.defaultValue));
       } else if (def.type !== typeDefaultValue()) {
         attributesHash.set(name, Attribute.fromDatabase(name, null, def.type));
-      } else if (!isSchemaLoaded.call(cacheHost as never)) {
+      } else if (Object.keys(columns).length === 0) {
         // Deviation: Rails resolves `columns_hash` synchronously before
         // `_default_attributes` (attributes.rb:239-248), so a decorator branching
         // on `subtype == Type.default_value` (enum.rb:240) never has to tell "no
-        // such column" from trails' "not reflected yet". A non-singleton `value`
-        // stands in until reflection; afterwards the name stays absent, as Rails'
-        // columns-only seed leaves it.
+        // such column" from trails' "not reflected yet". An EMPTY hash is that
+        // state — `_schemaLoaded` is not the test, since the warm-cache probe
+        // above stamps it even when the reflection yielded nothing (PG). A
+        // non-singleton `value` stands in until columns arrive; once ANY column
+        // has reflected, an absent name is genuinely absent and stays out, as
+        // Rails' columns-only seed leaves it.
         attributesHash.set(name, Attribute.fromDatabase(name, null, typeLookup("value")));
       }
     }
