@@ -114,7 +114,6 @@ interface CalculationRelation {
     typeForAttribute?(name: string, block?: () => ColumnType): ColumnType;
     /** Mirrors `Model.attribute_types` (attribute_registration.rb) — Rails' hash-with-default. */
     attributeTypes(): Record<string, ColumnType>;
-    _attributeDefinitions?: { has(name: string): boolean };
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: CalculationConnection;
     /** Mirrors `Model.load_schema` — `type_cast_pluck_values` needs attribute_types. */
@@ -1508,7 +1507,9 @@ function pluckCastTypeForKnownColumn(
   model: CalculationRelation["_model"],
   name: string,
 ): ColumnType | null {
-  if (!model._attributeDefinitions?.has(name)) return null;
+  // Rails' `model.attribute_types.fetch(name) { ... }` (calculations.rb:617):
+  // the fallback runs only when the model owns no such KEY.
+  if (!Object.hasOwn(model.attributeTypes(), name)) return null;
   const coder = model._serializedAttributes?.get(name);
   if (coder) return { deserialize: (value) => coder.load(value) };
   return model.typeForAttribute?.(name) ?? null;
