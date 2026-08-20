@@ -509,11 +509,8 @@ export class JoinDependency {
       const chainLen = child.reflection.chain.length;
       const resolvedByIdx: Array<{ aliased: TableRef; effectiveName: string } | undefined> =
         new Array(chainLen);
-      // How far `joinConstraints` walked the chain before terminating on an
-      // already-resolved tail — i.e. how many constraint joins it emits. The
-      // returned array also carries each step's scope join sources inline
-      // (Rails' `joins.concat arel.join_sources`,
-      // join_association.rb:64-69), so it is no longer 1:1 with chain links.
+      // How far `joinConstraints` walked before terminating on an
+      // already-resolved tail — i.e. how many constraint joins it emits.
       let walkedLen = chainLen;
       const built = child.joinConstraints(
         foreignTable,
@@ -589,7 +586,8 @@ export class JoinDependency {
         }
       }
       // `joinConstraints` walks the chain in reverse and emits each step's
-      // constraint join followed by that step's scope join sources, so the
+      // constraint join followed by that step's scope join sources
+      // (`joins.concat arel.join_sources`, join_association.rb:64-69), so the
       // returned array is `[J(n-1), sources…, J(n-2), sources…, …]`. Only the
       // constraint joins map back onto a chain link's tree node: an entry is
       // one when it joins the table the walk resolved for the next link.
