@@ -9,7 +9,6 @@
 
 import type { Base } from "../../base.js";
 import type { TableRef, Nodes } from "@blazetrails/arel";
-import type { ThroughJoinGroup } from "../join-dependency.js";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
@@ -30,16 +29,6 @@ export abstract class JoinPart {
   arelJoin: Nodes.Join | null = null;
   /** @internal */
   nodeReflection: any | null = null;
-  isThroughNode = false;
-  /**
-   * Set on the tree nodes of a `has_many :through` chain (target + `_through_`
-   * leaves). Rails keeps the whole chain inside the one JoinAssociation, whose
-   * `joinConstraints` resolves and joins every link in one call; the group is
-   * how `JoinDependency#makeConstraints` finds the tree nodes those joins and
-   * tables belong to. Null for non-through nodes.
-   * @internal
-   */
-  throughGroup: ThroughJoinGroup | null = null;
   immediateAssocName = "";
   parentPath: string | null = null;
   effectiveSqlName = "";

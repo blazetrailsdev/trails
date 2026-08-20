@@ -204,7 +204,11 @@ export class DateType extends ValueType<DateCastResult> {
    * a Hash value is validated by assembling it (raising on invalid input).
    */
   override assertValidValue(value: unknown): void {
-    if (isPlainObject(value)) this.valueFromMultiparameterAssignment(value);
+    if (isPlainObject(value)) {
+      this.valueFromMultiparameterAssignment(value);
+    } else {
+      super.assertValidValue(value);
+    }
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
