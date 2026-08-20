@@ -180,6 +180,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * `Temporal.Instant` this port spells a `::Time` as, so the instant is read
    * back off it.
    *
+   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
+   * does: TS types `super` against a declared base class only, never against a
+   * mixed-in module.
+   *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
@@ -191,10 +195,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         `Provided hash ${toS(values)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
-    // `super` — the mixin's own `value_from_multiparameter_assignment`, which
-    // Ruby reaches by ancestry and TS types only for a declared base class, so
-    // it is taken off the module as Ruby's own
-    // `instance_method(...).bind_call(self, ...)` does.
     const time = (
       acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
         this: unknown,

@@ -23,7 +23,6 @@ export type { DateInfinityType, DateNegativeInfinityType };
 
 export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType;
 
-/** Mirrors: `include Helpers::AcceptsMultiparameterTime.new` (date.rb:28). */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (date.rb:28); the class/interface merge is how `include()` surfaces on the type side.
 export interface DateType extends Omit<
   InstanceMethods<DateCastResult>,
@@ -187,15 +186,15 @@ export class DateType extends ValueType<DateCastResult> {
    * this class mixes in below itself (see the `include` at the bottom of this
    * file).
    *
+   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
+   * does: TS types `super` against a declared base class only, never against a
+   * mixed-in module.
+   *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    // `super` — the mixin's own `value_from_multiparameter_assignment`, which
-    // Ruby reaches by ancestry and TS types only for a declared base class, so
-    // it is taken off the module as Ruby's own
-    // `instance_method(...).bind_call(self, ...)` does.
     const time = (
       acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
         this: unknown,

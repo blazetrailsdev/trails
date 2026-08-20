@@ -18,17 +18,6 @@ export interface InstanceMethods<T = unknown> {
 }
 
 /**
- * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
- * (accepts_multiparameter_time.rb).
- *
- * A `Module` subclass whose `initialize` includes `InstanceMethods` and
- * `define_method`s `value_from_multiparameter_assignment` closed over the
- * `defaults:` kwarg; `include AcceptsMultiparameterTime.new(...)` in a type's
- * class body then puts all of it in that type's ancestry, so `cast` and
- * `assert_valid_value` reach the type's real `super`. trails' `Module` /
- * `include()` (`activesupport/src/include.ts`) splice the same way.
- */
-/**
  * `super` from a module method: Ruby resolves it from the method's OWNER in the
  * receiver's ancestry, not from the receiver's class, so the owner is located
  * by identity and its own ancestor answers. (TS `super` is only available to a
@@ -46,13 +35,13 @@ function superOf(
   return (Object.getPrototypeOf(owner!) as Record<string, (...args: unknown[]) => unknown>)[name];
 }
 
+/** The type mixing `InstanceMethods` in — Ruby's `self` inside a module method. */
+type Receiver = InstanceMethods & { valueFromMultiparameterAssignment(value: unknown): unknown };
+
 /**
  * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime::InstanceMethods
  * (accepts_multiparameter_time.rb:7-35).
  */
-/** The type mixing `InstanceMethods` in — Ruby's `self` inside a module method. */
-type Receiver = InstanceMethods & { valueFromMultiparameterAssignment(value: unknown): unknown };
-
 const InstanceMethods = {
   /** Mirrors: InstanceMethods#serialize (accepts_multiparameter_time.rb:9-11). */
   serialize(this: Receiver, value: unknown): unknown {
@@ -91,6 +80,17 @@ const InstanceMethods = {
   },
 };
 
+/**
+ * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
+ * (accepts_multiparameter_time.rb).
+ *
+ * A `Module` subclass whose `initialize` includes `InstanceMethods` and
+ * `define_method`s `value_from_multiparameter_assignment` closed over the
+ * `defaults:` kwarg; `include AcceptsMultiparameterTime.new(...)` in a type's
+ * class body then puts all of it in that type's ancestry, so `cast` and
+ * `assert_valid_value` reach the type's real `super`. trails' `Module` /
+ * `include()` (`activesupport/src/include.ts`) splice the same way.
+ */
 /**
  * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
  * (accepts_multiparameter_time.rb).

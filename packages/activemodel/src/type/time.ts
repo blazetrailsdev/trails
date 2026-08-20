@@ -220,15 +220,15 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * of its own; this one only re-spells that `::Time` as the
    * `Temporal.Instant` this port casts to.
    *
+   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
+   * does: TS types `super` against a declared base class only, never against a
+   * mixed-in module.
+   *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
     values: Record<string, unknown>,
   ): Temporal.Instant | null {
-    // `super` — the mixin's own `value_from_multiparameter_assignment`, which
-    // Ruby reaches by ancestry and TS types only for a declared base class, so
-    // it is taken off the module as Ruby's own
-    // `instance_method(...).bind_call(self, ...)` does.
     const time = (
       acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
         this: unknown,
