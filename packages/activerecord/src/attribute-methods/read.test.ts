@@ -16,6 +16,9 @@ describe("ReadTest", () => {
   // via `define_attribute_methods`. A real Base subclass generates accessors
   // eagerly at `attribute()` declaration, which would mask the gate.
   function buildKlass() {
+    // Rails' fake klass does `include ActiveRecord::AttributeMethods`
+    // (read_test.rb:20), which brings the pattern list and the generation
+    // hooks along; spell that out here.
     class Klass {
       static _attributeDefinitions = new Map<string, { name: string }>([
         ["one", { name: "one" }],
@@ -23,7 +26,12 @@ describe("ReadTest", () => {
         ["three", { name: "three" }],
       ]);
       static _attributeMethodsGenerated = false;
+      static _attributeMethodPatterns = Base._attributeMethodPatterns;
+      static _attributeAliases = {};
+      static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
+      static defineMethodAttribute = Base.defineMethodAttribute;
+      static setDefineMethodAttribute = Base.setDefineMethodAttribute;
       static attributeMethodsGenerated = isAttributeMethodsGenerated;
       static attributeNames = ClassMethods.attributeNames;
     }

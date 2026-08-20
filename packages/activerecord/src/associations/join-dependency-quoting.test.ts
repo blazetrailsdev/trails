@@ -1,8 +1,8 @@
 /**
  * Covers the Arel node construction in JoinDependency#build. Verifies that
- * each tree node carries an `arelJoin` (Nodes.OuterJoin) with the correct ON
- * predicate structure for polymorphic :as, STI subclass IN-list, and basic
- * foreign-key joins.
+ * `joinConstraints` returns a join (Nodes.OuterJoin) per tree node with the
+ * correct ON predicate structure for polymorphic :as, STI subclass IN-list, and
+ * basic foreign-key joins.
  *
  * Through-association Arel construction is covered by
  * join-dependency-through-aliasing.test.ts.
@@ -14,11 +14,20 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
   return jd.nodes.find((n) => n.assocName === path)!;
+}
+
+/**
+ * The join a node's own chain root contributed, picked out of what
+ * `joinConstraints` returned — Rails' JoinAssociation keeps no back-reference to
+ * it (join_dependency.rb:189-211 concatenates the joins into the arel).
+ */
+function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
+  return joins.find((join) => tableSqlName(join.left as TableRef) === node.effectiveSqlName)!;
 }
 
 describe("JoinDependency Arel node construction", () => {
@@ -55,12 +64,12 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", as: "owner" });
 
     const jd = new JoinDependency(Owner, null, "assets", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "assets");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = node.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     expect(on).toBeInstanceOf(Nodes.On);
 
@@ -101,11 +110,11 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(StiSubOwner, "assets", { className: "Asset", as: "owner" });
 
     const jd = new JoinDependency(StiSubOwner, null, "assets", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "assets");
     expect(node).not.toBeNull();
 
-    const outerJoin = node.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
@@ -141,12 +150,12 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "cars", { className: "Car", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner, null, "cars", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "cars");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = node.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
@@ -176,12 +185,12 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner, null, "assets", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "assets");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = node.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
@@ -198,12 +207,12 @@ describe("JoinDependency Arel node construction", () => {
     Associations.belongsTo.call(Asset, "owner", { className: "Owner", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Asset, null, "owner", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "owner");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = node.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
@@ -271,14 +280,14 @@ describe("JoinDependency Arel node construction", () => {
     const node2 = nodeAt(jd, "owner.assets");
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
 
-    const table1 = (node1.arelJoin as Nodes.OuterJoin).left;
+    const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
     expect((table1 as any).tableAlias).toBeNull();
     // Rails names self-join collisions via reflection.alias_candidate —
     // `{plural_name}_{parent_table}` (join_dependency.rb:204-206), not `t2`.
     expect(node2.effectiveSqlName).toBe("assets_owners");
-    const table2 = (node2.arelJoin as Nodes.OuterJoin).left;
+    const table2 = (joinFor(joins, node2) as Nodes.OuterJoin).left;
     expect((table2 as any).tableAlias).toBe("assets_owners");
   });
 
@@ -286,10 +295,10 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner, null, "assets", Nodes.InnerJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "assets");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.InnerJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.InnerJoin);
   });
 
   it("pushes JoinAssociation into tree when reflection is available", () => {

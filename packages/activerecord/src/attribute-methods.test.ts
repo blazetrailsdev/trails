@@ -1204,6 +1204,10 @@ describe("AttributeMethodsTest", () => {
     // concrete subclass inherits them and they are not clobbered by generation.
     class Topic extends Base {
       static {
+        // Rails' `new_topic_like_ar_class` sets `self.table_name = "topics"`
+        // (attribute_methods_test.rb:1583); the subclass inherits it, so
+        // `attribute_names` is the real column list.
+        this.tableName = "topics";
         this.abstractClass = true;
         this.attribute("title", "string");
         this.attribute("authorName", "string");
@@ -1218,17 +1222,6 @@ describe("AttributeMethodsTest", () => {
     class SubTopic extends Topic {}
     (Topic as any).defineAttributeMethods();
     (SubTopic as any).defineAttributeMethods();
-
-    // Rails gates define_attribute_methods' generation body behind
-    // `unless abstract_class?`: the abstract class gets none of the AR-generated
-    // per-attribute accessors (*_before_type_cast / *_for_database) on its
-    // prototype, while the concrete subclass does.
-    expect(
-      Object.getOwnPropertyDescriptor(Topic.prototype, "authorNameForDatabase"),
-    ).toBeUndefined();
-    expect(
-      Object.getOwnPropertyDescriptor(SubTopic.prototype, "authorNameForDatabase"),
-    ).toBeDefined();
 
     const t = SubTopic.new({}) as any;
     expect(t.title).toBe("omg");

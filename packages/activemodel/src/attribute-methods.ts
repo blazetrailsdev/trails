@@ -92,17 +92,20 @@ export class AttributeMethodPattern {
   readonly prefix: string;
   readonly suffix: string;
   readonly proxyTarget: string;
-  readonly parameters: string;
+  readonly parameters: string | false;
   readonly method_missing_target: string;
 
   constructor({
     prefix = "",
     suffix = "",
     parameters = null,
-  }: { prefix?: string; suffix?: string; parameters?: string | null } = {}) {
+  }: { prefix?: string; suffix?: string; parameters?: string | null | false } = {}) {
     this.prefix = prefix;
     this.suffix = suffix;
-    this.parameters = parameters === null ? "..." : parameters;
+    // `parameters: false` (before_type_cast.rb:32, query.rb:10) is NOT nil: it
+    // survives as `false`, so the generated method takes no arguments —
+    // `def #{mangled_name}(#{parameters || ''})` (attribute_methods.rb:465).
+    this.parameters = parameters == null ? "..." : parameters;
     this.proxyTarget = `${prefix}attribute${suffix}`;
     this.method_missing_target = `attribute_${prefix}${suffix ? `${suffix}` : ""}`;
   }
@@ -255,7 +258,7 @@ export function _readAttribute(
  */
 export function attributeMethodPrefix(
   this: AttributeMethodHost,
-  ...prefixes: Array<string | { parameters?: string | null }>
+  ...prefixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(prefixes);
   ensureOwnPatterns(this);
@@ -268,7 +271,7 @@ export function attributeMethodPrefix(
 
 export function attributeMethodSuffix(
   this: AttributeMethodHost,
-  ...suffixes: Array<string | { parameters?: string | null }>
+  ...suffixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(suffixes);
   ensureOwnPatterns(this);
@@ -570,7 +573,7 @@ export function defineProxyCall(
   codeGenerator: CodeGenerator,
   name: string,
   proxyTarget: string,
-  parameters: string | null,
+  parameters: string | null | false,
   ...rest: [...callArgs: string[], options: { namespace: string; as?: string }]
 ): void {
   const options = rest[rest.length - 1] as { namespace: string; as?: string };
@@ -615,8 +618,9 @@ export type InstanceHost = {
  *
  * Rails compiles `def mangled_name(params); self.target_name(call_args); end`
  * into the generator's batch. A TS "source" is the definition itself, so the
- * emitted body is the equivalent closure over `callArgs`, and `parameters` is
- * inert because a rest parameter forwards what Ruby's `params` names.
+ * emitted body is the equivalent closure over `callArgs`; a rest parameter
+ * forwards what Ruby's `params` names, so `parameters` only matters when it is
+ * `false` — the zero-arg case, which is an accessor property in TS.
  * `CALL_COMPILABLE_REGEXP` has no analogue either: a JS property lookup needs
  * no name to be compilable, so the `send(...)` arm it guards never applies.
  * `name` is unused here exactly as it is in Ruby.
@@ -626,12 +630,26 @@ export function defineCall(
   _name: string,
   targetName: string,
   mangledName: string,
-  _parameters: string | null,
+  parameters: string | null | false,
   callArgs: string[],
   { namespace, as }: { namespace: string; as: string },
 ): void {
   codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
     batch.push((mod) => {
+      // `def #{mangled_name}(#{parameters || ''})` (attribute_methods.rb:465):
+      // a `parameters: false` pattern generates a zero-arg reader, which is an
+      // accessor property in TS (see CLAUDE.md, "Generated attribute readers
+      // are properties").
+      if (parameters === false) {
+        Object.defineProperty(mod, mangledName, {
+          get(this: ReadWriteHost) {
+            const target = this[targetName] as (...a: unknown[]) => unknown;
+            return target.call(this, ...callArgs);
+          },
+          configurable: true,
+        });
+        return;
+      }
       Object.defineProperty(mod, mangledName, {
         value: function (this: ReadWriteHost, ...args: unknown[]) {
           const target = this[targetName] as (...a: unknown[]) => unknown;
@@ -652,7 +670,9 @@ export function defineCall(
  * `attribute_method_suffix`, which TS cannot spell as a real keyword after a
  * rest element.
  */
-function extractParameters(affixes: Array<string | { parameters?: string | null }>): string | null {
+function extractParameters(
+  affixes: Array<string | { parameters?: string | null | false }>,
+): string | null | false {
   const last = affixes[affixes.length - 1];
   if (last === undefined || typeof last === "string") return null;
   affixes.pop();

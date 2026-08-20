@@ -68,10 +68,10 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     );
     // The ON is built when the joins are emitted (Rails `make_constraints`,
     // join_dependency.rb:189-211), not at tree construction.
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = jd.nodes.find((n) => n.assocName === "order");
     expect(node).not.toBeNull();
-    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const outerJoin = joins[0] as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     // belongsTo keys target.association_primary_key = source.foreign_key per

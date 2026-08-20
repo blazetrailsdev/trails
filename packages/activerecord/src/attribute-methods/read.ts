@@ -72,6 +72,9 @@ export function defineMethodAttribute(
 ): void {
   const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
   const tempMethodName = buildMangledName(methodName);
+  completeHalfAccessor(this, as, "get", function (this: ReadRecord) {
+    return readGeneratedAttribute(this, canonicalName);
+  });
   owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
     batch.push((mod) => {
       Object.defineProperty(mod, tempMethodName, {
@@ -91,4 +94,48 @@ export function defineMethodAttribute(
       });
     });
   });
+}
+
+interface ReadRecord {
+  _attributes: AttributeSet;
+  _accessedFields: Set<string>;
+  _readAttribute(n: string, block: (n: string) => unknown): unknown;
+  missingAttribute(n: string, stack?: string): never;
+}
+
+/**
+ * The body of the generated reader (read.rb:18-20).
+ *
+ * @internal Rails-private helper.
+ */
+function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
+  if (record._attributes.has(canonicalName)) record._accessedFields.add(canonicalName);
+  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
+}
+
+/**
+ * A Ruby class that defines only `color=` (test/models/bulb.rb:27-29) still gets
+ * the generated `color` reader, because the two are separate methods. A JS
+ * accessor property is ONE descriptor for both halves, so the class's own
+ * `set color` shadows the generated module's reader as well as its writer —
+ * completing the class's half-descriptor with the generated half is what keeps
+ * the Rails behaviour.
+ *
+ * @noRailsEquivalent PERMANENT — a JS accessor property is one descriptor for
+ * both halves, so a class's own half-accessor shadows the generated module's
+ * whole property; no port can split it back into Ruby's two methods. The
+ * repo-wide consequence is ratified in CLAUDE.md ("Generated attribute readers
+ * are properties").
+ */
+export function completeHalfAccessor(
+  klass: unknown,
+  name: string,
+  half: "get" | "set",
+  fn: (this: never, ...args: never[]) => unknown,
+): void {
+  const proto = (klass as { prototype?: object }).prototype;
+  if (proto == null) return;
+  const desc = Object.getOwnPropertyDescriptor(proto, name);
+  if (desc == null || "value" in desc || desc[half] != null) return;
+  Object.defineProperty(proto, name, { ...desc, [half]: fn, configurable: true });
 }

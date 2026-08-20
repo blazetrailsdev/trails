@@ -31,6 +31,7 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
+  AttributeMethodPattern,
   Model,
   Type,
   pushPendingDecorator,
@@ -1760,6 +1761,17 @@ export class Base extends Model {
   static set sequenceName(name: string | null) {
     ModelSchema.sequenceName.call(this, name);
   }
+
+  // Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
+  // parameters: false` (attribute_methods/before_type_cast.rb:32). Ruby's
+  // `class_attribute` `+=` gives Active Record its own array rather than
+  // mutating ActiveModel's; `parameters: false` makes each generated method
+  // zero-arg, i.e. an accessor property in TS.
+  static override _attributeMethodPatterns: AttributeMethodPattern[] = [
+    ...Model._attributeMethodPatterns,
+    new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
+    new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
+  ];
 
   // -- Ignored columns --
   static _ignoredColumns: string[] = [];

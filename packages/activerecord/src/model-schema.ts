@@ -1109,6 +1109,16 @@ function reflectedTypeForColumn(
 }
 
 /**
+ * Classes whose accessor regeneration is already in flight — see the call site
+ * in `applyColumnsHash`.
+ *
+ * @noRailsEquivalent PERMANENT — guards the re-entrancy trails' schema-reflection
+ * hook adds to `define_attribute_methods`; Rails' `load_schema!` generates no
+ * methods, so the cycle it breaks does not exist upstream.
+ */
+const regeneratingAttributeMethods = new WeakSet<object>();
+
+/**
  * Sync worker: apply a columns hash (already fetched from the schema
  * cache) to `_attributeDefinitions`. Shared by sync `loadSchema` and
  * async `loadSchemaFromAdapter`.
@@ -1195,15 +1205,6 @@ function applyColumnsHash(
     });
   }
 
-  // Regenerate attribute accessors through the single define_attribute_methods
-  // path now that schema reflection has settled the attribute definitions.
-  const methodHost = host as unknown as {
-    _attributeMethodsGenerated?: boolean;
-    defineAttributeMethods?: () => boolean;
-  };
-  methodHost._attributeMethodsGenerated = false;
-  methodHost.defineAttributeMethods?.();
-
   type CacheBag = {
     _attributesBuilder?: unknown;
     _yamlEncoder?: unknown;
@@ -1217,6 +1218,28 @@ function applyColumnsHash(
   bag._cachedDefaultAttributes = null;
   bag._columns = undefined;
   host._columnsHash = filteredHash;
+
+  // Regenerate attribute accessors through the single define_attribute_methods
+  // path now that schema reflection has settled the attribute definitions.
+  const methodHost = host as unknown as {
+    _attributeMethodsGenerated?: boolean;
+    defineAttributeMethods?: () => boolean;
+  };
+  methodHost._attributeMethodsGenerated = false;
+  // Generation reads `attribute_names` (attribute_methods.rb:115
+  // `super(attribute_names)`), which consults `columnNames()` → `loadSchema` —
+  // and we are *inside* that load, whose superclass cascade can re-stale this
+  // class's memo. Rails never re-enters (`load_schema!` defines no attribute
+  // methods), so hold the re-entrant regeneration off: the outer call already
+  // generates from the settled definitions.
+  if (!regeneratingAttributeMethods.has(host)) {
+    regeneratingAttributeMethods.add(host);
+    try {
+      methodHost.defineAttributeMethods?.();
+    } finally {
+      regeneratingAttributeMethods.delete(host);
+    }
+  }
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
