@@ -5515,7 +5515,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect(await pirate.isValid()).toBe(true);
     expect(await pirate.isValid("conference")).toBe(false);
-    expect(ship.errors.get("name")[0]).toBe("can't be blank");
+    expect(ship.errors.messagesFor("name")[0]).toBe("can't be blank");
   });
   it("association with instance dependent scope", async () => {
     class InstScopeAuthor extends Base {

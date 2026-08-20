@@ -39,13 +39,13 @@ describe("AbsenceValidationTest", () => {
     t.title = "foo";
     t.content = "bar";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["must be blank"]);
-    expect(t.errors.get("content")).toEqual(["must be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["must be blank"]);
+    expect(t.errors.messagesFor("content")).toEqual(["must be blank"]);
     t.title = "";
     t.content = "something";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("content")).toEqual(["must be blank"]);
-    expect(t.errors.get("title")).toEqual([]);
+    expect(t.errors.messagesFor("content")).toEqual(["must be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual([]);
     t.content = "";
     assertPredicate(await t.isValid(), (valid) => valid);
   });
@@ -56,8 +56,8 @@ describe("AbsenceValidationTest", () => {
     t.title = "foo";
     t.content = "bar";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["must be blank"]);
-    expect(t.errors.get("content")).toEqual(["must be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["must be blank"]);
+    expect(t.errors.messagesFor("content")).toEqual(["must be blank"]);
   });
 
   it("validates absence of with custom error using quotes", async () => {
@@ -67,7 +67,7 @@ describe("AbsenceValidationTest", () => {
     const p = new Person();
     p.karma = "good";
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
-    expect(p.errors.get("karma").at(-1)).toEqual(
+    expect(p.errors.messagesFor("karma").at(-1)).toEqual(
       "This string contains 'single' and \"double\" quotes",
     );
   });
@@ -77,7 +77,7 @@ describe("AbsenceValidationTest", () => {
     const p = new Person();
     p.karma = "good";
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
-    expect(p.errors.get("karma")).toEqual(["must be blank"]);
+    expect(p.errors.messagesFor("karma")).toEqual(["must be blank"]);
     p.karma = null;
     assertPredicate(await p.isValid(), (valid) => valid);
   });
@@ -87,7 +87,7 @@ describe("AbsenceValidationTest", () => {
     const p = new CustomReader();
     p.data["karma"] = "excellent";
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
-    expect(p.errors.get("karma")).toEqual(["must be blank"]);
+    expect(p.errors.messagesFor("karma")).toEqual(["must be blank"]);
     p.data["karma"] = "";
     assertPredicate(await p.isValid(), (valid) => valid);
   });
@@ -101,6 +101,6 @@ describe("AbsenceValidationTest", () => {
     }
     const p = new Interpolated({ name: "Alice" });
     await p.isValid();
-    expect(p.errors.get("name")).toContain("must be empty");
+    expect(p.errors.messagesFor("name")).toContain("must be empty");
   });
 });

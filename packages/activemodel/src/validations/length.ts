@@ -1,7 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, except } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -65,7 +65,7 @@ export const RESERVED_OPTIONS = [
 export class LengthValidator extends EachValidator {
   // Declarations only — actual functions attached to the prototype below.
   // Prototype attachment (not class fields) so the helpers are present
-  // during EachValidator's constructor-time checkValidity() call. JS class
+  // during EachValidator's constructor-time checkValidityBang() call. JS class
   // fields don't initialize until AFTER super() returns. (Same bootstrapping
   // lesson as PR #994 / #1002.)
   declare resolveValue: typeof resolveValue;
@@ -78,7 +78,7 @@ export class LengthValidator extends EachValidator {
     options = { ...options };
 
     // Normalize :in / :within to :minimum / :maximum before super() calls
-    // checkValidity(), mirroring length.rb:16-20.
+    // checkValidityBang(), mirroring length.rb:16-20.
     const range = options["in"] ?? options["within"];
     if (range !== undefined) {
       delete options["in"];
@@ -115,52 +115,7 @@ export class LengthValidator extends EachValidator {
     super(options);
   }
 
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
-    // For nil → 0 (nil.to_s.length); for non-nil values without a .length
-    // (numbers, booleans, plain objects) → String(value).length.
-    let valueLength: number;
-    if (typeof value === "string" || Array.isArray(value)) {
-      valueLength = value.length;
-    } else if (
-      typeof value === "object" &&
-      value !== null &&
-      "length" in value &&
-      typeof (value as { length: unknown }).length === "number"
-    ) {
-      valueLength = (value as { length: number }).length;
-    } else if (value == null) {
-      valueLength = 0;
-    } else {
-      valueLength = String(value).length;
-    }
-
-    // Rails length.rb:49 — `errors_options = options.except(*RESERVED_OPTIONS)`
-    const errorsOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
-
-    for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
-      [CheckKey, (valueLength: number, checkValue: number) => boolean]
-    >) {
-      let checkValue = this.options[key];
-      if (checkValue == null) continue;
-
-      if (value != null || this.skipNilCheck(key)) {
-        checkValue = resolveLengthOpt.call(this, record, checkValue);
-        if (validityCheck(valueLength, checkValue as number)) continue;
-      }
-
-      errorsOptions["count"] = checkValue;
-
-      const defaultMessage = this.options[camelize(MESSAGES[key].slice(1), false)];
-      if (defaultMessage != null && errorsOptions["message"] == null) {
-        errorsOptions["message"] = defaultMessage;
-      }
-
-      record.errors.add(attribute, MESSAGES[key], { ...errorsOptions });
-    }
-  }
-
-  override checkValidity(): void {
+  override checkValidityBang(): void {
     // Mirrors length.rb:30 — `CHECKS.keys & options.keys`, which keeps CHECKS'
     // declaration order (is, minimum, maximum). An explicitly-passed
     // `undefined` is Ruby's absent kwarg, so it does not count as a key.
@@ -188,6 +143,51 @@ export class LengthValidator extends EachValidator {
         continue;
       }
       throw new ArgumentError(`:${key} must be a non-negative Integer, Infinity, Symbol, or Proc`);
+    }
+  }
+
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+    // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
+    // For nil → 0 (nil.to_s.length); for non-nil values without a .length
+    // (numbers, booleans, plain objects) → String(value).length.
+    let valueLength: number;
+    if (typeof value === "string" || Array.isArray(value)) {
+      valueLength = value.length;
+    } else if (
+      typeof value === "object" &&
+      value !== null &&
+      "length" in value &&
+      typeof (value as { length: unknown }).length === "number"
+    ) {
+      valueLength = (value as { length: number }).length;
+    } else if (value == null) {
+      valueLength = 0;
+    } else {
+      valueLength = String(value).length;
+    }
+
+    // Rails length.rb:49 — `errors_options = options.except(*RESERVED_OPTIONS)`
+    const errorsOptions = except(this.options, ...RESERVED_OPTIONS);
+
+    for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
+      [CheckKey, (valueLength: number, checkValue: number) => boolean]
+    >) {
+      let checkValue = this.options[key];
+      if (checkValue == null) continue;
+
+      if (value != null || this.skipNilCheck(key)) {
+        checkValue = resolveLengthOpt.call(this, record, checkValue);
+        if (validityCheck(valueLength, checkValue as number)) continue;
+      }
+
+      errorsOptions["count"] = checkValue;
+
+      const defaultMessage = this.options[camelize(MESSAGES[key].slice(1), false)];
+      if (defaultMessage != null && errorsOptions["message"] == null) {
+        errorsOptions["message"] = defaultMessage;
+      }
+
+      record.errors.add(attribute, MESSAGES[key], { ...errorsOptions });
     }
   }
 }

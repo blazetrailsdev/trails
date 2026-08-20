@@ -88,7 +88,7 @@ describe("I18nValidationTest", () => {
     seedAssociationCache(topic, "replies", [new FakeReply()]);
 
     await topic.isValid();
-    expect([...new Set(topic.errors.get("replies"))]).toEqual(["custom message"]);
+    expect([...new Set(topic.errors.messagesFor("replies"))]).toEqual(["custom message"]);
   });
 
   it("validates associated finds global default translation", async () => {
@@ -107,6 +107,6 @@ describe("I18nValidationTest", () => {
     seedAssociationCache(topic, "replies", [new FakeReply()]);
 
     await topic.isValid();
-    expect(topic.errors.get("replies")).toEqual(["global message"]);
+    expect(topic.errors.messagesFor("replies")).toEqual(["global message"]);
   });
 });

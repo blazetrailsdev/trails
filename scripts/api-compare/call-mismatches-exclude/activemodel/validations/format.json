@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activemodel",
+    "tsFile": "validations/format.ts",
+    "rubyName": "check_validity!",
+    "call": "include?",
+    "reason": "Language shortcoming: `options.include?(:with) ^ options.include?(:without)` (format.rb:21) is Hash#include?, an own-key test. `this.options` is a plain object, whose own-key test is `Object.hasOwn` — there is no `include?` call form to make; the guard and its xor are otherwise line-for-line."
+  }
+]

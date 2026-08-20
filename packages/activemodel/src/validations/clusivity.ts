@@ -11,7 +11,7 @@
  * prototypes (see InclusionValidator.prototype.* / ExclusionValidator
  * .prototype.* assignments in inclusion.ts / exclusion.ts). Prototype
  * placement matters because `EachValidator`'s constructor calls
- * `this.checkValidity()` before subclass class fields initialize — and
+ * `this.checkValidityBang()` before subclass class fields initialize — and
  * because subclass overrides should be honored, matching Rails' Ruby
  * method-lookup semantics.
  */
@@ -26,7 +26,7 @@ export const ERROR_MESSAGE =
   "and must be supplied as the :in (or :within) option of the configuration hash";
 
 export interface Clusivity {
-  checkValidity(): void;
+  checkValidityBang(): void;
   resolveValue(record: unknown, value: unknown): unknown;
   /** @internal */
   delimiter(): unknown;

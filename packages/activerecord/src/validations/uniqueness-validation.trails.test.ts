@@ -36,7 +36,7 @@ describe("UniquenessValidationContextTest", () => {
     // is caught.
     const dup = new Topic({ title: "ctx-unique" });
     expect(await dup.isValid()).toBe(false);
-    expect(dup.errors.get("title")).toEqual(["has already been taken"]);
+    expect(dup.errors.messagesFor("title")).toEqual(["has already been taken"]);
 
     // A persisted record validates in the :update context, where an `on: :create`
     // validator does not fire — even though its changed title now collides.
@@ -59,7 +59,7 @@ describe("UniquenessValidationContextTest", () => {
     const persisted = await Topic.createBang({ title: "upd-other" });
     persisted.writeAttribute("title", "upd-unique");
     expect(await persisted.isValid("update")).toBe(false);
-    expect(persisted.errors.get("title")).toEqual(["has already been taken"]);
+    expect(persisted.errors.messagesFor("title")).toEqual(["has already been taken"]);
   });
 
   it("strict: true raises StrictValidationFailed on a uniqueness collision", async () => {

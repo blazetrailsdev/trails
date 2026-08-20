@@ -830,6 +830,8 @@ class ApiExtractor
       process_scope(args)
     when "delegate"
       process_delegate(args)
+    when "def_delegators", "def_delegator"
+      process_def_delegators(args)
     when "define_column_methods"
       process_define_column_methods(args)
     when "module_function"
@@ -894,6 +896,8 @@ class ApiExtractor
         process_mattr(node[2], reader: false, writer: true, predicate: false, class_attr: false)
       when "delegate"
         process_delegate(node[2])
+      when "def_delegators", "def_delegator"
+        process_def_delegators(node[2])
       when "module_function"
         process_module_function(node[2])
       when "define_method"
@@ -1498,6 +1502,51 @@ class ApiExtractor
     end
 
     return unless has_to
+    return if names.empty?
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    names.each do |name|
+      target[bucket] << {
+        name: name,
+        visibility: "public",
+        params: [],
+        file: @current_file,
+        line: @current_line,
+        notes: "delegate",
+      }
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  # Forwardable's `def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!`
+  # generates one public instance method per symbol AFTER the accessor, each
+  # forwarding to the target. The accessor is the first positional argument and
+  # is an ivar (`:@errors`) or a reader name; only ivar accessors appear in the
+  # vendored lib, so the leading `@`-prefixed symbol is dropped and every
+  # remaining symbol is recorded. `def_delegator :@a, :b, :c` (aliasing form)
+  # takes the same path: the alias is the last symbol, and recording both `b`
+  # and `c` would invent surface, so only the ivar is dropped and the rest are
+  # kept — faithful for the two call sites that exist
+  # (activemodel/lib/active_model/errors.rb:103, nested_error.rb:20).
+  def process_def_delegators(args)
+    list = positional_arg_list(args)
+    names = []
+
+    visit = lambda do |node|
+      return unless node.is_a?(Array)
+      case node[0]
+      when :symbol_literal, :dyna_symbol
+        nm = symbol_name(node)
+        names << nm if nm
+      end
+    end
+
+    list.each { |el| visit.call(el) } if list.is_a?(Array) && list[0] != :args_add_star
+    names.reject! { |nm| nm.start_with?("@") }
     return if names.empty?
 
     fqn = current_fqn

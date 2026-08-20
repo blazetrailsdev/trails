@@ -33,13 +33,13 @@ describe("ErrorTest", () => {
   it("message handles lambda in messages and option values, and i18n interpolation", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid", { message: "custom error" });
-    expect(errors.get("name")).toEqual(["custom error"]);
+    expect(errors.messagesFor("name")).toEqual(["custom error"]);
   });
 
   it("message with type as a symbol and indexed attribute can lookup without index in attribute key", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid");
-    expect(errors.get("name")).toEqual(["is invalid"]);
+    expect(errors.messagesFor("name")).toEqual(["is invalid"]);
   });
 
   it("initialize", () => {
@@ -73,13 +73,13 @@ describe("ErrorTest", () => {
   it("message with type as custom message", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { message: "is required" });
-    expect(e.get("name")).toContain("is required");
+    expect(e.messagesFor("name")).toContain("is required");
   });
 
   it("message with options[:message] as custom message", () => {
     const e = new Errors(null);
     e.add("name", ":invalid", { message: "is not valid" });
-    expect(e.get("name")).toContain("is not valid");
+    expect(e.messagesFor("name")).toContain("is not valid");
   });
 
   it("equality by base attribute, type and options", () => {
@@ -131,33 +131,33 @@ describe("ErrorTest", () => {
   it("message with type as a symbol", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    expect(e.get("name")).toEqual(["can't be blank"]);
+    expect(e.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("message with custom interpolation", () => {
     const e = new Errors(null);
     e.add("name", ":greater_than", { count: 5 });
-    expect(e.get("name")).toEqual(["must be greater than 5"]);
+    expect(e.messagesFor("name")).toEqual(["must be greater than 5"]);
   });
 
   it("message returns plural interpolation", () => {
     const e = new Errors(null);
     e.add("name", ":too_short", { count: 3 });
-    expect(e.get("name").length).toBe(1);
+    expect(e.messagesFor("name").length).toBe(1);
     expect(e.objects[0].options?.count).toBe(3);
   });
 
   it("message returns singular interpolation", () => {
     const e = new Errors(null);
     e.add("name", ":too_short", { count: 1 });
-    expect(e.get("name").length).toBe(1);
+    expect(e.messagesFor("name").length).toBe(1);
     expect(e.objects[0].options?.count).toBe(1);
   });
 
   it("message returns count interpolation", () => {
     const e = new Errors(null);
     e.add("name", ":equal_to", { count: 42 });
-    expect(e.get("name")).toEqual(["must be equal to 42"]);
+    expect(e.messagesFor("name")).toEqual(["must be equal to 42"]);
   });
 
   it("inspect", () => {
@@ -172,13 +172,13 @@ describe("ErrorTest", () => {
   it("message renders lazily using current locale", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
-    expect(errors.get("name")).toEqual(["can't be blank"]);
+    expect(errors.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("message uses current locale", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid");
-    expect(errors.get("name")).toEqual(["is invalid"]);
+    expect(errors.messagesFor("name")).toEqual(["is invalid"]);
   });
 
   it("full_messages doesn't require the base object to respond to :errors", () => {
@@ -191,7 +191,7 @@ describe("ErrorTest", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
     expect(errors.count).toBe(1);
-    errors.merge(errors);
+    errors.mergeBang(errors);
     expect(errors.count).toBe(1);
   });
 
@@ -264,13 +264,13 @@ describe("ErrorTest", () => {
   it("message with identifier-shaped rawType routes through i18n", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    expect(e.get("name")).toEqual(["can't be blank"]);
+    expect(e.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("message with non-identifier rawType returns literal string", () => {
     const e = new Errors(null);
     e.add("name", "is really not great");
-    expect(e.get("name")).toEqual(["is really not great"]);
+    expect(e.messagesFor("name")).toEqual(["is really not great"]);
   });
 
   // P10: generateMessage promotes a Symbol-valued options.message to type.
@@ -279,7 +279,7 @@ describe("ErrorTest", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { message: ":tooShort" });
     // ":tooShort" becomes the type, and has no locale entry → the missing-translation message
-    expect(e.get("name")[0]).toContain("errors.messages.tooShort");
+    expect(e.messagesFor("name")[0]).toContain("errors.messages.tooShort");
   });
 
   // Rails error.rb:51-55: strip array notation, then pass full dotted attribute

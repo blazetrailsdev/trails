@@ -23,8 +23,8 @@ export class WithValidator extends EachValidator {
     }
   }
 
-  override checkValidity(): void {
-    super.checkValidity();
+  override checkValidityBang(): void {
+    super.checkValidityBang();
     const methodName = this.options.with;
     if (typeof methodName !== "string" || methodName.trim().length === 0) {
       throw new ArgumentError("WithValidator requires the :with option to be a non-blank string");

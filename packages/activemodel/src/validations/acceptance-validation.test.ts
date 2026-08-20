@@ -213,7 +213,7 @@ describe("acceptance options pass-through", () => {
     }
     const t = new Terms({ terms: "no" });
     await t.isValid();
-    expect(t.errors.get("terms")).toContain("must be accepted");
+    expect(t.errors.messagesFor("terms")).toContain("must be accepted");
   });
 
   it("reserved key accept does not appear in error options", async () => {

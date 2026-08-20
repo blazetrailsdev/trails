@@ -2,8 +2,12 @@
   {
     "package": "activemodel",
     "tsFile": "validations/length.ts",
-    "rubyName": "validate_each",
-    "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "check_validity!",
+    "call": "keys",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:options"
+    ],
+    "reason": "Language shortcoming: `CHECKS.keys & options.keys` (length.rb:30) intersects two key lists; the TS body filters `Object.keys(CHECKS)` on `this.options[key] !== undefined` instead, because an explicitly-passed `undefined` is Ruby's ABSENT kwarg — `Object.keys(this.options)` would count it present and accept `maximum: undefined`."
   }
 ]

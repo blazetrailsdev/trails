@@ -56,18 +56,18 @@ describe("LengthValidationTest", () => {
 
     t.title = "not";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 5 characters)"]);
 
     t.title = null;
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 5 characters)"]);
   });
 
   it("validates length of using maximum should allow nil", async () => {
@@ -94,8 +94,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -116,14 +116,14 @@ describe("LengthValidationTest", () => {
 
     const t = new Topic({ title: "a!", content: "I'm ooooooooh so very long" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
-    expect(t.errors.get("content")).toEqual(["is too long (maximum is 5 characters)"]);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.messagesFor("content")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = null;
     t.content = null;
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
-    expect(t.errors.get("content")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.messagesFor("content")).toEqual(["is too short (minimum is 3 characters)"]);
 
     t.title = "abe";
     t.content = "mad";
@@ -138,7 +138,7 @@ describe("LengthValidationTest", () => {
 
     t.title = "Now I'm 10";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 9 characters)"]);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 9 characters)"]);
 
     t.title = "Four";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -191,8 +191,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is the wrong length (should be 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is the wrong length (should be 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -237,45 +237,45 @@ describe("LengthValidationTest", () => {
     Topic.validatesLengthOf("title", { minimum: 5, message: "boo %{count}" });
     const t = new Topic({ title: "uhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["boo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["boo 5"]);
   });
 
   it("validates length of custom errors for minimum with too short", async () => {
     Topic.validatesLengthOf("title", { minimum: 5, tooShort: "hoo %{count}" });
     const t = new Topic({ title: "uhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("validates length of custom errors for maximum with message", async () => {
     Topic.validatesLengthOf("title", { maximum: 5, message: "boo %{count}" });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["boo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["boo 5"]);
   });
 
   it("validates length of custom errors for in", async () => {
     Topic.validatesLengthOf("title", { in: { begin: 10, end: 20 }, message: "hoo %{count}" });
     let t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 10"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 10"]);
 
     t = new Topic({ title: "uhohuhohuhohuhohuhohuhohuhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 20"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 20"]);
   });
 
   it("validates length of custom errors for maximum with too long", async () => {
     Topic.validatesLengthOf("title", { maximum: 5, tooLong: "hoo %{count}" });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("validates length of custom errors for both too short and too long", async () => {
@@ -288,29 +288,29 @@ describe("LengthValidationTest", () => {
 
     let t = new Topic({ title: "a" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["too short"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["too short"]);
 
     t = new Topic({ title: "aaaaaa" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["too long"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["too long"]);
   });
 
   it("validates length of custom errors for is with message", async () => {
     Topic.validatesLengthOf("title", { is: 5, message: "boo %{count}" });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["boo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["boo 5"]);
   });
 
   it("validates length of custom errors for is with wrong length", async () => {
     Topic.validatesLengthOf("title", { is: 5, wrongLength: "hoo %{count}" });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("validates length of using minimum utf8", async () => {
@@ -321,8 +321,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "一二三四";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 5 characters)"]);
   });
 
   it("validates length of using maximum utf8", async () => {
@@ -333,8 +333,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "一二34五六";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
   });
 
   it("validates length of using within utf8", async () => {
@@ -342,8 +342,8 @@ describe("LengthValidationTest", () => {
 
     const t = new Topic({ title: "一二", content: "12三四五六七" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
-    expect(t.errors.get("content")).toEqual(["is too long (maximum is 5 characters)"]);
+    expect(t.errors.messagesFor("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.messagesFor("content")).toEqual(["is too long (maximum is 5 characters)"]);
     t.title = "一二三";
     t.content = "12三";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -370,8 +370,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "一二345六";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is the wrong length (should be 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is the wrong length (should be 5 characters)"]);
   });
 
   it("validates length of for integer", async () => {
@@ -379,7 +379,7 @@ describe("LengthValidationTest", () => {
 
     let t = new Topic({ title: "uhohuhoh", content: "whatever", approved: 1 });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("approved"), (errors) => errors.length > 0);
+    assertPredicate(t.errors.messagesFor("approved"), (errors) => errors.length > 0);
 
     t = new Topic({ title: "uhohuhoh", content: "whatever", approved: 1234 });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -393,7 +393,7 @@ describe("LengthValidationTest", () => {
       p.karma = "Pix";
       assertPredicate(await p.isInvalid(), (invalid) => invalid);
 
-      expect(p.errors.get("karma")).toEqual(["is too short (minimum is 5 characters)"]);
+      expect(p.errors.messagesFor("karma")).toEqual(["is too short (minimum is 5 characters)"]);
 
       p.karma = "The Smiths";
       assertPredicate(await p.isValid(), (valid) => valid);
@@ -407,7 +407,7 @@ describe("LengthValidationTest", () => {
 
     const t = new Topic({ title: "1234" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
 
     t.title = "12345";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -475,8 +475,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -490,8 +490,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -511,8 +511,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -526,8 +526,8 @@ describe("LengthValidationTest", () => {
 
     t.title = "notvalid";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
-    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+    assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["is too long (maximum is 5 characters)"]);
 
     t.title = "";
     assertPredicate(await t.isValid(), (valid) => valid);

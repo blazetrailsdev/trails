@@ -56,7 +56,7 @@ describe("ValidationsContextTest", () => {
       await topic.isInvalid("create"),
       "Validation does run on create if 'on' is set to create",
     ).toBeTruthy();
-    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
   });
 
   it("with a class that adds errors on multiple contexts and validating a new model", async () => {
@@ -73,13 +73,13 @@ describe("ValidationsContextTest", () => {
       await topic.isInvalid("context1"),
       "Validation did not run on context1 when 'on' is set to context1 and context2",
     ).toBeTruthy();
-    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
 
     expect(
       await topic.isInvalid("context2"),
       "Validation did not run on context2 when 'on' is set to context1 and context2",
     ).toBeTruthy();
-    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
   });
 
   it("with a class that validating a model for a multiple contexts", async () => {
@@ -97,7 +97,7 @@ describe("ValidationsContextTest", () => {
       await topic.isInvalid(["context1", "context2"]),
       "Validation did not run on context1 when 'on' is set to context1 and context2",
     ).toBeTruthy();
-    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
-    expect(topic.errors.get("base")).toContain(ANOTHER_ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ANOTHER_ERROR_MESSAGE);
   });
 });

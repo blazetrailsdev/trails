@@ -37,7 +37,7 @@ describe("AbsenceValidationTest", () => {
     const face = new Face();
     seedAssociationCache(boy, "face", face);
     expect(await boy.isValid()).toBe(false);
-    expect(boy.errors.get("face").length).toBe(1);
+    expect(boy.errors.messagesFor("face").length).toBe(1);
 
     face.markForDestruction();
     expect(await boy.isValid()).toBe(true);

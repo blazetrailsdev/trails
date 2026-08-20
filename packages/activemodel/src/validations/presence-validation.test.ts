@@ -38,14 +38,14 @@ describe("PresenceValidationTest", () => {
 
     const t = new Topic();
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["can't be blank"]);
-    expect(t.errors.get("content")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("content")).toEqual(["can't be blank"]);
 
     t.title = "something";
     t.content = "   ";
 
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("content")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("content")).toEqual(["can't be blank"]);
 
     t.content = "like stuff";
 
@@ -58,8 +58,8 @@ describe("PresenceValidationTest", () => {
     Topic.validatesPresenceOf(["title", "content"]);
     const t = new Topic();
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["can't be blank"]);
-    expect(t.errors.get("content")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("content")).toEqual(["can't be blank"]);
   });
 
   it("validates acceptance of with custom error using quotes", async () => {
@@ -68,7 +68,7 @@ describe("PresenceValidationTest", () => {
     });
     const p = new Person();
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
-    expect(p.errors.get("karma").at(-1)).toEqual(
+    expect(p.errors.messagesFor("karma").at(-1)).toEqual(
       "This string contains 'single' and \"double\" quotes",
     );
   });
@@ -79,7 +79,7 @@ describe("PresenceValidationTest", () => {
     const p = new Person();
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
 
-    expect(p.errors.get("karma")).toEqual(["can't be blank"]);
+    expect(p.errors.messagesFor("karma")).toEqual(["can't be blank"]);
 
     p.karma = "Cold";
     assertPredicate(await p.isValid(), (valid) => valid);
@@ -91,7 +91,7 @@ describe("PresenceValidationTest", () => {
     const p = new CustomReader();
     assertPredicate(await p.isInvalid(), (invalid) => invalid);
 
-    expect(p.errors.get("karma")).toEqual(["can't be blank"]);
+    expect(p.errors.messagesFor("karma")).toEqual(["can't be blank"]);
 
     p.data["karma"] = "Cold";
     assertPredicate(await p.isValid(), (valid) => valid);
@@ -105,11 +105,11 @@ describe("PresenceValidationTest", () => {
 
     t.title = "";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["can't be blank"]);
 
     t.title = "  ";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["can't be blank"]);
+    expect(t.errors.messagesFor("title")).toEqual(["can't be blank"]);
 
     t.title = null;
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -140,7 +140,7 @@ describe("PresenceValidationTest", () => {
     }
     const p = new Interpolated({});
     await p.isValid();
-    expect(p.errors.get("name")).toContain("is wrong");
+    expect(p.errors.messagesFor("name")).toContain("is wrong");
   });
 
   it("strict: true raises StrictValidationFailed via filteredErrorOptions", async () => {

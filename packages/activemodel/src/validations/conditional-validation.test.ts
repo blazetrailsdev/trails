@@ -32,8 +32,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("if validation using array of true methods", async () => {
@@ -44,8 +44,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("unless validation using array of false methods", async () => {
@@ -56,8 +56,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("unless validation using method true", async () => {
@@ -69,7 +69,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("if validation using array of true and false methods", async () => {
@@ -80,7 +80,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("unless validation using array of true and false methods", async () => {
@@ -91,7 +91,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("if validation using method false", async () => {
@@ -103,7 +103,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("unless validation using method false", async () => {
@@ -115,8 +115,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("if validation using block true", async () => {
@@ -128,8 +128,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("unless validation using block true", async () => {
@@ -141,7 +141,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("if validation using block false", async () => {
@@ -153,7 +153,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("unless validation using block false", async () => {
@@ -165,8 +165,8 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 
   it("validation using combining if true and unless true conditions", async () => {
@@ -178,7 +178,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertEmpty(t.errors.get("title"));
+    assertEmpty(t.errors.messagesFor("title"));
   });
 
   it("validation using combining if true and unless false conditions", async () => {
@@ -190,7 +190,7 @@ describe("ConditionalValidationTest", () => {
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["hoo 5"]);
   });
 });

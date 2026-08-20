@@ -129,7 +129,7 @@ describe("ValidatesWithTest", () => {
     await topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
       field: "first_name",
     });
-    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
+    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
   });
 
   it("each validator checks validity", async () => {
@@ -157,7 +157,7 @@ describe("ValidatesWithTest", () => {
     });
     const p = new Person({});
     await p.isValid();
-    expect(p.errors.get("name").length).toBeGreaterThan(0);
+    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
   });
 
   it("each validator skip nil values if :allow_nil is set to true", async () => {
@@ -226,7 +226,7 @@ describe("ValidatesWithTest", () => {
     Person.validate("checkName");
     const p = new Person({});
     await p.isValid();
-    expect(p.errors.get("name").length).toBeGreaterThan(0);
+    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
   });
 
   it("validates_with each validator", async () => {
@@ -244,8 +244,8 @@ describe("ValidatesWithTest", () => {
     const p = new Person({});
     await p.isValid();
     expect(p.errors.count).toBe(2);
-    expect(p.errors.get("name").length).toBeGreaterThan(0);
-    expect(p.errors.get("age").length).toBeGreaterThan(0);
+    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
+    expect(p.errors.messagesFor("age").length).toBeGreaterThan(0);
   });
 
   it("validation with class that adds errors", async () => {

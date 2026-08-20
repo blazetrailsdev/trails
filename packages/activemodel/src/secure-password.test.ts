@@ -29,7 +29,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("password")).toContain("can't be blank");
+    expect(u.errors.messagesFor("password")).toContain("can't be blank");
   });
 
   it("don't include ActiveModel::Validations when validations are disabled", async () => {
@@ -380,7 +380,7 @@ describe("SecurePasswordTest", () => {
     expect(await u.isValid()).toBe(true);
     (u as any).passwordChallenge = "wrong";
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
   });
 
   it("password_challenge validates against existing digest before allowing changes", async () => {
@@ -406,7 +406,7 @@ describe("SecurePasswordTest", () => {
     (u as any).password = "newpassword";
     (u as any).passwordChallenge = "wrongold";
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
   });
 
   it("password_challenge is not validated when nil", async () => {
@@ -425,7 +425,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test", password_digest: digest });
     (u as any).passwordChallenge = "wrong";
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
   });
 
   it("password_challenge fails when no prior digest exists", async () => {
@@ -434,7 +434,7 @@ describe("SecurePasswordTest", () => {
     // No password set — password_digest baseline is null.
     (u as any).passwordChallenge = "anything";
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
   });
 
   it("password too long emits passwordTooLong error type", async () => {
@@ -459,7 +459,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test" });
     u.writeAttribute("password_digest", "   ");
     expect(await u.isValid()).toBe(false);
-    expect(u.errors.get("password")).toContain("can't be blank");
+    expect(u.errors.messagesFor("password")).toContain("can't be blank");
   });
 
   it("password_salt returns the bcrypt salt from the digest", () => {

@@ -19,7 +19,7 @@ import {
   ValidationError,
   Validator,
 } from "./index.js";
-import type { ConditionalOptions } from "./validator.js";
+import type { ConditionalOptions } from "./validations.js";
 import { FormatValidator } from "./validations/format.js";
 
 // Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
@@ -125,11 +125,11 @@ describe("ValidationsTest", () => {
     r.title = "There's no content!";
     assertPredicate(await r.isInvalid(), (invalid) => invalid);
     assertPredicate(
-      r.errors.get("content"),
+      r.errors.messagesFor("content"),
       (messages) => messages.length > 0,
       "A reply without content should mark that attribute as invalid",
     );
-    expect(r.errors.get("content")).toEqual(["is Empty"]);
+    expect(r.errors.messagesFor("content")).toEqual(["is Empty"]);
     expect(r.errors.count).toBe(1);
   });
 
@@ -138,18 +138,18 @@ describe("ValidationsTest", () => {
     assertPredicate(await r.isInvalid(), (invalid) => invalid);
 
     assertPredicate(
-      r.errors.get("title"),
+      r.errors.messagesFor("title"),
       (messages) => messages.length > 0,
       "A reply without title should mark that attribute as invalid",
     );
-    expect(r.errors.get("title")).toEqual(["is Empty"]);
+    expect(r.errors.messagesFor("title")).toEqual(["is Empty"]);
 
     assertPredicate(
-      r.errors.get("content"),
+      r.errors.messagesFor("content"),
       (messages) => messages.length > 0,
       "A reply without content should mark that attribute as invalid",
     );
-    expect(r.errors.get("content")).toEqual(["is Empty"]);
+    expect(r.errors.messagesFor("content")).toEqual(["is Empty"]);
 
     expect(r.errors.count).toBe(2);
   });
@@ -181,7 +181,7 @@ describe("ValidationsTest", () => {
 
     const errors = r.errors.toArray().reduce<string[]>((result, error) => [...result, error], []);
 
-    expect(r.errors.get("base")).toEqual(["Reply is not dignifying"]);
+    expect(r.errors.messagesFor("base")).toEqual(["Reply is not dignifying"]);
 
     expect(errors).toContain("Title is Empty");
     expect(errors).toContain("Reply is not dignifying");
@@ -196,7 +196,7 @@ describe("ValidationsTest", () => {
 
     const errors = r.errors.toArray().reduce<string[]>((result, error) => [...result, error], []);
 
-    expect(r.errors.get("base")).toEqual(["is invalid"]);
+    expect(r.errors.messagesFor("base")).toEqual(["is invalid"]);
 
     expect(errors).toContain("Title is Empty");
     expect(errors).toContain("is invalid");
@@ -206,7 +206,7 @@ describe("ValidationsTest", () => {
 
   it("errors empty after errors on check", () => {
     const t = new Topic();
-    assertEmpty(t.errors.get("id"));
+    assertEmpty(t.errors.messagesFor("id"));
     assertEmpty(t.errors);
   });
 
@@ -219,8 +219,8 @@ describe("ValidationsTest", () => {
     const t = new Topic({ title: "valid", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
     expect(hits).toBe(4);
-    expect(t.errors.get("title")).toEqual(["gotcha", "gotcha"]);
-    expect(t.errors.get("content")).toEqual(["gotcha", "gotcha"]);
+    expect(t.errors.messagesFor("title")).toEqual(["gotcha", "gotcha"]);
+    expect(t.errors.messagesFor("content")).toEqual(["gotcha", "gotcha"]);
   });
 
   it("validates each custom reader", async () => {
@@ -233,8 +233,8 @@ describe("ValidationsTest", () => {
       const t = new CustomReader({ title: "valid", content: "whatever" });
       assertPredicate(await t.isInvalid(), (invalid) => invalid);
       expect(hits).toBe(4);
-      expect(t.errors.get("title")).toEqual(["gotcha", "gotcha"]);
-      expect(t.errors.get("content")).toEqual(["gotcha", "gotcha"]);
+      expect(t.errors.messagesFor("title")).toEqual(["gotcha", "gotcha"]);
+      expect(t.errors.messagesFor("content")).toEqual(["gotcha", "gotcha"]);
     } finally {
       CustomReader.clearValidatorsBang();
     }
@@ -246,8 +246,8 @@ describe("ValidationsTest", () => {
     });
     const t = new Topic({ title: "Title", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["will never be valid"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["will never be valid"]);
   });
 
   it("validate block with params", async () => {
@@ -256,8 +256,8 @@ describe("ValidationsTest", () => {
     });
     const t = new Topic({ title: "Title", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
-    expect(t.errors.get("title")).toEqual(["will never be valid"]);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
+    expect(t.errors.messagesFor("title")).toEqual(["will never be valid"]);
   });
 
   it("invalid should be the opposite of valid", async () => {
@@ -265,7 +265,7 @@ describe("ValidationsTest", () => {
 
     const t = new Topic();
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    assertPredicate(t.errors.messagesFor("title"), (messages) => messages.length > 0);
 
     t.title = "Things are going to change";
     assertNotPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -277,7 +277,7 @@ describe("ValidationsTest", () => {
 
     let t = new Topic({ title: "" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")[0]).toEqual("can't be blank");
+    expect(t.errors.messagesFor("title")[0]).toEqual("can't be blank");
     Topic.validatesPresenceOf("title", "author_name");
     Topic.validate(function (this: Topic) {
       this.errors.add("author_email_address", "will never be valid");
@@ -289,14 +289,14 @@ describe("ValidationsTest", () => {
 
     let key: string;
     expect((key = t.errors.attributeNames[0])).toEqual("title");
-    expect(t.errors.get(key)[0]).toEqual("can't be blank");
-    expect(t.errors.get(key)[1]).toEqual("is too short (minimum is 2 characters)");
+    expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
+    expect(t.errors.messagesFor(key)[1]).toEqual("is too short (minimum is 2 characters)");
     expect((key = t.errors.attributeNames[1])).toEqual("author_name");
-    expect(t.errors.get(key)[0]).toEqual("can't be blank");
+    expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
     expect((key = t.errors.attributeNames[2])).toEqual("author_email_address");
-    expect(t.errors.get(key)[0]).toEqual("will never be valid");
+    expect(t.errors.messagesFor(key)[0]).toEqual("will never be valid");
     expect((key = t.errors.attributeNames[3])).toEqual("content");
-    expect(t.errors.get(key)[0]).toEqual("is too short (minimum is 2 characters)");
+    expect(t.errors.messagesFor(key)[0]).toEqual("is too short (minimum is 2 characters)");
   });
 
   it("validation with if and on", async () => {
@@ -434,7 +434,9 @@ describe("ValidationsTest", () => {
 
     const t = new Topic({ author_name: "Admiral" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["You have failed me for the last time, Admiral."]);
+    expect(t.errors.messagesFor("title")).toEqual([
+      "You have failed me for the last time, Admiral.",
+    ]);
   });
 
   it("frozen models can be validated", async () => {
@@ -536,7 +538,7 @@ describe("ValidationsTest", () => {
 
     const t = new Topic({ author_name: "Admiral" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual([
+    expect(t.errors.messagesFor("title")).toEqual([
       "Title is missing. You have failed me for the last time, Admiral.",
     ]);
   });
@@ -578,7 +580,7 @@ describe("ValidationsTest", () => {
     const topic = new Topic();
     await topic.validate();
 
-    expect(topic.errors.get("title")).toEqual(["can't be blank"]);
+    expect(topic.errors.messagesFor("title")).toEqual(["can't be blank"]);
 
     assert(await topic.validate("custom_context"));
   });
@@ -588,7 +590,7 @@ describe("ValidationsTest", () => {
 
     const t = new Topic();
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
-    expect(t.errors.get("title")).toEqual(["NO BLANKS HERE"]);
+    expect(t.errors.messagesFor("title")).toEqual(["NO BLANKS HERE"]);
   });
 
   it("list of validators on multiple attributes", () => {

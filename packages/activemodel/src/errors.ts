@@ -16,28 +16,6 @@ export type ErrorDetailHash = { error: string; [k: string]: unknown };
 const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 /**
- * The JS spelling of Ruby's `hash.default = value` (errors.rb:268-273, :276-284):
- * override only `get` so a missing key answers `defaultValue`, and bind every
- * other Map method to the raw target, since Map's internal slots require the
- * real receiver. Deliberately no `has` trap — `hash.default` does not make
- * `key?` true.
- *
- * @noRailsEquivalent JS has no Hash#default; Ruby's one-line assignment needs a
- * Proxy here, and one helper is better than a copy per getter.
- */
-function mapWithDefault<K, V, D>(map: Map<K, V>, defaultValue: D): Map<K, V | D> {
-  return new Proxy(map, {
-    get(target, prop) {
-      if (prop === "get") {
-        return (key: K) => target.get(key) ?? defaultValue;
-      }
-      const val = Reflect.get(target, prop, target);
-      return typeof val === "function" ? val.bind(target) : val;
-    },
-  }) as Map<K, V | D>;
-}
-
-/**
  * Errors — collects validation error messages on a model.
  *
  * Mirrors: ActiveModel::Errors
@@ -45,6 +23,35 @@ function mapWithDefault<K, V, D>(map: Map<K, V>, defaultValue: D): Map<K, V | D>
 export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
   private _base: TBase | null;
+
+  /**
+   * The collection facade, forwarded to `@errors` — the TS spelling of
+   * `def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!`
+   * (activemodel/lib/active_model/errors.rb:103). `each` also powers Ruby's
+   * `include Enumerable` (errors.rb:62); its TS analog is `[Symbol.iterator]`
+   * below.
+   */
+  each(fn: (error: ActiveModelError) => void): void {
+    this._errors.forEach(fn);
+  }
+
+  clear(): void {
+    this._errors.length = 0;
+  }
+
+  get empty(): boolean {
+    return this._errors.length === 0;
+  }
+
+  get size(): number {
+    return this._errors.length;
+  }
+
+  uniqBang(): void {
+    this._errors = this._errors.filter(
+      (error, i) => this._errors.findIndex((other) => error.equals(other)) === i,
+    );
+  }
 
   get errors(): this {
     return this;
@@ -175,10 +182,6 @@ export class Errors<TBase extends object = object> {
     return matches;
   }
 
-  get(attribute: string): string[] {
-    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
-  }
-
   get attributeNames(): string[] {
     return [...new Set(this._errors.map((e) => e.attribute))];
   }
@@ -196,7 +199,9 @@ export class Errors<TBase extends object = object> {
    * `.get()` returns the singleton frozen `[]`. Mirrors Rails `errors.rb:268-273`.
    */
   get messages(): Map<string, readonly string[]> {
-    return mapWithDefault(this.toHash(), EMPTY_ARRAY);
+    const hash = this.toHash();
+    hash.get = (attribute: string) => Map.prototype.get.call(hash, attribute) ?? EMPTY_ARRAY;
+    return hash;
   }
 
   /**
@@ -214,7 +219,8 @@ export class Errors<TBase extends object = object> {
         errors.map((e) => e.details as ErrorDetailHash),
       );
     }
-    return mapWithDefault(map, EMPTY_ARRAY);
+    map.get = (attribute: string) => Map.prototype.get.call(map, attribute) ?? EMPTY_ARRAY;
+    return map;
   }
 
   /**
@@ -327,11 +333,11 @@ export class Errors<TBase extends object = object> {
   }
 
   fullMessagesFor(attribute: string): string[] {
-    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.fullMessage);
+    return this.where(attribute).map((e) => e.fullMessage);
   }
 
   messagesFor(attribute: string): string[] {
-    return this.get(attribute);
+    return this.where(attribute).map((e) => e.message);
   }
 
   fullMessage(attribute: string, message: string): string {
@@ -385,62 +391,12 @@ export class Errors<TBase extends object = object> {
     return this._base;
   }
 
-  on(attribute: string): string[] {
-    return this.get(attribute);
-  }
-
   get count(): number {
-    return this._errors.length;
-  }
-
-  get size(): number {
     return this._errors.length;
   }
 
   get any(): boolean {
     return this._errors.length > 0;
-  }
-
-  get empty(): boolean {
-    return this._errors.length === 0;
-  }
-
-  clear(): void {
-    this._errors = [];
-  }
-
-  /**
-   * Remove duplicate errors in place. Mirrors Rails' delegated `@errors.uniq!`
-   * (activemodel/lib/active_model/errors.rb:103). Two errors are equal when
-   * they share attribute, raw type, and options (Rails'
-   * `Error#==` / `deep_dup` treats these fields as the identity).
-   */
-  uniqBang(): void {
-    const seen = new Set<string>();
-    const out: ActiveModelError[] = [];
-    for (const error of this._errors) {
-      const key = `${error.attribute} ${error.rawType} ${JSON.stringify(error.options ?? {})}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(error);
-    }
-    this._errors = out;
-  }
-
-  each(fn: (error: ActiveModelError) => void): void {
-    for (const error of this._errors) {
-      fn(error);
-    }
-  }
-
-  /** Alias for `copyBang` — Rails ships only `copy!`. */
-  copy<U extends object>(other: Errors<U>): void {
-    this.copyBang(other);
-  }
-
-  /** Alias for `mergeBang` — Rails ships only `merge!`. */
-  merge<U extends object>(other: Errors<U>): void {
-    this.mergeBang(other);
   }
 
   /**

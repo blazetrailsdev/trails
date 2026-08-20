@@ -86,7 +86,7 @@ describe("NumericalityValidator (trails-only)", () => {
     const errs = new Errors(null);
     const stubRecord = { errors: errs };
     v.validateEach(stubRecord, "x", { not: "a number" });
-    expect(errs.get("x")).toHaveLength(1);
+    expect(errs.messagesFor("x")).toHaveLength(1);
     expect(errs.where("x", ":not_a_number")).toHaveLength(1);
   });
 
@@ -106,7 +106,7 @@ describe("NumericalityValidator (trails-only)", () => {
     const p = new Person({ age: "abc" });
     expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("is not a number");
+    expect(p.errors.messagesFor("age")).toContain("is not a number");
   });
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", async () => {
@@ -125,7 +125,7 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(await new Person({ score: "5" }).isValid()).toBe(true);
     const f = new Person({ score: "5.5" });
     expect(await f.isValid()).toBe(false);
-    expect(f.errors.get("score")).toContain("must be an integer");
+    expect(f.errors.messagesFor("score")).toContain("must be an integer");
   });
 
   it("odd/even truncates float via Math.trunc before checking parity (2.5 → 2, even)", async () => {
@@ -177,7 +177,7 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(typeof (p as unknown as { cameFromUser?: unknown }).cameFromUser).toBe("undefined");
     // Validator sees "abc" (raw via readAttributeBeforeTypeCast), reports not_a_number
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("is not a number");
+    expect(p.errors.messagesFor("age")).toContain("is not a number");
   });
 
   it("cameFromUser false → validates cast value (readAttribute)", () => {

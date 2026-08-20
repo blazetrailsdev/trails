@@ -108,7 +108,7 @@ describe("InclusionValidationTest", () => {
     }
     const p = new Person({ karma: "other" });
     await p.isValid();
-    expect(p.errors.get("karma")).toContain("is not allowed");
+    expect(p.errors.messagesFor("karma")).toContain("is not allowed");
   });
 
   it("validates inclusion of with lambda", async () => {
