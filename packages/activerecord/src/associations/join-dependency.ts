@@ -590,18 +590,16 @@ export class JoinDependency {
       // (`joins.concat arel.join_sources`, join_association.rb:64-69), so the
       // returned array is `[J(n-1), sources…, J(n-2), sources…, …]`. Only the
       // constraint joins map back onto a chain link's tree node: an entry is
-      // one when it joins the table the walk resolved for the next link.
+      // one when its `left` IS the table object this block handed the walk for
+      // the next link. Identity, not table name — a scope join source is built
+      // from `scope.arel(...).join_sources` and so can never be the same
+      // instance even when it joins a same-named table, and `appendConstraints`
+      // carries `left` through by reference when it rebuilds a join.
       let linkIdx = walkedLen - 1;
       for (const entry of built) {
         const join = entry as Nodes.Join;
         const resolved = linkIdx >= 0 ? resolvedByIdx[linkIdx] : undefined;
-        const left = (join as { left?: unknown }).left;
-        if (
-          resolved &&
-          left != null &&
-          typeof left === "object" &&
-          tableSqlName(left as TableRef) === resolved.effectiveName
-        ) {
+        if (resolved && (join as { left?: unknown }).left === resolved.aliased) {
           const node = nodes[linkIdx];
           if (node) node.arelJoin = join;
           linkIdx--;
