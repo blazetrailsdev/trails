@@ -1649,8 +1649,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
         ]
   ): Promise<void> {
-    // TS has no kwargs, so Rails' `*table_names, **options` arrives as a
-    // trailing options object on the rest parameter.
     const last = args[args.length - 1];
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
@@ -1678,9 +1676,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Rails reads `@raw_connection` directly; `_connection` is trails' spelling
    * of that same ivar, so the SHOW WARNINGS round-trip is sourced the same way
-   * rather than passed in. `warning_count` is the one driver-specific read —
-   * the mysql2 npm client does not always populate it, so it is a hook the
-   * concrete adapter fills.
+   * rather than passed in.
+   *
+   * `ActiveRecord.db_warnings_action` is `nil` by default in Rails; trails
+   * spells that default `"ignore"` on `AbstractAdapter` (abstract-adapter.ts),
+   * so both spellings of "unset" take Rails' `.nil?` early return. The symbol
+   * arms below are the behaviors Rails' `db_warnings_action=` bakes into the
+   * Proc it stores (active_record.rb:236-252), which its `handle_warnings`
+   * then reaches through a single `.call`.
    *
    * Public rather than Ruby-private for the same reason PostgreSQL's is:
    * `perform_query` reaches it through a structurally-typed mixin host.
@@ -1689,13 +1692,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   async handleWarnings(sql: string): Promise<void> {
     const rawConnection = this._connection as unknown as {
+      warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
     } | null;
     const action = (this.constructor as typeof AbstractMysqlAdapter).dbWarningsAction;
     if (action == null || action === "ignore" || rawConnection == null) return;
-    if ((await this.warningCount(rawConnection)) === 0) return;
-
     const warningCount = await this.warningCount(rawConnection);
+    if (warningCount === 0) return;
+
     const [rawRows] = await rawConnection.query("SHOW WARNINGS");
     let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
     if (result.length === 0) {
@@ -1715,9 +1719,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (this.isWarningIgnored({ level: level ?? undefined, code: code ?? undefined, message }))
         continue;
 
-      // Rails' `ActiveRecord.db_warnings_action.call(warning)`. The setter
-      // (active_record.rb:236-252) bakes each symbol into that Proc; trails
-      // stores the symbol itself, so the arms live at the one `.call` site.
       if (action === "raise") throw warning;
       if (action === "log") {
         const codeSuffix = code ? ` (${code})` : "";
@@ -1733,14 +1734,24 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * The `@raw_connection.warning_count` read of `handle_warnings`
-   * (abstract_mysql_adapter.rb:771). Ruby's mysql2 client exposes it as an
-   * attribute; the npm driver does not always, so the concrete adapter
-   * supplies it.
+   * (abstract_mysql_adapter.rb:771). Ruby's mysql2 gem exposes it as an
+   * attribute on the connection, so Rails needs no seam; the npm driver only
+   * populates it when the last protocol packet carried it, and falls back to
+   * `SHOW COUNT(*) WARNINGS` — a SHOW, so it does not itself reset the warning
+   * list the following `SHOW WARNINGS` reads.
    *
    * @internal
    */
-  protected warningCount(_rawConnection: unknown): Promise<number> {
-    return Promise.resolve(0);
+  protected async warningCount(rawConnection: {
+    warningCount?: unknown;
+    query(sql: string): Promise<[unknown, unknown]>;
+  }): Promise<number> {
+    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
+    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
+    const row = (rows as Record<string, unknown>[])[0];
+    if (!row) return 0;
+    const value = Object.values(row)[0];
+    return typeof value === "number" ? value : Number(value) || 0;
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter#warning_ignored? */

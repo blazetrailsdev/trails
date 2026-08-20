@@ -480,81 +480,6 @@ export async function query(
 }
 
 /**
- * Executes a query with binds and returns an ActiveRecord::Result.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_query
- * (abstract/database_statements.rb:147-149)
- */
-export function execQuery(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null = "SQL",
-  binds: unknown[] = [],
-  { prepare = false }: { prepare?: boolean } = {},
-): Promise<Result> {
-  // Dispatch through the instance so an adapter's internalExecQuery override
-  // wins, as Ruby's virtual call does.
-  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  return run(sql, name, binds, { prepare });
-}
-
-/**
- * Executes an INSERT statement.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert
- * (abstract/database_statements.rb:157-160)
- */
-export function execInsert(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-  pk?: string | false | null,
-  _sequenceName?: string | null,
-  returning?: string[] | null,
-): Promise<Result> {
-  [sql, binds] = sqlForInsert.call(this, sql, pk, binds, returning ?? null);
-  // Dispatch through the instance so an adapter's internalExecQuery override
-  // wins, as Ruby's virtual call does.
-  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  return run(sql, name, binds);
-}
-
-/**
- * Executes a DELETE statement and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_delete
- * (abstract/database_statements.rb:165-167)
- */
-export async function execDelete(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  const doInternalExecute = this.internalExecute?.bind(this) ?? internalExecute.bind(this);
-  const doAffectedRows = this.affectedRows?.bind(this) ?? affectedRows;
-  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
-}
-
-/**
- * Executes an UPDATE statement and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_update
- * (abstract/database_statements.rb:172-174)
- */
-export async function execUpdate(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  const doInternalExecute = this.internalExecute?.bind(this) ?? internalExecute.bind(this);
-  const doAffectedRows = this.affectedRows?.bind(this) ?? affectedRows;
-  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
-}
-
-/**
  * Executes a SQL statement and returns the raw result.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#execute
@@ -1613,11 +1538,45 @@ export const DatabaseStatements = {
     return this.selectAll(arel, name, binds, { async }).then((result) => result.rows);
   },
 
-  execQuery,
-  execInsert,
+  async execQuery(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    name: string | null = "SQL",
+    binds: unknown[] = [],
+    { prepare = false }: { prepare?: boolean } = {},
+  ): Promise<Result> {
+    return this.internalExecQuery(sql, name, binds, { prepare });
+  },
 
-  execDelete,
-  execUpdate,
+  async execInsert(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    name: string | null = null,
+    binds?: unknown[],
+    _pk?: string | false | null,
+    _sequenceName?: string | null,
+    _returning?: string[] | null,
+  ): Promise<number> {
+    return this.executeMutation(sql, binds, name);
+  },
+
+  async execDelete(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    name: string | null = null,
+    binds?: unknown[],
+  ): Promise<number> {
+    return this.executeMutation(sql, binds, name);
+  },
+
+  async execUpdate(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    name: string | null = null,
+    binds?: unknown[],
+  ): Promise<number> {
+    return this.executeMutation(sql, binds, name);
+  },
 
   isWriteQuery(sql: string): boolean {
     return isWriteQuerySql(sql);

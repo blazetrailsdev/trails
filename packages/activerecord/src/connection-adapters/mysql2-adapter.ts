@@ -1772,36 +1772,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return conn;
   }
 
-  /**
-   * Query `SHOW COUNT(*) WARNINGS` to learn how many warnings the most
-   * recent statement on `rawConnection` produced. SHOW statements do not reset
-   * the warning list (unlike a normal SELECT), so the subsequent SHOW WARNINGS
-   * still returns the rows.
-   *
-   * Fills AbstractMysqlAdapter's `warningCount` seam for Rails'
-   * `@raw_connection.warning_count` (abstract_mysql_adapter.rb:771). Protected
-   * so tests can stub it via `vi.spyOn` to exercise the "warning_count does
-   * not match returned warnings" branch.
-   *
-   * @internal
-   */
-  protected override async warningCount(rawConnection: unknown): Promise<number> {
-    const conn = rawConnection as mysql.Connection;
-    // Optimization: when the mysql2 npm driver exposes the protocol's
-    // last `serverStatus` packet, the bottom 16 bits of the per-connection
-    // `warningCount` are populated for the most recent statement (mirrors
-    // Rails reading `@raw_connection.warning_count` directly instead of
-    // round-tripping `SHOW COUNT(*) WARNINGS`). Fall back to the SHOW
-    // query when the field is absent or non-numeric.
-    const raw = (conn as unknown as { warningCount?: unknown }).warningCount;
-    if (typeof raw === "number") return raw;
-    const [rows] = await conn.query("SHOW COUNT(*) WARNINGS");
-    const row = (rows as Record<string, unknown>[])[0];
-    if (!row) return 0;
-    const v = Object.values(row)[0];
-    return typeof v === "number" ? v : Number(v) || 0;
-  }
-
   // Mirrors AbstractMysqlAdapter#configure_connection.
   // Builds and returns the full SET statement (including the SET keyword and time_zone)
   // for wait_timeout, sql_mode (per strict flag), and arbitrary session variables.
