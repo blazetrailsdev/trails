@@ -485,8 +485,12 @@ describe("Enum with an undeclared type raises on the serialize path", () => {
     }
   }
 
+  // No explicit `loadSchema()` here: `define_attribute_methods` reaches
+  // `attribute_names` = `attribute_types.keys` (attribute_methods.rb:115,
+  // :236-241), which resolves the pending decorations — so the enum guard
+  // (enum.rb:240-245) fires from generation, and forcing a load first would
+  // move the raise off the serialize path this test is about.
   it("castEnumValue raises for an enum with no column and no explicit type", async () => {
-    await TypelessBook.loadSchema();
     expect(() => castEnumValue(TypelessBook, "typeless_genre", "comic")).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in/,
     );
