@@ -34,7 +34,7 @@ import {
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
-import { ConfigurationError, AssociationTypeMismatch, RecordNotFound } from "../errors.js";
+import { ConfigurationError, AssociationTypeMismatch } from "../errors.js";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import { AssociationNotFoundError } from "./errors.js";
