@@ -18,8 +18,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { Person } from "../test-helpers/models/person.js";
-
 import { fixtures } from "../test-fixtures.js";
+import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
 describe("JoinAssociation#join_constraints references_values", () => {
   fixtures(["people", "readers", "posts", "comments"]);
@@ -27,7 +27,9 @@ describe("JoinAssociation#join_constraints references_values", () => {
   it("joins an association scope that references and includes another association", async () => {
     const sql = await Person.joins(":postsWithNoComments").toSql();
 
-    expect(sql).toMatch(/LEFT OUTER JOIN\s+"?comments"?/i);
+    expect(sql).toMatch(
+      new RegExp(`LEFT OUTER JOIN\\s+${escapeRegExp(quoteTableName("comments"))}`, "i"),
+    );
     expect(sql).toMatch(/comments\.id is null/i);
   });
 });
