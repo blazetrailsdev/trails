@@ -221,30 +221,60 @@ export async function resetCounters(
  * Mirrors: ActiveRecord::CounterCache::ClassMethods#counter_cache_column?
  */
 export function isCounterCacheColumn(this: typeof Base, columnName: string): boolean {
-  const counterCols = getCounterCacheColumns(this);
-  return counterCols.has(columnName);
+  return getCounterCacheColumns(this).includes(columnName);
 }
 
 /**
- * Flush any pending counter-cache column registrations for this class,
- * mirroring the bookkeeping Rails' `ActiveRecord::CounterCache#load_schema!`
- * triggers.  Called by `registerModel` so that pending entries accumulated
- * before the target class was registered are applied deterministically.
+ * Mirrors: ActiveRecord::CounterCache::ClassMethods#load_schema!
+ * (counter_cache.rb:186-195)
+ *
+ *   def load_schema!
+ *     super
+ *
+ *     association_names = _reflections.filter_map do |name, reflection|
+ *       next unless reflection.belongs_to? && reflection.counter_cache_column
+ *
+ *       name.to_sym
+ *     end
+ *
+ *     self.counter_cached_association_names |= association_names
+ *   end
+ *
+ * The `super` call stands in for the pending-column flush: trails resolves a
+ * belongs_to's target through the model registry rather than a constant, so a
+ * counter column staged before its target existed is merged here.
  */
 export function loadSchemaBang(this: typeof Base): void {
   getCounterCacheColumns(this);
+
+  const associationNames: string[] = [];
+  for (const [name, reflection] of Object.entries(
+    (this as any)._reflections as Record<string, any>,
+  )) {
+    if (!reflection?.belongsTo?.() || !reflection.counterCacheColumn?.()) continue;
+    associationNames.push(name);
+  }
+  for (const name of associationNames) {
+    if (!this.counterCachedAssociationNames.includes(name)) {
+      this.counterCachedAssociationNames = [...this.counterCachedAssociationNames, name];
+    }
+  }
 }
 
 /**
  * Merge any pending counter-cache column registrations for a newly registered
  * model class.  Called by `registerModel` so entries accumulated before the
  * target was in the registry are applied immediately rather than on first read.
+ *
+ * trails has no `load_schema!` super chain to hang counter_cache.rb:186-195 on,
+ * so this — the seam already reached once a model and its associations are
+ * fully defined — is where `load_schema!` runs.
  */
 export function flushPendingCounterCacheColumns(modelClass: typeof Base): void {
-  getCounterCacheColumns(modelClass);
+  loadSchemaBang.call(modelClass);
 }
 
-function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
+function getCounterCacheColumns(modelClass: typeof Base): string[] {
   // Collect matching pending keys: exact class name, registry aliases, or "::ClassName" suffix.
   const registryKeys: string[] = (modelClass as any)._registryKeys ?? [];
   const suffix = `::${modelClass.name}`;
@@ -253,24 +283,23 @@ function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
     if (key === modelClass.name || registryKeys.includes(key) || key.endsWith(suffix))
       matchingKeys.push(key);
   }
-  // Copy-on-write: avoid mutating an inherited parent-class Set when flushing
-  // pending entries for a subclass. Mirrors Rails' class_attribute `|=`.
-  const owns = Object.prototype.hasOwnProperty.call(modelClass, "_counterCacheColumns");
-  const inherited: Set<string> | undefined = (modelClass as any)._counterCacheColumns;
-  if (matchingKeys.length === 0) return inherited ?? new Set<string>();
-  const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
   for (const key of matchingKeys) {
     // Re-derive each column now that the target class is registered; staging
     // thunks (not strings) lets a belongs_to declared before its target see the
     // correct demodulized column at flush time. See counter-cache-state.ts.
-    for (const col of pendingCounterCacheColumns.get(key)!) next.add(col());
+    for (const col of pendingCounterCacheColumns.get(key)!) {
+      // belongs_to.rb:40 — `klass._counter_cache_columns |= [cache_column]`.
+      const column = col();
+      if (!modelClass._counterCacheColumns.includes(column)) {
+        modelClass._counterCacheColumns = [...modelClass._counterCacheColumns, column];
+      }
+    }
     // Intentionally keep the pending entry so that if the target class is
     // re-defined and re-registered (e.g. between tests), the next
     // registerModel call also flushes the column into the new class.
-    // The Set-based dedup makes repeated flushes idempotent.
+    // The union above makes repeated flushes idempotent.
   }
-  (modelClass as any)._counterCacheColumns = next;
-  return next;
+  return modelClass._counterCacheColumns;
 }
 
 /**

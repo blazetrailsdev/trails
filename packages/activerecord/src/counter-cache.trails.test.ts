@@ -94,10 +94,9 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
     // demodulized `books_count`, not the flat `cpk_books_count`.
     const { CpkOrder } = await import("./test-helpers/models/cpk.js");
     registerModel(CpkOrder);
-    const cols = (CpkOrder as unknown as { _counterCacheColumns: Set<string> })
-      ._counterCacheColumns;
-    expect(cols.has("books_count")).toBe(true);
-    expect(cols.has("cpk_books_count")).toBe(false);
+    const cols = (CpkOrder as unknown as { _counterCacheColumns: string[] })._counterCacheColumns;
+    expect(cols).toContain("books_count");
+    expect(cols).not.toContain("cpk_books_count");
   });
 });
 
