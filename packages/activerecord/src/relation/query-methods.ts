@@ -22,6 +22,7 @@ import {
   PreparedStatementInvalid,
   UnmodifiableRelation,
 } from "../errors.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
@@ -3152,9 +3153,8 @@ export function buildArel(
   this: QueryMethodsHost,
   // Rails threads the `with_connection` connection into every `build_arel`
   // call (query_methods.rb:1595, relation.rb:1023), so the body never sees a
-  // missing one. Callers acquire before calling; the connectionless Arel build
-  // is named at the acquisition point (`Relation#toArel`), not tolerated here.
-  connection: { sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral },
+  // missing one. Callers acquire before calling.
+  connection: AbstractAdapter,
   aliases?: AliasTracker,
 ): any {
   const table: any = this.table;

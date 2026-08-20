@@ -1707,97 +1707,83 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   delegate(*delegate_methods, to: :scope)
 //
 // `SpawnMethods` (spawn-methods.ts) and `QueryMethodBangs` (query-methods.ts) are
-// the mixin objects `include()` mixes into `Relation`, so their own keys ARE
-// `public_instance_methods(false)` and the delegate list is read off them. The
-// non-bang `QueryMethods` members still live on `Relation` itself and stay a
-// hand-list below until RFC 0107 finishes moving them into the mixin; it shrinks
-// as they land. `public_instance_methods(false)` includes the bang builders
-// (`where!`, `limit!`, `none!`, …), so Rails delegates those to `scope` too — a
-// Rails `CollectionProxy` owns no relation state of its own. The
-// constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
-// prototype delegation is consulted only in the sense that they must target the
-// proxy's inherited state, so they are invoked through `Relation.prototype`
-// directly (see the ctor).
-const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "includes",
-  "all",
-  "eagerLoad",
-  "preload",
-  "extractAssociated",
-  "references",
-  "select",
-  "with",
-  "withRecursive",
-  "reselect",
-  "group",
-  "regroup",
-  "order",
-  "inOrderOf",
-  "reorder",
-  "unscope",
-  "joins",
-  "leftOuterJoins",
-  // `alias :left_joins :left_outer_joins` (query_methods.rb:887) — a public
-  // instance method of QueryMethods, so Rails delegates it to `scope` too.
-  "leftJoins",
-  "where",
-  "rewhere",
-  "invertWhere",
-  "structurallyCompatible",
-  "and",
-  "or",
-  "having",
-  "limit",
-  "offset",
-  "lock",
-  "none",
-  "isNullRelation",
-  "readonly",
-  "strictLoading",
-  "createWith",
-  "from",
-  "distinct",
-  "extending",
-  "optimizerHints",
-  "reverseOrder",
-  "annotate",
-  "excluding",
-  // `alias :without :excluding` (query_methods.rb:1585).
-  "without",
-  "arel",
-  "constructJoinDependency",
-] as const;
-
+// the mixin objects `include()` mixes into `Relation` (relation.rb:68), so their
+// own keys ARE `public_instance_methods(false)` and the delegate list is read
+// off them rather than hand-transcribed. `public_instance_methods(false)`
+// includes the bang builders (`where!`, `limit!`, `none!`, …), so Rails
+// delegates those to `scope` too — a Rails `CollectionProxy` owns no relation
+// state of its own. The constructor's own seeding calls (`noneBang` /
+// `extendingBang`) run BEFORE the prototype delegation is consulted only in the
+// sense that they must target the proxy's inherited state, so they are invoked
+// through `Relation.prototype` directly (see the ctor).
+//
 // Ruby's `private` keyword (query_methods.rb:1677, spawn_methods.rb:71) keeps
-// these out of `public_instance_methods(false)`, so `delegate` never sees them.
-// A JS object literal carries no such distinction, so the boundary is named here.
+// the members below out of `public_instance_methods(false)`, so `delegate` never
+// sees them. A JS object literal carries no such distinction, so the boundary is
+// named here.
 const PRIVATE_MIXIN_INSTANCE_METHODS = new Set([
+  "arelColumn",
+  "arelColumnAliasesFromHash",
+  "arelColumnWithTable",
+  "arelColumnsFromHash",
   "assertModifiableBang",
+  "async",
+  "buildArel",
+  "buildBoundSqlLiteral",
+  "buildCaseForValuePosition",
+  "buildCastValue",
+  "buildFrom",
+  "buildJoinBuckets",
+  "buildJoinDependencies",
+  "buildJoins",
+  "buildNamedBoundSqlLiteral",
+  "buildOrder",
+  "buildSelect",
+  "buildWith",
+  "buildWithExpressionFromValue",
+  "buildWithJoinNode",
+  "buildWithValueFromHash",
   "checkIfMethodHasArgumentsBang",
-  "_selectBang",
+  "columnReferences",
+  "eachJoinDependencies",
+  "extractTableNameFrom",
+  "flattenedArgs",
+  "isDoesNotSupportReverse",
+  "isTableNameMatches",
+  "lookupTableKlassFromJoinDependencies",
+  "orderColumn",
+  "preprocessOrderArgs",
+  "processSelectArgs",
+  "processWithArgs",
+  "resolveArelAttributes",
+  "reverseSqlOrder",
+  "sanitizeOrderArguments",
+  "selectAssociationList",
+  "selectNamedJoins",
+  "structurallyIncompatibleValuesFor",
+  "validateOrderArgs",
   "relationWith",
 ]);
 
-const MIXIN_PUBLIC_INSTANCE_METHODS = [
-  ...Object.keys(QueryMethodBangs).filter((name) => name.endsWith("Bang")),
+/** @internal `[QueryMethods, SpawnMethods].flat_map { |k| k.public_instance_methods(false) }`. */
+export const MIXIN_PUBLIC_INSTANCE_METHODS = [
+  ...Object.keys(QueryMethodBangs),
   ...Object.keys(SpawnMethods),
 ].filter((name) => !PRIVATE_MIXIN_INSTANCE_METHODS.has(name));
 
-const delegateMethods = (
-  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...MIXIN_PUBLIC_INSTANCE_METHODS] as string[]
-)
-  .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
-  .concat([
-    "scoping",
-    "values",
-    "insert",
-    "insertAll",
-    "insertBang",
-    "insertAllBang",
-    "upsert",
-    "upsertAll",
-    "loadAsync",
-  ]);
+const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
+  (name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select",
+).concat([
+  "scoping",
+  "values",
+  "insert",
+  "insertAll",
+  "insertBang",
+  "insertAllBang",
+  "upsert",
+  "upsertAll",
+  "loadAsync",
+]);
 
 // The VALUE_METHODS accessors `query_methods.rb:162-183` generates
 // (`where_clause`, `order_values`, `limit_value`, …) are
