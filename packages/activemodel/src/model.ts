@@ -96,13 +96,13 @@ import {
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
-  sanitizeForMassAssignment as attrSanitize,
+  assignAttributes as attrAssign,
   attributeWriterMissing as defaultAttributeWriterMissing,
-  assertHashAttributes,
   isMassAssignmentEmpty,
   ArgumentError,
   NoMethodError,
 } from "./attribute-assignment.js";
+import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";
 import { LengthValidator } from "./validations/length.js";
@@ -2639,9 +2639,7 @@ export class Model {
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
   assignAttributes(newAttributes: unknown): void {
-    assertHashAttributes(newAttributes);
-    if (isMassAssignmentEmpty(newAttributes)) return;
-    this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
+    attrAssign(this, newAttributes);
   }
 
   /**

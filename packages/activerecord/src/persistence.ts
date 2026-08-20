@@ -16,7 +16,6 @@ import {
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
-  assertHashAttributes,
   isMassAssignmentEmpty,
 } from "@blazetrails/activemodel";
 import {
@@ -596,7 +595,6 @@ export async function update<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
 ): Promise<boolean | undefined> {
-  assertHashAttributes(attributes);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // `assign_attributes(attributes); save` (persistence.rb:563-570).
@@ -613,7 +611,6 @@ export async function updateBang<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
 ): Promise<true | undefined> {
-  assertHashAttributes(attributes);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // `assign_attributes(attributes); save!` (persistence.rb:576-579).
@@ -1040,7 +1037,15 @@ export function assignAttributes(
   this: AttributeIO,
   attrs: Record<string, unknown>,
 ): Promise<void> | void {
-  assertHashAttributes(attrs);
+  // `unless new_attributes.respond_to?(:each_pair)` (attribute_assignment.rb:29-31).
+  // ActiveModel's own `assignAttributes` spells the same three lines; this port
+  // exists separately only because it has to be async, so the guard is repeated
+  // rather than shared through a helper Rails does not have.
+  if (!respondToEachPair(attrs)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${classOf(attrs)} passed.`,
+    );
+  }
   // `new_attributes.empty?` (attribute_assignment.rb:32) runs before the
   // sanitizer, so a blank strong-params object is a no-op rather than raising;
   // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
@@ -2243,3 +2248,24 @@ export function buildDefaultConstraint(this: {
 export const InstanceMethods = {
   _updateRecord: instanceUpdateRecord,
 };
+
+/** The JS spelling of `new_attributes.respond_to?(:each_pair)` (attribute_assignment.rb:29). */
+function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return true;
+  // A params-style wrapper (the `ActionController::Parameters` analogue) is the
+  // other Ruby receiver that answers `each_pair`.
+  const wrapper = attrs as { permitted?: unknown; toH?: unknown };
+  return "permitted" in wrapper || typeof wrapper.toH === "function";
+}
+
+/** The JS spelling of Ruby's `value.class` name, for the guard's message. */
+function classOf(value: unknown): string {
+  if (value === null) return "NilClass";
+  if (Array.isArray(value)) return "Array";
+  const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
+  if (ctorName) return ctorName;
+  const t = typeof value;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}

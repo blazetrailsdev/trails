@@ -1,17 +1,30 @@
-import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { UnknownAttributeError } from "./errors.js";
 
-interface PermittedAttributes {
-  permitted?: boolean | (() => boolean);
-  toH?(): Record<string, unknown>;
-}
-
+/**
+ * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
+ * (attribute_assignment.rb:28-34):
+ *
+ *   def assign_attributes(new_attributes)
+ *     unless new_attributes.respond_to?(:each_pair)
+ *       raise ArgumentError, "When assigning attributes, you must pass a hash as an argument, #{new_attributes.class} passed."
+ *     end
+ *     return if new_attributes.empty?
+ *
+ *     _assign_attributes(sanitize_for_mass_assignment(new_attributes))
+ *   end
+ *
+ * Both sends go through the model, as Ruby's implicit `self` receiver does, so
+ * a subclass override of either is honoured.
+ */
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
-  assertHashAttributes(newAttributes);
-
+  if (!respondToEachPair(newAttributes)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
+    );
+  }
   if (isMassAssignmentEmpty(newAttributes)) return;
 
-  _assignAttributes(model, sanitizeForMassAssignment(newAttributes));
+  model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
 }
 
 export function attributeWriterMissing(
@@ -95,21 +108,13 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
 }
 
 export interface AttributeAssignment {
-  writeAttribute(name: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
+  /** @internal */
+  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  /** @internal Rails-private helper. */
+  _assignAttributes(attributes: Record<string, unknown>): void;
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
-}
-
-/**
- * Reads a params-like wrapper's `permitted?`. The real
- * `ActionController::Parameters` exposes it as a boolean GETTER
- * (strong-parameters.ts:113), while duck-typed wrappers may expose a method —
- * Ruby draws no such distinction, so both must answer here.
- */
-function readPermitted(attrs: PermittedAttributes): boolean {
-  const permitted = attrs.permitted;
-  return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
 }
 
 /**
@@ -139,100 +144,50 @@ export function isMassAssignmentEmpty(attrs: object): boolean {
 }
 
 /**
+ * The JS spelling of `new_attributes.respond_to?(:each_pair)`
+ * (attribute_assignment.rb:29). JS has no `each_pair`, so a plain object
+ * (prototype `Object.prototype` or null) or a params-style wrapper duck-typing
+ * `permitted?`/`to_h` stands in for a Ruby Hash; a Date, Map, Set, Array, or
+ * arbitrary class instance has none of Hash's semantics and fails the guard
+ * exactly as it does in Ruby.
+ *
+ * KNOWN GAP: `HashWithIndifferentAccess` is a Hash subclass Rails' guard admits
+ * (it inherits `Hash#each_pair`), but trails HWIA stores entries in a private
+ * `Map` — so it fails here AND the downstream `_assignAttributes`
+ * `Object.entries` loop cannot read it either (a pre-existing silent no-op).
+ * Tracked by `assign-attributes-hwia-each-pair`.
+ */
+function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return true;
+  return isParamsLikeWrapper(attrs);
+}
+
+/**
  * A non-plain object duck-typing the `ActionController::Parameters` surface —
  * the trails analogue of Rails' params wrapper, distinct from a plain hash whose
- * own keys ARE its contents. Single source of truth for wrapper recognition on
- * the mass-assignment path: `isHashLike` admits it as hash-like, and
+ * own keys ARE its contents. `respondToEachPair` admits it as hash-like, and
  * `isMassAssignmentEmpty` consults its `empty` (so a plain hash that happens to
  * carry an `empty: <boolean>` attribute is unaffected).
- *
- * For the real ActionController::Parameters, `permitted` is a boolean getter
- * (strong-parameters.ts:113), not a method, so the probe tests key presence
- * rather than callability — the non-plain-prototype gate above is what keeps a
- * plain hash with a literal `permitted` key from being mistaken for a wrapper.
  */
 function isParamsLikeWrapper(attrs: object): boolean {
-  // `where`/`exists` funnel raw primitives through sanitizeForMassAssignment, and
+  // `where`/`exists` funnel raw primitives through this path, and
   // `Object.getPrototypeOf` box-coerces them (so a number clears the plain-object
   // gate below) while `in` throws on them outright. A primitive is never a params
   // wrapper — reject before either check.
   if (typeof attrs !== "object" || attrs === null) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;
-  const wrapper = attrs as PermittedAttributes;
+  const wrapper = attrs as { permitted?: unknown; toH?: unknown };
   return "permitted" in wrapper || typeof wrapper.toH === "function";
 }
 
-/** @internal Rails-private helper. */
-export function sanitizeForMassAssignment(
-  attributes: Record<string, unknown>,
-): Record<string, unknown> {
-  const attrs = attributes as Record<string, unknown> & PermittedAttributes;
-  // Mirrors ActiveModel::ForbiddenAttributesProtection#sanitize_for_mass_assignment:
-  // params-style objects expose `permitted?` — raise unless permitted, then
-  // unwrap via `to_h` so the caller iterates a plain hash, not the wrapper.
-  // Rails calls `attributes.to_h` unconditionally; a permitted params object is
-  // expected to respond to it (a malformed one would NoMethodError there too).
-  // The wrapper-hood conjunct is what stands in for `respond_to?`: it keeps a
-  // plain hash carrying a literal `permitted` key out of the guard, since
-  // Ruby's Hash does not `respond_to?(:permitted?)` either.
-  if (isParamsLikeWrapper(attrs) && "permitted" in attrs) {
-    if (!readPermitted(attrs)) {
-      throw new ForbiddenAttributesError();
-    }
-    return attrs.toH!();
-  }
-  return attributes;
-}
-
-/**
- * Enforces ActiveModel::AttributeAssignment#assign_attributes' guard
- * (attribute_assignment.rb:29-30): a non-hash argument raises ArgumentError,
- * not a raw TypeError. Shared by every entry point that mass-assigns —
- * `Model#assignAttributes`, this module's `assignAttributes`, and ActiveRecord
- * `#update`/`#update!` (which iterate a raw writeAttribute loop) — so all
- * agree on the class and message text for the same input.
- *
- * Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct raises
- * here; JS has no `each_pair`, so we accept a plain object (prototype is
- * `Object.prototype` or null) or a params-style wrapper that duck-types
- * `permitted?`/`to_h` (ActionController::Parameters' analogue). A Date, Map,
- * Set, or arbitrary class instance has no hash semantics and raises.
- *
- * KNOWN GAP: `HashWithIndifferentAccess` is a Hash subclass that Rails' guard
- * admits (it inherits `Hash#each_pair`), but trails HWIA stores entries in a
- * private `Map` — so it fails this proto/duck-type check AND the downstream
- * `_assignAttributes` `Object.entries` loop can't read it either (a pre-existing
- * silent no-op). Real HWIA mass-assignment is tracked separately in
- * `assign-attributes-hwia-each-pair`; this guard does not regress it (it was
- * never assigned before).
- */
-export function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
-  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs) || !isHashLike(attrs)) {
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(attrs)} passed.`,
-    );
-  }
-}
-
-/**
- * A plain object (literal / `Object.create(null)`) has hash semantics, as does
- * a params-style wrapper duck-typing `permitted`/`toH` — the trails analogue of
- * `ActionController::Parameters`, which Rails admits via `respond_to?(:each_pair)`.
- * Everything else (Date, Map, Set, arbitrary class instances) is rejected.
- */
-function isHashLike(attrs: object): boolean {
-  const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return true;
-  return isParamsLikeWrapper(attrs);
-}
-
-function typeNameForError(value: unknown): string {
+/** The JS spelling of Ruby's `value.class` name, for the guard's message. */
+function classOf(value: unknown): string {
   // Ruby: nil.class #=> NilClass (not "Null").
   if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
-  // Mirror Ruby's `value.class` name: a class instance (Date, Time, …) reports
-  // its constructor name, not the generic "Object" that `typeof` collapses to.
   const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
   if (ctorName) return ctorName;
   const t = typeof value;

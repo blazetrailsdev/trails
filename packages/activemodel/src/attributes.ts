@@ -150,10 +150,25 @@ export function attribute(
   // When the type is omitted, preserve the existing attribute's type (Rails'
   // PendingType `with_type` inheritance path); fall back to the value type only
   // when nothing is known about the attribute yet.
+  // Rails' `attribute(name, ...)` forwards `**options` straight to the type
+  // registry (attributes.rb:59-62 → attribute_registration.rb:18); the three
+  // keys consumed here — `default`, `virtual`, `user_provided_default` — are
+  // the ones Rails names explicitly, so only the rest reach the registry.
+  const {
+    default: _default,
+    virtual: _virtual,
+    userProvidedDefault: _upd,
+    ...typeOptions
+  } = options ?? {};
   const type = typeProvided
     ? typeName instanceof Type
       ? typeName
-      : this.resolveTypeName(typeName as string, typeOptions(options))
+      : this.resolveTypeName(
+          typeName as string,
+          Object.keys(typeOptions).length > 0
+            ? (typeOptions as Record<string, unknown>)
+            : undefined,
+        )
     : (existing?.type ?? typeRegistry.lookup("value"));
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
@@ -208,6 +223,11 @@ export function attribute(
  * reaches the `set` half of that reader's accessor property instead, because a
  * `MethodSet` applies one descriptor per generated name
  * (code_generator.rb:32-36) and a property cannot take its halves from two.
+ *
+ * ActiveModel has no `define_method_attribute` upstream — only ActiveRecord
+ * does (attribute_methods/read.rb:11). That it exists here is the repo-wide
+ * rule ratified in CLAUDE.md § "Generated attribute readers are properties",
+ * not a local decision; see that section rather than re-deriving it.
  *
  * @internal Rails-private helper.
  */
@@ -284,16 +304,6 @@ export class Attributes {
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
     return attributeMissing.call(this as unknown as Record<string, unknown>, match, ...args);
   }
-}
-
-function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
-  const {
-    default: _default,
-    virtual: _virtual,
-    userProvidedDefault: _userProvidedDefault,
-    ...rest
-  } = options ?? {};
-  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
 }
 
 // ---------------------------------------------------------------------------

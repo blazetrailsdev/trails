@@ -765,7 +765,7 @@ describe("ErrorsTest", () => {
       expect(imported.type).toBe("wrong");
       expect(imported.rawType).toBe(":invalid");
 
-      // copy!/dupWithBase must preserve the {attribute, type, rawType} split.
+      // copy! must preserve the {attribute, type, rawType} split.
       const copy = new Errors({});
       copy.copyBang(target);
       const round = copy.objects[0];
@@ -775,9 +775,12 @@ describe("ErrorsTest", () => {
     });
   });
 
-  it("copy! deep-dups the inner error on NestedError (no shared mutable state)", () => {
-    // Rails `deep_dup` on a NestedError recurses into `@inner_error`, so the
-    // duplicated wrapper's inner error is independent of the source's.
+  it("copy! dups each error without recursing into a NestedError's inner error", () => {
+    // `@errors = other.errors.deep_dup` (errors.rb:139). ActiveSupport's
+    // `Object#deep_dup` is `duplicable? ? dup : self`, and only Array/Hash
+    // override it to recurse — so an Error element gets a plain `dup` plus
+    // `initialize_dup` (error.rb:111-116), which deep-dups `@options` and
+    // leaves every other ivar, `@inner_error` included, shared.
     const source = new Errors({});
     source.add("age", ":out_of_range", { range: { min: 1 } });
     const wrapper = new Errors({});
@@ -790,10 +793,9 @@ describe("ErrorsTest", () => {
     const tgtInner = (
       target.objects[0] as unknown as { innerError: { options: Record<string, unknown> } }
     ).innerError;
-    expect(tgtInner).not.toBe(srcInner);
-    expect((tgtInner.options.range as { min: number }).min).toBe(1);
-    (srcInner.options.range as { min: number }).min = 999;
-    expect((tgtInner.options.range as { min: number }).min).toBe(1);
+    expect(tgtInner).toBe(srcInner);
+    // The wrapper's own `@options` is independent, though.
+    expect(target.objects[0].options).not.toBe(wrapper.objects[0].options);
   });
 
   it("copy! rebinds each error's base to the receiver", () => {

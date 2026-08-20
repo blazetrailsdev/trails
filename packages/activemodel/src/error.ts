@@ -80,11 +80,16 @@ function optionsEqual(a: unknown, b: unknown): boolean {
 export class Error {
   static i18nCustomizeFullMessage: boolean = false;
 
-  readonly base: ModelBase;
-  readonly attribute: string;
-  readonly type: string;
-  readonly rawType: string;
-  readonly options: Record<string, unknown>;
+  // Rails exposes these as `attr_reader` over plain ivars (error.rb:101), which
+  // `initialize_dup` (:111-115) and `Errors#copy!`'s
+  // `instance_variable_set(:@base, ...)` (errors.rb:141) both write through.
+  // TS has no `instance_variable_set` escape hatch from a `readonly` field, so
+  // the ivars are declared writable exactly as Ruby has them.
+  base: ModelBase;
+  attribute: string;
+  type: string;
+  rawType: string;
+  options: Record<string, unknown>;
 
   static fullMessage(attribute: string, message: string, base: ModelBase): string {
     if (attribute === "base") return message;
@@ -281,26 +286,21 @@ export class Error {
 
   /**
    * Strict match — Rails `Error#strict_match?`
-   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
-   * match and `options` must equal the error's `@options` with
-   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
+   * (activemodel/lib/active_model/error.rb:184-190):
+   *
+   *   return false unless match?(attribute, type)
+   *   options == @options.except(*CALLBACKS_OPTIONS + MESSAGE_OPTIONS)
+   *
+   * `optionsEqual` stands in for Ruby's `Hash#==`, which JS `===` does not
+   * provide.
    */
   strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
     if (!this.match(attribute, type)) return false;
-    const expected = options ?? {};
-    const own: Record<string, unknown> = except(
-      this.options,
-      ...CALLBACKS_OPTIONS,
-      ...MESSAGE_OPTIONS,
+
+    return optionsEqual(
+      options ?? {},
+      except(this.options, ...CALLBACKS_OPTIONS, ...MESSAGE_OPTIONS),
     );
-    const expectedKeys = Object.keys(expected);
-    const ownKeys = Object.keys(own);
-    if (expectedKeys.length !== ownKeys.length) return false;
-    for (const k of expectedKeys) {
-      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
-        return false;
-    }
-    return true;
   }
 
   equals(other: Error): boolean {
@@ -323,16 +323,36 @@ export class Error {
   }
 
   /**
-   * Return a deep-duped copy of this error, optionally rebinding `base` to a
-   * new model instance. Mirrors Rails' usage in
-   * `ActiveModel::Errors#copy!` where each error is `deep_dup`ed and then
-   * its `@base` is reset to the receiver
-   * (activemodel/lib/active_model/errors.rb:138-143). Preserves a split
-   * between `type` and `rawType` when a NestedError-style override was in
-   * play.
+   * Mirrors: ActiveModel::Error#initialize_dup
+   * (activemodel/lib/active_model/error.rb:111-116):
+   *
+   *   def initialize_dup(other)
+   *     @attribute = @attribute.dup
+   *     @raw_type  = @raw_type.dup
+   *     @type      = @type.dup
+   *     @options   = @options.deep_dup
+   *   end
+   *
+   * `@attribute` / `@raw_type` / `@type` are Ruby Strings, whose `dup` exists
+   * to unshare mutable storage; a JS string is a primitive and already
+   * unshared, so only the options hash needs the copy. `@base` is deliberately
+   * left shared, as in Rails.
    */
-  dupWithBase(newBase: ModelBase): Error {
-    return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
+  initializeDup(_other: Error): void {
+    this.options = deepDup(this.options);
+  }
+
+  /**
+   * Mirrors: `Object#deep_dup`
+   * (activesupport/lib/active_support/core_ext/object/deep_dup.rb:29-31) —
+   * `duplicable? ? dup : self`. JS has no `Object#dup`, so the shallow
+   * class-preserving copy Ruby gets for free is spelled out, followed by the
+   * `initialize_dup` hook Ruby runs for it.
+   */
+  deepDup(): this {
+    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
+    copy.initializeDup(this);
+    return copy;
   }
 
   inspect(): string {

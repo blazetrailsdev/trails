@@ -25,8 +25,8 @@ import {
 import {
   _assignAttributes as attrAssign,
   _assignAttribute as attrAssignOne,
-  sanitizeForMassAssignment as attrSanitize,
 } from "./attribute-assignment.js";
+import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
 
 /**
  * Rails: ActiveModel::API includes Validations (api.rb), so the

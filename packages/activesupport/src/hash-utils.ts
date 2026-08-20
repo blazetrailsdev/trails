@@ -76,6 +76,12 @@ export function deepMergeBang<T extends AnyObject>(target: T, source: AnyObject)
 export function deepDup<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map((item) => deepDup(item)) as T;
+  // Ruby dispatches `deep_dup` on the receiver (core_ext/object/deep_dup.rb),
+  // so a class that defines its own answers instead of falling through to the
+  // Hash/Array recursion below.
+  if (typeof (obj as { deepDup?: unknown }).deepDup === "function") {
+    return (obj as unknown as { deepDup(): T }).deepDup();
+  }
   if (typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
     for (const key of Object.keys(obj as AnyObject)) {
