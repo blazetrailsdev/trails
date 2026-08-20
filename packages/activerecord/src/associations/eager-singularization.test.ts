@@ -197,31 +197,31 @@ describe("EagerSingularizationTest", () => {
   registerModel("Compress", Compress);
 
   it("eager no extra singularization belongs to", async () => {
-    await expect(Virus.all().includes("octopus").toArray()).resolves.toBeDefined();
+    await expect(Virus.all().includes(":octopus").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has one", async () => {
-    await expect(Octopus.all().includes("virus").toArray()).resolves.toBeDefined();
+    await expect(Octopus.all().includes(":virus").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many", async () => {
-    await expect(Bus.all().includes("passes").toArray()).resolves.toBeDefined();
+    await expect(Bus.all().includes(":passes").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has and belongs to many", async () => {
     await expect(
       (async () => {
-        await Crisis.all().includes("messes");
-        return Mess.all().includes("crises").toArray();
+        await Crisis.all().includes(":messes");
+        return Mess.all().includes(":crises").toArray();
       })(),
     ).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many through belongs to", async () => {
-    await expect(Crisis.all().includes("successes").toArray()).resolves.toBeDefined();
+    await expect(Crisis.all().includes(":successes").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many through has many", async () => {
-    await expect(Crisis.all().includes("compresses").toArray()).resolves.toBeDefined();
+    await expect(Crisis.all().includes(":compresses").toArray()).resolves.toBeDefined();
   });
 });

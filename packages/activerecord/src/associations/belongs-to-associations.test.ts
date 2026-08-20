@@ -332,10 +332,10 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("eager loading wont mutate owner record", async () => {
-    const client = await Client.eagerLoad("firmWithBasicId").first();
+    const client = await Client.eagerLoad(":firmWithBasicId").first();
     expect((client as any).firmIdCameFromUser?.()).toBeFalsy();
 
-    const client2 = await Client.preload("firmWithBasicId").first();
+    const client2 = await Client.preload(":firmWithBasicId").first();
     expect((client2 as any).firmIdCameFromUser?.()).toBeFalsy();
   });
 
@@ -602,7 +602,7 @@ describe("BelongsToAssociationsTest", () => {
   it("eager loading with primary key", async () => {
     await Firm.create({ name: "Apple" });
     await Client.create({ name: "Citibank", firm_name: "Apple" });
-    const result = await Client.where({ name: "Citibank" }).includes("firmWithPrimaryKey").first();
+    const result = await Client.where({ name: "Citibank" }).includes(":firmWithPrimaryKey").first();
     expect(result!.association("firmWithPrimaryKey").loaded).toBe(true);
   });
 
@@ -610,7 +610,7 @@ describe("BelongsToAssociationsTest", () => {
     await Firm.create({ name: "Apple" });
     await Client.create({ name: "Citibank", firm_name: "Apple" });
     const result = await Client.where({ name: "Citibank" })
-      .includes("firmWithPrimaryKeySymbols")
+      .includes(":firmWithPrimaryKeySymbols")
       .first();
     expect(result!.association("firmWithPrimaryKeySymbols").loaded).toBe(true);
   });
@@ -854,8 +854,8 @@ describe("BelongsToAssociationsTest", () => {
     expect(await (sponsor as any).loadBelongsTo("sponsorableWithConditions")).toBeNull();
 
     const [sponsorPreloaded] = await Sponsor.includes(
-      "sponsorable",
-      "sponsorableWithConditions",
+      ":sponsorable",
+      ":sponsorableWithConditions",
     ).where({ id: sponsor.id });
     expect((sponsorPreloaded as any).sponsorable!.id).toBe(member.id);
     expect((sponsorPreloaded as any).sponsorableWithConditions).toBeNull();
@@ -1374,11 +1374,11 @@ describe("BelongsToAssociationsTest", () => {
 
     expect(Number(david.id)).toBe(1);
     expect(Number((comment as any).author_id)).toBe(1);
-    expect((await Comment.includes("author").first())!.author!.id).toBe(david.id);
+    expect((await Comment.includes(":author").first())!.author!.id).toBe(david.id);
 
     expect(Number(groucho.id)).toBe(1);
     expect((comment as any).resource_id).toBe("1");
-    expect((await Comment.includes("resource").first())!.resource!.id).toBe(groucho.id);
+    expect((await Comment.includes(":resource").first())!.resource!.id).toBe(groucho.id);
   });
 
   it("polymorphic assignment foreign type field updating", async () => {
@@ -1474,7 +1474,7 @@ describe("BelongsToAssociationsTest", () => {
 
     await expect(foundAccount.save()).resolves.toBeDefined();
     await expect(
-      Account.includes("firm")
+      Account.includes(":firm")
         .find(acct.id!)
         .then((a) => a.save()),
     ).resolves.toBeDefined();

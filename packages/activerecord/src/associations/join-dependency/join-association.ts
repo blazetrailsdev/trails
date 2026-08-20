@@ -19,6 +19,7 @@ import {
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
+import { structuralUnionEq } from "../../relation/query-methods.js";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -143,9 +144,25 @@ export class JoinAssociation extends JoinPart {
 
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
-      // TODO: Rails checks scope.references_values and builds join dependencies
-      // for eager-loaded associations here. We skip this until Relation#arel() and
-      // construct_join_dependency are implemented.
+      if (scope && scope.referencesValues.length > 0) {
+        // `scope.eager_load_values | scope.includes_values` — Ruby's array
+        // union, which compares a Hash/String spec by `eql?`; `structuralUnionEq`
+        // is the same comparison `joins!` unions with. Inlined rather than
+        // reusing query-methods' private `unionAppend`: exporting that helper
+        // adds a novel public name to a Rails-matched file (measured — it takes
+        // `relation/query-methods.ts` from 9 novel to 10 on `parity:api:extra`),
+        // and Rails spells this as one `|` operator with no helper at all.
+        const associations = [...scope.eagerLoadValues];
+        for (const spec of scope.includesValues) {
+          if (!associations.some((seen: unknown) => structuralUnionEq(seen, spec))) {
+            associations.push(spec);
+          }
+        }
+
+        if (associations.length > 0) {
+          scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
+        }
+      }
 
       let nodes: Nodes.Node;
       if (scope && scope.whereClause && !scope.whereClause.isEmpty()) {

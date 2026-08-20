@@ -151,7 +151,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("preload on disable joins through", async () => {
-    const loaded = await Member.preload("organization", "organizationWithoutJoins");
+    const loaded = await Member.preload(":organization", ":organizationWithoutJoins");
     const first = loaded[0];
     // preload must have populated both holders — assert they read as loaded so the
     // zero-query checks below actually exercise the preload path (a sync `.target`

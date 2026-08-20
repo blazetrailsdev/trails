@@ -839,7 +839,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("join middle table alias", async () => {
     const records = await (Project as any)
-      .includes("developers_projects")
+      .includes(":developers_projects")
       .where()
       .not({ "developers_projects.joined_on": null })
       .toArray();
@@ -848,7 +848,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("join table alias", async () => {
     const records = await (Developer as any)
-      .includes({ projects: "developers" })
+      .includes({ ":projects": ":developers" })
       .where()
       .not({ "developers_projects_projects_join.joined_on": null })
       .toArray();
@@ -864,7 +864,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     for (const c of Project.columnNames()) group.push(`projects.${c}`);
 
     const records = await (Developer as any)
-      .includes({ projects: "developers" })
+      .includes({ ":projects": ":developers" })
       .where()
       .not({ "developers_projects_projects_join.joined_on": null })
       .group(group.join(","))
@@ -1207,7 +1207,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await (developer as any).saveBang();
     await (project as any).developers.push(developer);
 
-    const projs = ProjectUnscopingDavidDefaultScope.includes("developers").where({
+    const projs = ProjectUnscopingDavidDefaultScope.includes(":developers").where({
       id: project.id,
     });
     expect(await ((await projs.first())! as any).developers.size()).toBe(1);
@@ -1215,13 +1215,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("preloaded associations size", async () => {
     const firstProjectDirect = await Project.first();
-    const preloadedProject = await Project.preload("salariedDevelopers").first();
+    const preloadedProject = await Project.preload(":salariedDevelopers").first();
     expect(await preloadedProject!.salariedDevelopers.size()).toBe(
       await firstProjectDirect!.salariedDevelopers.size(),
     );
 
-    const includesProject = await Project.includes("salariedDevelopers")
-      .references("salariedDevelopers")
+    const includesProject = await Project.includes(":salariedDevelopers")
+      .references(":salariedDevelopers")
       .first();
     expect(await includesProject!.salariedDevelopers.size()).toBe(
       await preloadedProject!.salariedDevelopers.size(),
@@ -1231,7 +1231,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const developer = await Developer.first();
     const firstProject = await developer!.projects.first();
     const preloadedDeveloper = await Developer.preload({
-      projects: "salariedDevelopers",
+      ":projects": ":salariedDevelopers",
     }).first();
     const preloadedProjects = await preloadedDeveloper!.projects;
     const preloadedFirstProject = preloadedProjects.find(

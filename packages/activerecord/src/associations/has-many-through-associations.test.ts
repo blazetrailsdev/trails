@@ -1993,7 +1993,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const person = await Person.createBang({ first_name: "Gaga" });
     const loaded = await Person.where({ id: person.id })
       .where(`readers.id = ${readerId} or 1=1`)
-      .references("readers")
+      .references(":readers")
       .includes(":posts");
     const p = loaded[0];
     expect((p as any).posts.loaded).toBe(true);

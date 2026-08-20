@@ -67,7 +67,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const r1 = ratings("normal_comment_rating");
     const r2 = ratings("special_comment_rating");
     const r3 = ratings("sub_special_comment_rating");
-    const [author] = await Author.where({ id: david.id }).includes("ratings");
+    const [author] = await Author.where({ id: david.id }).includes(":ratings");
     const preloaded = (author.association("ratings").target ?? []) as any[];
     expect(preloaded.map((r: any) => r.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
       [r1.id, r2.id, r3.id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -78,7 +78,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     // `comments` on Author = through: "posts" (a direct 2-level through).
     // Loading it independently must not bleed into a separate `ratings` preload.
     const david = authors("david");
-    const [author] = await Author.where({ id: david.id }).includes("comments");
+    const [author] = await Author.where({ id: david.id }).includes(":comments");
     const preloadedComments = (author.association("comments").target ?? []) as any[];
     expect(preloadedComments.length).toBeGreaterThan(0);
     // The ratings association must NOT be loaded as a side-effect.
@@ -90,7 +90,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const r1 = ratings("normal_comment_rating");
     const r2 = ratings("special_comment_rating");
     const r3 = ratings("sub_special_comment_rating");
-    const [author] = await Author.where({ id: david.id }).includes("ratings");
+    const [author] = await Author.where({ id: david.id }).includes(":ratings");
     const preloaded = (author.association("ratings").target ?? []) as any[];
     // Filtering the outer relation must not silently drop preloaded
     // targets, introduce duplicates, or leak stray rows.
@@ -118,7 +118,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     // When loaded through the Author→posts→comments chain, STI discriminator
     // must materialize the correct subclass — not the base Comment.
     const david = authors("david");
-    const preloaded = await Author.where({ id: david.id }).includes("comments");
+    const preloaded = await Author.where({ id: david.id }).includes(":comments");
     const comments = (preloaded[0].association("comments").target ?? []) as any[];
     const byId = new Map(comments.map((c: any) => [c.id, c]));
 

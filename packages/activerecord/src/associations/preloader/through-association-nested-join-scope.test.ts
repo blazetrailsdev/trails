@@ -82,7 +82,7 @@ type HasManyHost = {
   "davidIncludedCategorizedClub",
   (rel: NestedRel) =>
     (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
-      .includes({ category: "categorizations" })
+      .includes({ ":category": ":categorizations" })
       .where({ categorizations: { author_id: 1 } }),
   {
     through: "currentMembership",
@@ -99,7 +99,7 @@ type HasManyHost = {
   "generalClubs",
   (rel: NestedRel) =>
     (rel as unknown as { includes: (s: string) => NestedRel })
-      .includes("category")
+      .includes(":category")
       .where({ categories: { name: "General" } }),
   {
     through: "favoriteMemberships",
@@ -119,7 +119,7 @@ type HasManyHost = {
   "categorizedClubs",
   (rel: NestedRel) =>
     (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
-      .includes({ category: "categorizations" })
+      .includes({ ":category": ":categorizations" })
       .where({ categorizations: { author_id: 1 } }),
   {
     through: "favoriteMemberships",
@@ -219,11 +219,11 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(member?.id).toBe(members("groucho").id);
     expect((await assoc(member).loadTarget())?.id).toBe(clubs("boring_club").id);
 
-    member = (await Member.preload("davidCategorizedClub").first()) as unknown as AssocHost;
+    member = (await Member.preload(":davidCategorizedClub").first()) as unknown as AssocHost;
     expect(member?.id).toBe(members("groucho").id);
     expect(assoc(member).target?.id).toBe(clubs("boring_club").id);
 
-    member = (await Member.eagerLoad("davidCategorizedClub").first()) as unknown as AssocHost;
+    member = (await Member.eagerLoad(":davidCategorizedClub").first()) as unknown as AssocHost;
     expect(member?.id).toBe(members("groucho").id);
     expect(assoc(member).target?.id).toBe(clubs("boring_club").id);
   });

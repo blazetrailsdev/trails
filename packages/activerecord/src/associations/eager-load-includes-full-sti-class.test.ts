@@ -48,11 +48,11 @@ function findByTitle(): Promise<NamespacedPost | null> {
 }
 
 function includesFindByTitle(): Promise<NamespacedPost | null> {
-  return NamespacedPost.includes("tagging").findBy({ title: "Great stuff" });
+  return NamespacedPost.includes(":tagging").findBy({ title: "Great stuff" });
 }
 
 function eagerLoadFindByTitle(): Promise<NamespacedPost | null> {
-  return NamespacedPost.eagerLoad("tagging").findBy({ title: "Great stuff" });
+  return NamespacedPost.eagerLoad(":tagging").findBy({ title: "Great stuff" });
 }
 
 describe("FullStiClassNamesTest", () => {

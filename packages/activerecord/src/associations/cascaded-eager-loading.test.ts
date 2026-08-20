@@ -218,7 +218,7 @@ describe("CascadedEagerLoadingTest", () => {
       .includes(":categorizations")
       .includes({ ":categorizations": ":author" })
       .where("categorizations.id is not null")
-      .references("categorizations");
+      .references(":categorizations");
     expect(await categories.count()).toBe(3);
     expect((await categories).length).toBe(3);
   });
@@ -228,7 +228,7 @@ describe("CascadedEagerLoadingTest", () => {
       .includes({ ":categorizations": ":author" })
       .includes({ ":categorizations": ":post" })
       .where("posts.id is not null")
-      .references("posts");
+      .references(":posts");
     expect(await categories.count()).toBe(3);
     expect((await categories).length).toBe(3);
   });
