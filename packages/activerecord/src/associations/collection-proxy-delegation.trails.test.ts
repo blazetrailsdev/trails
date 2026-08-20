@@ -2,13 +2,15 @@
  * Trails-only surface: Rails derives `CollectionProxy`'s delegate-to-scope list
  * by reflection —
  * `[QueryMethods, SpawnMethods].flat_map { |k| k.public_instance_methods(false) }`
- * (collection_proxy.rb:1128-1137). trails stands that reflection in with a
- * hand-written name list, which drifted from it in both directions: it omitted
- * the public aliases `left_joins` (query_methods.rb:887) and `without`
- * (query_methods.rb:1585), and it carried `null!`, `rewhere!` and `select!`,
- * none of which Rails or trails defines (the real alias is `_select!`,
- * query_methods.rb:428). Ruby cannot drift this way — the list is computed — so
- * there is no Rails test to mirror and the coverage lives here.
+ * (collection_proxy.rb:1128-1137). trails reads it off the mixin objects'
+ * own keys, which stands in for that reflection but is only as good as the
+ * public/private split it filters on. The list has drifted from Rails in both
+ * directions before: it omitted the public aliases `left_joins`
+ * (query_methods.rb:887) and `without` (query_methods.rb:1585), and it carried
+ * `null!`, `rewhere!` and `select!`, none of which Rails or trails defines (the
+ * real alias is `_select!`, query_methods.rb:428). Ruby cannot drift this way —
+ * the list is computed — so there is no Rails test to mirror and the coverage
+ * lives here.
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
@@ -29,6 +31,29 @@ describe("CollectionProxy scope delegation matches QueryMethods", () => {
     for (const name of ["leftJoins", "without"]) {
       expect(Object.hasOwn(CollectionProxy.prototype, name)).toBe(true);
     }
+  });
+
+  it("delegates the QueryMethods bang builders to scope", () => {
+    // `- [:select]` (collection_proxy.rb:1130) subtracts only the non-bang
+    // reader, so `_select!` (query_methods.rb:428) stays in the delegate set.
+    expect(Object.hasOwn(CollectionProxy.prototype, "_selectBang")).toBe(true);
+  });
+
+  it("_selectBang runs against the association scope", async () => {
+    const author = await Author.find(authors("david").id);
+    const proxy = author.posts as unknown as {
+      _selectBang(column: string): { selectValues: string[] };
+      resetScope(): unknown;
+      selectValues: string[];
+    };
+    const relation = proxy._selectBang("id");
+
+    expect(relation.selectValues).toEqual(["id"]);
+    // The delegation routes the mutation at `scope()`, not at the proxy's own
+    // relation state — so dropping the memoized scope (`reset_scope`,
+    // collection_proxy.rb:1112) drops the select with it.
+    proxy.resetScope();
+    expect(proxy.selectValues).toEqual([]);
   });
 
   it("delegates no name QueryMethods does not define", () => {

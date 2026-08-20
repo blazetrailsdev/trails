@@ -631,11 +631,19 @@ export class Association {
     // exists (e.g. firm.clients was accessed before the async load completed).
     const name = this.reflection.name;
     const proxy = this.owner._collectionProxies.get(name) as
-      | { loaded?: boolean; _hydrateFromPreload?(r: Base[]): void }
+      | { loaded?: boolean; proxyAssociation?: Association }
       | undefined;
-    if (proxy && !proxy.loaded && typeof proxy._hydrateFromPreload === "function") {
+    const association = proxy && !proxy.loaded ? proxy.proxyAssociation : undefined;
+    if (association) {
+      // `associate_records_to_owner` (`preloader/association.rb:245-256`): the
+      // not-persisted records already on the target survive the writeback, and
+      // `target=` (`association.rb:100-103`) flips `loaded`.
       const records = Array.isArray(result) ? result : result != null ? [result] : [];
-      proxy._hydrateFromPreload(records);
+      const target = association.target;
+      const notPersistedRecords = (Array.isArray(target) ? target : []).filter(
+        (r) => !r.isPersisted(),
+      );
+      association.target = [...records, ...notPersistedRecords];
     }
     return result;
   }

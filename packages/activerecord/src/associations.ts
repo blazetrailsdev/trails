@@ -1711,6 +1711,23 @@ export function habtmTargetFk(
 }
 
 /**
+ * The preload writeback of `Preloader::Association#associate_records_to_owner`
+ * (`preloader/association.rb:245-256`) for the collection arm, written through
+ * the association's `target=` (`association.rb:100-103`), which is what flips
+ * `loaded`. Rails has no proxy-side hook for this.
+ *
+ * Module-private: trails' `association(record, name)` factory hydrates a proxy
+ * from an already-preloaded holder outside the Preloader, at two call sites, so
+ * the two Rails lines need one spelling here.
+ */
+function _associateRecordsToProxy<T extends Base>(proxy: CollectionProxy<T>, records: T[]): void {
+  const association = proxy.proxyAssociation;
+  const target = association.target;
+  const notPersistedRecords = (Array.isArray(target) ? target : []).filter((r) => !r.isPersisted());
+  association.target = [...records, ...notPersistedRecords];
+}
+
+/**
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
@@ -1725,7 +1742,7 @@ export function association<T extends Base = Base>(
       const preloaded = _preloadedHolderTarget(record, assocName)?.value;
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-        existing._hydrateFromPreload(records as T[]);
+        _associateRecordsToProxy(existing, records as T[]);
       }
     }
     // collection_association.rb:41 — `reader` ends in `@proxy.reset_scope`,
@@ -1774,14 +1791,12 @@ export function association<T extends Base = Base>(
     _CollectionProxyCtor as unknown as {
       _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
     }
-  )._create(record, assocName, assocDef) as CollectionProxy<T> & {
-    _hydrateFromPreload: (records: T[]) => void;
-  };
+  )._create(record, assocName, assocDef);
 
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-    proxy._hydrateFromPreload(records as T[]);
+    _associateRecordsToProxy(proxy, records as T[]);
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);
