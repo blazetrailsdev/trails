@@ -1,7 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { camelize, except } from "@blazetrails/activesupport";
+import { camelize, except, Range } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -39,13 +39,6 @@ const CHECKS: Record<CheckKey, (valueLength: number, checkValue: number) => bool
   maximum: (valueLength, checkValue) => valueLength <= checkValue,
 };
 
-/** Rails-style range object accepted by the `:in` / `:within` option. */
-export interface LengthRange {
-  begin?: number;
-  end?: number;
-  excludeEnd?: boolean;
-}
-
 /**
  * Keys stripped from options before forwarding to `errors.add` so they
  * don't leak as i18n interpolation variables.
@@ -79,27 +72,21 @@ export class LengthValidator extends EachValidator {
 
     // Normalize :in / :within to :minimum / :maximum before super() calls
     // checkValidityBang(), mirroring length.rb:16-20.
-    const range = options["in"] ?? options["within"];
-    if (range !== undefined) {
-      delete options["in"];
-      delete options["within"];
-      if (Array.isArray(range) && range.length === 2) {
-        options["minimum"] = range[0];
-        options["maximum"] = range[1];
-      } else if (
-        range !== null &&
-        typeof range === "object" &&
-        ("begin" in range || "end" in range)
-      ) {
-        const r = range as LengthRange;
-        if (r.begin !== undefined) options["minimum"] = r.begin;
-        if (r.end !== undefined) {
-          options["maximum"] = r.excludeEnd ? r.end - 1 : r.end;
-        }
-      } else {
-        // Mirrors length.rb:17. A Ruby Range spells as a `[min, max]` tuple or
-        // a `{ begin, end, excludeEnd? }` object in TS.
+    // Rails: `options.delete(:in) || options.delete(:within)` — both keys are
+    // removed, and Ruby `||` falls through only on nil/false.
+    const inOption = options["in"];
+    const withinOption = options["within"];
+    delete options["in"];
+    delete options["within"];
+    const range = inOption != null && inOption !== false ? inOption : withinOption;
+    if (range != null && range !== false) {
+      if (!(range instanceof Range)) {
         throw new ArgumentError(":in and :within must be a Range");
+      }
+      const r = range as Range<number>;
+      if (r.begin !== null) options["minimum"] = r.min();
+      if (r.end !== null) {
+        options["maximum"] = r.excludeEnd ? r.end - 1 : r.end;
       }
     }
 
@@ -176,7 +163,9 @@ export class LengthValidator extends EachValidator {
       if (checkValue == null) continue;
 
       if (value != null || this.skipNilCheck(key)) {
-        checkValue = resolveLengthOpt.call(this, record, checkValue);
+        // Rails length.rb:55 — a Proc / method-name reference is honored
+        // per-record before the comparison.
+        checkValue = this.resolveValue(record, checkValue);
         if (validityCheck(valueLength, checkValue as number)) continue;
       }
 
@@ -214,21 +203,6 @@ export function skipNilCheck(
     this.options.allowNil === undefined &&
     this.options.allowBlank === undefined
   );
-}
-
-/**
- * @internal Resolves a length option through this.resolveValue (so a
- * Proc / method-name reference is honored per Rails length.rb:55) and
- * narrows the result to a number.
- */
-function resolveLengthOpt(
-  this: { resolveValue(record: unknown, value: unknown): unknown },
-  record: ValidatableRecord,
-  raw: unknown,
-): number | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  const resolved = this.resolveValue(record, raw);
-  return typeof resolved === "number" ? resolved : undefined;
 }
 
 LengthValidator.prototype.resolveValue = resolveValue;

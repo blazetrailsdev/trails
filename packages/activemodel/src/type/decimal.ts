@@ -23,35 +23,71 @@ export class DecimalType extends NumericValueType {
     return JSON.stringify(value) ?? String(value);
   }
 
-  // Rails' `cast_value`:
-  //   - Numeric  -> BigDecimal(value)
-  //   - String   -> value.to_d  (returns BigDecimal(0) on invalid)
-  //   - nil      -> nil
-  // The precision-preserving math runs on digit strings (JS has no native
-  // arbitrary-precision decimal), then the result is wrapped in a
-  // BigDecimal so the value carries its type — decimal binds quote in
-  // fixed ("F") form (`1.5`, `42.0`) rather than as a `'1.5'` string
-  // literal (Rails: `when BigDecimal then value.to_s("F")`).
-  /** @internal Rails-private helper. */
+  /**
+   * Mirrors: decimal.rb:57-74
+   *
+   *   def cast_value(value)
+   *     casted_value = \
+   *       case value
+   *       when ::Float   then convert_float_to_big_decimal(value)
+   *       when ::Numeric then BigDecimal(value, precision || BIGDECIMAL_PRECISION)
+   *       when ::String
+   *         begin
+   *           value.to_d
+   *         rescue ArgumentError
+   *           BigDecimal(0)
+   *         end
+   *       else
+   *         if value.respond_to?(:to_d)
+   *           value.to_d
+   *         else
+   *           cast_value(value.to_s)
+   *         end
+   *       end
+   *     apply_scale(casted_value)
+   *   end
+   *
+   * BigDecimal has no NaN/±Infinity form, so those three values round-trip as
+   * sentinel strings rather than BigDecimals — PG's `'NaN'`/`'Infinity'::numeric`
+   * serialization reads them back out. Ruby has no such gap: `Float::NAN.to_d`
+   * is BigDecimal::NAN.
+   *
+   * @internal Rails-private helper.
+   */
   protected castValue(value: unknown): BigDecimal | string | null {
-    const casted = this.applyScale(this._castWithoutScale(value));
-    if (casted === null) return null;
-    // BigDecimal has no NaN/±Infinity form; keep those sentinel strings as-is
-    // so PG's 'NaN'/'Infinity'::numeric round-trip (quoted) still works.
-    if (casted === "NaN" || casted === "Infinity" || casted === "-Infinity") return casted;
-    try {
-      return new BigDecimal(casted);
-    } catch {
-      // Adversarial exponents (e.g. "1e10000000") exceed BigDecimal's
-      // expansion cap; leave the raw cast string untouched.
-      return casted;
+    if (value === null || value === undefined) return null;
+
+    let castedValue: BigDecimal | string | null;
+    if (typeof value === "number") {
+      if (Number.isNaN(value)) return "NaN";
+      if (value === Infinity) return "Infinity";
+      if (value === -Infinity) return "-Infinity";
+      castedValue = this.convertFloatToBigDecimal(value);
+    } else if (
+      value instanceof BigDecimal ||
+      typeof value === "bigint" ||
+      value instanceof Rational
+    ) {
+      // A Rational is the case that makes the significant-digit count matter
+      // here rather than in the Float arm: it carries an exact fraction, so
+      // `Rational(1, 3)` is `0.333333333333333333E0` at the default 18.
+      castedValue = new BigDecimal(value, this.precision ?? BIGDECIMAL_PRECISION);
+    } else if (typeof value === "string") {
+      castedValue = toD(value);
+    } else {
+      const toDMethod = (value as { toD?: unknown }).toD;
+      castedValue =
+        typeof toDMethod === "function"
+          ? (toDMethod as () => BigDecimal).call(value)
+          : this.castValue(String(value));
     }
+
+    return this.applyScale(castedValue);
   }
 
   /**
-   * Mirrors the float-conversion portion of
-   * ActiveModel::Type::Decimal#convert_float_to_big_decimal
-   * (decimal.rb:75-81).
+   * Mirrors: ActiveModel::Type::Decimal#convert_float_to_big_decimal
+   * (decimal.rb:76-82).
    *
    *   def convert_float_to_big_decimal(value)
    *     if precision
@@ -61,27 +97,22 @@ export class DecimalType extends NumericValueType {
    *     end
    *   end
    *
-   * This helper runs on the digit-string stage of the pipeline (before
-   * `castValue` wraps the result in a BigDecimal), so `BigDecimal(_,
-   * float_precision)` translates to "round to `floatPrecision()`
-   * significant digits". The inner `apply_scale` is load-bearing and runs
-   * first, exactly as Rails has it — that ordering is what
-   * `decimal_test.rb:81-86` pins. When no precision is configured, fall
-   * through to `String(value)` (the same form `_castWithoutScale` would
-   * otherwise emit).
+   * The inner `apply_scale` is load-bearing and runs first, exactly as Rails
+   * has it — that ordering is what `decimal_test.rb:81-86` pins.
    *
    * @internal Rails-private helper.
    */
-  protected convertFloatToBigDecimal(value: number): string {
-    if (this.precision === undefined) return String(value);
-    const precision = this.floatPrecision();
-    const scaled = this.applyScale(String(value)) as string;
-    if (precision <= 0) return scaled;
-    return roundDecimalStringToSignificantDigits(scaled, precision);
+  protected convertFloatToBigDecimal(value: number): BigDecimal {
+    if (this.precision !== undefined) {
+      return new BigDecimal(this.applyScale(value), this.floatPrecision());
+    }
+    // `Float#to_d` reads the float's SHORTEST round-trip decimal string —
+    // what `String(value)` yields — not its binary expansion.
+    return new BigDecimal(String(value));
   }
 
   /**
-   * Mirrors: ActiveModel::Type::Decimal#float_precision (decimal.rb:83-89).
+   * Mirrors: ActiveModel::Type::Decimal#float_precision (decimal.rb:84-90).
    *
    *   def float_precision
    *     if precision.to_i > ::Float::DIG + 1
@@ -91,12 +122,10 @@ export class DecimalType extends NumericValueType {
    *     end
    *   end
    *
-   * Ruby `::Float::DIG` is 15 on IEEE-754 doubles; cap at 16 so we
-   * never request more digits than the underlying representation can
-   * preserve. `precision.to_i` on `nil` gives `0`, truncates
-   * fractional values toward zero, and treats non-finite values as
-   * `0` — mirror that exactly so a fractional or NaN `precision:`
-   * doesn't trip `Number#toPrecision`'s integer requirement.
+   * Ruby `::Float::DIG` is 15 on IEEE-754 doubles; cap at 16 so we never
+   * request more digits than the underlying representation can preserve.
+   * `precision.to_i` on `nil` gives `0`, truncates fractional values toward
+   * zero, and treats non-finite values as `0`.
    *
    * @internal Rails-private helper.
    */
@@ -107,245 +136,60 @@ export class DecimalType extends NumericValueType {
   }
 
   /**
-   * Apply Rails' `scale:` option to a decimal string, rounding to the
-   * configured number of fractional digits using Ruby's default
-   * `BigDecimal#round` mode (`ROUND_HALF_UP` — half away from zero).
+   * Mirrors: ActiveModel::Type::Decimal#apply_scale (decimal.rb:92-98).
    *
-   * Mirrors: ActiveModel::Type::Decimal#apply_scale
-   * (activemodel/lib/active_model/type/decimal.rb).
+   *   def apply_scale(value)
+   *     if scale
+   *       value.round(scale)
+   *     else
+   *       value
+   *     end
+   *   end
+   *
+   * Ruby dispatches `round` on whatever the value is — a Float in the
+   * `convert_float_to_big_decimal` call site, a BigDecimal in the `cast_value`
+   * tail — and both round half away from zero, which is `BigDecimal#round`'s
+   * default mode. The NaN/Infinity sentinel strings pass through untouched.
+   *
+   * @internal Rails-private helper.
    */
-  protected applyScale(value: string | null): string | null {
-    if (value === null) return null;
+  protected applyScale(value: number): number;
+  protected applyScale(value: BigDecimal | string | null): BigDecimal | string | null;
+  protected applyScale(
+    value: BigDecimal | string | number | null,
+  ): BigDecimal | string | number | null {
     if (this.scale === undefined) return value;
-    // Ruby `BigDecimal#round(n)` only accepts an Integer argument; a
-    // non-integer or negative TS `scale:` option would just misfire our
-    // slice/charCodeAt math, so leave the value untouched rather than
-    // invent new semantics.
-    if (!Number.isInteger(this.scale) || this.scale < 0) return value;
-    return roundHalfUpToScale(value, this.scale);
-  }
-
-  private _castWithoutScale(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    // A BigDecimal re-cast (e.g. through serialize) round-trips via its
-    // fixed-form string — Rails treats BigDecimal as ::Numeric and re-wraps
-    // it through `BigDecimal(value, precision)`.
-    if (value instanceof BigDecimal) return value.toString("F");
-    if (typeof value === "bigint") return value.toString();
-    // Mirrors decimal.rb:64-66 — a `::Numeric` that is not a `::Float` goes
-    // through `BigDecimal(value, precision || BIGDECIMAL_PRECISION)`. Rational
-    // is the case that distinguishes this arm from the Float one: it carries an
-    // exact fraction, so the significant-digit count is what decides the
-    // result (`Rational(1, 3)` is `0.333333333333333333E0` at the default 18).
-    if (value instanceof Rational) {
-      return rationalToSignificantDigits(value, this.precision ?? BIGDECIMAL_PRECISION);
-    }
+    if (value instanceof BigDecimal) return value.round(this.scale);
     if (typeof value === "number") {
-      // BigDecimal("NaN") / BigDecimal("Infinity") have no decimal string
-      // form, so the non-finite values round-trip as sentinel strings (not
-      // BigDecimals) — `nan?`/`infinite?`-style checks and PG's
-      // 'NaN'/'Infinity'::numeric serialization rely on them. Rails routes
-      // Float through `value.to_d`, and `Float::INFINITY.to_d` yields
-      // BigDecimal::INFINITY ("Infinity") rather than nil.
-      if (Number.isNaN(value)) return "NaN";
-      if (value === Infinity) return "Infinity";
-      if (value === -Infinity) return "-Infinity";
-      // Rails dispatches Float through `convert_float_to_big_decimal`
-      // (decimal.rb:75-81). Route every JS number through the same hook
-      // so a configured `precision:` applies the same significant-digit
-      // rounding per Rails; integer-valued inputs may still change when
-      // the value has more digits than `floatPrecision()` preserves.
-      return this.convertFloatToBigDecimal(value);
+      return Number(new BigDecimal(String(value)).round(this.scale).toString("F"));
     }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "") return null;
-      // Ruby `"NaN".to_d` yields BigDecimal NaN, and the PG adapter hands
-      // numeric NaN back as the string "NaN" on load — both round-trip to
-      // the JS NaN sentinel rather than `to_d`'s leading-prefix parse.
-      // Likewise PG returns "Infinity"/"-Infinity" for non-finite numerics,
-      // and `"Infinity".to_d` yields BigDecimal::INFINITY.
-      if (trimmed === "NaN") return "NaN";
-      if (trimmed === "Infinity") return "Infinity";
-      if (trimmed === "-Infinity") return "-Infinity";
-      // Rails' `String#to_d` parses a leading numeric prefix and
-      // silently drops everything after, returning `BigDecimal(0)` if
-      // no leading number is present. Tests assert, e.g.,
-      // `"1ignore" -> BigDecimal("1")`, `"bad" -> BigDecimal("0")`.
-      const match = trimmed.match(/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?/);
-      return match ? match[0] : "0";
-    }
-    // Mirrors decimal.rb:73-77 — `value.to_d` when the object answers it.
-    const toD = (value as { toD?: unknown }).toD;
-    if (typeof toD === "function") {
-      const d = toD.call(value) as unknown;
-      return d instanceof BigDecimal ? d.toString("F") : this._castWithoutScale(d);
-    }
-    return null;
+    return value;
   }
 }
 
 /**
- * Round a JS number to `precision` significant digits, returning the
- * decimal string. Used by `convertFloatToBigDecimal` to emulate
- * Ruby's `BigDecimal(value, precision)`. Returns `String(value)` when
- * `precision <= 0` (Rails treats `precision: nil` as no rounding).
+ * Ruby's `String#to_d` (`bigdecimal/util.rb`), which `cast_value`'s `::String`
+ * arm calls: it parses a leading numeric prefix, silently drops everything
+ * after it, and answers `BigDecimal(0)` when there is no leading number —
+ * so its `rescue ArgumentError` arm is unreachable from a String.
+ *
+ * PG hands numeric NaN and ±Infinity back as those literal strings, and
+ * `"NaN".to_d` / `"Infinity".to_d` yield BigDecimal NAN / INFINITY, which
+ * trails carries as the same sentinel strings `cast_value` emits for the
+ * Float case.
  */
-export function roundFloatToSignificantDigits(value: number, precision: number): string {
-  if (precision <= 0 || !Number.isFinite(value)) return String(value);
-  return roundDecimalStringToSignificantDigits(String(value), precision);
-}
-
-/**
- * Ruby's `BigDecimal(value, precision)` on an exact `Rational`: the fraction is
- * expanded by long division over `bigint`s — never through a float, which would
- * lose digits well before the default precision of 18 — and the expansion is
- * then rounded to `precision` significant digits, half-up.
- */
-function rationalToSignificantDigits(value: Rational, precision: number): string {
-  if (precision <= 0) return String(value.toF());
-  const sign = value.numerator < 0n !== value.denominator < 0n ? "-" : "";
-  const n = value.numerator < 0n ? -value.numerator : value.numerator;
-  const d = value.denominator < 0n ? -value.denominator : value.denominator;
-  if (d === 0n || n === 0n) return `${n === 0n ? "0" : sign}0`;
-
-  const intDigits = n / d === 0n ? 0 : (n / d).toString().length;
-  let fracNeeded: number;
-  if (intDigits > 0) {
-    fracNeeded = Math.max(precision - intDigits, 0) + 2;
-  } else {
-    // Leading fractional zeros do not count as significant digits, so expand
-    // past them before asking for `precision` more.
-    let leadingZeros = 0;
-    for (let x = n * 10n; x < d && leadingZeros < MAX_EXPONENT_EXPANSION; x *= 10n) leadingZeros++;
-    fracNeeded = leadingZeros + precision + 2;
+function toD(value: string): BigDecimal | string | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (trimmed === "NaN") return "NaN";
+  if (trimmed === "Infinity") return "Infinity";
+  if (trimmed === "-Infinity") return "-Infinity";
+  const match = trimmed.match(/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?/);
+  try {
+    return new BigDecimal(match ? match[0] : "0");
+  } catch {
+    // Adversarial exponents (e.g. "1e10000000") exceed BigDecimal's expansion
+    // cap; leave the raw prefix untouched rather than answering a wrong value.
+    return match ? match[0] : "0";
   }
-  const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString().padStart(fracNeeded + 1, "0");
-  const raw = `${sign}${scaled.slice(0, scaled.length - fracNeeded)}.${scaled.slice(scaled.length - fracNeeded)}`;
-  return roundDecimalStringToSignificantDigits(raw, precision);
-}
-
-/** Round a decimal string to `precision` significant digits, half-up. */
-function roundDecimalStringToSignificantDigits(raw: string, precision: number): string {
-  // Ruby's `BigDecimal(float, n)` (BigDecimal 3.1.4+, an Active Support
-  // dependency) rounds the float's SHORTEST round-trip decimal string — what
-  // `String(value)` yields — to `n` significant digits, half-up. JS
-  // `Number#toPrecision` instead rounds the binary representation, which
-  // diverges on exact half-way decimals (`123.455` → `123.45` via the binary
-  // form, but `123.46` per BigDecimal). Round the decimal string directly so
-  // we match Ruby; see ruby/bigdecimal#70.
-  const parts = splitDecimal(raw);
-  if (!parts) return raw;
-  const { sign, intPart, fracPart } = parts;
-  // Significant-digit rounding maps to a fractional-scale round: subtract the
-  // count of leading significant integer digits (for |x| >= 1), or add the
-  // run of leading fractional zeros (for |x| < 1), from/to `precision`.
-  if (intPart !== "0" && precision < intPart.length) {
-    // Fewer significant digits than integer digits: round WITHIN the integer
-    // part and zero-fill the dropped places (e.g. 1234.5 @ 3 → "1230").
-    const kept = intPart.slice(0, precision);
-    const roundDigit = intPart.charCodeAt(precision) - 48; // '0' → 0
-    const droppedZeros = "0".repeat(intPart.length - precision);
-    const outDigits = roundDigit < 5 ? kept : incrementDecimalDigits(kept);
-    return `${sign}${outDigits}${droppedZeros}`;
-  }
-  let scale: number;
-  if (intPart !== "0") {
-    scale = precision - intPart.length;
-  } else {
-    let leadingZeros = 0;
-    while (leadingZeros < fracPart.length && fracPart.charCodeAt(leadingZeros) === 48) {
-      leadingZeros += 1;
-    }
-    scale = precision + leadingZeros;
-  }
-  return roundHalfUpToScale(`${sign}${intPart}.${fracPart}`, scale);
-}
-
-const MAX_EXPONENT_EXPANSION = 4000;
-
-/**
- * Normalize a decimal-string representation (including scientific notation
- * as emitted by JS `String(1e-7)`) into `sign` + integer + fractional
- * parts. Exponent magnitude is capped at `MAX_EXPONENT_EXPANSION` so
- * adversarial input like `"1e10000000"` can't drive `padEnd`/`padStart`
- * into allocating multi-gigabyte strings; over the cap we return null and
- * callers leave the raw form alone.
- */
-
-function splitDecimal(raw: string): { sign: "" | "-"; intPart: string; fracPart: string } | null {
-  let s = raw;
-  let sign: "" | "-" = "";
-  if (s.startsWith("-")) {
-    sign = "-";
-    s = s.slice(1);
-  } else if (s.startsWith("+")) {
-    s = s.slice(1);
-  }
-  // Accept the same numeric forms `_castWithoutScale` emits: `1`, `1.`,
-  // `.5`, `1.5`, `1e3`, `1.e3`. Reject input with no digits at all.
-  const m = s.match(/^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/);
-  if (!m) return null;
-  if (m[1] === "" && (m[2] ?? "") === "") return null;
-  let intPart = m[1] || "0";
-  let fracPart = m[2] ?? "";
-  const exp = m[3] ? Number(m[3]) : 0;
-  if (Math.abs(exp) > MAX_EXPONENT_EXPANSION) return null;
-  if (exp > 0) {
-    if (fracPart.length >= exp) {
-      intPart += fracPart.slice(0, exp);
-      fracPart = fracPart.slice(exp);
-    } else {
-      intPart += fracPart.padEnd(exp, "0");
-      fracPart = "";
-    }
-  } else if (exp < 0) {
-    const shift = -exp;
-    if (intPart.length > shift) {
-      fracPart = intPart.slice(intPart.length - shift) + fracPart;
-      intPart = intPart.slice(0, intPart.length - shift);
-    } else {
-      fracPart = intPart.padStart(shift, "0") + fracPart;
-      intPart = "0";
-    }
-  }
-  return { sign, intPart: intPart.replace(/^0+(?=\d)/, "") || "0", fracPart };
-}
-
-function roundHalfUpToScale(raw: string, scale: number): string {
-  const parts = splitDecimal(raw);
-  if (!parts) return raw;
-  const { sign, intPart, fracPart } = parts;
-  if (fracPart.length <= scale) {
-    const padded = scale > 0 ? `.${fracPart.padEnd(scale, "0")}` : "";
-    return `${sign}${intPart}${padded}`;
-  }
-  const keep = fracPart.slice(0, scale);
-  const roundDigit = fracPart.charCodeAt(scale) - 48; // '0' → 0
-  if (roundDigit < 5) {
-    return scale > 0 ? `${sign}${intPart}.${keep}` : `${sign}${intPart}`;
-  }
-  // Carry: half-away-from-zero bumps magnitude by 1 ulp at position `scale`.
-  const out = incrementDecimalDigits(intPart + keep);
-  const newIntLen = out.length - scale;
-  const newInt = out.slice(0, newIntLen);
-  const newFrac = out.slice(newIntLen);
-  return scale > 0 ? `${sign}${newInt}.${newFrac}` : `${sign}${newInt}`;
-}
-
-/**
- * Increment a run of ASCII digits by 1 with carry, returning a new
- * string. Uses no intermediate arrays so a multi-million-digit input
- * doesn't blow up memory.
- */
-function incrementDecimalDigits(digits: string): string {
-  let i = digits.length - 1;
-  while (i >= 0 && digits.charCodeAt(i) === 57 /* "9" */) {
-    i -= 1;
-  }
-  if (i < 0) {
-    return `1${"0".repeat(digits.length)}`;
-  }
-  const incremented = String.fromCharCode(digits.charCodeAt(i) + 1);
-  return `${digits.slice(0, i)}${incremented}${"0".repeat(digits.length - i - 1)}`;
 }

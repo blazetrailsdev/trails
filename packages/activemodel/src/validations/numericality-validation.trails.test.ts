@@ -39,10 +39,12 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(await new User({ name: "+0o10" }).isValid()).toBe(false);
   });
 
-  it("rejects hexadecimal literal strings (with or without leading whitespace)", async () => {
+  it("rejects hexadecimal literal strings HEXADECIMAL_REGEX anchors on", async () => {
     // Rails parse_as_number's elsif chain skips Kernel.Float when
-    // is_hexadecimal_literal?, so "0x10" is not-a-number even though
-    // JS Number("0x10") === 16.
+    // is_hexadecimal_literal?, so "0x10" is not-a-number. The regex is
+    // \A-anchored, so a leading space defeats it and Kernel.Float — which
+    // strips whitespace and DOES read hex (Float("  0x10") is 16.0 on
+    // MRI 3.3) — answers 16 instead.
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -50,8 +52,8 @@ describe("NumericalityValidator (trails-only)", () => {
       }
     }
     expect(await new User({ name: "0x10" }).isValid()).toBe(false);
-    expect(await new User({ name: "  0x10" }).isValid()).toBe(false);
     expect(await new User({ name: "+0x10" }).isValid()).toBe(false);
+    expect(await new User({ name: "  0x10" }).isValid()).toBe(true);
   });
 
   it("rejects non-string/non-number values (boolean, Temporal.Instant, plain object)", async () => {

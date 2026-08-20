@@ -327,7 +327,7 @@ export { nilUuid, uuidFromHash, uuidV3, uuidV4, uuidV5 } from "./core-ext/digest
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
-export { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+export { BigDecimal, kernelFloat } from "./core-ext/big-decimal/conversions.js";
 
 export {
   delegate,

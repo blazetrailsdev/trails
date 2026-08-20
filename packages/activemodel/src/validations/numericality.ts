@@ -1,11 +1,10 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, RoundingHelper, BigDecimal, Range } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, Range, kernelFloat } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { roundFloatToSignificantDigits } from "../type/decimal.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 
@@ -31,7 +30,7 @@ export class NumericalityValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare optionAsNumber: typeof optionAsNumber;
   /** @internal Rails-private helper. */
-  declare parseFloat: typeof parseFloatRails;
+  declare parseFloat: typeof parseFloat;
   /** @internal Rails-private helper. */
   declare round: typeof round;
   /** @internal Rails-private helper. */
@@ -154,12 +153,6 @@ const INTEGER_REGEX = /^[+-]?\d+(?![\s\S])/;
 // Rails: /\A[+-]?0[xX]/ — no leading whitespace permitted.
 const HEXADECIMAL_REGEX = /^[+-]?0[xX]/;
 
-// Trails-only guard: JS Number() also coerces 0b… (binary) and 0o…
-// (octal) literal strings, which Rails Kernel.Float rejects. Reuse the
-// hex check for the elsif-chain semantic Rails would apply, then layer
-// this on for the JS-specific surface.
-const NON_DECIMAL_LITERAL_REGEX = /^[+-]?0[xXbBoO]/;
-
 // Mirrors Rails numericality.rb:16:
 //   RESERVED_OPTIONS = COMPARE_CHECKS.keys + NUMBER_CHECKS.keys + RANGE_CHECKS.keys + [:only_integer, :only_numeric]
 // camelCased for trails option-key conventions.
@@ -235,44 +228,16 @@ export function parseAsNumber(
     if (Number.isNaN(rawValue)) return undefined;
     // `% 1 === 0` stands in for Ruby's Float-vs-Integer type test (see above);
     // an integral value takes the `Numeric` pass-through branch.
-    return rawValue % 1 === 0 ? rawValue : parseFloatRails(rawValue, precision, scale);
+    return rawValue % 1 === 0 ? rawValue : parseFloat(rawValue, precision, scale);
   }
   if (rawValue instanceof BigDecimal) return round(Number(rawValue.toString("F")), scale);
   if (isInteger(rawValue)) return Number.parseInt(String(rawValue), 10);
   if (!isHexadecimalLiteral(rawValue)) {
     const float = kernelFloat(rawValue);
     if (float === undefined) return undefined;
-    return parseFloatRails(float, precision, scale);
+    return parseFloat(float, precision, scale);
   }
   return undefined;
-}
-
-/**
- * Ruby's `Kernel.Float`, as `parse_as_number` (numericality.rb:82) calls it:
- * a strict decimal parse that honors `to_f` on a non-Numeric object and raises
- * `ArgumentError`/`TypeError` otherwise. `is_number?` rescues both, so the
- * unparseable cases return undefined here rather than throwing.
- *
- * `Number()` is laxer than `Kernel.Float` in two directions trails has to close
- * by hand: it reads `0b…`/`0o…`/`0x…` literals, and it coerces `""` and
- * whitespace to `0`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel.Float`, not a Rails method,
- * so `parity:api` has no Ruby name to credit it against.
- */
-function kernelFloat(rawValue: unknown): number | undefined {
-  if (rawValue !== null && typeof rawValue === "object") {
-    const toF = (rawValue as { toF?: unknown }).toF;
-    return typeof toF === "function" ? (toF as () => number).call(rawValue) : undefined;
-  }
-  if (typeof rawValue !== "string") return undefined;
-  if (rawValue.trim() === "") return undefined;
-  // `is_hexadecimal_literal?` is anchored at \A, but Kernel.Float strips
-  // leading whitespace before parsing, so "  0x1" is still rejected there.
-  const trimmed = rawValue.trimStart();
-  if (isHexadecimalLiteral(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) return undefined;
-  const coerced = Number(rawValue);
-  return Number.isNaN(coerced) ? undefined : coerced;
 }
 
 /** Ruby's `value.is_a?(Numeric)` over the two numeric types trails carries. */
@@ -292,18 +257,16 @@ function isSymbol(value: unknown): boolean {
  *   end
  *
  * Ruby Float#round defaults to half-away-from-zero (NOT banker's
- * rounding): 2.5.round == 3, (-2.5).round == -3.
- *
- * DEVIATION: Rails calls `Float#round`/`BigDecimal#round` on the value
- * itself; this routes through `RoundingHelper`, which shares the half-up
- * default but is a different object. Tracked by story
- * 0023-surfaced-deviations/numericality-round-calls-rounding-helper.
+ * rounding): 2.5.round == 3, (-2.5).round == -3, and it rounds the float's
+ * shortest round-trip decimal string, which is `BigDecimal#round`'s default
+ * mode over `String(num)`.
  *
  * @internal Rails-private helper.
  */
 export function round(num: number, scale?: number): number {
   if (scale === undefined || scale === null) return num;
-  return Number((new RoundingHelper({ precision: scale }).round(num) as BigDecimal).toString("F"));
+  if (!Number.isFinite(num)) return num;
+  return Number(new BigDecimal(String(num)).round(scale).toString("F"));
 }
 
 /**
@@ -518,25 +481,23 @@ export function isRecordAttributeChangedInPlace(
  *   end
  *
  * Rounds to `scale` decimal places, then rounds to `precision`
- * significant digits — matches Ruby's `BigDecimal(float.round(scale), precision)`.
- *
- * `to_d(precision)` (BigDecimal 3.1.4+) rounds the float's shortest decimal
- * string, not its binary form, so we route through
- * {@link roundFloatToSignificantDigits} rather than `Number#toPrecision`
- * (which rounds the binary value and diverges on exact half-way decimals like
- * `123.455`). See ruby/bigdecimal#70.
+ * significant digits — `BigDecimal(float.round(scale), precision)`, which is
+ * what `Float#to_d(precision)` (BigDecimal 3.1.4+) does. It rounds the
+ * float's shortest decimal string, not its binary form, which is why this
+ * cannot be `Number#toPrecision` — that rounds the binary value and diverges
+ * on exact half-way decimals like `123.455`. See ruby/bigdecimal#70.
  *
  * @internal Rails-private helper.
  */
-export function parseFloatRails(num: number, precision: number, scale?: number): number {
+function parseFloat(num: number, precision: number, scale?: number): number {
   // Ruby `(1.0/0.0).to_d(15)` is BigDecimal Infinity, not an error, so an
   // infinite Float survives the pipeline and reaches the comparisons.
   if (!Number.isFinite(num)) return num;
-  return Number(roundFloatToSignificantDigits(round(num, scale), precision));
+  return Number(new BigDecimal(round(num, scale), precision).toString("F"));
 }
 
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;
-NumericalityValidator.prototype.parseFloat = parseFloatRails;
+NumericalityValidator.prototype.parseFloat = parseFloat;
 NumericalityValidator.prototype.round = round;
 NumericalityValidator.prototype.isNumber = isNumber;
 NumericalityValidator.prototype.isInteger = isInteger;

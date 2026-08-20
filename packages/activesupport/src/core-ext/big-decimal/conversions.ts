@@ -12,6 +12,13 @@
 
 const MAX_EXPONENT_EXPANSION = 4000;
 
+/**
+ * The shape of a Ruby `Rational`, which `Kernel#BigDecimal` accepts as its
+ * first argument. Structural and unexported rather than an import:
+ * `Rational` lives in `@blazetrails/date`, which depends on this package.
+ */
+type RationalLike = { numerator: bigint; denominator: bigint };
+
 export class BigDecimal {
   /** "-" for negative values, "" otherwise. Zero is non-negative. */
   readonly sign: "" | "-";
@@ -20,14 +27,43 @@ export class BigDecimal {
   /** Fractional-part digits, trailing zeros stripped (possibly ""). */
   readonly fracDigits: string;
 
-  constructor(value: string | number | bigint) {
-    const parsed = parse(value);
+  /**
+   * Ruby `Kernel#BigDecimal(value, ndigits)`. `ndigits` is a count of
+   * SIGNIFICANT decimal digits, not a fractional scale, and it only rounds
+   * for the two arguments that carry more digits than a decimal can hold: a
+   * Float and a Rational. For a String, an Integer or another BigDecimal it
+   * is a minimum-precision hint and every digit survives — `BigDecimal(1234.5,
+   * 3)` is `0.123e4` where `BigDecimal("1234.5", 3)` is `0.12345e4`
+   * (verified on MRI 3.3).
+   *
+   * A Rational is expanded by exact long division over `bigint`s — never
+   * through a float, which would lose digits well before the default
+   * precision of 18 — and Ruby raises without a precision for one, since the
+   * expansion is otherwise unbounded.
+   */
+  constructor(
+    value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
+    ndigits = 0,
+  ) {
+    const isRational = typeof value === "object" && !(value instanceof BigDecimal);
+    const parsed = isRational
+      ? parseRational(value, ndigits)
+      : parse(value instanceof BigDecimal ? value.toString("F") : value);
     if (parsed === null) {
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }
     this.sign = parsed.sign;
     this.intDigits = parsed.intDigits;
     this.fracDigits = parsed.fracDigits;
+    if (ndigits > 0 && (isRational || typeof value === "number")) {
+      // Significant-digit rounding IS a fractional-scale round, offset by the
+      // value's decimal exponent: 1234.5 at 3 digits rounds at scale -1, and
+      // 0.00123456 at 3 digits rounds at scale 5.
+      const rounded = this.round(ndigits - this.exponent());
+      this.sign = rounded.sign;
+      this.intDigits = rounded.intDigits;
+      this.fracDigits = rounded.fracDigits;
+    }
   }
 
   /**
@@ -194,6 +230,18 @@ export class BigDecimal {
     return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, Math.max(n, 0));
   }
 
+  /**
+   * Ruby `BigDecimal#exponent` — the power of ten of the value's leading
+   * significant digit under the `0.<digits>e<exp>` normalization, and `0` for
+   * zero.
+   */
+  private exponent(): number {
+    const allDigits = this.intDigits + this.fracDigits;
+    const stripped = allDigits.replace(/^0+/, "");
+    if (stripped === "") return 0;
+    return this.intDigits.length - (allDigits.length - stripped.length);
+  }
+
   /** Digits as one integer, scaled by `10 ** fracDigits.length`. */
   private unscaled(signum = 1): bigint {
     const magnitude = BigInt(this.intDigits + this.fracDigits);
@@ -218,10 +266,8 @@ export class BigDecimal {
     const allDigits = this.intDigits + this.fracDigits;
     const mantissa = allDigits.replace(/^0+/, "").replace(/0+$/, "");
     if (mantissa === "") return "0.0";
-    const leadingZeros = allDigits.length - allDigits.replace(/^0+/, "").length;
-    const exp = this.intDigits.length - leadingZeros;
     const digits = group > 0 ? groupFromLeft(mantissa, group) : mantissa;
-    return `0.${digits}e${exp}`;
+    return `0.${digits}e${this.exponent()}`;
   }
 }
 
@@ -298,6 +344,46 @@ function groupFromLeft(s: string, n: number): string {
   return out;
 }
 
+/**
+ * Expand a `Rational` to a decimal string by exact long division, carrying
+ * two guard digits past the requested significant-digit count so the
+ * constructor's rounding step sees a correctly-rounded tail.
+ */
+function parseRational(
+  value: RationalLike,
+  ndigits: number,
+): { sign: "" | "-"; intDigits: string; fracDigits: string } | null {
+  if (ndigits <= 0) {
+    // Ruby raises `ArgumentError` here. This module has no runtime imports by
+    // construction, and ActiveSupport's `ArgumentError` would drag the
+    // `time-with-zone` graph in behind it, so it reuses the `TypeError` this
+    // file already throws for an unparseable value — the message is Ruby's.
+    throw new TypeError("can't omit precision for a Rational.");
+  }
+  const negative = value.numerator < 0n !== value.denominator < 0n;
+  const sign: "" | "-" = negative ? "-" : "";
+  const n = value.numerator < 0n ? -value.numerator : value.numerator;
+  const d = value.denominator < 0n ? -value.denominator : value.denominator;
+  if (d === 0n) return null;
+  if (n === 0n) return { sign: "", intDigits: "0", fracDigits: "" };
+
+  let fracNeeded: number;
+  const intPartDigits = n / d;
+  if (intPartDigits > 0n) {
+    fracNeeded = Math.max(ndigits - intPartDigits.toString().length, 0) + 2;
+  } else {
+    // Leading fractional zeros are not significant digits, so expand past
+    // them before asking for `ndigits` more.
+    let leadingZeros = 0;
+    for (let x = n * 10n; x < d && leadingZeros < MAX_EXPONENT_EXPANSION; x *= 10n) leadingZeros++;
+    fracNeeded = leadingZeros + ndigits + 2;
+  }
+  const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString().padStart(fracNeeded + 1, "0");
+  return parse(
+    `${sign}${scaled.slice(0, scaled.length - fracNeeded)}.${scaled.slice(scaled.length - fracNeeded)}`,
+  );
+}
+
 function parse(
   value: string | number | bigint,
 ): { sign: "" | "-"; intDigits: string; fracDigits: string } | null {
@@ -356,3 +442,41 @@ function parse(
   if (intPart === "0" && fracPart === "") sign = "";
   return { sign, intDigits: intPart, fracDigits: fracPart };
 }
+
+/**
+ * Ruby's `Kernel.Float` — the strict decimal parse Rails reaches for directly
+ * (`activemodel/lib/active_model/validations/numericality.rb:82`). It honors
+ * `to_f` on a non-Numeric object and raises `ArgumentError`/`TypeError`
+ * otherwise; every Rails call site rescues both, so the unparseable cases
+ * answer `undefined` here rather than throwing.
+ *
+ * JS `Number()` and `Kernel.Float` disagree in three places trails has to
+ * close by hand: `Number()` reads `0b…` and `0o…` literals, which Ruby
+ * rejects; it coerces `""` and whitespace to `0`, which Ruby rejects; and it
+ * rejects the `1_000` digit separators Ruby accepts. `0x…` is read by both
+ * (`Float("0x10")` is 16.0 on MRI 3.3).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (Kernel.Float), which Rails calls
+ * without defining, so there is no Ruby file in any gem for the port to
+ * mirror.
+ */
+export function kernelFloat(rawValue: unknown): number | undefined {
+  if (rawValue !== null && typeof rawValue === "object") {
+    const toF = (rawValue as { toF?: unknown }).toF;
+    return typeof toF === "function" ? (toF as () => number).call(rawValue) : undefined;
+  }
+  if (typeof rawValue === "number") return rawValue;
+  if (typeof rawValue !== "string") return undefined;
+  if (rawValue.trim() === "") return undefined;
+  // Kernel.Float strips leading whitespace before parsing, so "  0b1" is
+  // rejected too.
+  if (NON_DECIMAL_LITERAL_REGEX.test(rawValue.trimStart())) return undefined;
+  const coerced = Number(rawValue.replace(DIGIT_SEPARATOR_REGEX, ""));
+  return Number.isNaN(coerced) ? undefined : coerced;
+}
+
+/** The literal prefixes `Number()` reads and `Kernel.Float` rejects. */
+const NON_DECIMAL_LITERAL_REGEX = /^[+-]?0[bBoO]/;
+
+/** Ruby's `1_000` digit separator, which `Number()` does not read. */
+const DIGIT_SEPARATOR_REGEX = /(?<=\d)_(?=\d)/g;

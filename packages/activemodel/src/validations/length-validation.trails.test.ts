@@ -1,7 +1,7 @@
 // trails-only coverage for LengthValidator that has no Rails counterpart:
-// the TS spellings of a Ruby Range (`{ begin, end, excludeEnd }` and the
-// `[min, max]` tuple) and the option-leak / definition-time-error paths.
+// the option-leak and definition-time-error paths.
 import { describe, it, expect, afterEach } from "vitest";
+import { Range } from "@blazetrails/activesupport";
 import { Model, NoMethodError } from "../index.js";
 
 class Person extends Model {
@@ -20,16 +20,8 @@ describe("LengthValidator (trails)", () => {
     Person.clearValidatorsBang();
   });
 
-  it("accepts :in as a [min, max] tuple", async () => {
-    Person.validatesLengthOf("title", { in: [3, 10] });
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
-  });
-
   it("accepts :within as a range object { begin, end }", async () => {
-    Person.validatesLengthOf("title", { within: { begin: 3, end: 10 } });
+    Person.validatesLengthOf("title", { within: new Range(3, 10) });
     expect(await new Person({ title: "ab" }).isValid()).toBe(false);
     expect(await new Person({ title: "abc" }).isValid()).toBe(true);
     expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
@@ -37,7 +29,7 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("accepts :in as a range object with excludeEnd", async () => {
-    Person.validatesLengthOf("title", { in: { begin: 3, end: 5, excludeEnd: true } });
+    Person.validatesLengthOf("title", { in: new Range(3, 5, true) });
     expect(await new Person({ title: "abc" }).isValid()).toBe(true);
     expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
     expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
@@ -65,7 +57,7 @@ describe("LengthValidator (trails)", () => {
   });
 
   it("does not leak reserved keys into errors.add options (minimum/maximum path)", async () => {
-    Person.validatesLengthOf("title", { in: [3, 5] });
+    Person.validatesLengthOf("title", { in: new Range(3, 5) });
     const p = new Person({ title: "ab" });
     await p.isValid();
     const err = p.errors.objects[0];
@@ -99,7 +91,18 @@ describe("LengthValidator (trails)", () => {
     expect(await new Person({ title: "a" }).isValid()).toBe(true);
   });
 
-  it("throws at definition time when :in is not a tuple or range object", () => {
+  it("throws at definition time when the range is empty", () => {
+    // length.rb:18 is `options[:minimum] = range.min if range.begin`, and
+    // Ruby's `(1...1).min` is nil for an empty range — so :minimum is SET to
+    // nil, reaches check_validity!, and fails its non-negative Integer test.
+    // Verified against vendor/rails: `validates_length_of :title, in: 1...1`
+    // raises ":minimum must be a non-negative Integer, Infinity, Symbol, or Proc".
+    expect(() => Person.validatesLengthOf("title", { in: new Range(1, 1, true) })).toThrow(
+      /:minimum must be a non-negative Integer/,
+    );
+  });
+
+  it("throws at definition time when :in is not a Range", () => {
     expect(() => Person.validatesLengthOf("title", { in: "3..10" })).toThrow(
       /:in and :within must be a Range/,
     );
