@@ -41,8 +41,6 @@ export {
 export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
-  PendingDefault,
-  PendingType,
   pushPendingDecorator,
   pushPendingDefault,
   pushPendingType,

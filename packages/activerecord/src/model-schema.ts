@@ -4,8 +4,6 @@ import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
-  PendingDefault,
-  PendingType,
   YAMLEncoder,
   resetDefaultAttributesBang,
   typeRegistry,
@@ -961,6 +959,24 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 }
 
 /**
+ * The `PendingType` / `PendingDefault` member lists
+ * (attribute_registration.rb:53,60) — those two Structs are what a user
+ * `attribute(...)` queues. `name` is what separates them from
+ * `PendingDecorator`, whose member is `names` (:66); `type` in turn separates
+ * `PendingType` from `PendingDefault`, whose members are `name` and `default`.
+ * Reading the members is how Ruby tells the three apart, and it keeps these
+ * predicates off the structs themselves, which Rails declares `private` (:52)
+ * and ActiveModel therefore does not export.
+ */
+type PendingAttributeDeclaration = { name: string; type?: Type | null };
+
+function isPendingAttributeDeclaration(
+  modification: unknown,
+): modification is PendingAttributeDeclaration {
+  return typeof (modification as { name?: unknown })?.name === "string";
+}
+
+/**
  * Walk the ancestry's pending-modification queues, oldest ancestor first —
  * the loop written out of `apply_pending_attribute_modifications`' `superclass`
  * recursion (attribute_registration.rb:81-90). Reads the own queues directly
@@ -984,20 +1000,19 @@ function pendingAttributeModificationsInAncestry(host: unknown): unknown[] {
  * queued a `PendingType` / `PendingDefault` for it through `attribute(...)`
  * (attribute_registration.rb:53-72).
  *
- * @internal
- * @noRailsEquivalent CONVERGEABLE — retired by
- * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
- * Rails never asks: a user declaration lives only in the pending queue and a
- * reflected column only in `columns_hash`, so the two are already distinct
+ * Rails never asks this: a user declaration lives only in the pending queue and
+ * a reflected column only in `columns_hash`, so the two are already distinct
  * records. `applyColumnsHash` below re-registers reflected columns INTO
  * `_attributeDefinitions` beside the declarations, so the paths that must not
  * clobber a declaration read the provenance back off the queue Rails replays.
+ * Retired with that registry by
+ * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
+ *
+ * @internal
  */
 export function pendingAttributeDeclarationQ(host: unknown, name: string): boolean {
   return pendingAttributeModificationsInAncestry(host).some(
-    (modification) =>
-      (modification instanceof PendingType || modification instanceof PendingDefault) &&
-      modification.name === name,
+    (modification) => isPendingAttributeDeclaration(modification) && modification.name === name,
   );
 }
 
@@ -1006,14 +1021,14 @@ export function pendingAttributeDeclarationQ(host: unknown, name: string): boole
  * `PendingType` carrying a type only for `attribute(name, type)`, never for a
  * default-only or bare re-declaration (attribute_registration.rb:12-18).
  *
+ * Same registry-shaped reason as {@link pendingAttributeDeclarationQ}.
+ *
  * @internal
- * @noRailsEquivalent CONVERGEABLE — same reason as
- * {@link pendingAttributeDeclarationQ}.
  */
 export function pendingAttributeTypeQ(host: unknown, name: string): boolean {
   return pendingAttributeModificationsInAncestry(host).some(
     (modification) =>
-      modification instanceof PendingType &&
+      isPendingAttributeDeclaration(modification) &&
       modification.name === name &&
       modification.type != null,
   );
@@ -1261,22 +1276,6 @@ function applyColumnsHash(
     });
   }
 
-  // Regenerate attribute accessors through the single define_attribute_methods
-  // path now that schema reflection has settled the attribute definitions.
-  const methodHost = host as unknown as {
-    _attributeMethodsGenerated?: boolean;
-    defineAttributeMethods?: () => boolean;
-  };
-  methodHost._attributeMethodsGenerated = false;
-  if (!regeneratingAttributeMethods.has(host)) {
-    regeneratingAttributeMethods.add(host);
-    try {
-      methodHost.defineAttributeMethods?.();
-    } finally {
-      regeneratingAttributeMethods.delete(host);
-    }
-  }
-
   type CacheBag = {
     _attributesBuilder?: unknown;
     _yamlEncoder?: unknown;
@@ -1292,6 +1291,25 @@ function applyColumnsHash(
   bag._cachedAttributeTypes = null;
   bag._columns = undefined;
   host._columnsHash = filteredHash;
+
+  // Regenerate attribute accessors through the single define_attribute_methods
+  // path now that schema reflection has settled the attribute definitions AND
+  // the derived caches above have been dropped: generation reads
+  // `attribute_names` → `attribute_types` (attribute_methods.rb:236-242), which
+  // would otherwise answer from the pre-load memo and generate nothing.
+  const methodHost = host as unknown as {
+    _attributeMethodsGenerated?: boolean;
+    defineAttributeMethods?: () => boolean;
+  };
+  methodHost._attributeMethodsGenerated = false;
+  if (!regeneratingAttributeMethods.has(host)) {
+    regeneratingAttributeMethods.add(host);
+    try {
+      methodHost.defineAttributeMethods?.();
+    } finally {
+      regeneratingAttributeMethods.delete(host);
+    }
+  }
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
