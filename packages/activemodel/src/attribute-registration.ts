@@ -154,11 +154,10 @@ export function decorateAttributes(
  */
 export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   if (!this._cachedDefaultAttributes) {
-    // Ruby's `inherited` hook registers every subclass with the
-    // DescendantsTracker, which is what `reset_default_attributes`' recursion
-    // over `subclasses` walks (attribute_registration.rb:88-91). JS has no
-    // class-definition hook (CLAUDE.md, "Module mixins"), so trails registers
-    // lazily here, through the one repo-wide stand-in spelling.
+    // Stands in for Ruby's `inherited` hook, which populates the
+    // DescendantsTracker that `reset_default_attributes` recurses over
+    // (attribute_registration.rb:88-91); JS has no class-definition hook
+    // (CLAUDE.md, "Module mixins").
     registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
     const attributeSet = new AttributeSet(new Map<string, Attribute>());
     applyPendingAttributeModifications(this, attributeSet);

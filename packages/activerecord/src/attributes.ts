@@ -173,11 +173,10 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     !cacheHost._cachedDefaultAttributes ||
     schemaStaleAgainstAncestors(cacheHost)
   ) {
-    // Ruby's `inherited` hook registers every subclass with the
-    // DescendantsTracker that `reset_default_attributes` recurses over
-    // (activemodel/lib/active_model/attribute_registration.rb:88-91). JS has no
-    // class-definition hook (CLAUDE.md, "Module mixins"), so trails registers
-    // lazily here, through the one repo-wide stand-in spelling.
+    // Stands in for Ruby's `inherited` hook, which populates the
+    // DescendantsTracker `reset_default_attributes` recurses over
+    // (activemodel/lib/active_model/attribute_registration.rb:88-91); JS has no
+    // class-definition hook (CLAUDE.md, "Module mixins").
     registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
 
     // Phase 1: seed schema columns via `Attribute.fromDatabase`, mirroring Rails'
