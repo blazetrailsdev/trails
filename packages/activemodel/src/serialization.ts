@@ -584,9 +584,9 @@ function isSerializableCollection(value: unknown): value is Iterable<unknown> {
  * key may originate from user input — attribute names, include keys,
  * association names from a JSON-decoded options bag.
  *
- * @noRailsEquivalent Ruby's `hash[key] = value` always writes an entry; the JS
- *   assignment it ports invokes `Object.prototype`'s `__proto__` setter instead
- *   of writing one
+ * @noRailsEquivalent PERMANENT — Ruby's `hash[key] = value` always writes an
+ *   entry; the JS assignment it ports invokes `Object.prototype`'s `__proto__`
+ *   setter instead of writing one
  */
 function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
   Object.defineProperty(target, key, {

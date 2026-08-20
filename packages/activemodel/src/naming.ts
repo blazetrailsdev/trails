@@ -188,8 +188,8 @@ export class ModelName {
   /**
    * Implicit coercion hook so `String(mn)`, `` `${mn}` ``, `mn + ""` all work.
    *
-   * @noRailsEquivalent Ruby gets this from `Name`'s `to_str`; JS reads only
-   *   `Symbol.toPrimitive` when coercing an object to a string
+   * @noRailsEquivalent PERMANENT — Ruby gets this from `Name`'s `to_str`; JS
+   *   reads only `Symbol.toPrimitive` when coercing an object to a string
    */
   [Symbol.toPrimitive](_hint: string): string {
     return this.name;

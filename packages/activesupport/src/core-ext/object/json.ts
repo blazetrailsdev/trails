@@ -181,7 +181,8 @@ export class Range {
  * it is filled, so a second reference to the same value answers the same
  * result) and `leave()` closes it.
  *
- * @noRailsEquivalent Ruby's recursion has no guard: a cyclic structure raises
+ * @noRailsEquivalent PERMANENT — Ruby's recursion has no guard: a cyclic
+ *   structure raises
  *   SystemStackError, which a caller can rescue and which leaves the process
  *   usable. A JS RangeError from the same recursion unwinds a native stack the
  *   engine gives no comparable recovery for, so a cycle answers `nil` — the
