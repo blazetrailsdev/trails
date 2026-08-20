@@ -12,7 +12,6 @@ export {
   missingAttribute,
   AttributeMethodPattern,
   resolveAliasName,
-  resolveAliasNameIn,
   AttrNames,
   buildMangledName,
   defineDirtyAttributeMethods,

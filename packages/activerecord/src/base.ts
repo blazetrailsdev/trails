@@ -134,7 +134,6 @@ import {
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
-  resolveAliasNameIn,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
@@ -4359,7 +4358,7 @@ export class Base extends Model {
     // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
     // (attribute_methods.rb:256) before checking `attribute_types`.
     const defs = this._attributeDefinitions;
-    return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
+    return defs.has(this.resolveAttributeName(String(name)));
   }
 
   /**
