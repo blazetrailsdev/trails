@@ -161,10 +161,6 @@ export class Association {
 
     rawRecords ||= await this.loaderQuery().recordsFor([this]);
 
-    for (const record of rawRecords) {
-      this.setInverse(record);
-    }
-
     this._preloadedRecords = rawRecords.filter((record) => {
       let assignments = false;
       const key = this.deriveKey(record, this.associationKeyName);

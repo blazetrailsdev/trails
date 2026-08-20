@@ -315,10 +315,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope =
       pendingThroughScope ?? (this as unknown as { scope?: () => unknown }).scope?.();
     try {
-      // Rails' `super` here lands in `ThroughAssociation#build_record`
-      // (through_association.rb:116-129) before `Association#build_record`;
-      // trails has no module in the prototype chain, so the through half runs
-      // explicitly.
+      // Rails' `super` lands in `ThroughAssociation#build_record`
+      // (through_association.rb:116-129) first; the module is not in the TS
+      // prototype chain, so its half runs explicitly.
       throughBuildRecord(this, (attributes ??= {}));
       const record = super.buildRecord(attributes, block);
       if (!record) return record;
