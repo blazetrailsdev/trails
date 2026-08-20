@@ -456,14 +456,15 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // for every method except `:destroy` (whose per-record callbacks handle it).
     // `klass` is the ASSOCIATION's klass (the target model), not the source
     // reflection's — a polymorphic source belongs_to has none, and taggings'
+    // `taggable` is exactly such a source.
     const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      const klass = this.klass as unknown as {
+      const klass = this.klass as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
       };
-      if (typeof counter === "string" && klass?.decrementCounter) {
+      if (typeof counter === "string" && klass.decrementCounter) {
         await klass.decrementCounter(
           counter,
           records.map((record) => (record as any).id),

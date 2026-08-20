@@ -84,11 +84,8 @@ export class ThroughAssociation extends Association {
 
     // Rails reaches `through_records_by_owner` / `source_records_by_owner`
     // through the public `records_by_owner` reader, which forces `load_records`
-    // (preloader/association.rb:148-151). Both readers below are synchronous —
-    // `middle_records` calls them from `runnable_loaders` / `future_classes`,
-    // which cannot await — so the forcing happens here, on the one path that
-    // can. Through loaders first: `source_preloaders` is derived from the
-    // middle records they produce.
+    // (preloader/association.rb:148-151). Through loaders first:
+    // `source_preloaders` is derived from the middle records they produce.
     await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()));
     await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()));
 
