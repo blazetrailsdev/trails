@@ -223,8 +223,6 @@ export class HasAndBelongsToMany {
       foreignKey: ownerFk,
       dependent: "delete",
     };
-    // Reassign through the `class_attribute` writer (reflection.rb:11, :23) so
-    // the entry lands on this class and never mutates the inherited registry.
     model._associations = [
       ...model._associations,
       { type: "hasMany", name: middleName, options: middleOptions },

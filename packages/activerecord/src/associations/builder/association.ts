@@ -137,9 +137,6 @@ export class Association {
     const macro = this.macro();
     const reflection = Reflection.create(macro as any, name, scope, options, model);
 
-    // Rails: `ar._reflections = ar._reflections.except(name).merge!(...)`
-    // (reflection.rb:23) — reassigning through the `class_attribute` writer is
-    // what makes the registry copy-on-write per class.
     model._associations = [
       ...model._associations,
       {
