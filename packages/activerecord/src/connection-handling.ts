@@ -72,7 +72,7 @@ export function currentQueryConnection(): DatabaseAdapter | null {
  * getter's guard; it returns `null` (so callers fall back to `.connection`) for a
  * directly-assigned adapter or a model whose `connectionPool()` throws (e.g. a
  * HABTM join model with no registered pool), preserving those models' existing
- * resolution — including `_resolveAdapter`'s `ConnectionNotEstablished` path.
+ * resolution, so such a model still raises `ConnectionNotEstablished`.
  *
  * @internal
  */
