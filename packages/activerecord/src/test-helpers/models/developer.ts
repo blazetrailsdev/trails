@@ -1,4 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import { Range } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
 import type { Company } from "./company.js";
@@ -183,7 +184,7 @@ export class Developer extends Base {
     this.validates("salary", {
       inclusion: { in: { includes: (v: unknown) => Number(v) >= 50000 && Number(v) <= 200000 } },
     } as any);
-    this.validates("name", { length: { in: [3, 20] } });
+    this.validates("name", { length: { in: new Range(3, 20) } });
 
     // Rails: `before_create do |developer| developer.audit_logs.build ... end`
     // — the record arrives as the callback argument, not `this`.

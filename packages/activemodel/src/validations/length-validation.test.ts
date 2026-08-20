@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate, assertNothingRaised } from "@blazetrails/activesupport";
+import { assertPredicate, assertNothingRaised, Range } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Model } from "../index.js";
-import type { LengthRange } from "./length.js";
 
 // Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
@@ -112,7 +111,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of using within", async () => {
-    Topic.validatesLengthOf("title", "content", { within: { begin: 3, end: 5 } });
+    Topic.validatesLengthOf("title", "content", { within: new Range(3, 5) });
 
     const t = new Topic({ title: "a!", content: "I'm ooooooooh so very long" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -131,7 +130,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of using within with exclusive range", async () => {
-    Topic.validatesLengthOf("title", { within: { begin: 4, end: 10, excludeEnd: true } });
+    Topic.validatesLengthOf("title", { within: new Range(4, 10, true) });
 
     const t = new Topic({ title: "9 chars!!" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -145,16 +144,16 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of using within with infinite ranges", async () => {
-    const cases: Array<[LengthRange, number | null]> = [
-      [{ begin: -Infinity, end: 10 }, 11],
-      [{ begin: -Infinity, end: 11, excludeEnd: true }, 11],
-      [{ begin: -Infinity }, null],
-      [{ begin: 10, end: Infinity }, 9],
-      [{ begin: 10, end: Infinity, excludeEnd: true }, 9],
-      [{ begin: 10 }, 9],
-      [{ end: 10 }, 11],
-      [{ end: 11, excludeEnd: true }, 11],
-      [{ begin: -Infinity, end: Infinity }, null],
+    const cases: Array<[Range<number>, number | null]> = [
+      [new Range(-Infinity, 10), 11],
+      [new Range(-Infinity, 11, true), 11],
+      [new Range(-Infinity, null), null],
+      [new Range(10, Infinity), 9],
+      [new Range(10, Infinity, true), 9],
+      [new Range(10, null), 9],
+      [new Range(null, 10), 11],
+      [new Range(null, 11, true), 11],
+      [new Range(-Infinity, Infinity), null],
     ];
     for (const [range, invalidLength] of cases) {
       Topic.clearValidatorsBang();
@@ -172,7 +171,7 @@ describe("LengthValidationTest", () => {
 
   it("optionally validates length of using within", async () => {
     Topic.validatesLengthOf("title", "content", {
-      within: { begin: 3, end: 5 },
+      within: new Range(3, 5),
       allowNil: true,
     });
 
@@ -214,7 +213,7 @@ describe("LengthValidationTest", () => {
   it("validates length of using bignum", async () => {
     const bigmin = 2 ** 30;
     const bigmax = 2 ** 32;
-    const bigrange: LengthRange = { begin: bigmin, end: bigmax, excludeEnd: true };
+    const bigrange = new Range(bigmin, bigmax, true);
     await assertNothingRaised(() => {
       Topic.validatesLengthOf("title", { is: bigmin + 5 });
       Topic.validatesLengthOf("title", { within: bigrange });
@@ -258,7 +257,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of custom errors for in", async () => {
-    Topic.validatesLengthOf("title", { in: { begin: 10, end: 20 }, message: "hoo %{count}" });
+    Topic.validatesLengthOf("title", { in: new Range(10, 20), message: "hoo %{count}" });
     let t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
     assertPredicate(t.errors.messagesFor("title"), (errors) => errors.length > 0);
@@ -338,7 +337,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of using within utf8", async () => {
-    Topic.validatesLengthOf("title", "content", { within: { begin: 3, end: 5 } });
+    Topic.validatesLengthOf("title", "content", { within: new Range(3, 5) });
 
     const t = new Topic({ title: "一二", content: "12三四五六七" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -350,7 +349,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("optionally validates length of using within utf8", async () => {
-    Topic.validatesLengthOf("title", { within: { begin: 3, end: 5 }, allowNil: true });
+    Topic.validatesLengthOf("title", { within: new Range(3, 5), allowNil: true });
 
     let t = new Topic({ title: "一二三四五" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -403,7 +402,7 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of for infinite maxima", async () => {
-    Topic.validatesLengthOf("title", { within: { begin: 5, end: Infinity } });
+    Topic.validatesLengthOf("title", { within: new Range(5, Infinity) });
 
     const t = new Topic({ title: "1234" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);

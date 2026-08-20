@@ -48,6 +48,22 @@ export class Range<T> {
   }
 
   /**
+   * Ruby answers nil for an empty range and raises for a beginless one, since
+   * there is no least element to report.
+   *
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#min`, read by
+   * `length.rb:18`. No Rails file declares it, so `parity:api:extra` has no
+   * Ruby name to credit it against.
+   */
+  min(): T | null {
+    if (this.begin === null) {
+      throw new RangeError("cannot get the minimum of beginless range");
+    }
+    if (this.end !== null && cmp(this.begin, this.end) > 0) return null;
+    return this.begin;
+  }
+
+  /**
    * Ruby raises `TypeError` for a non-Integer excluded end rather than
    * silently reporting a fractional maximum.
    *

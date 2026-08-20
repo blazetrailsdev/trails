@@ -1,4 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import { Range } from "@blazetrails/activesupport";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { Project } from "./project.js";
@@ -84,7 +85,7 @@ export class MyAppBusinessDeveloper extends Base {
 
   static {
     this.hasAndBelongsToMany("projects");
-    this.validates("name", { length: { in: [3, 20] } });
+    this.validates("name", { length: { in: new Range(3, 20) } });
   }
 }
 

@@ -4,6 +4,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { Range } from "@blazetrails/activesupport";
 import "../index.js";
 import { registerModel, association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
@@ -50,7 +51,7 @@ describe("LengthValidationTest", () => {
 
   it("validates size of association using within", async () => {
     const owner = ownerClass();
-    owner.validatesSizeOf("pets", { within: [1, 2] });
+    owner.validatesSizeOf("pets", { within: new Range(1, 2) });
     const o = new owner({ name: "nopets" });
     expect(await o.save()).toBe(false);
     expect(o.errors.messagesFor("pets").length).toBeGreaterThan(0);

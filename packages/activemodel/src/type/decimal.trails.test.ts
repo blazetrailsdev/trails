@@ -33,11 +33,12 @@ describe("DecimalTypeTrails", () => {
     expect(type.cast("1e10000000")).toBe("1e10000000");
   });
 
-  it("apply_scale ignores non-integer/negative scale values", () => {
-    // Ruby BigDecimal#round(n) requires an Integer; rather than invent
-    // new semantics, leave the raw value alone for scale = 2.5 / -1.
-    expect(new Types.DecimalType({ scale: 2.5 }).cast("1.234")).toEqual(bd("1.234"));
-    expect(new Types.DecimalType({ scale: -1 }).cast("1.234")).toEqual(bd("1.234"));
+  it("apply_scale rounds to a multiple of ten for a negative scale", () => {
+    // Ruby `BigDecimal#round(-1)` rounds to a multiple of 10 ** 1, so
+    // apply_scale passes a negative `scale:` straight through to it.
+    expect(new Types.DecimalType({ scale: -1 }).cast("14")).toEqual(bd("10"));
+    expect(new Types.DecimalType({ scale: -1 }).cast("15")).toEqual(bd("20"));
+    expect(new Types.DecimalType({ scale: -1 }).cast("-15")).toEqual(bd("-20"));
   });
 
   it("apply_scale rounds half away from zero", () => {

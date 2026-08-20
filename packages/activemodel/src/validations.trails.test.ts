@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Range } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -107,7 +108,7 @@ describe("ValidationsTest (trails)", () => {
       class WithRange extends Model {
         static {
           this.attribute("name", "string");
-          this.validates("name", { length: { in: [2, 5] } });
+          this.validates("name", { length: { in: new Range(2, 5) } });
         }
       }
       expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
@@ -1049,7 +1050,7 @@ describe("ValidationsTest (trails)", () => {
         class WithRange extends Model {
           static {
             this.attribute("name", "string");
-            this.validates("name", { length: { in: [2, 5] } });
+            this.validates("name", { length: { in: new Range(2, 5) } });
           }
         }
         expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
