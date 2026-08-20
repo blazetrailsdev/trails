@@ -48,13 +48,18 @@ export interface AttributeHostInternals {
 // ---------------------------------------------------------------------------
 
 /**
- * A decorator receives the attribute name and its current type, and optionally
- * the *materializing* class (`host`) — the class whose AttributeSet is being
- * built. Rails' `decorate_attributes` block resolves against that class's
- * attributes, so a superclass's decorator replayed into a subclass sees the
- * subclass's columns. trails threads `host` through so a decorator (e.g. enum's
- * "Undeclared attribute type" check) can key off the materializing subclass
- * rather than the class the decorator was declared on.
+ * A decorator receives the attribute name and its current type, and — only on
+ * the `_default_attributes` replay — the *materializing* class (`host`): the
+ * class whose AttributeSet is being built. Rails' `decorate_attributes` block
+ * resolves against that class's attributes, so a superclass's decorator replayed
+ * into a subclass sees the subclass's columns; trails threads `host` through for
+ * that.
+ *
+ * `host` is absent on the eager pass `decorateAttributes` runs at declaration
+ * time, which Rails has no counterpart for. A decorator that must fire only
+ * where Rails' block fires — enum's "Undeclared attribute type" raise, which
+ * Rails evaluates when the attribute set is built (enum.rb:240-245) — keys off
+ * its presence.
  */
 export type AttributeDecorator = (name: string, type: Type, host?: unknown) => Type;
 
@@ -96,17 +101,6 @@ export class PendingDefault implements PendingModification {
 }
 
 /**
- * Depth counter set while a PendingDecorator replays during
- * `_default_attributes` materialization. trails also applies decorators eagerly
- * to `_attributeDefinitions` at declaration time (a back-compat convenience Rails
- * lacks); a decorator that must mirror Rails' replay-only behavior — e.g. the
- * enum decorator's "Undeclared attribute type" raise, which Rails fires inside
- * its `decorate_attributes` block only on materialization — consults
- * `isDecoratorReplay()` to run solely on the deferred replay, not the eager pass.
- */
-let _decoratorReplayDepth = 0;
-
-/**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#decorate_attributes
  *
  * Pushes a PendingDecorator onto the modification queue so it replays in the
@@ -136,7 +130,7 @@ export function decorateAttributes(
   for (const name of targetNames) {
     const def = defs.get(name);
     if (def) {
-      const newType = decorator(name, def.type, this);
+      const newType = decorator(name, def.type);
       if (newType) defs.set(name, { ...def, type: newType });
     }
   }
@@ -178,7 +172,7 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
+      const newType = this.decorator(name, existing.type, host);
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
@@ -378,28 +372,4 @@ export function hookAttributeType(
   type: Type,
 ): Type {
   return type;
-}
-
-/** True while a PendingDecorator is replaying during materialization. @internal */
-export function isDecoratorReplay(): boolean {
-  return _decoratorReplayDepth > 0;
-}
-
-/**
- * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
- *
- * Mirrors: the replay performed by
- * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
- * replays a pending decorator MUST go through this, or decorators gated on
- * replay context (notably enum's undeclared-type check) silently change behavior.
- *
- * @internal
- */
-function inDecoratorReplay<T>(fn: () => T): T {
-  _decoratorReplayDepth++;
-  try {
-    return fn();
-  } finally {
-    _decoratorReplayDepth--;
-  }
 }

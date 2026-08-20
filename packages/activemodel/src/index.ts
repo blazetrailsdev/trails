@@ -37,7 +37,6 @@ export {
 } from "./attribute-mutation-tracker.js";
 export {
   applyPendingAttributeModifications,
-  isDecoratorReplay,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";

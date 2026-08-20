@@ -1,12 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  ValueType,
-  IntegerType,
-  Type,
-  isDecoratorReplay,
-} from "@blazetrails/activemodel";
+import { ArgumentError, ValueType, IntegerType, Type } from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
@@ -201,12 +195,13 @@ export function installEnumAttribute(
     // concrete subclass materializes rather than throwing `TableNotSpecified` on
     // its own tableless schema.
     //
-    // Two trails-specific gates: `isDecoratorReplay()` skips the eager
+    // Two trails-specific gates: a `host` is passed only on the
+    // `_default_attributes` replay, so its absence marks the eager
     // class-definition-time application (a back-compat convenience Rails lacks,
     // when the subtype is still the bare default), and `!target.abstractClass`
     // skips the rare direct materialization of an abstract class itself.
     const target = (host as typeof Base | undefined) ?? klass;
-    if (isDecoratorReplay() && !target.abstractClass) {
+    if (host !== undefined && !target.abstractClass) {
       assertEnumTypeDeclared(target, resolved);
     }
     return enumTypeFrom(name, mapping, reflected, raiseOnInvalidValues);
