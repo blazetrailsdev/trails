@@ -37,13 +37,7 @@ import { singularize, camelize, constantize } from "@blazetrails/activesupport";
 import { ConfigurationError, AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
-import {
-  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
-  HasManyThroughNestedAssociationsAreReadonly,
-  HasOneThroughNestedAssociationsAreReadonly,
-  HasManyThroughOrderError,
-  AssociationNotFoundError,
-} from "./errors.js";
+import { AssociationNotFoundError } from "./errors.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -316,11 +310,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal Association name — used by AssociationRelation. */
   get associationName(): string {
     return this._assocName;
-  }
-
-  /** @internal Whether this is a through association — used by AssociationRelation. */
-  get isThrough(): boolean {
-    return !!this._assocDef.options.through;
   }
 
   /**
@@ -621,34 +610,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Load and return all associated records.
+   * Load and return all associated records — Rails' `to_a` is `records` is
+   * `load_target` (collection_proxy.rb:1024-1026, :44-46), so this is `load()`
+   * plus one trails-only arm.
+   *
+   * `null_scope?` on an unloaded target is exactly `!find_target?`, the arm
+   * where `load_target` (collection_association.rb:272-279) leaves `@target`
+   * unassigned. trails re-traverses the in-memory chain on each read there
+   * instead, so the arm must merge WITHOUT caching, and it cannot move into
+   * `load()`: `CollectionAssociation#concat` calls `loadTarget()` on a
+   * new-record owner before appending (collection_association.rb:439-446) and
+   * needs that call to cache. Retiring it belongs with the `_queryExecutor`
+   * residue that RFC 0075 owns.
    */
   async toArray(): Promise<T[]> {
-    // Rails `to_a` → `CollectionProxy#records` → `load_target`
-    // (collection_proxy.rb, collection_association.rb) hydrates and caches the
-    // association target (`@target = merge_target_lists(...)`) and marks it
-    // loaded. Delegate to `load` for that full hydrate-and-cache path.
-    //
-    // Keep the cache-bypassing re-query path when either (a) an in-place bang
-    // mutation (`whereBang`/`orderBang`/...) has diverged the proxy scope — this
-    // is effectively a scoped AssociationRelation whose `to_a` runs
-    // `exec_queries` without touching the owner's cached target — or (b) the
-    // target is not yet loaded and `find_target?` is false: a new-record owner
-    // with no foreign key present. Rails' `load_target` only assigns/caches
-    // `@target` from a query when `find_target?` (or the target is stale); for
-    // the new-record-without-FK case it leaves the in-memory target untouched,
-    // which for a through association means re-traversing the in-memory chain
-    // (`post.author.books` …) on each read rather than caching a scoped subset.
-    //
-    // The `!_targetLoaded` guard is essential: on an unloaded target
-    // `null_scope?` is exactly `!find_target?` (`owner.new_record? &&
-    // !foreign_key_present?`), so OR-ing on a bare `null_scope?` would send
-    // *every* post-load `toArray()` back down the re-query path and defeat
-    // caching entirely. `load()` is the hydrate/cache chokepoint for the
-    // already-loaded case (including staleness).
     if (!this._targetLoaded && this.isNullScope()) {
       const results = await this._execLoad();
-      return this._mergeTargetLists(results);
+      return this._collectionAssociation().mergeTargetLists(results, this._target) as T[];
     }
     return this.load();
   }
@@ -687,94 +665,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       wrapper?.resetScope?.();
     }
     const results = await this._execLoad();
-    this._target = this._mergeTargetLists(results);
+    // `@target = merge_target_lists(find_target, target)`
+    // (collection_association.rb:274).
+    this._target = this._collectionAssociation().mergeTargetLists(results, this._target) as T[];
     this._targetLoaded = true;
     // Snapshot the owner's `@stale_state` NOW (while owner FKs still reflect
     // the load time). Letting it happen later — after a FK change — would
     // capture the wrong state and mask the staleness.
     this._staleWrapper()?.loadedBang?.();
     return this._target;
-  }
-
-  /**
-   * Merge freshly-loaded DB rows with the in-memory `_target`, mirroring Rails'
-   * `CollectionAssociation#merge_target_lists` (collection_association.rb): for
-   * each DB row, prefer the matching in-memory instance by primary key (so
-   * unsaved attribute changes and scheduled destroys are preserved), copying DB
-   * values only onto attributes not changed in memory; then append the in-memory
-   * new records that have no DB counterpart. Used by both `toArray` (Rails
-   * `to_a`) and `load` so both surface in-memory state the same way.
-   * @internal
-   */
-  private _mergeTargetLists(results: T[]): T[] {
-    const existingByPk = new Map<string, T>();
-    for (const r of this._target) {
-      const id = this._identityFor(r);
-      if (id != null) existingByPk.set(id, r);
-    }
-    const merged: T[] = results.map((dbRecord) => {
-      const id = this._identityFor(dbRecord);
-      if (id == null || !existingByPk.has(id)) return dbRecord;
-      const memRecord = existingByPk.get(id)!;
-      this._refreshUnchangedAttributes(memRecord, dbRecord);
-      return memRecord;
-    });
-    const unsaved = this._target.filter((r) => r.isNewRecord());
-    return unsaved.length > 0 ? [...merged, ...unsaved] : merged;
-  }
-
-  /**
-   * Reconcile a fresh DB record with the matching in-memory record, mirroring
-   * the attribute merge inside Rails' `CollectionAssociation#merge_target_lists`
-   * (collection_association.rb): for every attribute the two share, copy the
-   * database value onto the in-memory record *unless* that attribute carries an
-   * unsaved change or is readonly. Unsaved updates and scheduled destroys win;
-   * every other attribute reflects the database. This keeps the in-memory
-   * instance (so order, identity, and dirty/destroy state are preserved) while
-   * refreshing its untouched columns from the just-loaded row.
-   * @internal
-   */
-  private _refreshUnchangedAttributes(memRecord: T, dbRecord: T): void {
-    const memClass = memRecord.constructor as typeof Base;
-    // Rails intersects the *instance* `attribute_names` of both records
-    // (collection_association.rb:340) — the actually-loaded keys, not the class
-    // set — so a collection loaded under a `select` projection only refreshes
-    // the columns both rows actually carry. The instance
-    // `attributeNames()` reads `_attributes.keys()`; using the class-level
-    // static would write columns absent from a partially-loaded dbRecord.
-    const dbNames = new Set(dbRecord.attributeNames());
-    const changed = new Set(
-      (memRecord as unknown as { changedAttributeNamesToSave: string[] })
-        .changedAttributeNamesToSave,
-    );
-    const readonly = new Set(memClass.readonlyAttributes);
-    // We iterate the intersection of loaded attribute names (not aliases/virtual
-    // reads), so the low-level `_readAttribute` is equivalent to Rails'
-    // `record[name]` (`read_attribute`, collection_association.rb:342) for every
-    // name here — the value is already type-cast from the fresh row. Both sides
-    // use the raw read/write pair, mirroring `_write_attribute` on the Rails side.
-    for (const name of memRecord.attributeNames()) {
-      if (!dbNames.has(name) || changed.has(name) || readonly.has(name)) continue;
-      memRecord._writeAttribute(name, dbRecord._readAttribute(name));
-    }
-  }
-
-  private _identityFor(r: Base): string | null {
-    const pk = (r.constructor as typeof Base).primaryKey;
-    if (Array.isArray(pk)) {
-      const vals = pk.map((col) => r._readAttribute(col));
-      if (vals.some((v) => v == null)) return null;
-      // Stringify each column value (matching the scalar branch below) so a
-      // BigInt PK value — how PG/MariaDB surface a bigint `id` — is serializable;
-      // JSON.stringify throws on a raw BigInt.
-      return JSON.stringify(vals.map((v) => String(v)));
-    }
-    const val = r._readAttribute(pk);
-    return val == null ? null : String(val);
-  }
-
-  private get _isThrough(): boolean {
-    return !!this._assocDef.options.through;
   }
 
   /**
@@ -819,39 +718,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
     if (typeof assoc.setStrictLoading !== "function") return;
     for (const r of records) assoc.setStrictLoading(r);
-  }
-
-  private _ensureThroughWritable(): void {
-    if (!this._isThrough) return;
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) {
-      throw new HasManyThroughOrderError(
-        ctor.name,
-        this._assocName,
-        this._assocDef.options.through as string,
-      );
-    }
-
-    if (throughAssoc.type === "hasOne" && !throughAssoc.options.through) {
-      throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
-        ctor.name,
-        this._assocName,
-      );
-    }
-
-    // Nested through: the through association is itself a through association
-    const isNestedThrough =
-      throughAssoc.options.through ||
-      (throughAssoc.type as string) === "hasManyThrough" ||
-      (throughAssoc.type as string) === "hasOneThrough";
-    if (isNestedThrough) {
-      if (this._assocDef.type === "hasOne" || (this._assocDef.type as string) === "hasOneThrough") {
-        throw new HasOneThroughNestedAssociationsAreReadonly(this._record, this._assocDef);
-      }
-      throw new HasManyThroughNestedAssociationsAreReadonly(this._record, this._assocDef);
-    }
   }
 
   private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
@@ -1040,7 +906,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * callbacks all land on this proxy too.
    */
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
-    this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
@@ -1079,13 +944,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * reads back; a scoped create (`AssociationRelation#create`) captured it
    * before this call, so it is lent to the association for this write only.
    */
-  /** @internal The OO association object backing this through-collection. */
-  private _throughAssociation(): ThroughAssociationHandle {
-    return this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
-  }
-
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._throughAssociation();
+    const assoc = this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -1339,7 +1199,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#exists?
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
-    if (this._isThrough) {
+    if (this._assocDef.options.through != null) {
       const records = (await this.loadTarget()).filter((r) => !r.isNewRecord());
       if (conditions === undefined) return records.length > 0;
       if (typeof conditions === "object" && conditions !== null && !Array.isArray(conditions)) {
@@ -1519,8 +1379,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#load_target
    */
   async loadTarget(): Promise<T[]> {
-    await this.load();
-    return this._target;
+    return this.load();
   }
 
   /**
@@ -1744,7 +1603,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#<< (bang semantics)
    */
   async appendBang(...records: T[]): Promise<void> {
-    this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
@@ -1898,6 +1756,9 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "unscope",
   "joins",
   "leftOuterJoins",
+  // `alias :left_joins :left_outer_joins` (query_methods.rb:887) — a public
+  // instance method of QueryMethods, so Rails delegates it to `scope` too.
+  "leftJoins",
   "where",
   "rewhere",
   "invertWhere",
@@ -1920,6 +1781,8 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "reverseOrder",
   "annotate",
   "excluding",
+  // `alias :without :excluding` (query_methods.rb:1585).
+  "without",
   "arel",
   "constructJoinDependency",
   // The bang half of `QueryMethods.public_instance_methods(false)`
@@ -1928,7 +1791,6 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "eagerLoadBang",
   "preloadBang",
   "referencesBang",
-  "selectBang",
   "withBang",
   "withRecursiveBang",
   "reselectBang",
@@ -1940,14 +1802,12 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "joinsBang",
   "leftOuterJoinsBang",
   "whereBang",
-  "rewhereBang",
   "invertWhereBang",
   "havingBang",
   "limitBang",
   "offsetBang",
   "lockBang",
   "noneBang",
-  "nullBang",
   "readonlyBang",
   "strictLoadingBang",
   "createWithBang",

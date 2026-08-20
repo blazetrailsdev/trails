@@ -675,9 +675,15 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through writers should raise error", async () => {
     const david = authors("david");
     const subscriber = subscribers("first");
-    await expect((david.subscribers as any).push(subscriber)).rejects.toThrow(
-      /goes through more than one other association/,
-    );
+    const readonly = /goes through more than one other association/;
+    const association = david.association("subscribers") as any;
+    await expect(association.writer([subscriber])).rejects.toThrow(readonly);
+    await expect(association.idsWriter([subscriber.id])).rejects.toThrow(readonly);
+    await expect((david.subscribers as any).push(subscriber)).rejects.toThrow(readonly);
+    await expect((david.subscribers as any).delete(subscriber)).rejects.toThrow(readonly);
+    await expect((david.subscribers as any).clear()).rejects.toThrow(readonly);
+    expect(() => (david.subscribers as any).build()).toThrow(readonly);
+    await expect((david.subscribers as any).create()).rejects.toThrow(readonly);
   });
 
   it("nested has one through writers should raise error", async () => {
