@@ -71,10 +71,14 @@ export class AcceptsMultiparameterTime {
    *
    * `||=` and the `1`/`2`/`3` guard are Ruby truthiness, so only `nil`/`false`
    * count as absent — an empty string is a present value and reaches `::Time`,
-   * which raises for it. The keys are the multiparameter indices, a JS object's
-   * string spelling of the Integer ones Ruby sorts, so `sort` is over `"1"`..`"6"`
-   * and orders the same. `default_timezone` is `Helpers::Timezone#is_utc?`'s
-   * choice of receiver, `Time.utc` or `Time.local` (timezone.rb:9-11).
+   * which raises for it. ActiveRecord never arrives with one:
+   * `extract_callstack_for_multiparameter_attributes` maps `value.empty?` to
+   * `nil` first (activerecord/attribute_assignment.rb:157).
+   *
+   * `sort` orders the Integer keys Ruby holds; a JS object spells them as
+   * strings, whose own order puts `"10"` ahead of `"2"`, so the comparison is
+   * numeric. `default_timezone` is `Helpers::Timezone#is_utc?`'s choice of
+   * receiver, `Time.utc` or `Time.local` (timezone.rb:9-11).
    *
    * @internal Rails-private helper.
    */
@@ -86,7 +90,7 @@ export class AcceptsMultiparameterTime {
       return null;
     }
     const values = Object.entries(valuesHash)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .sort(([a], [b]) => Number(a) - Number(b))
       .map(([, v]) => v as number | string);
     return isUtc()
       ? Time.utc(...(values as [number, number, number]))

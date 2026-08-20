@@ -40,19 +40,7 @@ export function serializableHash(
   options: SerializeOptions = {},
   sync = false,
 ): Record<string, unknown> {
-  if (
-    (() => {
-      // Rails has no such probe: `serializable_hash` is synchronous. This is the
-      // async-serialization re-entry gate (RFC 0022 b2) and it asks only whether
-      // `:include` names anything at all, in any of the option's three spellings.
-      const include = options.include as unknown;
-      if (include == null || include === false) return false;
-      if (typeof include === "string") return true;
-      if (Array.isArray(include)) return include.length > 0;
-      return Object.keys(include as object).length > 0;
-    })() &&
-    !sync
-  ) {
+  if (hasIncludes(options) && !sync) {
     return thenableHash(
       () => serializableHash(record, options, true),
       async () => {
@@ -368,9 +356,6 @@ export function serializableAddIncludes(
     | undefined;
   if (includeOpt == null || includeOpt === false) return;
 
-  // Rails: `unless includes.is_a?(Hash)
-  //           includes = Hash[Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }]
-  //         end` (serialization.rb:187-189).
   let includes: Record<string, SerializeOptions>;
   if (isIncludeHash(includeOpt)) {
     includes = includeOpt;
@@ -398,6 +383,23 @@ export function serializableAddIncludes(
 }
 
 /**
+ * Whether `:include` names anything at all, in any of the three spellings the
+ * option takes. Rails has no such probe — `serializable_hash` is synchronous;
+ * this is the async-serialization re-entry gate (RFC 0022 b2).
+ *
+ * @noRailsEquivalent The gate for trails' awaitable `serializable_hash`, which
+ * lazy-loads an unloaded association where Rails' `to_ary` would block.
+ * @internal
+ */
+function hasIncludes(options: SerializeOptions): boolean {
+  const include = options.include as unknown;
+  if (include == null || include === false) return false;
+  if (typeof include === "string") return true;
+  if (Array.isArray(include)) return include.length > 0;
+  return Object.keys(include as object).length > 0;
+}
+
+/**
  * Ruby `n.is_a?(Hash)` for an `:include` entry — a plain object mapping
  * association names to their own options, as against the String/Symbol (a JS
  * string) and Array spellings the same option takes.
@@ -409,6 +411,8 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
 /**
  * Recursively lazy-load every `include`d association (and nested includes) via
  * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
+ * Runs `serialization.rb:187-189`'s normalisation ahead of the load, the same
+ * one `serializableAddIncludes` runs before its `send`.
  */
 async function preloadIncludes(
   record: SerializationRecord,
@@ -416,8 +420,6 @@ async function preloadIncludes(
 ): Promise<void> {
   const includeOpt = options.include;
   if (includeOpt == null || (includeOpt as unknown) === false) return;
-  // The same `serialization.rb:187-189` normalisation `serializableAddIncludes`
-  // runs, ahead of the async load this walk exists for.
   let includes: Record<string, SerializeOptions>;
   if (isIncludeHash(includeOpt)) {
     includes = includeOpt;
@@ -500,19 +502,7 @@ export function asJsonThenable(
     if (root === false || root == null) return hash;
     return { [root === true ? element() : root]: hash };
   };
-  if (
-    !(() => {
-      // Rails has no such probe: `serializable_hash` is synchronous. This is the
-      // async-serialization re-entry gate (RFC 0022 b2) and it asks only whether
-      // `:include` names anything at all, in any of the option's three spellings.
-      const include = options.include as unknown;
-      if (include == null || include === false) return false;
-      if (typeof include === "string") return true;
-      if (Array.isArray(include)) return include.length > 0;
-      return Object.keys(include as object).length > 0;
-    })()
-  )
-    return finalize(serialize());
+  if (!hasIncludes(options)) return finalize(serialize());
   return thenableHash(
     () => finalize(serialize()),
     async () => finalize(await serialize()),

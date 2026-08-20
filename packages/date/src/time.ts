@@ -388,6 +388,12 @@ export class Time {
    * `Time.utc(2015, 2, 31)` is the 3rd of March. `Temporal.PlainDateTime`
    * rejects both outright, so the day is carried in as `1` and added back.
    *
+   * Every positional but the year also takes `nil`, which MRI defaults to the
+   * field's own default rather than rejecting (`time.c` `time_utc_or_local`) —
+   * so `Time.utc(2004, 6, 24, 16, 24, nil)` is a whole minute, the shape
+   * `AcceptsMultiparameterTime` hands it for a form field left blank — and a
+   * String, which `obj2vint` / `month_arg` convert.
+   *
    * That MRI reading is why `Time#toDatetime`'s `s == 60` fold
    * (`date_core.c:8913-8915`) is unreachable through the constructor on both
    * runtimes; the C carries it for a `right/`-zoneinfo build, which is not a
@@ -402,10 +408,6 @@ export class Time {
     sec: number | string | Rational | null = 0,
     zone: string | number | null = null,
   ) {
-    // MRI defaults a `nil` positional to the field's own default rather than
-    // rejecting it (`time.c` `time_utc_or_local`), which is what makes
-    // `Time.utc(2004, 6, 24, 16, 24, nil)` a whole minute — the shape
-    // `AcceptsMultiparameterTime` hands it for a form field left blank.
     year = obj2vint(year);
     month = month == null ? 1 : monthArg(month);
     day = day == null ? 1 : obj2vint(day);
