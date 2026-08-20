@@ -5,7 +5,6 @@ import {
   Attribute,
   AttributeSetBuilder,
   YAMLEncoder,
-  resetDefaultAttributesBang,
   typeRegistry,
   type Type,
 } from "@blazetrails/activemodel";
@@ -1062,8 +1061,9 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   // ActiveRecord::Attributes overrides `reload_schema_from_cache` to call
   // `reset_default_attributes!` before `super` (attributes.rb:268-271), which
   // nils `@attribute_types` as well as `@default_attributes`
-  // (attribute_registration.rb:96-99).
-  resetDefaultAttributesBang.call(this as never);
+  // (attribute_registration.rb:96-99). Sent to `this`, the way Ruby sends an
+  // inherited private method — ActiveModel's `Model` defines the static.
+  (this as SchemaHost & { resetDefaultAttributesBang(): void }).resetDefaultAttributesBang();
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);
   if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {

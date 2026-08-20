@@ -42,10 +42,7 @@ export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
   pushPendingDecorator,
-  pushPendingDefault,
-  pushPendingType,
   resetDefaultAttributes,
-  resetDefaultAttributesBang,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
 export type { AttributeDefinition, AttributeOptions } from "./attributes.js";
