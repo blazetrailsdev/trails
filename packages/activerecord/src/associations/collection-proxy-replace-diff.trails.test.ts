@@ -88,11 +88,14 @@ describe("collection replace diffs instead of clearing", () => {
     const bad = Client.new({ name: "Bad" });
     bad.raiseOnSave = true;
 
-    const before = await firm.clientsOfFirm;
+    // Snapshot the ids, not the array: `await proxy` resolves to the
+    // association's live target, which `replace` mutates in place (as Rails'
+    // proxy does — `firm.clients_of_firm.map(&:id)` re-reads it too).
+    const beforeIds = (await firm.clientsOfFirm).map((c) => c.id);
     await expect(firm.clientsOfFirm.replace([good, bad])).rejects.toThrow(Client.RaisedOnSave);
 
     const after = await Firm.find(companies("first_firm").id);
-    expect((await after.clientsOfFirm).map((c) => c.id)).toEqual(before.map((c) => c.id));
+    expect((await after.clientsOfFirm).map((c) => c.id)).toEqual(beforeIds);
   });
 
   // Rails' `replace` opens with `original_target = skip_strict_loading {

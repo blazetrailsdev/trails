@@ -10,11 +10,12 @@
  */
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { throwAbort, LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
-import { Base, transaction } from "./index.js";
+import { Base, transaction, registerModel } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
+import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -39,8 +40,20 @@ interface TxRecordInternals {
 
 // The wrapper adapter exposes currentTransaction() at runtime but not on the
 // public DatabaseAdapter type; narrow to just the member these guards read.
+// `restore_transaction_record_state` is a Rails-private member, wired onto
+// Base's prototype but absent from its public type.
+interface CpkRestoreView {
+  restoreTransactionRecordState(forceRestoreState?: boolean): void;
+}
+
 interface AdapterTxView {
   currentTransaction?(): unknown;
+}
+
+// Register the Cpk::Book association graph (CpkBook#order/author/chapters) so
+// association class resolution finds them.
+for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
+  registerModel(klass as unknown as typeof Base);
 }
 
 const openAdapters: SQLite3Adapter[] = [];
@@ -300,6 +313,26 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     expect(internals._dirty.mutationsFromDatabase).toEqual({
       title: ["original", "changed-during-tx"],
     });
+  });
+});
+
+describe("restoreTransactionRecordState composite primary key arm", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  it("restores the snapshotted id tuple on a composite-primary-key model", async () => {
+    const { rememberTransactionRecordState } = await import("./transactions.js");
+    const book = await CpkBook.createBang({ id: [1, 2], title: "Tender Is the Night" });
+    try {
+      rememberTransactionRecordState.call(book);
+      book.id = [42, 42];
+      expect(book.id).toEqual([42, 42]);
+
+      (book as unknown as CpkRestoreView).restoreTransactionRecordState(true);
+
+      expect(book.id).toEqual([1, 2]);
+    } finally {
+      await CpkBook.deleteAll();
+    }
   });
 });
 

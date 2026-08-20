@@ -5,6 +5,7 @@ import {
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
   Model,
+  type AttributeSet,
   type CallbackConditions,
 } from "@blazetrails/activemodel";
 import {
@@ -339,7 +340,7 @@ export async function rolledbackBang(
       await runAfterCallbacksOnProto((ctor as any).prototype, "rollback", this);
     }
   } finally {
-    _restoreTransactionRecordState.call(this, forceRestoreState);
+    restoreTransactionRecordState.call(this, forceRestoreState);
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
       // Force-null _startTransactionState on full outer rollback. Inner
@@ -361,22 +362,6 @@ export async function rolledbackBang(
  *
  * Mirrors: ActiveRecord::Transactions#remember_transaction_record_state
  */
-/**
- * Record identity state snapshot — only captures fields that define what
- * the record IS (new? destroyed? id?), not what happened to it during the
- * transaction (tracking flags are set by save/destroy and read by
- * trigger_transactional_callbacks?).
- */
-interface TransactionRecordSnapshot {
-  newRecord: boolean;
-  destroyed: boolean;
-  frozen: boolean;
-  id: unknown;
-  previouslyNewRecord: boolean;
-
-  attributes: any;
-}
-
 /** @internal */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
@@ -412,112 +397,57 @@ export function rememberTransactionRecordState(this: Base): void {
 }
 
 /**
- * Restore record identity state from a snapshot after a transaction rollback.
- * Does NOT restore tracking flags — those reflect what happened during the
- * transaction and are needed by trigger_transactional_callbacks?.
+ * Restore the new record state and id of a record that was previously saved by
+ * a call to save_record_state.
  *
  * Mirrors: ActiveRecord::Transactions#restore_transaction_record_state
  *
  * @internal
  */
-export function restoreTransactionRecordState(
-  this: Base,
-  snapshot: TransactionRecordSnapshot,
-): void {
+export function restoreTransactionRecordState(this: Base, forceRestoreState = false): void {
   const r = this as any;
-  r._newRecord = snapshot.newRecord;
-  r._destroyed = snapshot.destroyed;
-  r._previouslyNewRecord = snapshot.previouslyNewRecord;
-
-  // Unfreeze the attribute set while internal fields are restored so the
-  // PK write below always succeeds — even when the snapshot itself was
-  // frozen. Mirrors Rails' `restore_transaction_record_state`, which
-  // unconditionally reassigns `@attributes` to a fresh mapped set.
-  if (r._attributes.isFrozen()) {
-    r._attributes = r._attributes.deepDup();
-  }
-
-  // Restore the primary key if it was auto-assigned during insert. Must happen
-  // before dirty snapshot/redetect so the restored pk is the current value when
-  // redetectChanges runs — otherwise a second redetect cannot clear the stale
-  // id entry left by the first pass (redetectChanges only sets, never deletes).
-  if (snapshot.newRecord && !Array.isArray(this.id)) {
-    const ctor = this.constructor as typeof Base;
-    const pk = ctor.primaryKey as string;
-    if (r._attributes.fetchValue(pk) !== snapshot.id) {
-      r._attributes.set(pk, snapshot.id);
-    }
-  }
-
-  // Restore dirty tracking baseline to pre-transaction state while keeping
-  // current in-memory attribute values. Mirrors Rails' attribute map that
-  // rebuilds @attributes with snapshotted baseline + current values, so
-  // changes() reflects the diff between pre-TX and in-memory state.
-  // clearChangesInformation() nullifies previousChanges/mutationsBeforeLastSave
-  // matching Rails' @mutations_before_last_save = nil after rollback.
-  r._dirty.snapshot(snapshot.attributes);
-  r._dirty.clearChangesInformation();
-  r._dirty.redetectChanges(r._attributes);
-
-  // Re-apply the snapshot's frozen state *after* any internal restores.
-  if (snapshot.frozen && !r._attributes.isFrozen()) {
-    r._attributes.freeze();
-  }
-}
-
-/** @internal */
-function _restoreTransactionRecordState(this: Base, forceRestoreState = false): void {
-  const r = this as any;
-  if (!r._startTransactionState) return;
-  const state = r._startTransactionState;
-  if (forceRestoreState || state.level <= 1) {
-    r._newRecord = state.newRecord;
-    r._destroyed = state.destroyed;
-    r._previouslyNewRecord = state.previouslyNewRecord;
-
-    // Mirrors Rails restore_transaction_record_state:
-    //   @attributes = restore_state[:attributes].map { |attr|
-    //     value = @attributes.fetch_value(attr.name)
-    //     attr = attr.with_value_from_user(value) if attr.value != value
-    //     attr }
-    //
-    // Rails keeps post-TX user edits in memory by reconstructing each attribute
-    // with the post-TX value but the pre-TX attribute as the original_attribute.
-    // Our DirtyTracker is external, so we achieve the same observable result by:
-    //   1. Setting the dirty baseline to the pre-TX snapshot values
-    //   2. Redetecting differences against the current (post-TX) r._attributes
-    //
-    // r._attributes is NOT replaced — post-TX values stay live in memory.
-    // Only the PK is explicitly restored (it is auto-assigned by the DB and
-    // is not a user edit worth preserving).
-
-    // Unfreeze in place before writing the restored PK.
-    if (r._attributes.isFrozen()) {
-      r._attributes = r._attributes.deepDup();
-    }
-
-    // Restore primary key to the pre-TX value before redetect runs, so the
-    // PK does not appear as a spurious pending change.
-    const ctor = this.constructor as typeof Base;
-    if (Array.isArray(ctor.primaryKey)) {
-      const cols = ctor.primaryKey;
-      const savedId = state.id as unknown[];
-      if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
-        cols.forEach((col, i) => r._attributes.writeFromUser(col, savedId[i]));
+  const restoreState = r._startTransactionState;
+  if (restoreState) {
+    if (forceRestoreState || restoreState.level <= 1) {
+      r._newRecord = restoreState.newRecord;
+      r._previouslyNewRecord = restoreState.previouslyNewRecord;
+      r._destroyed = restoreState.destroyed;
+      r._attributes = (restoreState.attributes as AttributeSet).map((attr) => {
+        const value = r._attributes.fetchValue(attr.name);
+        if (attr.value !== value) attr = attr.withValueFromUser(value);
+        return attr;
+      });
+      r._mutationsFromDatabase = null;
+      r._mutationsBeforeLastSave = null;
+      const ctor = this.constructor as typeof Base;
+      const primaryKey = ctor.primaryKey;
+      if (ctor.compositePrimaryKey) {
+        const cols = primaryKey as string[];
+        const savedId = restoreState.id as unknown[];
+        if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
+          cols.forEach((col, i) => {
+            r._attributes.writeFromUser(col, savedId[i]);
+          });
+        }
+      } else {
+        if (r._attributes.fetchValue(primaryKey as string) !== restoreState.id) {
+          r._attributes.writeFromUser(primaryKey as string, restoreState.id);
+        }
       }
-    } else if (r._attributes.fetchValue(ctor.primaryKey) !== state.id) {
-      r._attributes.writeFromUser(ctor.primaryKey, state.id);
-    }
 
-    if (state.frozen && !r._attributes.isFrozen()) {
-      r._attributes.freeze();
-    }
+      // trails' dirty state lives in an external `DirtyTracker`, not in each
+      // `Attribute`'s `original_attribute`, so the `map` above cannot by itself
+      // move the changed-set the way nulling Rails' two mutation trackers does.
+      // Seed the tracker from the pre-TX snapshot and re-derive the diff against
+      // the rebuilt set to reach the same `changes()`. Order matters:
+      // `redetectChanges` only sets entries, never deletes them, so the primary
+      // key has to be restored (above) before it runs.
+      r._dirty.snapshot(restoreState.attributes);
+      r._dirty.clearChangesInformation();
+      r._dirty.redetectChanges(r._attributes);
 
-    // Set pre-TX snapshot as the dirty baseline, redetect in-TX edits as dirty.
-    // Mirrors Rails: @mutations_from_database = nil; @mutations_before_last_save = nil
-    r._dirty.snapshot(state.attributes);
-    r._dirty.clearChangesInformation();
-    r._dirty.redetectChanges(r._attributes);
+      if (restoreState.frozen) r._attributes.freeze();
+    }
   }
 }
 
@@ -554,7 +484,7 @@ export async function withTransactionReturningStatus<T>(
     await transaction(modelClass, async () => {
       // Enroll record with the TransactionManager so it fires committedBang/
       // rolledbackBang after the transaction commits or rolls back. The TM-driven
-      // rolledbackBang path calls _restoreTransactionRecordState which reads the
+      // rolledbackBang path calls restoreTransactionRecordState which reads the
       // persistent _startTransactionState snapshot — matching Rails exactly. We
       // intentionally do NOT register a per-call tx.afterRollback hook here: the
       // closure would capture per-save state, and on multi-save rollbacks the

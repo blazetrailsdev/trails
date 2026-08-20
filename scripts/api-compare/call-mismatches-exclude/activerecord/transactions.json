@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "transactions.ts",
-    "rubyName": "restore_transaction_record_state",
-    "call": "map",
-    "reason": "Reviewed (RFC 0106 wave 4c): Rails `map`s the composite primary key back onto the restored attributes; trails restores the snapshot object wholesale, so there is no per-key projection to spell."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "transactions.ts",
-    "rubyName": "rolledback!",
-    "call": "restore_transaction_record_state",
-    "reason": "Reviewed (RFC 0106 wave 4c): the call IS made — as the aliased import `_restoreTransactionRecordState.call(this, forceRestoreState)` — and the extractor keys on the local identifier, not the import binding."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "transactions.ts",
     "rubyName": "set_options_for_callbacks!",
     "call": "merge!",
     "reason": "Reviewed (RFC 0106 wave 4c): Ruby's `args.extract_options!.merge!(enforced_options)` mutates the extracted hash in place; TS returns a fresh merged object via spread because the caller binds the result straight into `set_callback`, so there is no in-place `merge!` to name."
