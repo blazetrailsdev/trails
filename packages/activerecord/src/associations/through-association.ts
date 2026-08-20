@@ -354,6 +354,12 @@ export function throughForeignKeyPresent(assoc: { owner: Base; reflection: any }
   });
 }
 
+/** Ruby's `Array()` Kernel method: `nil` becomes `[]`, an Array passes through. @internal */
+function toArray(value: unknown): unknown[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
 /**
  * Mirrors Rails' `ThroughAssociation#build_record`
  * (through_association.rb:116-129): when the source reflection is a
@@ -375,10 +381,11 @@ export function throughBuildRecord(
     const target = (throughAssociation(assoc) as any)?.target;
 
     if (inverse && target && !Array.isArray(target)) {
-      const primaryKeyValues: unknown[] = Array.isArray(target.id) ? target.id : [target.id];
-      const foreignKeyColumns: string[] = Array.isArray(inverse.foreignKey)
-        ? inverse.foreignKey
-        : [inverse.foreignKey];
+      // `Array(nil)` is `[]`, so an unpersisted through target zips to nothing
+      // and Rails assigns no attribute at all — a `[undefined]` here would put
+      // the foreign key in the built record's attribute hash.
+      const primaryKeyValues: unknown[] = toArray(target.id);
+      const foreignKeyColumns: string[] = toArray(inverse.foreignKey) as string[];
       primaryKeyValues.map((primaryKeyValue, i) => {
         const foreignKeyColumn = foreignKeyColumns[i];
         if (foreignKeyColumn != null) attributes[foreignKeyColumn] = primaryKeyValue;
