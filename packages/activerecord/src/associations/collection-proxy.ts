@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { QueryMethodBangs } from "../relation/query-methods.js";
-import { SpawnMethods } from "../relation/spawn-methods.js";
+import { QueryMethodsPublicInstanceMethods } from "../relation/query-methods.js";
+import { SpawnMethodsPublicInstanceMethods } from "../relation/spawn-methods.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
@@ -1569,70 +1569,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   ]
 //   delegate(*delegate_methods, to: :scope)
 //
-// `SpawnMethods` (spawn-methods.ts) and `QueryMethodBangs` (query-methods.ts) are
-// the mixin objects `include()` mixes into `Relation` (relation.rb:68), so their
-// own keys ARE `public_instance_methods(false)` and the delegate list is read
-// off them rather than hand-transcribed. `public_instance_methods(false)`
+// The mixin files name Ruby's `private` boundary structurally
+// (query_methods.rb:1677, spawn_methods.rb:71), so
+// `QueryMethodsPublicInstanceMethods` / `SpawnMethodsPublicInstanceMethods` ARE
+// `public_instance_methods(false)` and the delegate list is read off them
+// rather than hand-transcribed. `public_instance_methods(false)`
 // includes the bang builders (`where!`, `limit!`, `none!`, …), so Rails
 // delegates those to `scope` too — a Rails `CollectionProxy` owns no relation
 // state of its own. The constructor's own seeding calls (`noneBang` /
 // `extendingBang`) run BEFORE the prototype delegation is consulted only in the
 // sense that they must target the proxy's inherited state, so they are invoked
 // through `Relation.prototype` directly (see the ctor).
-//
-// Ruby's `private` keyword (query_methods.rb:1677, spawn_methods.rb:71) keeps
-// the members below out of `public_instance_methods(false)`, so `delegate` never
-// sees them. A JS object literal carries no such distinction, so the boundary is
-// named here.
-const PRIVATE_MIXIN_INSTANCE_METHODS = new Set([
-  "arelColumn",
-  "arelColumnAliasesFromHash",
-  "arelColumnWithTable",
-  "arelColumnsFromHash",
-  "assertModifiableBang",
-  "async",
-  "buildArel",
-  "buildBoundSqlLiteral",
-  "buildCaseForValuePosition",
-  "buildCastValue",
-  "buildFrom",
-  "buildJoinBuckets",
-  "buildJoinDependencies",
-  "buildJoins",
-  "buildNamedBoundSqlLiteral",
-  "buildOrder",
-  "buildSelect",
-  "buildWith",
-  "buildWithExpressionFromValue",
-  "buildWithJoinNode",
-  "buildWithValueFromHash",
-  "checkIfMethodHasArgumentsBang",
-  "columnReferences",
-  "eachJoinDependencies",
-  "extractTableNameFrom",
-  "flattenedArgs",
-  "isDoesNotSupportReverse",
-  "isTableNameMatches",
-  "lookupTableKlassFromJoinDependencies",
-  "orderColumn",
-  "preprocessOrderArgs",
-  "processSelectArgs",
-  "processWithArgs",
-  "resolveArelAttributes",
-  "reverseSqlOrder",
-  "sanitizeOrderArguments",
-  "selectAssociationList",
-  "selectNamedJoins",
-  "structurallyIncompatibleValuesFor",
-  "validateOrderArgs",
-  "relationWith",
-]);
-
 /** @internal `[QueryMethods, SpawnMethods].flat_map { |k| k.public_instance_methods(false) }`. */
 export const MIXIN_PUBLIC_INSTANCE_METHODS = [
-  ...Object.keys(QueryMethodBangs),
-  ...Object.keys(SpawnMethods),
-].filter((name) => !PRIVATE_MIXIN_INSTANCE_METHODS.has(name));
+  ...Object.keys(QueryMethodsPublicInstanceMethods),
+  ...Object.keys(SpawnMethodsPublicInstanceMethods),
+];
 
 const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
   (name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select",
