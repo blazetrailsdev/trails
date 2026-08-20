@@ -160,7 +160,8 @@ export function installEnumAttribute(
   const existingTypeName =
     typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
   const explicitlyTyped =
-    (existingDef?.source === "user" || existingDef?.userProvided === true) &&
+    existingDef !== undefined &&
+    (existingDef.userProvidedDefault ?? true) &&
     existingTypeName != null;
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
@@ -1020,7 +1021,7 @@ function undeclaredEnumTypeError(klass: typeof Base, name: string): Error {
  * of truth built lazily from the reflected column type via the
  * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
  * (`_defaultAttributes`), NOT `_attributeDefinitions`: reflection skips a
- * userProvided enum def, so its `type` stays the pre-reflection (mapping-shape-
+ * user-provided enum def, so its `type` stays the pre-reflection (mapping-shape-
  * inferred) EnumType, whereas the replayed decorator rebuilds the EnumType from
  * the reflected column subtype. Returns null when the attribute isn't an enum
  * on this class.
