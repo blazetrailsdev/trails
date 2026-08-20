@@ -942,16 +942,6 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 export type ExceptSkip = ExceptKey | (string & {});
 
 /**
- * Reset a single value-key: delete it from `@values` so it reads back as its
- * default.
- *
- * Mirrors: the `@values.delete(scope)` half of `QueryMethods#unscope!`.
- */
-export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): void {
-  delete host._values[scope];
-}
-
-/**
  * Replace `@values` wholesale.
  *
  * Mirrors: the assignment in `SpawnMethods#relation_with` (spawn_methods.rb:71-74),
@@ -995,7 +985,7 @@ function unscopeBang(
           `Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
         );
       }
-      resetValueForScope(this, scope as UnscopeType);
+      delete this._values[scope as UnscopeType];
     } else if (rawScope && typeof rawScope === "object") {
       for (const [key, target] of Object.entries(rawScope)) {
         if (key !== "where") {
