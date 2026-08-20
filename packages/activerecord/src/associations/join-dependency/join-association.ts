@@ -144,8 +144,16 @@ export class JoinAssociation extends JoinPart {
 
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
-      if (scope && scope.referencesValues && scope.referencesValues.length > 0) {
-        const associations = unionAppend(scope.eagerLoadValues ?? [], scope.includesValues ?? []);
+      if (scope && scope.referencesValues.length > 0) {
+        // `scope.eager_load_values | scope.includes_values` — Ruby's array
+        // union, which compares a Hash/String spec by `eql?`; `structuralUnionEq`
+        // is the same comparison `joins!` unions with.
+        const associations = [...scope.eagerLoadValues];
+        for (const spec of scope.includesValues) {
+          if (!associations.some((seen: unknown) => structuralUnionEq(seen, spec))) {
+            associations.push(spec);
+          }
+        }
 
         if (associations.length > 0) {
           scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
@@ -329,18 +337,4 @@ function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | 
     );
   }
   return join as Nodes.Node | null;
-}
-
-/**
- * Ruby `a | b` over association specs — array union by `eql?`, which for a
- * Hash/String spec is structural. `structuralUnionEq` is the same comparison
- * `joins!` uses.
- * @internal
- */
-function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
-  const union = [...target];
-  for (const spec of incoming) {
-    if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
-  }
-  return union;
 }
