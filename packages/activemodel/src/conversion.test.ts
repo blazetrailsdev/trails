@@ -14,19 +14,19 @@ class Contact extends Model {
 
 // models/helicopter.rb — `Helicopter`, `Helicopter::Comanche` and
 // `Helicopter::Apache`, the last overriding `model_name`. A TS class name
-// cannot contain `::`, so the namespaced names are spelled on `ModelName`,
+// cannot contain `::`, so the qualified names are spelled on `ModelName`,
 // which is where Rails' `_to_partial_path` reads them from anyway.
 class Helicopter extends Model {}
 
 class Comanche extends Model {
   static override get modelName(): ModelName {
-    return new ModelName("Comanche", "Helicopter");
+    return new ModelName("Helicopter::Comanche");
   }
 }
 
 class Apache extends Model {
   static override get modelName(): ModelName {
-    const modelName = new ModelName("Apache", "Helicopter");
+    const modelName = new ModelName("Helicopter::Apache");
     modelName.collection = "attack_helicopters";
     modelName.element = "ah-64";
     return modelName;

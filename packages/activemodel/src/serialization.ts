@@ -1,4 +1,5 @@
-import { Temporal } from "@blazetrails/date";
+import { asJson } from "@blazetrails/activesupport";
+
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 /** Minimum shape required of a record object passed to serialization helpers. */
@@ -481,7 +482,7 @@ export function asJsonThenable(
   options: SerializeOptions,
 ): Record<string, unknown> {
   const finalize = (raw: unknown): Record<string, unknown> => {
-    const hash = coerceForJson(raw) as Record<string, unknown>;
+    const hash = asJson(raw) as Record<string, unknown>;
     if (root === false || root == null) return hash;
     return { [root === true ? element() : root]: hash };
   };
@@ -582,6 +583,10 @@ function isSerializableCollection(value: unknown): value is Iterable<unknown> {
  * setter and mutate the target's prototype chain. Used everywhere the
  * key may originate from user input — attribute names, include keys,
  * association names from a JSON-decoded options bag.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's `hash[key] = value` always writes an
+ *   entry; the JS assignment it ports invokes `Object.prototype`'s `__proto__`
+ *   setter instead of writing one
  */
 function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
   Object.defineProperty(target, key, {
@@ -590,153 +595,6 @@ function safeSet(target: Record<string, unknown>, key: string, value: unknown): 
     enumerable: true,
     configurable: true,
   });
-}
-
-/**
- * Coerce a value into a JSON-safe shape, mirroring Rails'
- * `ActiveSupport::JSON.encode` → `Object#as_json` dispatch.
- *
- * Native `JSON.stringify` handles most primitives + Date
- * (`Date.prototype.toJSON()` → ISO 8601), but throws on `BigInt` and
- * emits nothing useful for non-enumerable types. Rails' encoder:
- *
- * - BigDecimal → string (to preserve precision)
- * - Time / Date / DateTime → ISO 8601 string
- * - Symbol → string (Ruby symbols are interned strings)
- *
- * We cover the JS analog:
- * - `bigint` → decimal string. Rails serializes large integers as JSON
- *   numbers because Ruby's Integer is arbitrary-precision and the JSON
- *   encoder handles them natively. JS `JSON.stringify` throws on bigint,
- *   and JS numbers lose precision above 2^53-1, so we emit a decimal
- *   string instead. Consumers that need the numeric value must parse
- *   with `BigInt(str)`.
- * - Temporal types → ISO 8601 string via `toJSON()`. Precision is
- *   native (no trailing-zero truncation for JSON consumers).
- * - Plain arrays / objects → recurse
- * - Everything else → pass through (numbers, strings, booleans, null)
- *
- * Does NOT delegate to nested `asJson()` / `toJSON()` methods. Rails'
- * `Object#as_json` dispatch is recursive from a single encoder, so
- * cycle tracking threads through every call. In our JS port
- * `Model#asJson` starts a fresh coerceForJson with new cycle state,
- * so re-entering through a Model's `asJson` would reset the guards
- * and stack-overflow on model-model cycles. Instead, Model instances
- * reach coerceForJson already pre-flattened by `serializableHash`
- * (via its include path at serialization.ts:88-104 for associations
- * and via the usual attribute read for scalars), so no delegation is
- * needed.
- *
- * Note on JS Symbols: we intentionally do NOT coerce. Ruby symbols
- * are interned-string identifiers (Rails' `:active ≈ "active"`). JS
- * `Symbol()` is a unique identity sigil — different concept. Coercing
- * would misrepresent it. `JSON.stringify` already drops symbol-valued
- * properties per spec, which correctly signals "this doesn't
- * serialize".
- */
-export function coerceForJson(value: unknown): unknown {
-  return _coerceForJson(value, new WeakMap(), new WeakSet());
-}
-
-/**
- * Internal recursion for `coerceForJson`. Threaded with shared cycle
- * state (`seen` for memoization, `inProgress` for self-recursion
- * detection) so the top-level entry point can keep a narrow public
- * signature.
- */
-function _coerceForJson(
-  value: unknown,
-  seen: WeakMap<object, unknown>,
-  inProgress: WeakSet<object>,
-): unknown {
-  // `null` is valid JSON. `undefined` is not — `JSON.stringify` silently
-  // drops object properties whose value is `undefined`, so an attribute
-  // that happens to be unset would just disappear from the output
-  // instead of appearing as `null` (matches Ruby `nil` mapping to JSON
-  // `null`). Normalize both to `null` at the top of the recursion.
-  if (value === null || value === undefined) return null;
-  if (typeof value === "bigint") return value.toString();
-  // Note: no JS `Symbol` handling. Ruby symbols are interned-string
-  // identifiers (`:active` ≈ "active"), which is why Rails
-  // `Symbol#as_json` returns the name. JS `Symbol()` is a unique
-  // identity sigil (well-known symbols, private keys) — coercing to
-  // its description would misrepresent its role. Leave symbols alone;
-  // `JSON.stringify` already drops them per spec, which correctly
-  // signals "this doesn't serialize".
-  // boundary: defensive ISO 8601 emission for any Date attribute value supplied
-  // by a custom (non-Temporal-cast) type. Invalid Dates coerce to null like
-  // Date#toJSON does, keeping asJson safe for downstream JSON.stringify.
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return null;
-    return value.toISOString();
-  }
-  if (
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainTime ||
-    value instanceof Temporal.ZonedDateTime
-  ) {
-    // Temporal.prototype.toJSON() emits ISO 8601 with native precision.
-    return value.toJSON();
-  }
-  if (Array.isArray(value)) {
-    // True cycle: short-circuit to null (Rails' JSON encoder raises, but
-    // `null` is less hostile for accidental self-refs and JSON.stringify
-    // would also fail).
-    if (inProgress.has(value)) return null;
-    // Previously coerced: return the same coerced result so shared
-    // references preserve object identity in the output (avoids silent
-    // data loss on `{ a: obj, b: obj }`-shaped hashes).
-    if (seen.has(value)) return seen.get(value);
-    const out: unknown[] = [];
-    seen.set(value, out);
-    inProgress.add(value);
-    try {
-      for (const entry of value) {
-        out.push(_coerceForJson(entry, seen, inProgress));
-      }
-    } finally {
-      inProgress.delete(value);
-    }
-    return out;
-  }
-  if (typeof value === "object") {
-    // Only recurse into plain objects (no prototype, or
-    // `Object.prototype` directly). Class instances keep an opaque
-    // pass-through so their internals don't leak — e.g. a `Model`
-    // reached here as a raw attribute value would expose
-    // `_attributes`/`_dirty`/`errors` via `Object.entries`. For these,
-    // JSON.stringify will invoke the instance's own `toJSON()` at
-    // encode time, which is the right Rails-parity boundary.
-    const proto = Object.getPrototypeOf(value);
-    if (proto !== null && proto !== Object.prototype) return value;
-
-    if (inProgress.has(value)) return null;
-    if (seen.has(value)) return seen.get(value);
-    const v = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    seen.set(value, out);
-    inProgress.add(value);
-    try {
-      for (const [k, val] of Object.entries(v)) {
-        // Use defineProperty so an own `__proto__` key (common on
-        // JSON.parse output) is written as a data property rather than
-        // invoking `Object.prototype.__proto__`'s setter and polluting
-        // the output's prototype.
-        Object.defineProperty(out, k, {
-          value: _coerceForJson(val, seen, inProgress),
-          writable: true,
-          enumerable: true,
-          configurable: true,
-        });
-      }
-    } finally {
-      inProgress.delete(value);
-    }
-    return out;
-  }
-  return value;
 }
 
 /**

@@ -3,21 +3,14 @@ import {
   pluralize,
   singularize,
   humanize,
-  Inflections,
-  Uncountables,
+  tableize,
+  demodulize,
+  isBlank,
   include,
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "./attribute-assignment.js";
-
-function sameSegments(a: readonly string[] | null, b: readonly string[] | null): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
 
 /**
  * Naming mixin — provides model_name on classes and naming helpers.
@@ -78,6 +71,14 @@ import type { TranslateOptions } from "@blazetrails/i18n";
 /** @internal Mirrors ActiveModel::Name::MISSING_TRANSLATION */
 const MISSING_TRANSLATION = -(2 ** 60);
 
+/**
+ * The enclosing module path a Ruby `klass.name` already carries and a JS class
+ * name does not; declared by the model, read only by `ModelName`'s constructor.
+ */
+interface ModulePath {
+  readonly moduleName?: string;
+}
+
 export interface ModelLike {
   readonly name: string;
   /**
@@ -97,10 +98,8 @@ export interface ModelName {
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ModelName {
-  /** Bare class name (no separators), e.g. `"Post"`. */
+  /** Rails' `@name` — the fully-qualified constant path, e.g. `"Blog::Post"`. */
   name: string;
-  /** Namespace segments from outermost to innermost; `null` if top-level. */
-  readonly namespace: readonly string[] | null;
 
   /** Snake-cased identifier with namespace joined by `_` — `"blog_post"`. */
   singular: string;
@@ -122,53 +121,42 @@ export class ModelName {
   /** I18n key in path form — `"blog/post"`. */
   i18nKey: string;
   /** Mirrors `ActiveModel::Name#uncountable?` (naming.rb:209-211). */
-  readonly isUncountable: boolean;
+  isUncountable: boolean;
 
   private _human: string;
   private _klass: ModelLike | null;
+  private _unnamespaced?: string;
 
   get cacheKey(): string {
     return this.collection;
   }
 
   /**
-   * Mirrors Rails `@name == other` (String#==). When comparing to
-   * another `ModelName`, both the bare name AND namespace segments
-   * must match — so `ModelName("Post")` and
-   * `ModelName("Post", { namespace: "Blog" })` are NOT equal. When
-   * comparing to a string, only `.name` is matched (a plain string
-   * can't express a namespace).
+   * Rails `delegate :==, to: :name` (naming.rb:151-152) — `String#==`. Ruby's
+   * `String#==` returns `other == self` when `other` responds to `to_str`,
+   * which is how two `Name`s compare equal (naming_test.rb:300).
    */
   equals(other: unknown): boolean {
-    if (other instanceof ModelName) {
-      if (this.name !== other.name) return false;
-      return sameSegments(this.namespace, other.namespace);
-    }
-    return typeof other === "string" && this.name === other;
+    if (other instanceof ModelName) return this.name === other.name;
+    return this.name === other;
   }
 
   /**
-   * Mirrors Rails `@name <=> other` (String#<=>). Returns `-1`, `0`,
-   * or `1`. Throws `ArgumentError` for non-string / non-ModelName
-   * arguments. For ModelName-to-ModelName, compares the full
-   * identity (name + namespace) so namespace-differing models sort
-   * distinctly; for ModelName-to-string, compares `.name` only.
+   * Rails `delegate :<=>, to: :name` (naming.rb:151-152) — `String#<=>`, which
+   * answers `nil` for an operand that is neither a String nor `to_str`-able
+   * (naming.rb:50-62 documents the String-operand contract). `nil` is spelled
+   * `undefined`, the repo's settled spelling for an incomparable spaceship
+   * (`activerecord/src/core.ts`'s `compare`).
+   *
+   * `include Comparable` (naming.rb:10) builds the operators off it; TS has no
+   * operator overloading, so call sites spell them `compare(...) < 0` etc.
    */
-  compare(other: unknown): -1 | 0 | 1 {
-    if (other instanceof ModelName) {
-      // Single string compare over the full `::`-qualified constant path —
-      // matches Rails' `String#<=>` on `@name` (e.g. "Admin::Other" <
-      // "Blog::Post" by first segment, regardless of bare-name ordering).
-      const l = ModelName._qualified(this);
-      const r = ModelName._qualified(other);
-      if (l === r) return 0;
-      return l < r ? -1 : 1;
-    }
-    if (typeof other === "string") {
-      if (this.name === other) return 0;
-      return this.name < other ? -1 : 1;
-    }
-    throw new ArgumentError("comparison of ModelName with non-string failed");
+  compare(other: unknown): number | undefined {
+    // `Name` answers `to_str`, so a `Name` operand takes String#<=>'s
+    // string-like arm rather than falling through to nil.
+    const name = other instanceof ModelName ? other.name : other;
+    if (typeof name !== "string") return undefined;
+    return this.name === name ? 0 : this.name < name ? -1 : 1;
   }
 
   /**
@@ -192,32 +180,17 @@ export class ModelName {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
-  //   include Comparable
-  //   delegate :==, :===, :<=>, :=~, :"!~", :eql?, :match?, :to_s,
-  //            :to_str, :as_json, to: :name
-  //
-  // JS can't overload operators, so we expose methods + the one coercion
-  // hook JS does have: `Symbol.toPrimitive`. That covers IMPLICIT string
-  // coercion only — `String(modelName)`, template literals, `modelName +
-  // ""`, and loose `==` against a string. It does NOT trigger on strict
-  // `===` / `Object.is` / matchers that use strict identity without
-  // coercion; for those, callers use `mn.name` or `mn.equals(other)`.
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Mirrors Rails `to_s` / `to_str` delegated to `@name`
-   * (naming.rb:131-152). Rails' `@name` is the full constant path
-   * (`"Blog::Post"`). TS class names carry no `::`, so we reconstruct the
-   * qualified path from the namespace segments in the constructor; `toString`
-   * returns that full path (`"Blog::Post"`) to match Rails.
-   */
+  /** Rails `delegate :to_s, :to_str, to: :name` (naming.rb:151-152). */
   toString(): string {
     return this.name;
   }
 
-  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
+  /**
+   * Implicit coercion hook so `String(mn)`, `` `${mn}` ``, `mn + ""` all work.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby gets this from `Name`'s `to_str`; JS
+   *   reads only `Symbol.toPrimitive` when coercing an object to a string
+   */
   [Symbol.toPrimitive](_hint: string): string {
     return this.name;
   }
@@ -235,144 +208,54 @@ export class ModelName {
   }
 
   /**
-   * Mirrors Rails `ActiveModel::Name#initialize`
-   * (activemodel/lib/active_model/naming.rb:166-185), same four positional
-   * arguments: `(klass, namespace = nil, name = nil, locale = :en)`.
+   * Mirrors Rails `ActiveModel::Name#initialize` (naming.rb:166-185), same four
+   * positional arguments: `(klass, namespace = nil, name = nil, locale = :en)`.
    *
-   * Rails derives the bare name from `klass.name` — the fully-qualified Ruby
-   * constant path — with `demodulize`. A JS class name carries no module
-   * path, so the demodulized name comes from the `_demodulizedName` carrier
-   * when the class has one, and the namespace is passed in as segments: a
-   * single string (`"Blog"`), a segment array (`["Admin", "Blog"]`), or a
-   * module-like object with a string `name` (`{ name: "Blog" }`).
-   *
-   * `klass` also accepts a bare name string. Ruby always has a class or module
-   * to pass, and reaches the same place with the `name` argument
-   * (`ActiveModel::Name.new(Class.new, nil, "Anonymous")`, naming_test.rb:295);
-   * the string arm is that call spelled without the placeholder class, for a
-   * `ModelName` built with no host class to walk for I18n lookup.
-   *
-   * Field math follows naming.rb:173-184 but operates on the namespace
-   * segments directly rather than round-tripping through a Ruby-shaped
-   * `::`-joined string — equivalent output, no Ruby-ism in TS code.
+   * Rails' `klass.name` is the fully-qualified constant path. A JS class name
+   * carries no module path, so the qualified name is reassembled from the
+   * `moduleName` / `_demodulizedName` carriers the model declares; `klass` also
+   * accepts that qualified name as a bare string, for a `ModelName` built with
+   * no host class to walk for I18n lookup.
    */
   constructor(
     klass: ModelLike | string,
-    namespace?:
-      | string
-      | readonly string[]
-      | { name: string; useRelativeModelNaming?: boolean }
-      | null,
-    name?: string,
-    /** Rails' fourth positional argument (naming.rb:166), `:en` by default. */
+    namespace: { name: string } | null = null,
+    name: string | null = null,
     locale = "en",
   ) {
-    this._klass = typeof klass === "string" ? null : klass;
-    name ??= typeof klass === "string" ? klass : (klass._demodulizedName ?? klass.name);
-    const rawNs = namespace ?? null;
-    const invalidNamespace = (): ArgumentError =>
-      new ArgumentError(
-        "namespace must be a non-blank string, an array of non-blank strings, or an object with a non-blank string `name`",
-      );
-    let segments: string[];
-    let isolated = false;
-    if (rawNs == null) {
-      segments = [];
-    } else if (typeof rawNs === "string") {
-      segments = [rawNs];
-    } else if (Array.isArray(rawNs)) {
-      if (!rawNs.every((s) => typeof s === "string")) throw invalidNamespace();
-      segments = [...rawNs];
-    } else if (
-      typeof rawNs === "object" &&
-      typeof (rawNs as { name?: unknown }).name === "string"
-    ) {
-      segments = [(rawNs as { name: string }).name];
-      // naming.rb:271-276 — `model_name` passes a `namespace` only for a module
-      // that answers `use_relative_model_naming?` truthily, and naming.rb:171
-      // `@unnamespaced` (hence the prefix-dropped `param_key`/`route_key`) is
-      // derived only when that argument is present.
-      isolated = (rawNs as { useRelativeModelNaming?: boolean }).useRelativeModelNaming === true;
-    } else {
-      throw invalidNamespace();
-    }
-    // Trim + reject blank segments. `underscore("")` and `underscore(" ")`
-    // leak through as empty / whitespace tails, which would produce invalid
-    // identifiers in `singular`, `collection`, `i18nKey`.
-    segments = segments.map((s) => s.trim());
-    if (segments.some((s) => s.length === 0)) throw invalidNamespace();
+    const constant = typeof klass === "string" ? null : (klass as ModelLike & ModulePath);
+    this.name =
+      name ??
+      (constant === null
+        ? (klass as string)
+        : constant.moduleName
+          ? `${constant.moduleName}::${constant._demodulizedName ?? constant.name}`
+          : (constant._demodulizedName ?? constant.name));
 
-    // Rails' `@name.blank?` guard — anonymous class without an explicit name.
-    if (!name || !name.trim()) {
+    if (isBlank(this.name))
       throw new ArgumentError(
         "Class name cannot be blank. You need to supply a name argument when anonymous class given",
       );
+
+    if (namespace) {
+      const prefix = `${namespace.name}::`;
+      this._unnamespaced = this.name.startsWith(prefix)
+        ? this.name.slice(prefix.length)
+        : this.name;
     }
-    // Reject Ruby-style separators. TS classes don't carry `::` in their
-    // `.name`, so presence here means a caller pasted a Ruby-shaped
-    // string — point them at the right option.
-    const hasRubySeparator = (s: string): boolean => s.includes("::");
-    if (hasRubySeparator(name) || segments.some(hasRubySeparator)) {
-      throw new ArgumentError(
-        'ModelName arguments must not contain "::" — pass namespace segments as the namespace argument (string, string[], or { name: string })',
-      );
-    }
-
-    // Rails `@name = name || klass.name` keeps the fully-qualified constant
-    // path (`"Admin::User"`). JS class names carry no `::`, so reconstruct the
-    // qualified name from the namespace segments plus the bare name.
-    this.name = segments.length > 0 ? [...segments, name].join("::") : name;
-    this.namespace = segments.length > 0 ? Object.freeze([...segments]) : null;
-
-    const bareUnderscored = underscore(name);
-    const segmentsUnderscored = segments.map(underscore);
-
-    // Rails `@singular = _singularize(@name)` flattens the path separator
-    // to `_`; with the namespace segments split out we equivalently join
-    // the underscored segments with `_`. Pre-segmented input lets us
-    // skip an explicit `_singularize(name)` here without changing the
-    // result. (`_singularize` is exposed below for parity with Rails.)
-    this.singular = [...segmentsUnderscored, bareUnderscored].join("_");
-    // Rails `@plural = pluralize(@singular)`.
-    this.plural = ModelName._uncountables(locale).isUncountable(this.singular)
-      ? this.singular
-      : pluralize(this.singular, locale);
-    const uncountable = this.plural === this.singular;
-    // Rails `@element = underscore(demodulize(@name))` — bare name only.
-    this.element = bareUnderscored;
+    this._klass = constant;
+    this.singular = this._singularize(this.name);
+    this.plural = pluralize(this.singular, locale);
+    this.isUncountable = this.plural === this.singular;
+    this.element = underscore(demodulize(this.name));
     this._human = humanize(this.element);
-    // Rails `@collection = tableize(@name)` — path form, last segment
-    // pluralized. Derive the last segment from `this.plural` (rather than
-    // pluralizing the bare name independently) so any uncountable decision
-    // made above — via `ModelName._uncountables` or via activesupport's
-    // Inflector — applies identically here.
-    let collectionTail: string;
-    if (segmentsUnderscored.length === 0) {
-      collectionTail = this.plural;
-    } else {
-      const prefix = `${segmentsUnderscored.join("_")}_`;
-      collectionTail = this.plural.startsWith(prefix)
-        ? this.plural.slice(prefix.length)
-        : pluralize(bareUnderscored, locale);
-    }
-    this.collection = [...segmentsUnderscored, collectionTail].join("/");
-    // Rails `@param_key = namespace ? _singularize(@unnamespaced) : @singular`
-    // (naming.rb:180). `@unnamespaced` is the name with the isolated
-    // namespace's prefix removed (naming.rb:171), which is the bare element
-    // for a one-segment namespace.
-    this.paramKey = isolated ? this.element : this.singular;
-    // Rails `@i18n_key = @name.underscore.to_sym` — path form with bare name.
-    this.i18nKey = [...segmentsUnderscored, bareUnderscored].join("/");
-    // Rails `@route_key = namespace ? pluralize(@param_key) : @plural.dup`.
-    let routeKey = isolated ? pluralize(this.paramKey, locale) : this.plural;
-    // naming.rb:182-184 — `singular_route_key` singularizes the route key
-    // BEFORE the uncountable `_index` suffix is appended, so an uncountable
-    // model's singular route key stays `"sheep"`, not `"sheep_index"`.
-    this.singularRouteKey = singularize(routeKey, locale);
-    if (uncountable) routeKey = `${routeKey}_index`;
-    this.routeKey = routeKey;
-    // naming.rb:175 `@uncountable = @plural == @singular`.
-    this.isUncountable = uncountable;
+    this.collection = tableize(this.name);
+    this.paramKey = namespace ? this._singularize(this._unnamespaced!) : this.singular;
+    this.i18nKey = underscore(this.name);
+
+    this.routeKey = namespace ? pluralize(this.paramKey, locale) : this.plural;
+    this.singularRouteKey = singularize(this.routeKey, locale);
+    if (this.isUncountable) this.routeKey += "_index";
   }
 
   human(options: TranslateOptions = {}): string {
@@ -434,24 +317,7 @@ export class ModelName {
     return typeof klassScope === "string" ? [klassScope, "models"] : [];
   }
 
-  // Uncountable lookup delegates to `@blazetrails/activesupport`'s
-  // `Inflections.instance(locale)` — the same store Rails models go
-  // through via `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
-  // (activesupport/lib/active_support/inflections.rb). Previously we
-  // maintained a local 6-word set that ignored user-added inflections
-  // and diverged from activesupport's own pluralize() which uses the
-  // shared store.
-  private static _uncountables(locale: string): Uncountables {
-    return Inflections.instance(locale).uncountables;
-  }
-
   private _cachedI18nKeys?: string[];
-
-  private static _qualified(mn: ModelName): string {
-    // `name` is already the full `::`-qualified constant path, so it doubles as
-    // the single-string sort key Rails' `String#<=>` compares.
-    return mn.name;
-  }
 }
 
 include(ModelName, ToJsonWithActiveSupportEncoder);

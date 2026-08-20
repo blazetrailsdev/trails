@@ -88,10 +88,15 @@ export class TrueClass {
   }
 }
 
-/** `NilClass#as_json` (json.rb:92-96). */
+/**
+ * `NilClass#as_json` (json.rb:92-96) — Ruby answers `nil` for its one absent
+ * value. JS has two, and `JSON.stringify` silently *drops* a property whose
+ * value is `undefined` rather than emitting `null`, so both absences answer
+ * `null` here to reach Ruby's single JSON form.
+ */
 export class NilClass {
-  static asJson(value: null | undefined): null | undefined {
-    return value;
+  static asJson(_value: null | undefined): null {
+    return null;
   }
 }
 
@@ -102,10 +107,19 @@ export class String {
   }
 }
 
-/** `Numeric#as_json` (json.rb:110-114). */
+/**
+ * `Numeric#as_json` (json.rb:110-114) — Ruby answers `self`, and its encoder
+ * renders an arbitrary-precision Integer as a JSON number.
+ *
+ * A JS `bigint` is the analogue of that Integer, but `JSON.stringify` throws
+ * `TypeError: Do not know how to serialize a BigInt` on one and a JS `number`
+ * loses precision above 2^53-1, so there is no way to answer `self` and stay
+ * encodable. It answers the decimal digits as a string instead; consumers
+ * recover the value with `BigInt(str)`.
+ */
 export class Numeric {
-  static asJson(value: number | bigint): number | bigint {
-    return value;
+  static asJson(value: number | bigint): number | string {
+    return typeof value === "bigint" ? value.toString() : value;
   }
 }
 
@@ -144,7 +158,7 @@ export class Regexp {
  * a `Set`, a generator — and `[...value]` is its `to_a`.
  */
 export class Enumerable {
-  static asJson(value: Iterable<unknown>, options?: EncodeOptions | null): unknown[] {
+  static asJson(value: Iterable<unknown>, options?: EncodeOptions | null): unknown[] | null {
     return Array.asJson([...value], options);
   }
 }
@@ -158,14 +172,66 @@ export class Range {
   }
 }
 
-/** `Array#as_json` (json.rb:163-172). */
+/**
+ * Cycle bookkeeping for the `Array#as_json` / `Hash#as_json` recursion above —
+ * Ruby's `v.as_json` at json.rb:167 and :192-194.
+ *
+ * `null` means the value is already being built one frame up, i.e. a true
+ * cycle; otherwise the frame hands back the container to fill (memoized before
+ * it is filled, so a second reference to the same value answers the same
+ * result) and `leave()` closes it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's recursion has no guard: a cyclic
+ *   structure raises
+ *   SystemStackError, which a caller can rescue and which leaves the process
+ *   usable. A JS RangeError from the same recursion unwinds a native stack the
+ *   engine gives no comparable recovery for, so a cycle answers `nil` — the
+ *   value Ruby's own `NilClass#as_json` would have produced for the absent
+ *   branch — rather than felling the encode
+ */
+function enterCycle(value: object): CycleFrame | null {
+  if (inProgress.has(value)) return null;
+  if (memo.has(value)) return { claim: () => memo.get(value), leave: () => {} } as CycleFrame;
+  inProgress.add(value);
+  depth += 1;
+  return {
+    claim: (container) => {
+      memo.set(value, container);
+      return container;
+    },
+    leave: () => {
+      inProgress.delete(value);
+      depth -= 1;
+      if (depth === 0) memo = new WeakMap();
+    },
+  };
+}
+
+interface CycleFrame {
+  claim<T extends object>(container: T): T;
+  leave(): void;
+}
+
+let depth = 0;
+const inProgress = new WeakSet<object>();
+let memo = new WeakMap<object, unknown>();
+
+/**
+ * `Array#as_json` (json.rb:163-172). The `map` is guarded (see `enterCycle`) —
+ * a JS `RangeError` from a cyclic structure is not recoverable the way Ruby's
+ * `SystemStackError` is.
+ */
 export class Array {
-  static asJson(value: unknown[], options?: EncodeOptions | null): unknown[] {
-    if (options) {
-      return value.map((v) => asJson(v, options));
-    } else {
-      return value.map((v) => asJson(v));
+  static asJson(value: unknown[], options?: EncodeOptions | null): unknown[] | null {
+    const frame = enterCycle(value);
+    if (frame === null) return null;
+    const result = frame.claim<unknown[]>([]);
+    try {
+      for (const v of value) result.push(options ? asJson(v, options) : asJson(v));
+    } finally {
+      frame.leave();
     }
+    return result;
   }
 }
 
@@ -179,7 +245,7 @@ export class Array {
  * index signature on `EncodeOptions` lets one reach here.
  */
 export class Hash {
-  static asJson(value: unknown, options?: EncodeOptions | null): Record<string, unknown> {
+  static asJson(value: unknown, options?: EncodeOptions | null): Record<string, unknown> | null {
     const entries =
       value instanceof Map
         ? [...value.entries()]
@@ -201,11 +267,24 @@ export class Hash {
       }
     }
 
-    const result: globalThis.Record<string, unknown> = {};
-    if (options) {
-      for (const [k, v] of subset) result[globalThis.String(k)] = asJson(v, options);
-    } else {
-      for (const [k, v] of subset) result[globalThis.String(k)] = asJson(v);
+    const frame = enterCycle(value as object);
+    if (frame === null) return null;
+    const result = frame.claim<globalThis.Record<string, unknown>>({});
+    try {
+      // Ruby's `hash[key] = value` always writes an entry. A JS assignment to
+      // `__proto__` — an own key any `JSON.parse` output can carry — invokes
+      // `Object.prototype`'s accessor and reparents the result instead, so the
+      // write goes through `defineProperty` to stay a plain data entry.
+      for (const [k, v] of subset) {
+        globalThis.Object.defineProperty(result, globalThis.String(k), {
+          value: options ? asJson(v, options) : asJson(v),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+    } finally {
+      frame.leave();
     }
     return result;
   }
