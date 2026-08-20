@@ -5,13 +5,7 @@ import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
-import {
-  ActiveRecordError,
-  ConnectionNotEstablished,
-  RecordNotSaved,
-  RecordNotUnique,
-  UnknownPrimaryKey,
-} from "./errors.js";
+import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
@@ -65,7 +59,6 @@ import {
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { Explain } from "./explain.js";
-import { sanitizeLimit } from "./connection-adapters/abstract/database-statements.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { PrettyPrinter } from "./pretty-print.js";
@@ -1719,14 +1712,13 @@ export class Relation<T extends Base> {
    */
   toArel(aliases?: AliasTracker): SelectManager {
     // Rails' `arel` reader is `with_connection { |c| build_arel(c, aliases) }`
-    // (query_methods.rb:1595), so `build_arel` always has a connection.
-    // `_resolveAdapter` is the trails stand-in for that acquisition, but it
-    // yields null for a model with no established pool — Arel building is
-    // reachable there (CTE bodies, `from(relation)` subqueries). Name that case
-    // HERE, at the acquisition point, substituting the abstract adapter's own
-    // `sanitize_limit` (abstract/database_statements.rb), so `build_arel`'s body
-    // never has to consider a missing connection the way Rails' never does.
-    return this.buildArel(this._resolveAdapter() ?? { sanitizeLimit }, aliases);
+    // (query_methods.rb:1595), so `build_arel` always has a connection. trails'
+    // `withConnection` is a `Promise`-returning checkout and this reader is
+    // synchronous, so the acquisition is the direct `_conn()` lease rather than
+    // a `with_connection` block; either way `build_arel` never sees a missing
+    // connection, and a model with no established pool raises
+    // `ConnectionNotEstablished` here exactly as Rails' `with_connection` does.
+    return this.buildArel(this._conn(), aliases);
   }
 
   /**
@@ -2089,7 +2081,7 @@ export class Relation<T extends Base> {
     _qm.buildJoins.call(joined as any, idSubquery);
     if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
     this.buildOrder(idSubquery);
-    const connection = this._resolveAdapter() ?? { sanitizeLimit };
+    const connection = this._conn();
     if (this.limitValue !== null) idSubquery.take(connection.sanitizeLimit(this.limitValue));
     if (this.offsetValue !== null) idSubquery.skip(_qm.toI(this.offsetValue));
     return idSubquery;
@@ -2232,16 +2224,6 @@ export class Relation<T extends Base> {
    */
   private _conn(): DatabaseAdapter {
     return threadedConnectionFor(this._model) ?? this._model.connection;
-  }
-
-  /** Resolve the connection through {@link _conn}, returning null for HABTM join models with no established connection. */
-  private _resolveAdapter(): DatabaseAdapter | null {
-    try {
-      return this._conn();
-    } catch (e) {
-      if (e instanceof ConnectionNotEstablished) return null;
-      throw e;
-    }
   }
 
   /**

@@ -22,10 +22,10 @@ import {
   PreparedStatementInvalid,
   UnmodifiableRelation,
 } from "../errors.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
-import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
@@ -3007,15 +3007,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // the where-subquery path (`relation-handler`); this is intentional, not a
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
-    const subArel =
-      typeof resolved.toArel === "function"
-        ? resolved.toArel()
-        : // A duck-typed relation with no `toArel` acquisition seam: this
-          // subquery build is one of the connectionless paths, so pass the
-          // abstract `sanitize_limit` (abstract/database_statements.rb)
-          // explicitly rather than letting `buildArel` degrade internally.
-          resolved.buildArel({ sanitizeLimit });
-    return subArel.as(alias);
+    return resolved.toArel().as(alias);
   }
   return opts;
 }
@@ -3161,9 +3153,8 @@ export function buildArel(
   this: QueryMethodsHost,
   // Rails threads the `with_connection` connection into every `build_arel`
   // call (query_methods.rb:1595, relation.rb:1023), so the body never sees a
-  // missing one. Callers acquire before calling; the connectionless Arel build
-  // is named at the acquisition point (`Relation#toArel`), not tolerated here.
-  connection: { sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral },
+  // missing one. Callers acquire before calling.
+  connection: AbstractAdapter,
   aliases?: AliasTracker,
 ): any {
   const table: any = this.table;
