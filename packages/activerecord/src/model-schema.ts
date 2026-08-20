@@ -984,11 +984,10 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
   this._schemaRevision = nextSchemaEpoch();
-  // Mirrors ActiveRecord::Attributes' `reload_schema_from_cache` override
-  // (activerecord/lib/active_record/attributes.rb:268-271), which calls
-  // `reset_default_attributes!` before `super` — nilling BOTH
-  // `@default_attributes` and `@attribute_types`
-  // (activemodel/lib/active_model/attribute_registration.rb:96-99).
+  // ActiveRecord::Attributes overrides `reload_schema_from_cache` to call
+  // `reset_default_attributes!` before `super` (attributes.rb:268-271), which
+  // nils `@attribute_types` as well as `@default_attributes`
+  // (attribute_registration.rb:96-99).
   resetDefaultAttributesBang.call(this as never);
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);

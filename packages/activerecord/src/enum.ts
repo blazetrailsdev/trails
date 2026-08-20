@@ -153,9 +153,7 @@ export function installEnumAttribute(
   // present (attribute_registration.rb:12-18); a default-only / type-less
   // attribute keeps the fallback `value` type until the column reflects, so its
   // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248). Reading the pending queue for a `PendingType` carrying
-  // a concrete type distinguishes the two exactly as Rails does: a default-only
-  // attribute pushes no typed `PendingType`, so it reads as column-reflected.
+  // enum.rb:238-248) — so the pending queue answers this as Rails asks it.
   const explicitlyTyped = pendingAttributeTypeQ(klass as never, resolved);
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {

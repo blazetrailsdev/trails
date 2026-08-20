@@ -32,9 +32,6 @@ describe("ReadTest", () => {
       static defineMethodAttribute = Base.defineMethodAttribute;
       static setDefineMethodAttribute = Base.setDefineMethodAttribute;
       static attributeMethodsGenerated = isAttributeMethodsGenerated;
-      // read_test.rb:22-24 overrides `attribute_names` with the literal array
-      // (its `attribute_types` is empty), so the fake does the same rather than
-      // routing through the real `attribute_names`, which reads attribute_types.
       static attributeNames = () => ["one", "two", "three"];
       static _hasAttribute = ClassMethods._hasAttribute;
       static attributeTypes = () => ({});

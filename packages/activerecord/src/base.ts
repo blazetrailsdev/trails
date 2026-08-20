@@ -1461,8 +1461,6 @@ export class Base extends Model {
       // ancestor's schema defs. Those carry a `reflectedTable` that differs from
       // ours — trust none of them; reflect our own table instead.
       for (const [, def] of this._attributeDefinitions) {
-        // `reflectedTable` is stamped only by `applyColumnsHash`, so a def
-        // carrying one is schema-sourced by construction.
         const d = def as { reflectedTable?: string };
         if (typeof d.reflectedTable === "string" && d.reflectedTable !== thisTable) {
           foreignTable = true;
