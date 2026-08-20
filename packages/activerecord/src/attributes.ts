@@ -20,8 +20,9 @@ import {
 // queue from ActiveRecord, so it imports the pushers off the defining module
 // rather than the package's public barrel.
 import {
-  pushPendingDefault,
-  pushPendingType,
+  PendingDefault,
+  PendingType,
+  pendingAttributeModifications,
 } from "@blazetrails/activemodel/attribute-registration";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { encryptionHooks } from "./encryption-hooks.js";
@@ -119,9 +120,11 @@ export function defineAttribute(
   // when it IS user-provided is that same fork: the replay applies
   // `with_user_default` (cast), a `from_user: false` def stays a column seed.
   if (userProvidedDefault) {
-    pushPendingType(this, name, castType);
+    pendingAttributeModifications.call(this).push(new PendingType(name, castType));
     if (defaultValue !== NO_DEFAULT) {
-      pushPendingDefault(this, name, resolvedDefault ?? null);
+      pendingAttributeModifications
+        .call(this)
+        .push(new PendingDefault(name, resolvedDefault ?? null));
     }
   }
 
