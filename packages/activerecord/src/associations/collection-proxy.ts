@@ -37,9 +37,7 @@ import {
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
 import { ConfigurationError, AssociationTypeMismatch } from "../errors.js";
-import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
-import { AssociationNotFoundError } from "./errors.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -325,36 +323,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this;
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // Array-likeness — sync ops over the loaded target.
-  //
-  // Rails' CollectionProxy IS a Relation that's iterable / countable
-  // / array-shaped against the loaded records. JS has no blocking IO,
-  // so these methods do NOT trigger a fresh DB load — they read
-  // whatever's in `_target` (populated by `await proxy`,
-  // `await proxy.load()`, `Post.includes(...)`, or push / build /
-  // create through the proxy). For a fresh load, await the proxy
-  // first.
-  // ──────────────────────────────────────────────────────────────────
-
-  /**
-   * Return the number of records in the collection.
-   *
-   * Mirrors ActiveRecord::Associations::CollectionProxy#length
-   * (collection_proxy.rb): `records.length`. `records` resolves through
-   * `load_target`, which returns the cached `@target` when the association is
-   * already loaded — so a loaded proxy counts in memory with NO query and only
-   * an unloaded one re-queries. `Relation`'s `to: :records` delegate
-   * (delegation.rb:101) always re-queries via `toArray`/`_execLoad`, which is
-   * why this overrides it: the proxy keeps loaded state in
-   * `_target`/`_targetLoaded`, not Relation's `_records`/`_loaded`, so
-   * `loadTarget()` (which short-circuits on `_targetLoaded`) is the faithful
-   * path.
-   */
-  async length(): Promise<number> {
-    return (await this.loadTarget()).length;
-  }
-
   /**
    * @noRailsEquivalent PERMANENT
    *   (`vendor/rails/activerecord/lib/active_record/relation/delegation.rb:101` — `each` is
@@ -362,107 +330,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * JS iteration protocol — Ruby uses Enumerable#each
    */
   [Symbol.iterator](): IterableIterator<T> {
-    return this._target[Symbol.iterator]();
+    return this.target[Symbol.iterator]();
   }
 
-  at(index: number): T | undefined {
-    return this._target.at(index);
-  }
-
-  map<U>(fn: (record: T, index: number, all: T[]) => U, thisArg?: unknown): U[] {
-    return this._target.map(fn, thisArg);
-  }
-
-  // filter has the standard type-predicate overload from Array<T>.
-  filter<S extends T>(
-    predicate: (record: T, index: number, all: T[]) => record is S,
-    thisArg?: unknown,
-  ): S[];
-  filter(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): T[];
-  filter(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): T[] {
-    return this._target.filter(predicate, thisArg);
-  }
-
-  forEach(fn: (record: T, index: number, all: T[]) => void, thisArg?: unknown): void {
-    this._target.forEach(fn, thisArg);
-  }
-
-  some(fn: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean {
-    return this._target.some(fn, thisArg);
-  }
-
-  // Enumerable#detect / #sort_by are inherited, not overridden: `toArray()`
-  // below is this proxy's `records` → `load_target` (collection_proxy.rb:1024).
-
-  // every has the standard type-predicate overload from Array<T>.
-  every<S extends T>(
-    predicate: (record: T, index: number, all: T[]) => record is S,
-    thisArg?: unknown,
-  ): boolean;
-  every(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean;
-  every(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean {
-    return this._target.every(predicate, thisArg);
-  }
-
-  // Mirrors Rails' Relation#any? / CollectionProxy#any? semantics:
-  // - No predicate: returns !empty? which uses exists? when not loaded
-  //   (SELECT 1 LIMIT 1) rather than materializing all rows.
-  // - With predicate: loads all records (via Enumerable#any? / to_a.any?).
-
-  async any(
-    fn?: (record: T, index: number, all: T[]) => unknown,
-    thisArg?: unknown,
-  ): Promise<boolean> {
-    if (!fn) return !(await this.isEmpty());
-    const records = await this.toArray();
-    return records.some(fn as (v: T, i: number, a: T[]) => unknown, thisArg);
-  }
-
-  // The Array-style `includes(record)` and `find(predicate)` overloads
-  // are intentionally NOT added:
-  //   - Array-style `includes(record)` would shadow
-  //     `Relation#includes(...associations)` (eager loading).
-  //   - Array-style `find(predicate)` would shadow this class's own
-  //     `async find(id)` and `Relation#find(id)` — the Rails-style
-  //     PK-lookup forms.
-  // Reach for Array semantics via `Array.from(proxy).includes(...)` /
-  // `Array.from(proxy).find(...)` (or `proxy.target.includes(...)` /
-  // `proxy.target.find(...)`). Matches Rails' priority — CollectionProxy
-  // preserves the Relation + PK-find surface and lets Array semantics
-  // route through `to_a`.
-
-  slice(start?: number, end?: number): T[] {
-    return this._target.slice(start, end);
-  }
-
-  reduce(fn: (acc: T, record: T, index: number, all: T[]) => T): T;
-  reduce<U>(fn: (acc: U, record: T, index: number, all: T[]) => U, initial: U): U;
-  reduce(...args: [unknown, ...unknown[]]): unknown {
-    // Forward verbatim with the array as receiver — reduce needs `this`
-    // to be the array. (with-vs-without initial value picks different
-    // semantics, hence the variadic forwarding.)
-    return (this._target.reduce as (...a: unknown[]) => unknown).apply(this._target, args);
-  }
-
-  indexOf(record: T, fromIndex?: number): number {
-    return this._target.indexOf(record, fromIndex);
-  }
-
-  flatMap<U>(fn: (record: T, index: number, all: T[]) => U | readonly U[], thisArg?: unknown): U[] {
-    return this._target.flatMap(fn, thisArg);
-  }
+  // `keys` / `entries` are the index-yielding half of the same JS iteration
+  // protocol as `[Symbol.iterator]` above — like it, they read the delegated
+  // records (`records` → `load_target`, collection_proxy.rb:1024). `values()`
+  // is NOT added: it would shadow `Relation#values()`.
 
   keys(): IterableIterator<number> {
-    return this._target.keys();
+    return this.target.keys();
   }
 
-  // `values()` is intentionally NOT added — it would shadow
-  // `Relation#values(): Record<string, unknown>` (query-state
-  // introspection used by the Relation merger). Use the proxy's
-  // built-in iteration (`for...of`, `[...proxy]`, `Array.from(proxy)`).
-
   entries(): IterableIterator<[number, T]> {
-    return this._target.entries();
+    return this.target.entries();
   }
 
   /** @internal Initialize from preloaded association data. */
@@ -576,13 +457,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `CollectionProxy → AssociationRelation#exec_queries → loadTarget` path
    * which always routes through the OO association regardless of scope state.
    *
-   * `_cascadeStrictLoading` is called exactly once here; the Relation's own
-   * `strictLoadingValue` is applied afterward so it wins over cascade (Rails
+   * `Association#set_strict_loading` cascades exactly once here; the Relation's
+   * own `strictLoadingValue` is applied afterward so it wins over cascade (Rails
    * applies `strict_loading_value` after `set_strict_loading` per record).
    */
   private async _execLoad(): Promise<T[]> {
     const results = (await this._findTargetViaAssociation()) as T[];
-    this._cascadeStrictLoading(results);
+    // `Association#set_strict_loading` per record (association.rb:270-271).
+    // The functional `findTarget` path bypasses the OO
+    // `CollectionAssociation.loadTarget` where Rails runs it, so it runs here.
+    const association = this._record.association(this._assocName) as unknown as {
+      setStrictLoading?: (record: Base) => Base;
+    };
+    if (typeof association.setStrictLoading === "function") {
+      for (const r of results) association.setStrictLoading(r);
+    }
     // Relation's strict_loading wins over cascade — applied last to match
     // Rails: AssociationRelation#exec_queries runs set_strict_loading per
     // record, then Relation#exec_queries applies strict_loading_value
@@ -689,37 +578,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       association?: (n: string) => StaleWrapper;
     };
     return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
-  }
-
-  private _checkStrictLoading(): void {
-    // Rails reaches `violates_strict_loading?` through the association the
-    // proxy delegates to (`find_target`, association.rb:248-250); trails' proxy
-    // loads on its own path, so it consults the same association instance.
-    const association = this._staleWrapper() as unknown as
-      | { isViolatesStrictLoading(): boolean }
-      | undefined;
-    if (association?.isViolatesStrictLoading()) {
-      const ctor = this._record.constructor as typeof Base;
-      const reflection = ctor._reflectOnAssociation?.(this._assocName);
-      if (!reflection) throw new AssociationNotFoundError(this._record, this._assocName);
-      strictLoadingViolationBang({ owner: ctor, reflection });
-    }
-  }
-
-  /**
-   * Propagate the owner's strict-loading mode onto each loaded child —
-   * mirrors `Association#set_strict_loading`, which Rails applies in
-   * `find_target` / `exec_queries`. The functional `findTarget` path
-   * (the common `await blog.posts` reader) bypasses the OO
-   * `CollectionAssociation.loadTarget` where this cascade lives, so we
-   * route through the OO association here to reuse the exact same logic.
-   */
-  private _cascadeStrictLoading(records: T[]): void {
-    const assoc = this._record.association(this._assocName) as unknown as {
-      setStrictLoading?: (record: Base) => Base;
-    };
-    if (typeof assoc.setStrictLoading !== "function") return;
-    for (const r of records) assoc.setStrictLoading(r);
   }
 
   /**

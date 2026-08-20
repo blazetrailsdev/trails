@@ -241,7 +241,7 @@ describe("AssociationsJoinModelTest", () => {
     // target via `load()` (Rails' `any?`-with-block loads it implicitly)
     // before the synchronous `sort`.
     const categories = (david as any).categories;
-    expect(await categories.any((category: Base) => (category as any).name === "General")).toBe(
+    expect(await categories.isAny((category: Base) => (category as any).name === "General")).toBe(
       true,
     );
     await categories.load();

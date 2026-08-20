@@ -1830,8 +1830,6 @@ function wrapCollectionProxy<T extends Base = Base>(
         return target.target[Number(prop)];
       }
 
-      (target as unknown as { _checkStrictLoading(): void })._checkStrictLoading();
-
       // Class-method delegations resolve through the `Reflect.get(scope, prop,
       // scope)` fallback below: `target.scope()` returns an `AssociationRelation`
       // wrapped by `wrapWithScopeProxy`, whose miss path runs the

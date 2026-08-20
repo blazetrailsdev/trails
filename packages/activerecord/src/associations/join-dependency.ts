@@ -607,19 +607,6 @@ export class JoinDependency {
         joins.push(join);
       }
       this._aliasesCache = undefined;
-    } else if (!child.throughGroup) {
-      // A non-reflection leaf has no chain to build, so it only claims its
-      // table — the `aliases[table_name] == 0` arm of `aliased_table_for`
-      // (alias_tracker.rb:60-63) — keeping a later merged join onto the same
-      // table detectable as a collision.
-      const t = child.tableName;
-      if (t) {
-        if ((this.aliasTracker.aliases.get(t) ?? 0) === 0) this.aliasTracker.aliases.set(t, 1);
-        const eff = child.effectiveSqlName;
-        if (eff && eff !== t) {
-          this.aliasTracker.aliases.set(eff, (this.aliasTracker.aliases.get(eff) ?? 0) + 1);
-        }
-      }
     }
 
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));

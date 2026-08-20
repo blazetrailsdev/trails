@@ -617,7 +617,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const result = await (post as any).people.concat(person);
     expect(await (post as any).people.size()).toBe(1);
     expect(await (await Post.find(posts("thinking").id)).people.size()).toBe(1);
-    expect((result as any[]).map((r: any) => r.id)).toContain(person.id);
+    expect(await (result as any[]).map((r: any) => r.id)).toContain(person.id);
   });
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
@@ -701,7 +701,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await (post as any).people.build({ first_name: "Bob" });
     await (post as any).people.build({ first_name: "Ted" });
 
-    const firstNames = (post as any).people.map((p: any) => p.first_name);
+    const firstNames = await (post as any).people.map((p: any) => p.first_name);
     expect(firstNames).toContain("Bob");
     expect(firstNames).toContain("Ted");
 

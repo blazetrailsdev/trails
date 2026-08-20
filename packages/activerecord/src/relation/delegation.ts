@@ -957,6 +957,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records.slice(shift).concat(records.slice(0, shift));
   },
   shuffle: (records) => shuffleInPlace([...records]),
+  slice: (records, start?: number, end?: number) => records.slice(start, end),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
   inGroups: (records, number: number, fillWith: Base | null | false = null) =>
     inGroups(records, number, fillWith),

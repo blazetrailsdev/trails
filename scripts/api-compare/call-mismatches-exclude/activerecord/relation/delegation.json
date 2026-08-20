@@ -40,12 +40,5 @@
     "rubyName": "initialize_relation_delegate_cache",
     "call": "include_relation_methods",
     "reason": "Verified per-site (RFC 0106): delegation.rb:38 — same lazy-subclass divergence as the `include` row above; `includeRelationMethods` runs from `buildDelegateClass` (delegation.ts:416) when the subclass is first needed."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/delegation.ts",
-    "rubyName": "uncacheable_methods",
-    "call": "flat_map",
-    "reason": "Verified per-site (RFC 0106): `delegated_classes.flat_map(&:public_instance_methods)` (delegation.rb:19) — Ruby Enumerable#flat_map over the class list; TS accumulates the same union with a `for` loop over `ownMethodNamesAbove` into a Set (delegation.ts:232-235), since JS has no `public_instance_methods` to flat-map."
   }
 ]

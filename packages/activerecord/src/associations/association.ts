@@ -925,14 +925,14 @@ export class Association {
   /**
    * Mirrors `Association#violates_strict_loading?` (association.rb:284-292),
    * called from `findTarget` (association.rb:248-250) and from
-   * `CollectionProxy._checkStrictLoading`.
+   * `HasManyAssociation`'s functional `findTarget`
+   * (has-many-association.ts, `Association#find_target`'s first statement).
    *
    * The `@skip_strict_loading` guard reads two flags rather than one: the
    * association-level ivar Rails has, plus the owner-level bypass counter the
    * explicit loaders (`loadBelongsTo` / `loadHasOne`) raise. Those loaders are
-   * the trails spelling of a
-   * deliberate load, and they run where Ruby would have had an association
-   * handle to call `skip_strict_loading` on.
+   * the trails spelling of a deliberate load, and they run where Ruby would
+   * have had an association handle to call `skip_strict_loading` on.
    * @internal
    */
   protected isViolatesStrictLoading(): boolean {
