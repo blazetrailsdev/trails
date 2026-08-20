@@ -2625,9 +2625,10 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
 // ---------------------------------------------------------------------------
 /**
  * `QueryMethods.public_instance_methods(false)` — the members Ruby defines
- * above `private` (query_methods.rb:1677). `CollectionProxy` delegates exactly
- * this set to `scope` (collection_proxy.rb:1128-1137), so the boundary is a
- * fact about this module and is expressed here rather than transcribed there.
+ * above the first `protected` (query_methods.rb:1604). `CollectionProxy`
+ * delegates exactly this set to `scope` (collection_proxy.rb:1128-1137), so
+ * the boundary is a fact about this module and is expressed here rather than
+ * transcribed there.
  *
  * @internal
  */
@@ -2644,7 +2645,6 @@ export const QueryMethodsPublicInstanceMethods = {
   leftOuterJoins,
   leftJoins,
   arel,
-  arelColumns,
   includesBang,
   eagerLoadBang,
   preloadBang,
@@ -2714,12 +2714,29 @@ export const QueryMethodsPublicInstanceMethods = {
   without,
   excludingBang,
   constructJoinDependency,
+} as const;
+
+/**
+ * The members in query_methods.rb's two `protected` sections
+ * (query_methods.rb:1604 and query_methods.rb:1663, the second running to
+ * `private` at query_methods.rb:1677). Ruby excludes `protected` members from
+ * `public_instance_methods(false)` exactly as it excludes private ones, so
+ * `CollectionProxy` delegates none of them to `scope`
+ * (collection_proxy.rb:1128-1137); they ride the same mixin here so
+ * `relation.ts` does not redeclare a second copy.
+ *
+ * @internal
+ */
+export const QueryMethodsProtectedInstanceMethods = {
+  // query_methods.rb:1604 (`protected`).
   buildSubquery,
   buildWhereClause,
   // Mirrors `alias :build_having_clause :build_where_clause`
   // (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
   buildHavingClause: buildWhereClause,
   asyncBang,
+  // query_methods.rb:1663 (a second `protected` section).
+  arelColumns,
 } as const;
 
 /**
@@ -2775,6 +2792,7 @@ export const QueryMethodsPrivateInstanceMethods = {
 
 export const QueryMethodBangs = {
   ...QueryMethodsPublicInstanceMethods,
+  ...QueryMethodsProtectedInstanceMethods,
   ...QueryMethodsPrivateInstanceMethods,
 } as const;
 
