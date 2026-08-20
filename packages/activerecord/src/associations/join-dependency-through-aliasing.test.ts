@@ -219,12 +219,11 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     });
 
     const jd = new JoinDependency(StjAuthor, null, "similarPosts", Nodes.OuterJoin);
-    jd.joinConstraints([]);
     const node = nodeAt(jd, "similarPosts");
     expect(node).not.toBeNull();
 
-    // Aliasing is deferred to emit: resolve the whole chain against the shared
-    // AliasTracker (_resolveThroughGroup).
+    // Aliasing is deferred to emit: the one `joinConstraints` call resolves the
+    // whole chain against the shared AliasTracker.
     jd.joinConstraints([]);
     const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
     // A twice-visited table keeps its real name on first encounter and is
