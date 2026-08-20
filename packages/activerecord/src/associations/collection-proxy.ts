@@ -1704,30 +1704,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Set the collection to exactly the records identified by ids, e.g.
-   * `order.book_ids = [...]`.
-   *
-   * Delegates to `CollectionAssociation#idsWriter`
-   * (collection_association.rb:62-85) — the same method the generated
-   * `<name>_ids=` writer calls (builder/collection_association.rb:73) — so
-   * there is one Rails-faithful `ids_writer` and tests exercise the real
-   * writer path. Rails reaches it as `record.association(:name).ids_writer`;
-   * a JS property assignment cannot be awaited, so the Rails name lives here
-   * as the awaitable entry point.
-   *
-   * @noRailsEquivalent collection_proxy.rb writes no `ids_writer`; the Ruby
-   *   spelling of this call site is the generated `<name>_ids=` setter, which
-   *   TypeScript cannot make awaitable.
-   */
-  async idsWriter(ids: (number | string | (number | string)[])[]): Promise<void> {
-    await (
-      this._record.association(this._assocName) as unknown as {
-        idsWriter(ids: unknown[]): Promise<void>;
-      }
-    ).idsWriter(ids);
-  }
-
-  /**
    * Mirrors: ActiveRecord::Associations::CollectionProxy#pluck
    * (collection_proxy.rb:728-730) — `null_scope? ? scope.pluck(*column_names) : super`.
    */

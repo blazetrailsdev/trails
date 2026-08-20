@@ -66,8 +66,12 @@ describe("ModulesTest", () => {
     const firm = await MyAppBusinessFirm.first();
     const client = await MyAppBusinessClient.first();
     await assertNothingRaised(async () => {
-      type WithClients = { clients: { idsWriter(ids: number[]): Promise<void> } };
-      await (firm as unknown as WithClients).clients.idsWriter([client!.id as number]);
+      type WithAssociation = {
+        association(name: string): { idsWriter(ids: number[]): Promise<void> };
+      };
+      await (firm as unknown as WithAssociation)
+        .association("clients")
+        .idsWriter([client!.id as number]);
     });
   });
 
