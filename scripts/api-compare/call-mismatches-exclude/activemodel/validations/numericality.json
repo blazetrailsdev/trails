@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "validations/numericality.ts",
-    "rubyName": "check_validity!",
-    "call": "slice",
-    "reason": "Language shortcoming: `options.slice(*COMPARE_CHECKS.keys).each` (numericality.rb:23, :29) is Ruby's core Hash#slice, which activesupport only ports as the mutating `sliceBang`; the TS body walks the same key list and skips the absent keys `slice` would have dropped."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/numericality.ts",
     "rubyName": "validate_each",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

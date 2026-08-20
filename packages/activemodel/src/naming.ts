@@ -142,6 +142,16 @@ export class ModelName {
   }
 
   /**
+   * Rails `delegate :===, to: :name` (naming.rb:151-152) — `String#===`, which
+   * Ruby aliases straight to `String#==` (string.c `rb_str_equal`), so this is
+   * {@link ModelName#equals}. `caseEquals` is the settled trails spelling for
+   * Ruby `===` (`Range#caseEquals`, `Date#caseEquals`).
+   */
+  caseEquals(other: unknown): boolean {
+    return this.equals(other);
+  }
+
+  /**
    * Rails `delegate :<=>, to: :name` (naming.rb:151-152) — `String#<=>`, which
    * answers `nil` for an operand that is neither a String nor `to_str`-able
    * (naming.rb:50-62 documents the String-operand contract). `nil` is spelled
@@ -160,15 +170,28 @@ export class ModelName {
   }
 
   /**
-   * Mirrors Rails `@name.match?(regexp)`. Returns whether the class
-   * name matches the given regex (boolean — this is `match?` semantic,
-   * not the integer position that Ruby `=~` returns).
+   * Rails `delegate :eql?, to: :name` (naming.rb:151-152) — `String#eql?`,
+   * true when the operand is a String of the same content. Unlike
+   * {@link ModelName#equals} it does NOT take `String#==`'s `to_str` arm
+   * (string.c `rb_str_eql` checks the class first), so another `Name` is not
+   * `eql?` to this one.
+   */
+  eql(other: unknown): boolean {
+    return typeof other === "string" && this.name === other;
+  }
+
+  /**
+   * Rails `delegate :match?, to: :name` (naming.rb:114-128, :151-152) —
+   * `String#match?`, which takes a Regexp OR a String that Ruby compiles as
+   * the pattern. Returns whether the class name matches (boolean — this is
+   * `match?` semantic, not the integer position that Ruby `=~` returns).
    *
    * Preserves `pattern.lastIndex` so repeated calls with `/g` or `/y`
    * regexes stay stable — `RegExp.prototype.test` advances `lastIndex`
    * on stateful flags, but Ruby `match?` is stateless.
    */
   match(pattern: unknown): boolean {
+    if (typeof pattern === "string") pattern = new RegExp(pattern);
     if (!(pattern instanceof RegExp)) {
       throw new ArgumentError("ModelName#match requires a RegExp");
     }

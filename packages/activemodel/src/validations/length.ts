@@ -106,9 +106,10 @@ export class LengthValidator extends EachValidator {
     // Mirrors length.rb:30 — `CHECKS.keys & options.keys`, which keeps CHECKS'
     // declaration order (is, minimum, maximum). An explicitly-passed
     // `undefined` is Ruby's absent kwarg, so it does not count as a key.
-    const keys = (Object.keys(CHECKS) as CheckKey[]).filter(
-      (key) => this.options[key] !== undefined,
+    const optionKeys = new Set(
+      Object.keys(this.options).filter((key) => this.options[key] !== undefined),
     );
+    const keys = (Object.keys(CHECKS) as CheckKey[]).filter((key) => optionKeys.has(key));
 
     if (keys.length === 0) {
       throw new ArgumentError(

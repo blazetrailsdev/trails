@@ -166,6 +166,20 @@ export class Range<T> {
     return this.cover(value);
   }
 
+  /**
+   * Ruby `Range#==` (range.c `range_eq`): another Range whose `begin`, `end`
+   * and `exclude_end?` are each `==`. Two separately-built `1..5` are equal in
+   * Ruby, where JS `===` sees two distinct objects.
+   */
+  equals(other: unknown): boolean {
+    if (!(other instanceof Range)) return false;
+    return (
+      valuesEqual(this.begin, other.begin) &&
+      valuesEqual(this.end, other.end) &&
+      this.excludeEnd === other.excludeEnd
+    );
+  }
+
   *each(): Generator<T> {
     yield* this.step(1);
   }
@@ -181,4 +195,18 @@ export class Range<T> {
       current += n;
     }
   }
+}
+
+/**
+ * Ruby `==` on a Range endpoint. Endpoints are primitives in nearly every
+ * range trails builds, but a `Date`/`Time` endpoint is a value that answers
+ * its own `==` — Ruby sends the message either way.
+ */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof (a as { equals?: unknown }).equals === "function") {
+    return (a as { equals(other: unknown): boolean }).equals(b);
+  }
+  return false;
 }

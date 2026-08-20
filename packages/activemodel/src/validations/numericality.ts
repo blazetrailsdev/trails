@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, Range, kernelFloat } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, Range, kernelFloat, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -49,19 +49,26 @@ export class NumericalityValidator extends EachValidator {
   declare isRecordAttributeChangedInPlace: typeof isRecordAttributeChangedInPlace;
 
   override checkValidityBang(): void {
-    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
-      const value = this.options[option];
+    // `slice` keeps the keys the caller actually passed, but an
+    // explicitly-passed `undefined` is Ruby's ABSENT kwarg, not a stored `nil`
+    // — so it is skipped here where Ruby never saw the key at all.
+    for (const [option, value] of Object.entries(
+      slice(this.options, ...Object.keys(COMPARE_CHECKS)),
+    )) {
       if (value === undefined) continue;
       // Rails: unless value.is_a?(Numeric) || value.is_a?(Proc) || value.is_a?(Symbol).
       // A trails Symbol is a colon-prefixed string, which is what separates
       // `":maxApproved"` (send it) from `"foo"` (a String — Rails rejects it).
       if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
-        throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
+        throw new ArgumentError(
+          `:${underscore(option as CompareKey)} must be a number, a symbol or a proc`,
+        );
       }
     }
 
-    for (const option of Object.keys(RANGE_CHECKS)) {
-      const value = this.options[option];
+    for (const [option, value] of Object.entries(
+      slice(this.options, ...Object.keys(RANGE_CHECKS)),
+    )) {
       if (value === undefined) continue;
       if (!(value instanceof Range)) {
         throw new ArgumentError(`:${option} must be a range`);
