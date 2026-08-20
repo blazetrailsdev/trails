@@ -703,8 +703,6 @@ export function _correctNames(dictionary: string[], input: string): string[] {
  * Mirrors: ActiveRecord::Associations::ClassMethods
  */
 export class Associations {
-  static _associations: AssociationDefinition[] = [];
-
   /**
    * Define a belongs_to association.
    *

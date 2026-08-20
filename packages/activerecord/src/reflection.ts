@@ -2195,13 +2195,14 @@ export function addReflection(
   reflection: AssociationReflection | ThroughReflection,
 ): void {
   clearReflectionsCache(ar);
-  const hasOwn = Object.prototype.hasOwnProperty.call(ar, "_reflections");
-  const inherited: Record<string, unknown> = (ar as any)._reflections ?? {};
-  const reflections = hasOwn ? inherited : { ...inherited };
-  // Rails: `_reflections.except(name).merge!(name => reflection)` — redefining an
-  // existing association deletes it first so the new reflection is re-appended at
-  // the end (preserving the subclass's declaration order, which the has_many
-  // :through order check in checkValidityBang depends on).
+  // Rails: `ar._reflections = ar._reflections.except(name).merge!(name => reflection)`
+  // (reflection.rb:23). `_reflections` is a `class_attribute` (reflection.rb:11),
+  // so the reassignment is what makes the registry per-class: the read walks the
+  // constructor chain, the write lands here. `except` drops an existing entry so
+  // the new reflection is re-appended at the end, preserving the subclass's
+  // declaration order (the has_many :through order check in checkValidityBang
+  // depends on it).
+  const reflections: Record<string, unknown> = { ...(ar as any)._reflections };
   delete reflections[name];
   reflections[name] = reflection;
   (ar as any)._reflections = reflections;

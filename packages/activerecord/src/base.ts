@@ -173,6 +173,7 @@ import * as QueryCacheClassMethods from "./query-cache.js";
 import {
   include,
   extend,
+  classAttribute,
   benchmark as benchmarkable,
   runLoadHooks,
   isBlank as _isBlankValue,
@@ -1009,7 +1010,9 @@ export class Base extends Model {
 
   /**
    * Whether this class is a connection class (owns its own connection pool).
-   * Per-class via hasOwnProperty — does not inherit from parent.
+   * Not a `class_attribute`: Rails stores it in a plain `@connection_class`
+   * ivar on the class singleton (core.rb:226-231), which is per-class and does
+   * NOT inherit — hence the hasOwnProperty read here.
    *
    * Mirrors: ActiveRecord::Base.connection_class
    */
@@ -4553,6 +4556,12 @@ extend(Base, {
   buildExplainClause: _buildExplainClause,
 });
 extend(Base, _Reflection.ClassMethods);
+// Mirrors `class_attribute :_reflections, instance_writer: false, default: {}`
+// (reflection.rb:11) and the sibling association registry: reads walk the
+// constructor chain, writes are local to the class, so `add_reflection`'s
+// reassignment is the whole copy-on-write mechanism.
+classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
+classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,

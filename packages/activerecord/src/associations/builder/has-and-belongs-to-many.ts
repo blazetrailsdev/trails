@@ -167,10 +167,6 @@ export class HasAndBelongsToMany {
     const name = this.associationName;
     const options = this.options;
 
-    if (!Object.prototype.hasOwnProperty.call(model, "_associations")) {
-      model._associations = [...(model._associations ?? [])];
-    }
-
     const targetClassName = (options.className as string) ?? camelize(singularize(name));
     const joinTableName =
       (options.joinTable as string) ??
@@ -227,11 +223,12 @@ export class HasAndBelongsToMany {
       foreignKey: ownerFk,
       dependent: "delete",
     };
-    model._associations.push({
-      type: "hasMany",
-      name: middleName,
-      options: middleOptions,
-    });
+    // Reassign through the `class_attribute` writer (reflection.rb:11, :23) so
+    // the entry lands on this class and never mutates the inherited registry.
+    model._associations = [
+      ...model._associations,
+      { type: "hasMany", name: middleName, options: middleOptions },
+    ];
     const middleReflection = Reflection.create("hasMany", middleName, null, middleOptions, model);
     // Rails: `Builder::HasMany.define_callbacks self, middle_reflection`
     // (associations.rb:1878); AutosaveAssociation is one of its extensions.
@@ -338,12 +335,10 @@ export class HasAndBelongsToMany {
       }
     }
     const positionalScope = typeof scope === "function" ? scope : null;
-    model._associations.push({
-      type: "hasAndBelongsToMany",
-      name,
-      scope: positionalScope,
-      options: habtmOptions,
-    });
+    model._associations = [
+      ...model._associations,
+      { type: "hasAndBelongsToMany", name, scope: positionalScope, options: habtmOptions },
+    ];
     // Register before/after_add/remove class properties for Rails parity —
     // mirrors CollectionAssociation.defineCallbacks for has_many. The bug-fix
     // in defineCallback ensures a subclass that redefines the HABTM without

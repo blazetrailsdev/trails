@@ -137,13 +137,18 @@ export class Association {
     const macro = this.macro();
     const reflection = Reflection.create(macro as any, name, scope, options, model);
 
-    this._ensureOwnAssociations(model);
-    model._associations.push({
-      type: macro,
-      name,
-      scope,
-      options: { ...options },
-    });
+    // Rails: `ar._reflections = ar._reflections.except(name).merge!(...)`
+    // (reflection.rb:23) — reassigning through the `class_attribute` writer is
+    // what makes the registry copy-on-write per class.
+    model._associations = [
+      ...model._associations,
+      {
+        type: macro,
+        name,
+        scope,
+        options: { ...options },
+      },
+    ];
 
     return reflection;
   }
@@ -283,11 +288,5 @@ export class Association {
     // Rails registers an after_commit that runs _after_commit_jobs for
     // dependent: :destroy_async. Requires after_commit infrastructure
     // which is not yet wired to the callback chain — skip until then.
-  }
-
-  private static _ensureOwnAssociations(model: any): void {
-    if (!Object.prototype.hasOwnProperty.call(model, "_associations")) {
-      model._associations = [...(model._associations ?? [])];
-    }
   }
 }
