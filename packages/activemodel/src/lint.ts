@@ -20,9 +20,10 @@ export interface Lint {}
  * assertion-failure identity so the standalone lint functions surface a single
  * named class instead of a bare `Error`.
  *
- * @noRailsEquivalent Minitest's assertion-failure class, not an ActiveModel one:
- * `lint.rb`'s tests are Minitest test methods and raise `Minitest::Assertion`,
- * which trails has no port of. Named for the Ruby class it stands in for.
+ * @noRailsEquivalent PERMANENT: the assertion-failure class belongs to Minitest,
+ * not to ActiveModel — `lint.rb`'s tests are Minitest test methods whose
+ * `assert*` calls raise `Minitest::Assertion`, so no ActiveModel Ruby file can
+ * ever grow a counterpart. Named for the Ruby class it stands in for.
  */
 export class MinitestAssertion extends globalThis.Error {
   constructor(message: string) {
