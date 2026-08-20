@@ -164,3 +164,15 @@ describe("DateTimeType serialize_cast_value_compatible?", () => {
     expect(type.itselfIfSerializeCastValueCompatible()).toBe(type);
   });
 });
+
+// `type_cast_for_schema` comes from Helpers::TimeValue (time_value.rb:36-38) —
+// `value.to_fs(:db).inspect` — where without the mixin the class would inherit
+// `Type::Value`'s `value.inspect` (value.rb:71-73). Verified against MRI:
+// `ActiveModel::Type::DateTime.new.type_cast_for_schema(cast)` answers
+// `"2000-01-01 00:00:00"` (quoted).
+describe("DateTimeType type_cast_for_schema", () => {
+  it("answers the to_fs(:db) form, quoted", () => {
+    const type = new Types.DateTimeType();
+    expect(type.typeCastForSchema(type.cast("2000-01-01 00:00:00"))).toBe('"2000-01-01 00:00:00"');
+  });
+});

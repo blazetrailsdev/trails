@@ -11,7 +11,12 @@ import {
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
-import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
+import {
+  applySecondsPrecision,
+  fastStringToTime,
+  newTime,
+  typeCastForSchema,
+} from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 /**
@@ -247,3 +252,13 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
   defaults: { "1": 2000, "2": 1, "3": 1, "4": 0, "5": 0 },
 });
 include(TimeType, acceptsMultiparameterTime);
+
+/**
+ * Ruby `include Helpers::TimeValue` (time.rb:43) for the one member of that
+ * module the class does not carry as a field: `type_cast_for_schema`
+ * (time_value.rb:36-38) is the module's only public member, so it lands on the
+ * prototype where a subclass's `super` reaches it — as
+ * `PostgreSQL::OID::DateTime` does on the sibling class
+ * (postgresql/oid/date_time.rb:21-27).
+ */
+include(TimeType, { typeCastForSchema });
