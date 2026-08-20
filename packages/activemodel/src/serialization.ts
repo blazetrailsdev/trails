@@ -40,7 +40,7 @@ export function serializableHash(
   options: SerializeOptions = {},
   sync = false,
 ): Record<string, unknown> {
-  if (hasIncludes(options) && !sync) {
+  if (options.include != null && (options.include as unknown) !== false && !sync) {
     return thenableHash(
       () => serializableHash(record, options, true),
       async () => {
@@ -205,7 +205,13 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
   // no installed accessor (a bare `_attributes` Map / AttributeSet) and a
   // reserved-name declared attribute (e.g. toJSON) whose function member would
   // recurse if invoked.
-  if (hasStore && storeHasKey(attrStore, key)) {
+  const storeHasKey =
+    attrStore instanceof Map
+      ? attrStore.has(key)
+      : attrStore && typeof (attrStore as { keys?: unknown }).keys === "function"
+        ? (attrStore as { keys(): string[] }).keys().includes(key)
+        : false;
+  if (hasStore && storeHasKey) {
     return attrStore instanceof Map
       ? attrStore.get(key)
       : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
@@ -349,7 +355,21 @@ export function serializableAddIncludes(
     | null
     | undefined;
   if (includeOpt == null || includeOpt === false) return;
-  const includes = normalizeIncludes(includeOpt);
+
+  let includes: Record<string, SerializeOptions>;
+  if (isIncludeHash(includeOpt)) {
+    includes = includeOpt;
+  } else {
+    includes = {};
+    for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
+      if (isIncludeHash(n)) {
+        for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
+      } else {
+        safeSet(includes as Record<string, unknown>, n, {});
+      }
+    }
+  }
+
   for (const [assocName, assocOpts] of Object.entries(includes)) {
     const records = sendAssociation(record, assocName);
     // Rails: `if records = send(association)` skips on nil — a defined-but-nil
@@ -362,25 +382,28 @@ export function serializableAddIncludes(
   }
 }
 
-/** Whether `key` is a stored attribute on an `_attributes` store (Map or AttributeSet). */
-function storeHasKey(attrStore: AttributeStore, key: string): boolean {
-  if (attrStore instanceof Map) return attrStore.has(key);
-  if (attrStore && typeof (attrStore as { keys?: unknown }).keys === "function") {
-    return (attrStore as { keys(): string[] }).keys().includes(key);
-  }
-  return false;
-}
-
-/** Whether `options` carries at least one `:include` entry to (maybe) load. */
-function hasIncludes(options: SerializeOptions): boolean {
-  const include = options.include;
-  if (include == null || (include as unknown) === false) return false;
-  return Object.keys(normalizeIncludes(include)).length > 0;
+/**
+ * Ruby `n.is_a?(Hash)` for an `:include` entry — a plain object mapping
+ * association names to their own options, as against the String/Symbol (a JS
+ * string) and Array spellings the same option takes.
+ */
+function isIncludeHash(value: unknown): value is Record<string, SerializeOptions> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
  * Recursively lazy-load every `include`d association (and nested includes) via
  * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
+ *
+ * The entry walk is `serialization.rb:188`'s own
+ * `Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }`, taken
+ * without the `Hash[...]` that wraps it there. That wrapper only dedupes, and
+ * dropping it can visit a name twice — which for a preload is a superset of the
+ * work, never a miss, so the sync pass still finds everything loaded.
+ * `serializableAddIncludes` keeps the wrapper, since Rails' own iteration is
+ * over the deduped hash.
+ *
+ * @noRailsEquivalent Serves trails' awaitable `serializable_hash` (RFC 0022 b2).
  */
 async function preloadIncludes(
   record: SerializationRecord,
@@ -388,7 +411,12 @@ async function preloadIncludes(
 ): Promise<void> {
   const includeOpt = options.include;
   if (includeOpt == null || (includeOpt as unknown) === false) return;
-  for (const [name, opts] of Object.entries(normalizeIncludes(includeOpt))) {
+  const entries: Array<[string, SerializeOptions]> = isIncludeHash(includeOpt)
+    ? Object.entries(includeOpt)
+    : (Array.isArray(includeOpt) ? includeOpt : [includeOpt]).flatMap((n) =>
+        isIncludeHash(n) ? Object.entries(n) : [[n, {}] as [string, SerializeOptions]],
+      );
+  for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
       ? Array.isArray(records)
@@ -457,7 +485,8 @@ export function asJsonThenable(
     if (root === false || root == null) return hash;
     return { [root === true ? element() : root]: hash };
   };
-  if (!hasIncludes(options)) return finalize(serialize());
+  if (options.include == null || (options.include as unknown) === false)
+    return finalize(serialize());
   return thenableHash(
     () => finalize(serialize()),
     async () => finalize(await serialize()),
@@ -720,40 +749,4 @@ function rubyArray(value: string | string[] | null | undefined): string[] {
   if (value == null) return [];
   const list = Array.isArray(value) ? value : [value];
   return list.map((entry) => String(entry));
-}
-
-/**
- * Normalize `:include` to a `{ name → opts }` hash. Mirrors Rails'
- * `Hash[Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }]`
- * — strings/arrays of strings get empty opts, embedded hashes flatten
- * into the result so `[:posts, { comments: {} }]` becomes
- * `{ posts: {}, comments: {} }`.
- */
-function normalizeIncludes(
-  include:
-    | Record<string, SerializeOptions>
-    | Array<string | Record<string, SerializeOptions>>
-    | string,
-): Record<string, SerializeOptions> {
-  const result: Record<string, SerializeOptions> = {};
-  if (typeof include === "string") {
-    safeSet(result as Record<string, unknown>, include, {});
-    return result;
-  }
-  if (Array.isArray(include)) {
-    for (const entry of include) {
-      if (typeof entry === "string") {
-        safeSet(result as Record<string, unknown>, entry, {});
-      } else {
-        for (const [k, v] of Object.entries(entry)) {
-          safeSet(result as Record<string, unknown>, k, v);
-        }
-      }
-    }
-    return result;
-  }
-  for (const [k, v] of Object.entries(include)) {
-    safeSet(result as Record<string, unknown>, k, v);
-  }
-  return result;
 }

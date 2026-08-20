@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/date";
 import { Types } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
 
@@ -6,7 +7,6 @@ describe("AcceptsMultiparameterTime defaults", () => {
   it("defaults fill missing slots", () => {
     const type = new Types.DateTimeType();
     const wrapper = new AcceptsMultiparameterTime(type, { "4": 0, "5": 0 });
-    // Only year/month/day provided — hour and minute should default to 0
     const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4 });
     expect(result).not.toBeNull();
   });
@@ -14,29 +14,44 @@ describe("AcceptsMultiparameterTime defaults", () => {
   it("user values override defaults", () => {
     const type = new Types.DateTimeType();
     const wrapper = new AcceptsMultiparameterTime(type, { "4": 0 });
-    // hour explicitly provided as 15 — default of 0 must not overwrite it
     const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": 15 });
-    expect(result).not.toBeNull();
-    // The Instant's UTC hour should be 15 (timezone is UTC in test env)
-    const instant = result as import("@blazetrails/date").Temporal.Instant;
-    expect(instant.toZonedDateTimeISO("UTC").hour).toBe(15);
+    expect((result as { hour: number }).hour).toBe(15);
   });
 
-  it("empty-string slots get defaults", () => {
+  it("a blank slot is a present value and reaches ::Time", () => {
     const type = new Types.DateTimeType();
     const wrapper = new AcceptsMultiparameterTime(type, { "4": 0 });
-    // hour is empty string — should be treated as missing and filled with 0
-    const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": "" });
-    expect(result).not.toBeNull();
-    const instant = result as import("@blazetrails/date").Temporal.Instant;
-    expect(instant.toZonedDateTimeISO("UTC").hour).toBe(0);
+    expect(() => wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": "" })).toThrow(
+      'invalid value for Integer(): ""',
+    );
   });
 
   it("no defaults, missing year/month/day keys → null (key-based guard)", () => {
     const type = new Types.DateType();
     const wrapper = new AcceptsMultiparameterTime(type);
-    // Only key "6" (second) present, no defaults → keys "1"/"2"/"3" absent → guard fires.
     const result = wrapper.cast({ "6": 0 });
     expect(result).toBeNull();
+  });
+
+  it("slots are ordered by index, not by their string spelling", () => {
+    const type = new Types.DateTimeType();
+    const wrapper = new AcceptsMultiparameterTime(type, { "10": 0 });
+    const time = wrapper.cast({ "1": 2004, "2": 6, "3": 24, "4": 16, "5": 24, "6": 12 }) as {
+      hour: number;
+      min: number;
+      sec: number;
+    };
+    expect([time.hour, time.min, time.sec]).toEqual([16, 24, 12]);
+  });
+
+  it("sub-second precision truncates at a pre-1970 instant", () => {
+    const wrapper = new AcceptsMultiparameterTime(new Types.DateTimeType());
+    const parts = { "1": 1969, "2": 7, "3": 20, "4": 20, "5": 17, "6": 40.9999999999 };
+    const time = wrapper.cast(parts) as { nsec: number; sec: number };
+    expect(time.nsec).toBe(999_999_999);
+    expect(time.sec).toBe(40);
+
+    const instant = new Types.DateTimeType().cast(parts) as Temporal.Instant;
+    expect(instant.epochNanoseconds).toBe(-14_182_940n * 1_000_000_000n + 999_999_999n);
   });
 });
