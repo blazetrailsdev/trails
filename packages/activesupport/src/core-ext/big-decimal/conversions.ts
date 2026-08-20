@@ -42,11 +42,13 @@ export class BigDecimal {
    * expansion is otherwise unbounded.
    */
   constructor(
-    value: string | number | bigint | { numerator: bigint; denominator: bigint },
+    value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
     ndigits = 0,
   ) {
-    const isRational = typeof value === "object" && value !== null;
-    const parsed = isRational ? parseRational(value, ndigits) : parse(value);
+    const isRational = typeof value === "object" && !(value instanceof BigDecimal);
+    const parsed = isRational
+      ? parseRational(value, ndigits)
+      : parse(value instanceof BigDecimal ? value.toString("F") : value);
     if (parsed === null) {
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }

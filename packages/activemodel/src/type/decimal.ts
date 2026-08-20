@@ -71,10 +71,7 @@ export class DecimalType extends NumericValueType {
       // A Rational is the case that makes the significant-digit count matter
       // here rather than in the Float arm: it carries an exact fraction, so
       // `Rational(1, 3)` is `0.333333333333333333E0` at the default 18.
-      castedValue = new BigDecimal(
-        value instanceof BigDecimal ? value.toString("F") : value,
-        this.precision ?? BIGDECIMAL_PRECISION,
-      );
+      castedValue = new BigDecimal(value, this.precision ?? BIGDECIMAL_PRECISION);
     } else if (typeof value === "string") {
       castedValue = toD(value);
     } else {

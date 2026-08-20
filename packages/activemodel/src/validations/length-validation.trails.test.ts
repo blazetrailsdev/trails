@@ -91,6 +91,17 @@ describe("LengthValidator (trails)", () => {
     expect(await new Person({ title: "a" }).isValid()).toBe(true);
   });
 
+  it("throws at definition time when the range is empty", () => {
+    // length.rb:18 is `options[:minimum] = range.min if range.begin`, and
+    // Ruby's `(1...1).min` is nil for an empty range — so :minimum is SET to
+    // nil, reaches check_validity!, and fails its non-negative Integer test.
+    // Verified against vendor/rails: `validates_length_of :title, in: 1...1`
+    // raises ":minimum must be a non-negative Integer, Infinity, Symbol, or Proc".
+    expect(() => Person.validatesLengthOf("title", { in: new Range(1, 1, true) })).toThrow(
+      /:minimum must be a non-negative Integer/,
+    );
+  });
+
   it("throws at definition time when :in is not a Range", () => {
     expect(() => Person.validatesLengthOf("title", { in: "3..10" })).toThrow(
       /:in and :within must be a Range/,

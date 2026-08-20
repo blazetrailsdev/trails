@@ -59,7 +59,9 @@ export class Range<T> {
     if (this.begin === null) {
       throw new RangeError("cannot get the minimum of beginless range");
     }
-    if (this.end !== null && cmp(this.begin, this.end) > 0) return null;
+    // Ruby answers nil for an empty range, and an exclusive end makes
+    // `begin == end` empty: `(1...1).min` is nil where `(1..1).min` is 1.
+    if (this.end !== null && cmp(this.begin, this.end) >= (this.excludeEnd ? 0 : 1)) return null;
     return this.begin;
   }
 

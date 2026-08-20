@@ -33,6 +33,9 @@ describe("BigDecimalTest", () => {
     expect(new BigDecimal(123456789012345678901234567890n, 3).toString("F")).toBe(
       "123456789012345678901234567890.0",
     );
+    // Ruby: BigDecimal(BigDecimal("1234.5"), 3) => 0.12345e4. This is the arm
+    // decimal.rb:63-64 sends every non-Float ::Numeric through.
+    expect(new BigDecimal(new BigDecimal("1234.5"), 3).toString("F")).toBe("1234.5");
   });
 
   it("BigDecimal(value, ndigits) carries through a run of nines", () => {
