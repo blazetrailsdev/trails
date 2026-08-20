@@ -1223,19 +1223,21 @@ export async function _loadSingularViaStatementCache(
       : undefined) ?? _scopeForAssociation(targetModel);
   const sc = (
     reflection as unknown as {
-      associationScopeCache(klass: typeof Base, owner: Base, block: () => unknown): unknown;
+      associationScopeCache(
+        klass: typeof Base,
+        owner: Base,
+        block: (params: { bind(): unknown }) => unknown,
+      ): unknown;
     }
-  ).associationScopeCache(targetModel, record, () =>
-    StatementCache.create(connection as never, (params) => {
-      const as = AssociationScope.create(() => params.bind());
-      const built = as.scope({
-        owner: record,
-        reflection: reflection as never,
-        klass: targetModel,
-      }) as Relation<Base>;
-      return baseScope().merge(built) as never;
-    }),
-  ) as StatementCache;
+  ).associationScopeCache(targetModel, record, (params: { bind(): unknown }) => {
+    const as = AssociationScope.create(() => params.bind());
+    const built = as.scope({
+      owner: record,
+      reflection: reflection as never,
+      klass: targetModel,
+    }) as Relation<Base>;
+    return baseScope().merge(built) as never;
+  }) as StatementCache;
   const chain = (reflection as unknown as { chain: never[] }).chain;
   const binds = AssociationScope.getBindValues(record, chain);
   const records = await sc.execute(binds, connection, { allowRetry: true });

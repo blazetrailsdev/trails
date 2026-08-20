@@ -252,9 +252,9 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
 
   // Mirrors Rails: push the literal classes (`klasses: classes`) rather than
   // their resolved connection_class_for_self. The caller's CCFS is resolved
-  // at read time in core.ts#matchesStack, so a `connected_to_many` scope
+  // at read time in core.ts#currentRole, so a `connected_to_many` scope
   // doesn't leak across abstract subclasses that happen to share a CCFS.
-  const klasses = new Set<any>(normalized);
+  const klasses: any[] = [...normalized];
   // Rails ends with `connected_to_stack.pop` (connection_handling.rb:177); this
   // unwind runs through `withCleanup` around a possibly-async body, so it removes
   // this entry by identity — which is why the literal is captured here.
@@ -321,8 +321,8 @@ export function connectingTo(
     shard,
     preventWrites,
     // Mirrors Rails: push `[self]` (resolution to connection_class_for_self
-    // happens at read time in core.ts#matchesStack).
-    klasses: new Set([this]),
+    // happens at read time in core.ts#currentRole).
+    klasses: [this],
   });
 }
 
@@ -665,7 +665,7 @@ export function withRoleAndShard<T>(
 ): T {
   const resolvedPreventWrites = role === READING_ROLE || preventWrites;
   // Mirrors Rails `with_role_and_shard`: push `[self]` raw, and let
-  // core.ts#matchesStack resolve the caller's connection_class_for_self at
+  // core.ts#currentRole resolve the caller's connection_class_for_self at
   // read time. Pushing the pre-resolved CCFS would leak a scope opened on
   // an abstract subclass without `connectsTo` (so CCFS walks up to Base)
   // into every pool.
@@ -675,7 +675,7 @@ export function withRoleAndShard<T>(
       role,
       shard,
       preventWrites: resolvedPreventWrites,
-      klasses: new Set<any>([this]),
+      klasses: [this] as any[],
     }),
   );
 
@@ -722,7 +722,7 @@ export function appendToConnectedToStack(entry: {
   role?: string;
   shard?: string;
   preventWrites?: boolean;
-  klasses: Set<any>;
+  klasses: any[];
 }): void {
   if (isShardSwappingProhibited() && entry.shard) {
     throw new ArgumentError("cannot swap `shard` while shard swapping is prohibited.");

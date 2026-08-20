@@ -158,13 +158,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.using) p.push(`USING ${o.using}`);
     p.push(`(${o.expression})`);
     if (o.where) p.push(`WHERE (${o.where})`);
-    if (o.deferrable) {
-      p.push(
-        o.deferrable === true
-          ? "DEFERRABLE"
-          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
-      );
-    }
+    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
     return p.join(" ");
   }
 
@@ -185,13 +179,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         .join(", ");
       p.push(`(${cols})`);
     }
-    if (o.deferrable) {
-      p.push(
-        o.deferrable === true
-          ? "DEFERRABLE"
-          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
-      );
-    }
+    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
     return p.join(" ");
   }
 

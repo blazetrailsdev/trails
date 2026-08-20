@@ -39,6 +39,38 @@ export class BelongsToAssociation extends SingularAssociation {
           }
         }
         break;
+      case "destroyAsync": {
+        let primaryKeyColumn: string | string[];
+        let id: unknown;
+        if (Array.isArray(this.reflection.foreignKey)) {
+          primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
+          id = this.reflection.foreignKey.map((col) => (this.owner as any)[col]);
+        } else {
+          primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
+          id = (this.owner as any)[this.reflection.foreignKey as string];
+        }
+
+        const associationClass = (this.reflection as any).isPolymorphic()
+          ? (this.owner as any)[(this.reflection as any).foreignType as string]
+          : this.reflection.klass;
+
+        this.enqueueDestroyAssociation({
+          ownerModelName: this.owner.constructor.name,
+          ownerId: (this.owner as any).id,
+          associationClass: String(
+            typeof associationClass === "function" ? associationClass.name : associationClass,
+          ),
+          associationIds: [id],
+          associationPrimaryKeyColumn: primaryKeyColumn,
+          // Ruby `options.fetch(:ensuring_owner_was, nil)` returns a stored
+          // `nil`/`false`; `??` would substitute the default for it.
+          ensuringOwnerWasMethod:
+            "ensuringOwnerWas" in this.reflection.options
+              ? (this.reflection.options as any).ensuringOwnerWas
+              : null,
+        });
+        break;
+      }
       case "delete":
         if (typeof (target as any).delete === "function") {
           await (target as any).delete();

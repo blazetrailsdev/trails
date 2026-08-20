@@ -1096,7 +1096,7 @@ export class AssociationReflection extends MacroReflection {
     return pk;
   }
 
-  associationScopeCache(klass: typeof Base, owner: any, block: () => any): any {
+  associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
     // Rails (`reflection.rb` AssociationReflection#association_scope_cache):
     //   key = self
     //   key = [key, owner._read_attribute(@foreign_type)] if polymorphic?
@@ -1483,7 +1483,7 @@ export class ThroughReflection extends AbstractReflection {
    * singular load statement-caches on the delegate reflection's key
    * (`Association#find_target`, association.rb:262).
    */
-  associationScopeCache(klass: typeof Base, owner: any, block: () => any): any {
+  associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
     return this.delegateReflection.associationScopeCache(klass, owner, block);
   }
 
