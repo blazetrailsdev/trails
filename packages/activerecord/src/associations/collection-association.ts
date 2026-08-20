@@ -1360,8 +1360,9 @@ export class CollectionAssociation extends Association {
    *
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#merge_target_lists
    * (collection_association.rb:335-352).
+   * @internal
    */
-  private mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
+  mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
     if (memory.length === 0) return persisted;
 
     // `memory.delete(record)` is Array#delete over AR `==` — id equality for a
