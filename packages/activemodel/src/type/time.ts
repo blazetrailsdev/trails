@@ -2,10 +2,14 @@ import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,
   Temporal,
+  Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { zone, isBlank, isPlainObject } from "@blazetrails/activesupport";
-import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
+import { zone, isBlank, include } from "@blazetrails/activesupport";
+import {
+  AcceptsMultiparameterTime,
+  type InstanceMethods,
+} from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
@@ -19,6 +23,13 @@ import { ValueType } from "./value.js";
  * instant. `Temporal.Instant` is the port's `::Time` (see `newTime`), so the
  * cast result carries that instant rather than a bare time of day.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
+export interface TimeType extends Omit<
+  InstanceMethods<Temporal.Instant>,
+  "valueFromMultiparameterAssignment"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TimeType extends ValueType<Temporal.Instant> {
   readonly name = "time";
 
@@ -203,51 +214,36 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 
   /**
-   * Mirrors: ActiveModel::Type::Time includes AcceptsMultiparameterTime.new(defaults: { 1 => 2000, 2 => 1, 3 => 1, 4 => 0, 5 => 0 }).
-   * Rails' base date 2000-01-01 lets hour-only form inputs (e.g. { "4": 15 }) produce a valid Time.
+   * `super` is the mixin's `::Time` assembly (see the `include` at the bottom
+   * of this file), whose Rails base date 2000-01-01 lets hour-only form inputs
+   * (e.g. { "4": 15 }) produce a valid Time. Rails' Type::Time has no override
+   * of its own; this one only re-spells that `::Time` as the
+   * `Temporal.Instant` this port casts to.
    *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
     values: Record<string, unknown>,
   ): Temporal.Instant | null {
-    const time = new AcceptsMultiparameterTime(this, {
-      "1": 2000,
-      "2": 1,
-      "3": 1,
-      "4": 0,
-      "5": 0,
-    }).valueFromMultiparameterAssignment(values);
+    // `super` — the mixin's own `value_from_multiparameter_assignment`, which
+    // Ruby reaches by ancestry and TS types only for a declared base class, so
+    // it is taken off the module as Ruby's own
+    // `instance_method(...).bind_call(self, ...)` does.
+    const time = (
+      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
+        this: unknown,
+        valuesHash: Record<string, unknown>,
+      ) => RubyTime | null
+    ).call(this, values);
     return time && time.toTime().toInstant();
   }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
-   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
-   * `Value#cast` (value.rb:53-55), which is `super`.
-   */
-  override cast(value: unknown): Temporal.Instant | null {
-    if (isPlainObject(value)) {
-      return this.valueFromMultiparameterAssignment(value);
-    } else {
-      return super.cast(value);
-    }
-  }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
-   * a Hash value is validated by assembling it (raising on invalid input).
-   */
-  override assertValidValue(value: unknown): void {
-    if (isPlainObject(value)) {
-      this.valueFromMultiparameterAssignment(value);
-    } else {
-      super.assertValidValue(value);
-    }
-  }
-
-  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
-  override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isPlainObject(value);
-  }
 }
+
+/**
+ * Mirrors: `include Helpers::AcceptsMultiparameterTime.new(defaults: { 1 => 2000, 2 => 1, 3 => 1, 4 => 0, 5 => 0 })`
+ * (time.rb:40-42).
+ */
+const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
+  defaults: { "1": 2000, "2": 1, "3": 1, "4": 0, "5": 0 },
+});
+include(TimeType, acceptsMultiparameterTime);

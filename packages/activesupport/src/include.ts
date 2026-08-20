@@ -49,6 +49,22 @@ export class Module {
     return block(carrierOf(this));
   }
 
+  /**
+   * Mirrors: Ruby's Module#include — mixes another module's instance methods
+   * into this module, so a class that includes this one gets them too.
+   */
+  include(mod: ModuleObject): void {
+    const carrier = carrierOf(this);
+    for (const key of Object.keys(mod)) {
+      if (typeof mod[key] !== "function" || /^[A-Z]/.test(key)) continue;
+      Object.defineProperty(carrier, key, {
+        value: mod[key],
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+
   /** Mirrors: Ruby's Module#define_method. */
   defineMethod(name: string, body: (...args: any[]) => unknown): void {
     Object.defineProperty(carrierOf(this), name, {

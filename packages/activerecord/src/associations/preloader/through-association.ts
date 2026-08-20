@@ -8,16 +8,8 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
-/**
- * `reduce(:merge)`. Rails' `records_by_owner` forces `load_records`
- * (preloader/association.rb:148-151); ours is async, so the forcing is hoisted to
- * `recordsByOwner` and this answers `undefined` while a loader has yet to load.
- */
-function merge(
-  acc: Map<Base, Base[]> | undefined,
-  recordsByOwner: Map<Base, Base[]> | undefined,
-): Map<Base, Base[]> | undefined {
-  if (acc === undefined || recordsByOwner === undefined) return undefined;
+/** `Hash#merge`, the block `reduce(:merge)` names (through_association.rb:89, :93). */
+function merge(acc: Map<Base, Base[]>, recordsByOwner: Map<Base, Base[]>): Map<Base, Base[]> {
   return new Map([...acc, ...recordsByOwner]);
 }
 
@@ -81,13 +73,6 @@ export class ThroughAssociation extends Association {
       this._recordsByOwner = result;
       return result;
     }
-
-    // Rails reaches `through_records_by_owner` / `source_records_by_owner`
-    // through the public `records_by_owner` reader, which forces `load_records`
-    // (preloader/association.rb:148-151). Through loaders first:
-    // `source_preloaders` is derived from the middle records they produce.
-    await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()));
-    await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()));
 
     const throughRecordsByOwner = await this.throughRecordsByOwner();
     const sourceRecordsByOwner = await this.sourceRecordsByOwner();
@@ -309,18 +294,20 @@ export class ThroughAssociation extends Association {
     return [...(await this.throughRecordsByOwner()).values()].flat();
   }
 
+  /** Mirrors: `preloader/through_association.rb:88-90`. */
   private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    this._sourceRecordsByOwner ??= (await this.sourcePreloaders())
-      .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
-      .reduce(merge, new Map<Base, Base[]>());
-    return this._sourceRecordsByOwner ?? new Map();
+    this._sourceRecordsByOwner ??= (
+      await Promise.all((await this.sourcePreloaders()).map((l) => l.recordsByOwner()))
+    ).reduce(merge, new Map<Base, Base[]>());
+    return this._sourceRecordsByOwner;
   }
 
+  /** Mirrors: `preloader/through_association.rb:92-94`. */
   private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
-    this._throughRecordsByOwner ??= (await this.throughPreloaders())
-      .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
-      .reduce(merge, new Map<Base, Base[]>());
-    return this._throughRecordsByOwner ?? new Map();
+    this._throughRecordsByOwner ??= (
+      await Promise.all((await this.throughPreloaders()).map((l) => l.recordsByOwner()))
+    ).reduce(merge, new Map<Base, Base[]>());
+    return this._throughRecordsByOwner;
   }
 
   private async preloadIndex(): Promise<Map<Base, number>> {

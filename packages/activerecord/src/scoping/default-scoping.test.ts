@@ -586,7 +586,7 @@ describe("DefaultScopingTest", () => {
   it("unscope includes", async () => {
     const expected = names(await Developer.all());
     const received = names(
-      await Developer.includes("projects").select("id").unscope("includes", "select"),
+      await Developer.includes(":projects").select("id").unscope("includes", "select"),
     );
     expect(received).toEqual(expected);
   });
@@ -601,7 +601,7 @@ describe("DefaultScopingTest", () => {
 
   it("unscope eager load", async () => {
     const expected = names(await Developer.all());
-    const received = Developer.eagerLoad("projects").select("id").unscope("eagerLoad", "select");
+    const received = Developer.eagerLoad(":projects").select("id").unscope("eagerLoad", "select");
     const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
@@ -609,7 +609,7 @@ describe("DefaultScopingTest", () => {
 
   it("unscope preloads", async () => {
     const expected = names(await Developer.all());
-    const received = Developer.preload("projects").select("id").unscope("preload", "select");
+    const received = Developer.preload(":projects").select("id").unscope("preload", "select");
     const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
@@ -853,9 +853,9 @@ describe("DefaultScopingTest", () => {
     await (SpecialComment as any).unscoped(async () => {
       expect((await Post.joins(":specialComments").find(post.id)).id).toBe(post.id);
       expect(await specialCommentIds(Post.joins(":specialComments"))).toEqual(expected);
-      expect(await specialCommentIds(Post.eagerLoad("specialComments"))).toEqual(expected);
-      expect(await specialCommentIds(Post.includes("specialComments"))).toEqual(expected);
-      expect(await specialCommentIds(Post.preload("specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.eagerLoad(":specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.includes(":specialComments"))).toEqual(expected);
+      expect(await specialCommentIds(Post.preload(":specialComments"))).toEqual(expected);
     });
   });
 

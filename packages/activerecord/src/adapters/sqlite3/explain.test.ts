@@ -29,7 +29,7 @@ describeIfSqlite("SQLite3ExplainTest", () => {
 
   it("explain with eager loading", async () => {
     const explain = await Author.where({ id: authors("david").id })
-      .includes("posts")
+      .includes(":posts")
       .explain();
     expect(explain).toMatch(
       /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
