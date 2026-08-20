@@ -742,7 +742,12 @@ export class CollectionAssociation extends Association {
         }
         for (const r of this.difference(otherArray, this.target)) {
           this.setOwnerAttributes(r);
-          this.addToTarget(r);
+          // `skipCallbacks` because this add is only the in-memory placeholder
+          // for the deferred `replace_records`: `persistReplacePlan` restores
+          // `originalTarget` and re-runs the Rails body, whose `concat` fires
+          // `before_add`/`after_add` for real. Firing them here too would
+          // double them for every gained record.
+          this.addToTarget(r, { skipCallbacks: true });
         }
         this.loadedBang();
         return { newTarget: [...otherArray], originalTarget, wasLoaded };
@@ -757,8 +762,15 @@ export class CollectionAssociation extends Association {
    * collection_association.rb:242). Awaited inline by {@link writer} — the
    * in-memory `replace` above has already mutated `target`, so this restores
    * the captured baseline for the duration of the diff.
+   *
+   * @noRailsEquivalent CONVERGEABLE — the awaitable half of `replace`
+   * (collection_association.rb:242), split off because a JS property setter
+   * cannot await (RFC 0068). Public rather than protected because
+   * `CollectionProxy#replace` (collection_proxy.rb:391-393) delegates here from
+   * outside the class, spelling the same two steps `writer`
+   * (collection_association.rb:46-48) does; it retires with the split.
    */
-  protected async persistReplacePlan(pending: ReplacePlan): Promise<void> {
+  async persistReplacePlan(pending: ReplacePlan): Promise<void> {
     if (pending.pending) await pending.pending;
     if (this.owner.isNewRecord()) return;
     // If the association wasn't loaded at assignment time, fetch the persisted
