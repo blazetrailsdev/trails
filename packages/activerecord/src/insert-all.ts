@@ -659,25 +659,8 @@ export class Builder implements InsertBuilder {
     const model = this._insertAll.model;
     const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      // Rails resolves the cast type through `model.type_for_attribute(key)`
-      // (insert_all.rb:312, via `extract_types_from_columns_on`) — the decorated
-      // `attribute_types` set, so serialize/normalizes/encrypts decorators are
-      // honored — not a raw column-definition lookup.
-      const type = model.typeForAttribute(key) as any;
-      const castValue = type && typeof type.cast === "function" ? type.cast(value) : value;
-      // Faithful dispatch (ActiveModel::Type::SerializeCastValue.serialize):
-      // only short-circuit through serializeCastValue when the type declares
-      // it compatible, otherwise call full serialize. A type overriding
-      // serialize but not serializeCastValue (binary, json, serialized, the
-      // PG OID types) inherits identity serializeCastValue and would
-      // otherwise persist the in-memory cast value.
-      if (type && typeof type.serialize === "function") {
-        value = SerializeCastValue.serialize(type, castValue);
-      } else if (type && typeof type.serializeCastValue === "function") {
-        value = type.serializeCastValue(castValue);
-      } else {
-        value = SerializeCastValue.serializeCastValue(castValue);
-      }
+      const type = model.typeForAttribute(key);
+      value = SerializeCastValue.serialize(type, type.cast(value));
       // Rails hands the serialized value to the ValuesList *as a value*
       // (insert_all.rb:246): `connection.visitor.compile` renders it, quoting
       // each entry through `connection.quote` (to_sql.rb:106-114). So no

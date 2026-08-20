@@ -21,8 +21,6 @@ describe("ActiveRecordTranslationLookupAncestorsTest", () => {
     class Topic extends Base {}
     class Reply extends Topic {}
 
-    // Mirrors translation.rb:11-13 — the walk ends at `base_class?`, so
-    // ActiveRecord::Base itself is never in the chain for a model.
     expect(Reply.lookupAncestors()).toEqual([Reply, Topic]);
     expect(Topic.lookupAncestors()).toEqual([Topic]);
     expect(Base.lookupAncestors()).toEqual([Base]);
