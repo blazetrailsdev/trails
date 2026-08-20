@@ -335,9 +335,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   // `keys` / `entries` are the index-yielding half of the same JS iteration
   // protocol as `[Symbol.iterator]` above — like it, they read the delegated
-  // records (`records` -> `load_target`, collection_proxy.rb:1024). `values()`
-  // is intentionally NOT added: it would shadow `Relation#values()`
-  // (query-state introspection used by the Relation merger).
+  // records (`records` → `load_target`, collection_proxy.rb:1024). `values()`
+  // is NOT added: it would shadow `Relation#values()`.
 
   keys(): IterableIterator<number> {
     return this.target.keys();
@@ -464,10 +463,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private async _execLoad(): Promise<T[]> {
     const results = (await this._findTargetViaAssociation()) as T[];
-    // `Association#set_strict_loading` per record — Rails applies it in
-    // `find_target` / `exec_queries` (association.rb:248-273). The functional
-    // `findTarget` path bypasses the OO `CollectionAssociation.loadTarget`
-    // where the cascade lives, so route through the OO association here.
+    // `Association#set_strict_loading` per record (association.rb:270-271).
+    // The functional `findTarget` path bypasses the OO
+    // `CollectionAssociation.loadTarget` where Rails runs it, so it runs here.
     const association = this._record.association(this._assocName) as unknown as {
       setStrictLoading?: (record: Base) => Base;
     };
