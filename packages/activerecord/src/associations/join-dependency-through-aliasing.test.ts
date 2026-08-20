@@ -6,10 +6,10 @@
  * / `alias_tracker.rb`): a joined table uses its real name when not already
  * in use, falling back to a tN alias only on collision.
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
+import "../support/canonical-model-index.js";
 import { fixtures } from "../test-fixtures.js";
-import { Associations } from "../associations.js";
+import { Author } from "../test-helpers/models/author.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { Nodes, Table, tableRealName, tableSqlName, type TableRef } from "@blazetrails/arel";
@@ -30,94 +30,57 @@ function joinedTableNames(joins: Nodes.Join[]): string[] {
 }
 
 describe("JoinDependency has_many :through real-table-name reuse", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
+  // The canonical schema and models: `Author.comments` is
+  // `has_many :comments, through: :posts` (author.rb:19), the same shape Rails'
+  // own alias coverage uses in
+  // `test/cases/associations/inner_join_association_test.rb`.
   fixtures({});
 
-  class JdtAuthor extends Base {
-    static {
-      this.attribute("name", "string");
-    }
-  }
-  class JdtPost extends Base {
-    static {
-      this.attribute("author_id", "integer");
-      this.attribute("title", "string");
-    }
-  }
-  class JdtComment extends Base {
-    static {
-      this.attribute("post_id", "integer");
-      this.attribute("body", "string");
-    }
-  }
-
-  beforeEach(() => {
-    for (const m of [JdtAuthor, JdtPost, JdtComment]) {
-      (m as any)._associations = [];
-      registerModel(m);
-    }
-    Associations.hasMany.call(JdtAuthor, "jdtPosts", {
-      className: "JdtPost",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(JdtPost, "jdtComments", {
-      className: "JdtComment",
-      foreignKey: "post_id",
-    });
-    Associations.hasMany.call(JdtAuthor, "jdtComments", {
-      through: "jdtPosts",
-      source: "jdtComments",
-      className: "JdtComment",
-    });
-  });
-
   it("uses real table names for through+target when no collision", () => {
-    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, null, "comments", Nodes.OuterJoin);
     const joins = jd.joinConstraints([]);
-    const node = nodeAt(jd, "jdtComments");
+    const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
     expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
-    expect(node.effectiveSqlName).toBe("jdt_comments");
+    expect(node.effectiveSqlName).toBe("comments");
 
     // Target table uses real name (no alias)
     const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(targetTable.name).toBe("jdt_comments");
+    expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
 
-    expect(joinedTableNames(joins)).toContain("jdt_posts");
-    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "jdt_posts")!;
+    expect(joinedTableNames(joins)).toContain("posts");
+    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "posts")!;
     expect(throughJoin).toBeInstanceOf(Nodes.OuterJoin);
     expect((throughJoin.left as Table).tableAlias).toBeNull();
   });
 
   it("uses the Rails alias_candidate when the target real name collides", () => {
-    Associations.hasMany.call(JdtAuthor, "directComments", {
-      className: "JdtComment",
-      foreignKey: "post_id",
-    });
+    // `comments` and `commentsWithForeignKey` (author.rb:19, 28) are two
+    // `through: :posts` associations onto the same `comments` table, so the
+    // second one's target collides.
     const jd = new JoinDependency(
-      JdtAuthor,
+      Author,
       null,
-      ["directComments", "jdtComments"],
+      ["comments", "commentsWithForeignKey"],
       Nodes.OuterJoin,
     );
-    const node = nodeAt(jd, "jdtComments");
+    const node = nodeAt(jd, "commentsWithForeignKey");
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
     const joins = jd.joinConstraints([]);
-    // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
-    expect(node.effectiveSqlName).toBe("jdt_comments_jdt_authors");
+    // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join)
+    // — `Reflection#alias_candidate` (reflection.rb:328).
+    expect(node.effectiveSqlName).toBe("comments_with_foreign_keys_authors");
 
     // Target aliased — Rails encodes this as a `TableAlias` over the real table.
     const targetTable = (node.arelJoin as Nodes.OuterJoin).left as TableRef;
-    expect(tableRealName(targetTable)).toBe("jdt_comments");
-    expect(tableSqlName(targetTable)).toBe("jdt_comments_jdt_authors");
+    expect(tableRealName(targetTable)).toBe("comments");
+    expect(tableSqlName(targetTable)).toBe("comments_with_foreign_keys_authors");
 
     // Through still uses real name
-    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "jdt_posts")!;
+    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "posts")!;
     expect(throughJoin).toBeDefined();
     expect((throughJoin.left as Table).tableAlias).toBeNull();
   });
@@ -127,101 +90,30 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     // (join_dependency.rb:228-240): a `has_many :through` is ONE tree edge whose
     // `join_constraints` walks `reflection.chain` internally, so the through
     // link never becomes a child of the root.
-    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, null, "comments", Nodes.OuterJoin);
     const joins = jd.joinConstraints([]);
-    const node = nodeAt(jd, "jdtComments");
+    const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
 
     const root = jd.joinRoot;
-    expect(root.baseKlass).toBe(JdtAuthor);
+    expect(root.baseKlass).toBe(Author);
     expect(root.children.length).toBe(1);
     const targetChild = root.children[0];
-    expect(targetChild.immediateAssocName).toBe("jdtComments");
-    expect(targetChild.tableName).toBe("jdt_comments");
+    expect(targetChild.immediateAssocName).toBe("comments");
+    expect(targetChild.tableName).toBe("comments");
 
-    expect(joinedTableNames(joins)).toEqual(["jdt_posts", "jdt_comments"]);
+    expect(joinedTableNames(joins)).toEqual(["posts", "comments"]);
   });
 
   it("emits canonical self-join aliases when a nested-through chain references a table multiple times", () => {
     // Mirrors the alias-emission slice of Rails
     // test_nested_has_many_through_with_a_table_referenced_multiple_times
-    // (nested_through_associations_test.rb:437): Author.similar_posts walks
-    // Author -> tags -> tagged_posts so the chain visits `posts` and `taggings`
-    // twice. AliasTracker names the colliding self-joins
+    // (nested_through_associations_test.rb:437): Author.similar_posts
+    // (author.rb:165) walks Author -> tags -> tagged_posts so the chain visits
+    // `posts` and `taggings` twice. AliasTracker names the colliding self-joins
     // `{plural_name}_{owner_table}_join` (join_dependency.rb:204-206), giving
     // `posts_authors_join` / `taggings_authors_join`.
-    class StjAuthor extends Base {
-      static {
-        this.tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class StjPost extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    class StjTagging extends Base {
-      static {
-        this.tableName = "taggings";
-        this.attribute("tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-      }
-    }
-    class StjTag extends Base {
-      static {
-        this.tableName = "tags";
-        this.attribute("name", "string");
-      }
-    }
-    for (const m of [StjAuthor, StjPost, StjTagging, StjTag]) {
-      (m as any)._associations = [];
-      registerModel(m);
-    }
-    Associations.hasMany.call(StjAuthor, "posts", {
-      className: "StjPost",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(StjPost, "taggings", {
-      className: "StjTagging",
-      foreignKey: "taggable_id",
-      as: "taggable",
-    });
-    Associations.hasMany.call(StjAuthor, "taggings", {
-      className: "StjTagging",
-      through: "posts",
-      source: "taggings",
-    });
-    Associations.belongsTo.call(StjTagging, "tag", { className: "StjTag", foreignKey: "tag_id" });
-    Associations.hasMany.call(StjAuthor, "tags", {
-      className: "StjTag",
-      through: "taggings",
-      source: "tag",
-    });
-    Associations.hasMany.call(StjTag, "taggings", {
-      className: "StjTagging",
-      foreignKey: "tag_id",
-    });
-    Associations.belongsTo.call(StjTagging, "taggable", {
-      polymorphic: true,
-      foreignKey: "taggable_id",
-    });
-    Associations.hasMany.call(StjTag, "taggedPosts", {
-      className: "StjPost",
-      through: "taggings",
-      source: "taggable",
-      sourceType: "StjPost",
-    });
-    Associations.hasMany.call(StjAuthor, "similarPosts", {
-      className: "StjPost",
-      through: "tags",
-      source: "taggedPosts",
-    });
-
-    const jd = new JoinDependency(StjAuthor, null, "similarPosts", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, null, "similarPosts", Nodes.OuterJoin);
     const node = nodeAt(jd, "similarPosts");
     expect(node).not.toBeNull();
 
@@ -240,7 +132,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     // The canonical alias is addressable in the emitted SQL. Match either
     // quote style (PG/SQLite double-quote, MySQL backtick) so the assertion
     // isn't tied to the test adapter's quoting.
-    const sql = (StjAuthor as any).all().leftJoins(":similarPosts").toSql();
+    const sql = (Author as any).all().leftJoins(":similarPosts").toSql();
     expect(sql).toMatch(/["`]taggings["`]\s+["`]taggings_authors_join["`]/);
     expect(sql).toMatch(/["`]posts["`]\s+["`]posts_authors_join["`]/);
   });
@@ -248,115 +140,78 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   it("aliases a referenced through-target table to the reference name when free", () => {
     // Mirrors Rails JoinDependency#make_constraints consuming `@references`
     // uniformly across every reflection in the chain (join_dependency.rb:202):
-    // `Author.includes(:jdt_comments).references(:jdt_comments)` records the
+    // `Author.includes(:comments_with_foreign_key).references(...)` records the
     // through-target name in `@references`, and when its join is emitted
-    // `aliased_table_for` uses the referenced name on first/free use
-    // (`jdt_comments AS jdtComments`). The aliasing is consumed lazily in
-    // `joinConstraints`/`makeConstraints`, so the through-target JoinAssociation
-    // is reference-aliased identically to a direct join target — without
-    // `_addThroughViaJoinAssociation` receiving `references` at build time.
-    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
-    const target = jd.nodes.find((n) => n.immediateAssocName === "jdtComments")!;
-    expect(target.effectiveSqlName).toBe("jdt_comments");
+    // `aliased_table_for` uses the referenced name on first/free use. The
+    // aliasing is consumed lazily in `joinConstraints`/`makeConstraints`, so the
+    // through-target JoinAssociation is reference-aliased identically to a
+    // direct join target — without `_addThroughViaJoinAssociation` receiving
+    // `references` at build time.
+    const jd = new JoinDependency(Author, null, "commentsWithForeignKey", Nodes.OuterJoin);
+    const target = jd.nodes.find((n) => n.immediateAssocName === "commentsWithForeignKey")!;
+    expect(target.effectiveSqlName).toBe("comments");
 
     // Lazily consume references; the free reference name renames the target.
-    jd.joinConstraints([], (jd as any)._aliasTracker, [new Nodes.SqlLiteral("jdtComments")]);
-    expect(target.effectiveSqlName).toBe("jdtComments");
-    expect(tableRealName(target.arelTable as TableRef)).toBe("jdt_comments");
-    expect(tableSqlName(target.arelTable as TableRef)).toBe("jdtComments");
+    jd.joinConstraints([], (jd as any)._aliasTracker, [
+      new Nodes.SqlLiteral("commentsWithForeignKey"),
+    ]);
+    expect(target.effectiveSqlName).toBe("commentsWithForeignKey");
+    expect(tableRealName(target.arelTable as TableRef)).toBe("comments");
+    expect(tableSqlName(target.arelTable as TableRef)).toBe("commentsWithForeignKey");
 
     // The intermediate chain link is internal and never reference-aliased.
-    expect(joinedTableNames(jd.joinConstraints([]))).toContain("jdt_posts");
+    expect(joinedTableNames(jd.joinConstraints([]))).toContain("posts");
   });
 
   it("reuses one chain-tail alias for two distinct through associations sharing it", () => {
     // Mirrors Rails JoinDependency#make_constraints memoizing `@joined_tables`
-    // (join_dependency.rb:193-200): two `through: :posts` associations both
-    // carry the owner's single `posts` reflection as their chain tail, so
-    // eager-loading both reuses ONE `mem_posts` join instead of minting a
-    // second `mem_posts_mem_authors_join` alias.
-    class MemAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("memPosts", { className: "MemPost", foreignKey: "author_id" });
-        this.hasMany("memComments", {
-          through: "memPosts",
-          source: "memComments",
-          className: "MemComment",
-        });
-        this.hasMany("memRatings", {
-          through: "memPosts",
-          source: "memRatings",
-          className: "MemRating",
-        });
-      }
-    }
-    class MemPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.hasMany("memComments", { className: "MemComment", foreignKey: "post_id" });
-        this.hasMany("memRatings", { className: "MemRating", foreignKey: "post_id" });
-      }
-    }
-    class MemComment extends Base {
-      static {
-        this.attribute("post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    class MemRating extends Base {
-      static {
-        this.attribute("post_id", "integer");
-        this.attribute("value", "integer");
-      }
-    }
-    for (const m of [MemAuthor, MemPost, MemComment, MemRating]) {
-      registerModel(m);
-    }
-
-    const jd = new JoinDependency(MemAuthor, null, ["memComments", "memRatings"], Nodes.OuterJoin);
+    // (join_dependency.rb:193-200): `Author.comments` (author.rb:19) and
+    // `Author.taggings` (author.rb:158) are both `through: :posts`, so they
+    // carry the owner's single `posts` reflection as their chain tail and
+    // eager-loading both reuses ONE `posts` join instead of minting a second
+    // `posts_authors_join` alias.
+    const jd = new JoinDependency(Author, null, ["comments", "taggings"], Nodes.OuterJoin);
     const effectiveNames = joinedTableNames(jd.joinConstraints([]));
-    // Exactly one `mem_posts` join survives; the shared tail emits no spurious
+    // Exactly one `posts` join survives; the shared tail emits no spurious
     // `_join` alias for the second through path.
-    expect(effectiveNames.filter((n) => n === "mem_posts").length).toBe(1);
-    expect(effectiveNames.some((n) => n.includes("mem_posts") && n.includes("_join"))).toBe(false);
+    expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
+    expect(effectiveNames.some((n) => n.includes("posts") && n.includes("_join"))).toBe(false);
 
-    // Both targets still join — and both key off the one shared `mem_posts`.
-    expect(effectiveNames).toContain("mem_comments");
-    expect(effectiveNames).toContain("mem_ratings");
+    // Both targets still join — and both key off the one shared `posts`.
+    expect(effectiveNames).toContain("comments");
+    expect(effectiveNames).toContain("taggings");
   });
 
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
     // Rails JoinDependency#make_constraints memoizes `@joined_tables` for EVERY
     // child (join_dependency.rb:193-209), including a plain (non-through)
-    // include. The direct `jdtPosts` include and the `jdtComments`-through-posts
-    // path both carry the owner's single `jdtPosts` reflection as a chain tail,
-    // so the direct include populates the memo and the through path reuses that
-    // ONE `jdt_posts` join instead of minting a second
-    // `jdt_posts_jdt_authors_join` alias.
-    const jd = new JoinDependency(JdtAuthor, null, ["jdtPosts", "jdtComments"], Nodes.OuterJoin);
+    // include. The direct `posts` include and the `comments`-through-posts path
+    // both carry the owner's single `posts` reflection as a chain tail, so the
+    // direct include populates the memo and the through path reuses that ONE
+    // `posts` join instead of minting a second `posts_authors_join` alias.
+    const jd = new JoinDependency(Author, null, ["posts", "comments"], Nodes.OuterJoin);
     const joins = jd.joinConstraints([]);
-    const directNode = nodeAt(jd, "jdtPosts");
-    const node = nodeAt(jd, "jdtComments");
+    const directNode = nodeAt(jd, "posts");
+    const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
 
-    // The direct include keeps the real `jdt_posts` name (first use) and owns
+    // The direct include keeps the real `posts` name (first use) and owns
     // the one emitted join.
-    expect(directNode.effectiveSqlName).toBe("jdt_posts");
+    expect(directNode.effectiveSqlName).toBe("posts");
     const directTable = (directNode.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(directTable.name).toBe("jdt_posts");
+    expect(directTable.name).toBe("posts");
     expect(directTable.tableAlias).toBeNull();
 
-    // The through link reuses the memoized `jdt_posts` alias — it is suppressed
-    // (no duplicate join emitted) so exactly one `jdt_posts` join survives and
+    // The through link reuses the memoized `posts` alias — it is suppressed
+    // (no duplicate join emitted) so exactly one `posts` join survives and
     // no spurious `_join` alias is minted.
     const effectiveNames = joinedTableNames(joins);
-    expect(effectiveNames.filter((n) => n === "jdt_posts").length).toBe(1);
+    expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
     expect(effectiveNames.some((n) => n.includes("_join"))).toBe(false);
 
-    // Target uses real name (first use), keyed off the one shared `jdt_posts`.
+    // Target uses real name (first use), keyed off the one shared `posts`.
     const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(targetTable.name).toBe("jdt_comments");
+    expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
   });
 });
