@@ -247,18 +247,20 @@ export function isCounterCacheColumn(this: typeof Base, columnName: string): boo
 export function loadSchemaBang(this: typeof Base): void {
   getCounterCacheColumns(this);
 
+  // `registerModel` also accepts stand-ins that do not descend from `Base`, so
+  // the class_attribute defaults of counter_cache.rb:9-10 (and reflection.rb:11)
+  // have to be supplied here rather than read off the constructor chain.
+  const reflections = ((this as any)._reflections ?? {}) as Record<string, any>;
   const associationNames: string[] = [];
-  for (const [name, reflection] of Object.entries(
-    (this as any)._reflections as Record<string, any>,
-  )) {
+  for (const [name, reflection] of Object.entries(reflections)) {
     if (!reflection?.belongsTo?.() || !reflection.counterCacheColumn?.()) continue;
     associationNames.push(name);
   }
+  let names: string[] = this.counterCachedAssociationNames ?? [];
   for (const name of associationNames) {
-    if (!this.counterCachedAssociationNames.includes(name)) {
-      this.counterCachedAssociationNames = [...this.counterCachedAssociationNames, name];
-    }
+    if (!names.includes(name)) names = [...names, name];
   }
+  this.counterCachedAssociationNames = names;
 }
 
 /**
@@ -290,16 +292,15 @@ function getCounterCacheColumns(modelClass: typeof Base): string[] {
     for (const col of pendingCounterCacheColumns.get(key)!) {
       // belongs_to.rb:40 — `klass._counter_cache_columns |= [cache_column]`.
       const column = col();
-      if (!modelClass._counterCacheColumns.includes(column)) {
-        modelClass._counterCacheColumns = [...modelClass._counterCacheColumns, column];
-      }
+      const columns = modelClass._counterCacheColumns ?? [];
+      if (!columns.includes(column)) modelClass._counterCacheColumns = [...columns, column];
     }
     // Intentionally keep the pending entry so that if the target class is
     // re-defined and re-registered (e.g. between tests), the next
     // registerModel call also flushes the column into the new class.
     // The union above makes repeated flushes idempotent.
   }
-  return modelClass._counterCacheColumns;
+  return modelClass._counterCacheColumns ?? [];
 }
 
 /**
