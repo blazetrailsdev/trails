@@ -38,3 +38,14 @@ describe("TimeType assert_valid_value", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+// `serialize_cast_value` comes from Helpers::TimeValue, included AFTER
+// AcceptsMultiparameterTime (time.rb:40-43), so it sits nearer the class than
+// the mixin's `serialize` and the predicate (serialize_cast_value.rb:9-12) is
+// true.
+describe("TimeType serialize_cast_value_compatible?", () => {
+  it("is compatible", () => {
+    const type = new Types.TimeType();
+    expect(type.itselfIfSerializeCastValueCompatible()).toBe(type);
+  });
+});
