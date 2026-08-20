@@ -7,7 +7,7 @@
  * `hasAttribute` alias resolution, and the readonly-attribute raise. Test names
  * are kept verbatim per CLAUDE.md.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { GeneratedAttributeMethods, isMethodDefinedWithin } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
@@ -342,6 +342,22 @@ describe("AttributeMethodsTest (trails)", () => {
     (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
 
     expect((new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBeUndefined();
+  });
+
+  it("generates once when the schema load drives generation first", () => {
+    class Widget extends Base {
+      static override tableName = "posts";
+    }
+    const spy = vi.spyOn(
+      Widget as unknown as { defineMethodAttribute(name: string): void },
+      "defineMethodAttribute",
+    );
+
+    generatable(Widget).defineAttributeMethods();
+
+    const names = spy.mock.calls.map(([name]) => name);
+    expect(names.length).toBe(new Set(names).size);
+    spy.mockRestore();
   });
 
   it("an inherited class-body method is already implemented for the subclass", () => {

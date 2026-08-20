@@ -379,6 +379,17 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // only the superclass cascade (above) and generateAliasAttributes (below) run.
   if (this.abstractClass !== true) {
     loadSchema.call(this as never);
+    // Rails re-checks `@attribute_methods_generated` after the step that can
+    // yield to another generator — the mutex it takes at attribute_methods.rb:108-110.
+    // trails' yielding step is `load_schema` itself: a cold load ends in the
+    // post-load generation trigger (model-schema.ts), which runs this whole
+    // body first, so the same re-check is what keeps generation single.
+    if (
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated
+    ) {
+      return false;
+    }
     amDefineAttributeMethods.call(this as never, ...this.attributeNames());
     if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
   }
