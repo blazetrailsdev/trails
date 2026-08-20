@@ -258,6 +258,26 @@ describe("attribute_names table_exists? guard (trails)", () => {
 describe("ignored columns follow Rails' value-keyed attribute set (trails)", () => {
   fixtures([]);
 
+  // `ignored_columns=` (model_schema.rb:366-369) calls only
+  // `reload_schema_from_cache` (:553-571), which nils the memos and clears
+  // `@schema_loaded`. It never calls `undefine_attribute_methods` — only
+  // `reset_column_information` (:523-530) does — so an accessor generated
+  // BEFORE the ignore survives it in Ruby. Rails' own coverage matches: the
+  // methods assertions (base_test.rb:1796-1806) use models that ignore in the
+  // class body, and the post-generation assignment (base_test.rb:1844-1846)
+  // asserts `column_names` only.
+  it("assigning ignoredColumns after generation leaves the generated accessor live", async () => {
+    class Developer extends Base {
+      static tableName = "developers";
+    }
+    expect(Developer.columnNames()).toContain("first_name");
+
+    Developer.ignoredColumns = ["first_name"];
+
+    expect(Developer.columnNames()).not.toContain("first_name");
+    expect("first_name" in Developer.prototype).toBe(true);
+  });
+
   it("a plain ignored column projected by a raw SELECT * is readable and responds", async () => {
     class Topic extends Base {
       static tableName = "topics";

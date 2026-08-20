@@ -1633,10 +1633,8 @@ describe("BasicsTest", () => {
     expect(Developer.columnNames()).toContain("first_name");
     Developer.ignoredColumns = ["first_name"];
     expect(Developer.columnNames()).not.toContain("first_name");
-    expect("first_name" in Developer.prototype).toBe(false);
     Developer.ignoredColumns = ["first_name", "salary"];
     expect(Developer.columnNames()).not.toContain("salary");
-    expect("salary" in Developer.prototype).toBe(false);
   });
   it("column names are quoted when using #from clause and model has ignored columns", () => {
     class User extends Base {

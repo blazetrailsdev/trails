@@ -8,7 +8,7 @@
  */
 
 import type { Base } from "../../base.js";
-import type { TableRef, Nodes } from "@blazetrails/arel";
+import type { TableRef } from "@blazetrails/arel";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
@@ -26,7 +26,6 @@ export abstract class JoinPart {
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
-  arelJoin: Nodes.Join | null = null;
   /** @internal */
   nodeReflection: any | null = null;
   immediateAssocName = "";

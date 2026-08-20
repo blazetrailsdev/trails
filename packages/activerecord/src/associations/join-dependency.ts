@@ -554,19 +554,9 @@ export class JoinDependency {
       // Rails keeps the whole chain inside the one JoinAssociation
       // (join_association.rb:32-73); only the chain's ROOT link is a tree node,
       // so only its resolved table lands back on the node.
-      child.arelJoin = null;
       if (resolvedRoot) {
         child.arelTable = resolvedRoot.aliased;
         child.effectiveSqlName = resolvedRoot.effectiveName;
-        // `joinConstraints` walks the chain in reverse, so the root link's own
-        // constraint join is the one built against the table this block handed
-        // back for it. Identity, not table name — a scope join source is built
-        // from `scope.arel(...).join_sources` (join_association.rb:64-69) and so
-        // is never the same instance even when it joins a same-named table.
-        child.arelJoin =
-          (built as Nodes.Join[]).find(
-            (join) => (join as { left?: unknown }).left === resolvedRoot!.aliased,
-          ) ?? null;
       }
       joins.push(...(built as Nodes.Join[]));
       this._aliasesCache = undefined;

@@ -11,6 +11,7 @@
 
 import { Model, AttrNames, buildMangledName } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
+import { completeHalfAccessor } from "./read.js";
 
 /**
  * The Write module interface.
@@ -65,6 +66,9 @@ export function setDefineMethodAttribute(
     writer: true,
   });
   const tempMethodName = buildMangledName(methodName);
+  completeHalfAccessor(this, as, "set", function (this: Model, value: unknown) {
+    this._writeAttribute(canonicalName, value);
+  });
   owner.defineCachedMethod(
     tempMethodName,
     { namespace: "active_record", as: `${as}=` },

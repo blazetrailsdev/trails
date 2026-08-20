@@ -14,7 +14,9 @@ describe("ReadTest", () => {
   // three}, empty attribute_types): a minimal AttributeMethods host whose
   // accessors are NOT eagerly generated, so we can observe lazy generation
   // via `define_attribute_methods`. A real Base subclass generates accessors
-  // eagerly at `attribute()` declaration, which would mask the gate.
+  // eagerly at `attribute()` declaration, which would mask the gate. Rails' fake
+  // klass does `include ActiveRecord::AttributeMethods` (read_test.rb:20); the
+  // statics below are that include.
   function buildKlass() {
     class Klass {
       static _attributeDefinitions = new Map<string, { name: string }>([
@@ -23,9 +25,17 @@ describe("ReadTest", () => {
         ["three", { name: "three" }],
       ]);
       static _attributeMethodsGenerated = false;
+      static _attributeMethodPatterns = Base._attributeMethodPatterns;
+      static _attributeAliases = {};
+      static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
+      static defineMethodAttribute = Base.defineMethodAttribute;
+      static setDefineMethodAttribute = Base.setDefineMethodAttribute;
       static attributeMethodsGenerated = isAttributeMethodsGenerated;
       static attributeNames = ClassMethods.attributeNames;
+      static _hasAttribute = ClassMethods._hasAttribute;
+      static attributeTypes = () => ({});
+      static aliasAttribute = Base.aliasAttribute;
     }
     return Klass;
   }

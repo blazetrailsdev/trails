@@ -29,6 +29,15 @@ function joinedTableNames(joins: Nodes.Join[]): string[] {
   return joins.map((join) => tableSqlName(join.left as TableRef));
 }
 
+/**
+ * The join a node's own chain root contributed, picked out of what
+ * `joinConstraints` returned — Rails' JoinAssociation keeps no back-reference to
+ * it (join_dependency.rb:189-211 concatenates the joins into the arel).
+ */
+function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
+  return joins.find((join) => tableSqlName(join.left as TableRef) === node.effectiveSqlName)!;
+}
+
 describe("JoinDependency has_many :through real-table-name reuse", () => {
   // The canonical schema and models: `Author.comments` is
   // `has_many :comments, through: :posts` (author.rb:19), the same shape Rails'
@@ -41,11 +50,11 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
-    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
     expect(node.effectiveSqlName).toBe("comments");
 
     // Target table uses real name (no alias)
-    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
+    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
 
@@ -75,7 +84,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(node.effectiveSqlName).toBe("comments_with_foreign_keys_authors");
 
     // Target aliased — Rails encodes this as a `TableAlias` over the real table.
-    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as TableRef;
+    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as TableRef;
     expect(tableRealName(targetTable)).toBe("comments");
     expect(tableSqlName(targetTable)).toBe("comments_with_foreign_keys_authors");
 
@@ -198,7 +207,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     // The direct include keeps the real `posts` name (first use) and owns
     // the one emitted join.
     expect(directNode.effectiveSqlName).toBe("posts");
-    const directTable = (directNode.arelJoin as Nodes.OuterJoin).left as Table;
+    const directTable = (joinFor(joins, directNode) as Nodes.OuterJoin).left as Table;
     expect(directTable.name).toBe("posts");
     expect(directTable.tableAlias).toBeNull();
 
@@ -210,7 +219,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(effectiveNames.some((n) => n.includes("_join"))).toBe(false);
 
     // Target uses real name (first use), keyed off the one shared `posts`.
-    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
+    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
   });

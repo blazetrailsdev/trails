@@ -1109,6 +1109,18 @@ function reflectedTypeForColumn(
 }
 
 /**
+ * Classes whose accessor regeneration is already in flight. `applyColumnsHash`
+ * regenerates through `define_attribute_methods`, which reads `attribute_names`
+ * (attribute_methods.rb:115) → `columnNames()` → `loadSchema` — and it runs
+ * *inside* that load, whose superclass cascade can re-stale this class's memo.
+ *
+ * @noRailsEquivalent PERMANENT — guards the re-entrancy trails' schema-reflection
+ * hook adds to `define_attribute_methods`; Rails' `load_schema!` generates no
+ * methods, so the cycle it breaks does not exist upstream.
+ */
+const regeneratingAttributeMethods = new WeakSet<object>();
+
+/**
  * Sync worker: apply a columns hash (already fetched from the schema
  * cache) to `_attributeDefinitions`. Shared by sync `loadSchema` and
  * async `loadSchemaFromAdapter`.
@@ -1130,13 +1142,6 @@ function applyColumnsHash(
   const filteredHash: Record<string, unknown> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) {
-      // Remove the prototype accessor unconditionally so `name in record`
-      // respects the ignore. Only drop the attribute def when it's
-      // schema-sourced — user-declared defs survive `ignoredColumns`
-      // per base.test.ts semantics.
-      if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
-        delete host.prototype[name];
-      }
       const existing = host._attributeDefinitions.get(name);
       if (!existing || (existing.userProvided ?? true) === false) {
         host._attributeDefinitions.delete(name);
@@ -1202,7 +1207,14 @@ function applyColumnsHash(
     defineAttributeMethods?: () => boolean;
   };
   methodHost._attributeMethodsGenerated = false;
-  methodHost.defineAttributeMethods?.();
+  if (!regeneratingAttributeMethods.has(host)) {
+    regeneratingAttributeMethods.add(host);
+    try {
+      methodHost.defineAttributeMethods?.();
+    } finally {
+      regeneratingAttributeMethods.delete(host);
+    }
+  }
 
   type CacheBag = {
     _attributesBuilder?: unknown;
@@ -1524,16 +1536,6 @@ export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   if (value !== undefined) {
     reloadSchemaFromCache.call(this);
     this._ignoredColumns = value.map(String);
-    for (const col of value) {
-      if (col in this.prototype) {
-        Object.defineProperty(this.prototype, col, {
-          get: undefined,
-          set: undefined,
-          configurable: true,
-        });
-        delete (this.prototype as any)[col];
-      }
-    }
   }
   return this._ignoredColumns ?? [];
 }

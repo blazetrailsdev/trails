@@ -471,3 +471,35 @@ describe("methodDefinedWithin (trails)", () => {
     expect(within("greet", Inherits)).toBe(false);
   });
 });
+
+// `define_attribute_methods` gates its whole generation body behind
+// `unless abstract_class?` (attribute_methods.rb:104-125), so an abstract class
+// gets no per-attribute accessors — reader, writer, `*_before_type_cast` or
+// `*_for_database` — while its concrete subclass gets all of them. The
+// generated methods live on the class's own GeneratedAttributeMethods carrier
+// spliced into its prototype chain, so `in` is what observes them; an
+// own-property check sees neither.
+describe("define_attribute_methods abstract gate (trails)", () => {
+  fixtures({});
+
+  it("an abstract class generates no per-attribute accessors and its concrete subclass does", () => {
+    class AbstractTopic extends Base {
+      static tableName = "topics";
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class ConcreteTopic extends AbstractTopic {}
+
+    (AbstractTopic as unknown as { defineAttributeMethods(): boolean }).defineAttributeMethods();
+    (ConcreteTopic as unknown as { defineAttributeMethods(): boolean }).defineAttributeMethods();
+
+    expect("author_name" in AbstractTopic.prototype).toBe(false);
+    expect("author_nameBeforeTypeCast" in AbstractTopic.prototype).toBe(false);
+    expect("author_nameForDatabase" in AbstractTopic.prototype).toBe(false);
+
+    expect("author_name" in ConcreteTopic.prototype).toBe(true);
+    expect("author_nameBeforeTypeCast" in ConcreteTopic.prototype).toBe(true);
+    expect("author_nameForDatabase" in ConcreteTopic.prototype).toBe(true);
+  });
+});

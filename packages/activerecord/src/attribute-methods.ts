@@ -8,8 +8,8 @@ import {
   MissingAttributeError,
   missingAttribute,
   resolveAliasNameIn,
-  defineDirtyAttributeMethods,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
+  defineAttributeMethods as amDefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
@@ -198,8 +198,10 @@ interface AttributeMethodsHost {
   _ignoredColumns?: string[];
   prototype: any;
   isBaseClass?(): boolean;
+  attributeNames(): string[];
   abstractClass?: boolean;
-  aliasAttribute?(newName: string, oldName: string): void;
+  aliasAttribute(newName: string, oldName: string): void;
+  _hasAttribute(attrName: string): boolean;
   defineAttributeMethods?(): boolean;
   generateAliasAttributes?(): void;
 }
@@ -396,109 +398,12 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // no table, so it generates no per-attribute accessors and no id_value alias —
   // only the superclass cascade (above) and generateAliasAttributes (below) run.
   if (this.abstractClass !== true) {
-    generateConcreteAttributeMethods.call(this);
+    amDefineAttributeMethods.call(this as never, ...this.attributeNames());
+    if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
   }
   generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
   return true;
-}
-
-function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
-  // Generate getter/setter for each attribute definition that doesn't
-  // already have one on the prototype (mirrors Rails' define_attribute_methods).
-  // This is the single generation path: the declaration sites
-  // (Attributes#defineAttribute, ModelSchema#applyColumnsHash) invalidate
-  // `_attributeMethodsGenerated` and route here rather than installing
-  // accessors inline, mirroring Rails' lazy `define_attribute_methods`.
-  const proto = this.prototype;
-  const ignored = new Set(this._ignoredColumns ?? []);
-  for (const name of this._attributeDefinitions.keys()) {
-    // ignored columns keep their (possibly user-declared) definition but expose
-    // no accessor — mirrors applyColumnsHash's strip-accessor-keep-def behavior.
-    if (ignored.has(name)) continue;
-    // `id` is left to Base.prototype.id (the CPK-aware getter), never a plain
-    // attribute accessor — matches the id-skip in the declaration sites.
-    if (name === "id") {
-      if (Object.prototype.hasOwnProperty.call(proto, "id")) {
-        delete (proto as Record<string, unknown>)["id"];
-      }
-      continue;
-    }
-    // Gate get and set independently: a user-defined setter should not suppress
-    // the generated reader, and vice versa — mirrors Rails' per-method generation.
-    // Walk the full prototype chain to find an existing descriptor for this name.
-    const existingDesc = (() => {
-      let p: object | null = proto;
-      while (p != null) {
-        const d = Object.getOwnPropertyDescriptor(p, name);
-        if (d) return d;
-        p = Object.getPrototypeOf(p) as object | null;
-      }
-      return undefined;
-    })();
-    const needsGetter =
-      existingDesc == null || (existingDesc.get == null && !("value" in existingDesc));
-    const needsSetter =
-      existingDesc == null || (existingDesc.set == null && !("value" in existingDesc));
-    if (needsGetter || needsSetter) {
-      // If a partial accessor already exists on the proto, we must redefine it to
-      // add the missing half; otherwise install a fresh descriptor.
-      const ownDesc = Object.getOwnPropertyDescriptor(proto, name);
-      const newDesc: PropertyDescriptor = { configurable: true };
-      if (needsGetter) {
-        newDesc.get = function (this: AttributeAccessorHost) {
-          // Rails' generated reader is `_read_attribute(name) { |n|
-          // missing_attribute(n, caller) }` — a known-but-unselected column
-          // yields to the block and raises, matching `record[attr]`.
-          return this._readAttribute(name, (n) => {
-            throw new MissingAttributeError(
-              `missing attribute '${n}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-            );
-          });
-        };
-      } else if (ownDesc?.get) {
-        newDesc.get = ownDesc.get;
-      }
-      if (needsSetter) {
-        newDesc.set = function (this: AttributeAccessorHost, value: unknown) {
-          this.writeAttribute(name, value);
-        };
-      } else if (ownDesc?.set) {
-        newDesc.set = ownDesc.set;
-      }
-      Object.defineProperty(proto, name, newDesc);
-    }
-    // Per-attribute *BeforeTypeCast / *ForDatabase aliases. Rails generates
-    // these via `attribute_method_suffix "_before_type_cast", "_for_database"`
-    // in AttributeMethods::BeforeTypeCast.
-    const btcName = `${name}BeforeTypeCast`;
-    if (!Object.prototype.hasOwnProperty.call(this.prototype, btcName)) {
-      Object.defineProperty(this.prototype, btcName, {
-        get(this: { readAttributeBeforeTypeCast(n: string): unknown }) {
-          return this.readAttributeBeforeTypeCast(name);
-        },
-        configurable: true,
-      });
-    }
-    const fdName = `${name}ForDatabase`;
-    if (!Object.prototype.hasOwnProperty.call(this.prototype, fdName)) {
-      Object.defineProperty(this.prototype, fdName, {
-        get(this: { readAttributeForDatabase(n: string): unknown }) {
-          return this.readAttributeForDatabase(name);
-        },
-        configurable: true,
-      });
-    }
-    defineDirtyAttributeMethods.call(this as any, name);
-  }
-  // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` — inside the
-  // `unless abstract_class?` block, so it only runs for concrete classes (this
-  // helper is only invoked when not abstract). Routed through aliasAttribute so
-  // it composes with generateAliasAttributes and the alias getter reads the
-  // (CPK-aware) id column.
-  if (this._attributeDefinitions.has("id") && typeof this.aliasAttribute === "function") {
-    this.aliasAttribute("idValue", "id");
-  }
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
@@ -809,8 +714,22 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
   return names;
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#_has_attribute?
+ * (attribute_methods.rb:260-262).
+ *
+ * @internal Rails-private helper.
+ */
+function classHasAttribute(
+  this: { attributeTypes(): Record<string, unknown> },
+  attrName: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(this.attributeTypes(), attrName);
+}
+
 export const ClassMethods = {
   attributeNames: classAttributeNames,
+  _hasAttribute: classHasAttribute,
 };
 
 // ---------------------------------------------------------------------------

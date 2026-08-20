@@ -86,6 +86,7 @@ import {
   defineMethodAttribute,
   undefineAttributeMethods,
   attributeMissing,
+  missingAttribute,
   attributeAliases,
   isAttributeAliases,
   attributeMethodPatterns,
@@ -1800,6 +1801,17 @@ export class Model {
    */
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
     return attributeMissing.call(this as Record<string, unknown>, match, ...args);
+  }
+
+  /**
+   * Mirrors: ActiveModel::AttributeMethods#missing_attribute
+   * (attribute_methods.rb:535-537) — the raise the generated readers' block
+   * runs for a known-but-unselected attribute.
+   *
+   * @internal Rails-private helper.
+   */
+  missingAttribute(attrName: string, stack?: string): never {
+    return missingAttribute.call(this as unknown as InstanceHost, attrName, stack);
   }
 
   /**
