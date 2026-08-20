@@ -217,7 +217,7 @@ describe("ReservedWordTest", () => {
 
   it("associations work with reserved words", async () => {
     await createTestFixtures("select", "group");
-    const selects = await Select.all().includes("groups");
+    const selects = await Select.all().includes(":groups");
     // Rails asserts the eager-loaded `groups` trigger zero queries here.
     await assertNoQueries(false, async () => {
       for (const s of selects) {

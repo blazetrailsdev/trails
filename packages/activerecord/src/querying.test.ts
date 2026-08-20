@@ -13,15 +13,15 @@ fixtures({ topics: [Topic, {}] });
 
 describe("QueryingTest — static forwarders on Base", () => {
   it("includes() returns a Relation without throwing", () => {
-    expect(Topic.includes("author")).toBeInstanceOf(Relation);
+    expect(Topic.includes(":author")).toBeInstanceOf(Relation);
   });
 
   it("preload() returns a Relation", () => {
-    expect(Topic.preload("comments")).toBeInstanceOf(Relation);
+    expect(Topic.preload(":comments")).toBeInstanceOf(Relation);
   });
 
   it("eagerLoad() returns a Relation", () => {
-    expect(Topic.eagerLoad("author")).toBeInstanceOf(Relation);
+    expect(Topic.eagerLoad(":author")).toBeInstanceOf(Relation);
   });
 
   it("references() returns a Relation", () => {
@@ -119,7 +119,7 @@ describe("QueryingTest — static forwarders on Base", () => {
   });
 
   it("includes().where() chains and produces valid SQL", () => {
-    const rel = Topic.includes("author").where({ title: "published" });
+    const rel = Topic.includes(":author").where({ title: "published" });
     expect(rel).toBeInstanceOf(Relation);
     const sql = rel.toSql();
     expect(sql).toContain("topics");

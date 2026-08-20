@@ -836,7 +836,7 @@ describe("PessimisticLockingTest", () => {
   // PostgreSQL protests SELECT ... FOR UPDATE on an outer join.
   it.skipIf(adapterType === "postgres")("eager find with lock", async () => {
     await Person.transaction(async () => {
-      await Person.includes("readers").lock().find(people("michael").id);
+      await Person.includes(":readers").lock().find(people("michael").id);
     });
   });
 

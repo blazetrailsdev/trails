@@ -136,12 +136,12 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for relation with includes", async () => {
-    const comments = Comment.includes("post").where({ "posts.type": "Post" });
+    const comments = Comment.includes(":post").where({ "posts.type": "Post" });
     expect(await comments.cacheKey()).toMatch(/^comments\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key for loaded relation with includes", async () => {
-    const comments = await Comment.includes("post").where({ "posts.type": "Post" }).load();
+    const comments = await Comment.includes(":post").where({ "posts.type": "Post" }).load();
     expect(await comments.cacheKey()).toMatch(/^comments\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
@@ -155,7 +155,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("update_all with includes will update cache_key", async () => {
-    const developers = Developer.includes("projects").where({ "projects.name": "Active Record" });
+    const developers = Developer.includes(":projects").where({ "projects.name": "Active Record" });
     const cacheKey = await developers.cacheKey();
 
     await developers.updateAll({ updated_at: Temporal.Now.instant() });
@@ -173,7 +173,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("delete_all with includes will update cache_key", async () => {
-    const developers = Developer.includes("projects").where({ "projects.name": "Active Record" });
+    const developers = Developer.includes(":projects").where({ "projects.name": "Active Record" });
     const cacheKey = await developers.cacheKey();
 
     await developers.deleteAll();
@@ -248,7 +248,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for loaded collection with zero size", async () => {
     await Comment.deleteAll();
-    const posts = Post.includes("comments");
+    const posts = Post.includes(":comments");
     const emptyLoadedCollection = (
       (await posts.first()) as unknown as { comments: Relation<Comment> }
     ).comments;

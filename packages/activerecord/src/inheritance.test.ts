@@ -474,19 +474,19 @@ describe("InheritanceTest", () => {
   });
 
   it("eager load belongs to something inherited", async () => {
-    const account = await Account.includes("firm").find(1);
+    const account = await Account.includes(":firm").find(1);
     expect(account.association("firm").loaded).toBe(true);
   });
 
   it("alt eager loading", async () => {
-    const cabbage = await RedCabbage.includes("seller").find(4);
+    const cabbage = await RedCabbage.includes(":seller").find(4);
     expect(cabbage.association("seller").loaded).toBe(true);
   });
 
   it("eager load belongs to primary key quoting", async () => {
     let error: unknown;
     try {
-      await Account.includes("firm").find(1);
+      await Account.includes(":firm").find(1);
     } catch (e) {
       error = e;
     }
@@ -704,7 +704,7 @@ describe("InheritanceAttributeMappingTest", () => {
     )) as string[];
     expect(rawTypes[0]).toMatch(/^omg_/);
 
-    const reloaded = await IamtSponsor.includes("sponsorable").find(sponsor.id);
+    const reloaded = await IamtSponsor.includes(":sponsorable").find(sponsor.id);
     expect((reloaded as any).sponsorable?.id).toBe(startup.id);
   });
 });

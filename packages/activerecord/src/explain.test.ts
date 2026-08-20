@@ -230,7 +230,7 @@ describe("ExplainTest", () => {
   });
 
   it("captures queries for eager-loaded associations, one block per query", async () => {
-    const plan = await Car.all().preload("bulbs").explain();
+    const plan = await Car.all().preload(":bulbs").explain();
     const blocks = plan.split(/^(?=EXPLAIN)/m).filter((b) => /EXPLAIN/.test(b));
     expect(blocks.length).toBeGreaterThanOrEqual(2);
     expect(plan.toLowerCase()).toContain("cars");
