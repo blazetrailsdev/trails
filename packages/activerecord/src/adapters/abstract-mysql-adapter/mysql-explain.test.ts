@@ -73,7 +73,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("explain options with eager loading", async () => {
       // Rails: Author.where(id: 1).includes(:posts).explain(explain_option)
       const result = await Author.where({ id: authors("david").id })
-        .includes("posts")
+        .includes(":posts")
         .explain(explainOpt);
       expect(result).toContain(`${expectedClause} for:`);
       const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
@@ -120,7 +120,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("Relation#explain on MySQL captures preload queries", async () => {
       const plan = await Author.where({ id: authors("david").id })
-        .preload("posts")
+        .preload(":posts")
         .explain();
       const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
       // The fallback path emits exactly one block (toSql() of the outer

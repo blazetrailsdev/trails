@@ -86,7 +86,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = (await ExAuthor.create({ name: "A" })) as any;
       await ExBook.create({ title: "B", ex_author_id: a.id });
 
-      const plan = await ExAuthor.all().preload("exBooks").explain();
+      const plan = await ExAuthor.all().preload(":exBooks").explain();
       const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
       expect(blocks.length).toBeGreaterThanOrEqual(2);
       expect(plan).toContain("ex_authors");
@@ -161,7 +161,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const author = (await OpAuthor.create({ name: "A" })) as any;
       await OpPost.create({ title: "B", op_author_id: author.id });
 
-      const plan = await OpAuthor.where({ id: author.id }).includes("opPosts").explain("analyze");
+      const plan = await OpAuthor.where({ id: author.id }).includes(":opPosts").explain("analyze");
       // Rails: assert_match %(QUERY PLAN), explain
       expect(plan).toContain("QUERY PLAN");
       // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "authors".*), explain

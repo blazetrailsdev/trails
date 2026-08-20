@@ -245,7 +245,7 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoped find include", async () => {
-    const scopedDevelopers = (await Developer.includes("projects").scoping(async () =>
+    const scopedDevelopers = (await Developer.includes(":projects").scoping(async () =>
       Developer.where({ "projects.id": 2 }).toArray(),
     )) as Base[];
     expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
@@ -623,7 +623,7 @@ describe("HasManyScopingTest", () => {
   it("should maintain default scope on eager loaded associations", async () => {
     const michael = people("michael");
     const loaded = (await Person.where({ id: michael.id })
-      .includes("badReferences")
+      .includes(":badReferences")
       .first()) as Base;
     const magician = (await BadReference.find(1)) as Base;
     const refs = await (loaded as any).badReferences.toArray();

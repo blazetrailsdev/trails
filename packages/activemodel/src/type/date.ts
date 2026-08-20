@@ -2,10 +2,14 @@ import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,
   Temporal,
+  Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { isPlainObject } from "@blazetrails/activesupport";
-import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
+import { include } from "@blazetrails/activesupport";
+import {
+  AcceptsMultiparameterTime,
+  type InstanceMethods,
+} from "./helpers/accepts-multiparameter-time.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -19,6 +23,13 @@ export type { DateInfinityType, DateNegativeInfinityType };
 
 export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (date.rb:28); the class/interface merge is how `include()` surfaces on the type side.
+export interface DateType extends Omit<
+  InstanceMethods<DateCastResult>,
+  "valueFromMultiparameterAssignment"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateType extends ValueType<DateCastResult> {
   readonly name: string = "date";
 
@@ -171,49 +182,26 @@ export class DateType extends ValueType<DateCastResult> {
    *     time && new_date(time.year, time.mon, time.mday)
    *   end
    *
-   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly,
-   * which trails reaches through the wrapper in
-   * `helpers/accepts-multiparameter-time.ts` rather than an ancestor.
+   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly, which
+   * this class mixes in below itself (see the `include` at the bottom of this
+   * file).
+   *
+   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
+   * does: TS types `super` against a declared base class only, never against a
+   * mixed-in module.
    *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    const time = new AcceptsMultiparameterTime(this).valueFromMultiparameterAssignment(
-      values as Record<string, unknown>,
-    );
+    const time = (
+      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
+        this: unknown,
+        valuesHash: Record<string, unknown>,
+      ) => RubyTime | null
+    ).call(this, values as Record<string, unknown>);
     return time && this.newDate(time.year, time.mon, time.mday);
-  }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
-   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
-   * `Value#cast` (value.rb:53-55), which is `super`.
-   */
-  override cast(value: unknown): DateCastResult | null {
-    if (isPlainObject(value)) {
-      return this.valueFromMultiparameterAssignment(value);
-    } else {
-      return super.cast(value);
-    }
-  }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
-   * a Hash value is validated by assembling it (raising on invalid input).
-   */
-  override assertValidValue(value: unknown): void {
-    if (isPlainObject(value)) {
-      this.valueFromMultiparameterAssignment(value);
-    } else {
-      super.assertValidValue(value);
-    }
-  }
-
-  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
-  override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isPlainObject(value);
   }
 
   /**
@@ -234,3 +222,7 @@ export class DateType extends ValueType<DateCastResult> {
 
 /** Mirrors: ActiveModel::Type::Date::ISO_DATE (date.rb:54). */
 const ISO_DATE = /^(\d{4})-(\d\d)-(\d\d)$/;
+
+/** Mirrors: `include Helpers::AcceptsMultiparameterTime.new` (date.rb:28). */
+const acceptsMultiparameterTime = new AcceptsMultiparameterTime();
+include(DateType, acceptsMultiparameterTime);

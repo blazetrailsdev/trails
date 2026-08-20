@@ -3,21 +3,32 @@ import {
   Date as RubyDate,
   Rational,
   Temporal,
+  Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { isPlainObject, toS } from "@blazetrails/activesupport";
+import { include, toS } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
-import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
+import {
+  AcceptsMultiparameterTime,
+  type InstanceMethods,
+} from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (date_time.rb:44-46); the class/interface merge is how `include()` surfaces on the type side.
+export interface DateTimeType extends Omit<
+  InstanceMethods<DateTimeCastResult>,
+  "valueFromMultiparameterAssignment"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
 
@@ -162,12 +173,16 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * trails spells one with (CLAUDE.md), so `{ ":a": 1 }` renders the `{:a=>1}`
    * MRI 3.3 emits.
    *
-   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly,
-   * which trails reaches through the wrapper in
-   * `helpers/accepts-multiparameter-time.ts` rather than an ancestor. Rails'
+   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly, which
+   * this class mixes in below itself (see the `include` at the bottom of this
+   * file). Rails'
    * cast result for a Hash IS that `::Time`; `DateTimeCastResult` is the
    * `Temporal.Instant` this port spells a `::Time` as, so the instant is read
    * back off it.
+   *
+   * `super` is reached as Ruby's own `instance_method(...).bind_call(self, ...)`
+   * does: TS types `super` against a declared base class only, never against a
+   * mixed-in module.
    *
    * @internal Rails-private helper.
    */
@@ -180,46 +195,17 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         `Provided hash ${toS(values)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
-    const time = new AcceptsMultiparameterTime(this, {
-      "4": 0,
-      "5": 0,
-    }).valueFromMultiparameterAssignment(values as Record<string, unknown>);
+    const time = (
+      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
+        this: unknown,
+        valuesHash: Record<string, unknown>,
+      ) => RubyTime | null
+    ).call(this, values as Record<string, unknown>);
     return time && time.toTime().toInstant();
   }
 
   get isUtc(): boolean {
     return isUtc();
-  }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
-   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
-   * `Value#cast` (value.rb:53-55), which is `super`.
-   */
-  override cast(value: unknown): DateTimeCastResult | null {
-    if (isPlainObject(value)) {
-      return this.valueFromMultiparameterAssignment(value);
-    } else {
-      return super.cast(value);
-    }
-  }
-
-  /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value.
-   * Runs eagerly at write_from_user time — this is how Rails surfaces
-   * MultiparameterAssignmentErrors at assignment (missing keys 1..3 raise).
-   */
-  override assertValidValue(value: unknown): void {
-    if (isPlainObject(value)) {
-      this.valueFromMultiparameterAssignment(value);
-    } else {
-      super.assertValidValue(value);
-    }
-  }
-
-  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
-  override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isPlainObject(value);
   }
 
   /**
@@ -259,3 +245,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return this.applySecondsPrecision(value);
   }
 }
+
+/**
+ * Mirrors: `include Helpers::AcceptsMultiparameterTime.new(defaults: { 4 => 0, 5 => 0 })`
+ * (date_time.rb:44-46).
+ */
+const acceptsMultiparameterTime = new AcceptsMultiparameterTime({ defaults: { "4": 0, "5": 0 } });
+include(DateTimeType, acceptsMultiparameterTime);
