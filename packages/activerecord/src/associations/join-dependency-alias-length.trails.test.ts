@@ -32,7 +32,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     const posts = new Table("posts");
-    tracker.aliasedTableFor(posts); // claim once so a repeat aliases + truncates
+    tracker.aliasedTableFor(posts, null, () => "unused"); // claim once so a repeat aliases + truncates
     expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(300)).name)).toBe(
       "a".repeat(256),
     );
@@ -42,7 +42,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const jd = new JoinDependency(stubBaseModel(63), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     const posts = new Table("posts");
-    tracker.aliasedTableFor(posts);
+    tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(200)).name)).toBe(
       "a".repeat(63),
     );
@@ -55,7 +55,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     // First claim keeps the full 256-slice; the repeat aliases through
     // `truncate` (slice to tableAliasLength - 2) with a `_2` suffix.
     const posts = new Table("posts");
-    tracker.aliasedTableFor(posts);
+    tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => candidate).name)).toBe(
       "a".repeat(256),
     );
@@ -76,7 +76,7 @@ describe("JoinDependency AliasTracker seeding", () => {
     const tracker = trackerOf(jd);
     // maxIdentifierLength default is 64.
     const posts = new Table("posts");
-    tracker.aliasedTableFor(posts);
+    tracker.aliasedTableFor(posts, null, () => "unused");
     expect(String(tracker.aliasedTableFor(posts, null, () => "a".repeat(200)).name)).toBe(
       "a".repeat(64),
     );

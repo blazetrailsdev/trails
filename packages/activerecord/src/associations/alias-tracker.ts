@@ -143,13 +143,13 @@ export class AliasTracker {
    *
    * Mirrors: `AliasTracker#aliased_table_for`
    * (`associations/alias_tracker.rb:58-75`). Ruby's block is a trailing
-   * parameter here; it is only invoked on the collision arm, exactly as
-   * `yield` is.
+   * parameter here; it is required, as Ruby's bare `yield`
+   * (`alias_tracker.rb:66`) is, and only invoked on the collision arm.
    */
   aliasedTableFor(
     arelTable: Table | any,
     tableName: string | null = null,
-    block?: () => string,
+    block: () => string,
   ): Table | any {
     tableName = (tableName ?? arelTable.name ?? String(arelTable)) as string;
 
@@ -161,7 +161,7 @@ export class AliasTracker {
       }
     } else {
       // Otherwise, we need to use an alias
-      let aliasedName = this.tableAliasFor(block ? block() : tableName);
+      let aliasedName = this.tableAliasFor(block());
 
       // Update the count
       const count = this._getCount(aliasedName) + 1;
