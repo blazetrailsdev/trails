@@ -6,7 +6,6 @@ import {
   IntegerType,
   Type,
   isDecoratorReplay,
-  pendingAttributeTypeQ,
 } from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
@@ -14,7 +13,12 @@ import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
-import { loadSchema as reflectSchemaSync, ownProp, type SchemaHost } from "./model-schema.js";
+import {
+  loadSchema as reflectSchemaSync,
+  ownProp,
+  pendingAttributeTypeQ,
+  type SchemaHost,
+} from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -154,7 +158,7 @@ export function installEnumAttribute(
   // attribute keeps the fallback `value` type until the column reflects, so its
   // subtype must still come from the column (enum decorates the column type,
   // enum.rb:238-248) — so the pending queue answers this as Rails asks it.
-  const explicitlyTyped = pendingAttributeTypeQ(klass as never, resolved);
+  const explicitlyTyped = pendingAttributeTypeQ(klass, resolved);
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {

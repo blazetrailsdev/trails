@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { ValueType, pendingAttributeDeclarationQ } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
-import { resetColumnInformation } from "./model-schema.js";
+import { pendingAttributeDeclarationQ, resetColumnInformation } from "./model-schema.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";

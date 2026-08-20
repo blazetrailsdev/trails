@@ -4,8 +4,9 @@ import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
+  PendingDefault,
+  PendingType,
   YAMLEncoder,
-  pendingAttributeDeclarationQ,
   resetDefaultAttributesBang,
   typeRegistry,
   type Type,
@@ -960,13 +961,72 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 }
 
 /**
+ * Walk the ancestry's pending-modification queues, oldest ancestor first —
+ * the loop written out of `apply_pending_attribute_modifications`' `superclass`
+ * recursion (attribute_registration.rb:81-90). Reads the own queues directly
+ * rather than through `pending_attribute_modifications`, whose `||= []` would
+ * stamp an empty queue onto every ancestor it passes.
+ */
+function pendingAttributeModificationsInAncestry(host: unknown): unknown[] {
+  const queues: unknown[][] = [];
+  for (let klass = host; klass != null; klass = Object.getPrototypeOf(klass)) {
+    if (Object.prototype.hasOwnProperty.call(klass, "_pendingAttributeModifications")) {
+      queues.unshift(
+        (klass as { _pendingAttributeModifications: unknown[] })._pendingAttributeModifications,
+      );
+    }
+  }
+  return queues.flat();
+}
+
+/**
+ * True when `name` was declared by user code — some class in the ancestry
+ * queued a `PendingType` / `PendingDefault` for it through `attribute(...)`
+ * (attribute_registration.rb:53-72).
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE — retired by
+ * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
+ * Rails never asks: a user declaration lives only in the pending queue and a
+ * reflected column only in `columns_hash`, so the two are already distinct
+ * records. `applyColumnsHash` below re-registers reflected columns INTO
+ * `_attributeDefinitions` beside the declarations, so the paths that must not
+ * clobber a declaration read the provenance back off the queue Rails replays.
+ */
+export function pendingAttributeDeclarationQ(host: unknown, name: string): boolean {
+  return pendingAttributeModificationsInAncestry(host).some(
+    (modification) =>
+      (modification instanceof PendingType || modification instanceof PendingDefault) &&
+      modification.name === name,
+  );
+}
+
+/**
+ * True when user code declared a concrete *type* for `name`: Rails queues a
+ * `PendingType` carrying a type only for `attribute(name, type)`, never for a
+ * default-only or bare re-declaration (attribute_registration.rb:12-18).
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE — same reason as
+ * {@link pendingAttributeDeclarationQ}.
+ */
+export function pendingAttributeTypeQ(host: unknown, name: string): boolean {
+  return pendingAttributeModificationsInAncestry(host).some(
+    (modification) =>
+      modification instanceof PendingType &&
+      modification.name === name &&
+      modification.type != null,
+  );
+}
+
+/**
  * Drop schema-sourced attribute defs (and their generated accessors) so the
  * next load re-reflects them; user-declared defs are preserved, matching
  * Rails where user-provided attributes survive reload.
  */
 function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
   for (const [name] of Array.from(host._attributeDefinitions)) {
-    if (!pendingAttributeDeclarationQ(host as never, name)) {
+    if (!pendingAttributeDeclarationQ(host, name)) {
       host._attributeDefinitions.delete(name);
       if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
         delete host.prototype[name];
@@ -1146,14 +1206,14 @@ function applyColumnsHash(
   const filteredHash: Record<string, unknown> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) {
-      if (!pendingAttributeDeclarationQ(host as never, name)) {
+      if (!pendingAttributeDeclarationQ(host, name)) {
         host._attributeDefinitions.delete(name);
       }
       continue;
     }
     filteredHash[name] = column;
     const existing = host._attributeDefinitions.get(name);
-    if (existing && pendingAttributeDeclarationQ(host as never, name)) {
+    if (existing && pendingAttributeDeclarationQ(host, name)) {
       // A user-declared type override (e.g. an enum) preserves its type across
       // reflection. The schema column's default is NOT merged onto the def;
       // `_defaultAttributes` seeds it via from_database directly from the cached
@@ -1433,7 +1493,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
-    if (!pendingAttributeDeclarationQ(host as never, name)) continue;
+    if (!pendingAttributeDeclarationQ(host, name)) continue;
     const isVirtual = !real.has(name);
     if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
   }

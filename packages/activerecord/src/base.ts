@@ -134,7 +134,6 @@ import {
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
-  pendingAttributeDeclarationQ,
   resolveAliasNameIn,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
@@ -1485,7 +1484,7 @@ export class Base extends Model {
       const d = def as { virtual?: boolean };
       if (
         !d.virtual &&
-        (!pendingAttributeDeclarationQ(this as never, name) || !enumNames?.has(name))
+        (!ModelSchema.pendingAttributeDeclarationQ(this, name) || !enumNames?.has(name))
       ) {
         // The model declares its own attributes, but some may be virtual (no
         // backing DB column). Rails' `column_names` is always DB-sourced, so

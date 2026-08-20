@@ -13,7 +13,6 @@ import {
   AttributeSet,
   type Type,
   applyPendingAttributeModifications,
-  pendingAttributeDeclarationQ,
   pushPendingDefault,
   pushPendingType,
   resetDefaultAttributes as amResetDefaultAttributes,
@@ -21,7 +20,12 @@ import {
 import { registerSubclass } from "@blazetrails/activesupport";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
-import { cachedColumnsHash, isSchemaLoaded, schemaStaleAgainstAncestors } from "./model-schema.js";
+import {
+  cachedColumnsHash,
+  isSchemaLoaded,
+  pendingAttributeDeclarationQ,
+  schemaStaleAgainstAncestors,
+} from "./model-schema.js";
 
 type AnyClass = any;
 

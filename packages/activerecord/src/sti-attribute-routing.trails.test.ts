@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pendingAttributeDeclarationQ } from "@blazetrails/activemodel";
+import { pendingAttributeDeclarationQ } from "./model-schema.js";
 import { Base } from "./base.js";
 
 describe("STI subclass attribute() registration", () => {
