@@ -924,11 +924,9 @@ export class AssociationScope {
     const evalWhere = (evaluated as { whereClause?: { predicates?: unknown[] } }).whereClause;
     const evalPredicates = evalWhere?.predicates ?? [];
     const evalOrders = (evaluated as { orderValues?: unknown[] }).orderValues ?? [];
-    const evalRawOrders = (evaluated as { _rawOrderClauses?: string[] })._rawOrderClauses ?? [];
     const merged = scope as {
       whereClause: WhereClause;
       orderValues?: unknown[];
-      _rawOrderClauses?: string[];
     };
     // Rails: `scope.where_clause += item.where_clause` (association_scope.rb:153).
     // The assignment matters: the preceding `unscope!` deletes the `:where` key,
@@ -941,10 +939,6 @@ export class AssociationScope {
     // (association_scope.rb:153). Chain-entry-first + structural dedup.
     if (evalOrders.length > 0) {
       merged.orderValues = unionOrderClauses(evalOrders, merged.orderValues ?? []);
-    }
-    if (evalRawOrders.length > 0) {
-      const existingRaw = merged._rawOrderClauses ?? [];
-      merged._rawOrderClauses = Array.from(new Set([...evalRawOrders, ...existingRaw]));
     }
     return merged;
   }

@@ -6,7 +6,6 @@ import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
   attributeMissing,
-  defineDirtyAttributeMethods,
   isAttributeMethod as _isAttributeMethod,
   matchedAttributeMethod as _matchedAttributeMethod,
   missingAttribute as _missingAttribute,
@@ -197,8 +196,6 @@ export function attribute(
   resetDefaultAttributes(this);
 
   _defineAttributeMethod.call(this as unknown as AttributeMethodHost, name);
-
-  defineDirtyAttributeMethods(this.prototype, name);
 }
 
 /**

@@ -447,10 +447,8 @@ export class ThroughAssociation extends Association {
         // scope.eager_loading? && order (rb:139-141): true here since we always
         // includes! the source above.
         const orderClauses: any[] = reflScope?.orderValues ?? [];
-        const rawOrderClauses: string[] = reflScope?._rawOrderClauses ?? [];
-        if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
+        if (orderClauses.length > 0) {
           scope.orderValues = [...scope.orderValues, ...orderClauses];
-          scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
         }
       }
     }

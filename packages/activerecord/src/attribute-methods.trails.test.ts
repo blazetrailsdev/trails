@@ -389,6 +389,41 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(false);
   });
 
+  it("an inherited generated dirty accessor does not suppress the subclass's own generation", () => {
+    // Rails declares the dirty cascade with `attribute_method_suffix` (dirty.rb),
+    // so `name_changed?` is generated into `generated_attribute_methods` like any
+    // other attribute method and the owner arm of
+    // `instance_method_already_implemented?` (attribute_methods.rb:174-177) sees
+    // it as generated rather than hand-written.
+    class Middle extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Leaf extends Middle {}
+
+    const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
+    expect("nameChanged" in (Leaf.prototype as object)).toBe(true);
+    expect(host.isInstanceMethodAlreadyImplemented("nameChanged")).toBe(false);
+  });
+
+  it("undefineAttributeMethods clears the generated dirty accessors", () => {
+    // attribute_methods.rb — `undefine_attribute_methods` undefines the module's
+    // instance methods, which now owns the dirty cascade too.
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(typeof (new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBe(
+      "function",
+    );
+
+    (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
+
+    expect((new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBeUndefined();
+  });
+
   it("an inherited class-body method is already implemented for the subclass", () => {
     class HandWritten extends Base {
       static {

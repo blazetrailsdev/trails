@@ -212,12 +212,8 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const recordIds = (await (
         records as { pluck: (...cols: string[]) => Promise<unknown[]> }
       ).pluck(...foreignKeyCols)) as JoinIds;
-      // `orderValues` covers `orderValues` (the parsed form); raw-SQL
-      // orders (e.g. `inOrderOf`) live in `_rawOrderClauses` and are
-      // invisible to the public getter. Check both so chain steps with
-      // raw orders trigger the DJAR wrapping branch correctly.
-      const ord = records as { orderValues?: unknown[]; _rawOrderClauses?: unknown[] };
-      const recordsOrdered = any(ord.orderValues ?? []) || any(ord._rawOrderClauses ?? []);
+      const ord = records as { orderValues?: unknown[] };
+      const recordsOrdered = any(ord.orderValues ?? []);
       acc = [nextReflection, recordsOrdered, recordIds];
     }
     return acc;
@@ -327,13 +323,8 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       scope = this._pushScopeIntoRelation(scope, evaluated);
     }
 
-    // Same _rawOrderClauses guard as the chain-walk: a raw-SQL order on
-    // the source step also disables the DJAR wrap.
-    const finalOrd = scope as { orderValues?: unknown[]; _rawOrderClauses?: unknown[] };
-    const finalOrders =
-      (finalOrd.orderValues?.length ?? 0) > 0 || (finalOrd._rawOrderClauses?.length ?? 0) > 0
-        ? [1]
-        : [];
+    const finalOrd = scope as { orderValues?: unknown[] };
+    const finalOrders = (finalOrd.orderValues?.length ?? 0) > 0 ? [1] : [];
     if (finalOrders.length === 0 && ordered) {
       // If PredicateBuilder.buildComposite short-circuited to
       // `Relation#none()` (empty tuples / all-null components), the

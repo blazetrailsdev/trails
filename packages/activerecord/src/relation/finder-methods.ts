@@ -291,7 +291,6 @@ interface FinderRelation {
   limitValue: number | string | null;
   offsetValue: number | string | null;
   orderValues: unknown[];
-  _rawOrderClauses: string[];
   createWithValue: Record<string, unknown>;
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
@@ -467,10 +466,6 @@ export async function performFindSoleBy(
   return performSole.call((this.where as any)(...conditions));
 }
 
-function hasOrder(rel: FinderRelation): boolean {
-  return rel.orderValues.length > 0 || rel._rawOrderClauses.length > 0;
-}
-
 /** @internal */
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
@@ -598,9 +593,11 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   }
   const relation: any = orderedRelation.call(this);
   // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
-  // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
-  // treated as "has an order" — avoids loading all records for those relations.
-  if (!hasOrder(relation) || relation.limitValue != null || relation.offsetValue != null) {
+  if (
+    relation.orderValues.length === 0 ||
+    relation.limitValue != null ||
+    relation.offsetValue != null
+  ) {
     const records = await relation.records();
     return records[records.length - 1 - index] ?? null;
   }
@@ -1028,7 +1025,7 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
 
 /** @internal */
 export async function findSome(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  if (!hasOrder(this)) return (this as any).findSomeOrdered(ids);
+  if (this.orderValues.length === 0) return (this as any).findSomeOrdered(ids);
 
   const pk = this.primaryKey as string;
   let relation = (this as any).where({ [pk]: ids });
@@ -1141,7 +1138,7 @@ export function orderedRelation(this: FinderRelation): any {
   const pk = this.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
-  if (!hasOrder(this) && (implicitOrder || constraintsList != null || pk)) {
+  if (this.orderValues.length === 0 && (implicitOrder || constraintsList != null || pk)) {
     const cols = _orderColumns.call(this);
     if (cols.length > 0) {
       return (this as any).order(

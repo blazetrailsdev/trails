@@ -8,6 +8,7 @@ import {
   MissingAttributeError,
   missingAttribute,
   resolveAliasNameIn,
+  defineDirtyAttributeMethods,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   type InstanceHost as AttributeMethodsInstanceHost,
 } from "@blazetrails/activemodel";
@@ -423,6 +424,10 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
       }
       continue;
     }
+    // The dirty cascade Rails declares with `attribute_method_suffix` (dirty.rb)
+    // and generates through this same `define_attribute_methods` path, into
+    // `generated_attribute_methods`.
+    defineDirtyAttributeMethods.call(this as never, name);
     // Gate get and set independently: a user-defined setter should not suppress
     // the generated reader, and vice versa — mirrors Rails' per-method generation.
     // Walk the full prototype chain to find an existing descriptor for this name.

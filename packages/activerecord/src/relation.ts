@@ -478,7 +478,6 @@ export class Relation<T extends Base> {
    * @internal
    */
   _values: ValuesHash = {};
-  private _rawOrderClauses: string[] = [];
   /**
    * Mirrors: ActiveRecord::Relation's `@with_is_recursive` (query_methods.rb:527)
    * — an ivar, not a `VALUE_METHODS` entry, so `initialize_copy` carries it over
@@ -3044,7 +3043,6 @@ export class Relation<T extends Base> {
   initializeCopy(source: Relation<T>): void {
     this._table = source._table;
     this._values = { ...source._values };
-    this._rawOrderClauses = [...source._rawOrderClauses];
     this._withIsRecursive = source._withIsRecursive;
     this._isNone = source._isNone;
     this._joinClauses = [...source._joinClauses];
