@@ -434,83 +434,6 @@ export function cacheableQuery(
 // --- Query execution ---
 
 /**
- * Returns rows as record hashes.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_all
- */
-export function selectAll(
-  sql: string,
-  _name?: string | null,
-  _binds?: unknown[],
-  _opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-): Promise<Result> {
-  throw new Error("selectAll must be implemented by adapter subclass");
-}
-
-/**
- * Returns a single record hash.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_one
- */
-export function selectOne(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds?: unknown[],
-  { async = false }: { async?: boolean } = {},
-): Promise<Record<string, unknown> | undefined> {
-  const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  return doSelect(sql, name, binds, { async }).then((result) => result.first());
-}
-
-/**
- * Returns a single value from the first row/column.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_value
- */
-export function selectValue(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds?: unknown[],
-  { async = false }: { async?: boolean } = {},
-): Promise<unknown> {
-  return selectRows
-    .call(this, sql, name, binds, { async })
-    .then((rows) => singleValueFromRows(rows));
-}
-
-/**
- * Returns an array of the first column values.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_values
- */
-export function selectValues(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds?: unknown[],
-): Promise<unknown[]> {
-  return selectRows.call(this, sql, name, binds).then((rows) => rows.map((row) => row[0]));
-}
-
-/**
- * Returns an array of arrays (rows of column values).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_rows
- */
-export function selectRows(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds?: unknown[],
-  { async = false }: { async?: boolean } = {},
-): Promise<unknown[][]> {
-  const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  return doSelect(sql, name, binds, { async }).then((result) => result.rows);
-}
-
-/**
  * Returns a single value via internal_exec_query.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#query_value
@@ -557,13 +480,78 @@ export async function query(
 }
 
 /**
- * Determines whether the SQL statement is a write query.
- * Must be overridden by adapter subclasses.
+ * Executes a query with binds and returns an ActiveRecord::Result.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#write_query?
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_query
+ * (abstract/database_statements.rb:147-149)
  */
-export function isWriteQuery(_sql: string): boolean {
-  throw new Error("isWriteQuery must be implemented by adapter subclass");
+export function execQuery(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = "SQL",
+  binds: unknown[] = [],
+  { prepare = false }: { prepare?: boolean } = {},
+): Promise<Result> {
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  return run(sql, name, binds, { prepare });
+}
+
+/**
+ * Executes an INSERT statement.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert
+ * (abstract/database_statements.rb:157-160)
+ */
+export function execInsert(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = null,
+  binds: unknown[] = [],
+  pk?: string | false | null,
+  _sequenceName?: string | null,
+  returning?: string[] | null,
+): Promise<Result> {
+  [sql, binds] = sqlForInsert.call(this, sql, pk, binds, returning ?? null);
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  return run(sql, name, binds);
+}
+
+/**
+ * Executes a DELETE statement and returns the number of affected rows.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_delete
+ * (abstract/database_statements.rb:165-167)
+ */
+export async function execDelete(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = null,
+  binds: unknown[] = [],
+): Promise<number> {
+  const doInternalExecute = this.internalExecute?.bind(this) ?? internalExecute.bind(this);
+  const doAffectedRows = this.affectedRows?.bind(this) ?? affectedRows;
+  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
+}
+
+/**
+ * Executes an UPDATE statement and returns the number of affected rows.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_update
+ * (abstract/database_statements.rb:172-174)
+ */
+export async function execUpdate(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = null,
+  binds: unknown[] = [],
+): Promise<number> {
+  const doInternalExecute = this.internalExecute?.bind(this) ?? internalExecute.bind(this);
+  const doAffectedRows = this.affectedRows?.bind(this) ?? affectedRows;
+  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
 }
 
 /**
@@ -573,55 +561,6 @@ export function isWriteQuery(_sql: string): boolean {
  */
 export function execute(_sql: string, _binds?: unknown[], _name?: string | null): Promise<unknown> {
   throw new Error("execute must be implemented by adapter subclass");
-}
-
-/**
- * Executes a query with binds and returns an ActiveRecord::Result.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_query
- */
-export function execQuery(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = "SQL",
-  binds: unknown[] = [],
-  { prepare = false }: { prepare?: boolean } = {},
-): Promise<Result> {
-  // Dispatch through the instance so an adapter's internalExecQuery override
-  // wins, as Ruby's virtual call does.
-  const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
-    this as DatabaseStatementsHost,
-  );
-  return run(sql, name, binds, { prepare });
-}
-
-/**
- * Executes an INSERT statement.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert
- */
-export function execInsert(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-  pk?: string | false | null,
-  _sequenceName?: string | null,
-  returning?: string[] | null,
-): Promise<Result> {
-  [sql, binds] = sqlForInsert.call(
-    this as DatabaseStatementsHost,
-    sql,
-    pk,
-    binds,
-    returning ?? null,
-  );
-  // Dispatch through the instance so an adapter's internalExecQuery override
-  // wins, as Ruby's virtual call does.
-  const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
-    this as DatabaseStatementsHost,
-  );
-  return run(sql, name, binds);
 }
 
 /**
@@ -671,40 +610,6 @@ export async function execInsertReturningReadback(
 }
 
 /**
- * Executes a DELETE statement and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_delete
- */
-export async function execDelete(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  const host = this as DatabaseStatementsHost;
-  const doInternalExecute = host?.internalExecute?.bind(host) ?? internalExecute.bind(host);
-  const doAffectedRows = host?.affectedRows?.bind(host) ?? affectedRows;
-  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
-}
-
-/**
- * Executes an UPDATE statement and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_update
- */
-export async function execUpdate(
-  this: DatabaseStatementsHost | void,
-  sql: string,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  const host = this as DatabaseStatementsHost;
-  const doInternalExecute = host?.internalExecute?.bind(host) ?? internalExecute.bind(host);
-  const doAffectedRows = host?.affectedRows?.bind(host) ?? affectedRows;
-  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
-}
-
-/**
  * Executes a bulk INSERT statement.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_insert_all
@@ -729,64 +634,6 @@ export function explain(_arel: unknown, _binds?: unknown[], _options?: unknown[]
 }
 
 // --- Data modification ---
-
-/**
- * Executes an INSERT and returns the new record's ID.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#insert
- */
-export async function insert(
-  this: DatabaseStatementsHost | void,
-  arel: unknown,
-  name: string | null = null,
-  pk?: string | null,
-  idValue?: unknown,
-  sequenceName?: string | null,
-  binds: unknown[] = [],
-): Promise<unknown> {
-  const host = this as DatabaseStatementsHost;
-  let sql: string;
-  [sql, binds] = toSqlAndBinds(arel, binds);
-  const result = await execInsert.call(this, sql, name, binds, pk, sequenceName);
-  if (idValue !== undefined && idValue !== null) return idValue;
-  return host.lastInsertedId!(result);
-}
-
-/**
- * Executes an UPDATE and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#update
- */
-export async function update(
-  this: DatabaseStatementsHost | void,
-  arel: unknown,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  let sql: string;
-  [sql, binds] = toSqlAndBinds(arel, binds);
-  return execUpdate.call(this, sql, name, binds);
-}
-
-/**
- * Executes a DELETE and returns the number of affected rows.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#delete
- */
-export async function deleteStatement(
-  this: DatabaseStatementsHost | void,
-  arel: unknown,
-  name: string | null = null,
-  binds: unknown[] = [],
-): Promise<number> {
-  let sql: string;
-  [sql, binds] = toSqlAndBinds(arel, binds);
-  return execDelete.call(this, sql, name, binds);
-}
-// Rails name: delete — aliased to avoid JS reserved word conflict.
-// Consumers can import as: import { delete as delete_ } from "..."
-
-export { deleteStatement as delete };
 
 /**
  * Executes a TRUNCATE statement.
@@ -1543,16 +1390,6 @@ function singleValueFromRows(rows: unknown[][]): unknown {
   return row ? row[0] : undefined;
 }
 
-/**
- * Alias: create = insert (matches Rails)
- */
-export { insert as create };
-
-/**
- * Alias: remove = delete (backwards compat with prior TS API)
- */
-export { deleteStatement as remove };
-
 // ---------------------------------------------------------------------------
 // Module object
 //
@@ -1776,67 +1613,19 @@ export const DatabaseStatements = {
     return this.selectAll(arel, name, binds, { async }).then((result) => result.rows);
   },
 
-  async execQuery(
-    this: DatabaseStatementsDefaultsHost,
-    sql: string,
-    name: string | null = "SQL",
-    binds: unknown[] = [],
-    { prepare = false }: { prepare?: boolean } = {},
-  ): Promise<Result> {
-    // Mirrors: abstract/database_statements.rb:147-149 — exec_query forwards to
-    // internal_exec_query, which each adapter overrides.
-    return this.internalExecQuery(sql, name, binds, { prepare });
-  },
+  execQuery,
+  execInsert,
 
-  async execInsert(
-    this: DatabaseStatementsDefaultsHost,
-    sql: string,
-    name: string | null = null,
-    binds?: unknown[],
-    _pk?: string | false | null,
-    _sequenceName?: string | null,
-    _returning?: string[] | null,
-  ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
-  },
-
-  async execDelete(
-    this: DatabaseStatementsDefaultsHost,
-    sql: string,
-    name: string | null = null,
-    binds?: unknown[],
-  ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
-  },
-
-  async execUpdate(
-    this: DatabaseStatementsDefaultsHost,
-    sql: string,
-    name: string | null = null,
-    binds?: unknown[],
-  ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
-  },
+  execDelete,
+  execUpdate,
 
   isWriteQuery(sql: string): boolean {
     return isWriteQuerySql(sql);
   },
 
-  emptyInsertStatementValue(_pk?: string | null): string {
-    return "DEFAULT VALUES";
-  },
+  emptyInsertStatementValue,
 
-  cacheableQuery(
-    this: unknown,
-    klass: {
-      query?(sql: string): unknown;
-      partialQuery?(parts: unknown): unknown;
-      partialQueryCollector?(): unknown;
-    },
-    arel: unknown,
-  ): [unknown, unknown[]] {
-    return cacheableQuery.call(this as never, klass, arel);
-  },
+  cacheableQuery,
 
   insert: insertStatement,
 

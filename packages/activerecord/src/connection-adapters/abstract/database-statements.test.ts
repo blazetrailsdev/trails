@@ -11,7 +11,6 @@ import {
   toSql,
   toSqlAndBinds,
   cacheableQuery,
-  isWriteQuery,
   explain,
   transaction,
   transactionIsolationLevels,
@@ -161,12 +160,6 @@ describe("DatabaseStatements", () => {
         throw new Rollback();
       });
       expect(result).toBeUndefined();
-    });
-  });
-
-  describe("isWriteQuery", () => {
-    it("raises not implemented", () => {
-      expect(() => isWriteQuery("INSERT INTO x")).toThrow();
     });
   });
 

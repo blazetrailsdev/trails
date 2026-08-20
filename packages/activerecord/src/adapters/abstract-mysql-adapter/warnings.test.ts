@@ -108,8 +108,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await withDbWarningsAction("raise", async () => {
         // Force warning_count to 1 even though SHOW WARNINGS will return [].
         vi.spyOn(
-          adapter as unknown as { _warningCount: () => Promise<number> },
-          "_warningCount",
+          adapter as unknown as { warningCount: () => Promise<number> },
+          "warningCount",
         ).mockResolvedValue(1);
         const raised = adapter.execute(`SELECT 'x'`);
         await expect(raised).rejects.toBeInstanceOf(SQLWarning);
