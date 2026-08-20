@@ -1,9 +1,10 @@
-import type { CodeGenerator } from "@blazetrails/activesupport";
+import { type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
+  attributeMethodSuffix,
   attributeMissing,
   isAttributeMethod as _isAttributeMethod,
   matchedAttributeMethod as _matchedAttributeMethod,
@@ -241,6 +242,16 @@ export function setDefineMethodAttribute(
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
 export class Attributes {
+  /**
+   * Mirrors: attributes.rb:35-37
+   *   included do
+   *     attribute_method_suffix "=", parameters: "value"
+   *   end
+   */
+  static [included](base: AttributeMethodHost): void {
+    attributeMethodSuffix.call(base, "=", { parameters: "value" });
+  }
+
   _attributes: AttributeSet;
 
   /**
