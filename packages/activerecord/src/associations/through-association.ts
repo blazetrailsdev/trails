@@ -378,7 +378,7 @@ export function throughBuildRecord(
   const srcRefl = sourceReflection(assoc) as any;
   if (srcRefl?.isCollection?.()) {
     const inverse = srcRefl.inverseOf?.();
-    const target = (throughAssociation(assoc) as any)?.target;
+    const target = throughAssociation.call(assoc as unknown as ThroughAssociationHost)?.target;
 
     if (inverse && target && !Array.isArray(target)) {
       // `Array(nil)` is `[]`, so an unpersisted through target zips to nothing
