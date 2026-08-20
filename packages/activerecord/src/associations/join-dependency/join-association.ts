@@ -147,7 +147,11 @@ export class JoinAssociation extends JoinPart {
       if (scope && scope.referencesValues.length > 0) {
         // `scope.eager_load_values | scope.includes_values` — Ruby's array
         // union, which compares a Hash/String spec by `eql?`; `structuralUnionEq`
-        // is the same comparison `joins!` unions with.
+        // is the same comparison `joins!` unions with. Inlined rather than
+        // reusing query-methods' private `unionAppend`: exporting that helper
+        // adds a novel public name to a Rails-matched file (measured — it takes
+        // `relation/query-methods.ts` from 9 novel to 10 on `parity:api:extra`),
+        // and Rails spells this as one `|` operator with no helper at all.
         const associations = [...scope.eagerLoadValues];
         for (const spec of scope.includesValues) {
           if (!associations.some((seen: unknown) => structuralUnionEq(seen, spec))) {
