@@ -71,6 +71,14 @@ import type { TranslateOptions } from "@blazetrails/i18n";
 /** @internal Mirrors ActiveModel::Name::MISSING_TRANSLATION */
 const MISSING_TRANSLATION = -(2 ** 60);
 
+/**
+ * The enclosing module path a Ruby `klass.name` already carries and a JS class
+ * name does not; declared by the model, read only by `ModelName`'s constructor.
+ */
+interface ModulePath {
+  readonly moduleName?: string;
+}
+
 export interface ModelLike {
   readonly name: string;
   /**
@@ -164,20 +172,6 @@ export class ModelName {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
-  //   include Comparable
-  //   delegate :==, :===, :<=>, :=~, :"!~", :eql?, :match?, :to_s,
-  //            :to_str, :as_json, to: :name
-  //
-  // JS can't overload operators, so we expose methods + the one coercion
-  // hook JS does have: `Symbol.toPrimitive`. That covers IMPLICIT string
-  // coercion only — `String(modelName)`, template literals, `modelName +
-  // ""`, and loose `==` against a string. It does NOT trigger on strict
-  // `===` / `Object.is` / matchers that use strict identity without
-  // coercion; for those, callers use `mn.name` or `mn.equals(other)`.
-  // ---------------------------------------------------------------------------
-
   /** Rails `delegate :to_s, :to_str, to: :name` (naming.rb:151-152). */
   toString(): string {
     return this.name;
@@ -221,13 +215,14 @@ export class ModelName {
     name: string | null = null,
     locale = "en",
   ) {
+    const constant = typeof klass === "string" ? null : (klass as ModelLike & ModulePath);
     this.name =
       name ??
-      (typeof klass === "string"
-        ? klass
-        : (klass as { moduleName?: string }).moduleName
-          ? `${(klass as { moduleName?: string }).moduleName}::${klass._demodulizedName ?? klass.name}`
-          : (klass._demodulizedName ?? klass.name));
+      (constant === null
+        ? (klass as string)
+        : constant.moduleName
+          ? `${constant.moduleName}::${constant._demodulizedName ?? constant.name}`
+          : (constant._demodulizedName ?? constant.name));
 
     if (isBlank(this.name))
       throw new ArgumentError(
@@ -240,7 +235,7 @@ export class ModelName {
         ? this.name.slice(prefix.length)
         : this.name;
     }
-    this._klass = typeof klass === "string" ? null : klass;
+    this._klass = constant;
     this.singular = this._singularize(this.name);
     this.plural = pluralize(this.singular, locale);
     this.isUncountable = this.plural === this.singular;
