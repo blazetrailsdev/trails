@@ -10,11 +10,10 @@ import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { withConnection } from "./connection-handling.js";
+import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
 
 type ModelClass = typeof Base;
 
-const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
-const UPDATE_TIMESTAMP_COLUMNS = ["updated_at", "updated_on"] as const;
 // Mirrors timestamp.ts CREATED_ATTRS/UPDATED_ATTRS: both _at and _on are magic
 // timestamp columns, so verifyAttributes must allow either pair even when only
 // the other is in the model's declared attribute set.
@@ -263,7 +262,7 @@ export class InsertAll {
     if (this._keysIncludingTimestamps) return this._keysIncludingTimestamps;
     if (this.recordTimestamps()) {
       const result = new Set(this.keys);
-      for (const col of this._physicalTimestampCols(TIMESTAMP_COLUMNS)) {
+      for (const col of allTimestampAttributesInModel.call(this.model as never)) {
         result.add(col);
       }
       this._keysIncludingTimestamps = result;
@@ -533,35 +532,11 @@ export class InsertAll {
     );
   }
 
-  /**
-   * Returns physical column names for the given logical timestamp columns,
-   * resolving alias_attribute mappings (e.g. created_at → legacy_created_at).
-   * @internal
-   */
-  private _physicalTimestampCols(logicalCols: readonly string[]): string[] {
-    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
-    const result: string[] = [];
-    for (const col of logicalCols) {
-      if (this.model._attributeDefinitions.has(col)) {
-        result.push(col);
-      } else {
-        const physical = aliases?.[col];
-        if (physical && this.model._attributeDefinitions.has(physical)) result.push(physical);
-      }
-    }
-    return result;
-  }
-
-  /** Physical column names for all update timestamp columns (resolves aliases). @internal */
-  updateTimestampColumnsInModel(): string[] {
-    return this._physicalTimestampCols(UPDATE_TIMESTAMP_COLUMNS);
-  }
-
-  /** @internal */
+  /** Mirrors: ActiveRecord::InsertAll#timestamps_for_create (insert_all.rb:221-223). @internal */
   private timestampsForCreate(): Record<string, unknown> {
     const now = Temporal.Now.instant();
     const result: Record<string, unknown> = {};
-    for (const col of this._physicalTimestampCols(TIMESTAMP_COLUMNS)) {
+    for (const col of allTimestampAttributesInModel.call(this.model as never)) {
       result[col] = now;
     }
     return result;
@@ -684,24 +659,8 @@ export class Builder implements InsertBuilder {
     const model = this._insertAll.model;
     const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      // Cast then serialize via the column type if available, falling back
-      // to SerializeCastValue.serializeCastValue (identity) when no type exists
-      const def = model._attributeDefinitions.get(key) as any;
-      const type = def?.type ?? def;
-      const castValue = type && typeof type.cast === "function" ? type.cast(value) : value;
-      // Faithful dispatch (ActiveModel::Type::SerializeCastValue.serialize):
-      // only short-circuit through serializeCastValue when the type declares
-      // it compatible, otherwise call full serialize. A type overriding
-      // serialize but not serializeCastValue (binary, json, serialized, the
-      // PG OID types) inherits identity serializeCastValue and would
-      // otherwise persist the in-memory cast value.
-      if (type && typeof type.serialize === "function") {
-        value = SerializeCastValue.serialize(type, castValue);
-      } else if (type && typeof type.serializeCastValue === "function") {
-        value = type.serializeCastValue(castValue);
-      } else {
-        value = SerializeCastValue.serializeCastValue(castValue);
-      }
+      const type = model.typeForAttribute(key);
+      value = SerializeCastValue.serialize(type, type.cast(value));
       // Rails hands the serialized value to the ValuesList *as a value*
       // (insert_all.rb:246): `connection.visitor.compile` renders it, quoting
       // each entry through `connection.quote` (to_sql.rb:106-114). So no
@@ -748,8 +707,8 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    return this._insertAll
-      .updateTimestampColumnsInModel()
+    return timestampAttributesForUpdateInModel
+      .call(this.model as never)
       .filter((columnName) => this.touchTimestampAttribute(columnName))
       .map(
         (columnName) =>
