@@ -1934,9 +1934,13 @@ export class Model {
     return [...(this.constructor as typeof Model).attributeNames()];
   }
 
-  get attributes(): Record<string, unknown> {
-    return this._attributes.toHash();
-  }
+  /**
+   * `ActiveModel::Attributes#attributes` (attributes.rb:131-133), installed on
+   * the prototype by the `include(Model, Attributes)` at the bottom of this
+   * file. Declared here only for its type: `Included<>` derives callable
+   * methods and cannot carry an accessor's type across the mixin.
+   */
+  declare attributes: Record<string, unknown>;
 
   attributePresent(name: string): boolean {
     const value = this.readAttribute(name);
