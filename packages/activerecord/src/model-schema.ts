@@ -1169,6 +1169,9 @@ export function loadSchema(this: SchemaHost): void {
  * the ones an instance is about to read. It runs *after* `_schemaLoaded` is
  * set, so `define_attribute_methods`' own `load_schema` (attribute_methods.rb:114)
  * returns immediately instead of re-entering the load.
+ *
+ * @noRailsEquivalent Rails needs no such hook: its readers are methods, so
+ * `method_missing` is the trigger.
  */
 function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
   (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.();

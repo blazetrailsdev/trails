@@ -62,3 +62,25 @@ describe("TimeType type_cast_for_schema", () => {
     expect(type.typeCastForSchema(type.cast("10:20:30"))).toBe('"2000-01-01 10:20:30"');
   });
 });
+
+describe("TimeType Helpers::TimeValue ancestry", () => {
+  it("resolves the mixin members through the ancestry, not off the instance", () => {
+    const type = new Types.TimeType();
+    for (const name of [
+      "serializeCastValue",
+      "applySecondsPrecision",
+      "typeCastForSchema",
+      "newTime",
+      "fastStringToTime",
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(type, name)).toBe(false);
+      expect(typeof (type as unknown as Record<string, unknown>)[name]).toBe("function");
+    }
+  });
+
+  it("keeps its own user_input_in_time_zone over the mixin's", () => {
+    expect(
+      Object.prototype.hasOwnProperty.call(Types.TimeType.prototype, "userInputInTimeZone"),
+    ).toBe(true);
+  });
+});
