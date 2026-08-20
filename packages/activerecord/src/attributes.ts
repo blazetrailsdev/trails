@@ -14,8 +14,8 @@ import {
   type Type,
   applyPendingAttributeModifications,
   resetDefaultAttributes as amResetDefaultAttributes,
-  registerWithSuperclass,
 } from "@blazetrails/activemodel";
+import { registerSubclass } from "@blazetrails/activesupport";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import { cachedColumnsHash, isSchemaLoaded, schemaStaleAgainstAncestors } from "./model-schema.js";
@@ -173,9 +173,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     !cacheHost._cachedDefaultAttributes ||
     schemaStaleAgainstAncestors(cacheHost)
   ) {
-    // Register cacheHost with its superclass so resetDefaultAttributes()
-    // cascades here when the superclass gains new attribute declarations.
-    registerWithSuperclass(cacheHost);
+    // Ruby's `inherited` hook registers every subclass with the
+    // DescendantsTracker that `reset_default_attributes` recurses over
+    // (activemodel/lib/active_model/attribute_registration.rb:88-91). JS has no
+    // class-definition hook (CLAUDE.md, "Module mixins"), so trails registers
+    // lazily here, through the one repo-wide stand-in spelling.
+    registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
 
     // Phase 1: seed schema columns via `Attribute.fromDatabase`, mirroring Rails'
     // `columns_hash.transform_values { Attribute.from_database(col.name, col.default, type) }`.

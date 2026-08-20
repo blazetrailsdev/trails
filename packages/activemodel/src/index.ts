@@ -37,12 +37,11 @@ export {
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
 export {
+  PendingDecorator,
   applyPendingAttributeModifications,
   isDecoratorReplay,
   pushPendingDecorator,
-  replayOwnPendingDecorators,
   resetDefaultAttributes,
-  registerWithSuperclass,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
 export type { AttributeDefinition, AttributeOptions } from "./attributes.js";

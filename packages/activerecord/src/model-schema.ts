@@ -3,10 +3,11 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
+  AttributeSet,
   AttributeSetBuilder,
+  PendingDecorator,
   YAMLEncoder,
   typeRegistry,
-  replayOwnPendingDecorators,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -1240,13 +1241,44 @@ function applyColumnsHash(
   // columns: `_attributeDefinitions` is trails' eager type cache, not Rails'
   // `_default_attributes`, so replaying a NON-column attribute here would fire
   // guards Rails only raises when the default set is built (enum.rb:240-245).
-  const reflectedDefs = new Map(
-    Object.keys(filteredHash)
-      .filter((n) => host._attributeDefinitions.has(n))
-      .map((n) => [n, host._attributeDefinitions.get(n)] as const),
-  );
-  replayOwnPendingDecorators(host as never, reflectedDefs as never);
-  for (const [name, def] of reflectedDefs) host._attributeDefinitions.set(name, def);
+  const reflectedNames = Object.keys(filteredHash).filter((n) => host._attributeDefinitions.has(n));
+  const attributeSet = new AttributeSet(new Map());
+  for (const name of reflectedNames) {
+    const def = host._attributeDefinitions.get(name);
+    // Seed from the BARE `type_for_column` result, exactly as Rails seeds
+    // `_default_attributes` (attributes.rb:241-245), so the decorator does the
+    // wrapping instead of re-wrapping a type it already wrapped.
+    attributeSet.set(name, Attribute.fromDatabase(name, null, def.reflectedColumnType ?? def.type));
+  }
+  const reflected = new Set(reflectedNames);
+  const decorated = new Set<string>();
+  // The class's OWN decorators only: an inherited one is already baked into the
+  // base map by `decorateAttributes`' immediate apply. Each is replayed through
+  // Rails' own `PendingDecorator#apply_to` (attribute_registration.rb:66-74) so
+  // the replay context it establishes is the same one materialization uses.
+  // NOT `apply_pending_attribute_modifications`: this runs mid-`load_schema!`,
+  // not at materialization, so a decorator naming an attribute with no reflected
+  // column (a typeless enum) would fire its "Undeclared attribute type" raise
+  // here — Rails only reaches that raise from `_default_attributes`
+  // (enum.rb:239-246), which is why the targets are clipped to real columns.
+  const ownPending = Object.prototype.hasOwnProperty.call(host, "_pendingAttributeModifications")
+    ? ((host as { _pendingAttributeModifications?: unknown[] })._pendingAttributeModifications ??
+      [])
+    : [];
+  for (const mod of ownPending) {
+    if (!(mod instanceof PendingDecorator)) continue;
+    const names = (mod.names ?? reflectedNames).filter((n) => reflected.has(n));
+    if (names.length === 0) continue;
+    new PendingDecorator(names, mod.decorator).applyTo(attributeSet, host);
+    for (const name of names) decorated.add(name);
+  }
+  // Only the decorated names are written back: an undecorated def keeps whatever
+  // type it already carries, including a user-declared override that reflection
+  // must not revert to the raw column type.
+  for (const name of decorated) {
+    const def = host._attributeDefinitions.get(name);
+    host._attributeDefinitions.set(name, { ...def, type: attributeSet.getAttribute(name).type });
+  }
 
   // Reflection may change a column's type/default without changing the key set,
   // so the revision stamps cannot infer staleness from key coverage.

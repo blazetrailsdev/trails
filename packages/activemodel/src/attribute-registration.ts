@@ -1,4 +1,4 @@
-import { DescendantsTracker } from "@blazetrails/activesupport";
+import { DescendantsTracker, registerSubclass } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
@@ -154,11 +154,12 @@ export function decorateAttributes(
  */
 export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   if (!this._cachedDefaultAttributes) {
-    // Register with our superclass so resetDefaultAttributes() cascades to us
-    // when the superclass gains new attribute declarations. Mirrors the
-    // ActiveSupport::DescendantsTracker registration that Rails does via
-    // the `inherited` hook; we do it lazily here instead.
-    registerWithSuperclass(this);
+    // Ruby's `inherited` hook registers every subclass with the
+    // DescendantsTracker, which is what `reset_default_attributes`' recursion
+    // over `subclasses` walks (attribute_registration.rb:88-91). JS has no
+    // class-definition hook (CLAUDE.md, "Module mixins"), so trails registers
+    // lazily here, through the one repo-wide stand-in spelling.
+    registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
     const attributeSet = new AttributeSet(new Map<string, Attribute>());
     applyPendingAttributeModifications(this, attributeSet);
     this._cachedDefaultAttributes = attributeSet;
@@ -191,19 +192,6 @@ export class PendingDecorator implements PendingModification {
 // Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
 // ---------------------------------------------------------------------------
 
-/**
- * Register cls as a direct subclass of its prototype-chain superclass so
- * resetDefaultAttributes() can cascade to it.
- *
- * Delegates to DescendantsTracker (WeakRef-backed, dedup'd) — the same
- * infrastructure Rails uses via ActiveSupport::DescendantsTracker. Rails
- * registers via the `inherited` hook; we register lazily on the first
- * _defaultAttributes() call instead (same effect: only classes that have
- * a cache worth invalidating are tracked).
- *
- * Mirrors: ActiveSupport::DescendantsTracker registration triggered by
- * Class.inherited in Rails.
- */
 type HostAsClass = new (...args: unknown[]) => unknown;
 
 /**
@@ -399,17 +387,6 @@ function inDecoratorReplay<T>(fn: () => T): T {
   }
 }
 
-export function registerWithSuperclass(cls: AttributeHostInternals): void {
-  const superclass = Object.getPrototypeOf(cls) as AttributeHostInternals;
-  if (!superclass || (superclass as unknown) === Function.prototype) return;
-  // Only register if the superclass participates in the attribute system.
-  if (!("_attributeDefinitions" in superclass)) return;
-  DescendantsTracker.registerSubclass(
-    superclass as unknown as HostAsClass,
-    cls as unknown as HostAsClass,
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -427,40 +404,6 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
 // ---------------------------------------------------------------------------
 // Exported functions
 // ---------------------------------------------------------------------------
-
-/**
- * Replay a class's OWN pending decorators onto a definitions map.
- *
- * Rails rebuilds `_default_attributes` from `columns_hash` and then replays the
- * pending-modification chain every time
- * (ActiveModel::AttributeRegistration#_default_attributes), so a decoration
- * declared on a class survives schema reflection/reload. AR's STI reflection
- * rebuilds a subclass's `_attributeDefinitions` from the base map, which drops
- * decorations unless they are replayed — this is that replay, restricted to the
- * class's OWN decorators because inherited ones are already baked into the base
- * map by `decorateAttributes`' immediate apply.
- *
- * @internal
- */
-export function replayOwnPendingDecorators(
-  cls: AttributeHostInternals,
-  defs: Map<string, { name: string; type: Type }>,
-): void {
-  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) return;
-  for (const mod of cls._pendingAttributeModifications as PendingModification[]) {
-    if (!(mod instanceof PendingDecorator)) continue;
-    const targets = mod.names ?? Array.from(defs.keys());
-    for (const name of targets) {
-      const def = defs.get(name);
-      if (!def) continue;
-      // Same replay context Rails' PendingDecorator#apply_to establishes — this
-      // IS a replay of the pending chain, so decorators gated on
-      // `isDecoratorReplay()` must run here too.
-      const newType = inDecoratorReplay(() => mod.decorator(name, def.type, cls));
-      if (newType) defs.set(name, { ...def, type: newType });
-    }
-  }
-}
 
 /**
  * Push a type declaration onto the pending-modification queue.
