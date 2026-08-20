@@ -48,4 +48,68 @@ describe("databaseConfiguration", () => {
 
     await expect(databaseConfiguration()).rejects.toThrow(/Could not load database configuration/);
   });
+
+  // configuration.rb:439-458 — the flat arm: `shared` is deleted and
+  // reverse-merged into every environment, so an env's own keys win.
+  it("reverse merges the shared key into each environment", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.json"),
+      JSON.stringify({
+        shared: { adapter: "sqlite3", pool: 5 },
+        test: { database: "db/test.sqlite3", pool: 9 },
+      }),
+    );
+    setTrailsRoot(tmpRoot);
+
+    const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
+    expect(Object.keys(config)).toEqual(["test"]);
+    expect(config.test).toEqual({ adapter: "sqlite3", database: "db/test.sqlite3", pool: 9 });
+  });
+
+  // configuration.rb:441-450 — the nested arm: both sides are hashes of
+  // hashes, so each named sub-config reverse merges the shared entry of the
+  // same name.
+  it("reverse merges shared per named database when both are hashes of hashes", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.json"),
+      JSON.stringify({
+        shared: { primary: { adapter: "sqlite3" }, animals: { adapter: "postgresql" } },
+        test: {
+          primary: { database: "db/test.sqlite3" },
+          animals: { database: "db/animals_test", adapter: "sqlite3" },
+        },
+      }),
+    );
+    setTrailsRoot(tmpRoot);
+
+    const config = (await databaseConfiguration()) as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+    expect(config.test.primary).toEqual({ adapter: "sqlite3", database: "db/test.sqlite3" });
+    expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "db/animals_test" });
+  });
+
+  // configuration.rb:458 — `Hash.new(shared).merge(loaded_yaml)`: an
+  // environment the file never lists still resolves to `shared`.
+  it("resolves an unlisted environment to shared", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.json"),
+      JSON.stringify({
+        shared: { adapter: "sqlite3", database: "db/shared.sqlite3" },
+        test: { database: "db/test.sqlite3" },
+      }),
+    );
+    setTrailsRoot(tmpRoot);
+
+    const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
+    expect(config.staging).toEqual({ adapter: "sqlite3", database: "db/shared.sqlite3" });
+    expect(Object.keys(config)).toEqual(["test"]);
+  });
 });

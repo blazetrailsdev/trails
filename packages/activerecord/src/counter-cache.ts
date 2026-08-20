@@ -277,24 +277,12 @@ function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
  */
-/**
- * Class-attribute accessor mirroring Rails'
- * `class_attribute :counter_cached_association_names`. Returns an array
- * (Rails parity) snapshot of the registered association names.
- *
- * Mirrors: ActiveRecord::CounterCache#counter_cached_association_names
- */
-export function getCounterCachedAssociationNames(this: typeof Base): string[] {
-  return counterCachedAssociationNames(this);
-}
-
 export const ClassMethods = {
   incrementCounter,
   decrementCounter,
   updateCounters,
   resetCounters,
   isCounterCacheColumn,
-  counterCachedAssociationNames: getCounterCachedAssociationNames,
 };
 
 type InstanceCounterHost = {
@@ -302,27 +290,6 @@ type InstanceCounterHost = {
   destroyedByAssociation: unknown;
   association(name: string): any;
 };
-
-/**
- * Mirrors: `model.counter_cached_association_names |= [name]` in
- * Rails' Associations::Builder::BelongsTo.add_counter_cache_callbacks.
- * Stored as a Set on the owning class for O(1) dedupe.
- * @internal
- */
-export function registerCounterCachedAssociation(model: any, name: string): void {
-  // Mirror Rails' class_attribute `|=` semantics: copy-on-write so subclass
-  // additions don't mutate the parent class's Set in place.
-  const owns = Object.prototype.hasOwnProperty.call(model, "_counterCachedAssociationNames");
-  const inherited: Set<string> | undefined = model._counterCachedAssociationNames;
-  const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
-  next.add(name);
-  model._counterCachedAssociationNames = next;
-}
-
-function counterCachedAssociationNames(ctor: typeof Base): string[] {
-  const registered: Set<string> | undefined = (ctor as any)._counterCachedAssociationNames;
-  return registered ? [...registered] : [];
-}
 
 /**
  * Derive a foreign key for a reflection that has none. Rails always has
@@ -357,7 +324,7 @@ export async function _createRecord(
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
   const id = await superFn();
-  for (const associationName of this.constructor.counterCachedAssociationNames()) {
+  for (const associationName of this.constructor.counterCachedAssociationNames) {
     await this.association(associationName).incrementCounters();
   }
   return id;
@@ -373,7 +340,7 @@ export async function destroyRow(
 ): Promise<number> {
   const affectedRows = await superFn();
   if (affectedRows > 0) {
-    for (const associationName of this.constructor.counterCachedAssociationNames()) {
+    for (const associationName of this.constructor.counterCachedAssociationNames) {
       const association = this.association(associationName);
       const dba = this.destroyedByAssociation as {
         foreignKey?: unknown;

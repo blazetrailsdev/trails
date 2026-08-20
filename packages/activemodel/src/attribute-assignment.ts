@@ -61,50 +61,81 @@ export function _assignAttributes(
  *   end
  *
  * There is no `write_attribute` on this path: the only write Rails makes is
- * `public_send(setter, v)`.
+ * `public_send(setter, v)`, and the branch it takes when that fails is decided
+ * in the `rescue`, not before the send.
  *
- * That send takes two spellings here because one Ruby method name reaches TS
- * two ways. Rails' generated writer is a real method named `name=`
- * (attributes.rb:92-102) and is reachable by that key; a user-authored
- * `def name=` ported as a TS `set` accessor is the same Ruby method under the
- * spelling docs/ruby-ts-conventions.md gives it, which `findSetter` resolves.
- * The accessor is tried first because Ruby finds a class's own `name=` before
- * the generated methods module's.
- *
- * Ruby reaches the `rescue NoMethodError` arm through
- * AttributeMethods#method_missing (attribute_methods.rb:508-517), which routes
- * a name matching an attribute-method pattern to `attribute_missing` before any
- * NoMethodError escapes — that is how assignment still works after
+ * Ruby reaches that rescue through AttributeMethods#method_missing
+ * (attribute_methods.rb:508-517), which routes a name matching an
+ * attribute-method pattern to `attribute_missing` before any NoMethodError
+ * escapes — that is how assignment still works after
  * `undefine_attribute_methods`. TS has no `method_missing`, so that dispatch is
- * explicit; a name with no pattern match is the `respond_to?(setter)` false arm
- * and goes to `attribute_writer_missing`. The remaining arm — the setter exists
- * and itself raised NoMethodError, so Rails re-raises at :70-71 — is tracked by
- * `assign-attribute-respond-to-setter-reraise-arm`. Resolving the setter before
- * dispatching means there is no rescue to re-enter: a NoMethodError from inside
- * a setter propagates out of the send above, which is what the re-raise does,
- * but Ruby's `respond_to?` consults the receiver's full method table where the
- * ladder above consults only what it can resolve.
+ * explicit inside the send below, in the same position Ruby runs it.
  *
  * @internal Rails-private helper.
  */
 export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
   const setter = `${k}=`;
-  const own = findSetter(model, k);
-  if (own) {
-    own.call(model, v);
-    return;
+  try {
+    const method = methodFor(model, setter);
+    if (method) {
+      method.call(model, v);
+      return;
+    }
+    // AttributeMethods#method_missing (attribute_methods.rb:508-517).
+    const match = model.matchedAttributeMethod(setter);
+    if (match) {
+      model.attributeMissing(match, v);
+      return;
+    }
+    throw new NoMethodError(
+      `undefined method '${setter}' for an instance of ${model.constructor.name}`,
+    );
+  } catch (error) {
+    if (!(error instanceof NoMethodError)) throw error;
+    if (methodFor(model, setter)) {
+      throw error;
+    } else {
+      model.attributeWriterMissing(k, v);
+    }
+  }
+}
+
+/**
+ * Ruby's method-table lookup for `setter` — what both `public_send(setter, v)`
+ * and `respond_to?(setter)` consult above.
+ *
+ * One Ruby method name reaches TS two ways, which is the single genuine JS
+ * shortcoming on this path. Rails' generated writer is a real method named
+ * `name=` (attributes.rb:92-102) and is reachable by that key; a user-authored
+ * `def name=` ported as a TS `set` accessor is the same Ruby method under the
+ * spelling docs/ruby-ts-conventions.md gives it, and a `set name(v)` accessor
+ * is NOT reachable by the key `"name="`. The accessor is tried first because
+ * Ruby finds a class's own `name=` before the generated methods module's.
+ *
+ * The accessor walk starts at the instance itself (JS analogue of Ruby
+ * singleton methods) and stops before `Object.prototype`, so built-in
+ * accessors like `__proto__` can't hijack mass assignment. It ignores
+ * shadowing data descriptors and get-only accessors: Ruby looks up `name=` as
+ * its own method, independent of any `name` getter.
+ */
+function methodFor(
+  model: AttributeAssignment,
+  setter: string,
+): ((this: AttributeAssignment, value: unknown) => void) | null {
+  const key = setter.slice(0, -1);
+  let obj: object | null = model;
+  while (obj && obj !== Object.prototype) {
+    const desc = Object.getOwnPropertyDescriptor(obj, key);
+    if (desc && typeof desc.set === "function") {
+      return desc.set as (this: AttributeAssignment, value: unknown) => void;
+    }
+    obj = Object.getPrototypeOf(obj);
   }
   const generated = (model as unknown as Record<string, unknown>)[setter];
   if (typeof generated === "function") {
-    (generated as (this: AttributeAssignment, value: unknown) => void).call(model, v);
-    return;
+    return generated as (this: AttributeAssignment, value: unknown) => void;
   }
-  const match = model.matchedAttributeMethod(setter);
-  if (match) {
-    model.attributeMissing(match, v);
-    return;
-  }
-  model.attributeWriterMissing(k, v);
+  return null;
 }
 
 export interface AttributeAssignment {
@@ -192,44 +223,6 @@ function classOf(value: unknown): string {
   if (ctorName) return ctorName;
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-/**
- * Walk instance → prototype chain looking for a setter descriptor for `key`.
- * Mirrors Rails' `public_send("#{k}=", v)` dispatch
- * (activemodel/lib/active_model/attribute_assignment.rb:67-70), which routes
- * through any user-defined `attr_writer` / `def name=` before the attribute
- * store sees the value.
- *
- * Starts at the instance itself (JS analogue of Ruby singleton methods —
- * `Object.defineProperty(model, key, { set })`) and walks up, stopping before
- * `Object.prototype` so built-in accessors like `__proto__` can't hijack
- * mass assignment.
- *
- * Matches either of:
- * - a user-defined setter on a subclass prototype
- *   (`class Cat extends Model { set name(v) { … } }`), or
- * - a framework-generated setter installed by `this.attribute("name", …)`
- *   (see attributes.ts:110-120), which just forwards to `writeAttribute` —
- *   so the net behaviour for non-overridden attributes is unchanged. The
- *   `hasOwnProperty` guard in `attributes.ts` preserves a user-authored
- *   `set name` if declared in the class body.
- *
- * Walks the full chain regardless of shadowing descriptors: Ruby looks up
- * `name=` as its own method, independent of any `name` getter. A get-only
- * accessor or a data descriptor at one level does not hide a setter
- * defined higher up, so neither should our walk.
- */
-function findSetter(model: object, key: string): ((this: object, value: unknown) => void) | null {
-  let obj: object | null = model;
-  while (obj && obj !== Object.prototype) {
-    const desc = Object.getOwnPropertyDescriptor(obj, key);
-    if (desc && typeof desc.set === "function") {
-      return desc.set as (this: object, value: unknown) => void;
-    }
-    obj = Object.getPrototypeOf(obj);
-  }
-  return null;
 }
 
 class ArgumentError extends globalThis.Error {

@@ -8,10 +8,7 @@ import {
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import {
-  flushPendingCounterCacheColumns,
-  registerCounterCachedAssociation,
-} from "../../counter-cache.js";
+import { flushPendingCounterCacheColumns } from "../../counter-cache.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { ActiveRecord } from "../../ar-config.js";
@@ -104,8 +101,10 @@ export class BelongsTo extends SingularAssociation {
     const klass = safeConstantize(targetClassName) as any;
     if (klass) flushPendingCounterCacheColumns(klass);
 
-    // Mirrors Rails: `model.counter_cached_association_names |= [reflection.name]`
-    registerCounterCachedAssociation(model, name);
+    // belongs_to.rb:41 — `model.counter_cached_association_names |= [reflection.name]`
+    if (!model.counterCachedAssociationNames.includes(name)) {
+      model.counterCachedAssociationNames = [...model.counterCachedAssociationNames, name];
+    }
 
     // Rails only registers after_update in add_counter_cache_callbacks.
     // Create/destroy counter handling is done by updateCounterCaches()
