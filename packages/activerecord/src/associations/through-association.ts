@@ -354,6 +354,46 @@ export function throughForeignKeyPresent(assoc: { owner: Base; reflection: any }
   });
 }
 
+/** Ruby's `Array()` Kernel method: `nil` becomes `[]`, an Array passes through. @internal */
+function toArray(value: unknown): unknown[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/**
+ * Mirrors Rails' `ThroughAssociation#build_record`
+ * (through_association.rb:116-129): when the source reflection is a
+ * collection, seed the new record's attributes with the through record's
+ * primary key under the source inverse's foreign key, so the built record
+ * already points back at the through record. Rails then calls `super`;
+ * in trails the caller (`HasManyThroughAssociation#buildRecord`) runs the
+ * `super` half itself, so this helper only performs the seeding.
+ *
+ * @internal
+ */
+export function throughBuildRecord(
+  assoc: { owner: Base; reflection: any },
+  attributes: Record<string, unknown>,
+): void {
+  const srcRefl = sourceReflection(assoc) as any;
+  if (srcRefl?.isCollection?.()) {
+    const inverse = srcRefl.inverseOf?.();
+    const target = throughAssociation.call(assoc as unknown as ThroughAssociationHost)?.target;
+
+    if (inverse && target && !Array.isArray(target)) {
+      // `Array(nil)` is `[]`, so an unpersisted through target zips to nothing
+      // and Rails assigns no attribute at all — a `[undefined]` here would put
+      // the foreign key in the built record's attribute hash.
+      const primaryKeyValues: unknown[] = toArray(target.id);
+      const foreignKeyColumns: string[] = toArray(inverse.foreignKey) as string[];
+      primaryKeyValues.map((primaryKeyValue, i) => {
+        const foreignKeyColumn = foreignKeyColumns[i];
+        if (foreignKeyColumn != null) attributes[foreignKeyColumn] = primaryKeyValue;
+      });
+    }
+  }
+}
+
 /** Rails' `include ThroughAssociation` — the module's instance methods. */
 export const ThroughAssociation = {
   transaction,

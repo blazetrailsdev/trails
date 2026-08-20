@@ -4,7 +4,7 @@
     "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "build_record",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' `map` is in ThroughAssociation#build_record (through_association.rb:121-124), which HasManyThroughAssociation#build_record reaches via `super`; trails ports it as `throughBuildRecord` in through-association.ts and calls it from `buildRecord`, the same module-delegation shape as the stale_state / target_scope rows on this class."
   },
   {
     "package": "activerecord",

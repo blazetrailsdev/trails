@@ -25,7 +25,7 @@
     "tsFile": "associations/association.ts",
     "rubyName": "skip_statement_cache?",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `reflection.source_reflection.active_record.default_scopes.any?` (association.rb:395) — `default_scopes` is an Array, and JS Array has no `any?`; the port is the emptiness test `...defaultScopes?.length` (association.ts). All three other disjuncts are called."
   },
   {
     "package": "activerecord",
