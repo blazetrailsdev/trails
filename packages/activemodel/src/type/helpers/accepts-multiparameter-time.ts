@@ -22,15 +22,24 @@ export interface InstanceMethods<T = unknown> {
  * receiver's ancestry, not from the receiver's class, so the owner is located
  * by identity and its own ancestor answers. (TS `super` is only available to a
  * class body, and these are module methods.)
+ *
+ * Ruby never holds one module twice in an ancestry — `include` skips a module
+ * already there — so the owner is the LAST link carrying the method: a JS
+ * prototype chain can hold the same carried function more than once, and
+ * answering the first would make `super` re-enter it.
  */
 function superOf(
   receiver: object,
   name: string,
   self: unknown,
 ): (this: unknown, ...args: unknown[]) => unknown {
-  let owner: object | null = Object.getPrototypeOf(receiver);
-  while (owner && Object.getOwnPropertyDescriptor(owner, name)?.value !== self) {
-    owner = Object.getPrototypeOf(owner);
+  let owner: object | null = null;
+  for (
+    let link: object | null = Object.getPrototypeOf(receiver);
+    link;
+    link = Object.getPrototypeOf(link)
+  ) {
+    if (Object.getOwnPropertyDescriptor(link, name)?.value === self) owner = link;
   }
   return (Object.getPrototypeOf(owner!) as Record<string, (...args: unknown[]) => unknown>)[name];
 }
@@ -80,17 +89,6 @@ const InstanceMethods = {
   },
 };
 
-/**
- * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
- * (accepts_multiparameter_time.rb).
- *
- * A `Module` subclass whose `initialize` includes `InstanceMethods` and
- * `define_method`s `value_from_multiparameter_assignment` closed over the
- * `defaults:` kwarg; `include AcceptsMultiparameterTime.new(...)` in a type's
- * class body then puts all of it in that type's ancestry, so `cast` and
- * `assert_valid_value` reach the type's real `super`. trails' `Module` /
- * `include()` (`activesupport/src/include.ts`) splice the same way.
- */
 /**
  * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
  * (accepts_multiparameter_time.rb).
