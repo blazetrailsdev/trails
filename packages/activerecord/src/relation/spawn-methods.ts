@@ -135,13 +135,34 @@ export function only<T extends SpawnRelation<T>>(this: T, ...onlies: Array<Excep
   return this.relationWith(slice(this.values(), ...onlies));
 }
 
-export const SpawnMethods = {
+/**
+ * `SpawnMethods.public_instance_methods(false)` — the members Ruby defines
+ * above `private` (spawn_methods.rb:71). `CollectionProxy` delegates exactly
+ * this set to `scope` (collection_proxy.rb:1128-1137).
+ *
+ * @internal
+ */
+export const SpawnMethodsPublicInstanceMethods = {
   spawn: performSpawn,
   merge: performMerge,
   mergeBang,
   except,
   only,
+} as const;
+
+/**
+ * The members below spawn_methods.rb's `private` (spawn_methods.rb:71) —
+ * `relation_with` (spawn_methods.rb:72), which is not delegated.
+ *
+ * @internal
+ */
+export const SpawnMethodsPrivateInstanceMethods = {
   relationWith,
+} as const;
+
+export const SpawnMethods = {
+  ...SpawnMethodsPublicInstanceMethods,
+  ...SpawnMethodsPrivateInstanceMethods,
 } as const;
 
 /**

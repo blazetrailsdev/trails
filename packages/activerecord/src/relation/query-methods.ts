@@ -2623,7 +2623,15 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
 // ---------------------------------------------------------------------------
 // Module export — all bang variants as a single object for `include()`.
 // ---------------------------------------------------------------------------
-export const QueryMethodBangs = {
+/**
+ * `QueryMethods.public_instance_methods(false)` — the members Ruby defines
+ * above `private` (query_methods.rb:1677). `CollectionProxy` delegates exactly
+ * this set to `scope` (collection_proxy.rb:1128-1137), so the boundary is a
+ * fact about this module and is expressed here rather than transcribed there.
+ *
+ * @internal
+ */
+export const QueryMethodsPublicInstanceMethods = {
   includes,
   all,
   eagerLoad,
@@ -2636,10 +2644,7 @@ export const QueryMethodBangs = {
   leftOuterJoins,
   leftJoins,
   arel,
-  assertModifiableBang,
-  checkIfMethodHasArgumentsBang,
   arelColumns,
-  arelColumnsFromHash,
   includesBang,
   eagerLoadBang,
   preloadBang,
@@ -2709,52 +2714,68 @@ export const QueryMethodBangs = {
   without,
   excludingBang,
   constructJoinDependency,
-  asyncBang,
-  // query_methods.rb's private column helpers. Rails defines these once, in
-  // QueryMethods, and Relation gets them by `include`; they ride the same
-  // mixin here so `relation.ts` does not redeclare a second copy.
-  isTableNameMatches,
-  arelColumn,
-  arelColumnWithTable,
-  async,
+  buildSubquery,
   buildWhereClause,
   // Mirrors `alias :build_having_clause :build_where_clause`
   // (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
   buildHavingClause: buildWhereClause,
+  asyncBang,
+} as const;
+
+/**
+ * The members below query_methods.rb's `private` (query_methods.rb:1677).
+ * Ruby keeps them out of `public_instance_methods(false)`, so they are not
+ * delegated; they ride the same mixin here so `relation.ts` does not redeclare
+ * a second copy.
+ *
+ * @internal
+ */
+export const QueryMethodsPrivateInstanceMethods = {
+  async,
   buildNamedBoundSqlLiteral,
   buildBoundSqlLiteral,
-  buildSubquery,
-  buildCastValue,
-  flattenedArgs,
-  validateOrderArgs,
-  processWithArgs,
-  isDoesNotSupportReverse,
-  reverseSqlOrder,
-  extractTableNameFrom,
-  columnReferences,
-  sanitizeOrderArguments,
-  preprocessOrderArgs,
-  buildOrder,
-  buildCaseForValuePosition,
-  resolveArelAttributes,
-  orderColumn,
-  processSelectArgs,
-  arelColumnAliasesFromHash,
-  buildFrom,
-  buildSelect,
-  buildWithExpressionFromValue,
-  buildWithValueFromHash,
   lookupTableKlassFromJoinDependencies,
   eachJoinDependencies,
   buildJoinDependencies,
+  assertModifiableBang,
   buildArel,
+  buildCastValue,
+  buildFrom,
   selectNamedJoins,
   selectAssociationList,
   buildJoinBuckets,
   buildJoins,
+  buildSelect,
   buildWith,
+  buildWithValueFromHash,
+  buildWithExpressionFromValue,
   buildWithJoinNode,
+  arelColumnsFromHash,
+  arelColumnWithTable,
+  arelColumn,
+  isTableNameMatches,
+  reverseSqlOrder,
+  isDoesNotSupportReverse,
+  buildOrder,
+  validateOrderArgs,
+  flattenedArgs,
+  preprocessOrderArgs,
+  sanitizeOrderArguments,
+  columnReferences,
+  extractTableNameFrom,
+  orderColumn,
+  buildCaseForValuePosition,
+  resolveArelAttributes,
+  checkIfMethodHasArgumentsBang,
+  processSelectArgs,
+  arelColumnAliasesFromHash,
+  processWithArgs,
   structurallyIncompatibleValuesFor,
+} as const;
+
+export const QueryMethodBangs = {
+  ...QueryMethodsPublicInstanceMethods,
+  ...QueryMethodsPrivateInstanceMethods,
 } as const;
 
 // ---------------------------------------------------------------------------
