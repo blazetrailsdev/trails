@@ -24,10 +24,12 @@ import {
   resetCallbacks as asResetCallbacks,
   withOptions,
   include,
+  extend,
   runLoadHooks,
   wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
+  type Extended,
   classAttribute,
   kernelArray,
 } from "@blazetrails/activesupport";
@@ -111,9 +113,10 @@ import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
 import {
   type AttributeDefinition,
+  Attributes,
   attribute,
-  matchedAttributeMethod as _matchedAttributeMethod,
   setDefineMethodAttribute,
+  matchedAttributeMethod as _matchedAttributeMethod,
 } from "./attributes.js";
 import {
   _defaultAttributes,
@@ -127,6 +130,17 @@ import {
   type AttributeHostInternals,
 } from "./attribute-registration.js";
 import { _toPartialPath } from "./conversion.js";
+
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
+ * class half `include ActiveModel::Attributes` contributes, mixed onto `Model`
+ * by the `extend()` at the bottom of this file.
+ *
+ * `attribute_names` (attributes.rb:73-75) is not carried: `Model` defines its
+ * own in the class body, and where Ruby's ancestry lets a class-body method
+ * outrank the module's, `extend()` would overwrite it.
+ */
+const AttributesClassMethods = { attribute, setDefineMethodAttribute };
 
 /** Args accepted by `Model.normalizes` — attributes, transform fn, and optional options. */
 export type NormalizesArgs =
@@ -309,9 +323,11 @@ export class Model {
 
   // -- Attributes (Phase 1000) --
 
-  static attribute = attribute;
+  declare static attribute: Extended<typeof AttributesClassMethods>["attribute"];
+  declare static setDefineMethodAttribute: Extended<
+    typeof AttributesClassMethods
+  >["setDefineMethodAttribute"];
   static defineMethodAttribute = defineMethodAttribute;
-  static setDefineMethodAttribute = setDefineMethodAttribute;
   static _defaultAttributes = _defaultAttributes;
   static decorateAttributes = decorateAttributes;
   static attributeTypes = attributeTypes;
@@ -1907,9 +1923,13 @@ export class Model {
     return [...(this.constructor as typeof Model).attributeNames()];
   }
 
-  get attributes(): Record<string, unknown> {
-    return this._attributes.toHash();
-  }
+  /**
+   * `ActiveModel::Attributes#attributes` (attributes.rb:131-133), installed on
+   * the prototype by the `include(Model, Attributes)` at the bottom of this
+   * file. Declared here only for its type: `Included<>` derives callable
+   * methods and cannot carry an accessor's type across the mixin.
+   */
+  declare attributes: Record<string, unknown>;
 
   attributePresent(name: string): boolean {
     const value = this.readAttribute(name);
@@ -2808,17 +2828,18 @@ export class Model {
   }
 }
 
-// Rails' `included do` block (attribute_methods.rb:70-73). The `"="` suffix
-// pattern is the one `ActiveModel::Attributes` adds on include
-// (attributes.rb:35), folded into the default because trails has one host class.
+// Rails' `included do` block (attribute_methods.rb:70-73).
 classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default: {} });
 classAttribute.call(Model, "attributeMethodPatterns", {
   instanceWriter: false,
-  default: [
-    new AttributeMethodPattern(),
-    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
-  ],
+  default: [new AttributeMethodPattern()],
 });
+
+// `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
+// issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
+// so it has to run after the `attributeMethodPatterns` class attribute exists.
+extend(Model, AttributesClassMethods);
+include(Model, Attributes);
 
 const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
 
