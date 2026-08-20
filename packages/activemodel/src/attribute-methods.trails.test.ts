@@ -73,4 +73,29 @@ describe("AttributeMethodsTest (trails)", () => {
     person.name = "Bob";
     expect(person.readAttribute("name")).toBe("Bob");
   });
+
+  it("alias_attribute and attribute_method_suffix write only the declaring class", () => {
+    // `attribute_aliases` and `attribute_method_patterns` are `class_attribute`s
+    // (activemodel/attribute_methods.rb:70-73), whose writer is local to the
+    // class: Rails' `self.attribute_aliases = attribute_aliases.merge(...)`
+    // (:203) and `self.attribute_method_patterns += ...` (:141) leave every
+    // ancestor — and the shared default — untouched.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Employee extends Person {
+      static {
+        this.aliasAttribute("nickname", "name");
+        this.attributeMethodSuffix("Short");
+      }
+    }
+
+    expect(Employee.attributeAliases).toEqual({ nickname: "name" });
+    expect(Person.attributeAliases).toEqual({});
+    expect(Model.attributeAliases).toEqual({});
+    expect(Employee.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length + 1);
+    expect(Model.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length);
+  });
 });

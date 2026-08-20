@@ -37,7 +37,7 @@ export interface AttributeHostInternals {
     { name: string; type?: Type; virtual?: boolean; userProvidedDefault?: boolean }
   >;
   _pendingAttributeModifications?: PendingModification[];
-  _attributeAliases?: Record<string, string>;
+  attributeAliases?: Record<string, string>;
   /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
   resolveAttributeName(name: string): string;
 }
@@ -48,13 +48,18 @@ export interface AttributeHostInternals {
 // ---------------------------------------------------------------------------
 
 /**
- * A decorator receives the attribute name and its current type, and optionally
- * the *materializing* class (`host`) — the class whose AttributeSet is being
- * built. Rails' `decorate_attributes` block resolves against that class's
- * attributes, so a superclass's decorator replayed into a subclass sees the
- * subclass's columns. trails threads `host` through so a decorator (e.g. enum's
- * "Undeclared attribute type" check) can key off the materializing subclass
- * rather than the class the decorator was declared on.
+ * A decorator receives the attribute name and its current type, and — only on
+ * the `_default_attributes` replay — the *materializing* class (`host`): the
+ * class whose AttributeSet is being built. Rails' `decorate_attributes` block
+ * resolves against that class's attributes, so a superclass's decorator replayed
+ * into a subclass sees the subclass's columns; trails threads `host` through for
+ * that.
+ *
+ * `host` is absent on the eager pass `decorateAttributes` runs at declaration
+ * time, which Rails has no counterpart for. A decorator that must fire only
+ * where Rails' block fires — enum's "Undeclared attribute type" raise, which
+ * Rails evaluates when the attribute set is built (enum.rb:240-245) — keys off
+ * its presence.
  */
 export type AttributeDecorator = (name: string, type: Type, host?: unknown) => Type;
 
@@ -96,17 +101,6 @@ export class PendingDefault implements PendingModification {
 }
 
 /**
- * Depth counter set while a PendingDecorator replays during
- * `_default_attributes` materialization. trails also applies decorators eagerly
- * to `_attributeDefinitions` at declaration time (a back-compat convenience Rails
- * lacks); a decorator that must mirror Rails' replay-only behavior — e.g. the
- * enum decorator's "Undeclared attribute type" raise, which Rails fires inside
- * its `decorate_attributes` block only on materialization — consults
- * `isDecoratorReplay()` to run solely on the deferred replay, not the eager pass.
- */
-let _decoratorReplayDepth = 0;
-
-/**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#decorate_attributes
  *
  * Pushes a PendingDecorator onto the modification queue so it replays in the
@@ -136,7 +130,7 @@ export function decorateAttributes(
   for (const name of targetNames) {
     const def = defs.get(name);
     if (def) {
-      const newType = decorator(name, def.type, this);
+      const newType = decorator(name, def.type);
       if (newType) defs.set(name, { ...def, type: newType });
     }
   }
@@ -178,20 +172,13 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
+      const newType = this.decorator(name, existing.type, host);
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Subclass registry
-// Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
-// ---------------------------------------------------------------------------
-
-type HostAsClass = new (...args: unknown[]) => unknown;
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#attribute_types
@@ -229,6 +216,13 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
   this._cachedAttributeTypes = proxy;
   return proxy;
 }
+
+// ---------------------------------------------------------------------------
+// Subclass registry
+// Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
+// ---------------------------------------------------------------------------
+
+type HostAsClass = new (...args: unknown[]) => unknown;
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#type_for_attribute
@@ -271,14 +265,32 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#apply_pending_attribute_modifications
  *
+ * Ruby's `superclass.respond_to?(:apply_pending_attribute_modifications, true)`
+ * (attribute_registration.rb:80) tests for a private method of the module; a TS
+ * module function is not a member of the class, so the participation test is
+ * the public entry point every AttributeRegistration includer answers.
+ *
+ * `host` is the class whose AttributeSet is being materialized, threaded down
+ * the recursion so a superclass's PendingDecorator resolves against the
+ * subclass it is replaying into — the same `host` thread AttributeDecorator
+ * documents, which Ruby gets from `self` inside the `decorate_attributes` block.
+ *
  * @internal
  */
 export function applyPendingAttributeModifications(
   cls: AttributeHostInternals,
   attributeSet: AttributeSet,
+  host: AttributeHostInternals = cls,
 ): void {
-  for (const modification of collectPendingModifications(cls)) {
-    modification.applyTo(attributeSet, cls);
+  const superclass = Object.getPrototypeOf(cls) as
+    | (AttributeHostInternals & { _defaultAttributes?: unknown })
+    | null;
+  if (superclass && typeof superclass._defaultAttributes === "function") {
+    applyPendingAttributeModifications(superclass, attributeSet, host);
+  }
+
+  for (const modification of pendingAttributeModifications.call(cls)) {
+    modification.applyTo(attributeSet, host);
   }
 }
 
@@ -360,88 +372,4 @@ export function hookAttributeType(
   type: Type,
 ): Type {
   return type;
-}
-
-/** True while a PendingDecorator is replaying during materialization. @internal */
-export function isDecoratorReplay(): boolean {
-  return _decoratorReplayDepth > 0;
-}
-
-/**
- * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
- *
- * Mirrors: the replay performed by
- * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
- * replays a pending decorator MUST go through this, or decorators gated on
- * replay context (notably enum's undeclared-type check) silently change behavior.
- *
- * @internal
- */
-function inDecoratorReplay<T>(fn: () => T): T {
-  _decoratorReplayDepth++;
-  try {
-    return fn();
-  } finally {
-    _decoratorReplayDepth--;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function collectPendingModifications(cls: AttributeHostInternals): PendingModification[] {
-  if (!cls || (cls as unknown) === Function.prototype || !cls._pendingAttributeModifications)
-    return [];
-  const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
-  const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
-    ? cls._pendingAttributeModifications
-    : [];
-  return [...superMods, ...own];
-}
-
-// ---------------------------------------------------------------------------
-// Exported functions
-// ---------------------------------------------------------------------------
-
-/**
- * Push a type declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingType(
-  cls: AttributeHostInternals,
-  name: string,
-  type: Type | null,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingType(name, type));
-}
-
-/**
- * Push a default declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingDefault(
-  cls: AttributeHostInternals,
-  name: string,
-  value: unknown,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
-}
-
-/**
- * Push a decorator onto the pending-modification queue.
- * Called by decorateAttributes and AR's applyPendingEncryptions.
- *
- * Mirrors: the PendingDecorator push inside ActiveModel::AttributeRegistration#decorate_attributes
- */
-export function pushPendingDecorator(
-  cls: AttributeHostInternals,
-  names: string[] | null,
-  decorator: AttributeDecorator,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
 }

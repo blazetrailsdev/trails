@@ -9,19 +9,15 @@ import {
   matchedAttributeMethod as _matchedAttributeMethod,
   missingAttribute as _missingAttribute,
   _readAttribute as __readAttribute,
-  attributeAliases as _attributeAliases,
-  isAttributeAliases as _isAttributeAliases,
-  attributeMethodPatterns as _attributeMethodPatterns,
   buildMangledName,
   defineAttributeMethod as _defineAttributeMethod,
-  isAttributeMethodPatterns as _isAttributeMethodPatterns,
   isRespondToWithoutAttributes as _isRespondToWithoutAttributes,
   type AttributeMethodHost,
-  type AttributeMethodPattern,
 } from "./attribute-methods.js";
 import {
-  pushPendingType,
-  pushPendingDefault,
+  pendingAttributeModifications,
+  PendingType,
+  PendingDefault,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 import { type InstanceHost } from "./attribute-methods.js";
@@ -110,7 +106,13 @@ export interface AttributeOptions {
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
  * — registers the attribute, then `define_attribute_method(name)` generates its
- * methods. A name the class already answers (`toJSON`, `freeze`, `attributes`)
+ * methods. Rails' body is `super; define_attribute_method(name)`, where `super`
+ * is `AttributeRegistration::ClassMethods#attribute`
+ * (attribute_registration.rb:12-20); the two are inlined here because TS cannot
+ * spell `super` across modules. Story:
+ * 0115/split-attribute-registration-attribute-from-attributes-attribute.
+ *
+ * A name the class already answers (`toJSON`, `freeze`, `attributes`)
  * gets no accessor, because `define_attribute_method_pattern`'s
  * `instance_method_already_implemented?` arm rejects it; such an attribute still
  * round-trips through `readAttribute` / `writeAttribute`.
@@ -196,10 +198,12 @@ export function attribute(
   // default-only call pushes only PendingDefault, preserving the existing type.
   const noDefault = options?.default === undefined;
   if (typeProvided || noDefault) {
-    pushPendingType(this, name, typeProvided ? type : null);
+    pendingAttributeModifications
+      .call(this)
+      .push(new PendingType(name, typeProvided ? type : null));
   }
   if (!noDefault) {
-    pushPendingDefault(this, name, defaultValue);
+    pendingAttributeModifications.call(this).push(new PendingDefault(name, defaultValue));
   }
 
   // Mirrors: Rails reset_default_attributes — invalidate cache on this class
@@ -306,6 +310,16 @@ export class Attributes {
   }
 }
 
+function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
+  const {
+    default: _default,
+    virtual: _virtual,
+    userProvidedDefault: _userProvidedDefault,
+    ...rest
+  } = options ?? {};
+  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Rails privates surfaced by attributes.rb
 // ---------------------------------------------------------------------------
@@ -337,26 +351,6 @@ export function _readAttribute(this: InstanceHost, attr: string): unknown {
     _readAttribute?(name: string): unknown;
   };
   return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
-}
-
-/** @internal Rails class_attribute. Mirrors: #attribute_aliases (via AttributeMethods include) */
-export function attributeAliases(this: AttributeMethodHost): Record<string, string> {
-  return _attributeAliases.call(this);
-}
-
-/** @internal Rails class_attribute predicate. Mirrors: #attribute_aliases? (via AttributeMethods include) */
-export function isAttributeAliases(this: AttributeMethodHost): boolean {
-  return _isAttributeAliases.call(this);
-}
-
-/** @internal Rails class_attribute. Mirrors: #attribute_method_patterns (via AttributeMethods include) */
-export function attributeMethodPatterns(this: AttributeMethodHost): AttributeMethodPattern[] {
-  return _attributeMethodPatterns.call(this);
-}
-
-/** @internal Rails class_attribute predicate. Mirrors: #attribute_method_patterns? (via AttributeMethods include) */
-export function isAttributeMethodPatterns(this: AttributeMethodHost): boolean {
-  return _isAttributeMethodPatterns.call(this);
 }
 
 /** @internal Rails-private helper. Mirrors: #respond_to_without_attributes? (via AttributeMethods include) */

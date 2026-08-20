@@ -49,7 +49,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   }
 
   if (names.length > 0) {
-    const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
+    const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
     for (const name of names) {
       const resolved = aliases[name] ?? name;
       if (!self._deferTouchAttrs.includes(resolved)) self._deferTouchAttrs.push(resolved);

@@ -34,7 +34,6 @@ import {
   AttributeMethodPattern,
   Model,
   Type,
-  pushPendingDecorator,
   type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
@@ -134,7 +133,6 @@ import {
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
-  resolveAliasNameIn,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
@@ -1194,12 +1192,9 @@ export class Base extends Model {
     // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
     // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.
     this._virtualAttributesReconciled = false;
-    // Apply hookAttributeType decorators (TZ conversion, locking) to the
-    // just-registered type so user-declared datetime attributes are wrapped.
-    // Patch _attributeDefinitions immediately (read path) and also push a
-    // PendingDecorator so _defaultAttributes() replay sees the hooked type
-    // after the PendingType for this attribute.
-    //
+    // Apply hookAttributeType decorators (TZ conversion, locking) via
+    // `decorate_attributes` (attribute_registration.rb:22-28), which queues the
+    // decorator for the `_default_attributes` replay.
     // Gated on an explicit type, mirroring Rails' `type = hook_attribute_type(name, type) if type`
     // (attribute_registration.rb:15). On a no-type call (`attribute("col", { default })`)
     // the existing type is already hooked from schema reflection — re-hooking would
@@ -1210,8 +1205,7 @@ export class Base extends Model {
     if (def) {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
-        this._attributeDefinitions.set(name, { ...def, type: hooked });
-        pushPendingDecorator(this, [name], (_n: string, _t: Type) => hooked);
+        this.decorateAttributes([name], (_n: string, _t: Type) => hooked);
       }
     }
     // If we just defined an "id" accessor on a subclass prototype, remove it
@@ -1257,7 +1251,7 @@ export class Base extends Model {
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, name);
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
-    const resolved = (this as any)._attributeAliases?.[name] ?? name;
+    const resolved = (this as any).attributeAliases?.[name] ?? name;
     // Rails raises inside enum's `decorate_attributes` block for an enum backed
     // by neither a DB column nor an explicit `attribute` type.
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
@@ -1764,15 +1758,17 @@ export class Base extends Model {
 
   /**
    * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-   * parameters: false` (attribute_methods/before_type_cast.rb:32). Ruby's
-   * `class_attribute` `+=` gives Active Record its own array rather than
+   * parameters: false` (attribute_methods/before_type_cast.rb:32). The
+   * `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
    */
-  static override _attributeMethodPatterns: AttributeMethodPattern[] = [
-    ...Model._attributeMethodPatterns,
-    new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
-    new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
-  ];
+  static {
+    this.attributeMethodPatterns = [
+      ...this.attributeMethodPatterns,
+      new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
+      new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
+    ];
+  }
 
   // -- Ignored columns --
   static _ignoredColumns: string[] = [];
@@ -2010,7 +2006,7 @@ export class Base extends Model {
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
-      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
     return super.attributeChanged(name, options);
@@ -2022,7 +2018,7 @@ export class Base extends Model {
   ): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
-      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
     return super.savedChangeToAttribute(name, options);
@@ -4359,7 +4355,7 @@ export class Base extends Model {
     // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
     // (attribute_methods.rb:256) before checking `attribute_types`.
     const defs = this._attributeDefinitions;
-    return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
+    return defs.has(this.resolveAttributeName(String(name)));
   }
 
   /**

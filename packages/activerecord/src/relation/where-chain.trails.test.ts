@@ -117,10 +117,11 @@ describe("WhereChain not inversion shapes (trails)", () => {
   it("resolves attribute aliases before inversion like build_where_clause", () => {
     // Rails WhereChain#not routes through build_where_clause (query_methods.rb:49),
     // which resolves alias_attribute keys before expand_from_hash — so
-    // `where.not(newName: ...)` lands on the real `name` column, inverted.
-    const sql = Company.where().not({ newName: "37signals" }).toSql();
+    // `where.not(new_name: ...)` lands on the real `name` column, inverted.
+    // `company.rb:22` is `alias_attribute :new_name, :name`.
+    const sql = Company.where().not({ new_name: "37signals" }).toSql();
     expect(sql).toMatch(/["`]name["`]\s*!=/);
-    expect(sql).not.toMatch(/newName/);
+    expect(sql).not.toMatch(/new_name/);
   });
 });
 

@@ -447,7 +447,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
  * @internal
  */
 export function encryptedAttribute(this: any, attributeName: string): boolean {
-  const name = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
+  const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
   if (!encryptedAttributes.call(this.constructor).has(name)) return false;
   // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
   // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
@@ -463,7 +463,7 @@ export function encryptedAttribute(this: any, attributeName: string): boolean {
  * @internal
  */
 export function ciphertextFor(this: any, attributeName: string): unknown {
-  attributeName = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
+  attributeName = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
   if (encryptedAttribute.call(this, attributeName)) {
     return this.readAttributeBeforeTypeCast?.(attributeName);
   }

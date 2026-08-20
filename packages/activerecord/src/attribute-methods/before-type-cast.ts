@@ -22,7 +22,7 @@ export function readAttributeBeforeTypeCast(
   record: BeforeTypeCastRecord,
   attrName: string,
 ): unknown {
-  const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
+  const name = record.constructor.attributeAliases?.[attrName] ?? attrName;
 
   return attributeBeforeTypeCast.call(record, name);
 }
@@ -48,7 +48,7 @@ interface DatabaseRecord extends AttributeOwner {
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#read_attribute_for_database
  */
 export function readAttributeForDatabase(record: DatabaseRecord, attrName: string): unknown {
-  const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
+  const name = record.constructor.attributeAliases?.[attrName] ?? attrName;
 
   return attributeForDatabase.call(record, name);
 }
@@ -70,7 +70,7 @@ interface AttributeOwner {
       cameFromUser(): boolean;
     };
   };
-  constructor: { _attributeAliases?: Record<string, string> };
+  constructor: { attributeAliases?: Record<string, string> };
 }
 
 /** @internal */
@@ -85,6 +85,6 @@ export function attributeForDatabase(this: AttributeOwner, attrName: string): un
 
 /** @internal */
 export function isAttributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
-  const name = this.constructor._attributeAliases?.[attrName] ?? attrName;
+  const name = this.constructor.attributeAliases?.[attrName] ?? attrName;
   return this._attributes.getAttribute(name).cameFromUser();
 }

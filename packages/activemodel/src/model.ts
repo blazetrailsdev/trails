@@ -28,6 +28,7 @@ import {
   wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
+  classAttribute,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -82,16 +83,10 @@ import {
   aliasAttribute,
   resolveAttributeName as _resolveAttributeNameHelper,
   type AttributeMethodHost,
-  resolveAliasName,
-  resolveAliasNameIn,
   defineMethodAttribute,
   undefineAttributeMethods,
   attributeMissing,
   missingAttribute,
-  attributeAliases,
-  isAttributeAliases,
-  attributeMethodPatterns,
-  isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
   type InstanceHost,
 } from "./attribute-methods.js";
@@ -287,15 +282,12 @@ export class Model {
   // (activemodel/lib/active_model/conversion.rb:32)
   static paramDelimiter: string = "-";
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-  // Rails: `class_attribute :attribute_method_patterns, … default:
-  // [ ClassMethods::AttributeMethodPattern.new ]`
-  // (activemodel/lib/active_model/attribute_methods.rb:72), plus the `"="`
-  // suffix pattern `Attributes` adds on include (attributes.rb:35).
-  static _attributeMethodPatterns: AttributeMethodPattern[] = [
-    new AttributeMethodPattern(),
-    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
-  ];
-  static _attributeAliases: Record<string, string> = {};
+  // Runtime accessors come from the `classAttribute()` calls at the bottom of
+  // this file (attribute_methods.rb:70-73).
+  declare static attributeAliases: Record<string, string>;
+  declare static isAttributeAliases: boolean;
+  declare static attributeMethodPatterns: AttributeMethodPattern[];
+  declare static isAttributeMethodPatterns: boolean;
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
   // (activemodel/lib/active_model/validations.rb:50). Map keyed by attribute
@@ -1591,10 +1583,6 @@ export class Model {
   static attributeMethodSuffix = attributeMethodSuffix;
   static attributeMethodAffix = attributeMethodAffix;
   static undefineAttributeMethods = undefineAttributeMethods;
-  static attributeAliases = attributeAliases;
-  static isAttributeAliases = isAttributeAliases;
-  static attributeMethodPatterns = attributeMethodPatterns;
-  static isAttributeMethodPatterns = isAttributeMethodPatterns;
   isRespondToWithoutAttributes = isRespondToWithoutAttributes;
 
   // -- Naming (Phase 1300) --
@@ -1769,7 +1757,7 @@ export class Model {
     // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
     // skips it. Resolved against the loaded attribute set so the trails
     // camelCase-key bridge cannot displace a name the record already owns.
-    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     if (this._attributes.has(resolved)) this._accessedFields.add(resolved);
     return this._attributes.fetchValue(resolved, block) ?? null;
   }
@@ -1838,7 +1826,7 @@ export class Model {
     // canonical attribute's dirty state (Rails `write_attribute`,
     // write.rb:31-34). Resolved against the loaded attribute set to stay
     // coherent with `readAttribute` / `hasAttribute`.
-    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     this._writeAttribute(resolved, value);
   }
 
@@ -1879,7 +1867,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_before_type_cast
    */
   readAttributeBeforeTypeCast(name: string): unknown {
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._attributes.getAttribute(resolved).valueBeforeTypeCast ?? null;
   }
 
@@ -1916,7 +1904,7 @@ export class Model {
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
     const defs = ctor._attributeDefinitions;
-    return defs.has(resolveAliasNameIn(ctor, defs, name));
+    return defs.has(ctor.resolveAttributeName(name));
   }
 
   /**
@@ -2219,7 +2207,7 @@ export class Model {
   }
 
   attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     if (!this._dirty.attributeChanged(name)) return false;
     if (!options) return true;
     const change = this._dirty.attributeChange(name);
@@ -2240,12 +2228,14 @@ export class Model {
   }
 
   attributeWas(name: string): unknown {
-    return this._dirty.attributeWas(resolveAliasName(this.constructor as typeof Model, name));
+    return this._dirty.attributeWas((this.constructor as typeof Model).resolveAttributeName(name));
   }
 
   /** @internal */
   attributeChange(name: string): [unknown, unknown] | null {
-    return this._dirty.attributeChange(resolveAliasName(this.constructor as typeof Model, name));
+    return this._dirty.attributeChange(
+      (this.constructor as typeof Model).resolveAttributeName(name),
+    );
   }
 
   /**
@@ -2276,7 +2266,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#saved_change_to_attribute?
    */
   savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     const changes = this._dirty.previousChanges;
     if (!(name in changes)) return false;
     if (!options) return true;
@@ -2297,7 +2287,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_before_last_save
    */
   attributeBeforeLastSave(name: string): unknown {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     const change = this._dirty.previousChanges[name];
     return change ? change[0] : this.readAttribute(name);
   }
@@ -2309,7 +2299,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_in_database
    */
   attributeInDatabase(name: string): unknown {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._dirty.attributeWas(name) ?? this.readAttribute(name);
   }
 
@@ -2348,7 +2338,7 @@ export class Model {
 
   savedChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
     const changes = this._dirty.previousChanges;
-    return changes[resolveAliasName(this.constructor as typeof Model, name)];
+    return changes[(this.constructor as typeof Model).resolveAttributeName(name)];
   }
 
   /**
@@ -2387,7 +2377,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_will_change!
    */
   attributeWillChange(name: string): unknown {
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._dirty.forceChange(resolved);
   }
 
@@ -2399,7 +2389,7 @@ export class Model {
   restoreAttribute(name: string): void {
     this._dirty.restoreAttribute(
       this._attributes,
-      resolveAliasName(this.constructor as typeof Model, name),
+      (this.constructor as typeof Model).resolveAttributeName(name),
     );
   }
 
@@ -2413,7 +2403,9 @@ export class Model {
    * @internal
    */
   attributePreviousChange(name: string): [unknown, unknown] | undefined {
-    return this._dirty.previousChanges[resolveAliasName(this.constructor as typeof Model, name)];
+    return this._dirty.previousChanges[
+      (this.constructor as typeof Model).resolveAttributeName(name)
+    ];
   }
 
   changesApplied(): void {
@@ -2826,6 +2818,18 @@ export class Model {
     return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
   }
 }
+
+// Rails' `included do` block (attribute_methods.rb:70-73). The `"="` suffix
+// pattern is the one `ActiveModel::Attributes` adds on include
+// (attributes.rb:35), folded into the default because trails has one host class.
+classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default: {} });
+classAttribute.call(Model, "attributeMethodPatterns", {
+  instanceWriter: false,
+  default: [
+    new AttributeMethodPattern(),
+    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
+  ],
+});
 
 const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
 

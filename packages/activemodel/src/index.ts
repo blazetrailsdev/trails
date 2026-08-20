@@ -11,11 +11,8 @@ export {
   MissingAttributeError,
   missingAttribute,
   AttributeMethodPattern,
-  resolveAliasName,
-  resolveAliasNameIn,
   AttrNames,
   buildMangledName,
-  defineDirtyAttributeMethods,
   defineAttributeMethods,
   isInstanceMethodAlreadyImplemented,
 } from "./attribute-methods.js";
@@ -40,8 +37,6 @@ export {
 } from "./attribute-mutation-tracker.js";
 export {
   applyPendingAttributeModifications,
-  isDecoratorReplay,
-  pushPendingDecorator,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";

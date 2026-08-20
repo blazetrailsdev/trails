@@ -106,7 +106,7 @@ describe("AttributeMethodsTest", () => {
     }
     const p = new Person({ name: "Alice" });
     expect((p as any).fullName).toBe("Alice");
-    expect(Person.attributeAliases()).toEqual({ fullName: "name" });
+    expect(Person.attributeAliases).toEqual({ fullName: "name" });
   });
 
   it("#define_attribute_methods generates attribute methods with spaces in their names", () => {
@@ -219,7 +219,7 @@ describe("AttributeMethodsTest", () => {
     expect(A.attributeNames()).toEqual(["x"]);
     expect(B.attributeNames()).toEqual(["y"]);
     A.attributeMethodPrefix("clear_");
-    expect(A.attributeMethodPatterns()).not.toEqual(B.attributeMethodPatterns());
+    expect(A.attributeMethodPatterns).not.toEqual(B.attributeMethodPatterns);
   });
 
   it("#define_attribute_method generates attribute method", () => {

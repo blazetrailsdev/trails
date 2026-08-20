@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Types, ValueType, isDecoratorReplay } from "./index.js";
+import { Model, Types, ValueType } from "./index.js";
 
 describe("AttributeRegistrationTest", () => {
   it("attributes can be registered", () => {
@@ -377,14 +377,14 @@ describe("AttributeRegistrationTest", () => {
 
   it("replaying pending decorators establishes decorator-replay context", () => {
     // Mirrors ActiveModel::AttributeRegistration::PendingDecorator#apply_to,
-    // which is what makes `isDecoratorReplay()` true. Decorators gated on replay
-    // context (enum's undeclared-type check) change behavior without this.
+    // which passes the materializing class. Decorators gated on replay context
+    // (enum's undeclared-type check) change behavior without it.
     const seen: boolean[] = [];
     class MyModel extends Model {
       static {
         this.attribute("title", "string");
-        this.decorateAttributes(["title"], (_name, type) => {
-          seen.push(isDecoratorReplay());
+        this.decorateAttributes(["title"], (_name, type, host) => {
+          seen.push(host !== undefined);
           return type;
         });
       }

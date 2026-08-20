@@ -294,7 +294,7 @@ export class UniquenessValidator extends EachValidator {
     // Resolve an attribute alias (`alias_attribute :new_content, :content`) to its
     // underlying column before building the comparison — Rails routes the bind
     // through the predicate builder, which resolves aliases.
-    attribute = (klass._attributeAliases?.[attribute] as string) ?? attribute;
+    attribute = (klass.attributeAliases?.[attribute] as string) ?? attribute;
 
     // Resolve an association attribute (`validates :event`) to its foreign-key
     // column for the comparison. `value` already arrives as the FK scalar; if a
@@ -403,7 +403,7 @@ export class UniquenessValidator extends EachValidator {
     for (const rawItem of scopes) {
       const ctor = record.constructor;
       // Resolve an alias scope (`scope: :new_parent_id`) to the real column.
-      const item = (ctor._attributeAliases?.[rawItem] as string) ?? rawItem;
+      const item = (ctor.attributeAliases?.[rawItem] as string) ?? rawItem;
       const refl = ctor._reflectOnAssociation?.(item);
       if (refl) {
         // Read FK (and foreignType for polymorphic) directly off the record —

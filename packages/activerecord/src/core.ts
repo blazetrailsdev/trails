@@ -1148,7 +1148,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   const keys = Object.keys(conditions);
   if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
-  const aliases: Record<string, string> = (this as any)._attributeAliases ?? {};
+  const aliases: Record<string, string> = (this as any).attributeAliases ?? {};
   const resolvedKeys: string[] = [];
   const values: unknown[] = [];
 

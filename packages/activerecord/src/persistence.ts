@@ -466,10 +466,10 @@ export function increment<T extends AttributeIO>(this: T, attribute: string, by:
   return this;
 }
 
-/** Resolves an attribute alias to its underlying column via `_attributeAliases`. */
+/** Resolves an attribute alias to its underlying column via `attributeAliases`. */
 function resolveAttributeAlias(record: object, attribute: string): string {
-  const aliases = (record.constructor as { _attributeAliases?: Record<string, string> })
-    ._attributeAliases;
+  const aliases = (record.constructor as { attributeAliases?: Record<string, string> })
+    .attributeAliases;
   return aliases?.[attribute] ?? attribute;
 }
 
@@ -1294,9 +1294,9 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   const aliases: Record<string, string> =
     (
       ctor as unknown as {
-        _attributeAliases?: Record<string, string>;
+        attributeAliases?: Record<string, string>;
       }
-    )._attributeAliases ?? {};
+    ).attributeAliases ?? {};
   // Rails resolves aliases and verifies every key against attr_readonly up
   // front (`transform_keys { verify_readonly_attribute }`) before writing any
   // value, so a readonly column raises without mutating the earlier keys.

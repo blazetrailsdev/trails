@@ -6,7 +6,7 @@
 /** Host shape `respondToMissing` reads off the model class. */
 interface DynamicMatchersHost {
   columnsHash(): Record<string, unknown>;
-  _attributeAliases?: Record<string, string>;
+  attributeAliases?: Record<string, string>;
 }
 
 /**
@@ -26,7 +26,7 @@ export function respondToMissing(this: DynamicMatchersHost, methodName: string):
     .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
   // Split on "_and_" like Rails' Method#attribute_names
   const attributeNames = snakePart.split("_and_");
-  const aliases = this._attributeAliases;
+  const aliases = this.attributeAliases;
   const columnsHash = this.columnsHash();
   return attributeNames.every((name) => {
     const resolved = aliases?.[name] ?? name;
