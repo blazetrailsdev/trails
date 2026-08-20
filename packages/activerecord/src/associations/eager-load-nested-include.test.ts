@@ -144,7 +144,7 @@ describe("EagerLoadPolyAssocsTest", () => {
       });
     }
 
-    const res = await ShapeExpression.all().includes("shape", { paint: "nonPoly" });
+    const res = await ShapeExpression.all().includes(":shape", { ":paint": ":nonPoly" });
     expect(res).toHaveLength(NUM_SHAPE_EXPRESSIONS);
     await assertNoQueries(false, async () => {
       for (const se of res) {
@@ -185,9 +185,9 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
     // when constructing objects across the missing branch.
     await Author.all()
       .includes(
-        { posts: "comments" },
-        { categorizations: "category" },
-        { authorFavorites: "favoriteAuthor" },
+        { ":posts": ":comments" },
+        { ":categorizations": ":category" },
+        { ":authorFavorites": ":favoriteAuthor" },
       )
       .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
       .order("categories.name");

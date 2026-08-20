@@ -5,7 +5,7 @@
  *
  * `Company` declares `attribute("metadata", "json")` (company.ts) but the
  * canonical `companies` table has no `metadata` column. Eager-loading
- * `Firm.includes("clients")` (both STI on `companies`) over a *partial* schema
+ * `Firm.includes(":clients")` (both STI on `companies`) over a *partial* schema
  * — only `companies` defined — previously projected `companies.metadata`,
  * failing the query with `no such column: companies.metadata`. Rails' eager
  * SELECT projects only real table columns.
@@ -29,7 +29,9 @@ describe("getModelColumns virtual-attribute eager projection", () => {
     });
     let firm: Firm;
     try {
-      firm = (await Firm.includes("clients").where({ "clients.newName": "Summit" }).last()) as Firm;
+      firm = (await Firm.includes(":clients")
+        .where({ "clients.newName": "Summit" })
+        .last()) as Firm;
     } finally {
       Notifications.unsubscribe(sub);
     }

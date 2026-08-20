@@ -149,7 +149,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // includes — that would shadow Relation#includes(...associations).
     // proxy.includes(...) falls through to Relation and builds an
     // eager-loading Relation. Membership is via Array.from(proxy).
-    const rel = proxy.includes("comments");
+    const rel = proxy.includes(":comments");
     expect(typeof rel?.where).toBe("function"); // it's a Relation, not a boolean
     expect(Array.from(proxy as Iterable<Post>).includes(first)).toBe(true);
     expect(proxy.target.includes(first)).toBe(true);

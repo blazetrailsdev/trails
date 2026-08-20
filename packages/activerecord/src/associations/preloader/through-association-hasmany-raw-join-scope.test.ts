@@ -98,7 +98,7 @@ describe("Preloader::ThroughAssociation#through_scope has_many raw-join handling
 
   it("raises ConfigurationError on preload, matching Rails", async () => {
     const groucho = members("groucho");
-    await expect(Member.where({ id: groucho.id }).preload("rawClubs")).rejects.toThrow(
+    await expect(Member.where({ id: groucho.id }).preload(":rawClubs")).rejects.toThrow(
       ConfigurationError,
     );
   });

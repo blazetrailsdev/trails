@@ -148,7 +148,7 @@ export class SingularAssociation extends Association {
    * lazy DB load throws `StrictLoadingViolationError` — pointing
    * users at the explicit async load path
    * (`post.loadBelongsTo("author")` / `post.loadHasOne("profile")`)
-   * or an eager-load query (`Post.includes("author").find(id)`).
+   * or an eager-load query (`Post.includes(":author").find(id)`).
    *
    * The check only fires when a DB load would actually be needed — it
    * honors:

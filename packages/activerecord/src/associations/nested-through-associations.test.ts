@@ -709,7 +709,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on through associations preload via joins", async () => {
     const bob = authors("bob");
     const result = await Author.where("tags.id = tags.id")
-      .references("tags")
+      .references(":tags")
       .joins(":miscPostFirstBlueTags");
     expect(result.map((a) => a.id)).toContain(bob.id);
   });
@@ -754,7 +754,7 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on source associations preload via joins", async () => {
     const bob = authors("bob");
     const result = await Author.where("tags.id = tags.id")
-      .references("tags")
+      .references(":tags")
       .joins(":miscPostFirstBlueTags_2");
     expect(result.map((a) => a.id)).toContain(bob.id);
   });

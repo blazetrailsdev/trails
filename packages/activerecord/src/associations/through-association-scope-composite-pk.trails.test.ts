@@ -81,7 +81,7 @@ describe("Preloader::ThroughAssociation#through_scope composite-PK through", () 
     const [row] = await CpkOrder.where({
       shop_id: order.shop_id,
       id: order.readAttribute("id"),
-    }).preload("tagsWithMixedCondition");
+    }).preload(":tagsWithMixedCondition");
     const tags = (row.association("tagsWithMixedCondition").target ?? []) as CpkTag[];
     // Both predicate halves resolved in one JOINed query: the through-table half
     // did not raise, and the source-table half narrowed order_1's two tags to one.

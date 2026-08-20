@@ -19,6 +19,7 @@ import {
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
+import { structuralUnionEq } from "../../relation/query-methods.js";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -143,9 +144,13 @@ export class JoinAssociation extends JoinPart {
 
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
-      // TODO: Rails checks scope.references_values and builds join dependencies
-      // for eager-loaded associations here. We skip this until Relation#arel() and
-      // construct_join_dependency are implemented.
+      if (scope && scope.referencesValues && scope.referencesValues.length > 0) {
+        const associations = unionAppend(scope.eagerLoadValues ?? [], scope.includesValues ?? []);
+
+        if (associations.length > 0) {
+          scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
+        }
+      }
 
       let nodes: Nodes.Node;
       if (scope && scope.whereClause && !scope.whereClause.isEmpty()) {
@@ -324,4 +329,18 @@ function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | 
     );
   }
   return join as Nodes.Node | null;
+}
+
+/**
+ * Ruby `a | b` over association specs — array union by `eql?`, which for a
+ * Hash/String spec is structural. `structuralUnionEq` is the same comparison
+ * `joins!` uses.
+ * @internal
+ */
+function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
+  const union = [...target];
+  for (const spec of incoming) {
+    if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
+  }
+  return union;
 }

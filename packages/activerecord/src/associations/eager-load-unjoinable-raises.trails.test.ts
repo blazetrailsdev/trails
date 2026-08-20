@@ -28,27 +28,27 @@ describe("eager_load with an unresolvable association", () => {
   const expected = /Can't join 'Post' to association named 'monkeys'; perhaps you misspelled it\?/;
 
   it("raises on the record-loading path", async () => {
-    await expect(Post.all().eagerLoad("monkeys").toArray()).rejects.toThrow(expected);
+    await expect(Post.all().eagerLoad(":monkeys").toArray()).rejects.toThrow(expected);
   });
 
   it("raises on a nested spec's inner segment", async () => {
-    await expect(Post.all().eagerLoad({ comments: "monkeys" }).toArray()).rejects.toThrow(
+    await expect(Post.all().eagerLoad({ ":comments": ":monkeys" }).toArray()).rejects.toThrow(
       /Can't join 'Comment' to association named 'monkeys'/,
     );
   });
 
   it("raises on the calculation path", async () => {
-    await expect(Post.all().eagerLoad("monkeys").count()).rejects.toThrow(expected);
-    await expect(Post.all().eagerLoad("monkeys").sum("legacyCommentsCount")).rejects.toThrow(
+    await expect(Post.all().eagerLoad(":monkeys").count()).rejects.toThrow(expected);
+    await expect(Post.all().eagerLoad(":monkeys").sum("legacyCommentsCount")).rejects.toThrow(
       expected,
     );
   });
 
   it("raises on the exists? path", async () => {
-    await expect(Post.all().eagerLoad("monkeys").exists()).rejects.toThrow(expected);
+    await expect(Post.all().eagerLoad(":monkeys").exists()).rejects.toThrow(expected);
   });
 
   it("raises on the pluck path", async () => {
-    await expect(Post.all().eagerLoad("monkeys").pluck("title")).rejects.toThrow(expected);
+    await expect(Post.all().eagerLoad(":monkeys").pluck("title")).rejects.toThrow(expected);
   });
 });

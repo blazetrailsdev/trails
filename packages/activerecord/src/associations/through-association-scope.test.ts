@@ -141,7 +141,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const scope = (loader as any).throughScope();
     expect(scope.toSql()).toContain("preload-through");
 
-    const [row] = await Author.where({ id: david.id }).preload("annotatedComments");
+    const [row] = await Author.where({ id: david.id }).preload(":annotatedComments");
     const comments = (row.association("annotatedComments").target ?? []) as any[];
     expect(comments.length).toBeGreaterThan(0);
   });
@@ -199,7 +199,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // query end-to-end — the preload returns the welcome post's comments (matched
     // via `posts.title`), never raising `no such column`.
     const david = authors("david");
-    const [row] = await Author.where({ id: david.id }).preload("commentsWithMixedCondition");
+    const [row] = await Author.where({ id: david.id }).preload(":commentsWithMixedCondition");
     const bodies = ((row.association("commentsWithMixedCondition").target ?? []) as any[])
       .map((c) => c._readAttribute("body"))
       .sort();
@@ -213,7 +213,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // `posts.title` predicate. Tag "general" tags two posts; the scoped
     // association must return only the matching one.
     const general = tags("general");
-    const [row] = await Tag.where({ id: general.id }).preload("welcomeTaggedPosts");
+    const [row] = await Tag.where({ id: general.id }).preload(":welcomeTaggedPosts");
     const titles = ((row.association("welcomeTaggedPosts").target ?? []) as any[])
       .map((p) => p._readAttribute("title"))
       .sort();

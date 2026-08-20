@@ -312,7 +312,7 @@ describe("InnerJoinAssociationTest", () => {
 
     const categoriesRel = await (author as any).categories
       .includes(":specialCategorizations")
-      .references("specialCategorizations");
+      .references(":specialCategorizations");
     expect(categoriesRel.length).toBe(2);
   });
 

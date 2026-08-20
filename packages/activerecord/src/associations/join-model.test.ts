@@ -579,7 +579,7 @@ describe("AssociationsJoinModelTest", () => {
       (general as any).taggings
         .includes(":taggable")
         .where("bogus_table.column = 1")
-        .references("bogus_table")
+        .references(":bogus_table")
         .toArray(),
     ).rejects.toThrow(EagerLoadPolymorphicError);
   });
