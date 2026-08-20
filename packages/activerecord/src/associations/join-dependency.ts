@@ -279,17 +279,15 @@ export class JoinDependency {
   }
 
   /**
-   * Materialize the JOIN node(s) for one already-checked reflection off
+   * Materialize the JOIN node for one already-checked reflection off
    * `modelClass` — the body of Rails' `JoinAssociation.new(reflection, ...)`,
-   * which in trails also allocates the node's t-index and its provisional join.
-   * A `through` reflection materializes one node per chain link (the target plus
-   * its `_through_` leaves), so the return is an array; the target is last.
+   * which in trails also allocates the node's t-index. A `through` reflection
+   * is ONE node here, as in Rails: `JoinAssociation#join_constraints` walks
+   * `reflection.chain` internally (join_association.rb:32-73), and the tree
+   * holds only JoinBase and JoinAssociation.
    * @internal
    */
-  private addAssociation(reflection: any, modelClass: typeof Base): JoinPart[] {
-    if (reflection.isThroughReflection()) {
-      return this._addThroughViaJoinAssociation(reflection, modelClass);
-    }
+  private addAssociation(reflection: any): JoinPart {
     const assocName: string = reflection.name;
 
     const assocType: "hasMany" | "hasOne" | "belongsTo" =
@@ -316,8 +314,7 @@ export class JoinDependency {
     treePart.immediateAssocName = assocName;
     treePart.assocType = assocType;
     treePart.nodeReflection = reflection;
-    treePart.isThroughNode = false;
-    return [treePart];
+    return treePart;
   }
 
   /**
@@ -348,10 +345,9 @@ export class JoinDependency {
       if (reflection.isPolymorphic?.()) {
         throw new EagerLoadPolymorphicError(name);
       }
-      const nodes = this.addAssociation(reflection, baseKlass);
-      const node = nodes[nodes.length - 1];
+      const node = this.addAssociation(reflection);
       if (right != null) node.children.push(...this.build(right, reflection.klass));
-      return nodes;
+      return [node];
     });
   }
 
@@ -367,11 +363,6 @@ export class JoinDependency {
    * Mirrors: `join_root.drop(1).map!(&:reflection)` (join_dependency.rb:81-83) —
    * the Enumerable walk of the join tree, root dropped, reading the reflection
    * each node already carries.
-   *
-   * `_through_` hops are trails-only tree nodes (`JoinLeaf`, declared below in
-   * this file): Rails keeps a
-   * through association's whole chain inside the one JoinAssociation, so the
-   * hops carry no reflection of their own and Rails never lists one here.
    */
   get reflections(): any[] {
     return this.joinRoot
@@ -469,7 +460,7 @@ export class JoinDependency {
 
     const joins = intersection.flatMap(([l, r]) => {
       // Rails: `r.table = l.table`.
-      if (r instanceof JoinAssociation || r instanceof JoinLeaf) {
+      if (r instanceof JoinAssociation) {
         const lt = l.table;
         r.table = l.effectiveSqlName || (typeof lt === "string" ? lt : tableSqlName(lt));
       }
@@ -490,9 +481,8 @@ export class JoinDependency {
    * `AliasTracker` in order, so a `merge` onto an already-joined table — or a
    * self-join / dup-include collision WITHIN this dependency — collides and
    * aliases here. A `has_many :through` walks its whole `reflection.chain`
-   * through this same block; the joins it returns are redistributed onto the
-   * chain's `_through_` tree nodes, which trails carries so each link can
-   * project its own columns.
+   * through this same block, inside the one JoinAssociation; only the chain's
+   * root link is a tree node, and only its columns are projected.
    * @internal
    */
   private makeConstraints(
@@ -506,19 +496,13 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
 
     if (child instanceof JoinAssociation) {
-      const chainLen = child.reflection.chain.length;
-      const resolvedByIdx: Array<{ aliased: TableRef; effectiveName: string } | undefined> =
-        new Array(chainLen);
-      // How far `joinConstraints` walked before terminating on an
-      // already-resolved tail — i.e. how many constraint joins it emits.
-      let walkedLen = chainLen;
+      let resolvedRoot: { aliased: TableRef; effectiveName: string } | undefined;
       const built = child.joinConstraints(
         foreignTable,
         foreignKlass,
         joinType,
         this.aliasTracker,
         (reflection, remainingReflectionChain) => {
-          const idx = chainLen - remainingReflectionChain.length;
           const chainKey = reflectionChainKey(remainingReflectionChain);
           const memo = this._joinedTables.get(chainKey);
           const root = reflection === child.reflection;
@@ -529,9 +513,10 @@ export class JoinDependency {
           // keys off the one shared alias rather than minting a spurious
           // `{candidate}_join`.
           if (memo && (!root || !memo.terminated)) {
-            if (root) memo.terminated = true;
-            resolvedByIdx[idx] = memo;
-            walkedLen = idx;
+            if (root) {
+              memo.terminated = true;
+              resolvedRoot = memo;
+            }
             return [memo.aliased, true];
           }
 
@@ -553,7 +538,7 @@ export class JoinDependency {
             (reflection as any).tableName,
             effectiveName,
           );
-          resolvedByIdx[idx] = { aliased, effectiveName };
+          if (root) resolvedRoot = { aliased, effectiveName };
 
           // `@joined_tables[remaining_reflection_chain] ||= [table, root] if
           // join_type == Arel::Nodes::OuterJoin` (join_dependency.rb:208). Keyed
@@ -566,46 +551,24 @@ export class JoinDependency {
         },
       );
 
-      // Rails keeps the whole chain inside the one JoinAssociation; trails also
-      // carries a tree node per link (the target plus its `_through_` leaves) so
-      // each can project its columns, so the resolved tables and joins are
-      // redistributed onto them here.
-      const nodes = child.throughGroup ? child.throughGroup.nodes : [child];
-      for (let idx = 0; idx < chainLen; idx++) {
-        const node = nodes[idx];
-        if (!node) continue;
-        const resolved = resolvedByIdx[idx];
-        node.arelJoin = null;
-        if (resolved && (idx < walkedLen || idx === 0)) {
-          node.arelTable = resolved.aliased;
-          node.effectiveSqlName = resolved.effectiveName;
-        } else {
-          // A link past the walked prefix was reused from an already-resolved
-          // chain tail: it must neither emit a join nor project duplicate columns.
-          node.tableIndex = -1;
-        }
+      // Rails keeps the whole chain inside the one JoinAssociation
+      // (join_association.rb:32-73); only the chain's ROOT link is a tree node,
+      // so only its resolved table lands back on the node.
+      child.arelJoin = null;
+      if (resolvedRoot) {
+        child.arelTable = resolvedRoot.aliased;
+        child.effectiveSqlName = resolvedRoot.effectiveName;
+        // `joinConstraints` walks the chain in reverse, so the root link's own
+        // constraint join is the one built against the table this block handed
+        // back for it. Identity, not table name — a scope join source is built
+        // from `scope.arel(...).join_sources` (join_association.rb:64-69) and so
+        // is never the same instance even when it joins a same-named table.
+        child.arelJoin =
+          (built as Nodes.Join[]).find(
+            (join) => (join as { left?: unknown }).left === resolvedRoot!.aliased,
+          ) ?? null;
       }
-      // `joinConstraints` walks the chain in reverse and emits each step's
-      // constraint join followed by that step's scope join sources
-      // (`joins.concat arel.join_sources`, join_association.rb:64-69), so the
-      // returned array is `[J(n-1), sources…, J(n-2), sources…, …]`. Only the
-      // constraint joins map back onto a chain link's tree node: an entry is
-      // one when its `left` IS the table object this block handed the walk for
-      // the next link. Identity, not table name — a scope join source is built
-      // from `scope.arel(...).join_sources` and so can never be the same
-      // instance even when it joins a same-named table, and `appendConstraints`
-      // carries `left` through by reference when it rebuilds a join.
-      let linkIdx = walkedLen - 1;
-      for (const entry of built) {
-        const join = entry as Nodes.Join;
-        const resolved = linkIdx >= 0 ? resolvedByIdx[linkIdx] : undefined;
-        if (resolved && (join as { left?: unknown }).left === resolved.aliased) {
-          const node = nodes[linkIdx];
-          if (node) node.arelJoin = join;
-          linkIdx--;
-        }
-        joins.push(join);
-      }
+      joins.push(...(built as Nodes.Join[]));
       this._aliasesCache = undefined;
     }
 
@@ -833,13 +796,6 @@ export class JoinDependency {
     for (const node of parent.children) {
       if (node.tableIndex < 0) continue;
 
-      // trails through-chain intermediates carry no AR record — pass the
-      // current parent straight through to the real target node.
-      if (node.isThroughNode) {
-        this.construct(arParent, node, row, seen, modelCache, strictLoadingValue);
-        continue;
-      }
-
       const isCollection = node.assocType === "hasMany";
       if (isCollection) {
         this._markCollectionLoaded(arParent, node);
@@ -929,7 +885,7 @@ export class JoinDependency {
     for (const [key, parent] of parents) {
       const assocs = new Map<string, any[]>();
       for (const child of this._joinRoot.children) {
-        if (child.tableIndex < 0 || child.isThroughNode) continue;
+        if (child.tableIndex < 0) continue;
         const proxy = parent.association?.(child.immediateAssocName);
         const target = proxy?.target;
         assocs.set(
@@ -983,13 +939,10 @@ export class JoinDependency {
     // Rails' join_root tree holds only the reflected association nodes — the
     // through/HABTM join-table links are joined by JoinAssociation#join_constraints
     // but never become JoinParts, so their columns are not projected into the
-    // eager SELECT (and thus never need a GROUP BY entry). trails models those
-    // links as `isThroughNode` leaves for constraint building; skip their
-    // columns here to match Rails' projection. The table index is the node's
-    // own `tableIndex` rather than Ruby's `each_with_index` position, since the
-    // skipped through-links would shift every later index.
+    // eager SELECT (and thus never need a GROUP BY entry). The table index is
+    // the node's own `tableIndex` rather than Ruby's `each_with_index` position.
     return (this._aliasesCache ??= new Aliases(
-      [this._joinRoot, ...this.nodes.filter((node) => !node.isThroughNode)].map((joinPart) => {
+      [this._joinRoot, ...this.nodes].map((joinPart) => {
         const isJoinRoot = joinPart === this._joinRoot;
         let columnNames: string[];
         if (isJoinRoot && !this._joinRootAlias) {
@@ -1141,91 +1094,5 @@ export class JoinDependency {
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
-  }
-
-  private _addThroughViaJoinAssociation(reflection: any, modelClass: typeof Base): JoinPart[] {
-    // A through reflection's `chain` is `[self, *through_reflection.chain]`, so
-    // it always carries the target plus at least one through link.
-    // `JoinAssociation#joinConstraints` walks the whole chain in one call at
-    // emit; trails still carries a tree node per link so each can project its
-    // own columns and hydrate. The nodes are siblings in the joins' emission
-    // order (deepest link first, target last) and share a `ThroughJoinGroup` so
-    // `makeConstraints` can redistribute the joins it gets back.
-    const chain = reflection.chain;
-    const group: ThroughJoinGroup = { nodes: new Array(chain.length) };
-    const nodes: JoinPart[] = [];
-
-    // The indices for the whole chain are allocated up front, before any
-    // nested association under the target claims one.
-    const startIndex = this._tableIndexCounter;
-    this._tableIndexCounter += chain.length;
-
-    for (let chainIdx = chain.length - 1; chainIdx >= 0; chainIdx--) {
-      const refl = chain[chainIdx];
-      const model = refl.klass as typeof Base;
-      const tableName = (model as any).tableName;
-      const tableIndex = startIndex + chainIdx;
-      const isTarget = chainIdx === 0;
-
-      const treePart = isTarget ? new JoinAssociation(reflection) : new JoinLeaf(model);
-      treePart.tableIndex = tableIndex;
-      treePart.arelTable = aliasedArelTableFor(model as never, tableName);
-      treePart.tableAlias = `t${tableIndex}`;
-      treePart.effectiveSqlName = tableName;
-      treePart.columns = getModelColumns(model);
-      treePart.throughGroup = group;
-      if (isTarget) {
-        treePart.immediateAssocName = reflection.name;
-        treePart.assocType =
-          reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
-        treePart.nodeReflection = reflection;
-        treePart.isThroughNode = false;
-      } else {
-        treePart.immediateAssocName = `_through_${refl.name ?? tableName}`;
-        treePart.assocType = (refl._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
-        treePart.isThroughNode = true;
-      }
-      group.nodes[chainIdx] = treePart;
-      nodes.push(treePart);
-    }
-
-    return nodes;
-  }
-}
-
-/**
- * Shared per-through-association state, attached to every tree node a
- * `has_many :through` chain produces (target + `_through_` leaves). Rails keeps
- * the whole chain inside the one JoinAssociation, whose `joinConstraints`
- * resolves and joins every link in one call; the group is how `makeConstraints`
- * finds the tree nodes those joins belong to.
- * @internal
- */
-export interface ThroughJoinGroup {
-  /** Tree nodes by chain index (0 = target, 1.. = `_through_` leaves). */
-  nodes: JoinPart[];
-}
-
-class JoinLeaf extends JoinPart {
-  private _tableOverride: string | null = null;
-
-  constructor(baseKlass: typeof Base) {
-    super(baseKlass);
-  }
-
-  get table(): string {
-    return this._tableOverride ?? this.effectiveSqlName;
-  }
-
-  set table(value: string) {
-    this._tableOverride = value;
-  }
-
-  override isMatch(other: JoinPart): boolean {
-    if (this === other) return true;
-    if (!(other instanceof JoinLeaf)) return false;
-    return (
-      this.immediateAssocName === other.immediateAssocName && this.baseKlass === other.baseKlass
-    );
   }
 }

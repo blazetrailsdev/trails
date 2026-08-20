@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Types } from "../index.js";
+import { Types, ValueType } from "../index.js";
 
 // Fallback-parser coverage for shapes `Date._parse` accepts that no Rails test
 // exercises directly. Rails reaches them through `Date._parse` in
@@ -122,5 +122,34 @@ describe("DateTimeType#serializeCastValue", () => {
     expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
       "1999-12-31T22:34:56.7Z",
     );
+  });
+});
+
+// AcceptsMultiparameterTime::InstanceMethods#assert_valid_value
+// (activemodel/lib/active_model/type/helpers/accepts_multiparameter_time.rb:24-30)
+// sends a non-Hash value on to `super`. `ActiveModel::Type::Value#assert_valid_value`
+// is a no-op, so the arm is only observable once an ancestor supplies a real one —
+// which ActiveRecord's Type::Serialized and the enum/PG OID types do.
+describe("DateTimeType assert_valid_value", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends a non-hash value to super", () => {
+    const spy = vi.spyOn(ValueType.prototype, "assertValidValue").mockImplementation(() => {
+      throw new Error("from super");
+    });
+    const type = new Types.DateTimeType();
+    expect(() => type.assertValidValue("2020-07-04T12:30:00Z")).toThrow("from super");
+    expect(spy).toHaveBeenCalledWith("2020-07-04T12:30:00Z");
+  });
+
+  it("does not send a multiparameter hash to super", () => {
+    const spy = vi.spyOn(ValueType.prototype, "assertValidValue").mockImplementation(() => {
+      throw new Error("from super");
+    });
+    const type = new Types.DateTimeType();
+    expect(() => type.assertValidValue({ 1: 2025, 2: 7, 3: 4 })).not.toThrow();
+    expect(spy).not.toHaveBeenCalled();
   });
 });

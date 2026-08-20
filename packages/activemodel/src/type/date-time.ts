@@ -210,7 +210,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * MultiparameterAssignmentErrors at assignment (missing keys 1..3 raise).
    */
   override assertValidValue(value: unknown): void {
-    if (isPlainObject(value)) this.valueFromMultiparameterAssignment(value);
+    if (isPlainObject(value)) {
+      this.valueFromMultiparameterAssignment(value);
+    } else {
+      super.assertValidValue(value);
+    }
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */

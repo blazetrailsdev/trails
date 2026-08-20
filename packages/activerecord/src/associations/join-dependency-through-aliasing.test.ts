@@ -1,12 +1,10 @@
 /**
- * Covers the real-table-name reuse in JoinDependency#_addThroughAssociation.
+ * Covers the real-table-name reuse a `has_many :through` chain gets from
+ * `JoinDependency#makeConstraints` (`join_dependency.rb:189-211`).
  *
  * Mirrors AliasTracker behavior (`activerecord/lib/active_record/table_metadata.rb`
  * / `alias_tracker.rb`): a joined table uses its real name when not already
- * in use, falling back to a tN alias only on collision. Previously
- * `_addThroughAssociation` hard-coded `tN` aliases for both the through
- * and target tables regardless of collisions, diverging from the
- * single-step join path.
+ * in use, falling back to a tN alias only on collision.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
@@ -21,7 +19,17 @@ function nodeAt(jd: JoinDependency, path: string): JoinPart {
   return jd.nodes.find((n) => n.assocName === path)!;
 }
 
-describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
+/**
+ * The SQL name of every table the emitted joins join, in emission order.
+ * A `has_many :through` chain's intermediate links live inside the one
+ * JoinAssociation (join_association.rb:32-73) and have no tree node of their
+ * own, so the emitted joins are the only place their aliasing is observable.
+ */
+function joinedTableNames(joins: Nodes.Join[]): string[] {
+  return joins.map((join) => tableSqlName(join.left as TableRef));
+}
+
+describe("JoinDependency has_many :through real-table-name reuse", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
@@ -67,7 +75,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
 
   it("uses real table names for through+target when no collision", () => {
     const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
     expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
@@ -78,13 +86,10 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetTable.name).toBe("jdt_comments");
     expect(targetTable.tableAlias).toBeNull();
 
-    // Through node also uses real name
-    const throughNode = jd.nodes.find((n) => n.tableName === "jdt_posts");
-    expect(throughNode).toBeDefined();
-    expect(throughNode!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
-    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(throughTable.name).toBe("jdt_posts");
-    expect(throughTable.tableAlias).toBeNull();
+    expect(joinedTableNames(joins)).toContain("jdt_posts");
+    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "jdt_posts")!;
+    expect(throughJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect((throughJoin.left as Table).tableAlias).toBeNull();
   });
 
   it("uses the Rails alias_candidate when the target real name collides", () => {
@@ -102,7 +107,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
     expect(node.effectiveSqlName).toBe("jdt_comments_jdt_authors");
 
@@ -112,31 +117,29 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(tableSqlName(targetTable)).toBe("jdt_comments_jdt_authors");
 
     // Through still uses real name
-    const throughNode = jd.nodes.find(
-      (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
-    );
-    expect(throughNode).toBeDefined();
-    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(throughTable.name).toBe("jdt_posts");
-    expect(throughTable.tableAlias).toBeNull();
+    const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "jdt_posts")!;
+    expect(throughJoin).toBeDefined();
+    expect((throughJoin.left as Table).tableAlias).toBeNull();
   });
 
-  it("builds tree with through node as child of root and target as sibling", () => {
+  it("builds one JoinAssociation for a has_many :through, not a node per chain link", () => {
+    // Rails' join tree holds only JoinBase and JoinAssociation
+    // (join_dependency.rb:228-240): a `has_many :through` is ONE tree edge whose
+    // `join_constraints` walks `reflection.chain` internally, so the through
+    // link never becomes a child of the root.
     const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
 
     const root = jd.joinRoot;
     expect(root.baseKlass).toBe(JdtAuthor);
-    // Through + target are both children of root (flat under root for has_many :through)
-    expect(root.children.length).toBe(2);
-    const throughChild = root.children[0];
-    expect(throughChild.immediateAssocName).toBe("_through_jdtPosts");
-    expect(throughChild.tableName).toBe("jdt_posts");
-    const targetChild = root.children[1];
+    expect(root.children.length).toBe(1);
+    const targetChild = root.children[0];
     expect(targetChild.immediateAssocName).toBe("jdtComments");
     expect(targetChild.tableName).toBe("jdt_comments");
+
+    expect(joinedTableNames(joins)).toEqual(["jdt_posts", "jdt_comments"]);
   });
 
   it("emits canonical self-join aliases when a nested-through chain references a table multiple times", () => {
@@ -224,8 +227,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
 
     // Aliasing is deferred to emit: the one `joinConstraints` call resolves the
     // whole chain against the shared AliasTracker.
-    jd.joinConstraints([]);
-    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    const effectiveNames = joinedTableNames(jd.joinConstraints([]));
     // A twice-visited table keeps its real name on first encounter and is
     // self-join aliased only on the colliding second encounter (the emit-time
     // chain resolution claims each link in forward order), so exactly one
@@ -263,9 +265,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(tableRealName(target.arelTable as TableRef)).toBe("jdt_comments");
     expect(tableSqlName(target.arelTable as TableRef)).toBe("jdtComments");
 
-    // The intermediate `_through_` link is internal and never reference-aliased.
-    const throughNode = jd.nodes.find((n) => n.assocName.includes("_through_"))!;
-    expect(throughNode.effectiveSqlName).toBe("jdt_posts");
+    // The intermediate chain link is internal and never reference-aliased.
+    expect(joinedTableNames(jd.joinConstraints([]))).toContain("jdt_posts");
   });
 
   it("reuses one chain-tail alias for two distinct through associations sharing it", () => {
@@ -314,9 +315,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     }
 
     const jd = new JoinDependency(MemAuthor, null, ["memComments", "memRatings"], Nodes.OuterJoin);
-    jd.joinConstraints([]);
-
-    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    const effectiveNames = joinedTableNames(jd.joinConstraints([]));
     // Exactly one `mem_posts` join survives; the shared tail emits no spurious
     // `_join` alias for the second through path.
     expect(effectiveNames.filter((n) => n === "mem_posts").length).toBe(1);
@@ -336,13 +335,10 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // ONE `jdt_posts` join instead of minting a second
     // `jdt_posts_jdt_authors_join` alias.
     const jd = new JoinDependency(JdtAuthor, null, ["jdtPosts", "jdtComments"], Nodes.OuterJoin);
-    jd.joinConstraints([]);
+    const joins = jd.joinConstraints([]);
     const directNode = nodeAt(jd, "jdtPosts");
     const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
-
-    // Aliasing is deferred to emit: resolve against the shared AliasTracker.
-    jd.joinConstraints([]);
 
     // The direct include keeps the real `jdt_posts` name (first use) and owns
     // the one emitted join.
@@ -352,14 +348,11 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(directTable.tableAlias).toBeNull();
 
     // The through link reuses the memoized `jdt_posts` alias — it is suppressed
-    // (no duplicate join, dropped from the projected `nodes`) so exactly one
-    // `jdt_posts` join survives and no spurious `_join` alias is minted.
-    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    // (no duplicate join emitted) so exactly one `jdt_posts` join survives and
+    // no spurious `_join` alias is minted.
+    const effectiveNames = joinedTableNames(joins);
     expect(effectiveNames.filter((n) => n === "jdt_posts").length).toBe(1);
     expect(effectiveNames.some((n) => n.includes("_join"))).toBe(false);
-    expect(
-      jd.nodes.some((n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_")),
-    ).toBe(false);
 
     // Target uses real name (first use), keyed off the one shared `jdt_posts`.
     const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
