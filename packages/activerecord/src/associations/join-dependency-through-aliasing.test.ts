@@ -1,12 +1,10 @@
 /**
- * Covers the real-table-name reuse in JoinDependency#_addThroughAssociation.
+ * Covers the real-table-name reuse a `has_many :through` chain gets from
+ * `JoinDependency#makeConstraints` (`join_dependency.rb:189-211`).
  *
  * Mirrors AliasTracker behavior (`activerecord/lib/active_record/table_metadata.rb`
  * / `alias_tracker.rb`): a joined table uses its real name when not already
- * in use, falling back to a tN alias only on collision. Previously
- * `_addThroughAssociation` hard-coded `tN` aliases for both the through
- * and target tables regardless of collisions, diverging from the
- * single-step join path.
+ * in use, falling back to a tN alias only on collision.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
@@ -31,7 +29,7 @@ function joinedTableNames(joins: Nodes.Join[]): string[] {
   return joins.map((join) => tableSqlName(join.left as TableRef));
 }
 
-describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
+describe("JoinDependency has_many :through real-table-name reuse", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
