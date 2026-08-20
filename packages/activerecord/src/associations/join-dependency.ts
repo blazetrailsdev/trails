@@ -496,8 +496,6 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
 
     if (child instanceof JoinAssociation) {
-      // The chain's ROOT link is the one the tree node stands for; the rest of
-      // the chain lives inside this single `joinConstraints` walk, as in Rails.
       let resolvedRoot: { aliased: TableRef; effectiveName: string } | undefined;
       const built = child.joinConstraints(
         foreignTable,

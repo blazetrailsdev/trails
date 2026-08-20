@@ -88,8 +88,6 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetTable.name).toBe("jdt_comments");
     expect(targetTable.tableAlias).toBeNull();
 
-    // The through link, joined from inside the same JoinAssociation, also uses
-    // its real name.
     expect(joinedTableNames(joins)).toContain("jdt_posts");
     const throughJoin = joins.find((j) => tableSqlName(j.left as TableRef) === "jdt_posts")!;
     expect(throughJoin).toBeInstanceOf(Nodes.OuterJoin);
@@ -143,7 +141,6 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetChild.immediateAssocName).toBe("jdtComments");
     expect(targetChild.tableName).toBe("jdt_comments");
 
-    // Both chain links are still joined — from inside that one node.
     expect(joinedTableNames(joins)).toEqual(["jdt_posts", "jdt_comments"]);
   });
 
