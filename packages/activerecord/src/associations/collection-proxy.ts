@@ -720,15 +720,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     for (const r of records) assoc.setStrictLoading(r);
   }
 
-  private async _withoutStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
-    this._record._strictLoadingBypassCount++;
-    try {
-      return await fn();
-    } finally {
-      this._record._strictLoadingBypassCount--;
-    }
-  }
-
   /**
    * Mirrors `CollectionProxy#build` (collection_proxy.rb:315-317): a plain
    * delegation to `@association.build(attributes, &block)`. The Array arm and

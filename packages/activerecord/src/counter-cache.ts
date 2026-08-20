@@ -153,7 +153,7 @@ export async function resetCounters(
   }
 
   const object = await this.find(id);
-  const { countHasMany } = await import("./associations.js");
+  const { association } = await import("./associations.js");
   const { reflectOnAllAssociations } = await import("./reflection.js");
 
   const updates: Record<string, unknown> = {};
@@ -186,7 +186,10 @@ export async function resetCounters(
     ) as any;
     const counterName = reflection.counterCacheColumn();
 
-    const count = await countHasMany(object, countReflection.name, countReflection);
+    // counter_cache.rb:57 — `object.send(counter_association).count(:all)`:
+    // the reader's CollectionProxy counts over `association.scope`, and `:all`
+    // keeps a `select` declared on the association off the COUNT.
+    const count = (await association(object, countReflection.name).count("all")) as number;
     // Ruby's `!=` is type-coercing across Integer/Bignum; in TS the stored
     // attribute of a big_integer column is a bigint and needs an explicit widen.
     const countWas = (object as any).readAttribute?.(counterName) ?? (object as any)[counterName];
