@@ -121,22 +121,23 @@ export class EncryptableRecord {
    * @internal
    */
   static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
-    modelClass.decorateAttributes([name], (attrName: string, castType: Type, host: unknown) => {
+    modelClass.decorateAttributes([name], (attrName: string, castType: Type) => {
       // Idempotence guard: a fresh-seed replay applies each queued decorator
       // once, but the seeded cast type can itself already be encrypted (the
       // `registerEncryptedType` path writes one into `_attributeDefinitions`,
       // which AR's column seeding reads back).
       if (castType instanceof EncryptedAttributeType) return null as unknown as Type;
-      const target = host;
       return new EncryptedAttributeType({
         scheme: pending.scheme,
         castType,
+        // Rails reads `columns_hash[name.to_s]&.default` off the class the
+        // block was declared in (encryptable_record.rb:91).
         default: this.columnDefaultFor(
-          target,
+          modelClass,
           attrName,
-          (target as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.get?.(
-            attrName,
-          ),
+          (
+            modelClass as { _attributeDefinitions?: Map<string, unknown> }
+          )._attributeDefinitions?.get?.(attrName),
         ),
       });
     });
