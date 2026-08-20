@@ -781,7 +781,9 @@ describe("EnumTest", () => {
   // into the subclass attribute set). A concrete subclass that DOES back the enum
   // (Lion has lions.gender via Cat) stays green; one that does NOT raises against
   // its own columns — not silently install, and not throw TableNotSpecified on the
-  // abstract parent's tableless schema.
+  // abstract parent's tableless schema. The message names the DECLARING class:
+  // Rails interpolates `self.name` (enum.rb:241) and the block is a closure over
+  // the class body `enum` was called in, not the materializing subclass.
   it("enum on abstract parent resolves against concrete subclass columns", () => {
     class AbstractParent extends Base {
       static {
@@ -795,7 +797,7 @@ describe("EnumTest", () => {
     registerModel(Concrete);
 
     expect(() => (Concrete as any).typeForAttribute("typeless_genre")).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
     );
   });
 
@@ -822,10 +824,10 @@ describe("EnumTest", () => {
     registerModel(Concrete);
 
     expect(() => (Concrete as any)._defaultAttributes()).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
     );
     expect(() => new (Concrete as any)({})).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+      /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
     );
   });
 

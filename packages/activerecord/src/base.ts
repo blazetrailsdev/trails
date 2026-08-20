@@ -1242,19 +1242,9 @@ export class Base extends Model {
    */
   static override typeForAttribute(name: string, block?: () => Type): Type {
     (ModelSchema.loadSchema as any).call(this);
-    // Check the *un-resolved* name first: an `enum` declared before its
-    // `alias_attribute` keys a phantom attribute under the un-aliased name, and
-    // resolving the alias first would look past that phantom to the real backing
-    // column. `assertEnumTypeDeclared` raises only when the name has no column of
-    // its own (Rails' `subtype == default_value` condition, enum.rb:240-245), so
-    // a column-backed enum whose name is later aliased is unaffected.
-    _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, name);
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
     const resolved = (this as any).attributeAliases?.[name] ?? name;
-    // Rails raises inside enum's `decorate_attributes` block for an enum backed
-    // by neither a DB column nor an explicit `attribute` type.
-    _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
     // Resolve through the decorated default attribute set — Rails'
     // `attribute_types[name]` is `_default_attributes.cast_types[name]` with a
     // `Type.default_value` hash default (attribute_registration.rb:43-50). The set

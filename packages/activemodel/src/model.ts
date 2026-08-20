@@ -29,6 +29,7 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
   classAttribute,
+  kernelArray,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -74,7 +75,6 @@ import {
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions, ConditionFn } from "./validations.js";
-import { evaluateCondition } from "./validations.js";
 import {
   AttributeMethodPattern,
   attributeMethodPrefix,
@@ -151,10 +151,10 @@ export type ValidationCallbackConditions<TRecord> = CallbackConditions<TRecord> 
 };
 
 /**
- * Mirrors Rails `ActiveModel::Validations.before_validation` / `after_validation`:
- * the `on:` option is translated into an `:if` predicate over the record's
- * current `validation_context` (Rails prepends `predicate_for_validation_context`
- * to any existing `:if`). We AND it with an existing `if` so both must pass.
+ * Mirrors Rails `ActiveModel::Validations.before_validation` / `after_validation`
+ * (validations/callbacks.rb): the `on:` option becomes an `:if` predicate over the
+ * record's current `validation_context`, PREPENDED to any existing `:if` —
+ * `options[:if] = [predicate, *options[:if]]`.
  */
 function _validationOnToIf<TRecord extends object>(
   conditions?: ValidationCallbackConditions<TRecord>,
@@ -164,7 +164,7 @@ function _validationOnToIf<TRecord extends object>(
   const onPredicate = validationsPredicateForValidationContext(on) as (r: TRecord) => boolean;
   return {
     ...rest,
-    if: (record: TRecord) => onPredicate(record) && (existingIf ? existingIf(record) : true),
+    if: [onPredicate, ...kernelArray(existingIf)],
   };
 }
 
@@ -1518,44 +1518,33 @@ export class Model {
   private static _buildValidateConditions(
     options: ConditionalOptions,
   ): CallbackConditions | undefined {
-    const parts: Array<(record: object) => boolean> = [];
+    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
+    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
 
     if (options.on !== undefined) {
-      // Mirrors Rails (validations.rb:170-172): the `on:` clause is
-      // installed via `predicate_for_validation_context(options[:on])`,
-      // so route through the same module-level cache here. Single
-      // source of truth for the intersection-vs-equality semantics.
       const pred = validationsPredicateForValidationContext(options.on);
-      parts.push((record: object) => pred(record as ValidationsContextHost));
-    }
-
-    if (options.if !== undefined) {
-      const conds = Array.isArray(options.if) ? options.if : [options.if];
-      parts.push((record: object) =>
-        conds.every((c) => evaluateCondition(record as ValidatableRecord, c)),
-      );
+      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
     }
 
     if (options.exceptOn !== undefined) {
-      const exceptOn = Array.isArray(options.exceptOn) ? options.exceptOn : [options.exceptOn];
-      parts.push((record: object) => {
-        const mc = (record as unknown as ValidationsContextHost).validationContext;
-        const current = mc == null ? [] : Array.isArray(mc) ? mc : [mc];
-        return !exceptOn.some((c) => current.includes(c));
-      });
+      const exceptOn = kernelArray(options.exceptOn);
+      unlessConds = [
+        (record: object) => {
+          const mc = (record as unknown as ValidationsContextHost).validationContext;
+          const current = kernelArray(mc);
+          return exceptOn.some((c) => current.includes(c));
+        },
+        ...unlessConds,
+      ];
     }
 
-    if (options.unless !== undefined) {
-      const conds = Array.isArray(options.unless) ? options.unless : [options.unless];
-      parts.push(
-        (record: object) => !conds.some((c) => evaluateCondition(record as ValidatableRecord, c)),
-      );
+    if (ifConds.length === 0 && unlessConds.length === 0) {
+      return options.prepend ? { prepend: true } : undefined;
     }
-
-    if (parts.length === 0) return options.prepend ? { prepend: true } : undefined;
 
     return {
-      if: (record: object) => parts.every((fn) => fn(record)),
+      ...(ifConds.length > 0 ? { if: ifConds } : {}),
+      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
       ...(options.prepend ? { prepend: true } : {}),
     };
   }

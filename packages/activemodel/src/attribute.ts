@@ -1,5 +1,5 @@
 import { Type } from "./type/value.js";
-import { typeRegistry } from "./type/registry.js";
+import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { RuntimeError } from "./attribute-assignment.js";
 
@@ -326,7 +326,7 @@ export class WithCastValue extends Attribute {
 
 export class Null extends Attribute {
   constructor(name: string) {
-    super(name, null, typeRegistry.lookup("value"));
+    super(name, null, defaultValue());
   }
 
   typeCast(): unknown {

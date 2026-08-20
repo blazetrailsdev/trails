@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  Value,
   defineCallbacks,
   setCallback,
   skipCallback,
@@ -430,13 +431,17 @@ describe("Callbacks", () => {
     });
 
     it("forwards the block's return value (env.value) to after-callback conditions", () => {
-      // Mirrors ActiveModel's after-model-callback guard (`value != false`):
-      // the condition reads the run_callbacks block's return, so an after
-      // callback is skipped when the block returned false and runs otherwise.
+      // Mirrors ActiveModel's after-model-callback guard (`value != false`,
+      // activemodel/lib/active_model/callbacks.rb:147-149): the condition reads
+      // the run_callbacks block's return, so an after callback is skipped when
+      // the block returned false and runs otherwise. `Conditionals::Value` is
+      // the only filter arm handed that value — `CallTemplate.build` routes a
+      // Proc by arity, and the 2-arity arm is InstanceExec2, which demands a
+      // block (callbacks.rb:494-508).
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "after", (t: any) => t.log.push("after"), {
-        unless: (_t, value) => value === false,
+        unless: new Value((value) => value === false),
       });
 
       runCallbacks(target, "save", () => false);

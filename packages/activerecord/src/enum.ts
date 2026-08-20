@@ -1,18 +1,19 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
-import { ArgumentError, ValueType, IntegerType, Type } from "@blazetrails/activemodel";
+import {
+  ArgumentError,
+  ValueType,
+  IntegerType,
+  Type,
+  defaultValue,
+} from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
-import {
-  loadSchema as reflectSchemaSync,
-  ownProp,
-  pendingAttributeTypeQ,
-  type SchemaHost,
-} from "./model-schema.js";
+import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -137,34 +138,6 @@ export function installEnumAttribute(
   // column-seeded FromDatabase attribute.
   // The deferred-type-check marker below keys off the same name `attribute` /
   // `decorate_attributes` register under (attribute_registration.rb:13,24).
-  const resolved = klass.resolveAttributeName(name);
-  // Rails raises for an enum on an attribute with no declared type AND no
-  // backing DB column, but only once the schema is reflected (inside the
-  // `decorate_attributes` block, at `type_for_attribute`). We can't tell a real
-  // column apart from a typeless attribute at `enum` time, so any enum NOT
-  // explicitly typed via `attribute(name, type)` is queued for a deferred check
-  // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
-  // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
-  // "Explicitly typed" means the user declared a concrete attribute *type*
-  // (`attribute(name, "integer")`), NOT merely a default (`attribute(name,
-  // { default })`) or nothing. Rails pushes a `PendingType` only when a type is
-  // present (attribute_registration.rb:12-18); a default-only / type-less
-  // attribute keeps the fallback `value` type until the column reflects, so its
-  // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248) — so the pending queue answers this as Rails asks it.
-  const explicitlyTyped = pendingAttributeTypeQ(klass, resolved);
-  const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
-  if (!explicitlyTyped) {
-    if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
-      pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
-    }
-    pendingHost._enumsPendingTypeCheck!.add(resolved);
-  } else if (pendingHost._enumsPendingTypeCheck?.has(resolved)) {
-    // An explicit type now backs the enum — drop any inherited pending marker.
-    pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
-    pendingHost._enumsPendingTypeCheck.delete(resolved);
-  }
-
   if (attributeOptions && "default" in attributeOptions) {
     klass.attribute(name, { default: attributeOptions.default });
   } else {
@@ -174,33 +147,15 @@ export function installEnumAttribute(
   // reflected column type (enum.rb:239-246); the decorator re-runs on every
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
-  klass.decorateAttributes([name], (_name: string, reflected: Type, host?: unknown) => {
-    // Rails raises inside the `decorate_attributes` block when the decorated
-    // subtype is `ActiveModel::Type.default_value` — an enum name with no backing
-    // column and no explicit type (enum.rb:240-245). trails can't mirror that via
-    // the `reflected` subtype: its alias-aware column-seeding hands the aliased
-    // phantom the *target* column's type at replay (so `reflected.type()` is e.g.
-    // "integer", not "value"). Instead check the real column via
-    // `assertEnumTypeDeclared` (an alias-unaware `columnForAttribute` lookup).
-    //
-    // Resolve the check against the *materializing* class (`host`), not the
-    // declaring `klass`: Rails replays a superclass's pending decorator into the
-    // subclass's attribute set (attribute_registration.rb:81-87), so a concrete
-    // subclass of an abstract parent (e.g. `Lion` < abstract `Cat`) checks its own
-    // columns — while an abstract parent that declares an enum defers until a
-    // concrete subclass materializes rather than throwing `TableNotSpecified` on
-    // its own tableless schema.
-    //
-    // Two trails-specific gates: a `host` is passed only on the
-    // `_default_attributes` replay, so its absence marks the eager
-    // class-definition-time application (a back-compat convenience Rails lacks,
-    // when the subtype is still the bare default), and `!target.abstractClass`
-    // skips the rare direct materialization of an abstract class itself.
-    const target = (host as typeof Base | undefined) ?? klass;
-    if (host !== undefined && !target.abstractClass) {
-      assertEnumTypeDeclared(target, resolved);
+  klass.decorateAttributes([name], (_name: string, subtype: Type) => {
+    if (subtype === defaultValue()) {
+      throw new Error(
+        `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
+          " backed by a database column or declared with an explicit type" +
+          " via `attribute`.",
+      );
     }
-    return enumTypeFrom(name, mapping, reflected, raiseOnInvalidValues);
+    return enumTypeFrom(name, mapping, subtype, raiseOnInvalidValues);
   });
 
   // Define the getter after attribute() so the EnumType is already in
@@ -952,62 +907,6 @@ export function raiseConflictError(
 }
 
 /**
- * Raise if an enum was declared on an attribute that ends up with no declared
- * type — no backing DB column and no explicit `attribute(name, type)`. Called
- * lazily from `typeForAttribute` (after `loadSchema`) so the check sees real
- * columns, mirroring Rails raising inside the `decorate_attributes` block when
- * `subtype == ActiveModel::Type.default_value`.
- *
- * Reads ALREADY-RESOLVED schema state (`_columnsHash`) rather than calling
- * `columnForAttribute`, which would call `loadSchema`. Rails' check runs inside
- * the decorate block during `_default_attributes` materialization
- * (enum.rb:239-246), by which point the schema is resolved — the decorator never
- * drives a schema load. Calling `columnForAttribute` here made it drive one, and
- * since a load replays the pending decorators, the cycle
- * replay → columnForAttribute → loadSchema → replay recursed until the stack
- * blew. Every caller (`Base.typeForAttribute`, `enumTypeOf`) already resolves
- * the schema before asking.
- *
- * @internal
- */
-export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
-  const host = klass as unknown as {
-    _enumsPendingTypeCheck?: Set<string>;
-  };
-  const pending = host._enumsPendingTypeCheck;
-  if (!pending || !pending.has(name)) return;
-  // A backing DB column resolves the subtype; an unknown name is simply absent
-  // from the resolved columns hash. `ownProp`, NOT `ownSchemaMemo`: this runs
-  // inside the class's own decorator replay, before `applyColumnsHash` stamps
-  // `_schemaRevision`, so the `schemaStaleAgainstAncestors` pull fallback would
-  // blank the hash just written.
-  const columnsHash = ownProp(klass as unknown as SchemaHost, "_columnsHash") as
-    | Record<string, { type?: unknown } | undefined>
-    | undefined;
-  const column = columnsHash?.[name];
-  if (column && column.type != null) {
-    // Backed by a real column — clear the marker so we don't re-check on every
-    // subsequent `typeForAttribute` call. Copy-on-write to avoid mutating an
-    // inherited set shared with the parent class.
-    if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
-      host._enumsPendingTypeCheck = new Set(pending);
-    }
-    host._enumsPendingTypeCheck!.delete(name);
-    return;
-  }
-  throw undeclaredEnumTypeError(klass, name);
-}
-
-/** The Rails "Undeclared attribute type for enum" RuntimeError message. */
-function undeclaredEnumTypeError(klass: typeof Base, name: string): Error {
-  return new Error(
-    `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
-      " backed by a database column or declared with an explicit type" +
-      " via `attribute`.",
-  );
-}
-
-/**
  * Fetch the single registered EnumType for an enum attribute — the one source
  * of truth built lazily from the reflected column type via the
  * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
@@ -1025,15 +924,6 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
     attributeAliases?: Record<string, string>;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
-  // Check the *un-resolved* name before resolving the alias: an `enum` declared
-  // before its `alias_attribute` keys a phantom `_enums` entry under the
-  // un-aliased name, so resolving first would look past it to the backing column
-  // and silently return null. `assertEnumTypeDeclared` raises only when the name
-  // has no column of its own (Rails' `subtype == default_value` condition), so a
-  // column-backed enum whose name is later aliased is unaffected. Mirrors Rails
-  // routing type casting through `type_for_attribute(name)`, whose
-  // `decorate_attributes` block raises (type_caster/map.rb:10-16, enum.rb:240-245).
-  //
   // Reflect synchronously from the warm schema cache FIRST — the SAME path
   // `Base.typeForAttribute` uses (base.ts). The public `Base.loadSchema()` is
   // async and would fire-and-forget, letting a caller read the pre-reflection
@@ -1041,16 +931,10 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // type and rebuilds `_defaultAttributes` before either the guard or the read
   // below, so the reflected subtype is already in place.
   reflectSchemaSync.call(klass);
-  assertEnumTypeDeclared(klass, attribute);
   // `defined_enums` is keyed by the *declared* enum name, alias or not
   // (enum.rb:232); only the attribute-set lookup resolves the alias.
   if (!host._enums?.has(attribute)) return null;
   const resolved = host.attributeAliases?.[attribute] ?? attribute;
-  // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,
-  // no explicit `attribute` type) must raise rather than silently serialize
-  // through the pre-reflection fallback (Rails raises from the enum
-  // `decorate_attributes` block, enum.rb:240-245).
-  assertEnumTypeDeclared(klass, resolved);
   const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
 }

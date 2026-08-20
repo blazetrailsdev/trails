@@ -28,7 +28,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: "conditionIsTrue",
+      if: ":conditionIsTrue",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -40,7 +40,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: ["conditionIsTrue", "conditionIsTrue"],
+      if: [":conditionIsTrue", ":conditionIsTrue"],
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -52,7 +52,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      unless: ["conditionIsFalse", "conditionIsFalse"],
+      unless: [":conditionIsFalse", ":conditionIsFalse"],
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -65,7 +65,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      unless: "conditionIsTrue",
+      unless: ":conditionIsTrue",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -76,7 +76,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: ["conditionIsTrue", "conditionIsFalse"],
+      if: [":conditionIsTrue", ":conditionIsFalse"],
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -87,7 +87,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      unless: ["conditionIsTrue", "conditionIsFalse"],
+      unless: [":conditionIsTrue", ":conditionIsFalse"],
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -99,7 +99,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: "conditionIsFalse",
+      if: ":conditionIsFalse",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -111,7 +111,7 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      unless: "conditionIsFalse",
+      unless: ":conditionIsFalse",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
@@ -173,8 +173,8 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: "conditionIsTrue",
-      unless: "conditionIsTrue",
+      if: ":conditionIsTrue",
+      unless: ":conditionIsTrue",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isValid(), (valid) => valid);
@@ -185,8 +185,8 @@ describe("ConditionalValidationTest", () => {
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
-      if: "conditionIsTrue",
-      unless: "conditionIsFalse",
+      if: ":conditionIsTrue",
+      unless: ":conditionIsFalse",
     });
     const t = new Topic({ title: "uhohuhoh", content: "whatever" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
