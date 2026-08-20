@@ -34,7 +34,8 @@ import {
   AttributeMethodPattern,
   Model,
   Type,
-  pushPendingDecorator,
+  pendingAttributeModifications,
+  PendingDecorator,
   type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
@@ -1211,7 +1212,9 @@ export class Base extends Model {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
         this._attributeDefinitions.set(name, { ...def, type: hooked });
-        pushPendingDecorator(this, [name], (_n: string, _t: Type) => hooked);
+        pendingAttributeModifications
+          .call(this)
+          .push(new PendingDecorator([name], (_n: string, _t: Type) => hooked));
       }
     }
     // If we just defined an "id" accessor on a subclass prototype, remove it

@@ -276,9 +276,24 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
 export function applyPendingAttributeModifications(
   cls: AttributeHostInternals,
   attributeSet: AttributeSet,
+  // The class whose AttributeSet is being materialized, threaded down the
+  // recursion so a superclass's PendingDecorator resolves against the subclass
+  // it is replaying into — the `host` thread documented on AttributeDecorator.
+  host: AttributeHostInternals = cls,
 ): void {
-  for (const modification of collectPendingModifications(cls)) {
-    modification.applyTo(attributeSet, cls);
+  // Ruby `superclass.respond_to?(:apply_pending_attribute_modifications, true)`
+  // (attribute_registration.rb:80). The module function is not a member of the
+  // class in TS, so the participation test is the public entry point every
+  // AttributeRegistration includer answers.
+  const superclass = Object.getPrototypeOf(cls) as
+    | (AttributeHostInternals & { _defaultAttributes?: unknown })
+    | null;
+  if (superclass && typeof superclass._defaultAttributes === "function") {
+    applyPendingAttributeModifications(superclass, attributeSet, host);
+  }
+
+  for (const modification of pendingAttributeModifications.call(cls)) {
+    modification.applyTo(attributeSet, host);
   }
 }
 
@@ -384,64 +399,4 @@ function inDecoratorReplay<T>(fn: () => T): T {
   } finally {
     _decoratorReplayDepth--;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function collectPendingModifications(cls: AttributeHostInternals): PendingModification[] {
-  if (!cls || (cls as unknown) === Function.prototype || !cls._pendingAttributeModifications)
-    return [];
-  const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
-  const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
-    ? cls._pendingAttributeModifications
-    : [];
-  return [...superMods, ...own];
-}
-
-// ---------------------------------------------------------------------------
-// Exported functions
-// ---------------------------------------------------------------------------
-
-/**
- * Push a type declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingType(
-  cls: AttributeHostInternals,
-  name: string,
-  type: Type | null,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingType(name, type));
-}
-
-/**
- * Push a default declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingDefault(
-  cls: AttributeHostInternals,
-  name: string,
-  value: unknown,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
-}
-
-/**
- * Push a decorator onto the pending-modification queue.
- * Called by decorateAttributes and AR's applyPendingEncryptions.
- *
- * Mirrors: the PendingDecorator push inside ActiveModel::AttributeRegistration#decorate_attributes
- */
-export function pushPendingDecorator(
-  cls: AttributeHostInternals,
-  names: string[] | null,
-  decorator: AttributeDecorator,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
 }

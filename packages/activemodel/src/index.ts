@@ -11,7 +11,6 @@ export {
   MissingAttributeError,
   missingAttribute,
   AttributeMethodPattern,
-  resolveAliasName,
   resolveAliasNameIn,
   AttrNames,
   buildMangledName,
@@ -41,7 +40,8 @@ export {
 export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
-  pushPendingDecorator,
+  pendingAttributeModifications,
+  PendingDecorator,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";

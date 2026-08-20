@@ -20,8 +20,9 @@ import {
   type AttributeMethodPattern,
 } from "./attribute-methods.js";
 import {
-  pushPendingType,
-  pushPendingDefault,
+  pendingAttributeModifications,
+  PendingType,
+  PendingDefault,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 import { type InstanceHost } from "./attribute-methods.js";
@@ -196,10 +197,12 @@ export function attribute(
   // default-only call pushes only PendingDefault, preserving the existing type.
   const noDefault = options?.default === undefined;
   if (typeProvided || noDefault) {
-    pushPendingType(this, name, typeProvided ? type : null);
+    pendingAttributeModifications
+      .call(this)
+      .push(new PendingType(name, typeProvided ? type : null));
   }
   if (!noDefault) {
-    pushPendingDefault(this, name, defaultValue);
+    pendingAttributeModifications.call(this).push(new PendingDefault(name, defaultValue));
   }
 
   // Mirrors: Rails reset_default_attributes — invalidate cache on this class

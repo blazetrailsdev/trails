@@ -50,20 +50,27 @@ export class MissingAttributeError extends globalThis.Error {
 //
 // Rails declares `class_attribute :attribute_aliases` and
 // `:attribute_method_patterns` in the `included do` block, which surfaces a
-// reader / `=` writer / `?` predicate triple. trails already holds this state
-// under `_attributeAliases` (a `{ alias => original }` hash) and
-// `_attributeMethodPatterns` (an array), maintained subclass-locally by the
-// existing copy-on-write helpers (`ensureOwnAliases` / `ensureOwnPatterns`).
-// These accessors expose that state under the Rails names. The write path is
-// the public `alias_attribute` / `attribute_method_*` API (which Rails itself
-// uses — `attribute_aliases=` is never called by user code); the bare `=`
-// writers have no caller, so we expose only the reader and predicate rather
-// than a dead bespoke setter.
+// reader / `=` writer / `?` predicate triple. trails holds the storage under
+// `_attributeAliases` (a `{ alias => original }` hash) and
+// `_attributeMethodPatterns` (an array), and these accessors are that triple:
+// the reader walks the constructor chain, and the `=` writer — spelled `setX`
+// per docs/ruby-ts-conventions.md, since a `x=` whose reader is a function
+// cannot be a TS `set` accessor — writes an own property, which is exactly
+// `class_attribute`'s "writes are local to the class". Rails' own writes are
+// `self.attribute_aliases = attribute_aliases.merge(...)` (:203) and
+// `self.attribute_method_patterns += ...` (:101, :141, :175), so the writer is
+// what gives every one of those call sites its per-subclass copy — no
+// copy-on-first-write helper is involved on either side.
 // ---------------------------------------------------------------------------
 
 /** Mirrors: ClassMethods#attribute_aliases (class_attribute reader/writer). */
 export function attributeAliases(this: AttributeMethodHost): Record<string, string> {
   return this._attributeAliases;
+}
+
+/** Mirrors: ClassMethods#attribute_aliases? (class_attribute predicate). */
+export function isAttributeAliases(this: AttributeMethodHost): boolean {
+  return Boolean(this._attributeAliases);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -93,7 +100,6 @@ export class AttributeMethodPattern {
   readonly suffix: string;
   readonly proxyTarget: string;
   readonly parameters: string | false;
-  readonly method_missing_target: string;
 
   constructor({
     prefix = "",
@@ -104,7 +110,6 @@ export class AttributeMethodPattern {
     this.suffix = suffix;
     this.parameters = parameters == null ? "..." : parameters;
     this.proxyTarget = `${prefix}attribute${suffix}`;
-    this.method_missing_target = `attribute_${prefix}${suffix ? `${suffix}` : ""}`;
   }
 
   match(method: string): { attr: string } | null {
@@ -139,9 +144,12 @@ export interface AttributeMethodHost {
   prototype: { [key: string]: unknown };
 }
 
-/** Mirrors: ClassMethods#attribute_aliases? (class_attribute predicate). */
-export function isAttributeAliases(this: AttributeMethodHost): boolean {
-  return Boolean(this._attributeAliases);
+/** Mirrors: ClassMethods#attribute_aliases= (class_attribute writer). */
+export function setAttributeAliases(
+  this: AttributeMethodHost,
+  attributeAliases: Record<string, string>,
+): void {
+  this._attributeAliases = attributeAliases;
 }
 
 /** Mirrors: ClassMethods#attribute_method_patterns (class_attribute reader/writer). */
@@ -152,6 +160,14 @@ export function attributeMethodPatterns(this: AttributeMethodHost): AttributeMet
 /** Mirrors: ClassMethods#attribute_method_patterns? (class_attribute predicate). */
 export function isAttributeMethodPatterns(this: AttributeMethodHost): boolean {
   return Boolean(this._attributeMethodPatterns);
+}
+
+/** Mirrors: ClassMethods#attribute_method_patterns= (class_attribute writer). */
+export function setAttributeMethodPatterns(
+  this: AttributeMethodHost,
+  attributeMethodPatterns: AttributeMethodPattern[],
+): void {
+  this._attributeMethodPatterns = attributeMethodPatterns;
 }
 
 /**
@@ -258,10 +274,10 @@ export function attributeMethodPrefix(
   ...prefixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(prefixes);
-  ensureOwnPatterns(this);
-  for (const prefix of prefixes as string[]) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern({ prefix, parameters }));
-  }
+  setAttributeMethodPatterns.call(this, [
+    ...attributeMethodPatterns.call(this),
+    ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
+  ]);
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
@@ -271,10 +287,10 @@ export function attributeMethodSuffix(
   ...suffixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(suffixes);
-  ensureOwnPatterns(this);
-  for (const suffix of suffixes as string[]) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern({ suffix, parameters }));
-  }
+  setAttributeMethodPatterns.call(this, [
+    ...attributeMethodPatterns.call(this),
+    ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
+  ]);
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
@@ -283,17 +299,16 @@ export function attributeMethodAffix(
   this: AttributeMethodHost,
   ...affixes: Array<{ prefix: string; suffix: string }>
 ): void {
-  ensureOwnPatterns(this);
-  for (const affix of affixes) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern(affix));
-  }
+  setAttributeMethodPatterns.call(this, [
+    ...attributeMethodPatterns.call(this),
+    ...affixes.map((affix) => new AttributeMethodPattern(affix)),
+  ]);
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
 
 export function aliasAttribute(this: AttributeMethodHost, newName: string, oldName: string): void {
-  ensureOwnAliases(this);
-  this._attributeAliases[newName] = oldName;
+  setAttributeAliases.call(this, { ...attributeAliases.call(this), [newName]: oldName });
   const aliases = aliasesByAttributeName(this);
   if (!aliases.has(oldName)) aliases.set(oldName, []);
   aliases.get(oldName)!.push(newName);
@@ -749,18 +764,6 @@ export function defineMethodAttribute(
   });
 }
 
-function ensureOwnPatterns(host: AttributeMethodHost): void {
-  if (!Object.prototype.hasOwnProperty.call(host, "_attributeMethodPatterns")) {
-    host._attributeMethodPatterns = [...host._attributeMethodPatterns];
-  }
-}
-
-function ensureOwnAliases(host: AttributeMethodHost): void {
-  if (!Object.prototype.hasOwnProperty.call(host, "_attributeAliases")) {
-    host._attributeAliases = { ...host._attributeAliases };
-  }
-}
-
 /**
  * Generate per-attribute dirty methods into the class's
  * `generated_attribute_methods` module, mirroring the method cascade Rails
@@ -847,20 +850,7 @@ export function defineDirtyAttributeMethods(this: AttributeMethodHost, attrName:
 }
 
 /**
- * Resolve `name` to its canonical attribute name, following one alias
- * hop. Mirrors Rails `ActiveModel::AttributeMethods#read_attribute`'s
- * `attribute_aliases[name] || name` (activemodel/lib/active_model/attribute_methods.rb
- * read_attribute / write_attribute paths) so every read/write path sees
- * the same key whether the caller passed `nickname` or `name`.
- */
-export function resolveAliasName(host: AttributeMethodHost, name: string): string {
-  // Rails: `attribute_aliases[attr_name] || attr_name`. Exact lookup only —
-  // read/write paths must not second-guess the name the caller supplied.
-  return host._attributeAliases?.[name] ?? name;
-}
-
-/**
- * `resolveAliasName` plus the trails-only camelCase-key bridge, resolved
+ * `resolveAttributeName` plus the trails-only camelCase-key bridge, resolved
  * against a caller-supplied attribute set.
  *
  * Trails stores alias KEYS camelCase (`newName`, `commentsCount`) while derived

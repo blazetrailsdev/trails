@@ -81,7 +81,6 @@ import {
   aliasAttribute,
   resolveAttributeName as _resolveAttributeNameHelper,
   type AttributeMethodHost,
-  resolveAliasName,
   resolveAliasNameIn,
   defineMethodAttribute,
   undefineAttributeMethods,
@@ -1876,7 +1875,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_before_type_cast
    */
   readAttributeBeforeTypeCast(name: string): unknown {
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._attributes.getAttribute(resolved).valueBeforeTypeCast ?? null;
   }
 
@@ -2216,7 +2215,7 @@ export class Model {
   }
 
   attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     if (!this._dirty.attributeChanged(name)) return false;
     if (!options) return true;
     const change = this._dirty.attributeChange(name);
@@ -2237,12 +2236,14 @@ export class Model {
   }
 
   attributeWas(name: string): unknown {
-    return this._dirty.attributeWas(resolveAliasName(this.constructor as typeof Model, name));
+    return this._dirty.attributeWas((this.constructor as typeof Model).resolveAttributeName(name));
   }
 
   /** @internal */
   attributeChange(name: string): [unknown, unknown] | null {
-    return this._dirty.attributeChange(resolveAliasName(this.constructor as typeof Model, name));
+    return this._dirty.attributeChange(
+      (this.constructor as typeof Model).resolveAttributeName(name),
+    );
   }
 
   /**
@@ -2273,7 +2274,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#saved_change_to_attribute?
    */
   savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     const changes = this._dirty.previousChanges;
     if (!(name in changes)) return false;
     if (!options) return true;
@@ -2294,7 +2295,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_before_last_save
    */
   attributeBeforeLastSave(name: string): unknown {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     const change = this._dirty.previousChanges[name];
     return change ? change[0] : this.readAttribute(name);
   }
@@ -2306,7 +2307,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_in_database
    */
   attributeInDatabase(name: string): unknown {
-    name = resolveAliasName(this.constructor as typeof Model, name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._dirty.attributeWas(name) ?? this.readAttribute(name);
   }
 
@@ -2345,7 +2346,7 @@ export class Model {
 
   savedChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
     const changes = this._dirty.previousChanges;
-    return changes[resolveAliasName(this.constructor as typeof Model, name)];
+    return changes[(this.constructor as typeof Model).resolveAttributeName(name)];
   }
 
   /**
@@ -2384,7 +2385,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_will_change!
    */
   attributeWillChange(name: string): unknown {
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     return this._dirty.forceChange(resolved);
   }
 
@@ -2396,7 +2397,7 @@ export class Model {
   restoreAttribute(name: string): void {
     this._dirty.restoreAttribute(
       this._attributes,
-      resolveAliasName(this.constructor as typeof Model, name),
+      (this.constructor as typeof Model).resolveAttributeName(name),
     );
   }
 
@@ -2410,7 +2411,9 @@ export class Model {
    * @internal
    */
   attributePreviousChange(name: string): [unknown, unknown] | undefined {
-    return this._dirty.previousChanges[resolveAliasName(this.constructor as typeof Model, name)];
+    return this._dirty.previousChanges[
+      (this.constructor as typeof Model).resolveAttributeName(name)
+    ];
   }
 
   changesApplied(): void {
