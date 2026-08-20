@@ -378,16 +378,20 @@ type DatabaseAdapterLike = { internalSchemaCache?: unknown };
  * ever touching `.connection` — which under the default `permanentConnectionCheckout`
  * would permanently lease a connection on every record construction. Reads the warm
  * schema cache off an already-available connection only: the threaded (in-query)
- * connection, else a connection the pool has already leased. Returns `{}` when
- * neither is available (a bare `new Model()` with no active connection); the caller
- * then seeds that column from its attribute definition instead. Any real DB column
- * whose default matters here has already pinned a connection via the
- * `!_schemaLoaded` reflection in `_defaultAttributes`, so `{}` is only reached for
- * columns that carry no client-side default anyway.
+ * connection, else a connection the pool has already leased. Returns `undefined`
+ * when the cache has no entry for the table — no connection was available (a bare
+ * `new Model()`), or the table has not been reflected yet — as distinct from a `{}`
+ * entry for a table that reflected and genuinely has no columns. Callers that only
+ * need to look a column up can `?? {}`; the one that must tell "not reflected yet"
+ * from "no such column" — `_defaultAttributes`' seed, feeding decorators that
+ * branch on `subtype == Type.default_value` — depends on the difference. Any real
+ * DB column whose default matters here has already pinned a connection via the
+ * `!_schemaLoaded` reflection in `_defaultAttributes`, so a miss is only reached
+ * for columns that carry no client-side default anyway.
  *
  * @internal
  */
-export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
+export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
     const cache = conn?.internalSchemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
@@ -408,7 +412,7 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   } catch {
     /* fall through */
   }
-  return {};
+  return undefined;
 }
 
 /**

@@ -214,7 +214,11 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     // that are NOT DB columns seed from `_attributeDefinitions`: with a default
     // via withUserDefault (cast), without one via fromDatabase(null) — the latter
     // matters for LockingType, where deserialize(null) → 0.
-    const columns = cachedColumnsHash(cacheHost);
+    // `undefined` = the schema cache has no entry for this table (not reflected
+    // yet); `{}` = reflected and genuinely columnless. The seed below must tell
+    // them apart, so keep the miss rather than folding it into an empty hash.
+    const cachedColumns = cachedColumnsHash(cacheHost);
+    const columns = cachedColumns ?? {};
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attributesHash = new Map<string, Attribute>();
     // Rails seeds phase 1 from `columns_hash` alone (attributes.rb:241-245) and
@@ -245,15 +249,16 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         attributesHash.set(name, base.withUserDefault(def.defaultValue));
       } else if (def.type !== typeDefaultValue()) {
         attributesHash.set(name, Attribute.fromDatabase(name, null, def.type));
-      } else if (Object.keys(columns).length === 0) {
+      } else if (cachedColumns === undefined) {
         // Deviation: Rails resolves `columns_hash` synchronously before
-        // `_default_attributes` (attributes.rb:239-248), so a decorator branching
+        // `_default_attributes` (attributes.rb:241-250), so a decorator branching
         // on `subtype == Type.default_value` (enum.rb:240) never has to tell "no
-        // such column" from trails' "not reflected yet". An EMPTY hash is that
-        // state — `_schemaLoaded` is not the test, since the warm-cache probe
-        // above stamps it even when the reflection yielded nothing (PG). A
-        // non-singleton `value` stands in until columns arrive; once ANY column
-        // has reflected, an absent name is genuinely absent and stays out, as
+        // such column" from trails' "not reflected yet". A schema-cache MISS is
+        // that state — not an empty hash (a reflected columnless table must still
+        // raise) and not `!_schemaLoaded` (the warm-cache probe above stamps the
+        // flag even when the reflection yielded nothing, which is how PG got
+        // here). A non-singleton `value` stands in until the table reflects; once
+        // it has, an absent name is genuinely absent and stays out of the set, as
         // Rails' columns-only seed leaves it.
         attributesHash.set(name, Attribute.fromDatabase(name, null, typeLookup("value")));
       }
