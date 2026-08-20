@@ -52,6 +52,12 @@ function isNestedParameterHash(value: unknown): boolean {
  * has finished writing by the time the loop reaches the next key, so where a send
  * here answers a promise the rest of the loop is chained behind it to keep that
  * order. Every send that stays in memory keeps running inline.
+ *
+ * `_assign_attribute` is Ruby's implicit-self send, but trails' AR-side one is
+ * a module-private function in `persistence.ts` (where the association-writer
+ * resolution it needs lives) rather than a method on the class — publishing it
+ * as one would put an `_assign_attribute` override on ActiveRecord that Rails
+ * does not have. It is called directly here instead.
  */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
