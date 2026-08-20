@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/association.ts",
-    "rubyName": "load_records",
-    "call": "records_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/association.ts",
     "rubyName": "preloaded_records",
     "call": "load_records",
     "reason": "Verified per-site (RFC 0106): `load_records unless defined?(@preloaded_records)` (preloader/association.rb:155) — `loadRecords` is async in trails (it runs the preload query), so the synchronous getter cannot call it; it is awaited by `load()` (preloader/association.ts) before any reader touches `preloadedRecords`."

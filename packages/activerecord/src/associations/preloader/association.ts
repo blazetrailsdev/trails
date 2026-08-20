@@ -159,18 +159,7 @@ export class Association {
   async loadRecords(rawRecords?: Base[]): Promise<void> {
     this._recordsByOwner = new Map();
 
-    if (!rawRecords) {
-      const lq = this.loaderQuery();
-      // Wire the inverse inside the instantiation block (mirrors Rails'
-      // `Preloader::Association#records_for` passing `set_inverse_instance` as
-      // the `find_by_sql` block) so it lands BEFORE the child's find/initialize
-      // callbacks fire. In the batch path the shared query already ran the block
-      // (see `LoaderRecords#records`); the loop below re-runs setInverse
-      // idempotently for already-loaded owners.
-      rawRecords = await lq.loadRecordsForKeys([...this.ownersByKey.keys()], (record) =>
-        this.setInverse(record),
-      );
-    }
+    rawRecords ||= await this.loaderQuery().recordsFor([this]);
 
     for (const record of rawRecords) {
       this.setInverse(record);

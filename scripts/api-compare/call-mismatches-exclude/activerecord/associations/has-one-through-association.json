@@ -25,7 +25,7 @@
     "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "replace",
     "call": "create_through_record",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `create_through_record(record, save)` (has_one_through_association.rb:10-12) writes the join row, so it is async in trails. `replace` cannot be — it is reached from the synchronous `writer`/`setNewRecord` path that RFC 0087 requires to stay sync — so the body queues `_pendingReplace` and `persistReplace`/`autosaveHasOne` awaits `createThroughRecord` one frame later. Same sync-setter shortcoming as the `setX()` idiom."
   },
   {
     "package": "activerecord",
