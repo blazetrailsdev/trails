@@ -4,8 +4,8 @@ import {
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
-import { zone, isBlank } from "@blazetrails/activesupport";
-import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
+import { zone, isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
@@ -211,15 +211,14 @@ export class TimeType extends ValueType<Temporal.Instant> {
   protected valueFromMultiparameterAssignment(
     values: Record<string, unknown>,
   ): Temporal.Instant | null {
-    return (
-      (new AcceptsMultiparameterTime(this, {
-        "1": 2000,
-        "2": 1,
-        "3": 1,
-        "4": 0,
-        "5": 0,
-      }).cast(values) as Temporal.Instant | null) ?? null
-    );
+    const time = new AcceptsMultiparameterTime(this, {
+      "1": 2000,
+      "2": 1,
+      "3": 1,
+      "4": 0,
+      "5": 0,
+    }).valueFromMultiparameterAssignment(values);
+    return time && time.toTime().toInstant();
   }
 
   /**
@@ -228,7 +227,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * `Value#cast` (value.rb:53-55), which is `super`.
    */
   override cast(value: unknown): Temporal.Instant | null {
-    if (isHash(value)) {
+    if (isPlainObject(value)) {
       return this.valueFromMultiparameterAssignment(value);
     } else {
       return super.cast(value);
@@ -240,11 +239,11 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * a Hash value is validated by assembling it (raising on invalid input).
    */
   override assertValidValue(value: unknown): void {
-    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+    if (isPlainObject(value)) this.valueFromMultiparameterAssignment(value);
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
   override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isHash(value);
+    return isPlainObject(value);
   }
 }

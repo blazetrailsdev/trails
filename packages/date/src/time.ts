@@ -202,6 +202,40 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
+ * MRI's `months[]` table (`time.c`), the three-letter month names
+ * `month_arg` matches a String positional against.
+ */
+const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * MRI's `obj2vint` (`time.c`), the conversion every `::Time` constructor
+ * positional goes through before `obj2ubits` sees it. A String is taken
+ * through `rb_str_to_inum(str, 10, TRUE)` — strict `Integer()`, so
+ * `Time.utc("2004")` is the year 2004 while `"5.5"`, `"2004abc"` and `""` all
+ * raise. A Numeric is truncated toward zero.
+ */
+function obj2vint(obj: number | string): number {
+  if (typeof obj !== "string") return Math.trunc(obj);
+  if (!/^[+-]?\d+$/.test(obj.trim())) {
+    throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(obj)}`);
+  }
+  return parseInt(obj.trim(), 10);
+}
+
+/**
+ * MRI's `month_arg` (`time.c`): the month positional alone also takes one of
+ * `months[]`, matched case-insensitively over exactly three characters, so
+ * `Time.utc(2004, "JAN")` is January and `Time.utc(2004, "june")` raises.
+ */
+function monthArg(obj: number | string): number {
+  if (typeof obj === "string") {
+    const index = months.indexOf(obj.trim().toLowerCase());
+    if (index !== -1) return index + 1;
+  }
+  return obj2vint(obj);
+}
+
+/**
  * MRI's `obj2ubits` (`time.c`), which every `::Time` constructor positional
  * goes through before `validate_vtm` sees it: the value has to fit in `bits`
  * unsigned bits or the argument is rejected outright, with a message that names
@@ -258,12 +292,12 @@ export class Time {
    * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`.
    */
   static utc(
-    year: number,
-    month: number,
-    day: number,
-    hour = 0,
-    min = 0,
-    sec: number | Rational = 0,
+    year: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
     usec?: number,
   ): Time {
     return new Time(
@@ -274,7 +308,7 @@ export class Time {
       min,
       usec === undefined
         ? sec
-        : new Rational(sec instanceof Rational ? sec.toI() : Math.trunc(sec), 1).add(
+        : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             new Rational(Math.round(usec * 1_000), 1_000_000_000),
           ),
       "UTC",
@@ -288,12 +322,12 @@ export class Time {
    * truncates `sec` to a whole second.
    */
   static mktime(
-    year: number,
-    month: number,
-    day: number,
-    hour = 0,
-    min = 0,
-    sec: number | Rational = 0,
+    year: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
     usec?: number,
   ): Time {
     return new Time(
@@ -304,7 +338,7 @@ export class Time {
       min,
       usec === undefined
         ? sec
-        : new Rational(sec instanceof Rational ? sec.toI() : Math.trunc(sec), 1).add(
+        : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             new Rational(Math.round(usec * 1_000), 1_000_000_000),
           ),
     );
@@ -316,12 +350,12 @@ export class Time {
    * positionals and builds in the LOCAL zone too.
    */
   static local(
-    year: number,
-    month: number,
-    day: number,
-    hour = 0,
-    min = 0,
-    sec: number | Rational = 0,
+    year: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
     usec?: number,
   ): Time {
     return Time.mktime(year, month, day, hour, min, sec, usec);
@@ -360,14 +394,25 @@ export class Time {
    * shape trails has.
    */
   constructor(
-    year: number,
-    month: number,
-    day: number,
-    hour = 0,
-    min = 0,
-    sec: number | Rational = 0,
+    year: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
     zone: string | number | null = null,
   ) {
+    // MRI defaults a `nil` positional to the field's own default rather than
+    // rejecting it (`time.c` `time_utc_or_local`), which is what makes
+    // `Time.utc(2004, 6, 24, 16, 24, nil)` a whole minute — the shape
+    // `AcceptsMultiparameterTime` hands it for a form field left blank.
+    year = obj2vint(year);
+    month = month == null ? 1 : monthArg(month);
+    day = day == null ? 1 : obj2vint(day);
+    hour = hour == null ? 0 : obj2vint(hour);
+    min = min == null ? 0 : obj2vint(min);
+    if (sec == null) sec = 0;
+    else if (typeof sec === "string") sec = obj2vint(sec);
     const nsec = subsecNanoseconds(sec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
     obj2ubits(month, 4);
@@ -414,6 +459,11 @@ export class Time {
   }
 
   get day(): number {
+    return this.#plain.day;
+  }
+
+  /** Ruby `Time#mday`, the `day` alias (`time.c` binds both to `time_mday`). */
+  get mday(): number {
     return this.#plain.day;
   }
 

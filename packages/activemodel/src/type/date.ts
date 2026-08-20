@@ -4,7 +4,8 @@ import {
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
-import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -170,24 +171,19 @@ export class DateType extends ValueType<DateCastResult> {
    *     time && new_date(time.year, time.mon, time.mday)
    *   end
    *
-   * The Rails version delegates to `Helpers::AcceptsMultiparameterTime`
-   * for the `Time` reconstruction, then narrows the result to a `::Date`.
-   * Trails routes multiparameter casts through
-   * `AcceptsMultiparameterTime`'s wrapper
-   * (`helpers/accepts-multiparameter-time.ts`); this helper mirrors the
-   * narrowing step so subclasses / consumers can call the Rails-named
-   * hook directly with the `{ 1: year, 2: mon, 3: mday, ... }` form
-   * pulled out of the multiparameter hash.
+   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly,
+   * which trails reaches through the wrapper in
+   * `helpers/accepts-multiparameter-time.ts` rather than an ancestor.
    *
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    // Rails' `super` — AcceptsMultiparameterTime's Time assembly, which rolls
-    // within-range overflow like Time.local (Nov 31 → Dec 1).
-    const time = new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
-    return time && this.newDate(time.year, time.month, time.day);
+    const time = new AcceptsMultiparameterTime(this).valueFromMultiparameterAssignment(
+      values as Record<string, unknown>,
+    );
+    return time && this.newDate(time.year, time.mon, time.mday);
   }
 
   /**
@@ -196,7 +192,7 @@ export class DateType extends ValueType<DateCastResult> {
    * `Value#cast` (value.rb:53-55), which is `super`.
    */
   override cast(value: unknown): DateCastResult | null {
-    if (isHash(value)) {
+    if (isPlainObject(value)) {
       return this.valueFromMultiparameterAssignment(value);
     } else {
       return super.cast(value);
@@ -208,12 +204,12 @@ export class DateType extends ValueType<DateCastResult> {
    * a Hash value is validated by assembling it (raising on invalid input).
    */
   override assertValidValue(value: unknown): void {
-    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+    if (isPlainObject(value)) this.valueFromMultiparameterAssignment(value);
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
   override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isHash(value);
+    return isPlainObject(value);
   }
 
   /**

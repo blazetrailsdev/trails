@@ -9,9 +9,9 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { toS } from "@blazetrails/activesupport";
+import { isPlainObject, toS } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
-import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
@@ -162,12 +162,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * trails spells one with (CLAUDE.md), so `{ ":a": 1 }` renders the `{:a=>1}`
    * MRI 3.3 emits.
    *
-   * Validates that year/mon/mday (multiparameter keys 1, 2, 3) are
-   * present, then defers to the multiparameter wrapper. Trails routes
-   * the actual reconstruction through `AcceptsMultiparameterTime`
-   * (`helpers/accepts-multiparameter-time.ts`); this helper exists for
-   * Rails parity and as the entry point for callers that want the
-   * key-presence check.
+   * `super` is `Helpers::AcceptsMultiparameterTime`'s `::Time` assembly,
+   * which trails reaches through the wrapper in
+   * `helpers/accepts-multiparameter-time.ts` rather than an ancestor. Rails'
+   * cast result for a Hash IS that `::Time`; `DateTimeCastResult` is the
+   * `Temporal.Instant` this port spells a `::Time` as, so the instant is read
+   * back off it.
    *
    * @internal Rails-private helper.
    */
@@ -180,9 +180,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         `Provided hash ${toS(values)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
-    return new AcceptsMultiparameterTime(this, { "4": 0, "5": 0 }).cast(
-      values,
-    ) as DateTimeCastResult | null;
+    const time = new AcceptsMultiparameterTime(this, {
+      "4": 0,
+      "5": 0,
+    }).valueFromMultiparameterAssignment(values as Record<string, unknown>);
+    return time && time.toTime().toInstant();
   }
 
   get isUtc(): boolean {
@@ -195,7 +197,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * `Value#cast` (value.rb:53-55), which is `super`.
    */
   override cast(value: unknown): DateTimeCastResult | null {
-    if (isHash(value)) {
+    if (isPlainObject(value)) {
       return this.valueFromMultiparameterAssignment(value);
     } else {
       return super.cast(value);
@@ -208,12 +210,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * MultiparameterAssignmentErrors at assignment (missing keys 1..3 raise).
    */
   override assertValidValue(value: unknown): void {
-    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+    if (isPlainObject(value)) this.valueFromMultiparameterAssignment(value);
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
   override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isHash(value);
+    return isPlainObject(value);
   }
 
   /**

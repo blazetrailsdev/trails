@@ -1,70 +1,19 @@
-import { Temporal } from "@blazetrails/date";
-import { ArgumentError } from "../../attribute-assignment.js";
+import { Time } from "@blazetrails/date";
+import { isPlainObject } from "@blazetrails/activesupport";
 import { Type } from "../value.js";
+import { isUtc } from "./timezone.js";
 
 /**
- * AcceptsMultiparameterTime — wraps a time-based type to handle
- * multiparameter assignment from HTML forms.
- *
  * Mirrors: ActiveModel::Type::Helpers::AcceptsMultiparameterTime
+ * (accepts_multiparameter_time.rb).
  *
- * In Rails, date/time form fields are submitted as multiple parameters
- * (year, month, day, hour, minute, second). This class reassembles them
- * into a single Temporal.PlainDateTime and delegates to the wrapped type,
- * which extracts what it needs (PlainDate, PlainTime, or PlainDateTime).
+ * Ruby builds the module with `defaults:` and closes `define_method` over it;
+ * TS has no anonymous-module `include`, so the same state is a constructor
+ * argument and the wrapped type is the receiver `super` would have reached.
  */
-/**
- * Ruby `value.is_a?(Hash)` analogue — a plain object (including null-prototype
- * objects, which the multiparameter extractor produces).
- * @internal
- */
-export function isHash(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
-// Ruby Time's month-name coercion table (time.c months[]).
-const MONTH_ABBREVIATIONS = [
-  "jan",
-  "feb",
-  "mar",
-  "apr",
-  "may",
-  "jun",
-  "jul",
-  "aug",
-  "sep",
-  "oct",
-  "nov",
-  "dec",
-];
-
-/**
- * Split non-negative seconds into whole seconds + truncated nanoseconds using
- * the double's exact binary value (mantissa * 2^exponent), mirroring Ruby
- * Time's Float → Rational conversion. Negative or non-finite input falls back
- * to a plain trunc — the caller's domain check raises for it anyway.
- */
-function exactSecondsToNanoseconds(second: number): { whole: number; ns: number } {
-  if (!(second >= 0) || !Number.isFinite(second)) {
-    return { whole: Math.trunc(second), ns: 0 };
-  }
-  const dv = new DataView(new ArrayBuffer(8));
-  dv.setFloat64(0, second);
-  const bits = dv.getBigUint64(0);
-  const expBits = Number((bits >> 52n) & 0x7ffn);
-  let mantissa = bits & 0xf_ffff_ffff_ffffn;
-  if (expBits !== 0) mantissa |= 1n << 52n;
-  const exponent = expBits === 0 ? -1074 : expBits - 1075;
-  let totalNs = mantissa * 1_000_000_000n;
-  totalNs = exponent >= 0 ? totalNs << BigInt(exponent) : totalNs >> BigInt(-exponent);
-  return { whole: Number(totalNs / 1_000_000_000n), ns: Number(totalNs % 1_000_000_000n) };
-}
-
 export class AcceptsMultiparameterTime {
   readonly type: Type;
-  /** @internal */
+  /** @internal `AcceptsMultiparameterTime#initialize`'s `defaults:` kwarg. */
   readonly defaults: Record<string, number>;
 
   constructor(type: Type, defaults: Record<string, number> = {}) {
@@ -72,139 +21,82 @@ export class AcceptsMultiparameterTime {
     this.defaults = defaults;
   }
 
+  /** Mirrors: InstanceMethods#serialize (accepts_multiparameter_time.rb:9-11). */
   serialize(value: unknown): unknown {
-    return this.type.serialize(value);
+    return this.serializeCastValue(this.cast(value));
   }
 
+  /** Mirrors: InstanceMethods#serialize_cast_value (accepts_multiparameter_time.rb:13-15). */
   serializeCastValue(value: unknown): unknown {
-    if (
-      typeof (this.type as unknown as { serializeCastValue?(v: unknown): unknown })
-        .serializeCastValue === "function"
-    ) {
-      return (
-        this.type as unknown as { serializeCastValue(v: unknown): unknown }
-      ).serializeCastValue(value);
-    }
-    return this.type.serialize(value);
+    return value;
   }
 
+  /** Mirrors: InstanceMethods#cast (accepts_multiparameter_time.rb:17-23). */
   cast(value: unknown): unknown {
-    if (this.isMultiparameterHash(value)) {
-      return this.castFromMultiparameter(value as Record<string, unknown>);
+    if (isPlainObject(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return this.type.cast(value);
     }
-    return this.type.cast(value);
   }
 
-  assertValidValue(value: unknown): void {
-    this.type.cast(value);
+  /** Mirrors: InstanceMethods#assert_valid_value (accepts_multiparameter_time.rb:25-31). */
+  assertValidValue(value: unknown): unknown {
+    if (isPlainObject(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return this.type.assertValidValue(value);
+    }
   }
 
+  /**
+   * Mirrors: InstanceMethods#value_constructed_by_mass_assignment?
+   * (accepts_multiparameter_time.rb:33-35).
+   */
   isValueConstructedByMassAssignment(value: unknown): boolean {
-    return this.isMultiparameterHash(value);
+    return isPlainObject(value);
   }
 
-  private isMultiparameterHash(value: unknown): boolean {
-    return isHash(value);
-  }
-
-  private castFromMultiparameter(hash: Record<string, unknown>): unknown {
-    // Apply per-type defaults before the year/month/day guard — mirrors
-    // AcceptsMultiparameterTime#initialize's defaults.each { |k,v| values_hash[k] ||= v }.
-    const filled: Record<string, unknown> = { ...hash };
+  /**
+   * Mirrors: the `define_method(:value_from_multiparameter_assignment)`
+   * `AcceptsMultiparameterTime#initialize` installs
+   * (accepts_multiparameter_time.rb:38-46).
+   *
+   *   defaults.each do |k, v|
+   *     values_hash[k] ||= v
+   *   end
+   *   return unless values_hash[1] && values_hash[2] && values_hash[3]
+   *   values = values_hash.sort.map!(&:last)
+   *   ::Time.public_send(default_timezone, *values)
+   *
+   * `||=` and the `1`/`2`/`3` guard are Ruby truthiness, so only `nil`/`false`
+   * count as absent — an empty string is a present value and reaches `::Time`,
+   * which raises for it. The keys are the multiparameter indices, a JS object's
+   * string spelling of the Integer ones Ruby sorts, so `sort` is over `"1"`..`"6"`
+   * and orders the same. `default_timezone` is `Helpers::Timezone#is_utc?`'s
+   * choice of receiver, `Time.utc` or `Time.local` (timezone.rb:9-11).
+   *
+   * @internal Rails-private helper.
+   */
+  valueFromMultiparameterAssignment(valuesHash: Record<string, unknown>): Time | null {
     for (const [k, v] of Object.entries(this.defaults)) {
-      if (filled[k] === undefined || filled[k] === null || filled[k] === "") {
-        filled[k] = v;
-      }
+      if (valuesHash[k] == null || valuesHash[k] === false) valuesHash[k] = v;
     }
-
-    // Rails guard: return unless values_hash[1] && values_hash[2] && values_hash[3]
-    // Ruby 0 is truthy, so only nil/"" absence counts — use explicit nil/empty check.
-    const absent = (k: string) => filled[k] === undefined || filled[k] === null || filled[k] === "";
-    if (absent("1") || absent("2") || absent("3")) return null;
-
-    // Extract each slot by key with ::Time.utc/local's argument coercion
-    // (verified on Ruby 3.3): nil → the slot default; Numeric truncates except
-    // the seconds slot (Time.utc(...,5.5) keeps the fraction); String goes
-    // through strict Integer() — "2004abc", "5.5", and "" all raise
-    // ArgumentError — except the month slot, which also accepts 3-letter
-    // month-name abbreviations case-insensitively ("JAN" works, "june" raises).
-    const num = (key: string, fallback: number): number => {
-      const v = filled[key];
-      if (v === undefined || v === null) return fallback;
-      if (typeof v === "number") return key === "6" ? v : Math.trunc(v);
-      const s = String(v).trim();
-      if (key === "2") {
-        const monthIndex = MONTH_ABBREVIATIONS.indexOf(s.toLowerCase());
-        if (monthIndex !== -1) return monthIndex + 1;
-      }
-      if (!/^[+-]?\d+$/.test(s)) {
-        throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(v)}`);
-      }
-      return parseInt(s, 10);
-    };
-
-    const year = num("1", 0);
-    const month = num("2", 1);
-    const day = num("3", 1);
-    const hour = num("4", 0);
-    const minute = num("5", 0);
-    const second = num("6", 0);
-
-    // Ruby converts the seconds Float to an exact Rational and truncates:
-    // Time.utc(...,0.9999999999).nsec == 999_999_999 (never carried into the
-    // next second), and Time.utc(...,0.7).nsec == 699_999_999 because 0.7's
-    // exact binary value is 0.69999999999999995…. Decompose the double's bits
-    // so the truncation operates on that exact value, not an FP product.
-    const { whole: wholeSecond, ns: totalNanoseconds } = exactSecondsToNanoseconds(second);
-    const millisecond = Math.trunc(totalNanoseconds / 1_000_000);
-    const microsecond = Math.trunc((totalNanoseconds % 1_000_000) / 1_000);
-    const nanosecond = totalNanoseconds % 1_000;
-    const timeParts = { hour, minute, second: wholeSecond, millisecond, microsecond, nanosecond };
-    try {
-      const pdt = Temporal.PlainDateTime.from(
-        { year, month, day, ...timeParts },
-        { overflow: "reject" },
-      );
-      return this.type.cast(pdt);
-    } catch {
-      // Rails assembles via ::Time.public_send(default_timezone, *values).
-      // Time.utc/local rolls *within-range* overflow (Nov 31 → Dec 1, Feb 29
-      // in a common year → Mar 1, hour 24 with 0 min/sec → next midnight,
-      // sec 60 → next minute) but raises ArgumentError outside its accepted
-      // domain (month 13, mday 32, hour 25 — verified on Ruby 3.3), which AR
-      // surfaces as MultiparameterAssignmentErrors. Roll over only inside that
-      // accepted domain; otherwise raise to match Time's strictness.
-      // Ruby requires min and whole sec to be 0 at hour 24 but accepts a
-      // fractional second: Time.utc(2004,1,1,24,0,0.1) → 2004-01-02 00:00:00.1.
-      const midnight24 = hour === 24 && minute === 0 && wholeSecond === 0;
-      if (
-        month >= 1 &&
-        month <= 12 &&
-        day >= 1 &&
-        day <= 31 &&
-        ((hour >= 0 && hour <= 23) || midnight24) &&
-        minute >= 0 &&
-        minute <= 59 &&
-        wholeSecond >= 0 &&
-        wholeSecond <= 60
-      ) {
-        // Duration add carries all out-of-range components (day-in-month,
-        // hour 24, leap-second 60) the way Time normalizes them.
-        const rolled = Temporal.PlainDate.from({ year, month: 1, day: 1 })
-          .toPlainDateTime()
-          .add({
-            months: month - 1,
-            days: day - 1,
-            hours: hour,
-            minutes: minute,
-            seconds: wholeSecond,
-            nanoseconds: totalNanoseconds,
-          });
-        return this.type.cast(rolled);
-      }
-      throw new ArgumentError("argument out of range");
+    if (!truthy(valuesHash["1"]) || !truthy(valuesHash["2"]) || !truthy(valuesHash["3"])) {
+      return null;
     }
+    const values = Object.entries(valuesHash)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([, v]) => v as number | string);
+    return isUtc()
+      ? Time.utc(...(values as [number, number, number]))
+      : Time.local(...(values as [number, number, number]));
   }
+}
+
+/** Ruby truthiness: only `nil` and `false` are falsy (CLAUDE.md). */
+function truthy(value: unknown): boolean {
+  return value != null && value !== false;
 }
 
 /**
@@ -214,6 +106,6 @@ export interface InstanceMethods {
   serialize(value: unknown): unknown;
   serializeCastValue(value: unknown): unknown;
   cast(value: unknown): unknown;
-  assertValidValue(value: unknown): void;
+  assertValidValue(value: unknown): unknown;
   isValueConstructedByMassAssignment(value: unknown): boolean;
 }
