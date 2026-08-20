@@ -11,13 +11,7 @@ import {
   _canRouteThroughViaDisableJoinsAssociationScope,
   _loadThroughViaDisableJoinsScope,
 } from "../associations.js";
-import {
-  ThroughAssociation,
-  sourceReflection,
-  staleStateImpl as throughStaleState,
-  throughBuildRecord,
-  throughTargetScope,
-} from "./through-association.js";
+import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
 import { runAllCallbacks } from "@blazetrails/activemodel";
@@ -205,20 +199,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return isThenable(concatenated)
       ? concatenated.then(buildThroughRecords)
       : buildThroughRecords(concatenated);
-  }
-
-  /**
-   * Mirrors Rails' `ThroughAssociation#target_scope` override.
-   * @internal
-   */
-  protected override targetScope(): unknown {
-    return throughTargetScope(this, super["targetScope"]());
-  }
-
-  protected override staleState(): unknown {
-    const vals = throughStaleState(this);
-    if (!vals) return null;
-    return vals.length === 1 ? vals[0] : JSON.stringify(vals);
   }
 
   /**

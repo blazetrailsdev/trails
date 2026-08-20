@@ -255,105 +255,6 @@ export function ensureNotNested(this: ThroughAssociationHost): void {
   }
 }
 
-/** @internal */
-export function staleStateImpl(assoc: { owner: Base; reflection: any }): unknown[] | null {
-  const tr = throughReflection.call(assoc as unknown as ThroughAssociationHost) as any;
-  if (!tr?.isBelongsTo?.()) return null;
-  const fks: string[] = Array.isArray(tr.foreignKey) ? tr.foreignKey : [tr.foreignKey];
-  const vals = fks
-    .map((fk: string) =>
-      typeof (assoc.owner as any).readAttribute === "function"
-        ? (assoc.owner as any).readAttribute(fk)
-        : (assoc.owner as any)[fk],
-    )
-    .filter((v: unknown) => v != null);
-  return vals.length > 0 ? vals : null;
-}
-
-/**
- * Mirrors Rails' `ThroughAssociation#target_scope`
- * (through_association.rb):
- *
- *     def target_scope
- *       scope = super
- *       reflection.chain.drop(1).each do |reflection|
- *         relation = reflection.klass.scope_for_association
- *         scope.merge!(
- *           relation.except(:select, :create_with, :includes, :preload,
- *                           :eager_load, :joins, :left_outer_joins)
- *         )
- *       end
- *       scope
- *     end
- *
- * `superScope` is the base `Association#targetScope` (= the AR bound to the
- * target klass). This helper folds in each intermediate reflection's
- * `klass.scopeForAssociation()` to propagate `default_scope` declared on
- * join models into the target query, stripping the parts that would conflict
- * with the JOIN-based query shape (mirrors Rails' `.except(:select, ...)`).
- *
- * @internal
- */
-export function throughTargetScope(
-  assoc: { owner: Base; reflection: { name: string } },
-  superScope: unknown,
-): unknown {
-  let scope = superScope;
-  if (!scope) return scope;
-  const ctor = assoc.owner.constructor as {
-    _reflectOnAssociation?: (n: string) => unknown;
-  };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as
-    | { chain?: Array<{ klass?: { scopeForAssociation?: () => unknown } }> }
-    | null
-    | undefined;
-  const chain = refl?.chain;
-  if (!chain || chain.length <= 1) return scope;
-  for (let i = 1; i < chain.length; i++) {
-    const interKlass = chain[i]?.klass;
-    let interScope = interKlass?.scopeForAssociation?.();
-    // Rails: `relation.except(:select, :create_with, :includes, :preload,
-    //   :eager_load, :joins, :left_outer_joins)` — strip query parts that
-    // would conflict with the JOIN-based target query (e.g. a `select` on
-    // the through model would otherwise shadow the target's columns).
-    // Must be `except` (value removal), not `unscope`: the result is merged
-    // into `scope`, and `unscope` would replay the resets onto `scope`.
-    if (interScope && typeof (interScope as { except?: unknown }).except === "function") {
-      interScope = (
-        interScope as {
-          except: (...keys: string[]) => unknown;
-        }
-      ).except(
-        "select",
-        "createWith",
-        "includes",
-        "preload",
-        "eagerLoad",
-        "joins",
-        "leftOuterJoins",
-      );
-    }
-    if (interScope && typeof (scope as { merge?: unknown }).merge === "function") {
-      scope = (scope as { merge: (r: unknown) => unknown }).merge(interScope);
-    }
-  }
-  return scope;
-}
-
-/** @internal */
-export function throughForeignKeyPresent(assoc: { owner: Base; reflection: any }): boolean {
-  const tr = throughReflection.call(assoc as unknown as ThroughAssociationHost) as any;
-  if (!tr?.isBelongsTo?.()) return false;
-  const fks: string[] = Array.isArray(tr.foreignKey) ? tr.foreignKey : [tr.foreignKey];
-  return fks.every((fk: string) => {
-    const val =
-      typeof (assoc.owner as any).readAttribute === "function"
-        ? (assoc.owner as any).readAttribute(fk)
-        : (assoc.owner as any)[fk];
-    return val != null;
-  });
-}
-
 /** Ruby's `Array()` Kernel method: `nil` becomes `[]`, an Array passes through. @internal */
 function toArray(value: unknown): unknown[] {
   if (value == null) return [];
@@ -399,7 +300,84 @@ export const ThroughAssociation = {
   transaction,
   throughReflection,
   throughAssociation,
+
+  // We merge in these scopes for two reasons:
+  //
+  //   1. To get the default_scope conditions for any of the other reflections in the chain
+  //   2. To get the type conditions for any STI models in the chain
+  //
+  // Mirrors: ActiveRecord::Associations::ThroughAssociation#target_scope
+  // (through_association.rb:34-42).
+  targetScope(this: ThroughAssociationHost): any {
+    let scope = super.targetScope();
+    if (!scope) return scope;
+    const ctor = this.owner.constructor as {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl = ctor._reflectOnAssociation?.(this.reflection.name) as
+      | { chain?: Array<{ klass?: { scopeForAssociation?: () => unknown } }> }
+      | null
+      | undefined;
+    const chain = refl?.chain;
+    if (!chain) return scope;
+    // Ruby's `chain.drop(1)`: a JS array has no `drop`.
+    for (const reflection of chain.slice(1)) {
+      let relation = reflection?.klass?.scopeForAssociation?.();
+      // Rails: `relation.except(:select, :create_with, :includes, :preload,
+      //   :eager_load, :joins, :left_outer_joins)` — strip query parts that
+      // would conflict with the JOIN-based target query (e.g. a `select` on
+      // the through model would otherwise shadow the target's columns).
+      // Must be `except` (value removal), not `unscope`: the result is merged
+      // into `scope`, and `unscope` would replay the resets onto `scope`.
+      if (relation && typeof (relation as { except?: unknown }).except === "function") {
+        relation = (relation as { except: (...keys: string[]) => unknown }).except(
+          "select",
+          "createWith",
+          "includes",
+          "preload",
+          "eagerLoad",
+          "joins",
+          "leftOuterJoins",
+        );
+      }
+      if (relation && typeof (scope as { merge?: unknown }).merge === "function") {
+        scope = (scope as { merge: (r: unknown) => unknown }).merge(relation);
+      }
+    }
+    return scope;
+  },
+
   constructJoinAttributes,
+
+  // Note: this does not capture all cases, for example it would be impractical
+  // to try to properly support stale-checking for nested associations.
+  //
+  // Rails returns the filtered array itself; `Association#isStaleTarget`
+  // compares stale states with `!==`, which on a JS array is identity, so a
+  // single value stays scalar and a composite one folds to a comparable string.
+  //
+  // Mirrors: ActiveRecord::Associations::ThroughAssociation#stale_state
+  // (through_association.rb:82-88).
+  staleState(this: ThroughAssociationHost): unknown {
+    if (!(this.throughReflection() as any)?.isBelongsTo?.()) return null;
+    const state = toArray((this.throughReflection() as any).foreignKey)
+      .map((foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string))
+      .filter((value) => value != null);
+    if (state.length === 0) return null;
+    return state.length === 1 ? state[0] : JSON.stringify(state);
+  },
+
+  /**
+   * Mirrors: ActiveRecord::Associations::ThroughAssociation#foreign_key_present?
+   * (through_association.rb:90-94).
+   */
+  foreignKeyPresent(this: ThroughAssociationHost): boolean {
+    if (!(this.throughReflection() as any)?.isBelongsTo?.()) return false;
+    return toArray((this.throughReflection() as any).foreignKey).every(
+      (foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string) != null,
+    );
+  },
+
   ensureMutable,
   ensureNotNested,
 };

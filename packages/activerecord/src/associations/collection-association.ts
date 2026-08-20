@@ -12,7 +12,6 @@ import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { _CollectionProxyCtor } from "./collection-proxy-slot.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
-import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
@@ -940,22 +939,17 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Whether the target can be fetched for a new-record owner. A has_many :through
-   * routes through a belongs_to (`ThroughAssociation#foreign_key_present?`,
-   * through_association.rb:90); a vanilla has_many requires the owner's
-   * `active_record_primary_key` to be present (`ForeignAssociation#foreign_key_present?`,
-   * foreign_association.rb:5). This is the only copy of the dispatch:
+   * Whether the target can be fetched for a new-record owner: the owner's
+   * `active_record_primary_key` must be present
+   * (`ForeignAssociation#foreign_key_present?`, foreign_association.rb:5). A
+   * has_many :through overrides this with `ThroughAssociation#foreign_key_present?`
+   * (through_association.rb:90), which the mixin installs on
+   * `HasManyThroughAssociation` itself.
    * `CollectionProxy#null_scope?` (collection_proxy.rb:1150-1152) delegates
    * here through `isNullScope`, so the proxy and the association cannot
    * disagree.
    */
   protected override foreignKeyPresent(): boolean {
-    if (this.reflection.options.through) {
-      return throughForeignKeyPresent({
-        owner: this.owner,
-        reflection: this.reflection as unknown as AssociationReflection,
-      });
-    }
     return foreignKeyPresentFor(this.reflection as unknown as AssociationReflection, this.owner);
   }
 

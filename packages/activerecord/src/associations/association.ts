@@ -9,6 +9,7 @@ import { AssociationScope, type AssociationScopeable } from "./association-scope
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
+import { ThroughAssociation } from "./through-association.js";
 import {
   camelize,
   constantize,
@@ -966,7 +967,7 @@ export class Association {
    * can hold when a future `CollectionProxy.scoping` implementation sets the
    * AR as the class-level current scope. Uses `scopeForAssociation()` (not
    * `all()`) so ordinary `Model.where(...).scoping {}` blocks don't leak in.
-   * The through-association chain merge is in `throughTargetScope`.
+   * The through-association chain merge is in `ThroughAssociation#targetScope`.
    *
    * @internal
    */
@@ -1093,3 +1094,12 @@ function inspectMismatchedRecord(record: unknown): string {
     return String(record);
   }
 }
+
+// Ruby resolves `super` inside an included module along the including class's
+// ancestry, so `ThroughAssociation#target_scope`'s `super`
+// (through_association.rb:35) is `Association#target_scope` for both including
+// classes. The TS mixin's `super` resolves against the module literal's own
+// prototype, so it is linked here — after `Association` exists, and from the
+// module that owns the binding, which keeps `through-association.ts` free of an
+// import edge back into this module's cycle.
+Object.setPrototypeOf(ThroughAssociation, Association.prototype);

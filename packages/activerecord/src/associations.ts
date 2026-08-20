@@ -56,7 +56,7 @@ import * as Reflection from "./reflection.js";
 import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { foreignKeyPresentFor } from "./associations/foreign-association.js";
-import { throughForeignKeyPresent } from "./associations/through-association.js";
+import { ThroughAssociation } from "./associations/through-association.js";
 
 /**
  * **Rails parity note:** Rails' `Associations.eager_load!` uses Ruby's
@@ -1420,7 +1420,16 @@ function _associationForeignKeyPresent(
   const ctor = record.constructor as typeof Base;
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through) {
-    return reflection ? throughForeignKeyPresent({ owner: record, reflection }) : false;
+    // No association instance here, so the module's `self` is an owner /
+    // reflection pair that inherits the module — Ruby reaches
+    // `foreign_key_present?` off the association it always has in hand.
+    return reflection
+      ? ThroughAssociation.foreignKeyPresent.call({
+          ...ThroughAssociation,
+          owner: record,
+          reflection,
+        })
+      : false;
   }
   if (kind === "belongsTo") {
     const fk = options.foreignKey ?? options.queryConstraints;
