@@ -919,10 +919,9 @@ function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
 
 /**
  * Rails: clears column cache, schema cache, reloads schema.
- * Drops schema-sourced attribute defs so the next load re-reflects
- * them; user-declared defs are preserved, matching
- * Rails' reload_schema_from_cache behavior where user-provided
- * attributes survive reload.
+ * Drops schema-sourced attribute defs so the next load re-reflects them;
+ * user-declared defs are preserved, matching Rails' reload_schema_from_cache
+ * behavior where user-provided attributes survive reload.
  *
  * Returns the re-warm thenable (see {@link rewarmDataSourceCache}). Declared
  * `PromiseLike<void> | void` rather than `async` on purpose: every write above the
@@ -961,8 +960,8 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 
 /**
  * Drop schema-sourced attribute defs (and their generated accessors) so the
- * next load re-reflects them; user-declared defs are
- * preserved, matching Rails where user-provided attributes survive reload.
+ * next load re-reflects them; user-declared defs are preserved, matching
+ * Rails where user-provided attributes survive reload.
  */
 function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
   for (const [name, def] of Array.from(host._attributeDefinitions)) {
