@@ -424,10 +424,6 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
       }
       continue;
     }
-    // The dirty cascade Rails declares with `attribute_method_suffix` (dirty.rb)
-    // and generates through this same `define_attribute_methods` path, into
-    // `generated_attribute_methods`.
-    defineDirtyAttributeMethods.call(this as never, name);
     // Gate get and set independently: a user-defined setter should not suppress
     // the generated reader, and vice versa — mirrors Rails' per-method generation.
     // Walk the full prototype chain to find an existing descriptor for this name.
@@ -493,6 +489,7 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
         configurable: true,
       });
     }
+    defineDirtyAttributeMethods.call(this as any, name);
   }
   // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")` — inside the
   // `unless abstract_class?` block, so it only runs for concrete classes (this
