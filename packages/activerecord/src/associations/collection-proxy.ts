@@ -36,7 +36,7 @@ import {
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
-import { ConfigurationError, AssociationTypeMismatch, RecordNotFound } from "../errors.js";
+import { ConfigurationError, AssociationTypeMismatch } from "../errors.js";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import { AssociationNotFoundError } from "./errors.js";
@@ -1050,17 +1050,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#first!
-   */
-  override async firstBang(): Promise<T> {
-    const record = await this.first();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
-  }
-
-  /**
    * Return the last associated record.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#last
@@ -1078,17 +1067,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#last!
-   */
-  override async lastBang(): Promise<T> {
-    const record = await this.last();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
-  }
-
-  /**
    * Return the first n records (or first record if n omitted).
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#take
@@ -1102,17 +1080,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // the base `FinderMethods` bodies'.
     if (this.isFindFromTarget()) await this.loadTarget();
     return super.take(n as number);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#take!
-   */
-  override async takeBang(): Promise<T> {
-    const record = await this.take();
-    if (!record) {
-      throw new RecordNotFound(`${this.model.name} not found`, this.model.name);
-    }
-    return record;
   }
 
   /**
@@ -1141,101 +1108,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   protected override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
     return baseFindNthFromLast.call(this as any, index);
-  }
-
-  /**
-   * True if the collection has more than one record.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#many?
-   */
-  async many(predicate?: (record: T) => boolean): Promise<boolean> {
-    if (predicate !== undefined) {
-      const records = await this.loadTarget();
-      let matched = 0;
-      for (const r of records) {
-        if (predicate(r) && ++matched > 1) return true;
-      }
-      return false;
-    }
-    // Rails Relation#many? uses records.many? when loaded (no query),
-    // otherwise limited_count > 1.
-    if (this._targetLoaded) return this._target.length > 1;
-    return ((await this.count()) as number) > 1;
-  }
-
-  /**
-   * True if the collection has exactly one record.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#one?
-   */
-  async one(): Promise<boolean> {
-    return (await this.count()) === 1;
-  }
-
-  /**
-   * True if any records exist in the collection (optionally matching conditions).
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#exists?
-   */
-  async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
-    if (this._assocDef.options.through != null) {
-      const records = (await this.loadTarget()).filter((r) => !r.isNewRecord());
-      if (conditions === undefined) return records.length > 0;
-      if (typeof conditions === "object" && conditions !== null && !Array.isArray(conditions)) {
-        const entries = Object.entries(conditions as Record<string, unknown>);
-        return records.some((r) => entries.every(([k, v]) => r.readAttribute(k) === v));
-      }
-      const targetModel = this.model;
-      const pk = targetModel.primaryKey;
-      if (Array.isArray(pk)) {
-        throw new Error(
-          `CollectionProxy#exists does not support composite primary keys for through associations on "${this._assocName}".`,
-        );
-      }
-      if (Array.isArray(conditions)) {
-        const idSet = new Set(conditions);
-        return records.some((r) => idSet.has(r.readAttribute(pk)));
-      }
-      return records.some((r) => r.readAttribute(pk) === conditions);
-    }
-    this._checkStrictLoading();
-    return this.scope().exists(conditions);
-  }
-
-  /**
-   * Find first record matching conditions, or build (but don't save) a new one.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_initialize
-   */
-  async firstOrInitialize(conditions: Record<string, unknown> = {}): Promise<T> {
-    this._checkStrictLoading();
-    const matches = await this.scope().where(conditions).toArray();
-    if (matches.length > 0) return matches[0];
-    return this.build(conditions);
-  }
-
-  /**
-   * Find first record matching conditions, or create one.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create
-   */
-  async firstOrCreate(conditions: Record<string, unknown> = {}): Promise<T> {
-    this._checkStrictLoading();
-    const matches = await this.scope().where(conditions).toArray();
-    if (matches.length > 0) return matches[0];
-    return this.create(conditions);
-  }
-
-  /**
-   * Find first record matching conditions, or create one (raises on failure).
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create!
-   */
-  async firstOrCreateBang(conditions: Record<string, unknown> = {}): Promise<T> {
-    this._checkStrictLoading();
-    const matches = await this.scope().where(conditions).toArray();
-    if (matches.length > 0) return matches[0];
-    return this.createBang(conditions);
   }
 
   /**

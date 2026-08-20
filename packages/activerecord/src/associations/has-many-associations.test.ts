@@ -1344,17 +1344,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling many should return false if none or one", async () => {
     let firm = companies("another_firm") as any;
-    expect(await firm.clientsLikeMs.many()).toBe(false);
+    expect(await firm.clientsLikeMs.isMany()).toBe(false);
     expect(await firm.clientsLikeMs.size()).toBe(0);
 
     firm = companies("first_firm") as any;
-    expect(await firm.limitedClients.many()).toBe(false);
+    expect(await firm.limitedClients.isMany()).toBe(false);
     expect(await firm.limitedClients.size()).toBe(1);
   });
 
   it("calling many should return true if more than one", async () => {
     const firm = companies("first_firm") as any;
-    expect(await firm.clients.many()).toBe(true);
+    expect(await firm.clients.isMany()).toBe(true);
     expect(await firm.clients.size()).toBe(3);
   });
 
@@ -4390,7 +4390,7 @@ describe("HasManyAssociationsTest", () => {
     await ManyCountPost.create({ author_id: author.id, title: "B", body: "body" });
     const proxy = association(author, "manyCountPosts");
     expect(proxy.loaded).toBe(false);
-    expect(await proxy.many()).toBe(true);
+    expect(await proxy.isMany()).toBe(true);
     // many() uses COUNT — must NOT have loaded the target
     expect(proxy.loaded).toBe(false);
   });
@@ -4432,7 +4432,7 @@ describe("HasManyAssociationsTest", () => {
       if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
     });
     try {
-      expect(await proxy.many()).toBe(true);
+      expect(await proxy.isMany()).toBe(true);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -4469,11 +4469,11 @@ describe("HasManyAssociationsTest", () => {
     await ManySubPost.create({ author_id: author.id, title: "A", body: "body" });
     const proxy = association(author, "manySubPosts");
     // 1 post → not many
-    expect(await proxy.many()).toBe(false);
+    expect(await proxy.isMany()).toBe(false);
     expect(proxy.loaded).toBe(false);
     // second call still issues a COUNT (not cached)
     await ManySubPost.create({ author_id: author.id, title: "B", body: "body" });
-    expect(await proxy.many()).toBe(true);
+    expect(await proxy.isMany()).toBe(true);
   });
   it("calling many should defer to collection if using a block", async () => {
     class ManyBlkAuthor extends Base {
@@ -4506,9 +4506,9 @@ describe("HasManyAssociationsTest", () => {
     await ManyBlkPost.create({ author_id: author.id, title: "B", body: "body" });
     const proxy = association(author, "manyBlkPosts");
     // predicate form: loads target, filters, checks count > 1
-    expect(await proxy.many((p) => (p as any).title === "A")).toBe(false);
+    expect(await proxy.isMany((p: any) => p.title === "A")).toBe(false);
     // predicate matched all → many
-    expect(await proxy.many((_p) => true)).toBe(true);
+    expect(await proxy.isMany((_p: any) => true)).toBe(true);
     // loading side-effect: target should now be loaded
     expect(proxy.loaded).toBe(true);
   });
@@ -6594,7 +6594,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling one should return true if one", async () => {
     const firm = companies("first_firm") as any;
-    expect(await firm.limitedClients.one()).toBe(true);
+    expect(await firm.limitedClients.isOne()).toBe(true);
     expect(await firm.limitedClients.size()).toBe(1);
   });
 

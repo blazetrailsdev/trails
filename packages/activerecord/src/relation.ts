@@ -866,7 +866,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#empty?
    */
   async isEmpty(): Promise<boolean> {
-    if (this._loaded) return this._records.length === 0;
+    if (this.isLoaded) return (await this.records()).length === 0;
     return !(await this.exists());
   }
 
@@ -906,7 +906,7 @@ export class Relation<T extends Base> {
       }
       return count > 1;
     }
-    if (this._loaded) return this._records.length > 1;
+    if (this.isLoaded) return (await this.records()).length > 1;
     return (await this.limitedCount()) > 1;
   }
 
@@ -930,7 +930,7 @@ export class Relation<T extends Base> {
       }
       return count === 1;
     }
-    if (this._loaded) return this._records.length === 1;
+    if (this.isLoaded) return (await this.records()).length === 1;
     return (await this.limitedCount()) === 1;
   }
 
