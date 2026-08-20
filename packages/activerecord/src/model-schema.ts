@@ -958,13 +958,89 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 }
 
 /**
+ * The `PendingType` / `PendingDefault` member lists
+ * (attribute_registration.rb:53,60) — those two Structs are what a user
+ * `attribute(...)` queues. `name` is what separates them from
+ * `PendingDecorator`, whose member is `names` (:66); `type` in turn separates
+ * `PendingType` from `PendingDefault`, whose members are `name` and `default`.
+ * Reading the members is how Ruby tells the three apart, and it keeps these
+ * predicates off the structs themselves, which Rails declares `private` (:52)
+ * and ActiveModel therefore does not export.
+ */
+type PendingAttributeDeclaration = { name: string; type?: Type | null };
+
+function isPendingAttributeDeclaration(
+  modification: unknown,
+): modification is PendingAttributeDeclaration {
+  return typeof (modification as { name?: unknown })?.name === "string";
+}
+
+/**
+ * Walk the ancestry's pending-modification queues, oldest ancestor first —
+ * the loop written out of `apply_pending_attribute_modifications`' `superclass`
+ * recursion (attribute_registration.rb:81-90). Reads the own queues directly
+ * rather than through `pending_attribute_modifications`, whose `||= []` would
+ * stamp an empty queue onto every ancestor it passes.
+ */
+function pendingAttributeModificationsInAncestry(host: unknown): unknown[] {
+  const queues: unknown[][] = [];
+  for (let klass = host; klass != null; klass = Object.getPrototypeOf(klass)) {
+    if (Object.prototype.hasOwnProperty.call(klass, "_pendingAttributeModifications")) {
+      queues.unshift(
+        (klass as { _pendingAttributeModifications: unknown[] })._pendingAttributeModifications,
+      );
+    }
+  }
+  return queues.flat();
+}
+
+/**
+ * True when `name` was declared by user code — some class in the ancestry
+ * queued a `PendingType` / `PendingDefault` for it through `attribute(...)`
+ * (attribute_registration.rb:53-72).
+ *
+ * Rails never asks this: a user declaration lives only in the pending queue and
+ * a reflected column only in `columns_hash`, so the two are already distinct
+ * records. `applyColumnsHash` below re-registers reflected columns INTO
+ * `_attributeDefinitions` beside the declarations, so the paths that must not
+ * clobber a declaration read the provenance back off the queue Rails replays.
+ * Retired with that registry by
+ * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
+ *
+ * @internal
+ */
+export function pendingAttributeDeclarationQ(host: unknown, name: string): boolean {
+  return pendingAttributeModificationsInAncestry(host).some(
+    (modification) => isPendingAttributeDeclaration(modification) && modification.name === name,
+  );
+}
+
+/**
+ * True when user code declared a concrete *type* for `name`: Rails queues a
+ * `PendingType` carrying a type only for `attribute(name, type)`, never for a
+ * default-only or bare re-declaration (attribute_registration.rb:12-18).
+ *
+ * Same registry-shaped reason as {@link pendingAttributeDeclarationQ}.
+ *
+ * @internal
+ */
+export function pendingAttributeTypeQ(host: unknown, name: string): boolean {
+  return pendingAttributeModificationsInAncestry(host).some(
+    (modification) =>
+      isPendingAttributeDeclaration(modification) &&
+      modification.name === name &&
+      modification.type != null,
+  );
+}
+
+/**
  * Drop schema-sourced attribute defs (and their generated accessors) so the
  * next load re-reflects them; user-declared defs are preserved, matching
  * Rails where user-provided attributes survive reload.
  */
 function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
-  for (const [name, def] of Array.from(host._attributeDefinitions)) {
-    if ((def.userProvidedDefault ?? true) === false) {
+  for (const [name] of Array.from(host._attributeDefinitions)) {
+    if (!pendingAttributeDeclarationQ(host, name)) {
       host._attributeDefinitions.delete(name);
       if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
         delete host.prototype[name];
@@ -982,7 +1058,12 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
   this._schemaRevision = nextSchemaEpoch();
-  (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
+  // ActiveRecord::Attributes overrides `reload_schema_from_cache` to call
+  // `reset_default_attributes!` before `super` (attributes.rb:268-271), which
+  // nils `@attribute_types` as well as `@default_attributes`
+  // (attribute_registration.rb:96-99). Sent to `this`, the way Ruby sends an
+  // inherited private method — ActiveModel's `Model` defines the static.
+  (this as SchemaHost & { resetDefaultAttributesBang(): void }).resetDefaultAttributesBang();
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);
   if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
@@ -1140,15 +1221,14 @@ function applyColumnsHash(
   const filteredHash: Record<string, unknown> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) {
-      const existing = host._attributeDefinitions.get(name);
-      if (!existing || (existing.userProvidedDefault ?? true) === false) {
+      if (!pendingAttributeDeclarationQ(host, name)) {
         host._attributeDefinitions.delete(name);
       }
       continue;
     }
     filteredHash[name] = column;
     const existing = host._attributeDefinitions.get(name);
-    if (existing && (existing.userProvidedDefault ?? true)) {
+    if (existing && pendingAttributeDeclarationQ(host, name)) {
       // A user-declared type override (e.g. an enum) preserves its type across
       // reflection. The schema column's default is NOT merged onto the def;
       // `_defaultAttributes` seeds it via from_database directly from the cached
@@ -1190,15 +1270,33 @@ function applyColumnsHash(
       // `encrypts` on one column yields Encrypted(Serialized(Encrypted(...))).
       reflectedColumnType,
       defaultValue,
-      userProvidedDefault: false,
       ...(typeof host.tableName === "string" ? { reflectedTable: host.tableName } : {}),
       ...(colLimit != null ? { limit: colLimit } : {}),
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });
   }
 
+  type CacheBag = {
+    _attributesBuilder?: unknown;
+    _yamlEncoder?: unknown;
+    _cachedDefaultAttributes?: unknown;
+    _cachedAttributeTypes?: unknown;
+    _columnsHash?: unknown;
+    _columns?: unknown;
+  };
+  const bag = host as CacheBag;
+  bag._attributesBuilder = undefined;
+  bag._yamlEncoder = undefined;
+  bag._cachedDefaultAttributes = null;
+  bag._cachedAttributeTypes = null;
+  bag._columns = undefined;
+  host._columnsHash = filteredHash;
+
   // Regenerate attribute accessors through the single define_attribute_methods
-  // path now that schema reflection has settled the attribute definitions.
+  // path now that schema reflection has settled the attribute definitions AND
+  // the derived caches above have been dropped: generation reads
+  // `attribute_names` → `attribute_types` (attribute_methods.rb:236-242), which
+  // would otherwise answer from the pre-load memo and generate nothing.
   const methodHost = host as unknown as {
     _attributeMethodsGenerated?: boolean;
     defineAttributeMethods?: () => boolean;
@@ -1212,20 +1310,6 @@ function applyColumnsHash(
       regeneratingAttributeMethods.delete(host);
     }
   }
-
-  type CacheBag = {
-    _attributesBuilder?: unknown;
-    _yamlEncoder?: unknown;
-    _cachedDefaultAttributes?: unknown;
-    _columnsHash?: unknown;
-    _columns?: unknown;
-  };
-  const bag = host as CacheBag;
-  bag._attributesBuilder = undefined;
-  bag._yamlEncoder = undefined;
-  bag._cachedDefaultAttributes = null;
-  bag._columns = undefined;
-  host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
@@ -1256,9 +1340,10 @@ function applyColumnsHash(
  * column so the cast type comes from the adapter (e.g. PG OID map) rather
  * than the generic ActiveModel type registry.
  *
- * Populates the schema cache if needed (async). User-declared attributes
- * (`userProvidedDefault: true`) are NEVER overwritten — matching Rails where
- * `attribute :foo, :bar` always wins over schema-reflected types.
+ * Populates the schema cache if needed (async). User-declared attributes —
+ * the ones carrying a pending `attribute(...)` modification — are NEVER
+ * overwritten, matching Rails where the pending replay runs after the column
+ * seed so `attribute :foo, :bar` always wins over the reflected type.
  *
  * @internal
  */
@@ -1426,7 +1511,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
-    if ((def.userProvidedDefault ?? true) === false) continue;
+    if (!pendingAttributeDeclarationQ(host, name)) continue;
     const isVirtual = !real.has(name);
     if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
   }

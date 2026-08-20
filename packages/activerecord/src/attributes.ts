@@ -15,10 +15,23 @@ import {
   applyPendingAttributeModifications,
   resetDefaultAttributes as amResetDefaultAttributes,
 } from "@blazetrails/activemodel";
+// The pending queue is private on ActiveModel (attribute_registration.rb:77);
+// only `attribute` (:17) pushes onto it. `define_attribute` reaches the same
+// queue from ActiveRecord, so it imports the pushers off the defining module
+// rather than the package's public barrel.
+import {
+  pushPendingDefault,
+  pushPendingType,
+} from "@blazetrails/activemodel/attribute-registration";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
-import { cachedColumnsHash, isSchemaLoaded, schemaStaleAgainstAncestors } from "./model-schema.js";
+import {
+  cachedColumnsHash,
+  isSchemaLoaded,
+  pendingAttributeDeclarationQ,
+  schemaStaleAgainstAncestors,
+} from "./model-schema.js";
 
 type AnyClass = any;
 
@@ -26,7 +39,6 @@ interface AttributeDefinition {
   name: string;
   type: Type;
   defaultValue?: unknown;
-  userProvidedDefault?: boolean;
   limit?: number | null;
   /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
   virtual?: boolean;
@@ -98,9 +110,20 @@ export function defineAttribute(
     name,
     type: castType,
     defaultValue: resolvedDefault ?? null,
-    userProvidedDefault,
     ...(options.limit != null ? { limit: options.limit } : {}),
   });
+
+  // Rails stores nothing for `user_provided_default:`; it forwards it to
+  // `define_default_attribute`'s `from_user:`, which picks the Attribute
+  // subclass (attributes.rb:229-238,277-291). Queueing the declaration only
+  // when it IS user-provided is that same fork: the replay applies
+  // `with_user_default` (cast), a `from_user: false` def stays a column seed.
+  if (userProvidedDefault) {
+    pushPendingType(this, name, castType);
+    if (defaultValue !== NO_DEFAULT) {
+      pushPendingDefault(this, name, resolvedDefault ?? null);
+    }
+  }
 
   amResetDefaultAttributes(this);
   // A newly declared attribute may be virtual (no DB column); force the next
@@ -190,29 +213,29 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     const columns = cachedColumnsHash(cacheHost);
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attributesHash = new Map<string, Attribute>();
-    for (const [name, def] of defs) {
+    // Rails seeds phase 1 from `columns_hash` alone (attributes.rb:241-245) and
+    // the non-column declarations arrive with the phase-2 replay, so a column
+    // holds its schema position even under an `attribute` override.
+    const orderedDefNames = [
+      ...Object.keys(columns).filter((name) => defs.has(name)),
+      ...[...defs.keys()].filter((name) => columns[name] === undefined),
+    ];
+    for (const name of orderedDefNames) {
+      const def = defs.get(name)!;
       const column = columns[name];
-      if ((def.userProvidedDefault ?? true) === false) {
+      if (column !== undefined || !pendingAttributeDeclarationQ(cacheHost, name)) {
+        // Rails' `columns_hash.transform_values { Attribute.from_database(name,
+        // column.default, type_for_column(connection, column)) }`
+        // (attributes.rb:241-245) — a user type-override on a real column (an
+        // enum, `serialize`, `encrypts`) is layered back on in phase 2.
+        //
         // Seed from the BARE reflected column type, not `def.type` — trails
         // eagerly bakes decorations into `def.type` (a back-compat convenience
         // Rails lacks), and phase 2 replays those same decorators, so seeding
         // from `def.type` applies each one twice.
         const seedType = def.reflectedColumnType ?? def.type;
-        attributesHash.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, seedType));
-      } else if (column !== undefined) {
-        // User type-override on a real DB column (e.g. enum, serialize,
-        // normalizes, encryption): seed with the REFLECTED column type, not the
-        // override's own type, mirroring Rails' `type_for_column(connection,
-        // column)` seed (attributes.rb:241-245). The cached column carries the
-        // authoritative raw default; from_database deserializes it through the
-        // reflected type. The user override is layered back on in phase 2 —
-        // decorators receive the reflected type as their `subtype`, and an
-        // explicit `attribute(name, type)` PendingType still wins over the seed.
-        // `reflectedColumnType` is stashed by applyColumnsHash (model-schema.ts)
-        // where the adapter is in hand; fall back to the def's own type before
-        // the schema has reflected.
-        const seedType = def.reflectedColumnType ?? def.type;
-        attributesHash.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
+        const defaultValue = column !== undefined ? column.default : def.defaultValue;
+        attributesHash.set(name, Attribute.fromDatabase(name, defaultValue ?? null, seedType));
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
         attributesHash.set(name, base.withUserDefault(def.defaultValue));

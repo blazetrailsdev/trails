@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ValueType, typeRegistry } from "@blazetrails/activemodel";
 type Type = ValueType;
 import { Base } from "./base.js";
-import { loadSchemaFromAdapter } from "./model-schema.js";
+import { loadSchemaFromAdapter, pendingAttributeDeclarationQ } from "./model-schema.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -55,8 +55,7 @@ describe("loadSchemaFromAdapter", () => {
     const guid = Model._attributeDefinitions.get("guid");
     const payload = Model._attributeDefinitions.get("payload");
     expect(guid?.type.name).toBe("uuid");
-    expect(guid?.userProvidedDefault).toBe(false);
-    expect(guid?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(false);
     expect(payload?.type.name).toBe("jsonb");
   });
 
@@ -69,8 +68,7 @@ describe("loadSchemaFromAdapter", () => {
 
     const def = Model._attributeDefinitions.get("guid");
     expect(def?.type.name).toBe("string");
-    expect(def?.userProvidedDefault).toBe(true);
-    expect(def?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(true);
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -126,7 +124,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(false);
   });
 
   it("falls back to ValueType when adapter has no cast type", async () => {
@@ -143,7 +141,7 @@ describe("loadSchemaFromAdapter", () => {
 
     const def = Model._attributeDefinitions.get("mystery");
     expect(def?.type).toBeInstanceOf(typeRegistry.lookup("value").constructor);
-    expect(def?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Model, "mystery")).toBe(false);
   });
 
   it("invalidates the _attributesBuilder cache", async () => {
@@ -219,7 +217,7 @@ describe("loadSchemaFromAdapter integration details", () => {
 
     // User-declared def survives ignoredColumns.
     expect(Post._attributeDefinitions.has("age")).toBe(true);
-    expect(Post._attributeDefinitions.get("age")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Post, "age")).toBe(true);
     // Accessor stripped.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
@@ -240,31 +238,6 @@ describe("loadSchemaFromAdapter integration details", () => {
     expect((Post as unknown as { _columns: unknown })._columns).toBeUndefined();
   });
 
-  it("treats externally-constructed defs without userProvided as user-authored (no overwrite)", async () => {
-    class Post extends Base {
-      static override tableName = "posts";
-    }
-    // Simulate a downstream-style def that predates the userProvidedDefault field.
-    (Post as unknown as { _attributeDefinitions: Map<string, unknown> })._attributeDefinitions =
-      new Map([
-        [
-          "guid",
-          {
-            name: "guid",
-            type: typeRegistry.lookup("string"),
-            defaultValue: null,
-          },
-        ],
-      ]);
-
-    const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
-    (Post as unknown as { adapter: unknown }).adapter = adapter;
-    await Post.loadSchema();
-
-    const def = Post._attributeDefinitions.get("guid");
-    expect(def?.type.name).toBe("string");
-  });
-
   it("does not shadow Base.prototype.id when reflecting an id column", async () => {
     class Post extends Base {
       static override tableName = "posts";
@@ -274,7 +247,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "id")).toBeUndefined();
-    expect(Post._attributeDefinitions.get("id")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Post, "id")).toBe(false);
 
     const rec = new Post();
     rec.writeAttribute("id", "abc-123");
@@ -324,26 +297,6 @@ describe("set adapter auto-loads schema", () => {
 
     const def = Post._attributeDefinitions.get("guid");
     expect(def?.type.name).toBe("uuid");
-    expect(def?.userProvidedDefault).toBe(false);
-  });
-});
-
-describe("attribute() userProvidedDefault option", () => {
-  it("defaults to userProvided=true (source=user)", () => {
-    class Foo extends Base {}
-    Foo.attribute("name", "string");
-    const def = Foo._attributeDefinitions.get("name");
-    expect(def?.userProvidedDefault).toBe(true);
-    expect(def?.userProvidedDefault).toBe(true);
-  });
-
-  it("sets userProvided=false when userProvidedDefault:false is passed", () => {
-    class Foo extends Base {}
-    Foo.attribute("name", "string", { userProvidedDefault: false } as {
-      userProvidedDefault?: boolean;
-    });
-    const def = Foo._attributeDefinitions.get("name");
-    expect(def?.userProvidedDefault).toBe(false);
-    expect(def?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
   });
 });

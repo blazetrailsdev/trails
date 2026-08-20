@@ -6,6 +6,9 @@
     "baseUrl": ".",
     "paths": {
       "@blazetrails/activerecord": ["../src/index.ts"],
+      "@blazetrails/activemodel/attribute-registration": [
+        "../../activemodel/src/attribute-registration.ts"
+      ],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],

@@ -171,7 +171,6 @@ export class EncryptableRecord {
         name,
         type: encryptedType,
         defaultValue: existingDef?.defaultValue ?? null,
-        userProvidedDefault: existingDef?.userProvidedDefault ?? false,
         ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
       });
     }

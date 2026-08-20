@@ -7,7 +7,12 @@ import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
-import { loadSchema as reflectSchemaSync, ownProp, type SchemaHost } from "./model-schema.js";
+import {
+  loadSchema as reflectSchemaSync,
+  ownProp,
+  pendingAttributeTypeQ,
+  type SchemaHost,
+} from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -146,17 +151,8 @@ export function installEnumAttribute(
   // present (attribute_registration.rb:12-18); a default-only / type-less
   // attribute keeps the fallback `value` type until the column reflects, so its
   // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248). Requiring a user-provided def AND a concrete type
-  // distinguishes the two: the `value` default's `type()` is nil (like Rails'
-  // `Value#type`), so a default-only attribute reads as `existingTypeName ==
-  // null` and is treated as column-reflected.
-  const existingDef = (klass as any)._attributeDefinitions?.get(resolved);
-  const existingTypeName =
-    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
-  const explicitlyTyped =
-    existingDef !== undefined &&
-    (existingDef.userProvidedDefault ?? true) &&
-    existingTypeName != null;
+  // enum.rb:238-248) — so the pending queue answers this as Rails asks it.
+  const explicitlyTyped = pendingAttributeTypeQ(klass, resolved);
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {

@@ -628,24 +628,18 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 }
 
 interface AttributeNamesHost {
-  _attributeDefinitions: { keys(): Iterable<string>; has(name: string): boolean };
+  attributeTypes(): Record<string, unknown>;
   abstractClass?: boolean;
-  columnNames?(): string[];
   _schemaRevision?: number;
   _attributeNamesMemo?: { revision: number; names: readonly string[] };
 }
 
 /**
- * Returns the list of attribute names for the model class.
+ * Returns an array of column names as strings if it's not an abstract class and
+ * table exists. Otherwise it returns an empty array.
  *
  * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#attribute_names
- *
- * Rails returns schema column order first, then any declared/virtual
- * attributes that aren't columns (attributes_test.rb "overloading properties
- * does not attribute method order"). A user `attribute :col` override keeps the
- * column's schema position rather than jumping to its declaration slot, so we
- * walk `column_names` first and append the non-column declarations in
- * declaration order.
+ * (attribute_methods.rb:236-242).
  */
 function classAttributeNames(this: AttributeNamesHost): string[] {
   // Rails' `@attribute_names ||= ...freeze` memo, own-property per class (a
@@ -673,20 +667,10 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
     this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
     return frozen as string[];
   }
-  const declared = [...this._attributeDefinitions.keys()];
-  const columnNames = this.columnNames?.() ?? [];
-  let names: string[];
-  if (columnNames.length === 0) {
-    names = declared;
-  } else {
-    const columnSet = new Set(columnNames);
-    const orderedColumns = columnNames.filter((name) => this._attributeDefinitions.has(name));
-    const virtuals = declared.filter((name) => !columnSet.has(name));
-    names = [...orderedColumns, ...virtuals];
-  }
+  const names = Object.keys(this.attributeTypes());
   if (exists !== undefined) {
     const frozen = Object.freeze(names);
-    // Re-read the revision: `columnNames()` above can run the first sync
+    // Re-read the revision: `attributeTypes()` above can run the first sync
     // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
     this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
     return frozen as string[];

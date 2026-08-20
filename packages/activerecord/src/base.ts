@@ -1454,12 +1454,8 @@ export class Base extends Model {
       // ancestor's schema defs. Those carry a `reflectedTable` that differs from
       // ours — trust none of them; reflect our own table instead.
       for (const [, def] of this._attributeDefinitions) {
-        const d = def as { userProvidedDefault?: boolean; reflectedTable?: string };
-        if (
-          d.userProvidedDefault === false &&
-          typeof d.reflectedTable === "string" &&
-          d.reflectedTable !== thisTable
-        ) {
+        const d = def as { reflectedTable?: string };
+        if (typeof d.reflectedTable === "string" && d.reflectedTable !== thisTable) {
           foreignTable = true;
           break;
         }
@@ -1479,8 +1475,11 @@ export class Base extends Model {
 
     const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
     for (const [name, def] of this._attributeDefinitions) {
-      const d = def as { virtual?: boolean; userProvidedDefault?: boolean };
-      if (!d.virtual && (d.userProvidedDefault === false || !enumNames?.has(name))) {
+      const d = def as { virtual?: boolean };
+      if (
+        !d.virtual &&
+        (!ModelSchema.pendingAttributeDeclarationQ(this, name) || !enumNames?.has(name))
+      ) {
         // The model declares its own attributes, but some may be virtual (no
         // backing DB column). Rails' `column_names` is always DB-sourced, so
         // reconcile against the real columns and flag those as virtual — keeping

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { pendingAttributeDeclarationQ } from "./model-schema.js";
 import { Base } from "./base.js";
 
 describe("STI subclass attribute() registration", () => {
@@ -32,7 +33,7 @@ describe("STI subclass attribute() registration", () => {
 
     // Shape IS the STI base (not a subclass), so its map is its own.
     expect(Object.prototype.hasOwnProperty.call(Shape, "_attributeDefinitions")).toBe(true);
-    expect(Shape._attributeDefinitions.get("name")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Shape, "name")).toBe(true);
   });
 
   it("non-STI classes are unaffected", () => {
@@ -43,7 +44,7 @@ describe("STI subclass attribute() registration", () => {
     }
 
     expect(Object.prototype.hasOwnProperty.call(Widget, "_attributeDefinitions")).toBe(true);
-    expect(Widget._attributeDefinitions.get("price")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Widget, "price")).toBe(true);
   });
 
   it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
