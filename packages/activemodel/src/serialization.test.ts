@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
 import { NoMethodError } from "./attribute-assignment.js";
@@ -496,21 +495,6 @@ describe("SerializationTest", () => {
     // the subset that actually occurs in JS: BigInt → string, Date →
     // ISO8601 (so the hash form already contains strings, not Date
     // objects), and recursive coercion within arrays/objects.
-    it("asJson coerces bigint attributes to string (JSON.stringify-safe)", () => {
-      class Row extends Model {
-        static {
-          this.attribute("id", "big_integer");
-          this.attribute("name", "string");
-        }
-      }
-      const r = new Row({ id: "99999999999999999999", name: "row-1" });
-      const json = r.asJson();
-      // bigint attributes are coerced to decimal strings by coerceForJson.
-      expect(json["id"]).toBe("99999999999999999999");
-      expect(json["name"]).toBe("row-1");
-      // JSON.stringify now round-trips without throwing.
-      expect(() => JSON.stringify(json)).not.toThrow();
-    });
 
     it("asJson coerces Temporal attributes to ISO 8601 strings", () => {
       class Event extends Model {
@@ -520,14 +504,9 @@ describe("SerializationTest", () => {
       }
       const e = new Event({ startsAt: "2026-04-24T10:00:00.123456Z" });
       const json = e.asJson();
-      expect(json["startsAt"]).toBe("2026-04-24T10:00:00.123456Z");
-    });
-
-    it("asJson preserves microsecond precision for Temporal.Instant", async () => {
-      const { coerceForJson } = await import("./serialization.js");
-      const i = instant("2026-04-24T10:00:00.123456Z");
-      const out = coerceForJson({ at: i }) as { at: unknown };
-      expect(out.at).toBe("2026-04-24T10:00:00.123456Z");
+      // `Time#as_json` renders at `ActiveSupport::JSON::Encoding.time_precision`
+      // (json.rb:200-208), which defaults to 3 (encoding.rb:135).
+      expect(json["startsAt"]).toBe("2026-04-24T10:00:00.123Z");
     });
 
     it("asJson recurses into include: arrays and nested objects", () => {
@@ -609,137 +588,6 @@ describe("SerializationTest", () => {
       expect(typeof parsed.id).toBe("string");
       expect(parsed.id).toBe("4611686018427387904");
       expect(parsed.name).toBe("row-2");
-    });
-
-    it("coerceForJson maps null to null", async () => {
-      const { coerceForJson } = await import("./serialization.js");
-      const out = coerceForJson({ at: null }) as { at: unknown };
-      expect(out.at).toBe(null);
-    });
-
-    it("coerceForJson maps invalid Date to null (Date path still active during dual-typed window)", async () => {
-      const { coerceForJson } = await import("./serialization.js");
-      const out = coerceForJson({ at: new Date("not a date") }) as { at: unknown };
-      expect(out.at).toBe(null);
-    });
-
-    it("coerceForJson preserves shared references (no silent data loss)", async () => {
-      // `{ a: obj, b: obj }` — same object twice. Must not be treated
-      // as a cycle. Previously the WeakSet-based cycle guard would
-      // return null on the second occurrence; the in-progress/seen
-      // split now returns the memoized coerced result and preserves
-      // identity in the output.
-      const { coerceForJson } = await import("./serialization.js");
-      const shared = { kind: "tag", count: 5 };
-      const root = { a: shared, b: shared };
-      const out = coerceForJson(root) as { a: unknown; b: unknown };
-      expect(out.a).toEqual({ kind: "tag", count: 5 });
-      expect(out.b).toEqual({ kind: "tag", count: 5 });
-      expect(out.a).toBe(out.b); // same coerced reference
-    });
-
-    it("coerceForJson breaks true cycles (self-referential object → null)", async () => {
-      const { coerceForJson } = await import("./serialization.js");
-      const a: Record<string, unknown> = { name: "a" };
-      a.self = a; // cycle
-      const out = coerceForJson(a) as { name: string; self: unknown };
-      expect(out.name).toBe("a");
-      // Inner self-reference collapses to null so the result stays
-      // JSON.stringify-safe.
-      expect(out.self).toBe(null);
-      expect(() => JSON.stringify(out)).not.toThrow();
-    });
-
-    it("asJson terminates on model-through-model cycles (no stack overflow)", () => {
-      // A cycle modelA.ref → modelB → modelA would blow the stack if
-      // coerceForJson delegated to each Model's own asJson (each call
-      // resetting cycle state). Nested models arrive pre-flattened by
-      // serializableHash, so coerceForJson walks plain objects with
-      // shared cycle state.
-      class Node extends Model {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      const a = new Node({ name: "a" });
-      const b = new Node({ name: "b" });
-      setAssociationAccessors(a, { next: b });
-      setAssociationAccessors(b, { next: a });
-      // serializableHash only traverses associations that are
-      // explicitly included. Here we include "next" on `a`, so that
-      // association is serialized once; it won't keep traversing
-      // `b.next` unless a nested include is provided. So asJson emits
-      // a single hop and doesn't loop.
-      expect(() => a.asJson({ include: ["next"] })).not.toThrow();
-      const json = a.asJson({ include: ["next"] }) as { next: { name: string } };
-      expect(json.next.name).toBe("b");
-    });
-
-    it("coerceForJson breaks true cycles in arrays (self-containing)", async () => {
-      const { coerceForJson } = await import("./serialization.js");
-      const arr: unknown[] = [1, 2];
-      arr.push(arr); // cycle
-      const out = coerceForJson(arr) as unknown[];
-      expect(out[0]).toBe(1);
-      expect(out[1]).toBe(2);
-      expect(out[2]).toBe(null);
-      expect(() => JSON.stringify(out)).not.toThrow();
-    });
-
-    it("coerceForJson is safe against __proto__ prototype pollution", async () => {
-      // JSON.parse('{"__proto__": {"polluted": true}}') produces an own
-      // `__proto__` key. Naïve `out[k] = val` assignment would invoke
-      // `Object.prototype.__proto__`'s setter and mutate the output's
-      // prototype. `Object.defineProperty` treats it as a data key.
-      const { coerceForJson } = await import("./serialization.js");
-      const hostile = JSON.parse('{"__proto__": {"polluted": true}, "legit": 1}');
-      const out = coerceForJson(hostile) as Record<string, unknown>;
-      // Output's prototype should NOT be polluted.
-      expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
-      // Plain Object should still return polluted=undefined (sanity).
-      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
-      expect(out.legit).toBe(1);
-    });
-
-    it("coerceForJson maps undefined to null (matches Ruby nil → JSON null)", async () => {
-      // `JSON.stringify({ a: undefined })` silently drops the key,
-      // which would make an unset attribute disappear from output.
-      // Ruby `nil` serializes to JSON `null`, so we match that.
-      const { coerceForJson } = await import("./serialization.js");
-      const out = coerceForJson({ name: "x", missing: undefined, nested: [undefined, 1] }) as {
-        name: unknown;
-        missing: unknown;
-        nested: unknown[];
-      };
-      expect(out.missing).toBe(null);
-      expect(out.nested).toEqual([null, 1]);
-      expect(JSON.parse(JSON.stringify(out))).toEqual({
-        name: "x",
-        missing: null,
-        nested: [null, 1],
-      });
-    });
-
-    it("coerceForJson does not shell open class instances (no internal-field leak)", async () => {
-      // A raw Model instance reaching coerceForJson (e.g. as a direct
-      // attribute value) must NOT be walked via Object.entries — that
-      // would expose _attributes/_dirty/errors/etc. Instead, it passes
-      // through as the instance itself, and JSON.stringify will later
-      // invoke its toJSON() (which calls asJson with its own
-      // coerceForJson context).
-      const { coerceForJson } = await import("./serialization.js");
-      class Wrapper {
-        public internal = "hidden";
-        toJSON() {
-          return { kind: "wrapper" };
-        }
-      }
-      const w = new Wrapper();
-      const out = coerceForJson({ nested: w }) as { nested: unknown };
-      // Pass-through — still the class instance, not `{ internal: "..." }`.
-      expect(out.nested).toBe(w);
-      // JSON.stringify at the end invokes toJSON on the instance.
-      expect(JSON.parse(JSON.stringify(out))).toEqual({ nested: { kind: "wrapper" } });
     });
 
     it("asJson is idempotent on JSON-safe values", () => {

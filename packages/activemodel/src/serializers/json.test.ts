@@ -131,7 +131,7 @@ describe("Serializers::JSON host", () => {
     }
     const b = new Big();
     b._id = 9007199254740993n;
-    // Without coerceForJson, JSON.stringify(b.asJson()) would throw.
+    // Without `Numeric#as_json`, JSON.stringify(b.asJson()) would throw.
     expect(() => globalThis.JSON.stringify(b.asJson())).not.toThrow();
   });
 

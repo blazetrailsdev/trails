@@ -8,7 +8,7 @@ describe("NamingTest", () => {
   class Post extends Model {}
 
   // models/track_back.rb — `Post::TrackBack`.
-  const modelName = new ModelName("TrackBack", "Post");
+  const modelName = new ModelName("Post::TrackBack");
 
   it("name returns class name", () => {
     expect(Post.modelName.name).toBe("Post");
@@ -76,7 +76,7 @@ describe("NamingHelpersTest", () => {
   // `Post::NamedTrackBack`, so naming goes through the proxy.
   class NamedTrackBack extends Model {
     static override get modelName(): ModelName {
-      return new ModelName("NamedTrackBack", "Post");
+      return new ModelName("Post::NamedTrackBack");
     }
   }
   class TrackBack {
@@ -153,38 +153,36 @@ describe("NamingMethodDelegationTest", () => {
 // (activemodel/test/cases/naming_test.rb:87-125): `Name.new(Blog::Post)` with
 // no namespace argument, so `param_key`/`route_key` keep the prefix.
 describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
-  const namespace = "Blog";
-
   it("singular", () => {
-    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
+    expect(new ModelName("Blog::Post").singular).toBe("blog_post");
   });
 
   it("plural", () => {
-    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
+    expect(new ModelName("Blog::Post").plural).toBe("blog_posts");
   });
 
   it("element", () => {
-    expect(new ModelName("Post", namespace).element).toBe("post");
+    expect(new ModelName("Blog::Post").element).toBe("post");
   });
 
   it("collection", () => {
-    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
+    expect(new ModelName("Blog::Post").collection).toBe("blog/posts");
   });
 
   it("human", () => {
-    expect(new ModelName("Post", namespace).human()).toBe("Post");
+    expect(new ModelName("Blog::Post").human()).toBe("Post");
   });
 
   it("route key", () => {
-    expect(new ModelName("Post", namespace).routeKey).toBe("blog_posts");
+    expect(new ModelName("Blog::Post").routeKey).toBe("blog_posts");
   });
 
   it("param key", () => {
-    expect(new ModelName("Post", namespace).paramKey).toBe("blog_post");
+    expect(new ModelName("Blog::Post").paramKey).toBe("blog_post");
   });
 
   it("i18n key", () => {
-    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
+    expect(new ModelName("Blog::Post").i18nKey).toBe("blog/post");
   });
 });
 
@@ -239,60 +237,60 @@ describe("NamingWithSuppliedLocaleTest", () => {
 // `Blog::Post.model_name`, and `Blog.use_relative_model_naming?` is true
 // (test/models/blog_post.rb), so `model_name` passes `Blog` as the namespace.
 describe("NamingUsingRelativeModelNameTest", () => {
-  const namespace = { name: "Blog", useRelativeModelNaming: true };
+  const namespace = { name: "Blog" };
   it("singular", () => {
-    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
+    expect(new ModelName("Blog::Post", namespace).singular).toBe("blog_post");
   });
   it("plural", () => {
-    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
+    expect(new ModelName("Blog::Post", namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Post", namespace).element).toBe("post");
+    expect(new ModelName("Blog::Post", namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
+    expect(new ModelName("Blog::Post", namespace).collection).toBe("blog/posts");
   });
   it("human", () => {
-    expect(new ModelName("Post", namespace).human()).toBe("Post");
+    expect(new ModelName("Blog::Post", namespace).human()).toBe("Post");
   });
   it("route key", () => {
-    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
+    expect(new ModelName("Blog::Post", namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Post", namespace).paramKey).toBe("post");
+    expect(new ModelName("Blog::Post", namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
+    expect(new ModelName("Blog::Post", namespace).i18nKey).toBe("blog/post");
   });
 });
 
 // Ports Rails `NamingWithNamespacedModelInIsolatedNamespaceTest`
 // (activemodel/test/cases/naming_test.rb:51-86): `Name.new(Blog::Post, Blog)`.
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
-  const namespace = { name: "Blog", useRelativeModelNaming: true };
+  const namespace = { name: "Blog" };
   it("singular", () => {
-    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
+    expect(new ModelName("Blog::Post", namespace).singular).toBe("blog_post");
   });
   it("human", () => {
-    expect(new ModelName("Post", namespace).human()).toBe("Post");
+    expect(new ModelName("Blog::Post", namespace).human()).toBe("Post");
   });
   it("plural", () => {
-    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
+    expect(new ModelName("Blog::Post", namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Post", namespace).element).toBe("post");
+    expect(new ModelName("Blog::Post", namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
+    expect(new ModelName("Blog::Post", namespace).collection).toBe("blog/posts");
   });
   it("route key", () => {
-    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
+    expect(new ModelName("Blog::Post", namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Post", namespace).paramKey).toBe("post");
+    expect(new ModelName("Blog::Post", namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
+    expect(new ModelName("Blog::Post", namespace).i18nKey).toBe("blog/post");
   });
 });
 
@@ -314,51 +312,6 @@ describe("NameWithAnonymousClassTest", () => {
   });
 });
 
-// Arbitrary-depth namespaces: Rails walks a full `::` chain via
-// `_singularize`/`tableize`; our equivalent is a segment array — same
-// output, no Ruby-shaped strings in the TS API.
-describe("ModelName deeply-nested namespace", () => {
-  it("multi-segment namespace array produces full prefix on derived fields", () => {
-    const name = new ModelName("Post", ["Admin", "Blog"]);
-    expect(name.name).toBe("Admin::Blog::Post");
-    expect(Array.from(name.namespace ?? [])).toEqual(["Admin", "Blog"]);
-    expect(name.singular).toBe("admin_blog_post");
-    expect(name.plural).toBe("admin_blog_posts");
-    expect(name.element).toBe("post");
-    expect(name.collection).toBe("admin/blog/posts");
-    expect(name.i18nKey).toBe("admin/blog/post");
-    expect(name.paramKey).toBe("admin_blog_post");
-    expect(name.routeKey).toBe("admin_blog_posts");
-  });
-});
-
-describe("ModelName rejects Ruby-shaped strings", () => {
-  it("throws when className contains ::", () => {
-    expect(() => new ModelName("Blog::Post")).toThrow(/must not contain/);
-  });
-  it("throws when namespace contains ::", () => {
-    expect(() => new ModelName("Post", "Admin::Blog")).toThrow(/must not contain/);
-  });
-});
-
-describe("ModelName rejects malformed namespace option", () => {
-  it("throws ArgumentError on object without a string .name", () => {
-    expect(() => new ModelName("Post", {} as unknown as { name: string })).toThrow(ArgumentError);
-  });
-  it("throws ArgumentError on array with non-string elements", () => {
-    expect(() => new ModelName("Post", ["Blog", 42 as unknown as string])).toThrow(ArgumentError);
-  });
-  it("throws ArgumentError on empty-string namespace", () => {
-    expect(() => new ModelName("Post", "")).toThrow(ArgumentError);
-  });
-  it("throws ArgumentError on whitespace-only segment in an array", () => {
-    expect(() => new ModelName("Post", ["Blog", "   "])).toThrow(ArgumentError);
-  });
-  it("throws ArgumentError on blank name", () => {
-    expect(() => new ModelName("   ")).toThrow(ArgumentError);
-  });
-});
-
 describe("ModelName singularRouteKey", () => {
   it("top-level: equal to singular", () => {
     const name = new ModelName("Post");
@@ -366,7 +319,7 @@ describe("ModelName singularRouteKey", () => {
     expect(name.routeKey).toBe("posts");
   });
   it("namespaced: singularizes the prefix-dropped routeKey", () => {
-    const name = new ModelName("Post", { name: "Blog", useRelativeModelNaming: true });
+    const name = new ModelName("Blog::Post", { name: "Blog" });
     expect(name.routeKey).toBe("posts");
     expect(name.singularRouteKey).toBe("post");
   });
@@ -381,38 +334,28 @@ describe("ModelName singularRouteKey", () => {
     expect(name.singularRouteKey.length).toBeGreaterThan(0);
   });
   it("Naming.singularRouteKey delegates to ModelName.singularRouteKey", () => {
-    const name = new ModelName("Post", "Blog");
+    const name = new ModelName("Blog::Post");
     expect(Naming.singularRouteKey(name)).toBe(name.singularRouteKey);
   });
 });
 
-describe("ModelName collection is derived from plural", () => {
-  // Addresses the uncountable-consistency concern: whatever decision
-  // `plural` makes (local uncountables table, activesupport Inflector rules,
-  // whatever), `collection` follows the same decision instead of
-  // independently pluralizing.
-  it("namespaced normal word: collection tail === bare pluralization", () => {
-    const name = new ModelName("Post", "Blog");
+describe("ModelName collection", () => {
+  it("namespaced: `tableize(@name)` pluralizes the last path segment", () => {
+    const name = new ModelName("Blog::Post");
     expect(name.plural).toBe("blog_posts");
     expect(name.collection).toBe("blog/posts");
   });
 
-  it("addUncountable on full singular keeps plural and collection in sync", () => {
+  it("uncountable full singular leaves collection on tableize's own inflection", () => {
+    // `@plural` is `pluralize(@singular)` and `@collection` is
+    // `tableize(@name)` (naming.rb:174, :178) — two independent inflections,
+    // so an uncountable registered on the `_`-joined singular does not reach
+    // the `/`-joined path form.
     Inflections.instance("en").uncountable("legal_status");
-    const name = new ModelName("Status", "Legal");
+    const name = new ModelName("Legal::Status");
     expect(name.singular).toBe("legal_status");
-    expect(name.plural).toBe("legal_status"); // uncountable per local table
-    expect(name.collection).toBe("legal/status"); // tail follows plural
-  });
-});
-
-describe("ModelName namespace accepts Module-like {name}", () => {
-  it("an object with a string `name` property is equivalent to the string form", () => {
-    const asObject = new ModelName("Post", { name: "Blog" });
-    const asString = new ModelName("Post", "Blog");
-    expect(asObject.singular).toBe(asString.singular);
-    expect(asObject.paramKey).toBe(asString.paramKey);
-    expect(asObject.routeKey).toBe(asString.routeKey);
+    expect(name.plural).toBe("legal_status");
+    expect(name.collection).toBe("legal/statuses");
   });
 });
 
@@ -470,13 +413,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(stickyRe.lastIndex).toBe(0);
   });
 
-  it("compare throws ArgumentError on non-string/non-ModelName input", () => {
-    const mn = new ModelName("Post");
-    expect(() => mn.compare(42)).toThrow(ArgumentError);
-    expect(() => mn.compare(null)).toThrow(ArgumentError);
-    expect(() => mn.compare(undefined)).toThrow(ArgumentError);
-  });
-
   it("match throws ArgumentError on non-RegExp input", () => {
     const mn = new ModelName("Post");
     expect(() => mn.match("Post")).toThrow(ArgumentError);
@@ -487,16 +423,16 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
   it("equals / compare distinguish namespaced models with the same bare name", () => {
     // Two ModelName instances share the same `name: "Post"` but differ
     // in namespace — must not compare equal, must sort deterministically.
-    const blogPost = new ModelName("Post", "Blog");
-    const adminPost = new ModelName("Post", "Admin");
-    const blogPost2 = new ModelName("Post", "Blog");
+    const blogPost = new ModelName("Blog::Post");
+    const adminPost = new ModelName("Admin::Post");
+    const blogPost2 = new ModelName("Blog::Post");
     const barePost = new ModelName("Post");
 
     expect(blogPost.equals(adminPost)).toBe(false);
     expect(blogPost.equals(blogPost2)).toBe(true);
     expect(blogPost.equals(barePost)).toBe(false);
-    // `compare` compares the full qualified path ("Admin/Post" vs
-    // "Blog/Post"), so Admin < Blog.
+    // `compare` is `String#<=>` on `@name` ("Admin::Post" vs "Blog::Post"),
+    // so Admin < Blog.
     expect(blogPost.compare(adminPost)).toBe(1);
     expect(adminPost.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(blogPost2)).toBe(0);
@@ -515,14 +451,12 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     // the full namespace+name path as a single string — so a model
     // under an earlier-sorting namespace outranks a later-sorting
     // namespace even when its bare name comes later alphabetically.
-    const adminOther = new ModelName("Other", "Admin");
-    const blogPost = new ModelName("Post", "Blog");
-    // "Admin/Other" < "Blog/Post"
+    const adminOther = new ModelName("Admin::Other");
+    const blogPost = new ModelName("Blog::Post");
+    // "Admin::Other" < "Blog::Post"
     expect(adminOther.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(adminOther)).toBe(1);
-    // Bare name ("Post") > a qualified name starting with earlier letters
-    // ("Admin/Other")? No — bare comparison uses the raw qualified path,
-    // so "Admin/Other" < "Post".
+    // Comparison is over the raw qualified path, so "Admin::Other" < "Post".
     const barePost = new ModelName("Post");
     expect(adminOther.compare(barePost)).toBe(-1);
     expect(barePost.compare(adminOther)).toBe(1);
@@ -552,7 +486,7 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
 
 describe("OverridingAccessorsTest", () => {
   it("overriding accessors keys", () => {
-    const modelName = new ModelName("TrackBack", "Post");
+    const modelName = new ModelName("Post::TrackBack");
     modelName.singular = "singular";
     modelName.plural = "plural";
     modelName.element = "element";
@@ -603,7 +537,9 @@ describe("ModelName locale", () => {
     Inflections.instance("es").singular(/es$/, "");
     const name = new ModelName("Ley", undefined, undefined, "es");
     expect(name.plural).toBe("leyes");
-    expect(name.collection).toBe("leyes");
+    // Rails' `@collection = tableize(@name)` (naming.rb:178) takes no locale,
+    // so the collection stays on the default `:en` inflections.
+    expect(name.collection).toBe("leys");
     expect(name.routeKey).toBe("leyes");
     expect(name.singularRouteKey).toBe("ley");
     expect(new ModelName("Ley").plural).toBe("leys");

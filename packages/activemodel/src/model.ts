@@ -1619,7 +1619,11 @@ export class Model {
    */
   static get modelName(): ModelName {
     if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      const namespace = this.moduleName?.split("::");
+      // Rails walks `module_parents` for a module answering
+      // `use_relative_model_naming?` (naming.rb:271-276). JS has no
+      // enclosing-module chain to walk, so nothing can declare relative naming
+      // and the detect answers nil.
+      const namespace = null;
       // Model satisfies ModelLike but TS can't prove it due to circular types.
       this._modelName = new ModelName(this as unknown as ModelLike, namespace);
     }

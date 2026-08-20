@@ -88,10 +88,15 @@ export class TrueClass {
   }
 }
 
-/** `NilClass#as_json` (json.rb:92-96). */
+/**
+ * `NilClass#as_json` (json.rb:92-96) — Ruby answers `nil` for its one absent
+ * value. JS has two, and `JSON.stringify` silently *drops* a property whose
+ * value is `undefined` rather than emitting `null`, so both absences answer
+ * `null` here to reach Ruby's single JSON form.
+ */
 export class NilClass {
-  static asJson(value: null | undefined): null | undefined {
-    return value;
+  static asJson(_value: null | undefined): null {
+    return null;
   }
 }
 
@@ -102,10 +107,19 @@ export class String {
   }
 }
 
-/** `Numeric#as_json` (json.rb:110-114). */
+/**
+ * `Numeric#as_json` (json.rb:110-114) — Ruby answers `self`, and its encoder
+ * renders an arbitrary-precision Integer as a JSON number.
+ *
+ * A JS `bigint` is the analogue of that Integer, but `JSON.stringify` throws
+ * `TypeError: Do not know how to serialize a BigInt` on one and a JS `number`
+ * loses precision above 2^53-1, so there is no way to answer `self` and stay
+ * encodable. It answers the decimal digits as a string instead; consumers
+ * recover the value with `BigInt(str)`.
+ */
 export class Numeric {
-  static asJson(value: number | bigint): number | bigint {
-    return value;
+  static asJson(value: number | bigint): number | string {
+    return typeof value === "bigint" ? value.toString() : value;
   }
 }
 
@@ -201,11 +215,18 @@ export class Hash {
       }
     }
 
+    // Ruby's `hash[key] = value` always writes an entry. A JS assignment to
+    // `__proto__` — an own key any `JSON.parse` output can carry — invokes
+    // `Object.prototype`'s accessor and reparents the result instead, so the
+    // write goes through `defineProperty` to stay a plain data entry.
     const result: globalThis.Record<string, unknown> = {};
-    if (options) {
-      for (const [k, v] of subset) result[globalThis.String(k)] = asJson(v, options);
-    } else {
-      for (const [k, v] of subset) result[globalThis.String(k)] = asJson(v);
+    for (const [k, v] of subset) {
+      globalThis.Object.defineProperty(result, globalThis.String(k), {
+        value: options ? asJson(v, options) : asJson(v),
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
     return result;
   }
