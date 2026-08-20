@@ -31,23 +31,6 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: TableRef | null = null;
   readonly tables: TableRef[] = [];
-  /**
-   * Extra join sources contributed by the association scope's own `joins(...)`
-   * (Rails `joins.concat arel.join_sources`). Kept separate from the per-chain
-   * constraint joins so callers that map joins 1:1 to chain entries aren't
-   * disturbed; `makeConstraints` emits these after the node's own join.
-   * @internal
-   */
-  readonly joinSources: Nodes.Node[] = [];
-  /**
-   * Scope join sources bucketed by their emitted constraint-join index (aligned
-   * 1:1 with the array `joinConstraints` returns). The single-step path reads the
-   * flat `joinSources`; the through path reads this so each chain step's string
-   * joins attach to that step's tree node — Rails' per-step
-   * `joins.concat arel.join_sources` inside `chain.reverse_each`.
-   * @internal
-   */
-  readonly joinSourcesByJoin: Nodes.Node[][] = [];
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
@@ -102,12 +85,6 @@ export class JoinAssociation extends JoinPart {
   ): Nodes.Node[] {
     const joins: Nodes.Node[] = [];
     const chain: [AbstractReflection, TableRef][] = [];
-
-    // Ruby rebuilds the scope's join sources on every call; the accumulators
-    // below are trails-side state, so clear them so a re-emit doesn't inherit
-    // the previous emit's sources (or shift their per-join buckets).
-    this.joinSources.length = 0;
-    this.joinSourcesByJoin.length = 0;
 
     const reflectionChain = this.reflection.chain;
 
@@ -202,7 +179,6 @@ export class JoinAssociation extends JoinPart {
       }
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
-      this.joinSourcesByJoin.push([]);
 
       // Rails, gated on `unless others.empty?`:
       //   joins.concat arel.join_sources
@@ -226,21 +202,10 @@ export class JoinAssociation extends JoinPart {
         const sources: Nodes.Node[] = scope?.arel
           ? ([...scope.arel(aliasTracker).joinSources()] as Nodes.Node[])
           : [];
-        // `this.joinSources` accumulates flat across the chain (consumed by the
-        // single-step `has_one`/`has_many` path, whose chain is length 1). The
-        // through path instead reads `joinSourcesByJoin`, which buckets each
-        // step's sources against that step's emitted join index — Rails' per-step
-        // `joins.concat arel.join_sources` inside `chain.reverse_each`.
-        if (sources.length > 0) {
-          const lastIdx = sources.length - 1;
-          sources[lastIdx] = appendConstraints(sources[lastIdx], others) ?? sources[lastIdx];
-          this.joinSources.push(...sources);
-          this.joinSourcesByJoin[joins.length - 1] = sources;
-        } else {
-          const lastIdx = joins.length - 1;
-          joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
-            joins[lastIdx]) as Nodes.Join;
-        }
+        joins.push(...sources);
+        const lastIdx = joins.length - 1;
+        joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
+          joins[lastIdx]) as Nodes.Join;
       }
 
       foreignTable = table;

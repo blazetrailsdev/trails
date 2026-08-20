@@ -509,6 +509,12 @@ export class JoinDependency {
       const chainLen = child.reflection.chain.length;
       const resolvedByIdx: Array<{ aliased: TableRef; effectiveName: string } | undefined> =
         new Array(chainLen);
+      // How far `joinConstraints` walked the chain before terminating on an
+      // already-resolved tail — i.e. how many constraint joins it emits. The
+      // returned array also carries each step's scope join sources inline
+      // (Rails' `joins.concat arel.join_sources`,
+      // join_association.rb:64-69), so it is no longer 1:1 with chain links.
+      let walkedLen = chainLen;
       const built = child.joinConstraints(
         foreignTable,
         foreignKlass,
@@ -528,6 +534,7 @@ export class JoinDependency {
           if (memo && (!root || !memo.terminated)) {
             if (root) memo.terminated = true;
             resolvedByIdx[idx] = memo;
+            walkedLen = idx;
             return [memo.aliased, true];
           }
 
@@ -572,8 +579,7 @@ export class JoinDependency {
         if (!node) continue;
         const resolved = resolvedByIdx[idx];
         node.arelJoin = null;
-        node.scopeJoinSources = [];
-        if (resolved && (idx < built.length || idx === 0)) {
+        if (resolved && (idx < walkedLen || idx === 0)) {
           node.arelTable = resolved.aliased;
           node.effectiveSqlName = resolved.effectiveName;
         } else {
@@ -582,19 +588,27 @@ export class JoinDependency {
           node.tableIndex = -1;
         }
       }
-      // `joinConstraints` walks the chain in reverse, so built[i] is chain link
-      // `built.length - 1 - i`; each join is followed by that step's scope join
-      // sources (Rails' `joins.concat arel.join_sources`).
-      for (let i = 0; i < built.length; i++) {
-        const node = nodes[built.length - 1 - i];
-        const join = built[i] as Nodes.Join;
-        const sources = child.joinSourcesByJoin[i] ?? [];
-        if (node) {
-          node.arelJoin = join;
-          node.scopeJoinSources = sources;
+      // `joinConstraints` walks the chain in reverse and emits each step's
+      // constraint join followed by that step's scope join sources, so the
+      // returned array is `[J(n-1), sources…, J(n-2), sources…, …]`. Only the
+      // constraint joins map back onto a chain link's tree node: an entry is
+      // one when it joins the table the walk resolved for the next link.
+      let linkIdx = walkedLen - 1;
+      for (const entry of built) {
+        const join = entry as Nodes.Join;
+        const resolved = linkIdx >= 0 ? resolvedByIdx[linkIdx] : undefined;
+        const left = (join as { left?: unknown }).left;
+        if (
+          resolved &&
+          left != null &&
+          typeof left === "object" &&
+          tableSqlName(left as TableRef) === resolved.effectiveName
+        ) {
+          const node = nodes[linkIdx];
+          if (node) node.arelJoin = join;
+          linkIdx--;
         }
         joins.push(join);
-        for (const src of sources) joins.push(src as Nodes.Join);
       }
       this._aliasesCache = undefined;
     } else if (!child.throughGroup) {
