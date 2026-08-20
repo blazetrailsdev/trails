@@ -71,7 +71,9 @@ export class JoinAssociation extends JoinPart {
    *
    * For each reflection in the chain, resolves the table (via the yield-like
    * resolver callback), builds a scoped relation via reflection.joinScope(),
-   * extracts the WHERE predicates as Arel nodes, and wraps them in
+   * materializes it once through `scope.arel(alias_tracker.aliases)` and reads
+   * the join predicates off `arel.constraints.first`
+   * (join_association.rb:56-57), then wraps them in
    * join_type(table, On(constraints)).
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#join_constraints
@@ -141,25 +143,8 @@ export class JoinAssociation extends JoinPart {
         }
       }
 
-      let nodes: Nodes.Node;
-      if (scope && scope.whereClause && !scope.whereClause.isEmpty()) {
-        nodes = scope.whereClause.ast;
-      } else {
-        // Scope produced no constraints — build direct key equality
-        const rawPk = (refl as any).joinPrimaryKey ?? klass.primaryKey ?? "id";
-        const reflName = (refl as any).name ?? "";
-        const rawFk = (refl as any).joinForeignKey ?? (refl as any).foreignKey ?? `${reflName}_id`;
-        const pks = Array.isArray(rawPk) ? rawPk : [rawPk];
-        const fks = Array.isArray(rawFk) ? rawFk : [rawFk];
-        if (pks.length !== fks.length) {
-          throw new Error(
-            `joinConstraints: joinPrimaryKey and joinForeignKey must have the same number of columns ` +
-              `(got ${pks.length} and ${fks.length})`,
-          );
-        }
-        const eqs = pks.map((pk: string, i: number) => table.get(pk).eq(foreignTable.get(fks[i])));
-        nodes = eqs.length === 1 ? eqs[0] : new Nodes.And(eqs);
-      }
+      const arel = scope.arel(aliasTracker);
+      let nodes: Nodes.Node = arel.constraints[0];
 
       // Rails: extract predicates that DON'T belong to this table into "others"
       const others: Nodes.Node[] = [];
@@ -199,9 +184,7 @@ export class JoinAssociation extends JoinPart {
         // `comments_for_first_author` re-joining `posts`) is re-aliased instead
         // of emitting a duplicate `posts` that yields ambiguous columns — Rails'
         // `join_scope.arel(alias_tracker.aliases)` (join_dependency.rb:56).
-        const sources: Nodes.Node[] = scope?.arel
-          ? ([...scope.arel(aliasTracker).joinSources()] as Nodes.Node[])
-          : [];
+        const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;
         joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??

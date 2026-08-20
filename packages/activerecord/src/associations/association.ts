@@ -1,6 +1,10 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { autoloadModel, _preloadedHolderTarget } from "../associations.js";
+import {
+  autoloadModel,
+  _preloadedHolderTarget,
+  _associateRecordsToOwner,
+} from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
@@ -631,11 +635,12 @@ export class Association {
     // exists (e.g. firm.clients was accessed before the async load completed).
     const name = this.reflection.name;
     const proxy = this.owner._collectionProxies.get(name) as
-      | { loaded?: boolean; _hydrateFromPreload?(r: Base[]): void }
+      | { loaded?: boolean; proxyAssociation?: Association }
       | undefined;
-    if (proxy && !proxy.loaded && typeof proxy._hydrateFromPreload === "function") {
+    const association = proxy && !proxy.loaded ? proxy.proxyAssociation : undefined;
+    if (association) {
       const records = Array.isArray(result) ? result : result != null ? [result] : [];
-      proxy._hydrateFromPreload(records);
+      _associateRecordsToOwner(association, records);
     }
     return result;
   }

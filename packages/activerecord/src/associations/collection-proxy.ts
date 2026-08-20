@@ -346,14 +346,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this.target.entries();
   }
 
-  /** @internal Initialize from preloaded association data. */
-  _hydrateFromPreload(records: T[]): void {
-    // Preserve any unsaved in-memory records (from build/push before preload ran)
-    const unsaved = this._target.filter((r) => r.isNewRecord());
-    this._target = unsaved.length > 0 ? [...records, ...unsaved] : records;
-    this._targetLoaded = true;
-  }
-
   /**
    * @internal Resolve the target model an association's proxy scopes to —
    * preferring the rich reflection's namespace-aware klass, else `className`.
@@ -1258,7 +1250,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#proxy_association
    */
   get proxyAssociation(): CollectionAssociation {
-    return this._collectionAssociation();
+    // `def proxy_association; @association; end` — the very seat `target` /
+    // `loaded?` read off (collection_proxy.rb:33, 53), not a fresh lookup. For a
+    // collection the two are the same object; they differ only for the proxy
+    // trails builds for a declared SINGULAR name, where `@association` is this
+    // proxy's own collection seat (see `_targetAssociation`).
+    return this._targetAssociation;
   }
 
   /**
