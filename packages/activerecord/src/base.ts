@@ -2987,6 +2987,10 @@ export class Base extends Model {
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
   _strictLoading = false;
   _strictLoadingMode?: _Core.StrictLoadingMode;
+  // No Rails counterpart: Rails' strict_loading is tripped by `load_target`
+  // alone. Trails keeps the counter only for `loadBelongsTo` / `loadHasOne`
+  // (associations/instance-methods.ts) — explicit lazy loads the caller asked
+  // for by name, which Rails has no method to express an exemption for.
   _strictLoadingBypassCount = 0;
   /**
    * The single backing slot for this record's association cache — RFC-0022's
