@@ -40,7 +40,7 @@ export function serializableHash(
   options: SerializeOptions = {},
   sync = false,
 ): Record<string, unknown> {
-  if (hasIncludes(options) && !sync) {
+  if (options.include != null && (options.include as unknown) !== false && !sync) {
     return thenableHash(
       () => serializableHash(record, options, true),
       async () => {
@@ -383,23 +383,6 @@ export function serializableAddIncludes(
 }
 
 /**
- * Whether `:include` names anything at all, in any of the three spellings the
- * option takes. Rails has no such probe — `serializable_hash` is synchronous;
- * this is the async-serialization re-entry gate (RFC 0022 b2).
- *
- * @noRailsEquivalent The gate for trails' awaitable `serializable_hash`, which
- * lazy-loads an unloaded association where Rails' `to_ary` would block.
- * @internal
- */
-function hasIncludes(options: SerializeOptions): boolean {
-  const include = options.include as unknown;
-  if (include == null || include === false) return false;
-  if (typeof include === "string") return true;
-  if (Array.isArray(include)) return include.length > 0;
-  return Object.keys(include as object).length > 0;
-}
-
-/**
  * Ruby `n.is_a?(Hash)` for an `:include` entry — a plain object mapping
  * association names to their own options, as against the String/Symbol (a JS
  * string) and Array spellings the same option takes.
@@ -409,10 +392,38 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
 }
 
 /**
+ * `serialization.rb:187-189`'s normalisation, for `preloadIncludes` alone.
+ *
+ * `serializableAddIncludes` spells this out inline because Rails does; this
+ * exists because `preloadIncludes` has no Rails counterpart to inline into and
+ * cannot borrow the Rails method's copy — it must reach each association
+ * through `resolveIncludeAsync`, where `serializableAddIncludes` reaches it
+ * through the synchronous `send` that preloading exists to get ahead of.
+ *
+ * @noRailsEquivalent Serves trails' awaitable `serializable_hash` (RFC 0022 b2).
+ * @internal
+ */
+function normalizeIncludes(
+  includeOpt:
+    | string
+    | Array<string | Record<string, SerializeOptions>>
+    | Record<string, SerializeOptions>,
+): Record<string, SerializeOptions> {
+  if (isIncludeHash(includeOpt)) return includeOpt;
+  const includes: Record<string, SerializeOptions> = {};
+  for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
+    if (isIncludeHash(n)) {
+      for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
+    } else {
+      safeSet(includes as Record<string, unknown>, n, {});
+    }
+  }
+  return includes;
+}
+
+/**
  * Recursively lazy-load every `include`d association (and nested includes) via
  * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
- * Runs `serialization.rb:187-189`'s normalisation ahead of the load, the same
- * one `serializableAddIncludes` runs before its `send`.
  */
 async function preloadIncludes(
   record: SerializationRecord,
@@ -420,20 +431,7 @@ async function preloadIncludes(
 ): Promise<void> {
   const includeOpt = options.include;
   if (includeOpt == null || (includeOpt as unknown) === false) return;
-  let includes: Record<string, SerializeOptions>;
-  if (isIncludeHash(includeOpt)) {
-    includes = includeOpt;
-  } else {
-    includes = {};
-    for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
-      if (isIncludeHash(n)) {
-        for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
-      } else {
-        safeSet(includes as Record<string, unknown>, n, {});
-      }
-    }
-  }
-  for (const [name, opts] of Object.entries(includes)) {
+  for (const [name, opts] of Object.entries(normalizeIncludes(includeOpt))) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
       ? Array.isArray(records)
@@ -502,7 +500,8 @@ export function asJsonThenable(
     if (root === false || root == null) return hash;
     return { [root === true ? element() : root]: hash };
   };
-  if (!hasIncludes(options)) return finalize(serialize());
+  if (options.include == null || (options.include as unknown) === false)
+    return finalize(serialize());
   return thenableHash(
     () => finalize(serialize()),
     async () => finalize(await serialize()),
