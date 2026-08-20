@@ -193,3 +193,10 @@ describe("DateTimeType Helpers::TimeValue ancestry", () => {
     }
   });
 });
+
+describe("DateTimeType type_cast_for_schema", () => {
+  it("quotes the to_fs(:db) form", () => {
+    const type = new Types.DateTimeType();
+    expect(type.typeCastForSchema(type.cast("2000-01-01T12:34:56Z"))).toBe('"2000-01-01 12:34:56"');
+  });
+});

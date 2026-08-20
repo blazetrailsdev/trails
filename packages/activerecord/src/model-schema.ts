@@ -1401,6 +1401,12 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (currentAdapter !== startingAdapter) return;
 
   applyColumnsHash(this, startingAdapter, hash);
+  // Rails' `load_schema` sets `@schema_loaded = true` before returning
+  // (model_schema.rb:534-546), and the reflected columns just applied are the
+  // authoritative ones — so mark the load settled before the generation hook,
+  // whose `define_attribute_methods` calls `load_schema` first
+  // (attribute_methods.rb:114) and would otherwise re-enter this load.
+  this._schemaLoaded = true;
   defineAttributeMethodsAfterLoad(this);
 }
 
