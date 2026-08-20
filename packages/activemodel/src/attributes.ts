@@ -282,16 +282,6 @@ export class Attributes {
   }
 }
 
-function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
-  const {
-    default: _default,
-    virtual: _virtual,
-    userProvidedDefault: _userProvidedDefault,
-    ...rest
-  } = options ?? {};
-  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
-}
-
 // ---------------------------------------------------------------------------
 // Rails privates surfaced by attributes.rb
 // ---------------------------------------------------------------------------
