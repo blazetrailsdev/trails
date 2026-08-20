@@ -1711,17 +1711,16 @@ export function habtmTargetFk(
 }
 
 /**
- * The preload writeback of `Preloader::Association#associate_records_to_owner`
- * (`preloader/association.rb:245-256`) for the collection arm, written through
- * the association's `target=` (`association.rb:100-103`), which is what flips
- * `loaded`. Rails has no proxy-side hook for this.
+ * The collection arm of `Preloader::Association#associate_records_to_owner`
+ * (`preloader/association.rb:245-256`), written through the association's
+ * `target=` (`association.rb:100-103`), which is what flips `loaded`. Rails has
+ * no proxy-side hook for this. The owner lookup Rails does inline
+ * (`owner.association(reflection.name)`, :247) is the caller's, so the
+ * association arrives resolved.
  *
- * Module-private: trails' `association(record, name)` factory hydrates a proxy
- * from an already-preloaded holder outside the Preloader, at two call sites, so
- * the two Rails lines need one spelling here.
+ * @internal
  */
-function _associateRecordsToProxy<T extends Base>(proxy: CollectionProxy<T>, records: T[]): void {
-  const association = proxy.proxyAssociation;
+export function _associateRecordsToOwner(association: AssociationInstance, records: Base[]): void {
   const target = association.target;
   const notPersistedRecords = (Array.isArray(target) ? target : []).filter((r) => !r.isPersisted());
   association.target = [...records, ...notPersistedRecords];
@@ -1742,7 +1741,7 @@ export function association<T extends Base = Base>(
       const preloaded = _preloadedHolderTarget(record, assocName)?.value;
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-        _associateRecordsToProxy(existing, records as T[]);
+        _associateRecordsToOwner(existing.proxyAssociation, records as T[]);
       }
     }
     // collection_association.rb:41 — `reader` ends in `@proxy.reset_scope`,
@@ -1796,7 +1795,7 @@ export function association<T extends Base = Base>(
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-    _associateRecordsToProxy(proxy, records as T[]);
+    _associateRecordsToOwner(proxy.proxyAssociation, records as T[]);
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);

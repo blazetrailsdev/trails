@@ -1,6 +1,10 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { autoloadModel, _preloadedHolderTarget } from "../associations.js";
+import {
+  autoloadModel,
+  _preloadedHolderTarget,
+  _associateRecordsToOwner,
+} from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
@@ -635,15 +639,8 @@ export class Association {
       | undefined;
     const association = proxy && !proxy.loaded ? proxy.proxyAssociation : undefined;
     if (association) {
-      // `associate_records_to_owner` (`preloader/association.rb:245-256`): the
-      // not-persisted records already on the target survive the writeback, and
-      // `target=` (`association.rb:100-103`) flips `loaded`.
       const records = Array.isArray(result) ? result : result != null ? [result] : [];
-      const target = association.target;
-      const notPersistedRecords = (Array.isArray(target) ? target : []).filter(
-        (r) => !r.isPersisted(),
-      );
-      association.target = [...records, ...notPersistedRecords];
+      _associateRecordsToOwner(association, records);
     }
     return result;
   }
