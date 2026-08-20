@@ -31,7 +31,7 @@ import {
 import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { camelize, singularize, underscore } from "@blazetrails/activesupport";
+import { camelize, eachSlice, singularize, underscore } from "@blazetrails/activesupport";
 
 /**
  * Proxy that handles a has_many association.
@@ -165,10 +165,11 @@ export class HasManyAssociation extends CollectionAssociation {
             ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
           }
 
-          const batchSize =
-            (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length;
-          for (let i = 0; i < ids.length; i += batchSize) {
-            const idsBatch = ids.slice(i, i + batchSize);
+          const idsBatches = eachSlice(
+            ids,
+            (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
+          );
+          for (const idsBatch of idsBatches) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
               ownerId: (this.owner as any).id,
