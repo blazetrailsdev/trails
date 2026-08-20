@@ -1882,7 +1882,7 @@ function wrapCollectionProxy<T extends Base = Base>(
 
       // Enumerable-method delegation — async + self-loading, checked before
       // scope lookup so it routes to the collection cache via
-      // `target.loadTarget()` rather than the scope relation's `_records`.
+      // `target.records()` rather than the scope relation's `_records`.
       // Covers `partition` and all DELEGATED_ARRAY_METHODS on *unloaded*
       // proxies (the sync path above handles loaded proxies). Rails resolves
       // every `to: :records` delegate through `CollectionProxy#records`
@@ -1890,7 +1890,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       // `find_target` into the in-memory target rather than replacing it
       // (collection_association.rb:270-278), so a proxy holding
       // built-but-unsaved records answers with them included.
-      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.loadTarget());
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
       const scope = target.scope();
@@ -1925,7 +1925,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (typeof prop === "symbol") return false;
       const modelClass = target.model as typeof Base & { _scopes?: Map<string, unknown> };
       if (modelClass._scopes?.has(prop)) return true;
-      if (delegateEnumerableMethod(prop, () => target.loadTarget()) !== undefined) return true;
+      if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return typeof (modelClass as any)[prop] === "function";
     },
   });

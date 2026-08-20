@@ -545,7 +545,7 @@ describe("DelegationTest", () => {
         }
       }
       const host = {
-        async toArray() {
+        async records() {
           return [new Sparrow(), new Hawk()];
         },
       };

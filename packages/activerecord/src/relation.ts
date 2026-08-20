@@ -187,18 +187,6 @@ const StrictLoadingScope = {
 } as const;
 
 /**
- * One pre-resolved association JOIN: the SQL table + ON predicate. The resolved
- * target model is retained here; it is no longer copied onto `_joinClauses`,
- * since a plain `.joins(:assoc)` now resolves its klass through the
- * join-dependency walk.
- */
-type JoinClauseSpec = {
-  table: string;
-  on: string | Nodes.Node;
-  klass?: unknown;
-};
-
-/**
  * A `Relation::VALUE_METHODS` key — the Ruby Symbol the `@values` hash is keyed
  * by, camelCased (`:eager_load` → `"eagerLoad"`).
  */
@@ -493,20 +481,6 @@ export class Relation<T extends Base> {
    * mutation predicates from the stale `1=0` seed. Empty on ordinary relations.
    */
   _seedWherePredicates: readonly unknown[] = [];
-  private _joinClauses: Array<{
-    type: "inner" | "left";
-    table: string;
-    on: string | Nodes.Node;
-    quoted?: boolean;
-    as?: string;
-    // The association this join was derived from (when added via
-    // where.associated/where.missing), so a repeat of the same association reuses
-    // the existing join instead of minting a duplicate alias.
-    assoc?: string;
-    // The base alias candidate a self-join alias was minted from (see
-    // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
-    aliasBase?: string;
-  }> = [];
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue = false;
   private _loaded = false;
@@ -2950,7 +2924,6 @@ export class Relation<T extends Base> {
     this._values = { ...source._values };
     this._withIsRecursive = source._withIsRecursive;
     this._isNone = source._isNone;
-    this._joinClauses = [...source._joinClauses];
     // Rebind extension-module methods onto this clone. Ruby's `extend`
     // mutates the singleton class, so a cloned relation keeps the mixed-in
     // methods; here `extending_values` only carries the module objects, so we

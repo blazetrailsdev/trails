@@ -28,7 +28,6 @@ import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
-import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
 import { any, compactBlank, foreignKey, wrap } from "@blazetrails/activesupport";
@@ -330,19 +329,6 @@ interface QueryMethodsHost {
   createWithValue: Record<string, unknown>;
   skipQueryCacheValue: boolean | null;
   _isNone: boolean;
-  _joinClauses: Array<{
-    type: "inner" | "left";
-    table: string;
-    on: string | Nodes.Node;
-    quoted?: boolean;
-    // The target model a `.joins(:assoc)` resolved to. Rails keeps the join
-    // dependency (joins_values feed build_join_dependencies), so
-    // lookup_table_klass_from_join_dependencies can recover the joined model for
-    // any plain `.joins(:assoc)`. We pre-resolve the association to SQL here, so
-    // we retain the klass to drive aggregate/where cast-type resolution without a
-    // global registry scan by table name.
-    klass?: unknown;
-  }>;
   // Converged Rails `Relation#alias_tracker(joins, aliases)` (relation.rb:1307);
   // `buildJoins` reads it to build the shared `build_joins` tracker.
   aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
@@ -957,30 +943,13 @@ export type ExceptSkip = ExceptKey | (string & {});
 
 /**
  * Reset a single value-key: delete it from `@values` so it reads back as its
- * default, then clear the trails-only sidecar store that backs it outside the
- * hash.
+ * default.
  *
- * Mirrors: the `@values.delete(scope)` half of `QueryMethods#unscope!`. Rails
- * keeps every value in `@values`, so deleting the key is the whole reset; the
- * switch below covers only the stores trails still keeps beside the hash.
+ * Mirrors: the `@values.delete(scope)` half of `QueryMethods#unscope!`.
  */
 export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): void {
   delete host._values[scope];
-  switch (scope) {
-    case "joins":
-      host._joinClauses = [];
-      break;
-    case "leftOuterJoins":
-      host._joinClauses = host._joinClauses.filter((j) => j.type !== "left");
-      break;
-  }
 }
-
-/**
- * The value keys whose trails representation spills outside `@values` into a
- * sidecar store, so replacing the hash wholesale has to clear them too.
- */
-const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = ["joins", "leftOuterJoins"];
 
 /**
  * Replace `@values` wholesale.
@@ -993,9 +962,6 @@ const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = ["joins", "leftOuterJoins"];
  */
 export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
   host._values = values;
-  for (const scope of SIDECAR_BACKED_KEYS) {
-    if (!(scope in values)) resetValueForScope(host, scope);
-  }
 }
 
 /**
@@ -1491,12 +1457,6 @@ export function structurallyIncompatibleValuesFor(
     }
     return !deepEqual(v1, v2);
   });
-  // trails splits `:joins` storage across `@values[:joins]` and the trails-only
-  // `_joinClauses` (the explicit-ON and where-association joins), so the second
-  // store is compared too — under the same `:joins` name, never reported twice.
-  if (!deepEqual(this._joinClauses, other._joinClauses) && !incompat.includes("joins")) {
-    incompat.push("joins");
-  }
   return incompat;
 }
 
@@ -3168,9 +3128,7 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   //   join_dependencies.unshift construct_join_dependency(select_named_joins(joins, …), nil)
   // i.e. ALL named association joins fold into a single JoinDependency (nil join
   // type, since this set is consulted for table-klass / cast-type lookups, not
-  // SQL emission). The named association joins in `joins_values` lead the union;
-  // _joinClauses hold pre-resolved raw SQL (table + ON), not association names,
-  // and do not contribute here.
+  // SQL emission).
   const joinNames: AssociationSpec[] = [];
   const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
     for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
@@ -3385,7 +3343,7 @@ export function buildJoinBuckets(
       }
     });
 
-    if (joinsValues.length === 0 && this._joinClauses.length === 0) {
+    if (joinsValues.length === 0) {
       // query_methods.rb:1838-1842: `if joins_values.empty?`.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
@@ -3484,8 +3442,7 @@ export interface JoinEmissionPlan {
   /**
    * The shared tracker, built by the caller via the converged
    * `Relation#aliasTracker(leading_joins + join_nodes, aliases)`
-   * (query_methods.rb:1894) and seeded with the resolved `_joinClauses`
-   * tables (`seedJoinClauseAliases`). A memoized thunk, not an instance:
+   * (query_methods.rb:1894). A memoized thunk, not an instance:
    * Rails only builds `alias_tracker` inside the
    * `unless named_joins.empty? && stashed_joins.empty?` guard
    * (query_methods.rb:1893), so a relation with no join dependencies to emit
@@ -3506,24 +3463,6 @@ export interface JoinEmissionPlan {
  */
 export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmissionPlan): void {
   if (plan.leadingJoins.length > 0) manager.prependJoinNodes(...plan.leadingJoins);
-
-  // Raw join clauses (pre-resolved SQL join specs). `as` aliasing mirrors the
-  // live path; `on` is an Arel predicate node (binds thread through the
-  // collector) or an inlined raw-SQL fragment wrapped as SqlLiteral.
-  for (const j of this._joinClauses as any[]) {
-    const tableNode = j.quoted
-      ? j.as
-        ? new ArelTable(j.table, { as: j.as })
-        : new ArelTable(j.table)
-      : j.table;
-    const onNode = typeof j.on === "string" ? Arel.sql(j.on) : j.on;
-    if (j.type === "inner") {
-      manager.join(tableNode);
-    } else {
-      manager.outerJoin(tableNode);
-    }
-    if (onNode != null) manager.on(onNode);
-  }
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
   // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
@@ -3595,14 +3534,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 /** @internal */
 export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
   // query_methods.rb:1882 — `return if joins_values.empty? && left_outer_joins_values.empty?`.
-  // `_joinClauses` is trails-only compensation for raw join clauses living
-  // outside `joins_values` (see merged-join-alias-tracker.ts).
-  if (
-    this.joinsValues.length === 0 &&
-    this.leftOuterJoinsValues.length === 0 &&
-    this._joinClauses.length === 0
-  )
-    return;
+  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return;
 
   // Buckets fold eager into stashed_join. Delegate emission to the shared
   // `build_joins` port.
@@ -3612,15 +3544,10 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
   // (query_methods.rb:1894) — the converged `Relation#aliasTracker`, built
   // lazily behind the same `unless named_joins.empty? && stashed_joins.empty?`
-  // guard Rails builds it under (see JoinEmissionPlan#tracker). The
-  // `_joinClauses` seeding is trails-only compensation for raw join clauses
-  // living outside `joins_values` (see merged-join-alias-tracker.ts).
+  // guard Rails builds it under (see JoinEmissionPlan#tracker).
   let memoTracker: AliasTracker | undefined;
   const tracker = (): AliasTracker => {
-    if (!memoTracker) {
-      memoTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
-      seedJoinClauseAliases(this, memoTracker);
-    }
+    memoTracker ??= this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     return memoTracker;
   };
   emitJoinPlan.call(this, arel, {

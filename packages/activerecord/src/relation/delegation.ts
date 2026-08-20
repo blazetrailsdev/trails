@@ -819,8 +819,8 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // Enumerable-method delegation — async + self-loading. Covers `partition`
       // and all DELEGATED_ARRAY_METHODS on unloaded relations (mirrors Rails'
       // `records` → `load` path). Always present so `assert_respond_to` passes.
-      // `toArray()` forces a load and returns the rows.
-      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.toArray());
+      // `records()` forces a load and returns the rows.
+      const enumerableDelegate = delegateEnumerableMethod(prop, () => target.records());
       if (enumerableDelegate) return enumerableDelegate;
 
       // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
@@ -852,7 +852,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (typeof prop === "symbol") return false;
       const modelClass = target._model as typeof Base;
       if (modelClass._scopes.has(prop)) return true;
-      if (delegateEnumerableMethod(prop, () => target.toArray()) !== undefined) return true;
+      if (delegateEnumerableMethod(prop, () => target.records()) !== undefined) return true;
       return typeof (modelClass as any)[prop] === "function";
     },
   });
@@ -861,12 +861,11 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 /**
  * The host surface `DelegationMethods` operates against once mixed into
  * `Relation` — the `model` accessor (Rails' delegation target `:model`) and the
- * loaded `records` (`:records`), reached through `toArray()` since trails loads
- * asynchronously.
+ * loaded `records` (`:records`), which trails loads asynchronously.
  */
 export interface DelegationHost {
   readonly model: typeof Base;
-  toArray(): Promise<Base[]>;
+  records(): Promise<Base[]>;
 }
 
 /**
@@ -878,7 +877,7 @@ export interface DelegationHost {
  *
  * The `to: :records` methods are async + self-loading: Rails reads the loaded
  * `records` array synchronously, but trails loads asynchronously, so each forces
- * `toArray()` first and then applies the corresponding `Array`/`Enumerable`
+ * `records()` first and then applies the corresponding `Array`/`Enumerable`
  * helper to a copy (preserving Ruby's non-mutating semantics).
  *
  * Mirrors: ActiveRecord::Delegation
@@ -1018,43 +1017,43 @@ export function delegateRecordMethodSync(
 
 export class DelegationMethods {
   // ---- to: :records (Array / Enumerable) ----
-  // Each loads via `toArray()` (trails has no blocking IO) then applies the
+  // Each loads via `records()` (trails has no blocking IO) then applies the
   // shared `RECORD_DELEGATES` helper — the same pure function the synchronous
   // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses.
 
   /** `Array#length` — the number of loaded records. */
   async length(this: DelegationHost): Promise<number> {
-    return RECORD_DELEGATES.length(await this.toArray()) as number;
+    return RECORD_DELEGATES.length(await this.records()) as number;
   }
 
   /** `Array#each` — yields each loaded record, returning the records. */
   async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
-    return RECORD_DELEGATES.each(await this.toArray(), fn) as Base[];
+    return RECORD_DELEGATES.each(await this.records(), fn) as Base[];
   }
 
   /** `Array#join`. */
   async join(this: DelegationHost, separator?: string): Promise<string> {
-    return RECORD_DELEGATES.join(await this.toArray(), separator) as string;
+    return RECORD_DELEGATES.join(await this.records(), separator) as string;
   }
 
   /** `Array#intersect?` — whether any record is also in `other`. */
   async isIntersect(this: DelegationHost, other: Base[]): Promise<boolean> {
-    return RECORD_DELEGATES.isIntersect(await this.toArray(), other) as boolean;
+    return RECORD_DELEGATES.isIntersect(await this.records(), other) as boolean;
   }
 
   /** `Array#reverse` (non-mutating). */
   async reverse(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.reverse(await this.toArray()) as Base[];
+    return RECORD_DELEGATES.reverse(await this.records()) as Base[];
   }
 
   /** `Array#compact` — drop nil records. */
   async compact(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.compact(await this.toArray()) as Base[];
+    return RECORD_DELEGATES.compact(await this.records()) as Base[];
   }
 
   /** `Array#index` — index of the first matching record, or `null` (Ruby `nil`). */
   async index(this: DelegationHost, v: Base | ((record: Base) => unknown)): Promise<number | null> {
-    return RECORD_DELEGATES.index(await this.toArray(), v) as number | null;
+    return RECORD_DELEGATES.index(await this.records(), v) as number | null;
   }
 
   /** `Array#rindex` — index of the last matching record, or `null` (Ruby `nil`). */
@@ -1062,32 +1061,32 @@ export class DelegationMethods {
     this: DelegationHost,
     v: Base | ((record: Base) => unknown),
   ): Promise<number | null> {
-    return RECORD_DELEGATES.rindex(await this.toArray(), v) as number | null;
+    return RECORD_DELEGATES.rindex(await this.records(), v) as number | null;
   }
 
   /** `Array#sample` — a random record, or (with `n`) up to `n`; `null` if empty. */
   async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
-    return RECORD_DELEGATES.sample(await this.toArray(), n) as Base | Base[] | null;
+    return RECORD_DELEGATES.sample(await this.records(), n) as Base | Base[] | null;
   }
 
   /** `Array#rotate` — rotate left by `count` (negative rotates right). */
   async rotate(this: DelegationHost, count = 1): Promise<Base[]> {
-    return RECORD_DELEGATES.rotate(await this.toArray(), count) as Base[];
+    return RECORD_DELEGATES.rotate(await this.records(), count) as Base[];
   }
 
   /** `Array#shuffle` (non-mutating). */
   async shuffle(this: DelegationHost): Promise<Base[]> {
-    return RECORD_DELEGATES.shuffle(await this.toArray()) as Base[];
+    return RECORD_DELEGATES.shuffle(await this.records()) as Base[];
   }
 
   /** `Array#split` — split records on a value or predicate (ActiveSupport). */
   async split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Promise<Base[][]> {
-    return RECORD_DELEGATES.split(await this.toArray(), v) as Base[][];
+    return RECORD_DELEGATES.split(await this.records(), v) as Base[][];
   }
 
   /** `Array#in_groups` — split records into `number` groups (ActiveSupport). */
   async inGroups(this: DelegationHost, n: number, fill: GroupFill = null): Promise<GroupedRecords> {
-    return RECORD_DELEGATES.inGroups(await this.toArray(), n, fill) as GroupedRecords;
+    return RECORD_DELEGATES.inGroups(await this.records(), n, fill) as GroupedRecords;
   }
 
   /** `Array#in_groups_of` — split records into groups of `number` (ActiveSupport). */
@@ -1096,17 +1095,17 @@ export class DelegationMethods {
     n: number,
     fill: GroupFill = null,
   ): Promise<GroupedRecords> {
-    return RECORD_DELEGATES.inGroupsOf(await this.toArray(), n, fill) as GroupedRecords;
+    return RECORD_DELEGATES.inGroupsOf(await this.records(), n, fill) as GroupedRecords;
   }
 
   /** `Array#to_sentence` — comma/`and`-joined record strings (ActiveSupport). */
   async toSentence(this: DelegationHost, options?: ToSentenceOptions): Promise<string> {
-    return RECORD_DELEGATES.toSentence(await this.toArray(), options) as string;
+    return RECORD_DELEGATES.toSentence(await this.records(), options) as string;
   }
 
   /** `Array#as_json` — each record's `as_json`. */
   async asJson(this: DelegationHost, options?: SerializeOptions): Promise<unknown[]> {
-    return RECORD_DELEGATES.asJson(await this.toArray(), options) as unknown[];
+    return RECORD_DELEGATES.asJson(await this.records(), options) as unknown[];
   }
 
   /**
@@ -1115,12 +1114,12 @@ export class DelegationMethods {
    * inspect form).
    */
   async toFs(this: DelegationHost, format?: string): Promise<string> {
-    return RECORD_DELEGATES.toFs(await this.toArray(), format) as string;
+    return RECORD_DELEGATES.toFs(await this.records(), format) as string;
   }
 
   /** Alias of {@link toFs} — `alias_method :to_formatted_s, :to_fs`. */
   async toFormattedS(this: DelegationHost, format?: string): Promise<string> {
-    return RECORD_DELEGATES.toFormattedS(await this.toArray(), format) as string;
+    return RECORD_DELEGATES.toFormattedS(await this.records(), format) as string;
   }
 
   /**
@@ -1138,7 +1137,7 @@ export class DelegationMethods {
    * `:skip_instruct` (conversions.rb:197-208).
    */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
-    const records = (await this.toArray()) as unknown as XmlSerializable[];
+    const records = (await this.records()) as unknown as XmlSerializable[];
     // Strip the collection-only keys; everything else (only/except/methods/
     // include/skipTypes) is forwarded to each record's `toXml`, as Rails passes
     // the shared options hash down to `XmlMini.to_tag`.
