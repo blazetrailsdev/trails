@@ -83,7 +83,12 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Circle._attributeDefinitions.get("guid")?.source).toBe("schema");
     expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
-    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
+    // The subclass's own map is its own — but the base reflects too: generating
+    // Circle's attribute methods runs `superclass.define_attribute_methods
+    // unless base_class?` (attribute_methods.rb:111), whose body loads Shape's
+    // schema (:114). Shape and Circle share the `shapes` table, so `guid` is
+    // Shape's column as much as Circle's.
+    expect(Shape._attributeDefinitions.has("guid")).toBe(true);
   });
 
   // D-Y-INCOMPATIBLE: D-Y installs Base.connectionHandler globally so Shape (which

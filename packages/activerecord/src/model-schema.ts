@@ -1200,20 +1200,6 @@ function applyColumnsHash(
     });
   }
 
-  type CacheBag = {
-    _attributesBuilder?: unknown;
-    _yamlEncoder?: unknown;
-    _cachedDefaultAttributes?: unknown;
-    _columnsHash?: unknown;
-    _columns?: unknown;
-  };
-  const bag = host as CacheBag;
-  bag._attributesBuilder = undefined;
-  bag._yamlEncoder = undefined;
-  bag._cachedDefaultAttributes = null;
-  bag._columns = undefined;
-  host._columnsHash = filteredHash;
-
   // Regenerate attribute accessors through the single define_attribute_methods
   // path now that schema reflection has settled the attribute definitions.
   const methodHost = host as unknown as {
@@ -1229,6 +1215,20 @@ function applyColumnsHash(
       regeneratingAttributeMethods.delete(host);
     }
   }
+
+  type CacheBag = {
+    _attributesBuilder?: unknown;
+    _yamlEncoder?: unknown;
+    _cachedDefaultAttributes?: unknown;
+    _columnsHash?: unknown;
+    _columns?: unknown;
+  };
+  const bag = host as CacheBag;
+  bag._attributesBuilder = undefined;
+  bag._yamlEncoder = undefined;
+  bag._cachedDefaultAttributes = null;
+  bag._columns = undefined;
+  host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)

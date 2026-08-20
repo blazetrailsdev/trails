@@ -195,7 +195,12 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Post._attributeDefinitions.has("secret")).toBe(false);
-    expect(Object.getOwnPropertyDescriptor(Post.prototype, "secret")).toBeUndefined();
+    // The schema-sourced def is dropped, but an accessor that already exists
+    // survives: `load_schema!` defines and undefines no methods, and
+    // `ignored_columns=` (model_schema.rb:366-369) calls only
+    // `reload_schema_from_cache` — only `reset_column_information` (:523-530)
+    // undefines attribute methods.
+    expect(Object.getOwnPropertyDescriptor(Post.prototype, "secret")).toBeDefined();
     expect(Post._attributeDefinitions.has("guid")).toBe(true);
   });
 
