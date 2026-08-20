@@ -60,7 +60,7 @@ export class Preloader {
     // `materialize()`, driven from the `isEmpty()` check in `Batch`.
     this._materialized = !isRelation(this.records);
     if (this._materialized) {
-      this._tree.preloadedRecords = this.records as Base[];
+      this._tree.setPreloadedRecords(this.records as Base[]);
     }
   }
 
@@ -76,7 +76,7 @@ export class Preloader {
   async isEmpty(): Promise<boolean> {
     if (this.associations == null) return true;
     await this.materialize();
-    return this._tree.preloadedRecords.length === 0;
+    return (await this._tree.preloadedRecords()).length === 0;
   }
 
   /**
@@ -85,21 +85,25 @@ export class Preloader {
    */
   async materialize(): Promise<void> {
     if (this._materialized) return;
-    this._tree.preloadedRecords = await (this.records as Relation<Base>);
+    this._tree.setPreloadedRecords(await (this.records as Relation<Base>));
     this._materialized = true;
   }
 
   async call(): Promise<Association[]> {
     const batch = new Batch([this], this._availableRecords);
     await batch.call();
-    return this.loaders;
+    return this.loaders();
   }
 
   get branches(): Branch[] {
     return this._tree.children;
   }
 
-  get loaders(): Association[] {
-    return this.branches.flatMap((b) => b.loaders);
+  async loaders(): Promise<Association[]> {
+    const loaders: Association[] = [];
+    for (const branch of this.branches) {
+      loaders.push(...(await branch.loaders()));
+    }
+    return loaders;
   }
 }

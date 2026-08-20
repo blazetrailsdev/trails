@@ -138,21 +138,23 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     "authors",
   ]);
 
-  function throughScopeSql(owners: Member[], name: string): string {
-    const loader = new Preloader({
-      records: owners,
-      associations: [name],
-      associateByDefault: false,
-    }).loaders.find((l) => l instanceof ThroughAssociation);
+  async function throughScopeSql(owners: Member[], name: string): Promise<string> {
+    const loader = (
+      await new Preloader({
+        records: owners,
+        associations: [name],
+        associateByDefault: false,
+      }).loaders()
+    ).find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return (loader as unknown as { throughScope: () => { toSql: () => string } })
       .throughScope()
       .toSql();
   }
 
-  it("nests the two-level scope join under the source reflection on the through query", () => {
+  it("nests the two-level scope join under the source reflection on the through query", async () => {
     const groucho = members("groucho");
-    const sql = throughScopeSql([groucho], "davidCategorizedClub");
+    const sql = await throughScopeSql([groucho], "davidCategorizedClub");
     // The deeper `categorizations` join is realized on the through query by
     // nesting the scope's `.leftJoins({ ":category": ":categorizations" })` under the
     // source reflection, and the copied full where_clause qualifies it, so the
@@ -166,9 +168,9 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     );
   });
 
-  it("nests an explicit scope includes under the source reflection on the through query", () => {
+  it("nests an explicit scope includes under the source reflection on the through query", async () => {
     const groucho = members("groucho");
-    const sql = throughScopeSql([groucho], "davidIncludedCategorizedClub");
+    const sql = await throughScopeSql([groucho], "davidIncludedCategorizedClub");
     // Rails nests `values[:includes]` under the source reflection, joining the
     // deeper tables so the copied `categorizations.author_id` predicate resolves
     // on the through query (rather than being left on the source query where the
@@ -180,9 +182,9 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     );
   });
 
-  it("nests a belongs_to scope includes onto the through query for a has_many-through", () => {
+  it("nests a belongs_to scope includes onto the through query for a has_many-through", async () => {
     const groucho = members("groucho");
-    const sql = throughScopeSql([groucho], "generalClubs");
+    const sql = await throughScopeSql([groucho], "generalClubs");
     // `category` (belongs_to on Club) is a 1:1 join, so even for this collection
     // target it is nested onto the through query and the `categories.name`
     // predicate resolves there — not left on the source query where `categories`
@@ -191,9 +193,9 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
   });
 
-  it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", () => {
+  it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", async () => {
     const groucho = members("groucho");
-    const sql = throughScopeSql([groucho], "categorizedClubs");
+    const sql = await throughScopeSql([groucho], "categorizedClubs");
     // Rails nests the scope's `values[:includes]` under the source reflection
     // and eager-loads it; the JoinDependency dedups the middle records by PK, so
     // the two-level `categorizations` join is realized on the through query and

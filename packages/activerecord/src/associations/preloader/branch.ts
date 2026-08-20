@@ -39,22 +39,34 @@ export class Branch {
     this._loaders = null;
   }
 
-  set preloadedRecords(records: Base[]) {
+  /** Mirrors: Preloader::Branch#preloaded_records= — `attr_writer`
+   *  (`preloader/branch.rb:9`). A JS property setter cannot pair with the
+   *  awaitable reader below, so the writer keeps the Rails name in `set` form. */
+  setPreloadedRecords(records: Base[]): void {
     this._preloadedRecords = records;
   }
 
-  get preloadedRecords(): Base[] {
+  /** Mirrors: Preloader::Branch#preloaded_records
+   *  (`preloader/branch.rb:68-70`). */
+  async preloadedRecords(): Promise<Base[]> {
     if (this._preloadedRecords !== undefined) return this._preloadedRecords;
     if (this.parent == null) {
       throw new Error("Root preloader branch requires preloadedRecords to be set before access");
     }
-    this._preloadedRecords = this.loaders.flatMap((l) => l.preloadedRecords);
+    const records: Base[] = [];
+    for (const loader of await this.loaders()) {
+      records.push(...(await loader.preloadedRecords()));
+    }
+    this._preloadedRecords = records;
     return this._preloadedRecords;
   }
 
-  futureClasses(): (typeof Base)[] {
-    const immediate = this.immediateFutureClasses();
-    const childClasses = this.children.flatMap((c) => c.futureClasses());
+  async futureClasses(): Promise<(typeof Base)[]> {
+    const immediate = await this.immediateFutureClasses();
+    const childClasses: (typeof Base)[] = [];
+    for (const child of this.children) {
+      childClasses.push(...(await child.futureClasses()));
+    }
     const seen = new Set<typeof Base>();
     return [...immediate, ...childClasses].filter((k) => {
       if (seen.has(k)) return false;
@@ -63,24 +75,26 @@ export class Branch {
     });
   }
 
-  immediateFutureClasses(): (typeof Base)[] {
+  async immediateFutureClasses(): Promise<(typeof Base)[]> {
     if (this.parent == null) {
       return [];
     }
 
     if (this.parent.isDone()) {
+      const classes: (typeof Base)[] = [];
+      for (const loader of await this.loaders()) {
+        classes.push(...(await loader.futureClasses()));
+      }
       const seen = new Set<typeof Base>();
-      return this.loaders
-        .flatMap((l) => l.futureClasses())
-        .filter((k) => {
-          if (seen.has(k)) return false;
-          seen.add(k);
-          return true;
-        });
+      return classes.filter((k) => {
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
     }
 
     const seen = new Set<typeof Base>();
-    return this.likelyReflections()
+    return (await this.likelyReflections())
       .filter((r) => !r.isPolymorphic())
       .flatMap((r) => r.chain.map((c: AbstractReflection) => c.klass))
       .filter((k) => {
@@ -90,10 +104,10 @@ export class Branch {
       });
   }
 
-  targetClasses(): (typeof Base)[] {
+  async targetClasses(): Promise<(typeof Base)[]> {
     if (this.isDone()) {
       const seen = new Set<typeof Base>();
-      return this.preloadedRecords
+      return (await this.preloadedRecords())
         .map((r) => r.constructor as typeof Base)
         .filter((k) => {
           if (seen.has(k)) return false;
@@ -104,7 +118,7 @@ export class Branch {
 
     if (this.parent!.isDone()) {
       const seen = new Set<typeof Base>();
-      return this.loaders
+      return (await this.loaders())
         .map((l) => l.klass)
         .filter((k) => {
           if (seen.has(k)) return false;
@@ -114,7 +128,7 @@ export class Branch {
     }
 
     const seen = new Set<typeof Base>();
-    return this.likelyReflections()
+    return (await this.likelyReflections())
       .filter((r) => !r.isPolymorphic())
       .map((r) => r.klass)
       .filter((k) => {
@@ -124,8 +138,8 @@ export class Branch {
       });
   }
 
-  likelyReflections(): AbstractReflection[] {
-    const parentClasses = this.parent!.targetClasses();
+  async likelyReflections(): Promise<AbstractReflection[]> {
+    const parentClasses = await this.parent!.targetClasses();
     const result: AbstractReflection[] = [];
     for (const parentKlass of parentClasses) {
       const refl = parentKlass._reflectOnAssociation(this.association!);
@@ -138,25 +152,29 @@ export class Branch {
     return this.parent === null;
   }
 
-  get sourceRecords(): Base[] {
+  async sourceRecords(): Promise<Base[]> {
     if (this.isRoot()) return [];
-    return this.parent!.preloadedRecords;
+    return this.parent!.preloadedRecords();
   }
 
   isDone(): boolean {
     return this.isRoot() || (this._loaders != null && this._loaders.every((l) => l.isRun()));
   }
 
-  runnableLoaders(): Association[] {
+  async runnableLoaders(): Promise<Association[]> {
     if (this.isRoot()) return [];
-    return this.loaders.flatMap((l) => l.runnableLoaders()).filter((l) => !l.isRun());
+    const runnable: Association[] = [];
+    for (const loader of await this.loaders()) {
+      runnable.push(...(await loader.runnableLoaders()));
+    }
+    return runnable.filter((l) => !l.isRun());
   }
 
-  groupedRecords(): Map<AbstractReflection, Base[]> {
+  async groupedRecords(): Promise<Map<AbstractReflection, Base[]>> {
     const h = new Map<AbstractReflection, Base[]>();
-    const polymorphicParent = !this.isRoot() && this.parent!.isPolymorphic();
+    const polymorphicParent = !this.isRoot() && (await this.parent!.isPolymorphic());
 
-    for (const record of this.sourceRecords) {
+    for (const record of await this.sourceRecords()) {
       const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
         this.association!,
       );
@@ -241,11 +259,11 @@ export class Branch {
     });
   }
 
-  isPolymorphic(): boolean {
+  async isPolymorphic(): Promise<boolean> {
     if (this.isRoot()) return false;
     if (this._polymorphic !== undefined) return this._polymorphic;
 
-    this._polymorphic = this.sourceRecords.some((record) => {
+    this._polymorphic = (await this.sourceRecords()).some((record) => {
       const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
         this.association!,
       );
@@ -254,9 +272,9 @@ export class Branch {
     return this._polymorphic;
   }
 
-  get loaders(): Association[] {
+  async loaders(): Promise<Association[]> {
     if (this._loaders !== null) return this._loaders;
-    this._loaders = [...this.groupedRecords()].flatMap(([reflection, reflectionRecords]) =>
+    this._loaders = [...(await this.groupedRecords())].flatMap(([reflection, reflectionRecords]) =>
       this.preloadersForReflection(reflection, reflectionRecords),
     );
     return this._loaders;

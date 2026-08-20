@@ -133,12 +133,14 @@ type HasOneHost = {
 describe("Preloader::ThroughAssociation#through_scope nested raw-join handling", () => {
   const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);
 
-  function throughLoader(owners: Member[], name: string): ThroughAssociation {
-    const loader = new Preloader({
-      records: owners,
-      associations: [name],
-      associateByDefault: false,
-    }).loaders.find((l) => l instanceof ThroughAssociation);
+  async function throughLoader(owners: Member[], name: string): Promise<ThroughAssociation> {
+    const loader = (
+      await new Preloader({
+        records: owners,
+        associations: [name],
+        associateByDefault: false,
+      }).loaders()
+    ).find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return loader;
   }
@@ -149,35 +151,33 @@ describe("Preloader::ThroughAssociation#through_scope nested raw-join handling",
       .toSql();
   }
 
-  it("raises when the outer reflection's own scope carries a raw join", () => {
+  it("raises when the outer reflection's own scope carries a raw join", async () => {
     const groucho = members("groucho");
-    expect(() => buildSql(throughLoader([groucho], "rawMembersOfClub"))).toThrow(
-      ConfigurationError,
-    );
+    const loader = await throughLoader([groucho], "rawMembersOfClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
   });
 
-  it("raises when only the source sub-chain carries a raw join, matching Rails", () => {
+  it("raises when only the source sub-chain carries a raw join, matching Rails", async () => {
     const groucho = members("groucho");
     // The sub-chain's raw join is flattened into `reflection_scope`; the
     // flattened where_clause is non-empty, so Rails nests it under the source
     // reflection at the outer build and raises — it is NOT deferred.
-    expect(() => buildSql(throughLoader([groucho], "membersViaRawClub"))).toThrow(
-      ConfigurationError,
-    );
+    const loader = await throughLoader([groucho], "membersViaRawClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
   });
 
-  it("raises for a has_one nested through whose scope carries a raw join", () => {
+  it("raises for a has_one nested through whose scope carries a raw join", async () => {
     const groucho = members("groucho");
-    expect(() => buildSql(throughLoader([groucho], "rawCategoryOfClub"))).toThrow(
-      ConfigurationError,
-    );
+    const loader = await throughLoader([groucho], "rawCategoryOfClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
   });
 
-  it("does NOT raise when the chain carries a raw join but an empty where_clause", () => {
+  it("does NOT raise when the chain carries a raw join but an empty where_clause", async () => {
     const groucho = members("groucho");
     // Empty flattened where_clause → Rails skips the `elsif` branch entirely, so
     // the raw join is never nested and nothing raises.
-    expect(() => buildSql(throughLoader([groucho], "noWhereRawMembersOfClub"))).not.toThrow();
+    const loader = await throughLoader([groucho], "noWhereRawMembersOfClub");
+    expect(() => buildSql(loader)).not.toThrow();
   });
 
   it("raises ConfigurationError on preload, matching Rails", async () => {

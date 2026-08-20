@@ -77,20 +77,20 @@ type HasOneHost = {
 describe("Preloader::ThroughAssociation#through_scope raw-join handling", () => {
   const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);
 
-  function throughLoader(owners: Member[], name: string): ThroughAssociation {
-    const loaders = new Preloader({
+  async function throughLoader(owners: Member[], name: string): Promise<ThroughAssociation> {
+    const loaders = await new Preloader({
       records: owners,
       associations: [name],
       associateByDefault: false,
-    }).loaders;
+    }).loaders();
     const loader = loaders.find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return loader;
   }
 
-  it("nests the reflection scope's raw join under the source reflection, as Rails does", () => {
+  it("nests the reflection scope's raw join under the source reflection, as Rails does", async () => {
     const groucho = members("groucho");
-    const loader = throughLoader([groucho], "rawGeneralClub");
+    const loader = await throughLoader([groucho], "rawGeneralClub");
     // Rails: `joins!(source_reflection.name => values[:joins])`. Building the
     // through query then raises ConfigurationError because the raw string is
     // treated as an association name that Club has no reflection for.

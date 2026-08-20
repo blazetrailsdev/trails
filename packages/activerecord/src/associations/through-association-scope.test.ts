@@ -123,13 +123,17 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     "taggings",
   ]);
 
-  function throughLoader(owners: Author[], name: string, scope?: any): ThroughAssociation {
-    const loaders = new Preloader({
+  async function throughLoader(
+    owners: Author[],
+    name: string,
+    scope?: any,
+  ): Promise<ThroughAssociation> {
+    const loaders = await new Preloader({
       records: owners,
       associations: [name],
       scope,
       associateByDefault: false,
-    }).loaders;
+    }).loaders();
     const loader = loaders.find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
     return loader;
@@ -137,7 +141,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
 
   it("carries annotate from the through reflection scope onto the through query", async () => {
     const david = authors("david");
-    const loader = throughLoader([david], "annotatedComments");
+    const loader = await throughLoader([david], "annotatedComments");
     const scope = (loader as any).throughScope();
     expect(scope.toSql()).toContain("preload-through");
 
@@ -146,9 +150,9 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     expect(comments.length).toBeGreaterThan(0);
   });
 
-  it("keeps a source-table condition on a collection source at the source stage, not the through query", () => {
+  it("keeps a source-table condition on a collection source at the source stage, not the through query", async () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithSourceCondition");
+    const loader = await throughLoader([david], "commentsWithSourceCondition");
     // Rails copies the full where_clause and eager-loads the source (JOIN
     // comments), whose JoinDependency dedups the middle records by PK — so the
     // source condition rides the through query with the source JOIN, resolving
@@ -159,27 +163,27 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     expect(sql).toMatch(/JOIN .*comments/);
   });
 
-  it("copies a through-table condition onto the through query for a collection source", () => {
+  it("copies a through-table condition onto the through query for a collection source", async () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithThroughCondition");
+    const loader = await throughLoader([david], "commentsWithThroughCondition");
     const scope = (loader as any).throughScope();
     const sql = scope.toSql();
     // The through-table predicate constrains the intermediate (posts) rows.
     expect(sql).toContain("Welcome to the weblog");
   });
 
-  it("copies a raw-SQL through-table condition onto the through query for a collection source", () => {
+  it("copies a raw-SQL through-table condition onto the through query for a collection source", async () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithRawThroughCondition");
+    const loader = await throughLoader([david], "commentsWithRawThroughCondition");
     const scope = (loader as any).throughScope();
     // Raw through-table predicate rides the through query (Rails' full
     // where_clause assignment), not the source query where `posts` is unjoined.
     expect(scope.toSql()).toContain("posts.title");
   });
 
-  it("does not copy a mixed through+source predicate onto the through query", () => {
+  it("does not copy a mixed through+source predicate onto the through query", async () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithMixedCondition");
+    const loader = await throughLoader([david], "commentsWithMixedCondition");
     const scope = (loader as any).throughScope();
     // The predicate references both `posts` (through) and `comments` (source) in
     // one node. Rails copies the full where_clause and JOINs the source, so both
@@ -223,7 +227,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("cascades strict loading from the preload scope onto the through query", async () => {
     const david = authors("david");
 
-    const loader = throughLoader([david], "annotatedComments", Comment.all().strictLoading());
+    const loader = await throughLoader([david], "annotatedComments", Comment.all().strictLoading());
     const scope = (loader as any).throughScope();
     expect(scope.strictLoadingValue).toBe(true);
   });

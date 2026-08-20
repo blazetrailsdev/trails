@@ -7,14 +7,6 @@ import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import { RecordInvalid } from "../validations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 
-function safeKlass(refl: { klass?: unknown } | null | undefined): any {
-  try {
-    return refl?.klass ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation
  */

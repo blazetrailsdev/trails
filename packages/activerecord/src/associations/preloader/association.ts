@@ -57,12 +57,12 @@ export class Association {
     return this.klass.tableName;
   }
 
-  futureClasses(): (typeof Base)[] {
+  async futureClasses(): Promise<(typeof Base)[]> {
     if (this.isRun()) return [];
     return [this.klass];
   }
 
-  runnableLoaders(): Association[] {
+  async runnableLoaders(): Promise<Association[]> {
     return [this];
   }
 
@@ -92,8 +92,16 @@ export class Association {
     return this._recordsByOwner!;
   }
 
-  get preloadedRecords(): Base[] {
-    return this._preloadedRecords ?? [];
+  /** Mirrors: Preloader::Association#preloaded_records
+   *  (`preloader/association.rb:153-157`) — the reader forces the preload
+   *  query on first access. Ruby's `defined?(@preloaded_records)` is an
+   *  assignment check, so the guard is on the backing field being unassigned:
+   *  a legitimately-empty preload must not re-run the query. */
+  async preloadedRecords(): Promise<Base[]> {
+    if (this._preloadedRecords === undefined) {
+      await this.loadRecords();
+    }
+    return this._preloadedRecords!;
   }
 
   get associationKeyName(): string | string[] {
