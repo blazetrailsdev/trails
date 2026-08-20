@@ -102,9 +102,6 @@ export class AttributeMethodPattern {
   }: { prefix?: string; suffix?: string; parameters?: string | null | false } = {}) {
     this.prefix = prefix;
     this.suffix = suffix;
-    // `parameters: false` (before_type_cast.rb:32, query.rb:10) is NOT nil: it
-    // survives as `false`, so the generated method takes no arguments —
-    // `def #{mangled_name}(#{parameters || ''})` (attribute_methods.rb:465).
     this.parameters = parameters == null ? "..." : parameters;
     this.proxyTarget = `${prefix}attribute${suffix}`;
     this.method_missing_target = `attribute_${prefix}${suffix ? `${suffix}` : ""}`;
@@ -620,7 +617,10 @@ export type InstanceHost = {
  * into the generator's batch. A TS "source" is the definition itself, so the
  * emitted body is the equivalent closure over `callArgs`; a rest parameter
  * forwards what Ruby's `params` names, so `parameters` only matters when it is
- * `false` — the zero-arg case, which is an accessor property in TS.
+ * `false` — `def #{mangled_name}(#{parameters || ''})` (attribute_methods.rb:465)
+ * is then a zero-arg reader, which is an accessor property in TS (CLAUDE.md,
+ * "Generated attribute readers are properties"). A `parameters: false` pattern
+ * (before_type_cast.rb:32, query.rb:10) is NOT nil, so it survives as `false`.
  * `CALL_COMPILABLE_REGEXP` has no analogue either: a JS property lookup needs
  * no name to be compilable, so the `send(...)` arm it guards never applies.
  * `name` is unused here exactly as it is in Ruby.
@@ -636,10 +636,6 @@ export function defineCall(
 ): void {
   codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
     batch.push((mod) => {
-      // `def #{mangled_name}(#{parameters || ''})` (attribute_methods.rb:465):
-      // a `parameters: false` pattern generates a zero-arg reader, which is an
-      // accessor property in TS (see CLAUDE.md, "Generated attribute readers
-      // are properties").
       if (parameters === false) {
         Object.defineProperty(mod, mangledName, {
           get(this: ReadWriteHost) {

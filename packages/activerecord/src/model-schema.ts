@@ -1109,8 +1109,10 @@ function reflectedTypeForColumn(
 }
 
 /**
- * Classes whose accessor regeneration is already in flight — see the call site
- * in `applyColumnsHash`.
+ * Classes whose accessor regeneration is already in flight. `applyColumnsHash`
+ * regenerates through `define_attribute_methods`, which reads `attribute_names`
+ * (attribute_methods.rb:115) → `columnNames()` → `loadSchema` — and it runs
+ * *inside* that load, whose superclass cascade can re-stale this class's memo.
  *
  * @noRailsEquivalent PERMANENT — guards the re-entrancy trails' schema-reflection
  * hook adds to `define_attribute_methods`; Rails' `load_schema!` generates no
@@ -1226,12 +1228,6 @@ function applyColumnsHash(
     defineAttributeMethods?: () => boolean;
   };
   methodHost._attributeMethodsGenerated = false;
-  // Generation reads `attribute_names` (attribute_methods.rb:115
-  // `super(attribute_names)`), which consults `columnNames()` → `loadSchema` —
-  // and we are *inside* that load, whose superclass cascade can re-stale this
-  // class's memo. Rails never re-enters (`load_schema!` defines no attribute
-  // methods), so hold the re-entrant regeneration off: the outer call already
-  // generates from the settled definitions.
   if (!regeneratingAttributeMethods.has(host)) {
     regeneratingAttributeMethods.add(host);
     try {

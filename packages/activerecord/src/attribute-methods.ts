@@ -200,7 +200,8 @@ interface AttributeMethodsHost {
   isBaseClass?(): boolean;
   attributeNames(): string[];
   abstractClass?: boolean;
-  aliasAttribute?(newName: string, oldName: string): void;
+  aliasAttribute(newName: string, oldName: string): void;
+  _hasAttribute(attrName: string): boolean;
   defineAttributeMethods?(): boolean;
   generateAliasAttributes?(): void;
 }
@@ -398,11 +399,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // only the superclass cascade (above) and generateAliasAttributes (below) run.
   if (this.abstractClass !== true) {
     amDefineAttributeMethods.call(this as never, ...this.attributeNames());
-    // Rails: `alias_attribute :id_value, :id if _has_attribute?("id")`
-    // (attribute_methods.rb:117).
-    if (this._attributeDefinitions.has("id") && typeof this.aliasAttribute === "function") {
-      this.aliasAttribute("idValue", "id");
-    }
+    if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
   }
   generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
@@ -717,8 +714,22 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
   return names;
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#_has_attribute?
+ * (attribute_methods.rb:260-262).
+ *
+ * @internal Rails-private helper.
+ */
+function classHasAttribute(
+  this: { attributeTypes(): Record<string, unknown> },
+  attrName: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(this.attributeTypes(), attrName);
+}
+
 export const ClassMethods = {
   attributeNames: classAttributeNames,
+  _hasAttribute: classHasAttribute,
 };
 
 // ---------------------------------------------------------------------------

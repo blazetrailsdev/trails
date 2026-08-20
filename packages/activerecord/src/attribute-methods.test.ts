@@ -1204,9 +1204,7 @@ describe("AttributeMethodsTest", () => {
     // concrete subclass inherits them and they are not clobbered by generation.
     class Topic extends Base {
       static {
-        // Rails' `new_topic_like_ar_class` sets `self.table_name = "topics"`
-        // (attribute_methods_test.rb:1583); the subclass inherits it, so
-        // `attribute_names` is the real column list.
+        // Rails' `new_topic_like_ar_class` (attribute_methods_test.rb:1583).
         this.tableName = "topics";
         this.abstractClass = true;
         this.attribute("title", "string");

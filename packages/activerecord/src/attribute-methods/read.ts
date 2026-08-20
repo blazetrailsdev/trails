@@ -78,14 +78,8 @@ export function defineMethodAttribute(
   owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
     batch.push((mod) => {
       Object.defineProperty(mod, tempMethodName, {
-        get(this: {
-          _attributes: AttributeSet;
-          _accessedFields: Set<string>;
-          _readAttribute(n: string, block: (n: string) => unknown): unknown;
-          missingAttribute(n: string, stack?: string): never;
-        }) {
-          if (this._attributes.has(canonicalName)) this._accessedFields.add(canonicalName);
-          return this._readAttribute(canonicalName, (n) => this.missingAttribute(n));
+        get(this: ReadRecord) {
+          return readGeneratedAttribute(this, canonicalName);
         },
         set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
           this.writeAttribute(canonicalName, value);

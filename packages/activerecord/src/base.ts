@@ -1762,11 +1762,12 @@ export class Base extends Model {
     ModelSchema.sequenceName.call(this, name);
   }
 
-  // Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-  // parameters: false` (attribute_methods/before_type_cast.rb:32). Ruby's
-  // `class_attribute` `+=` gives Active Record its own array rather than
-  // mutating ActiveModel's; `parameters: false` makes each generated method
-  // zero-arg, i.e. an accessor property in TS.
+  /**
+   * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
+   * parameters: false` (attribute_methods/before_type_cast.rb:32). Ruby's
+   * `class_attribute` `+=` gives Active Record its own array rather than
+   * mutating ActiveModel's.
+   */
   static override _attributeMethodPatterns: AttributeMethodPattern[] = [
     ...Model._attributeMethodPatterns,
     new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
@@ -3873,6 +3874,16 @@ export class Base extends Model {
 
   static attributeNames(): string[] {
     return AttributeMethodsClassMethods.attributeNames.call(this);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#_has_attribute?
+   * (attribute_methods.rb:260-262).
+   *
+   * @internal Rails-private helper.
+   */
+  static _hasAttribute(attrName: string): boolean {
+    return AttributeMethodsClassMethods._hasAttribute.call(this as never, attrName);
   }
 
   /**
