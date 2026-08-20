@@ -230,15 +230,6 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect([...proxy].map((p: Post) => p.title).sort()).toEqual(["x", "y"]);
   });
 
-  it("keys / entries work (values intentionally not added)", async () => {
-    const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts");
-    expect([...proxy.keys()]).toEqual([0, 1, 2]);
-    expect([...proxy.entries()].map(([i, p]) => `${i}:${p.title}`)).toEqual(
-      proxy.target.map((p, i) => `${i}:${p.title}`),
-    );
-  });
-
   it("array methods accept a thisArg (matches Array.prototype signatures)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");

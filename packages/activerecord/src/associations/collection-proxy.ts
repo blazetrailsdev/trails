@@ -333,19 +333,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this.target[Symbol.iterator]();
   }
 
-  // `keys` / `entries` are the index-yielding half of the same JS iteration
-  // protocol as `[Symbol.iterator]` above — like it, they read the delegated
-  // records (`records` → `load_target`, collection_proxy.rb:1024). `values()`
-  // is NOT added: it would shadow `Relation#values()`.
-
-  keys(): IterableIterator<number> {
-    return this.target.keys();
-  }
-
-  entries(): IterableIterator<[number, T]> {
-    return this.target.entries();
-  }
-
   /**
    * @internal Resolve the target model an association's proxy scopes to —
    * preferring the rich reflection's namespace-aware klass, else `className`.
@@ -1424,8 +1411,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   ]
 //   delegate(*delegate_methods, to: :scope)
 //
-// The mixin files name Ruby's `private` boundary structurally
-// (query_methods.rb:1677, spawn_methods.rb:71), so
+// The mixin files name Ruby's `protected` and `private` boundaries
+// structurally (query_methods.rb:1604 and query_methods.rb:1663 for the two
+// protected sections, query_methods.rb:1677 and spawn_methods.rb:71 for
+// private) — Ruby excludes both from `public_instance_methods(false)` — so
 // `QueryMethodsPublicInstanceMethods` / `SpawnMethodsPublicInstanceMethods` ARE
 // `public_instance_methods(false)` and the delegate list is read off them
 // rather than hand-transcribed. `public_instance_methods(false)`
