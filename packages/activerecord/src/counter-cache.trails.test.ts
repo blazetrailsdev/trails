@@ -32,10 +32,8 @@ describe("CounterCacheTest (trails)", () => {
     expect(reloaded.legacy_comments_count).toBe(1);
   });
 
-  // counter_cache.rb:10 declares counter_cached_association_names with
-  // class_attribute, so belongs_to.rb:41's `|=` on a subclass writes locally
-  // and leaves the superclass list alone. JS has no such default for a class
-  // property, so the semantics are worth pinning.
+  // counter_cache.rb:10 — class_attribute, so belongs_to.rb:41's `|=` on a
+  // subclass writes locally; JS class properties have no such default.
   it("registering a counter cached association does not mutate the superclass list", () => {
     class ParentModel extends Base {}
     class ChildModel extends ParentModel {}

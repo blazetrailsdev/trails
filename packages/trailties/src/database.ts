@@ -174,25 +174,59 @@ export async function loadDatabaseConfigModule(
  *
  * The `shared` key (configuration.rb:439-458) is deleted and reverse-merged
  * into every environment, with the nested arm for the multi-database shape.
+ * Rails' `reverse_merge!` mutates the parsed YAML in place; the loaded value
+ * here is an imported module's export, shared with (and possibly frozen by) the
+ * module registry, so each merged hash is rebuilt instead.
+ *
  * Rails then returns `Hash.new(shared).merge(loaded_yaml)`, whose default value
- * answers an environment the file never listed; a plain object has no default,
+ * answers an environment the file never listed. A plain object has no default,
  * so the returned record is a Proxy whose `get` falls back to `shared` — the
- * one JS construct with `Hash.new`'s semantics (its own keys, and so its
- * enumeration, stay exactly the loaded ones, as in Ruby).
+ * one JS construct with `Hash.new`'s semantics, leaving its own keys (and so
+ * its enumeration) exactly the loaded ones, as in Ruby.
  */
+type AnyHash = Record<string, unknown>;
+
 export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
   const fs = await getFsAsync();
   const path = await getPathAsync();
   const resolvedRoot = root ?? trailsRoot() ?? fs.cwd();
 
   const loaded = await loadDatabaseConfigModule(resolvedRoot);
-  if (loaded) return mergeShared(loaded.module);
-
   const jsonPath = path.join(resolvedRoot, "config", "database.json");
-  if (await fs.exists(jsonPath)) {
+  let loadedYaml: DatabaseConfigModule | null = null;
+  if (loaded) {
+    loadedYaml = loaded.module;
+  } else if (await fs.exists(jsonPath)) {
     if (!fs.readFile)
       throw new Error("Config loading requires an fs adapter with readFile support.");
-    return mergeShared(JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule);
+    loadedYaml = JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule;
+  }
+
+  if (loadedYaml) {
+    const shared = loadedYaml.shared;
+    if (shared == null || shared === false) return loadedYaml;
+
+    const merged: Record<string, unknown> = { ...loadedYaml };
+    delete merged.shared;
+    for (const [env, config] of Object.entries(merged)) {
+      if (isMultiDatabaseEnv(config)) {
+        const subConfigs: Record<string, unknown> = {};
+        for (const [name, subConfig] of Object.entries(config)) {
+          subConfigs[name] = isMultiDatabaseEnv(shared)
+            ? reverseMerge(subConfig as AnyHash, (shared as Record<string, AnyHash>)[name] ?? {})
+            : reverseMerge(subConfig as AnyHash, shared as AnyHash);
+        }
+        merged[env] = subConfigs;
+      } else if (config !== null && typeof config === "object") {
+        merged[env] = reverseMerge(config as AnyHash, shared as AnyHash);
+      }
+    }
+    return new Proxy(merged, {
+      get(target, key, receiver) {
+        if (typeof key === "string" && !Reflect.has(target, key)) return shared;
+        return Reflect.get(target, key, receiver);
+      },
+    }) as DatabaseConfigModule;
   }
 
   if (env.DATABASE_URL) return {};
@@ -201,47 +235,6 @@ export async function databaseConfiguration(root?: string): Promise<DatabaseConf
     `Could not load database configuration. No such file - ${path.join(resolvedRoot, "config", "database.*")}`,
   );
 }
-
-/**
- * configuration.rb:439-458 — `loaded_yaml.delete("shared")` and the
- * reverse-merge of what it yields into every environment, then
- * `Hash.new(shared).merge(loaded_yaml)`.
- *
- * Rails' `reverse_merge!` mutates the parsed YAML in place. Here the loaded
- * value is an imported module's export, which is shared with (and may be
- * frozen by) the module registry, so each merged hash is rebuilt instead.
- */
-function mergeShared(loadedYaml: DatabaseConfigModule): DatabaseConfigModule {
-  const shared = loadedYaml.shared;
-  // Ruby's `if (shared = ...)`: only nil/false skip the branch.
-  if (shared == null || shared === false) return loadedYaml;
-
-  const merged: Record<string, unknown> = { ...loadedYaml };
-  delete merged.shared;
-
-  for (const [env, config] of Object.entries(merged)) {
-    if (isMultiDatabaseEnv(config)) {
-      const subConfigs: Record<string, unknown> = {};
-      for (const [name, subConfig] of Object.entries(config)) {
-        subConfigs[name] = isMultiDatabaseEnv(shared)
-          ? reverseMerge(subConfig as AnyHash, (shared as Record<string, AnyHash>)[name] ?? {})
-          : reverseMerge(subConfig as AnyHash, shared as AnyHash);
-      }
-      merged[env] = subConfigs;
-    } else if (config !== null && typeof config === "object") {
-      merged[env] = reverseMerge(config as AnyHash, shared as AnyHash);
-    }
-  }
-
-  return new Proxy(merged, {
-    get(target, key, receiver) {
-      if (typeof key === "string" && !Reflect.has(target, key)) return shared;
-      return Reflect.get(target, key, receiver);
-    },
-  }) as DatabaseConfigModule;
-}
-
-type AnyHash = Record<string, unknown>;
 
 /**
  * Load the database configuration for the given environment.

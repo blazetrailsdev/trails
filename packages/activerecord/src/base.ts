@@ -4574,7 +4574,6 @@ extend(Base, _Reflection.ClassMethods);
 // `_reflections` it shadows, so the two cannot drift apart.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
-// counter_cache.rb:10
 classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,
   default: [],

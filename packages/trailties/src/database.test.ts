@@ -49,8 +49,7 @@ describe("databaseConfiguration", () => {
     await expect(databaseConfiguration()).rejects.toThrow(/Could not load database configuration/);
   });
 
-  // configuration.rb:439-458 — the flat arm: `shared` is deleted and
-  // reverse-merged into every environment, so an env's own keys win.
+  // configuration.rb:451-453 — the flat arm.
   it("reverse merges the shared key into each environment", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
@@ -68,9 +67,7 @@ describe("databaseConfiguration", () => {
     expect(config.test).toEqual({ adapter: "sqlite3", database: "db/test.sqlite3", pool: 9 });
   });
 
-  // configuration.rb:441-450 — the nested arm: both sides are hashes of
-  // hashes, so each named sub-config reverse merges the shared entry of the
-  // same name.
+  // configuration.rb:441-450 — the nested arm.
   it("reverse merges shared per named database when both are hashes of hashes", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
@@ -94,8 +91,7 @@ describe("databaseConfiguration", () => {
     expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "db/animals_test" });
   });
 
-  // configuration.rb:458 — `Hash.new(shared).merge(loaded_yaml)`: an
-  // environment the file never lists still resolves to `shared`.
+  // configuration.rb:458 — `Hash.new(shared).merge(loaded_yaml)`.
   it("resolves an unlisted environment to shared", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));

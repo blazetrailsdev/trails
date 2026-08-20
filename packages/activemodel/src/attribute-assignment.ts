@@ -71,17 +71,23 @@ export function _assignAttributes(
  * `undefine_attribute_methods`. TS has no `method_missing`, so that dispatch is
  * explicit inside the send below, in the same position Ruby runs it.
  *
+ * `respond_to?` consults the receiver's full method table, including names
+ * answered through `respond_to_missing?`, where the lookup below sees only what
+ * it can resolve — so a NoMethodError raised from *inside* a matched
+ * `attribute_missing` still routes to `attribute_writer_missing` instead of
+ * being re-raised at :70-71. Tracked by
+ * `assign-attribute-respond-to-setter-reraise-arm`.
+ *
  * @internal Rails-private helper.
  */
 export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
   const setter = `${k}=`;
   try {
-    const method = methodFor(model, setter);
+    const method = publicMethod(model, setter);
     if (method) {
       method.call(model, v);
       return;
     }
-    // AttributeMethods#method_missing (attribute_methods.rb:508-517).
     const match = model.matchedAttributeMethod(setter);
     if (match) {
       model.attributeMissing(match, v);
@@ -92,7 +98,7 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
     );
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
-    if (methodFor(model, setter)) {
+    if (publicMethod(model, setter)) {
       throw error;
     } else {
       model.attributeWriterMissing(k, v);
@@ -101,8 +107,8 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
 }
 
 /**
- * Ruby's method-table lookup for `setter` — what both `public_send(setter, v)`
- * and `respond_to?(setter)` consult above.
+ * Ruby's `Object#public_method` for `setter` — the lookup both
+ * `public_send(setter, v)` and `respond_to?(setter)` consult above.
  *
  * One Ruby method name reaches TS two ways, which is the single genuine JS
  * shortcoming on this path. Rails' generated writer is a real method named
@@ -118,7 +124,7 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
  * shadowing data descriptors and get-only accessors: Ruby looks up `name=` as
  * its own method, independent of any `name` getter.
  */
-function methodFor(
+function publicMethod(
   model: AttributeAssignment,
   setter: string,
 ): ((this: AttributeAssignment, value: unknown) => void) | null {
