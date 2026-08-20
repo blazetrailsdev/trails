@@ -1872,16 +1872,15 @@ function wrapCollectionProxy<T extends Base = Base>(
       }
 
       // Enumerable-method delegation — async + self-loading, checked before
-      // scope lookup so it routes to the collection cache rather than the scope
-      // relation's `_records`. Covers `partition` and all
-      // DELEGATED_ARRAY_METHODS on *unloaded* proxies (the sync path above
-      // handles loaded proxies). Rails resolves every `to: :records` delegate
-      // through `CollectionProxy#records` (collection_proxy.rb:1024-1026),
-      // which is `load_target` — and `load_target` MERGES rather than replaces
-      // (`@target = merge_target_lists(find_target, target)`,
-      // collection_association.rb:270-278), so a proxy holding built-but-unsaved
-      // records answers with them included. Reading through `loadTarget()`
-      // rather than `load()` names that seam at the call site.
+      // scope lookup so it routes to the collection cache via
+      // `target.loadTarget()` rather than the scope relation's `_records`.
+      // Covers `partition` and all DELEGATED_ARRAY_METHODS on *unloaded*
+      // proxies (the sync path above handles loaded proxies). Rails resolves
+      // every `to: :records` delegate through `CollectionProxy#records`
+      // (collection_proxy.rb:1024-1026), which is `load_target` — it merges
+      // `find_target` into the in-memory target rather than replacing it
+      // (collection_association.rb:270-278), so a proxy holding
+      // built-but-unsaved records answers with them included.
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.loadTarget());
       if (enumerableDelegate) return enumerableDelegate;
 

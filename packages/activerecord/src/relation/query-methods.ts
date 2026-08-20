@@ -2626,8 +2626,9 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
 /**
  * `QueryMethods.public_instance_methods(false)` — the members Ruby defines
  * above the first `protected` (query_methods.rb:1604). `CollectionProxy`
- * delegates exactly this set to `scope` (collection_proxy.rb:1128-1137), so the boundary is a
- * fact about this module and is expressed here rather than transcribed there.
+ * delegates exactly this set to `scope` (collection_proxy.rb:1128-1137), so
+ * the boundary is a fact about this module and is expressed here rather than
+ * transcribed there.
  *
  * @internal
  */
@@ -2716,9 +2717,9 @@ export const QueryMethodsPublicInstanceMethods = {
 } as const;
 
 /**
- * The members between query_methods.rb's two `protected` keywords
- * (query_methods.rb:1604 and query_methods.rb:1663) and the following
- * `private` (query_methods.rb:1677). Ruby excludes `protected` members from
+ * The members in query_methods.rb's two `protected` sections
+ * (query_methods.rb:1604 and query_methods.rb:1663, the second running to
+ * `private` at query_methods.rb:1677). Ruby excludes `protected` members from
  * `public_instance_methods(false)` exactly as it excludes private ones, so
  * `CollectionProxy` delegates none of them to `scope`
  * (collection_proxy.rb:1128-1137); they ride the same mixin here so
