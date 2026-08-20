@@ -41,9 +41,7 @@ export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
   pushPendingDecorator,
-  replayOwnPendingDecorators,
   resetDefaultAttributes,
-  registerWithSuperclass,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
 export type { AttributeDefinition, AttributeOptions } from "./attributes.js";

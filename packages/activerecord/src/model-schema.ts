@@ -6,7 +6,6 @@ import {
   AttributeSetBuilder,
   YAMLEncoder,
   typeRegistry,
-  replayOwnPendingDecorators,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -1243,20 +1242,6 @@ function applyColumnsHash(
   // `columnNames()` partial-load path — are the source of truth here.
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
-
-  // Mirrors ActiveModel::AttributeRegistration#_default_attributes rebuilding
-  // from `columns_hash` and replaying the pending chain, so a `normalizes` /
-  // `serialize` decoration survives the overwrite above. Restricted to reflected
-  // columns: `_attributeDefinitions` is trails' eager type cache, not Rails'
-  // `_default_attributes`, so replaying a NON-column attribute here would fire
-  // guards Rails only raises when the default set is built (enum.rb:240-245).
-  const reflectedDefs = new Map(
-    Object.keys(filteredHash)
-      .filter((n) => host._attributeDefinitions.has(n))
-      .map((n) => [n, host._attributeDefinitions.get(n)] as const),
-  );
-  replayOwnPendingDecorators(host as never, reflectedDefs as never);
-  for (const [name, def] of reflectedDefs) host._attributeDefinitions.set(name, def);
 
   // Reflection may change a column's type/default without changing the key set,
   // so the revision stamps cannot infer staleness from key coverage.
