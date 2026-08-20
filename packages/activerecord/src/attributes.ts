@@ -26,8 +26,7 @@ interface AttributeDefinition {
   name: string;
   type: Type;
   defaultValue?: unknown;
-  userProvided?: boolean;
-  source?: "user" | "schema";
+  userProvidedDefault?: boolean;
   limit?: number | null;
   /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
   virtual?: boolean;
@@ -93,14 +92,13 @@ export function defineAttribute(
   const resolvedDefault = defaultValue === NO_DEFAULT ? existing?.defaultValue : defaultValue;
 
   this._attributeDefinitions.set(name, {
-    // Spread existing to preserve metadata fields (source, virtual, etc.)
+    // Spread existing to preserve metadata fields (reflectedTable, virtual, etc.)
     // that other code paths (resetColumnInformation, schema reflection) rely on.
     ...existing,
     name,
     type: castType,
     defaultValue: resolvedDefault ?? null,
-    userProvided: userProvidedDefault,
-    source: userProvidedDefault ? "user" : "schema",
+    userProvidedDefault,
     ...(options.limit != null ? { limit: options.limit } : {}),
   });
 
@@ -191,9 +189,8 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attributesHash = new Map<string, Attribute>();
     for (const [name, def] of defs) {
-      const source = def.source ?? (def.userProvided === false ? "schema" : "user");
       const column = columns[name];
-      if (source === "schema") {
+      if ((def.userProvidedDefault ?? true) === false) {
         // Seed from the BARE reflected column type, not `def.type` — trails
         // eagerly bakes decorations into `def.type` (a back-compat convenience
         // Rails lacks), and phase 2 replays those same decorators, so seeding

@@ -961,12 +961,12 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 
 /**
  * Drop schema-sourced attribute defs (and their generated accessors) so the
- * next load re-reflects them; user-declared defs (source === "user") are
+ * next load re-reflects them; user-declared defs are
  * preserved, matching Rails where user-provided attributes survive reload.
  */
 function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
   for (const [name, def] of Array.from(host._attributeDefinitions)) {
-    if ((def.userProvided ?? true) === false || def.source === "schema") {
+    if ((def.userProvidedDefault ?? true) === false) {
       host._attributeDefinitions.delete(name);
       if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
         delete host.prototype[name];
@@ -1138,14 +1138,14 @@ function applyColumnsHash(
         delete host.prototype[name];
       }
       const existing = host._attributeDefinitions.get(name);
-      if (!existing || (existing.userProvided ?? true) === false) {
+      if (!existing || (existing.userProvidedDefault ?? true) === false) {
         host._attributeDefinitions.delete(name);
       }
       continue;
     }
     filteredHash[name] = column;
     const existing = host._attributeDefinitions.get(name);
-    if (existing && (existing.userProvided ?? true)) {
+    if (existing && (existing.userProvidedDefault ?? true)) {
       // A user-declared type override (e.g. an enum) preserves its type across
       // reflection. The schema column's default is NOT merged onto the def;
       // `_defaultAttributes` seeds it via from_database directly from the cached
@@ -1187,8 +1187,7 @@ function applyColumnsHash(
       // `encrypts` on one column yields Encrypted(Serialized(Encrypted(...))).
       reflectedColumnType,
       defaultValue,
-      userProvided: false,
-      source: "schema",
+      userProvidedDefault: false,
       ...(typeof host.tableName === "string" ? { reflectedTable: host.tableName } : {}),
       ...(colLimit != null ? { limit: colLimit } : {}),
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
@@ -1262,7 +1261,7 @@ function applyColumnsHash(
  * than the generic ActiveModel type registry.
  *
  * Populates the schema cache if needed (async). User-declared attributes
- * (`userProvided: true`) are NEVER overwritten — matching Rails where
+ * (`userProvidedDefault: true`) are NEVER overwritten — matching Rails where
  * `attribute :foo, :bar` always wins over schema-reflected types.
  *
  * @internal
@@ -1431,9 +1430,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
-    const userDeclared =
-      (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
-    if (!userDeclared) continue;
+    if ((def.userProvidedDefault ?? true) === false) continue;
     const isVirtual = !real.has(name);
     if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
   }

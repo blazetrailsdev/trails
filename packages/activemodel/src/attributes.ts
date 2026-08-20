@@ -1,7 +1,6 @@
 import type { CodeGenerator } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
-import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
@@ -34,21 +33,19 @@ export interface AttributeDefinition {
   virtual?: boolean;
   limit?: number | null;
   /**
-   * True when the attribute was declared via `this.attribute(...)` (user code).
-   * False when registered from schema reflection (`load_schema`).
-   *
-   * Mirrors: Rails' `user_provided_default:` keyword on `define_attribute`.
-   * The distinction controls how defaults are materialized (user default vs.
-   * database default) and whether schema reflection is allowed to overwrite
-   * the definition — user-provided defs always win.
+   * Mirrors: the `user_provided_default:` keyword on
+   * `ActiveRecord::Attributes::ClassMethods#define_attribute`
+   * (activerecord/lib/active_record/attributes.rb:235-238), which Rails passes
+   * through to `define_default_attribute`'s `from_user:` and never stores.
+   * trails records it on the definition because schema reflection re-registers
+   * definitions and must not overwrite a user-declared one (model-schema.ts
+   * `ensureSchemaLoaded`).
    *
    * Optional for backwards compatibility with downstream consumers that
    * construct `AttributeDefinition` directly. When absent, treated as
-   * `true` (user-authored) — matching pre-load_schema behavior.
+   * `true` (user-authored).
    */
-  userProvided?: boolean;
-  /** Provenance tag — matches `userProvided` but kept explicit for clarity. */
-  source?: "user" | "schema";
+  userProvidedDefault?: boolean;
 }
 
 /**
@@ -145,7 +142,7 @@ export function attribute(
     typeName = undefined;
   }
   const typeProvided = typeName !== undefined;
-  const userProvided = options?.userProvidedDefault !== false;
+  const userProvidedDefault = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
@@ -169,8 +166,7 @@ export function attribute(
     type,
     defaultValue,
     virtual: options?.virtual ?? existing?.virtual,
-    userProvided,
-    source: userProvided ? "user" : "schema",
+    userProvidedDefault,
     ...(options?.limit != null ? { limit: options.limit } : {}),
   });
 
@@ -298,37 +294,6 @@ function typeOptions(options?: AttributeOptions): Record<string, unknown> | unde
     ...rest
   } = options ?? {};
   return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Instance methods — Mirrors: ActiveModel::Attributes instance methods
-// ---------------------------------------------------------------------------
-
-/**
- * Build default AttributeSet from class definitions.
- *
- * Mirrors: ActiveModel::AttributeRegistration._default_attributes
- */
-export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
-  const attrMap = new Map<string, Attribute>();
-  for (const [name, def] of defs) {
-    const userProvided = def.userProvided ?? true;
-    if (def.defaultValue != null) {
-      if (userProvided) {
-        // Rails: user_provided_default: true → wraps the default so it is
-        // cast through the user-type (and procs re-evaluate per instance).
-        const base = Attribute.withCastValue(name, null, def.type);
-        attrMap.set(name, base.withUserDefault(def.defaultValue));
-      } else {
-        // Rails: user_provided_default: false → column default comes from
-        // the database; use fromDatabase so deserialize is applied.
-        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
-      }
-    } else {
-      attrMap.set(name, Attribute.withCastValue(name, null, def.type));
-    }
-  }
-  return new AttributeSet(attrMap);
 }
 
 // ---------------------------------------------------------------------------
