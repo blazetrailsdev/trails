@@ -630,8 +630,7 @@ export class Duration {
 
     const parts: Partial<DurationParts> = {};
     const remainderSign = Math.sign(value);
-    // Ruby `value.round(9).abs`.
-    let remainder = Math.abs(Math.round(value * 1e9) / 1e9);
+    let remainder = Math.abs(Number(value.toFixed(9)));
     let variable = false;
 
     if (value !== 0) {

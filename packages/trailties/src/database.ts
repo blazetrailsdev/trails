@@ -160,18 +160,21 @@ export async function loadDatabaseConfigModule(
  * Loads and returns the entire raw configuration of database from values
  * stored in the app's `config/database.*`.
  *
- * Mirrors `Rails::Application::Configuration#database_configuration`
- * (`railties/lib/rails/application/configuration.rb:434-468`): it reads
+ * trails' seat for `Rails::Application::Configuration#database_configuration`
+ * (`railties/lib/rails/application/configuration.rb:434-468`), which reads
  * `paths["config/database"].existent.first`, returns `{}` when the file is
  * absent but `DATABASE_URL` is set (Active Record builds the primary config
- * from the env var), and otherwise raises.
+ * from the env var), and otherwise raises. `root` defaults to `Trails.root` —
+ * Rails' `Rails.root` — falling back to the working directory.
  *
- * This is the seam `establish_connection` reads through, not from: the
+ * This is the seam `establish_connection` reads *through*, never from: the
  * Railtie's `active_record.initialize_database`
  * (`activerecord/lib/active_record/railtie.rb:256-262`) assigns this to
- * `Base.configurations` and only then calls `establish_connection`. `root`
- * defaults to `Trails.root` — Rails' `Rails.root` — falling back to the
- * working directory.
+ * `Base.configurations` and only then calls `establish_connection`.
+ *
+ * Rails' `shared`-key reverse-merge (configuration.rb:439-458) is not ported
+ * yet; tracked by `0112-one-rails-thing-n-trails-things/
+ * database-configuration-shared-key-reverse-merge`.
  */
 export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
   const fs = await getFsAsync();

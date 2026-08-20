@@ -764,21 +764,19 @@ export async function establishConnection(
     current = parent;
   }
 
-  if (configOrEnv === undefined) {
-    await autoConnect(modelClass);
-  } else {
-    // Mirrors Rails `establish_connection(config_or_env)`
-    // (connection_handling.rb:51-54): every input — string URL, hash, or an
-    // already-resolved DatabaseConfig (the `run_without_connection` restore
-    // path) — funnels through `resolve_config_for_connection`, which plants the
-    // connection_specification_name and then `configurations.resolve(...)` (a
-    // no-op that returns the object unchanged for a DatabaseConfig). The
-    // resolved object then goes to the handler verbatim, so the pool stores it
-    // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
-    // and buildAdapterArg live inside establishWithDbConfig.
-    const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
-    await establishWithDbConfig(modelClass, dbConfig);
-  }
+  // Mirrors Rails `establish_connection(config_or_env)`
+  // (connection_handling.rb:50-54): `config_or_env ||= DEFAULT_ENV.call.to_sym`,
+  // then every input — env name, string URL, hash, or an already-resolved
+  // DatabaseConfig (the `run_without_connection` restore path) — funnels through
+  // `resolve_config_for_connection`, which plants the
+  // connection_specification_name and then `configurations.resolve(...)` (a
+  // no-op that returns the object unchanged for a DatabaseConfig). The
+  // resolved object then goes to the handler verbatim, so the pool stores it
+  // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
+  // and buildAdapterArg live inside establishWithDbConfig.
+  configOrEnv ??= DatabaseConfigurations.currentEnv();
+  const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
+  await establishWithDbConfig(modelClass, dbConfig);
 }
 
 /**
@@ -811,9 +809,8 @@ function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc
 /**
  * Mirrors Rails `establish_connection(db_config)` where the argument is already
  * a resolved `DatabaseConfig`. Derives the adapter name and connection URL from
- * the object — exactly as {@link autoConnect} does for the config it looks up —
- * and threads the object through {@link establishWithConfig} so the pool stores
- * the captured config verbatim instead of rebuilding one from its hash.
+ * the object and threads it through {@link establishWithConfig} so the pool
+ * stores the captured config verbatim instead of rebuilding one from its hash.
  */
 async function establishWithDbConfig(
   modelClass: typeof Base,
@@ -853,9 +850,7 @@ async function establishWithDbConfig(
 
 /**
  * Derive the adapter name and the URL to forward to the adapter layer from a
- * resolved DatabaseConfig. Shared by {@link autoConnect} (config looked up from
- * `Base.configurations`) and {@link establishWithDbConfig} (config handed
- * straight to `establish_connection`) so the two resolution paths can't drift.
+ * resolved DatabaseConfig, for {@link establishWithDbConfig}.
  *
  * The original URL is always usable for adapter inference (e.g.
  * `sqlite3:db/test.sqlite3` → "sqlite3"), even when the connection target
@@ -953,36 +948,6 @@ async function establishWithConfig(
     adapterFactory: () =>
       new (AdapterClass as new (...args: unknown[]) => DatabaseAdapter)(...adapterArgs),
   });
-}
-
-/**
- * Mirrors the no-arg arm of Rails' `establish_connection`
- * (connection_handling.rb:50-54): `config_or_env ||= DEFAULT_ENV.call.to_sym`,
- * then the same `resolve_config_for_connection` funnel over `configurations`.
- * Rails never reads a config file here — `config/database.yml` reaches
- * `Base.configurations` once at boot, through the Railtie
- * (`activerecord/lib/active_record/railtie.rb:256-262`), which assigns
- * `Rails.application.config.database_configuration` and only then calls
- * `establish_connection`. trails' boot seam is `databaseConfiguration()` in
- * `@blazetrails/trailties`.
- */
-async function autoConnect(modelClass: typeof Base): Promise<void> {
-  const configs = baseConfigurations();
-  const env = DatabaseConfigurations.currentEnv();
-  const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
-  const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
-
-  if (!dbConfig) {
-    throw new ConnectionNotEstablished(
-      `No database configuration found for ${modelClass.name}. ` +
-        `Add config/database.json, set DATABASE_URL, or call ${modelClass.name}.establishConnection(url)`,
-    );
-  }
-
-  // The looked-up DatabaseConfig is handed straight to the shared object funnel
-  // — adapter/url derivation and the handler call live in establishWithDbConfig
-  // — instead of re-deriving and rebuilding a fresh config here.
-  await establishWithDbConfig(modelClass, dbConfig);
 }
 
 // Re-exports for backward compat — these now live in adapter-args.ts so
