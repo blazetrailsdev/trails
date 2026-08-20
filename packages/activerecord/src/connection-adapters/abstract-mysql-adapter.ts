@@ -1676,7 +1676,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Rails reads `@raw_connection` directly; `_connection` is trails' spelling
    * of that same ivar, so the SHOW WARNINGS round-trip is sourced the same way
-   * rather than passed in.
+   * rather than passed in. Rails' `handle_warnings` has no null guard on it
+   * because `perform_query` only runs with a checked-out connection
+   * (mysql2/database_statements.rb:103); trails types `_connection` as
+   * nullable for the disconnected adapter, so the guard joins the `.nil?`
+   * early return rather than becoming a second branch Rails does not have.
    *
    * `ActiveRecord.db_warnings_action` is `nil` by default in Rails; trails
    * spells that default `"ignore"` on `AbstractAdapter` (abstract-adapter.ts),
@@ -1707,7 +1711,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         {
           Level: "Warning",
           Code: undefined,
-          Message: `Query had warning_count=${warningCount} but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
+          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
         },
       ];
     }
@@ -1716,7 +1720,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       const code = row.Code == null ? null : String(row.Code);
       const message = row.Message ?? "";
       const warning = new SQLWarning(message, code, level, sql, this.pool);
-      if (this.isWarningIgnored({ level: level ?? undefined, code: code ?? undefined, message }))
+      if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
       if (action === "raise") throw warning;

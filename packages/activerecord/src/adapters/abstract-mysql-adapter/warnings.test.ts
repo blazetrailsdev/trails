@@ -114,7 +114,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const raised = adapter.execute(`SELECT 'x'`);
         await expect(raised).rejects.toBeInstanceOf(SQLWarning);
         await expect(raised).rejects.toThrow(
-          `Query had warning_count=1 but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
+          `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
         );
       });
     });
