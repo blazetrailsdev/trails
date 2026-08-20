@@ -41,8 +41,13 @@ export {
 export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
+  pendingAttributeDeclarationQ,
+  pendingAttributeTypeQ,
   pushPendingDecorator,
+  pushPendingDefault,
+  pushPendingType,
   resetDefaultAttributes,
+  resetDefaultAttributesBang,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
 export type { AttributeDefinition, AttributeOptions } from "./attributes.js";

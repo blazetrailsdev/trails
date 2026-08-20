@@ -32,10 +32,7 @@ export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
   _cachedAttributeTypes?: Record<string, Type> | null;
   _attributesBuilder?: unknown;
-  _attributeDefinitions?: Map<
-    string,
-    { name: string; type?: Type; virtual?: boolean; userProvidedDefault?: boolean }
-  >;
+  _attributeDefinitions?: Map<string, { name: string; type?: Type; virtual?: boolean }>;
   _pendingAttributeModifications?: PendingModification[];
   _attributeAliases?: Record<string, string>;
   /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
@@ -360,6 +357,47 @@ export function hookAttributeType(
   type: Type,
 ): Type {
   return type;
+}
+
+/**
+ * True when `name` was declared by user code — i.e. some class in the ancestry
+ * pushed a `PendingType` / `PendingDefault` for it through `attribute(...)`
+ * (attribute_registration.rb:53-72).
+ *
+ * @noRailsEquivalent CONVERGEABLE — retired by
+ * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
+ * Rails never has to ask: a user declaration lives only in
+ * the pending-modification queue and a reflected column lives only in
+ * `columns_hash`, so the two are already distinct records. trails' ActiveRecord
+ * re-registers reflected columns INTO `_attributeDefinitions` beside the user
+ * declarations, so the paths that must not clobber a declaration read the
+ * provenance back off the same queue Rails replays — rather than off a stored
+ * flag, which is the shape Rails has no counterpart for.
+ */
+export function pendingAttributeDeclarationQ(cls: AttributeHostInternals, name: string): boolean {
+  return collectPendingModifications(cls).some(
+    (modification) =>
+      (modification instanceof PendingType || modification instanceof PendingDefault) &&
+      modification.name === name,
+  );
+}
+
+/**
+ * True when user code declared a concrete *type* for `name` — Rails pushes a
+ * `PendingType` with a non-nil type only for `attribute(name, type)`, never for
+ * a default-only or bare re-declaration (attribute_registration.rb:12-18).
+ *
+ * @noRailsEquivalent CONVERGEABLE — same reason as
+ * {@link pendingAttributeDeclarationQ}; retired by
+ * `retire-attribute-definitions-registry-for-default-attributes` (RFC 0115).
+ */
+export function pendingAttributeTypeQ(cls: AttributeHostInternals, name: string): boolean {
+  return collectPendingModifications(cls).some(
+    (modification) =>
+      modification instanceof PendingType &&
+      modification.name === name &&
+      modification.type != null,
+  );
 }
 
 /** True while a PendingDecorator is replaying during materialization. @internal */

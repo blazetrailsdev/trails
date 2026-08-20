@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ValueType } from "@blazetrails/activemodel";
+import { ValueType, pendingAttributeDeclarationQ } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
@@ -33,7 +33,7 @@ describe("sync loadSchema / columnsHash", () => {
     const hash = Post.columnsHash();
 
     expect(hash.guid).toBe(cols.guid);
-    expect(Post._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
   });
 
   it("columnsHash filters ignoredColumns out of the cached hash", () => {
@@ -81,7 +81,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
     expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
     // The subclass's own map is its own — but the base reflects too: generating
     // Circle's attribute methods runs `superclass.define_attribute_methods
@@ -113,7 +113,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     // Reflection should have landed on the STI base via subclass adapter;
     // subclass shares the base's map reference.
-    expect(Shape._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Shape, "guid")).toBe(false);
     expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
   });
 
@@ -164,7 +164,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(Circle._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
   });
 
   it("resetColumnInformation scrubs schema-sourced defs from a subclass-forked map", () => {
@@ -185,7 +185,6 @@ describe("sync loadSchema / columnsHash", () => {
             name: "guid",
             type: { name: "uuid" },
             defaultValue: null,
-            userProvidedDefault: false,
           },
         ],
       ]);
@@ -214,8 +213,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Circle._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
-    expect(Circle._attributeDefinitions.get("radius")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
+    expect(pendingAttributeDeclarationQ(Circle, "radius")).toBe(true);
     expect(Shape._attributeDefinitions.has("radius")).toBe(false);
     expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
   });
@@ -347,7 +346,7 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Shape.columnsHash();
-    expect(Shape._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
+    expect(pendingAttributeDeclarationQ(Shape, "guid")).toBe(false);
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
 
@@ -366,13 +365,13 @@ describe("sync loadSchema / columnsHash", () => {
     (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Post.columnsHash(); // triggers reflection
 
-    expect(Post._attributeDefinitions.get("guid")?.userProvidedDefault).toBe(false);
-    expect(Post._attributeDefinitions.get("title")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
+    expect(pendingAttributeDeclarationQ(Post, "title")).toBe(true);
 
     (resetColumnInformation as any).call(Post);
 
     expect(Post._attributeDefinitions.has("guid")).toBe(false);
-    expect(Post._attributeDefinitions.get("title")?.userProvidedDefault).toBe(true);
+    expect(pendingAttributeDeclarationQ(Post, "title")).toBe(true);
   });
 
   // An internalSchemaCache that starts warm and tracks whether resetColumnInformation

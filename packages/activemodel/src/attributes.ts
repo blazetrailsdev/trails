@@ -32,20 +32,6 @@ export interface AttributeDefinition {
   defaultValue: unknown;
   virtual?: boolean;
   limit?: number | null;
-  /**
-   * Mirrors: the `user_provided_default:` keyword on
-   * `ActiveRecord::Attributes::ClassMethods#define_attribute`
-   * (activerecord/lib/active_record/attributes.rb:235-238), which Rails passes
-   * through to `define_default_attribute`'s `from_user:` and never stores.
-   * trails records it on the definition because schema reflection re-registers
-   * definitions and must not overwrite a user-declared one (model-schema.ts
-   * `ensureSchemaLoaded`).
-   *
-   * Optional for backwards compatibility with downstream consumers that
-   * construct `AttributeDefinition` directly. When absent, treated as
-   * `true` (user-authored).
-   */
-  userProvidedDefault?: boolean;
 }
 
 /**
@@ -90,13 +76,6 @@ export function _writeAttribute(
 export interface AttributeOptions {
   default?: unknown;
   virtual?: boolean;
-  /**
-   * Mirrors Rails' `user_provided_default:` keyword. Defaults to true —
-   * any call to `attribute(...)` is treated as user-authored. Internal
-   * schema-reflection paths pass `false` so user-declared attributes win
-   * on re-registration.
-   */
-  userProvidedDefault?: boolean;
   limit?: number | null;
   /**
    * PG type modifiers, forwarded to the registry as Rails' `**options` are:
@@ -142,7 +121,6 @@ export function attribute(
     typeName = undefined;
   }
   const typeProvided = typeName !== undefined;
-  const userProvidedDefault = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
@@ -151,15 +129,10 @@ export function attribute(
   // PendingType `with_type` inheritance path); fall back to the value type only
   // when nothing is known about the attribute yet.
   // Rails' `attribute(name, ...)` forwards `**options` straight to the type
-  // registry (attributes.rb:59-62 → attribute_registration.rb:18); the three
-  // keys consumed here — `default`, `virtual`, `user_provided_default` — are
-  // the ones Rails names explicitly, so only the rest reach the registry.
-  const {
-    default: _default,
-    virtual: _virtual,
-    userProvidedDefault: _upd,
-    ...typeOptions
-  } = options ?? {};
+  // registry (attributes.rb:59-62 → attribute_registration.rb:18); the two keys
+  // consumed here — `default` and `virtual` — are the ones Rails names
+  // explicitly, so only the rest reach the registry.
+  const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
   const type = typeProvided
     ? typeName instanceof Type
       ? typeName
@@ -181,7 +154,6 @@ export function attribute(
     type,
     defaultValue,
     virtual: options?.virtual ?? existing?.virtual,
-    userProvidedDefault,
     ...(options?.limit != null ? { limit: options.limit } : {}),
   });
 

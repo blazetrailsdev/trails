@@ -6,6 +6,7 @@ import {
   IntegerType,
   Type,
   isDecoratorReplay,
+  pendingAttributeTypeQ,
 } from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
@@ -152,17 +153,10 @@ export function installEnumAttribute(
   // present (attribute_registration.rb:12-18); a default-only / type-less
   // attribute keeps the fallback `value` type until the column reflects, so its
   // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248). Requiring a user-provided def AND a concrete type
-  // distinguishes the two: the `value` default's `type()` is nil (like Rails'
-  // `Value#type`), so a default-only attribute reads as `existingTypeName ==
-  // null` and is treated as column-reflected.
-  const existingDef = (klass as any)._attributeDefinitions?.get(resolved);
-  const existingTypeName =
-    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
-  const explicitlyTyped =
-    existingDef !== undefined &&
-    (existingDef.userProvidedDefault ?? true) &&
-    existingTypeName != null;
+  // enum.rb:238-248). Reading the pending queue for a `PendingType` carrying
+  // a concrete type distinguishes the two exactly as Rails does: a default-only
+  // attribute pushes no typed `PendingType`, so it reads as column-reflected.
+  const explicitlyTyped = pendingAttributeTypeQ(klass as never, resolved);
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
