@@ -160,7 +160,9 @@ export function installEnumAttribute(
   const existingTypeName =
     typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
   const explicitlyTyped =
-    (existingDef?.userProvidedDefault ?? true) === true && existingTypeName != null;
+    existingDef !== undefined &&
+    (existingDef.userProvidedDefault ?? true) &&
+    existingTypeName != null;
   const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
