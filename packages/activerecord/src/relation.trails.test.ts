@@ -292,11 +292,10 @@ describe("RelationTest", () => {
     registerModel("LeftJoinPost2", Post);
 
     const rel = Author.leftJoins(":posts");
-    // Association name stored in leftOuterJoinsValues, not pre-resolved to _joinClauses
+    // Association name stored in leftOuterJoinsValues verbatim; the join is
+    // resolved to SQL only at build time, by the join dependency.
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
-    expect((rel as any)._joinClauses.some((j: any) => j.table === "posts")).toBe(false);
-    // SQL still contains LEFT OUTER JOIN
-    expect(rel.toSql()).toMatch(/LEFT OUTER JOIN/i);
+    expect(rel.toSql()).toMatch(/LEFT OUTER JOIN\s+\S*posts\S*\s+ON/i);
   });
 
   it("leftJoins stores an invalid non-Hash/Symbol/Array arg verbatim and raises lazily at build", () => {
@@ -351,7 +350,7 @@ describe("RelationTest", () => {
   });
 
   it("eagerLoad + leftJoins: buildJoinBuckets short-circuit does not drop eager stash", () => {
-    // Regression: when joins_values and _joinClauses are empty, buildJoinBuckets
+    // Regression: when joins_values is empty, buildJoinBuckets
     // short-circuits for the left-outer-only path. If eagerLoadValues is
     // also present, the short-circuit must not fire — eager stash would be skipped.
     class Author extends Base {
@@ -368,7 +367,7 @@ describe("RelationTest", () => {
     }
     registerModel("EagerLeftAuthor", Author);
     registerModel("EagerLeftPost", Post);
-    // Both eagerLoad and leftJoins present, no explicit joins_values/_joinClauses
+    // Both eagerLoad and leftJoins present, no explicit joins_values
     const rel = Author.leftJoins(":posts").eagerLoad(":posts");
     expect((rel as any).eagerLoadValues).toContain(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");

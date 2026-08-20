@@ -144,11 +144,6 @@ export class Merger {
 
   private mergeJoins(rel: any): void {
     const other = this.other;
-    // trails-only: raw Arel join clauses live outside joins_values, so they are
-    // copied alongside them.
-    const clauses = other._joinClauses ?? [];
-    if (clauses.length > 0) rel._joinClauses.push(...clauses);
-
     const joinsValues = other.joinsValues ?? [];
     if (joinsValues.length === 0) return;
     if (other.model === rel.model) {

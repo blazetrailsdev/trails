@@ -967,7 +967,6 @@ export class AssociationScope {
     const item = evaluated as {
       referencesValues?: Array<string | Nodes.SqlLiteral>;
       joinsValues?: unknown[];
-      _joinClauses?: unknown[];
       leftOuterJoinsValues?: unknown[];
       includesValues?: unknown[];
       eagerLoadValues?: unknown[];
@@ -977,15 +976,13 @@ export class AssociationScope {
     if (refs.length === 0) return;
     const target = scope as {
       joinsValues: unknown[];
-      _joinClauses: unknown[];
       leftOuterJoinsValues: unknown[];
       _model?: typeof Base;
     };
     const sameKlass = item._model !== undefined && item._model === target._model;
-    // item.only(:joins, :left_outer_joins) — carry raw SQL / Arel join nodes
-    // straight across, then union named association joins (same-klass) or build
-    // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
-    for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
+    // item.only(:joins, :left_outer_joins) — union named association joins
+    // (same-klass) or build cross-klass JoinDependencies (Merger#merge_joins /
+    // #merge_outer_joins).
     // merger.rb:123-126 — `other.joins_values.partition { |join| case join when
     // Hash, Symbol, Array; true end }`: association specs on one side, raw SQL /
     // Arel nodes and stashed JoinDependencies on the other.

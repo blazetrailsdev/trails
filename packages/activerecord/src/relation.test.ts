@@ -604,8 +604,8 @@ describe("RelationTest", () => {
 
   // A cross-model `merge` that joins an already-joined table aliases the child
   // INNER JOIN (`authors_categorizations`) via a shared AliasTracker re-aligned
-  // across the merged JoinDependencies (Rails build_joins). See
-  // relation/merged-join-alias-tracker.ts.
+  // across the merged JoinDependencies (Rails build_joins,
+  // query_methods.rb:1894).
   it("relation merging with merged symbol joins is aliased", async () => {
     const categorizationsWithAuthors = CanonCategorization.joins(":author");
     const queries = await captureSql(async () => {

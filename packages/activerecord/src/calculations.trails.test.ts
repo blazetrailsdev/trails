@@ -122,8 +122,8 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 
   // A plain `joins(:assoc)` now feeds buildJoinDependencies (via joins_values),
   // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
-  // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
-  // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.
+  // through the join-dependency walk — the joined klass is recovered from the
+  // join dependency, never from a pre-resolved sidecar store.
   it("resolves joined column cast type through the join-dependency walk", () => {
     const rel = CalcAuthor.joins(":topics");
     // `written_on` is a datetime attribute that lives only on the joined Topic;
