@@ -1609,7 +1609,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("collection singular ids setter", async () => {
     const company = await Company.find(companies("rails_core").id);
     const dev = (await Developer.first())!;
-    await association(company, "developers").setIds([dev.id as number]);
+    await (company as any).association("developers").idsWriter([dev.id as number]);
     const devs = await (company as any).developers.toArray();
     expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
   });
@@ -1617,7 +1617,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("collection singular ids setter with required type cast", async () => {
     const company = await Company.find(companies("rails_core").id);
     const dev = (await Developer.first())!;
-    await association(company, "developers").setIds([`${dev.id}`]);
+    await (company as any).association("developers").idsWriter([`${dev.id}`]);
     const devs = await (company as any).developers.toArray();
     expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
   });
@@ -1625,12 +1625,12 @@ describe("HasManyThroughAssociationsTest", () => {
   it("collection singular ids setter with string primary keys", async () => {
     const book = await Book.find(books("awdr").id);
     const second = await Subscriber.find(subscribers("second").nick);
-    await association(book, "subscribers").setIds([second.nick]);
+    await (book as any).association("subscribers").idsWriter([second.nick]);
     expect((await (book as any).subscribers.reload()).map((s: any) => s.nick)).toEqual([
       second.nick,
     ]);
 
-    await association(book, "subscribers").setIds([]);
+    await (book as any).association("subscribers").idsWriter([]);
     await (book as any).subscribers.reload();
     expect(await (book as any).subscribers.toArray()).toEqual([]);
   });
@@ -1641,7 +1641,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const ids = [dev.id as number, -9999];
     // Rails asserts the full message, including the trailing `not_found_ids`
     // sentence (`klass.all.raise_record_not_found_exception!(…, not_found_ids)`).
-    await expect(association(company, "developers").setIds(ids)).rejects.toThrow(
+    await expect((company as any).association("developers").idsWriter(ids)).rejects.toThrow(
       `Couldn't find all Developers with 'id': (${dev.id}, -9999) (found 1 results, but was looking for 2). Couldn't find Developer with id -9999.`,
     );
   });
@@ -1649,7 +1649,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("collection singular ids through setter raises exception when invalid ids set", async () => {
     const david = await Author.find(authors("david").id);
     const ids = [(categories("general") as any).name, "Unknown"];
-    await expect(association(david, "essayCategories").setIds(ids)).rejects.toThrow(
+    await expect((david as any).association("essayCategories").idsWriter(ids)).rejects.toThrow(
       "Couldn't find all Categories with 'name': (General, Unknown) (found 1 results, but was looking for 2). Couldn't find Category with name Unknown.",
     );
   });

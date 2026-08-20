@@ -365,8 +365,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       devs.push(await Developer.create({ name: `JME ${i}`, salary: 50000 }));
     }
 
-    await newProject.developers.setIds([devs[0].id, devs[1].id] as any);
-    await newProject.developersWithCallbacks.setIds([devs[2].id, devs[3].id] as any);
+    await (newProject as any).association("developers").idsWriter([devs[0].id, devs[1].id]);
+    await (newProject as any)
+      .association("developersWithCallbacks")
+      .idsWriter([devs[2].id, devs[3].id]);
     expect(await newProject.save()).toBe(true);
 
     await newProject.reload();
@@ -937,7 +939,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const activeRecord = projects("active_record");
     const actionController = projects("action_controller");
     const developer = new Developer({ name: "Joe" });
-    await developer.projects.setIds([activeRecord.id, actionController.id] as any);
+    await (developer as any)
+      .association("projects")
+      .idsWriter([activeRecord.id, actionController.id]);
     await (developer as any).save();
     await developer.reload();
     expect((await developer.projects).length).toBe(2);
@@ -951,7 +955,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const activeRecord = projects("active_record");
     const actionController = projects("action_controller");
     const developer = new Developer({ name: "Joe" });
-    await developer.projects.setIds([activeRecord.id, null, actionController.id, ""] as any);
+    await (developer as any)
+      .association("projects")
+      .idsWriter([activeRecord.id, null, actionController.id, ""]);
     await (developer as any).save();
     await developer.reload();
     expect((await developer.projects).length).toBe(2);

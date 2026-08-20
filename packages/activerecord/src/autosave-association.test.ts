@@ -700,10 +700,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("assign ids", async () => {
     const firm = new Firm({ name: "Apple" });
-    await firm.clients.setIds([
-      companies("first_client").id as number,
-      companies("second_client").id as number,
-    ]);
+    await (firm as any)
+      .association("clients")
+      .idsWriter([companies("first_client").id as number, companies("second_client").id as number]);
     await firm.save();
     await firm.reload();
     const clients = await firm.clients;
@@ -759,7 +758,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const proxy = association(order, "orderAgreements");
     expect(await proxy).toHaveLength(0);
 
-    await proxy.setIds(orderAgreements as number[]);
+    await (order as any).association("orderAgreements").idsWriter(orderAgreements as number[]);
     await order.save();
     await order.reload();
 
@@ -833,7 +832,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const proxy = association(order, "books");
     expect(await proxy).toHaveLength(0);
 
-    await proxy.setIds(bookIds as number[][]);
+    await (order as any).association("books").idsWriter(bookIds as number[][]);
     await order.save();
     await order.reload();
 
@@ -892,10 +891,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
   it("assign ids for through a belongs to", async () => {
     const firm = new Firm({ name: "Apple" });
-    await firm.developers.setIds([
-      developers("david").id as number,
-      developers("jamis").id as number,
-    ]);
+    await (firm as any)
+      .association("developers")
+      .idsWriter([developers("david").id as number, developers("jamis").id as number]);
     await firm.save();
     await firm.reload();
     const devs = await firm.developers;
