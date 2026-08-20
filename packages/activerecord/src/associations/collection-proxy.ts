@@ -1,5 +1,7 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { QueryMethodBangs } from "../relation/query-methods.js";
+import { SpawnMethods } from "../relation/spawn-methods.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
@@ -953,22 +955,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } finally {
       assoc._throughScope = previousThroughScope;
     }
-    this._invalidateAssociationIds();
-  }
-
-  private _invalidateAssociationIds(): void {
     // `@offsets = @take = nil; @scope = nil` (collection_proxy.rb:1112-1116).
     this.resetScope();
-    const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
-    if (assocInstance) {
-      assocInstance._associationIds = null;
-      // Rails' `insert_record` ends in `reset_scope` (collection_association.rb),
-      // which drops the memoized `@association_scope` — NOT `reset`, which now
-      // shares one array with this proxy and would discard the record just added.
-      if (typeof assocInstance.resetScope === "function") {
-        assocInstance.resetScope();
-      }
-    }
   }
 
   private _raiseOnTypeMismatch(records: T[]): void {
@@ -1287,9 +1275,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy_all
    */
   async destroyAll(): Promise<T[]> {
-    const records = await this.toArray();
-    await this.destroy(...records);
-    this._invalidateAssociationIds();
+    const records = (await this._collectionAssociation().destroyAll()) as T[];
+    this.resetScope();
     return records;
   }
 
@@ -1500,13 +1487,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         deleteAll(dependent?: string): Promise<number>;
       }
     ).deleteAll(dependent);
-    // In Rails the proxy reads the association's `@target`, so the `reset` /
-    // `loaded!` inside `delete_all` is what empties the collection the proxy
-    // shows. The trails CollectionProxy keeps its own copy of the target, so
-    // the same reset has to be replayed on it here.
-    this._target = [];
-    this._targetLoaded = true;
-    this._invalidateAssociationIds();
     this.resetScope();
     return count;
   }
@@ -1726,13 +1706,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 //   ]
 //   delegate(*delegate_methods, to: :scope)
 //
-// trails mixes QueryMethods / SpawnMethods into `Relation` itself rather than
-// keeping them as standalone modules, so their `public_instance_methods(false)`
-// can't be reflected off a module object — the two name lists below stand in for
-// that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
-// Both halves of each module are listed: `public_instance_methods(false)` includes
-// the bang builders (`where!`, `limit!`, `none!`, …), so Rails delegates those to
-// `scope` too — a Rails `CollectionProxy` owns no relation state of its own. The
+// `SpawnMethods` (spawn-methods.ts) and `QueryMethodBangs` (query-methods.ts) are
+// the mixin objects `include()` mixes into `Relation`, so their own keys ARE
+// `public_instance_methods(false)` and the delegate list is read off them. The
+// non-bang `QueryMethods` members still live on `Relation` itself and stay a
+// hand-list below until RFC 0107 finishes moving them into the mixin; it shrinks
+// as they land. `public_instance_methods(false)` includes the bang builders
+// (`where!`, `limit!`, `none!`, …), so Rails delegates those to `scope` too — a
+// Rails `CollectionProxy` owns no relation state of its own. The
 // constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
 // prototype delegation is consulted only in the sense that they must target the
 // proxy's inherited state, so they are invoked through `Relation.prototype`
@@ -1785,56 +1766,25 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "without",
   "arel",
   "constructJoinDependency",
-  // The bang half of `QueryMethods.public_instance_methods(false)`
-  // (query_methods.rb) — Rails delegates these to `scope` as well.
-  "includesBang",
-  "eagerLoadBang",
-  "preloadBang",
-  "referencesBang",
-  "withBang",
-  "withRecursiveBang",
-  "reselectBang",
-  "groupBang",
-  "regroupBang",
-  "orderBang",
-  "reorderBang",
-  "unscopeBang",
-  "joinsBang",
-  "leftOuterJoinsBang",
-  "whereBang",
-  "invertWhereBang",
-  "havingBang",
-  "limitBang",
-  "offsetBang",
-  "lockBang",
-  "noneBang",
-  "readonlyBang",
-  "strictLoadingBang",
-  "createWithBang",
-  "fromBang",
-  "distinctBang",
-  "extendingBang",
-  "optimizerHintsBang",
-  "reverseOrderBang",
-  "annotateBang",
-  "excludingBang",
-  "uniqBang",
-  "skipQueryCacheBang",
-  "skipPreloadingBang",
-  "andBang",
-  "orBang",
 ] as const;
 
-const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = [
-  "spawn",
-  "merge",
-  "mergeBang",
-  "except",
-  "only",
-] as const;
+// Ruby's `private` keyword (query_methods.rb:1677, spawn_methods.rb:71) keeps
+// these out of `public_instance_methods(false)`, so `delegate` never sees them.
+// A JS object literal carries no such distinction, so the boundary is named here.
+const PRIVATE_MIXIN_INSTANCE_METHODS = new Set([
+  "assertModifiableBang",
+  "checkIfMethodHasArgumentsBang",
+  "_selectBang",
+  "relationWith",
+]);
+
+const MIXIN_PUBLIC_INSTANCE_METHODS = [
+  ...Object.keys(QueryMethodBangs).filter((name) => name.endsWith("Bang")),
+  ...Object.keys(SpawnMethods),
+].filter((name) => !PRIVATE_MIXIN_INSTANCE_METHODS.has(name));
 
 const delegateMethods = (
-  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]
+  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...MIXIN_PUBLIC_INSTANCE_METHODS] as string[]
 )
   .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
   .concat([

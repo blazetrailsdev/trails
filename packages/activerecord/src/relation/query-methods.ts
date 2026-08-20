@@ -25,7 +25,6 @@ import {
 import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
-import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
@@ -3007,15 +3006,10 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // the where-subquery path (`relation-handler`); this is intentional, not a
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
-    const subArel =
-      typeof resolved.toArel === "function"
-        ? resolved.toArel()
-        : // A duck-typed relation with no `toArel` acquisition seam: this
-          // subquery build is one of the connectionless paths, so pass the
-          // abstract `sanitize_limit` (abstract/database_statements.rb)
-          // explicitly rather than letting `buildArel` degrade internally.
-          resolved.buildArel({ sanitizeLimit });
-    return subArel.as(alias);
+    // `opts.arel` — unconditional in Rails, and `arel` is the acquisition point
+    // (query_methods.rb:1595), so the subquery build gets the same connection
+    // the outer one does.
+    return resolved.toArel().as(alias);
   }
   return opts;
 }

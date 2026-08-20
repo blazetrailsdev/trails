@@ -603,11 +603,14 @@ export class CollectionAssociation extends Association {
    * `after_remove` fire — not a direct `record.destroy` loop, which would
    * bypass the collection callbacks on `owner.destroy` (`dependent: :destroy`).
    */
-  async destroyAll(): Promise<void> {
-    const records = await this.loadTarget();
-    await this.destroy(...records);
+  async destroyAll(): Promise<Base[] | undefined> {
+    // `destroy(load_target)` — the loaded target goes in as ONE argument, as in
+    // Ruby, so the pre-flatten empty check sees a non-empty arg list and an
+    // empty collection destroys to `[]` rather than nil.
+    const destroyed = await this.destroy(await this.loadTarget());
     this.reset();
     this.loadedBang();
+    return destroyed;
   }
 
   /**
@@ -627,9 +630,12 @@ export class CollectionAssociation extends Association {
    * Destroy specific records, ignoring the :dependent option.
    * Calls before_remove/after_remove + before_destroy/after_destroy callbacks.
    */
-  async destroy(...records: Array<Base | number | string | bigint>): Promise<Base[] | undefined> {
-    // Raw splat, as in `delete` above — the empty check is pre-flatten.
-    return this.deleteOrDestroy(records, "destroy");
+  async destroy(
+    ...records: Array<Base | number | string | bigint | Base[]>
+  ): Promise<Base[] | undefined> {
+    // Raw splat, as in `delete` above — the empty check is pre-flatten. A
+    // nested array is flattened by `delete_or_destroy` itself, as in Ruby.
+    return this.deleteOrDestroy(records as Array<Base | number | string | bigint>, "destroy");
   }
 
   /**
