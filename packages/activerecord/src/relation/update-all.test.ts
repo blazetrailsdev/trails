@@ -228,7 +228,7 @@ describe("UpdateAllTest", () => {
   });
 
   it("touch all with aliased for update timestamp", async () => {
-    expect(Object.keys((Developer as any)._attributeAliases ?? {})).toContain("updated_at");
+    expect(Object.keys((Developer as any).attributeAliases ?? {})).toContain("updated_at");
 
     const developer = developers("david");
     const previouslyCreatedAt = developer.legacy_created_at;

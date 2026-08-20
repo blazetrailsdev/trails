@@ -1240,7 +1240,7 @@ export async function prepareModelFixtures(
       // insert columns (not the model's columnNames(), which can be stale before
       // the schema cache is warmed — RFC 0030) so the fill is correct regardless.
       const aliases: Record<string, string> =
-        (ModelClass as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
+        (ModelClass as { attributeAliases?: Record<string, string> }).attributeAliases ?? {};
       const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
         colNames.has(c),
       );
@@ -1298,7 +1298,7 @@ export async function prepareModelFixtures(
         const cols: { name: string }[] = await (adapter as any).columns(joinTable);
         const colNames = new Set(cols.map((c) => c.name));
         const aliases: Record<string, string> =
-          (throughModel as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
+          (throughModel as { attributeAliases?: Record<string, string> }).attributeAliases ?? {};
         const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
           colNames.has(c),
         );

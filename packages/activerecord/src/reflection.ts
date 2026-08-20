@@ -161,10 +161,10 @@ export function belongsToCounterCacheColumn(
  * @internal
  */
 export function resolveAliasedColumn(
-  modelClass: { _attributeAliases?: Record<string, string> } | null | undefined,
+  modelClass: { attributeAliases?: Record<string, string> } | null | undefined,
   name: string,
 ): string {
-  const aliases = modelClass?._attributeAliases ?? {};
+  const aliases = modelClass?.attributeAliases ?? {};
   return aliases[name] ?? aliases[camelize(name, "lower")] ?? name;
 }
 

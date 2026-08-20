@@ -363,8 +363,8 @@ export class InsertAll {
 
   /** @internal */
   private hasAttributeAliases(attributes: Record<string, unknown>): boolean {
-    // _attributeAliases is on the AttributeMethods mixin host, not yet declared on typeof Base
-    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    // attributeAliases is on the AttributeMethods mixin host, not yet declared on typeof Base
+    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     if (!aliases) return false;
     return Object.keys(attributes).some((attr) => attr in aliases);
   }
@@ -415,7 +415,7 @@ export class InsertAll {
 
   /** @internal */
   private resolveAttributeAlias(attribute: string): string {
-    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     return aliases?.[attribute] ?? attribute;
   }
 
@@ -613,7 +613,7 @@ export class Builder implements InsertBuilder {
     if (!ret) return undefined;
     if (ret instanceof Nodes.SqlLiteral) return ret.value;
     const cols = Array.isArray(ret) ? ret : [ret];
-    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     return cols
       .map((attr: string) => {
         const physical = aliases?.[attr];

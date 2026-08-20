@@ -34,8 +34,6 @@ import {
   AttributeMethodPattern,
   Model,
   Type,
-  pendingAttributeModifications,
-  PendingDecorator,
   type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
@@ -1195,12 +1193,9 @@ export class Base extends Model {
     // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
     // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.
     this._virtualAttributesReconciled = false;
-    // Apply hookAttributeType decorators (TZ conversion, locking) to the
-    // just-registered type so user-declared datetime attributes are wrapped.
-    // Patch _attributeDefinitions immediately (read path) and also push a
-    // PendingDecorator so _defaultAttributes() replay sees the hooked type
-    // after the PendingType for this attribute.
-    //
+    // Apply hookAttributeType decorators (TZ conversion, locking) via
+    // `decorate_attributes` (attribute_registration.rb:22-28), which queues the
+    // decorator for the `_default_attributes` replay.
     // Gated on an explicit type, mirroring Rails' `type = hook_attribute_type(name, type) if type`
     // (attribute_registration.rb:15). On a no-type call (`attribute("col", { default })`)
     // the existing type is already hooked from schema reflection — re-hooking would
@@ -1211,10 +1206,7 @@ export class Base extends Model {
     if (def) {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
-        this._attributeDefinitions.set(name, { ...def, type: hooked });
-        pendingAttributeModifications
-          .call(this)
-          .push(new PendingDecorator([name], (_n: string, _t: Type) => hooked));
+        this.decorateAttributes([name], (_n: string, _t: Type) => hooked);
       }
     }
     // If we just defined an "id" accessor on a subclass prototype, remove it
@@ -1260,7 +1252,7 @@ export class Base extends Model {
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, name);
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
-    const resolved = (this as any)._attributeAliases?.[name] ?? name;
+    const resolved = (this as any).attributeAliases?.[name] ?? name;
     // Rails raises inside enum's `decorate_attributes` block for an enum backed
     // by neither a DB column nor an explicit `attribute` type.
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
@@ -2013,7 +2005,7 @@ export class Base extends Model {
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
-      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
     return super.attributeChanged(name, options);
@@ -2025,7 +2017,7 @@ export class Base extends Model {
   ): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
-      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
     return super.savedChangeToAttribute(name, options);

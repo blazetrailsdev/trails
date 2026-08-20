@@ -12,7 +12,7 @@ import { TableAlias } from "./nodes/table-alias.js";
 /** Structural duck-type for Rails' `@klass.attribute_aliases`.
  *  Kept minimal so arel does not import activerecord. */
 export interface TableKlass {
-  readonly _attributeAliases?: Record<string, string>;
+  readonly attributeAliases?: Record<string, string>;
   /**
    * Rails' `klass&.type_caster` default for `type_caster:` (table.rb:14).
    *
@@ -177,7 +177,7 @@ export class Table extends Node {
     // Rails' `Table#[]` accepts a nil name (`table[nil]` for a pkless model in
     // `Relation#delete_all`, relation.rb:1027-1031) and builds an Attribute
     // whose name is nil; only a subquery-shaped statement ever renders it.
-    const resolved = name === null ? null : (this.klass?._attributeAliases?.[name] ?? name);
+    const resolved = name === null ? null : (this.klass?.attributeAliases?.[name] ?? name);
     return new Attribute(table ?? this, resolved as string);
   }
 

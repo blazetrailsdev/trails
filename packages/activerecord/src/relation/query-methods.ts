@@ -1115,7 +1115,7 @@ export function buildWhereClause(
     // auto-adds references for its nested-hash / dotted-key tables, so an
     // includes(...) with a WHERE on the joined table promotes to eager JOIN.
     const mc = this.model;
-    const aliases: Record<string, string> = mc?._attributeAliases ?? {};
+    const aliases: Record<string, string> = mc?.attributeAliases ?? {};
     // Rails never pre-casts hash values here — build_where_clause hands them
     // raw to PredicateBuilder, whose QueryAttribute bind casts/serializes at
     // compile time (predicate_builder.rb:57-69 → build_bind_attribute →
@@ -2799,7 +2799,7 @@ export function arelColumn(
   // (calculations.rb:182) as `""`, the empty `SUM()`.
   const isSymbol = isRubySymbol(field);
   let fieldStr = isSymbol ? symbolToName(field) : field == null ? "" : String(field);
-  fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
+  fieldStr = modelClass?.attributeAliases?.[fieldStr] ?? fieldStr;
 
   const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;

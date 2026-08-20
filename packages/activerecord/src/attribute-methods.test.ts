@@ -123,7 +123,7 @@ describe("AttributeMethodsTest", () => {
     }
     (Post as any).defineAttributeMethods();
     expect(Post.attributeNames()).toContain("id");
-    expect(Object.keys((Post as any)._attributeAliases ?? {})).toContain("idValue");
+    expect(Object.keys((Post as any).attributeAliases ?? {})).toContain("idValue");
   });
 
   it("aliasing `id` attribute allows reading the column value", async () => {
@@ -274,7 +274,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     (Keyboard as any).defineAttributeMethods();
-    expect(Object.keys((Keyboard as any)._attributeAliases ?? {})).not.toContain("idValue");
+    expect(Object.keys((Keyboard as any).attributeAliases ?? {})).not.toContain("idValue");
   });
   it("#id_value alias returns id column only for composite primary key models", async () => {
     class Order extends Base {

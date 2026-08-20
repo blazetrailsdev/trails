@@ -45,34 +45,6 @@ export class MissingAttributeError extends globalThis.Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// class_attribute accessors (attribute_methods.rb:71-72)
-//
-// Rails declares `class_attribute :attribute_aliases` and
-// `:attribute_method_patterns` in the `included do` block, which surfaces a
-// reader / `=` writer / `?` predicate triple. trails holds the storage under
-// `_attributeAliases` (a `{ alias => original }` hash) and
-// `_attributeMethodPatterns` (an array), and these accessors are that triple:
-// the reader walks the constructor chain, and the `=` writer — spelled `setX`
-// per docs/ruby-ts-conventions.md, since a `x=` whose reader is a function
-// cannot be a TS `set` accessor — writes an own property, which is exactly
-// `class_attribute`'s "writes are local to the class". Rails' own writes are
-// `self.attribute_aliases = attribute_aliases.merge(...)` (:203) and
-// `self.attribute_method_patterns += ...` (:101, :141, :175), so the writer is
-// what gives every one of those call sites its per-subclass copy — no
-// copy-on-first-write helper is involved on either side.
-// ---------------------------------------------------------------------------
-
-/** Mirrors: ClassMethods#attribute_aliases (class_attribute reader/writer). */
-export function attributeAliases(this: AttributeMethodHost): Record<string, string> {
-  return this._attributeAliases;
-}
-
-/** Mirrors: ClassMethods#attribute_aliases? (class_attribute predicate). */
-export function isAttributeAliases(this: AttributeMethodHost): boolean {
-  return Boolean(this._attributeAliases);
-}
-
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace AttrNames {
   const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
@@ -137,37 +109,11 @@ interface ReadWriteHost {
 
 export interface AttributeMethodHost {
   _attributeDefinitions: Map<string, { name: string }>;
-  _attributeMethodPatterns: AttributeMethodPattern[];
-  _attributeAliases: Record<string, string>;
+  attributeMethodPatterns: AttributeMethodPattern[];
+  attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
   _generatedAttributeMethods?: Module;
   prototype: { [key: string]: unknown };
-}
-
-/** Mirrors: ClassMethods#attribute_aliases= (class_attribute writer). */
-export function setAttributeAliases(
-  this: AttributeMethodHost,
-  attributeAliases: Record<string, string>,
-): void {
-  this._attributeAliases = attributeAliases;
-}
-
-/** Mirrors: ClassMethods#attribute_method_patterns (class_attribute reader/writer). */
-export function attributeMethodPatterns(this: AttributeMethodHost): AttributeMethodPattern[] {
-  return this._attributeMethodPatterns;
-}
-
-/** Mirrors: ClassMethods#attribute_method_patterns? (class_attribute predicate). */
-export function isAttributeMethodPatterns(this: AttributeMethodHost): boolean {
-  return Boolean(this._attributeMethodPatterns);
-}
-
-/** Mirrors: ClassMethods#attribute_method_patterns= (class_attribute writer). */
-export function setAttributeMethodPatterns(
-  this: AttributeMethodHost,
-  attributeMethodPatterns: AttributeMethodPattern[],
-): void {
-  this._attributeMethodPatterns = attributeMethodPatterns;
 }
 
 /**
@@ -264,51 +210,58 @@ export function _readAttribute(
 }
 
 /**
- * Mirrors Rails' `attribute_method_prefix(*prefixes, parameters: nil)`. TS
- * forbids a keyword after a rest element, so the trailing `parameters:` hash
- * rides in the splat and is peeled off — the same shape `touch(*names, time:)`
- * uses in `activerecord/timestamp.ts`.
+ * Mirrors Rails' `attribute_method_prefix(*prefixes, parameters: nil)`
+ * (attribute_methods.rb:106-109). TS forbids a keyword after a rest element, so
+ * the trailing `parameters:` hash rides in the splat and is peeled off — the
+ * same shape `touch(*names, time:)` uses in `activerecord/timestamp.ts`.
+ *
+ * Rails stops at `undefine_attribute_methods` and regenerates a late-declared
+ * pattern lazily via `method_missing` (attribute_methods.rb:504-518). JS has no
+ * `method_missing`, so the `defineAttributeMethods` call here — and in
+ * `attributeMethodSuffix` / `attributeMethodAffix` — materializes it eagerly.
  */
 export function attributeMethodPrefix(
   this: AttributeMethodHost,
   ...prefixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(prefixes);
-  setAttributeMethodPatterns.call(this, [
-    ...attributeMethodPatterns.call(this),
+  this.attributeMethodPatterns = [
+    ...this.attributeMethodPatterns,
     ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
-  ]);
+  ];
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
 
+/** Mirrors: ClassMethods#attribute_method_suffix (attribute_methods.rb:140-143). */
 export function attributeMethodSuffix(
   this: AttributeMethodHost,
   ...suffixes: Array<string | { parameters?: string | null | false }>
 ): void {
   const parameters = extractParameters(suffixes);
-  setAttributeMethodPatterns.call(this, [
-    ...attributeMethodPatterns.call(this),
+  this.attributeMethodPatterns = [
+    ...this.attributeMethodPatterns,
     ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
-  ]);
+  ];
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
 
+/** Mirrors: ClassMethods#attribute_method_affix (attribute_methods.rb:175-178). */
 export function attributeMethodAffix(
   this: AttributeMethodHost,
   ...affixes: Array<{ prefix: string; suffix: string }>
 ): void {
-  setAttributeMethodPatterns.call(this, [
-    ...attributeMethodPatterns.call(this),
+  this.attributeMethodPatterns = [
+    ...this.attributeMethodPatterns,
     ...affixes.map((affix) => new AttributeMethodPattern(affix)),
-  ]);
+  ];
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
 
 export function aliasAttribute(this: AttributeMethodHost, newName: string, oldName: string): void {
-  setAttributeAliases.call(this, { ...attributeAliases.call(this), [newName]: oldName });
+  this.attributeAliases = { ...this.attributeAliases, [newName]: oldName };
   const aliases = aliasesByAttributeName(this);
   if (!aliases.has(oldName)) aliases.set(oldName, []);
   aliases.get(oldName)!.push(newName);
@@ -341,7 +294,7 @@ export function generateAliasAttributeMethods(
   oldName: string,
 ): void {
   CodeGenerator.batch(codeGenerator, __FILE__, __LINE__, () => {
-    for (const pattern of host._attributeMethodPatterns) {
+    for (const pattern of host.attributeMethodPatterns) {
       aliasAttributeMethodDefinition.call(host, codeGenerator, pattern, newName, oldName);
     }
     attributeMethodPatternsCache.call(host).clear();
@@ -369,11 +322,11 @@ export function aliasAttributeMethodDefinition(
 }
 
 export function isAttributeAlias(host: AttributeMethodHost, name: string): boolean {
-  return Object.prototype.hasOwnProperty.call(host._attributeAliases, name);
+  return Object.prototype.hasOwnProperty.call(host.attributeAliases, name);
 }
 
 export function attributeAlias(host: AttributeMethodHost, name: string): string | undefined {
-  return host._attributeAliases[name];
+  return host.attributeAliases[name];
 }
 
 export function defineAttributeMethods(this: AttributeMethodHost, ...attrNames: string[]): void {
@@ -402,7 +355,7 @@ export function defineAttributeMethod(
   }: { _owner?: Module | CodeGenerator; as?: string } = {},
 ): void {
   CodeGenerator.batch(_owner, __FILE__, __LINE__, (owner) => {
-    for (const pattern of this._attributeMethodPatterns) {
+    for (const pattern of this.attributeMethodPatterns) {
       defineAttributeMethodPattern.call(this, pattern, attrName, { owner, as });
     }
     defineDirtyAttributeMethods.call(this, as);
@@ -507,7 +460,7 @@ export function aliasesByAttributeName(host: AttributeMethodHost): Map<string, s
 
 /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
 export function resolveAttributeName(this: AttributeMethodHost, name: string): string {
-  return this._attributeAliases?.[name] ?? name;
+  return this.attributeAliases?.[name] ?? name;
 }
 
 /**
@@ -560,7 +513,7 @@ export function attributeMethodPatternsMatching(
 ): Array<{ proxyTarget: string; attrName: string }> {
   const cache = attributeMethodPatternsCache.call(this);
   if (cache.has(methodName)) return cache.get(methodName)!;
-  const matches = this._attributeMethodPatterns.flatMap((pattern) => {
+  const matches = this.attributeMethodPatterns.flatMap((pattern) => {
     const m = pattern.match(methodName);
     return m ? [{ proxyTarget: pattern.proxyTarget, attrName: m.attr }] : [];
   });
@@ -621,7 +574,7 @@ export function buildMangledName(name: string): string {
 
 export type InstanceHost = {
   _attributes?: { has(name: string): boolean };
-  _attributeMethodPatterns?: AttributeMethodPattern[];
+  attributeMethodPatterns?: AttributeMethodPattern[];
   constructor: AttributeMethodHost;
 };
 
@@ -791,13 +744,16 @@ export function defineMethodAttribute(
  * survives, an inherited GENERATED one does not count as hand-written — and it
  * makes `undefine_attribute_methods` clear the cascade.
  *
- * @noRailsEquivalent CONVERGEABLE — Rails has no such method: it declares the
+ * @noRailsEquivalent CONVERGEABLE — Rails has no such method. It declares the
  * cascade as `attribute_method_suffix` / `attribute_method_affix` patterns
- * (dirty.rb) and `define_attribute_methods` walks them. trails'
- * `_attributeMethodPatterns` only carries patterns whose generated body is a
- * proxy call, and these route through `attribute_missing` instead, so the
- * cascade is emitted here — from the same `define_attribute_methods` path and
- * into the same module. Story:
+ * (dirty.rb:241-245, plus ActiveRecord's `saved_change_to_*` /
+ * `will_save_change_to_*` / `*_in_database` / `*_before_last_save` set in
+ * activerecord/attribute_methods/dirty.rb), and `define_attribute_methods`
+ * walks `attribute_method_patterns` and generates each one
+ * (attribute_methods.rb:313-316). This method stands in for exactly that walk.
+ * Blocked on two things out of scope here: `methodName` concatenates
+ * `prefix + attrName + suffix` and cannot produce a camelCased
+ * `savedChangeToName`, and this cascade spans both packages' halves. Story:
  * 0096-naming-identifier-burndown/declare-dirty-cascade-as-attribute-method-suffix-patterns.
  */
 export function defineDirtyAttributeMethods(this: AttributeMethodHost, attrName: string): void {
@@ -880,7 +836,7 @@ export function resolveAliasNameIn(
   present: { has(name: string): boolean } | undefined,
   name: string,
 ): string {
-  const aliases = host?._attributeAliases;
+  const aliases = host?.attributeAliases;
   const exact = aliases?.[name];
   if (exact !== undefined) return exact;
   if (present?.has(name)) return name;

@@ -56,7 +56,7 @@ export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
       : t instanceof Temporal.Instant
         ? t
         : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
-  const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
+  const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 
   // Mirrors Rails' Persistence#touch: verify_readonly_attribute runs over the
@@ -270,7 +270,7 @@ const CREATED_ATTRS = ["created_at", "created_on"];
 const UPDATED_ATTRS = ["updated_at", "updated_on"];
 
 interface TimestampHost {
-  _attributeAliases?: Record<string, string>;
+  attributeAliases?: Record<string, string>;
   columnNames?: string[] | (() => string[]);
   _timestampAttributesForCreateInModel?: string[];
   _timestampAttributesForUpdateInModel?: string[];
@@ -321,7 +321,7 @@ export function touchAttributesWithTime(
   const names = args.slice(0, -1) as string[];
   const time = args[args.length - 1] as Temporal.Instant | undefined;
   const resolvedTime = time ?? currentTimeFromProperTimezone();
-  const resolved = names.map((n) => this._attributeAliases?.[n] ?? n);
+  const resolved = names.map((n) => this.attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
   const allNames = [...new Set([...updateAttrs, ...resolved])];
   const result: Record<string, Temporal.Instant> = {};
@@ -421,13 +421,13 @@ export function reloadSchemaFromCache(this: TimestampHost): void {
 
 /** @internal */
 export function timestampAttributesForCreate(this: TimestampHost): string[] {
-  const aliases = this._attributeAliases ?? {};
+  const aliases = this.attributeAliases ?? {};
   return CREATED_ATTRS.map((name) => aliases[name] ?? name);
 }
 
 /** @internal */
 export function timestampAttributesForUpdate(this: TimestampHost): string[] {
-  const aliases = this._attributeAliases ?? {};
+  const aliases = this.attributeAliases ?? {};
   return UPDATED_ATTRS.map((name) => aliases[name] ?? name);
 }
 

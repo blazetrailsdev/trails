@@ -1031,7 +1031,7 @@ function undeclaredEnumTypeError(klass: typeof Base, name: string): Error {
 export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
   const host = klass as unknown as {
     _enums?: Map<string, unknown>;
-    _attributeAliases?: Record<string, string>;
+    attributeAliases?: Record<string, string>;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
   // Check the *un-resolved* name before resolving the alias: an `enum` declared
@@ -1054,7 +1054,7 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // `defined_enums` is keyed by the *declared* enum name, alias or not
   // (enum.rb:232); only the attribute-set lookup resolves the alias.
   if (!host._enums?.has(attribute)) return null;
-  const resolved = host._attributeAliases?.[attribute] ?? attribute;
+  const resolved = host.attributeAliases?.[attribute] ?? attribute;
   // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,
   // no explicit `attribute` type) must raise rather than silently serialize
   // through the pre-reflection fallback (Rails raises from the enum

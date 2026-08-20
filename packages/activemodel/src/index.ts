@@ -40,8 +40,6 @@ export {
 export {
   applyPendingAttributeModifications,
   isDecoratorReplay,
-  pendingAttributeModifications,
-  PendingDecorator,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";

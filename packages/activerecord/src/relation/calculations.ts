@@ -979,7 +979,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
   const model = rel.model as any;
   const known = new Set<string>([
     ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
-    ...Object.keys(model._attributeAliases ?? {}),
+    ...Object.keys(model.attributeAliases ?? {}),
   ]);
   return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
 }

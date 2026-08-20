@@ -28,6 +28,7 @@ import {
   wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
+  classAttribute,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -86,10 +87,6 @@ import {
   undefineAttributeMethods,
   attributeMissing,
   missingAttribute,
-  attributeAliases,
-  isAttributeAliases,
-  attributeMethodPatterns,
-  isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
   type InstanceHost,
 } from "./attribute-methods.js";
@@ -285,15 +282,13 @@ export class Model {
   // (activemodel/lib/active_model/conversion.rb:32)
   static paramDelimiter: string = "-";
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-  // Rails: `class_attribute :attribute_method_patterns, … default:
-  // [ ClassMethods::AttributeMethodPattern.new ]`
-  // (activemodel/lib/active_model/attribute_methods.rb:72), plus the `"="`
-  // suffix pattern `Attributes` adds on include (attributes.rb:35).
-  static _attributeMethodPatterns: AttributeMethodPattern[] = [
-    new AttributeMethodPattern(),
-    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
-  ];
-  static _attributeAliases: Record<string, string> = {};
+  // Runtime accessors come from the `classAttribute()` calls at the bottom of
+  // this file — Rails' `included do class_attribute … end`
+  // (attribute_methods.rb:70-73).
+  declare static attributeAliases: Record<string, string>;
+  declare static isAttributeAliases: boolean;
+  declare static attributeMethodPatterns: AttributeMethodPattern[];
+  declare static isAttributeMethodPatterns: boolean;
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
   // (activemodel/lib/active_model/validations.rb:50). Map keyed by attribute
@@ -1591,10 +1586,6 @@ export class Model {
   static attributeMethodSuffix = attributeMethodSuffix;
   static attributeMethodAffix = attributeMethodAffix;
   static undefineAttributeMethods = undefineAttributeMethods;
-  static attributeAliases = attributeAliases;
-  static isAttributeAliases = isAttributeAliases;
-  static attributeMethodPatterns = attributeMethodPatterns;
-  static isAttributeMethodPatterns = isAttributeMethodPatterns;
   isRespondToWithoutAttributes = isRespondToWithoutAttributes;
 
   // -- Naming (Phase 1300) --
@@ -2826,6 +2817,18 @@ export class Model {
     return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
   }
 }
+
+// Rails' `included do` block (attribute_methods.rb:70-73). The `"="` suffix
+// pattern is the one `ActiveModel::Attributes` adds on include
+// (attributes.rb:35), folded into the default because trails has one host class.
+classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default: {} });
+classAttribute.call(Model, "attributeMethodPatterns", {
+  instanceWriter: false,
+  default: [
+    new AttributeMethodPattern(),
+    new AttributeMethodPattern({ suffix: "=", parameters: "value" }),
+  ],
+});
 
 const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
 

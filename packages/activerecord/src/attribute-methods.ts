@@ -193,7 +193,7 @@ interface AttributeMethodsHost {
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
   _generatedAttributeMethods?: GeneratedAttributeMethods;
-  _attributeAliases?: Record<string, string>;
+  attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
   _ignoredColumns?: string[];
   prototype: any;
@@ -305,8 +305,8 @@ export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldN
   if (typeof amFn === "function") {
     amFn.call(this, newName, oldName);
   } else {
-    if (!this._attributeAliases) this._attributeAliases = {};
-    this._attributeAliases[newName] = oldName;
+    if (!this.attributeAliases) this.attributeAliases = {};
+    this.attributeAliases[newName] = oldName;
   }
 }
 
@@ -424,8 +424,8 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   ) {
     return;
   }
-  if (this._attributeAliases) {
-    for (const [newName, oldName] of Object.entries(this._attributeAliases)) {
+  if (this.attributeAliases) {
+    for (const [newName, oldName] of Object.entries(this.attributeAliases)) {
       aliasAttributeMethodDefinition.call(this, newName, oldName);
     }
   }

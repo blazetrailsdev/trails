@@ -327,14 +327,14 @@ describe("TableTest", () => {
 
   describe("attribute_aliases", () => {
     it("resolves an aliased attribute name", () => {
-      const t = new Table("users", { klass: { _attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
       const attr = t.get("nickname");
       expect(attr).toBeInstanceOf(Nodes.Attribute);
       expect(attr.name).toBe("name");
     });
 
     it("passes through an unaliased attribute name", () => {
-      const t = new Table("users", { klass: { _attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
       const attr = t.get("name");
       expect(attr.name).toBe("name");
     });
