@@ -20,7 +20,7 @@ registerModel(Minivan);
 
 /** Internal attribute-method generation surface exercised by these tests. */
 interface Generatable {
-  defineAttributeMethods(): void;
+  defineAttributeMethods(): boolean;
   _attributeMethodsGenerated?: boolean;
 }
 const generatable = (cls: unknown): Generatable => cls as Generatable;
@@ -353,7 +353,9 @@ describe("AttributeMethodsTest (trails)", () => {
       "defineMethodAttribute",
     );
 
-    generatable(Widget).defineAttributeMethods();
+    // Rails answers true from the first generating pass (attribute_methods.rb:104-125);
+    // the nested post-load pass is still this call generating them.
+    expect(generatable(Widget).defineAttributeMethods()).toBe(true);
 
     const names = spy.mock.calls.map(([name]) => name);
     expect(names.length).toBe(new Set(names).size);

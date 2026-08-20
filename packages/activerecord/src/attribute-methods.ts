@@ -383,15 +383,18 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
     // yield to another generator — the mutex it takes at attribute_methods.rb:108-110.
     // trails' yielding step is `load_schema` itself: a cold load ends in the
     // post-load generation trigger (model-schema.ts), which runs this whole
-    // body first, so the same re-check is what keeps generation single.
-    if (
+    // body first, so the same re-check is what keeps generation single. The
+    // methods still came from this call, so it answers `true` below as the
+    // first generating pass does (attribute_methods.rb:104-125) — only a call
+    // that found them already generated returns false, and that arm is the
+    // flag check above `load_schema`.
+    const generatedByNestedLoad =
       Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-      this._attributeMethodsGenerated
-    ) {
-      return false;
+      this._attributeMethodsGenerated;
+    if (!generatedByNestedLoad) {
+      amDefineAttributeMethods.call(this as never, ...this.attributeNames());
+      if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
     }
-    amDefineAttributeMethods.call(this as never, ...this.attributeNames());
-    if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
   }
   generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
