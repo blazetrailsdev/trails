@@ -174,8 +174,8 @@ export class Range<T> {
   equals(other: unknown): boolean {
     if (!(other instanceof Range)) return false;
     return (
-      valuesEqual(this.begin, other.begin) &&
-      valuesEqual(this.end, other.end) &&
+      rbEqual(this.begin, other.begin) &&
+      rbEqual(this.end, other.end) &&
       this.excludeEnd === other.excludeEnd
     );
   }
@@ -198,11 +198,11 @@ export class Range<T> {
 }
 
 /**
- * Ruby `==` on a Range endpoint. Endpoints are primitives in nearly every
- * range trails builds, but a `Date`/`Time` endpoint is a value that answers
- * its own `==` — Ruby sends the message either way.
+ * Ruby's `rb_equal` — the C primitive `range_eq`'s `recursive_equal`
+ * (range.c) applies to each endpoint, which is identity first and then a
+ * `==` send. A `Date`/`Time` endpoint answers its own `equals`.
  */
-function valuesEqual(a: unknown, b: unknown): boolean {
+function rbEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof (a as { equals?: unknown }).equals === "function") {

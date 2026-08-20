@@ -418,8 +418,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
 
   it("match throws ArgumentError on non-RegExp input", () => {
     const mn = new ModelName("Post");
-    // A String is NOT invalid input: Ruby `String#match?` compiles a String
-    // operand as the pattern (naming.rb:114-128 delegates `match?` to `name`).
     expect(mn.match("Post")).toBe(true);
     expect(mn.match("os")).toBe(true);
     expect(mn.match("\\d")).toBe(false);
@@ -428,9 +426,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
   });
 
   it("caseEquals and eql delegate to the name", () => {
-    // naming.rb:151-152 `delegate :===, :eql?, to: :name`. `String#===` is
-    // aliased to `String#==` and so takes its `to_str` arm; `String#eql?`
-    // checks the class first, so another `Name` is not `eql?` to this one.
     const mn = new ModelName("Post");
     expect(mn.caseEquals("Post")).toBe(true);
     expect(mn.caseEquals(new ModelName("Post"))).toBe(true);

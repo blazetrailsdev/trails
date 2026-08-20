@@ -55,8 +55,6 @@ export class FormatValidator extends EachValidator {
   }
 
   override checkValidityBang(): void {
-    // Rails: `unless options.include?(:with) ^ options.include?(:without)`
-    // (format.rb:21). `^` on two booleans is `!==`.
     if (isInclude(this.options, "with") === isInclude(this.options, "without")) {
       throw new ArgumentError("Either :with or :without must be supplied (but not both)");
     }

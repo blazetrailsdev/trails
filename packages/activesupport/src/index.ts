@@ -228,10 +228,6 @@ export {
   deepDup,
   slice,
   except,
-  // `isInclude` is Hash#include? (an alias of Hash#has_key?); the barrel
-  // already exports Range#include?'s port under the bare name from
-  // core-ext/range/compare-range.ts, and one ESM namespace cannot hold both.
-  // Same shape as `compactBlank as compactBlankObj` below.
   isInclude as isIncludeObj,
   deepTransformKeys,
   deepCamelizeKeys,

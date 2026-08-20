@@ -109,6 +109,10 @@ export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K
  * Mirrors Ruby's `Hash#include?` — an alias of `Hash#has_key?`, so it is an
  * OWN-key test (`Object.hasOwn`), never the `in` operator, which also answers
  * for keys inherited down the prototype chain.
+ *
+ * Reaches the package barrel as `isIncludeObj`: `Range#include?`'s port
+ * already owns the bare name there and one ESM namespace cannot hold both,
+ * the same collision `compactBlank as compactBlankObj` resolves.
  */
 export function isInclude(hash: AnyObject, key: string): boolean {
   return Object.hasOwn(hash, key);
