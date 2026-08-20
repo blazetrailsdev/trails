@@ -155,9 +155,9 @@ describe("ReadOnlyTest", () => {
   it("has many find readonly", async () => {
     const post = await Post.find(posts("welcome").id);
     // assert_not_empty post.comments
-    expect(await (post as any).comments.any()).toBe(true);
+    expect(await (post as any).comments.isAny()).toBe(true);
     // assert_not post.comments.any?(&:readonly?)
-    expect(await (post as any).comments.any((c: any) => c.isReadonly())).toBe(false);
+    expect(await (post as any).comments.isAny((c: any) => c.isReadonly())).toBe(false);
     // assert_not post.comments.to_a.any?(&:readonly?)
     const arr = await (post as any).comments.toArray();
     expect(arr.some((c: any) => c.isReadonly())).toBe(false);

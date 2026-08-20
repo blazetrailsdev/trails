@@ -779,7 +779,7 @@ describe("CounterCacheTest", () => {
       expect(await (car as any).bulbs.size()).toBe(2);
       expect(await (car as any).bulbs.count()).toBe(2);
       expect(await (car as any).bulbs.isEmpty()).toBe(false);
-      expect(await (car as any).bulbs.any()).toBe(true);
+      expect(await (car as any).bulbs.isAny()).toBe(true);
       expect(await (car as any).bulbs.isNone()).toBe(false);
     });
   });
@@ -795,7 +795,7 @@ describe("CounterCacheTest", () => {
     await assertQueriesCount(0, false, async () => {
       expect(await (car as any).tyres.size()).toBe(2);
       expect(await (car as any).tyres.isEmpty()).toBe(false);
-      expect(await (car as any).tyres.any()).toBe(true);
+      expect(await (car as any).tyres.isAny()).toBe(true);
       expect(await (car as any).tyres.isNone()).toBe(false);
     });
 

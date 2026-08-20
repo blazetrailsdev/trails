@@ -103,23 +103,23 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("map / filter / forEach delegate to the target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    expect(proxy.map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
+    expect(proxy.map((p: Post) => p.title).sort()).toEqual(["a", "b", "c"]);
     expect(
       proxy
-        .filter((p) => p.title !== "b")
-        .map((p) => p.title)
+        .filter((p: Post) => p.title !== "b")
+        .map((p: Post) => p.title)
         .sort(),
     ).toEqual(["a", "c"]);
     const seen: string[] = [];
-    proxy.forEach((p) => seen.push(p.title));
+    proxy.forEach((p: Post) => seen.push(p.title));
     expect(seen.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("some / every work", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    expect(proxy.some((p) => p.title === "b")).toBe(true);
-    expect(proxy.every((p) => p.title.length === 1)).toBe(true);
+    expect(proxy.some((p: Post) => p.title === "b")).toBe(true);
+    expect(proxy.every((p: Post) => p.title.length === 1)).toBe(true);
   });
 
   it("delegates arbitrary Array methods to the loaded target (method_missing)", async () => {
@@ -179,7 +179,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("reduce composes over the target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const concatenated = proxy.reduce((acc, p) => acc + p.title, "");
+    const concatenated = proxy.reduce((acc: string, p: Post) => acc + p.title, "");
     expect([...concatenated].sort().join("")).toBe("abc");
   });
 
@@ -188,7 +188,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts");
     const second = proxy.at(1)!;
     expect(proxy.indexOf(second)).toBe(1);
-    expect(proxy.flatMap((p) => [p.title, p.title.toUpperCase()])).toEqual(
+    expect(proxy.flatMap((p: Post) => [p.title, p.title.toUpperCase()])).toEqual(
       proxy.target.flatMap((p) => [p.title, p.title.toUpperCase()]),
     );
   });
@@ -243,7 +243,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     const ctx = { suffix: "!" };
-    const titles = proxy.map(function (this: { suffix: string }, p) {
+    const titles = proxy.map(function (this: { suffix: string }, p: Post) {
       return p.title + this.suffix;
     }, ctx);
     expect(titles.sort()).toEqual(["a!", "b!", "c!"]);
@@ -253,7 +253,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     // Without an initial value, accumulator type is the element type (T).
-    const concat = proxy.reduce((acc, p) => {
+    const concat = proxy.reduce((acc: Post, p: Post) => {
       return { ...acc, title: acc.title + p.title } as Post;
     });
     expect([...concat.title].sort().join("")).toBe("abc");
