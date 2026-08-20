@@ -17,8 +17,8 @@ import {
 } from "@blazetrails/activemodel";
 // The pending queue is private on ActiveModel (attribute_registration.rb:77);
 // only `attribute` (:17) pushes onto it. `define_attribute` reaches the same
-// queue from ActiveRecord, so it imports the pushers off the defining module
-// rather than the package's public barrel.
+// queue from ActiveRecord, so it imports the queue accessor and the pending
+// classes off the defining module rather than the package's public barrel.
 import {
   PendingDefault,
   PendingType,
