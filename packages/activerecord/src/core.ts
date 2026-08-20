@@ -24,6 +24,7 @@ import {
   Notifications,
   IsolatedExecutionState,
   ParameterFilter,
+  isPlainObject,
   constantize,
   pluralize,
 } from "@blazetrails/activesupport";
@@ -1140,9 +1141,8 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   if (this.isScopeAttributes()) {
     return this.all().findBy(...args);
   }
-  // Rails: `hash = args.first; return super unless Hash === hash` — a raw SQL
-  // fragment (`Post.find_by("1 = 0")`) or bind args go to the relation path.
-  if (conditions === null || typeof conditions !== "object" || Array.isArray(conditions)) {
+  // Rails: `hash = args.first; return super unless Hash === hash` (core.rb:286-287).
+  if (!isPlainObject(conditions)) {
     return this.all().findBy(...args);
   }
   const keys = Object.keys(conditions);
@@ -1162,7 +1162,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
     const reflection = _reflectOnAssociation(this as any, key);
 
     if (!reflection) {
-      if (respondsToId(value)) value = value.id;
+      if (respondsToId(value)) value = (value as any).id;
     } else if (reflection.belongsTo() && !reflection.isPolymorphic()) {
       const fk = reflection.joinForeignKey;
       const pkey = reflection.joinPrimaryKey;
@@ -1170,7 +1170,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
       // StatementCache below can't bind — defer to the relation path.
       if (Array.isArray(fk) || Array.isArray(pkey)) return this.all().findBy(conditions);
       key = fk;
-      if (respondsTo(value, pkey)) value = value[pkey];
+      if (respondsTo(value, pkey)) value = (value as any)[pkey];
     }
 
     if (
