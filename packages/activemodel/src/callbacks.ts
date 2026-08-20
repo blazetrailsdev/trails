@@ -8,6 +8,8 @@
 import { ArgumentError } from "./attribute-assignment.js";
 import {
   Callback,
+  Value,
+  kernelArray,
   CallbackChain as ASCallbackChain,
   type BeforeCallback,
   type AfterCallback,
@@ -135,7 +137,8 @@ export interface RunCallbacksOptions {
  * to `CallbackConditions<object>` under `strictFunctionTypes`.
  */
 export type CallbackConditionFilter<TRecord = CallbackRecord> =
-  { _(record: TRecord, value?: unknown): boolean }["_"] | string;
+  | { _(record: TRecord, value?: unknown): boolean }["_"]
+  | string;
 
 export interface CallbackConditions<TRecord = CallbackRecord> {
   if?: CallbackConditionFilter<TRecord> | Array<CallbackConditionFilter<TRecord>>;
@@ -279,20 +282,12 @@ function _buildAfterModelIfConditions(
   timing: CallbackTiming,
   event: string,
   userIf: CallbackConditions["if"] | undefined,
-):
-  | ((target: object, value?: unknown) => boolean)
-  | Array<(target: object, value?: unknown) => boolean>
-  | undefined {
-  const userIfs = (
-    userIf === undefined ? [] : Array.isArray(userIf) ? [...userIf] : [userIf]
-  ) as Array<(target: object, value?: unknown) => boolean>;
+): CallbackConditions["if"] | Value | Array<CallbackConditionFilter | Value> {
+  const userIfs = kernelArray(userIf) as Array<CallbackConditionFilter | Value>;
   if (timing !== "after" || PLAIN_DEFINE_CALLBACKS_EVENTS.has(event)) {
-    return userIf as
-      | ((target: object, value?: unknown) => boolean)
-      | Array<(target: object, value?: unknown) => boolean>
-      | undefined;
+    return userIf;
   }
-  return [...userIfs, (_target: object, value?: unknown) => value !== false];
+  return [...userIfs, new Value((v) => v !== false)];
 }
 
 export function _registerCallbackOnProto(

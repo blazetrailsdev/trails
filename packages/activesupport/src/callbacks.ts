@@ -36,13 +36,17 @@ export function isAbortSignal(e: unknown): boolean {
 // conditions only look at `target`; ActiveModel's after-model-callback
 // conditional (`v != false`, define_model_callbacks) reads `value`.
 /**
- * One `if:` / `unless:` filter — a callable, or a Ruby Symbol naming a method on
- * the target, spelled colon-prefixed (`":someMethod"`).
- * {@link Callback.conditionsLambdas} resolves it through `CallTemplate.build`
- * (callbacks.rb:326-331).
+ * One `if:` / `unless:` filter — the same set `CallTemplate.build` dispatches on
+ * (callbacks.rb:494-508): a Ruby Symbol naming a method on the target, spelled
+ * colon-prefixed (`":someMethod"`); a `Conditionals::Value`, the only arm that
+ * reads the chain's `value`; or a Proc, whose arity picks
+ * `InstanceExec0`/`InstanceExec1` and which therefore runs with `this` bound to
+ * the target. {@link Callback.conditionsLambdas} resolves every one of them
+ * through `CallTemplate` (callbacks.rb:326-331).
  */
 export type CallbackCondition<T extends object = object> =
   | ((target: T, value?: unknown) => boolean)
+  | Value
   | string;
 
 export interface CallbackOptions<T extends object = object> {
@@ -720,24 +724,15 @@ export class Callback {
    * `@if.map { |c| CallTemplate.build(c, self).make_lambda } +
    *  @unless.map { |c| CallTemplate.build(c, self).inverted_lambda }`.
    *
-   * A callable filter is called directly with `(target, value)` rather than
-   * through `CallTemplate`: `value` is `env.value` (the run_callbacks block's
-   * return), which ActiveModel's after-model-callback guard (`value != false`)
-   * reads, and Rails' Proc arms take that second argument too.
-   *
    * @internal Rails-private helper.
    */
   conditionsLambdas(): Array<(target: object, value: unknown) => boolean> {
     const conditions = [
-      ...kernelArray(this.options.if as CallbackCondition | CallbackCondition[]).map((c) =>
-        typeof c === "string"
-          ? (CallTemplate.build(c, this).makeLambda() as (t: object, v: unknown) => boolean)
-          : (t: object, v: unknown) => c(t, v),
+      ...kernelArray(this.options.if as CallbackCondition | CallbackCondition[]).map(
+        (c) => CallTemplate.build(c, this).makeLambda() as (t: object, v: unknown) => boolean,
       ),
       ...kernelArray(this.options.unless as CallbackCondition | CallbackCondition[]).map((c) =>
-        typeof c === "string"
-          ? CallTemplate.build(c, this).invertedLambda()
-          : (t: object, v: unknown) => !c(t, v),
+        CallTemplate.build(c, this).invertedLambda(),
       ),
     ];
     return conditions;
