@@ -3,9 +3,7 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
-  AttributeSet,
   AttributeSetBuilder,
-  PendingDecorator,
   YAMLEncoder,
   typeRegistry,
   type Type,
@@ -1234,40 +1232,6 @@ function applyColumnsHash(
   // `columnNames()` partial-load path — are the source of truth here.
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
-
-  // Mirrors ActiveModel::AttributeRegistration#_default_attributes rebuilding
-  // from `columns_hash` (seeded from the bare `type_for_column`, attributes.rb:
-  // 241-245) and replaying the pending chain through PendingDecorator#apply_to
-  // (attribute_registration.rb:66-74), so a `normalizes` / `serialize`
-  // decoration survives the overwrite above. Own decorators only — an inherited
-  // one is already baked into the base map by `decorateAttributes`. Restricted
-  // to reflected columns: `_attributeDefinitions` is trails' eager type cache,
-  // not Rails' `_default_attributes`, so replaying a NON-column attribute here
-  // would fire guards Rails only raises when the default set is built
-  // (enum.rb:240-245).
-  const reflectedNames = Object.keys(filteredHash).filter((n) => host._attributeDefinitions.has(n));
-  const attributeSet = new AttributeSet(new Map());
-  for (const name of reflectedNames) {
-    const def = host._attributeDefinitions.get(name);
-    attributeSet.set(name, Attribute.fromDatabase(name, null, def.reflectedColumnType ?? def.type));
-  }
-  const reflected = new Set(reflectedNames);
-  const decorated = new Set<string>();
-  const ownPending = Object.prototype.hasOwnProperty.call(host, "_pendingAttributeModifications")
-    ? ((host as { _pendingAttributeModifications?: unknown[] })._pendingAttributeModifications ??
-      [])
-    : [];
-  for (const mod of ownPending) {
-    if (!(mod instanceof PendingDecorator)) continue;
-    const names = (mod.names ?? reflectedNames).filter((n) => reflected.has(n));
-    if (names.length === 0) continue;
-    new PendingDecorator(names, mod.decorator).applyTo(attributeSet, host);
-    for (const name of names) decorated.add(name);
-  }
-  for (const name of decorated) {
-    const def = host._attributeDefinitions.get(name);
-    host._attributeDefinitions.set(name, { ...def, type: attributeSet.getAttribute(name).type });
-  }
 
   // Reflection may change a column's type/default without changing the key set,
   // so the revision stamps cannot infer staleness from key coverage.

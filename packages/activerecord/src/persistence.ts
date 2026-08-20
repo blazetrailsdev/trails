@@ -1205,6 +1205,11 @@ interface UpdateColumnsRecord {
         };
       }
     >;
+    typeForAttribute(name: string): {
+      cast(v: unknown): unknown;
+      serialize?(v: unknown): unknown;
+      type?(): string;
+    };
     _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
     connection: {
       execUpdate(sql: string, name?: string, binds?: unknown[]): Promise<number>;
@@ -1305,7 +1310,12 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     if (!def && !pkCols.includes(key)) {
       throw new UnknownAttributeError(this, key);
     }
-    const cast = def ? def.type.cast(value) : value;
+    // Rails casts through `@attributes.write_cast_value` (persistence.rb:625),
+    // i.e. the `_default_attributes` type — the pending-decorator chain replayed
+    // — not a per-class definition cache, so a `serialize` / `encrypts`
+    // decoration applies here too.
+    const attrType = def ? (ctor.typeForAttribute(key) ?? def.type) : undefined;
+    const cast = attrType ? attrType.cast(value) : value;
     this._attributes.set(key, cast);
     // Bridge the in-memory cast value to its DB representation via the
     // faithful SerializeCastValue.serialize dispatcher — the same path
@@ -1318,7 +1328,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     // serialize-overriding type (binary, json, serialized, PG OID types). This
     // replaces the former Temporal+Enum type-name allowlist, which silently
     // wrote the in-memory value for any other diverging type.
-    const type = def?.type as
+    const type = attrType as
       | {
           serializeCastValue(v: unknown): unknown;
           serialize(v: unknown): unknown;

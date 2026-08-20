@@ -37,7 +37,6 @@ export {
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
 export {
-  PendingDecorator,
   applyPendingAttributeModifications,
   isDecoratorReplay,
   pushPendingDecorator,

@@ -55,7 +55,7 @@ describe("STI subclass normalizes", () => {
     ReloadedCompany.normalizes("name", (name: unknown) =>
       typeof name === "string" ? name.trim().toUpperCase() : name,
     );
-    expect(defTypeFor(ReloadedCompany, "name").cast("  acme  ")).toBe("ACME");
+    expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
 
     // Rails re-seeds `_default_attributes` from `columns_hash` and replays the
     // pending-decorator chain on every rebuild, so reflection must not revert
@@ -64,8 +64,8 @@ describe("STI subclass normalizes", () => {
     await Company.loadSchema();
     await ReloadedCompany.loadSchema();
 
-    expect(defTypeFor(ReloadedCompany, "name").cast("  acme  ")).toBe("ACME");
-    expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
+    expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
+    expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
   });
 
   it("re-reflects a subclass whose key set is unchanged after a base reset", async () => {
