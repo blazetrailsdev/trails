@@ -1016,7 +1016,7 @@ describe("BasicsTest", () => {
     const bulbsOfCar = Bulb.where({ car_id: car.id });
     // Rails: assert_equal bulbs_of_car, car.bulbs.includes(:car)
     // AssociationRelation (includes chain off proxy) returns same rows as plain Relation
-    const assocRelation = association(car, "bulbs").includes("car");
+    const assocRelation = association(car, "bulbs").includes(":car");
     const relationResults = await bulbsOfCar;
     const assocResults = await assocRelation;
     expect(relationResults).toHaveLength(1);
@@ -1033,7 +1033,7 @@ describe("BasicsTest", () => {
     // Rails: assert_equal car.bulbs, car.bulbs.includes(:car)
     // CollectionProxy and includes-chain produce the same underlying rows
     const proxyResults = await association(car, "bulbs");
-    const assocRelResults = await association(car, "bulbs").includes("car");
+    const assocRelResults = await association(car, "bulbs").includes(":car");
     expect(proxyResults).toHaveLength(1);
     expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
       assocRelResults.map((r: any) => r.id).sort(),

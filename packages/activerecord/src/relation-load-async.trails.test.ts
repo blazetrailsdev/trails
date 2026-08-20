@@ -117,7 +117,7 @@ describe("Relation#load_async", () => {
     };
     const spy = vi.spyOn(connection, "selectAll");
 
-    await Topic.eagerLoad("replies").loadAsync();
+    await Topic.eagerLoad(":replies").loadAsync();
 
     const joinCall = spy.mock.calls.find((call) => call[1] === "SQL");
     expect(joinCall).toBeDefined();

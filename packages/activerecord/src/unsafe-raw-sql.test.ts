@@ -216,8 +216,8 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: allows column names with includes", async () => {
-    const valuesExpected = await Post.includes("comments").pluck(arelSql("title"), arelSql("id"));
-    const values = await Post.includes("comments").pluck("title", "id");
+    const valuesExpected = await Post.includes(":comments").pluck(arelSql("title"), arelSql("id"));
+    const values = await Post.includes(":comments").pluck("title", "id");
     expect(values).toEqual(valuesExpected);
   });
 
@@ -257,7 +257,7 @@ describe("UnsafeRawSqlTest", () => {
 
   it("pluck: disallows invalid column names with includes", async () => {
     await expect(
-      Post.includes("comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
+      Post.includes(":comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
     ).rejects.toBeInstanceOf(UnknownAttributeReference);
   });
 
@@ -271,10 +271,10 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: always allows Arel", async () => {
-    const expectedValues = (await Post.includes("comments").pluck("title")).map(
+    const expectedValues = (await Post.includes(":comments").pluck("title")).map(
       (title: unknown) => [title, (title as string).length],
     );
-    const values = await Post.includes("comments").pluck("title", arelSql("length(title)"));
+    const values = await Post.includes(":comments").pluck("title", arelSql("length(title)"));
     expect(values).toEqual(expectedValues);
   });
 

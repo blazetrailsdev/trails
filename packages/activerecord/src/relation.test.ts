@@ -314,17 +314,17 @@ describe("RelationTest", () => {
   });
 
   it("eager load values", () => {
-    const rel = CanonPost.all().includes("comments");
+    const rel = CanonPost.all().includes(":comments");
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("references values", () => {
-    const sql = CanonPost.all().includes("comments").toSql();
+    const sql = CanonPost.all().includes(":comments").toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("references values dont duplicate", () => {
-    const sql = CanonPost.all().includes("comments").includes("comments").toSql();
+    const sql = CanonPost.all().includes(":comments").includes(":comments").toSql();
     expect(sql).toContain("SELECT");
   });
 

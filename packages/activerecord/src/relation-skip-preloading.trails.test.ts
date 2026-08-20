@@ -17,7 +17,7 @@ describe("Relation#exec_queries skip_preloading_value guard", () => {
   fixtures(["authors", "posts"]);
 
   it("issues no preload query and leaves the association unloaded", async () => {
-    const relation = Author.includes("posts").order("id");
+    const relation = Author.includes(":posts").order("id");
     relation.skipPreloadingBang();
 
     let authors: Author[] = [];
@@ -30,7 +30,7 @@ describe("Relation#exec_queries skip_preloading_value guard", () => {
   });
 
   it("preloads when the flag is not set", async () => {
-    const authors = await Author.includes("posts").order("id");
+    const authors = await Author.includes(":posts").order("id");
 
     expect(authors[0].association("posts").isLoaded()).toBe(true);
   });
