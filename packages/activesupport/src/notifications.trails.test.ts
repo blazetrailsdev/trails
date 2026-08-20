@@ -33,16 +33,6 @@ describe("Notifications (trails)", () => {
       });
     });
 
-    it("does not attach a child event to a listened-to parent", () => {
-      const events: Event[] = [];
-      Notifications.subscribe("parent", (e) => events.push(e));
-      Notifications.instrument("parent", {}, () => {
-        Notifications.instrument("unlistened.child", {}, () => undefined);
-      });
-      expect(events).toHaveLength(1);
-      expect(events[0].children).toHaveLength(0);
-    });
-
     it("does not set exception keys when nothing is listening", () => {
       const payload: Record<string, unknown> = {};
       expect(() =>

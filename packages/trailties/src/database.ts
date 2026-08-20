@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/activesupport/process-adapter";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
@@ -154,6 +154,45 @@ export async function loadDatabaseConfigModule(
     );
   }
   return { path: configPath, module: candidateVal as DatabaseConfigModule };
+}
+
+/**
+ * Loads and returns the entire raw configuration of database from values
+ * stored in the app's `config/database.*`.
+ *
+ * Mirrors `Rails::Application::Configuration#database_configuration`
+ * (`railties/lib/rails/application/configuration.rb:434-468`): it reads
+ * `paths["config/database"].existent.first`, returns `{}` when the file is
+ * absent but `DATABASE_URL` is set (Active Record builds the primary config
+ * from the env var), and otherwise raises.
+ *
+ * This is the seam `establish_connection` reads through, not from: the
+ * Railtie's `active_record.initialize_database`
+ * (`activerecord/lib/active_record/railtie.rb:256-262`) assigns this to
+ * `Base.configurations` and only then calls `establish_connection`. `root`
+ * defaults to `Trails.root` — Rails' `Rails.root` — falling back to the
+ * working directory.
+ */
+export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+  const resolvedRoot = root ?? trailsRoot() ?? fs.cwd();
+
+  const loaded = await loadDatabaseConfigModule(resolvedRoot);
+  if (loaded) return loaded.module;
+
+  const jsonPath = path.join(resolvedRoot, "config", "database.json");
+  if (await fs.exists(jsonPath)) {
+    if (!fs.readFile)
+      throw new Error("Config loading requires an fs adapter with readFile support.");
+    return JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule;
+  }
+
+  if (env.DATABASE_URL) return {};
+
+  throw new Error(
+    `Could not load database configuration. No such file - ${path.join(resolvedRoot, "config", "database.*")}`,
+  );
 }
 
 /**

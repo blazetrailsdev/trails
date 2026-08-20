@@ -571,6 +571,22 @@ describe("DurationTest", () => {
     expect(parsed.seconds).toBeCloseTo(600, 0);
   });
 
+  it("build", () => {
+    expect(Duration.build(31556952)._parts()).toEqual({ years: 1 });
+    expect(Duration.build(2716146)._parts()).toEqual({ months: 1, days: 1 });
+    expect(Duration.build(0)._parts()).toEqual({ seconds: 0 });
+    expect(Duration.build(-31556952)._parts()).toEqual({ years: -1 });
+    expect(Duration.build(90)._parts()).toEqual({ minutes: 1, seconds: 30 });
+    expect(Duration.build(31556952).isVariable()).toBe(true);
+    expect(Duration.build(90).isVariable()).toBe(false);
+    expect(Duration.build(2716146).value).toBe(2716146);
+  });
+
+  it("modulo", () => {
+    expect(Duration.minutes(5).modulo(Duration.minutes(2))._parts()).toEqual({ minutes: 1 });
+    expect(Duration.minutes(5).modulo(60)._parts()).toEqual({ seconds: 0 });
+  });
+
   it("string build raises error", () => {
     expect(() => Duration.build("9" as any)).toThrow(TypeError);
     expect(() => Duration.build("9" as any)).toThrow("String");

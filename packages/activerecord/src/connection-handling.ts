@@ -2,8 +2,7 @@ import type { Base } from "./base.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport";
-import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 import {
@@ -23,7 +22,6 @@ import {
 import {
   AdapterNotSpecified,
   ConnectionNotEstablished,
-  ConfigurationError,
   NotImplementedError,
   ActiveRecordError,
 } from "./errors.js";
@@ -957,21 +955,19 @@ async function establishWithConfig(
   });
 }
 
+/**
+ * Mirrors the no-arg arm of Rails' `establish_connection`
+ * (connection_handling.rb:50-54): `config_or_env ||= DEFAULT_ENV.call.to_sym`,
+ * then the same `resolve_config_for_connection` funnel over `configurations`.
+ * Rails never reads a config file here — `config/database.yml` reaches
+ * `Base.configurations` once at boot, through the Railtie
+ * (`activerecord/lib/active_record/railtie.rb:256-262`), which assigns
+ * `Rails.application.config.database_configuration` and only then calls
+ * `establish_connection`. trails' boot seam is `databaseConfiguration()` in
+ * `@blazetrails/trailties`.
+ */
 async function autoConnect(modelClass: typeof Base): Promise<void> {
-  // Prefer the in-memory configurations when set — Rails'
-  // `establish_connection` (no args) reads from `Base.configurations`,
-  // the same registry mutated by callers like
-  // `TestDatabases.create_and_load_schema` (which suffixes `_database`
-  // per worker before reconnect). Falling back to disk would re-read
-  // unmutated configs and reconnect to the wrong database.
-  const inMemory = baseConfigurations();
-  let configs: DatabaseConfigurations;
-  if (!inMemory.empty) {
-    configs = inMemory;
-  } else {
-    const raw = await loadConfigFile(modelClass);
-    configs = DatabaseConfigurations.fromEnv(raw);
-  }
+  const configs = baseConfigurations();
   const env = DatabaseConfigurations.currentEnv();
   const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
   const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
@@ -983,63 +979,10 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     );
   }
 
-  // Rails has no separate no-arg path: `config_or_env ||= DEFAULT_ENV` then the
-  // same `resolve_config_for_connection` funnel (connection_handling.rb:50-53).
   // The looked-up DatabaseConfig is handed straight to the shared object funnel
   // — adapter/url derivation and the handler call live in establishWithDbConfig
   // — instead of re-deriving and rebuilding a fresh config here.
   await establishWithDbConfig(modelClass, dbConfig);
-}
-
-async function loadConfigFile(modelClass: typeof Base): Promise<RawConfigurations> {
-  if ((modelClass as any)._configPath) {
-    return loadJsonConfig((modelClass as any)._configPath);
-  }
-
-  const pathAdapter = await getPathAsync();
-  const fsAdapter = await getFsAsync();
-  // Mirrors Rails' optional `Rails.root` seam: resolve `config/database.*`
-  // against `Trails.root` when trailties' boot has set it, else the working
-  // directory.
-  const cwd = trailsRoot() ?? fsAdapter.cwd();
-  const tsCandidates = [
-    pathAdapter.resolve(cwd, "config", "database.ts"),
-    pathAdapter.resolve(cwd, "config", "database.js"),
-    pathAdapter.resolve(cwd, "src", "config", "database.ts"),
-    pathAdapter.resolve(cwd, "src", "config", "database.js"),
-  ];
-
-  for (const candidate of tsCandidates) {
-    if (fsAdapter.existsSync(candidate)) {
-      try {
-        const { pathToFileURL } = await import("node:url");
-        const mod = await import(pathToFileURL(candidate).href);
-        return mod.default ?? mod;
-      } catch (error: unknown) {
-        throw new Error(
-          `Failed to load database config at ${candidate}: ${(error as Error).message}`,
-          { cause: error },
-        );
-      }
-    }
-  }
-
-  return loadJsonConfig(pathAdapter.resolve(cwd, "config", "database.json"));
-}
-
-async function loadJsonConfig(configPath: string): Promise<RawConfigurations> {
-  try {
-    const fsAdapter = await getFsAsync();
-    return JSON.parse(fsAdapter.readFileSync(configPath, "utf-8"));
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return {};
-    }
-    throw new ConfigurationError(
-      `Failed to load database config at ${configPath}: ${(error as Error).message}`,
-      { cause: error },
-    );
-  }
 }
 
 // Re-exports for backward compat — these now live in adapter-args.ts so

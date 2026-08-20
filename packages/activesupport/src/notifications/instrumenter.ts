@@ -1,5 +1,4 @@
 import { getCrypto } from "../crypto-adapter.js";
-import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -28,7 +27,6 @@ export class Event {
   private _end: number | null;
   private _cpuTimeStart = 0.0;
   private _cpuTimeFinish = 0.0;
-  readonly children: Event[];
 
   constructor(
     name: string,
@@ -45,7 +43,6 @@ export class Event {
     this._time = start != null ? start * 1_000.0 : start;
     this.transactionId = transactionId;
     this._end = ending != null ? ending * 1_000.0 : ending;
-    this.children = [];
   }
 
   get time(): number | null {
@@ -190,18 +187,10 @@ export interface InstrumenterNotifier {
 export interface NotificationHandle {
   start(): void;
   finish(): void;
-  /** The Event this handle built (if any) — used to thread child-event nesting. */
-  readonly event?: Event | null;
 }
 
 export class Instrumenter {
   private _notifier: InstrumenterNotifier;
-  // trails' (non-Rails) child-event nesting stack. Rails keeps no such stack on
-  // the Instrumenter; trails threads `Event#children` here. It lives in
-  // AsyncContext (per-instance key), so concurrent `instrumentAsync` calls
-  // racing under `Promise.all` fork their own view and can't pop each other's
-  // entries — an instance array would interleave and collapse the nesting.
-  private readonly _stackKey = Symbol("as_notification_instrumenter_stack");
   readonly id: string;
 
   constructor(notifier: InstrumenterNotifier) {
@@ -209,18 +198,12 @@ export class Instrumenter {
     this.id = this.uniqueId();
   }
 
-  private _stack(): Event[] {
-    return IsolatedExecutionState.fetch<Event[]>(this._stackKey, () => []);
-  }
-
   /**
    * Mirrors ActiveSupport::Notifications::Instrumenter#instrument
    * (instrumenter.rb:54-65): build a handle, start it, yield the raw payload
    * (the rescue arm records the exception on it), then finish the handle in the
    * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
-   * groups drive the event, rather than open-coding an Event/publish here. The
-   * handle's event is linked under the enclosing one and pushed for the block's
-   * duration, so nested instruments become children.
+   * groups drive the event, rather than open-coding an Event/publish here.
    */
   instrument<T = void>(
     name: string,
@@ -229,12 +212,9 @@ export class Instrumenter {
   ): T {
     const handle = this.buildHandle(name, payload);
     handle.start();
-    const inner = this._nest(handle.event ?? null);
 
     try {
-      return IsolatedExecutionState.scope(this._stackKey, inner, () =>
-        fn ? fn(payload) : (undefined as unknown as T),
-      );
+      return fn ? fn(payload) : (undefined as unknown as T);
     } catch (e) {
       _recordException(payload, e);
       throw e;
@@ -250,29 +230,15 @@ export class Instrumenter {
   ): Promise<T> {
     const handle = this.buildHandle(name, payload);
     handle.start();
-    const inner = this._nest(handle.event ?? null);
 
     try {
-      return await IsolatedExecutionState.scope(this._stackKey, inner, () =>
-        fn ? fn(payload) : Promise.resolve(undefined as unknown as T),
-      );
+      return await (fn ? fn(payload) : Promise.resolve(undefined as unknown as T));
     } catch (e) {
       _recordException(payload, e);
       throw e;
     } finally {
       handle.finish();
     }
-  }
-
-  // Link `event` under the currently-open one and return the stack the block
-  // should run in (with `event` pushed). A handle with no event-object group
-  // (nothing listening) leaves the stack unchanged.
-  private _nest(event: Event | null): Event[] {
-    const stack = this._stack();
-    if (!event) return stack;
-    const parent = stack[stack.length - 1];
-    if (parent) parent.children.push(event);
-    return [...stack, event];
   }
 
   /**
@@ -356,11 +322,6 @@ export class Handle implements NotificationHandle {
     private _transactionId: string,
     private _notifier: { publish(name: string, event: Event): void },
   ) {}
-
-  /** The Event built at #start — the Instrumenter threads nesting through it. */
-  get event(): Event | null {
-    return this._event;
-  }
 
   start(): void {
     if (this._state !== "initialized") {
