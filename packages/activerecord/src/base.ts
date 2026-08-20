@@ -4557,9 +4557,13 @@ extend(Base, {
 });
 extend(Base, _Reflection.ClassMethods);
 // Mirrors `class_attribute :_reflections, instance_writer: false, default: {}`
-// (reflection.rb:11) and the sibling association registry: reads walk the
-// constructor chain, writes are local to the class, so `add_reflection`'s
-// reassignment is the whole copy-on-write mechanism.
+// (reflection.rb:11): reads walk the constructor chain, writes are local to the
+// class, so `add_reflection`'s reassignment is the whole copy-on-write
+// mechanism. `_associations` has no `class_attribute` of its own upstream —
+// reflection.rb:11-14 declares only `_reflections`, `aggregate_reflections`,
+// `automatic_scope_inversing` and `automatically_invert_plural_associations` —
+// it is trails-only registry bookkeeping carried on the same mechanism as the
+// `_reflections` it shadows, so the two cannot drift apart.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 extend(Base, {
