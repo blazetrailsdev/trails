@@ -68,11 +68,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // naming.rb:151 `delegate :==, :===, :<=>, :=~, :"!~", :eql?, …, to: :name` →
   // naming.ts `equals`, `caseEquals` and `compare` (`eql?` is not an operator;
   // it ports as `eql` and `rubyMethodToTs` already spells it). `=~` and `!~`
-  // stay UNMAPPED: `String#=~` answers the Integer match POSITION and `!~` its
-  // negation, and neither has a trails spelling — `match` is already taken by
-  // the `match?` delegate, whose boolean is a different value. Nothing in the
-  // repo consumes a match position, so the port is deferred rather than given
-  // an invented name.
+  // stay UNMAPPED under the naming.rb entry in `SCOPED_SKIP_GROUPS`, which
+  // carries the reason.
   "ActiveModel::Name": { "==": ["equals"], "===": ["caseEquals"], "<=>": ["compare"] },
   // abstract_adapter.rb:252 `def <=>(version_string)` → abstract-adapter.ts
   // `compare`. `Version` does `include Comparable`, so `>=` / `<` are derived

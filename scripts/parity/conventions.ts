@@ -543,6 +543,21 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Ruby's match operators on ActiveModel::Name, which delegates `=~` and " +
+      "`!~` to `@name` along with `==`/`===`/`<=>`/`eql?`/`match?` " +
+      "(naming.rb:151-152). `String#=~` answers the Integer OFFSET of the " +
+      "match (string.c `rb_str_match`) and `!~` its negation " +
+      "(Object#!~, object.c) — a different value from the boolean `match?` " +
+      "already ported as `match`, so neither can share that spelling, and " +
+      "TypeScript has no operator to overload for either. Nothing in trails " +
+      "consumes a match offset, so a port would exist only to be named. " +
+      "Scoped to naming.rb so the operators stay expected wherever a real " +
+      "offset-returning surface is ported.",
+    names: ["=~", "!~"],
+    rubyFiles: ["naming.rb"],
+  },
+  {
+    reason:
       "The GC and allocation counters on Notifications::Event " +
       "(notifications/instrumenter.rb:174-186, :213-227): `gc_time` and " +
       "`allocations` are differences of `now_gc` / `now_allocations`, which read " +
