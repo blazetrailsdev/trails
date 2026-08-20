@@ -29,3 +29,13 @@ describe("DateType assert_valid_value", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+// `serialize` comes from the AcceptsMultiparameterTime mixin and Type::Date
+// defines no `serialize_cast_value` of its own, so both are answered by the
+// same ancestor and the predicate (serialize_cast_value.rb:9-12) is true.
+describe("DateType serialize_cast_value_compatible?", () => {
+  it("is compatible", () => {
+    const type = new Types.DateType();
+    expect(type.itselfIfSerializeCastValueCompatible()).toBe(type);
+  });
+});

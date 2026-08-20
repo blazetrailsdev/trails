@@ -203,21 +203,6 @@ export class DateType extends ValueType<DateCastResult> {
     ).call(this, values as Record<string, unknown>);
     return time && this.newDate(time.year, time.mon, time.mday);
   }
-
-  /**
-   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
-   * returns the cast Temporal.PlainDate — NOT a SQL string; the adapter quotes it later.
-   */
-  // Return type is `unknown` (matching ActiveModel::Type::Value#serialize) so
-  // adapter subclasses can widen it — e.g. PostgreSQL's OID::Date emits the
-  // "infinity" wire string for the infinity sentinels.
-  serialize(value: unknown): unknown {
-    return this.cast(value);
-  }
-
-  serializeCastValue(value: DateCastResult | null): DateCastResult | null {
-    return value;
-  }
 }
 
 /** Mirrors: ActiveModel::Type::Date::ISO_DATE (date.rb:54). */

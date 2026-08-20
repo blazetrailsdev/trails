@@ -222,20 +222,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   /**
-   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
-   * returns the cast Temporal value — NOT a SQL string. The connection adapter's
-   * quoting/bind layer converts it to a SQL literal at quote/type_cast time, matching
-   * Rails where `value_for_database` for a datetime yields the cast Time and the
-   * adapter does the quoting. Sub-second precision is already applied in `castValue`.
-   */
-  // Return type is `unknown` (matching ActiveModel::Type::Value#serialize) so
-  // adapter subclasses can widen it — e.g. PostgreSQL's OID::DateTime emits the
-  // "infinity" wire string for the infinity sentinels.
-  serialize(value: unknown): unknown {
-    return this.serializeCastValue(this.cast(value));
-  }
-
-  /**
    * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
    * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
    * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by

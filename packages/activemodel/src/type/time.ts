@@ -201,16 +201,15 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 
   /**
-   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
-   * returns the cast Temporal.Instant — NOT a SQL string; the adapter quotes it later.
+   * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
+   * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
+   * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by
+   * `serialize-cast-value-drops-is-utc-normalization`.
    */
-  serialize(value: unknown): unknown {
-    return this.serializeCastValue(this.cast(value));
-  }
-
-  // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
+  // Return type is `unknown` so adapter subclasses can widen it — ActiveRecord's
+  // Type::Time serializes to a SQL time string.
   serializeCastValue(value: Temporal.Instant | null): unknown {
-    return value === null ? null : this.applySecondsPrecision(value);
+    return this.applySecondsPrecision(value);
   }
 
   /**
