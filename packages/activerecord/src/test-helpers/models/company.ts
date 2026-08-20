@@ -70,7 +70,7 @@ export class Company extends AbstractCompany {
     this.hasMany("specialDevelopers", { through: "specialContracts" });
     this.hasMany("comments", { foreignKey: "company" });
 
-    this.aliasAttribute("newName", "name");
+    this.aliasAttribute("new_name", "name");
     this.attribute("metadata", "json");
 
     this.scope("ofFirstFirm", (q: any) =>

@@ -30,7 +30,7 @@ describe("getModelColumns virtual-attribute eager projection", () => {
     let firm: Firm;
     try {
       firm = (await Firm.includes(":clients")
-        .where({ "clients.newName": "Summit" })
+        .where({ "clients.new_name": "Summit" })
         .last()) as Firm;
     } finally {
       Notifications.unsubscribe(sub);

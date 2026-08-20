@@ -25,8 +25,8 @@ describe("ReadTest", () => {
         ["three", { name: "three" }],
       ]);
       static _attributeMethodsGenerated = false;
-      static _attributeMethodPatterns = Base._attributeMethodPatterns;
-      static _attributeAliases = {};
+      static attributeMethodPatterns = Base.attributeMethodPatterns;
+      static attributeAliases = {};
       static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
       static defineMethodAttribute = Base.defineMethodAttribute;

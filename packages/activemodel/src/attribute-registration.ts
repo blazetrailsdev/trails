@@ -28,16 +28,6 @@ export interface AttributeRegistrationClassMethods {
 
 export type AttributeRegistration = AttributeRegistrationClassMethods;
 
-/** @internal The class-side shape `AttributeRegistration::ClassMethods` needs of its host. */
-export interface AttributeRegistrationHost {
-  _attributeDefinitions: Map<string, { name: string; type?: Type }>;
-  _cachedDefaultAttributes?: AttributeSet | null;
-  /** @internal */
-  resolveTypeName(name: string, options?: Record<string, unknown>): Type;
-  /** @internal */
-  resolveAttributeName(name: string): string;
-}
-
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
   _cachedAttributeTypes?: Record<string, Type> | null;
@@ -176,6 +166,26 @@ export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   return this._cachedDefaultAttributes;
 }
 
+/** @internal Rails-private helper. */
+export class PendingDecorator implements PendingModification {
+  constructor(
+    readonly names: string[] | null,
+    readonly decorator: AttributeDecorator,
+  ) {}
+
+  /** @internal */
+  applyTo(attributeSet: AttributeSet, host?: unknown): void {
+    const targets = this.names ?? attributeSet.keys();
+    for (const name of targets) {
+      const existing = attributeSet.getAttribute(name);
+      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
+      if (newType) {
+        attributeSet.set(name, existing.withType(newType));
+      }
+    }
+  }
+}
+
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#attribute_types
  *
@@ -211,26 +221,6 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
   });
   this._cachedAttributeTypes = proxy;
   return proxy;
-}
-
-/** @internal Rails-private helper. */
-export class PendingDecorator implements PendingModification {
-  constructor(
-    readonly names: string[] | null,
-    readonly decorator: AttributeDecorator,
-  ) {}
-
-  /** @internal */
-  applyTo(attributeSet: AttributeSet, host?: unknown): void {
-    const targets = this.names ?? attributeSet.keys();
-    for (const name of targets) {
-      const existing = attributeSet.getAttribute(name);
-      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
-      if (newType) {
-        attributeSet.set(name, existing.withType(newType));
-      }
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------

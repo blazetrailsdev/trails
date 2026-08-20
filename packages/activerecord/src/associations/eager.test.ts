@@ -363,7 +363,7 @@ describe("EagerAssociationTest", () => {
   });
   it("attribute alias in where references association name", async () => {
     const firm = (await Firm.includes(":clients")
-      .where({ "clients.newName": "Summit" })
+      .where({ "clients.new_name": "Summit" })
       .last()) as any;
     expect(firm.id).toBe(companies("first_firm").id);
     expect((await firm.clients.toArray()).map((c: any) => c.id)).toEqual([
@@ -2257,7 +2257,7 @@ describe("EagerAssociationTest", () => {
 
   it("test_attribute_alias_in_where_references_association_name", async () => {
     const firm = (await Firm.includes(":clients")
-      .where({ "clients.newName": "Summit" })
+      .where({ "clients.new_name": "Summit" })
       .last()) as Firm;
     expect(firm.id).toBe(companies("first_firm").id);
     const clients = (await (firm as any).clients.toArray()) as Base[];

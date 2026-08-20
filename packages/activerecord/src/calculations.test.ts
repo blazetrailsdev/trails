@@ -1692,7 +1692,7 @@ describe("CalculationsTest", () => {
     await companies.load();
 
     await assertNoQueries(false, async () => {
-      expect(await companies.pick("newName")).toBe("37signals");
+      expect(await companies.pick("new_name")).toBe("37signals");
     });
   });
 

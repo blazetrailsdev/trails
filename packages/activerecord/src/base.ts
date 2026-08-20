@@ -133,7 +133,6 @@ import {
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
-  resolveAliasNameIn,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
@@ -1759,15 +1758,17 @@ export class Base extends Model {
 
   /**
    * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-   * parameters: false` (attribute_methods/before_type_cast.rb:32). Ruby's
-   * `class_attribute` `+=` gives Active Record its own array rather than
+   * parameters: false` (attribute_methods/before_type_cast.rb:32). The
+   * `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
    */
-  static override _attributeMethodPatterns: AttributeMethodPattern[] = [
-    ...Model._attributeMethodPatterns,
-    new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
-    new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
-  ];
+  static {
+    this.attributeMethodPatterns = [
+      ...this.attributeMethodPatterns,
+      new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
+      new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
+    ];
+  }
 
   // -- Ignored columns --
   static _ignoredColumns: string[] = [];
@@ -4354,7 +4355,7 @@ export class Base extends Model {
     // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
     // (attribute_methods.rb:256) before checking `attribute_types`.
     const defs = this._attributeDefinitions;
-    return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
+    return defs.has(this.resolveAttributeName(String(name)));
   }
 
   /**

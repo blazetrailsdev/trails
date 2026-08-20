@@ -7,7 +7,6 @@ import { isBlank, include, Module } from "@blazetrails/activesupport";
 import {
   MissingAttributeError,
   missingAttribute,
-  resolveAliasNameIn,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   defineAttributeMethods as amDefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
@@ -86,29 +85,6 @@ interface AttributeAccessorHost {
 }
 
 /**
- * Instance-level alias resolution, resolved against the record's loaded
- * attribute set.
- *
- * Rails runs one identical `attribute_aliases[name] || name` step in
- * `has_attribute?` (attribute_methods.rb:316-319), `read_attribute`
- * (read.rb:31-34) and `write_attribute` (write.rb:31-34). Trails needs an extra
- * camelCase-key bridge on top (see `resolveAliasNameIn`), so all three route
- * through here rather than resolving independently — otherwise the bridge could
- * report an attribute present while reads and writes went somewhere else.
- *
- * @internal
- */
-export function recordAliasName(
-  record: { _attributes?: { has(name: string): boolean } },
-  name: string,
-): string {
-  const ctor = (record as unknown as { constructor: unknown }).constructor as Parameters<
-    typeof resolveAliasNameIn
-  >[0];
-  return resolveAliasNameIn(ctor, record._attributes, name);
-}
-
-/**
  * Check whether an attribute exists on a record.
  *
  * Mirrors: ActiveRecord::AttributeMethods#has_attribute?
@@ -116,7 +92,11 @@ export function recordAliasName(
 export function hasAttribute(this: AttributeRecord, name: string): boolean {
   // Rails: `attr_name = self.class.attribute_aliases[attr_name] || attr_name`
   // then `@attributes.key?(attr_name)` (attribute_methods.rb:316-319).
-  return this._attributes.has(recordAliasName(this, name));
+  return this._attributes.has(
+    (
+      this.constructor as unknown as { resolveAttributeName(n: string): string }
+    ).resolveAttributeName(name),
+  );
 }
 
 /**
@@ -747,7 +727,12 @@ export function readAttribute(
   name: string,
   block?: (name: string) => unknown,
 ): unknown {
-  return this._readAttribute(recordAliasName(this, name), block);
+  return this._readAttribute(
+    (
+      this.constructor as unknown as { resolveAttributeName(n: string): string }
+    ).resolveAttributeName(name),
+    block,
+  );
 }
 
 /**
@@ -776,7 +761,13 @@ export function set(this: InstanceMethodHost, attrName: string, value: unknown):
 
 /** Mirrors: ActiveRecord::AttributeMethods#write_attribute (write.rb:31-34) */
 export function writeAttribute(this: InstanceMethodHost, name: string, value: unknown): void {
-  _writeAttribute.call(this as any, recordAliasName(this, name), value);
+  _writeAttribute.call(
+    this as any,
+    (
+      this.constructor as unknown as { resolveAttributeName(n: string): string }
+    ).resolveAttributeName(name),
+    value,
+  );
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#query_attribute */

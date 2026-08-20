@@ -113,7 +113,6 @@ export interface AttributeMethodHost {
   attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
   _generatedAttributeMethods?: Module;
-  prototype: { [key: string]: unknown };
 }
 
 /**
@@ -744,16 +743,13 @@ export function defineMethodAttribute(
  * survives, an inherited GENERATED one does not count as hand-written — and it
  * makes `undefine_attribute_methods` clear the cascade.
  *
- * @noRailsEquivalent CONVERGEABLE — Rails has no such method. It declares the
- * cascade as `attribute_method_suffix` / `attribute_method_affix` patterns
- * (dirty.rb:241-245, plus ActiveRecord's `saved_change_to_*` /
- * `will_save_change_to_*` / `*_in_database` / `*_before_last_save` set in
- * activerecord/attribute_methods/dirty.rb), and `define_attribute_methods`
- * walks `attribute_method_patterns` and generates each one
- * (attribute_methods.rb:313-316). This method stands in for exactly that walk.
- * Blocked on two things out of scope here: `methodName` concatenates
- * `prefix + attrName + suffix` and cannot produce a camelCased
- * `savedChangeToName`, and this cascade spans both packages' halves. Story:
+ * @noRailsEquivalent CONVERGEABLE — Rails declares this cascade as
+ * `attribute_method_suffix` / `attribute_method_affix` patterns (dirty.rb:241-245,
+ * plus AR's `saved_change_to_*` set in activerecord/attribute_methods/dirty.rb)
+ * and lets `define_attribute_methods` walk them (attribute_methods.rb:313-316);
+ * this stands in for that walk. Blocked on `methodName` concatenating
+ * `prefix + attrName + suffix`, which cannot produce a camelCased
+ * `savedChangeToName`, and on the cascade spanning both packages. Story:
  * 0096-naming-identifier-burndown/declare-dirty-cascade-as-attribute-method-suffix-patterns.
  */
 export function defineDirtyAttributeMethods(this: AttributeMethodHost, attrName: string): void {
@@ -803,42 +799,4 @@ export function defineDirtyAttributeMethods(this: AttributeMethodHost, attrName:
       },
     );
   }
-}
-
-/**
- * `resolveAttributeName` plus the trails-only camelCase-key bridge, resolved
- * against a caller-supplied attribute set.
- *
- * Trails stores alias KEYS camelCase (`newName`, `commentsCount`) while derived
- * names — counter-cache columns, DB column names — are snake_case (`new_name`,
- * `comments_count`). Rails needs no such bridge: its alias keys are already in
- * the same convention as its column names, so the plain
- * `attribute_aliases[attr_name] || attr_name` step suffices everywhere it uses
- * one (attribute_methods.rb:316-319, read.rb:31-34, write.rb:31-34).
- *
- * Because the camelized key is a *guess*, it is applied only after `present`
- * has been consulted: a name the relevant set already owns — a record loaded
- * with a projected `SELECT COUNT(*) AS comments_count`, say — must never be
- * redirected to an unrelated `commentsCount` alias. `present` is the set that
- * defines ownership for the calling surface: the class attribute set for
- * class-level `has_attribute?`, the loaded `@attributes` for the instance form
- * and for `read_attribute` / `write_attribute`.
- *
- * Rails applies one identical resolution step across all of those surfaces, so
- * trails routes them all through this single function — sharing the bridge
- * keeps them coherent, i.e. never `has_attribute?` true while `read_attribute`
- * returns nil for the same name.
- *
- * @internal
- */
-export function resolveAliasNameIn(
-  host: AttributeMethodHost,
-  present: { has(name: string): boolean } | undefined,
-  name: string,
-): string {
-  const aliases = host?.attributeAliases;
-  const exact = aliases?.[name];
-  if (exact !== undefined) return exact;
-  if (present?.has(name)) return name;
-  return aliases?.[camelize(name, "lower")] ?? name;
 }

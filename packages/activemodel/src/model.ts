@@ -82,7 +82,6 @@ import {
   aliasAttribute,
   resolveAttributeName as _resolveAttributeNameHelper,
   type AttributeMethodHost,
-  resolveAliasNameIn,
   defineMethodAttribute,
   undefineAttributeMethods,
   attributeMissing,
@@ -283,8 +282,7 @@ export class Model {
   static paramDelimiter: string = "-";
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   // Runtime accessors come from the `classAttribute()` calls at the bottom of
-  // this file — Rails' `included do class_attribute … end`
-  // (attribute_methods.rb:70-73).
+  // this file (attribute_methods.rb:70-73).
   declare static attributeAliases: Record<string, string>;
   declare static isAttributeAliases: boolean;
   declare static attributeMethodPatterns: AttributeMethodPattern[];
@@ -1756,7 +1754,7 @@ export class Model {
     // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
     // skips it. Resolved against the loaded attribute set so the trails
     // camelCase-key bridge cannot displace a name the record already owns.
-    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     if (this._attributes.has(resolved)) this._accessedFields.add(resolved);
     return this._attributes.fetchValue(resolved, block) ?? null;
   }
@@ -1825,7 +1823,7 @@ export class Model {
     // canonical attribute's dirty state (Rails `write_attribute`,
     // write.rb:31-34). Resolved against the loaded attribute set to stay
     // coherent with `readAttribute` / `hasAttribute`.
-    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
+    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
     this._writeAttribute(resolved, value);
   }
 
@@ -1903,7 +1901,7 @@ export class Model {
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
     const defs = ctor._attributeDefinitions;
-    return defs.has(resolveAliasNameIn(ctor, defs, name));
+    return defs.has(ctor.resolveAttributeName(name));
   }
 
   /**

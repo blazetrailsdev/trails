@@ -103,38 +103,30 @@ export interface AttributeOptions {
   range?: boolean;
 }
 
-/** @internal The class-side shape `AttributeRegistration::ClassMethods` needs of its host. */
-interface AttributeRegistrationHost {
-  _attributeDefinitions: Map<string, AttributeDefinition>;
-  _cachedDefaultAttributes?: AttributeSet | null;
-  /** @internal */
-  resolveTypeName(name: string, options?: Record<string, unknown>): Type;
-  /** @internal */
-  resolveAttributeName(name: string): string;
-}
-
 /**
- * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-62)
- *
- *   def attribute(name, ...)
- *     super
- *     define_attribute_method(name)
- *   end
- *
- * `super` is `AttributeRegistration::ClassMethods#attribute`
- * (attribute_registration.rb:12-20), inlined rather than split into its own
- * file: Rails' two same-named methods `super` into one another, which TS cannot
- * spell across modules. Story:
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
+ * — registers the attribute, then `define_attribute_method(name)` generates its
+ * methods. Rails' body is `super; define_attribute_method(name)`, where `super`
+ * is `AttributeRegistration::ClassMethods#attribute`
+ * (attribute_registration.rb:12-20); the two are inlined here because TS cannot
+ * spell `super` across modules. Story:
  * 0115/split-attribute-registration-attribute-from-attributes-attribute.
  *
- * A name the class already answers (`toJSON`, `freeze`) gets no accessor —
- * `define_attribute_method_pattern`'s `instance_method_already_implemented?`
- * arm rejects it — but still round-trips through `readAttribute`.
+ * A name the class already answers (`toJSON`, `freeze`, `attributes`)
+ * gets no accessor, because `define_attribute_method_pattern`'s
+ * `instance_method_already_implemented?` arm rejects it; such an attribute still
+ * round-trips through `readAttribute` / `writeAttribute`.
  *
  * @internal
  */
 export function attribute(
-  this: AttributeRegistrationHost,
+  this: {
+    _attributeDefinitions: Map<string, AttributeDefinition>;
+    prototype: object;
+    _cachedDefaultAttributes?: AttributeSet | null;
+    resolveTypeName(name: string, options?: Record<string, unknown>): Type;
+    resolveAttributeName(name: string): string;
+  },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
   // optional. When omitted, the attribute keeps its existing (schema-reflected
@@ -318,6 +310,16 @@ export class Attributes {
   }
 }
 
+function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
+  const {
+    default: _default,
+    virtual: _virtual,
+    userProvidedDefault: _userProvidedDefault,
+    ...rest
+  } = options ?? {};
+  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Rails privates surfaced by attributes.rb
 // ---------------------------------------------------------------------------
@@ -358,14 +360,4 @@ export function isRespondToWithoutAttributes(
   includePrivateMethods: boolean = false,
 ): boolean {
   return _isRespondToWithoutAttributes.call(this, method, includePrivateMethods);
-}
-
-function typeOptions(options?: AttributeOptions): Record<string, unknown> | undefined {
-  const {
-    default: _default,
-    virtual: _virtual,
-    userProvidedDefault: _userProvidedDefault,
-    ...rest
-  } = options ?? {};
-  return Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined;
 }
