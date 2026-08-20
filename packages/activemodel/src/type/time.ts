@@ -205,9 +205,10 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
    * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by
    * `serialize-cast-value-drops-is-utc-normalization`.
+   *
+   * The return type is `unknown` so a subclass can widen it, as ActiveRecord's
+   * `Type::Time` does (activerecord/lib/active_record/type/time.rb:20-22).
    */
-  // Return type is `unknown` so adapter subclasses can widen it — ActiveRecord's
-  // Type::Time serializes to a SQL time string.
   serializeCastValue(value: Temporal.Instant | null): unknown {
     return this.applySecondsPrecision(value);
   }
