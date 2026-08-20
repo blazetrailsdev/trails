@@ -561,13 +561,6 @@ export class Relation<T extends Base> {
    * eager arm and consumed — then cleared — by `instantiate_records` (:1457-1459).
    */
   private _joinDependency: JoinDependency | null = null;
-  /**
-   * The eager associations `exec_main_query` degraded to a preload, handed to
-   * `exec_queries`' preload step. No Rails counterpart: Rails' eager arm always
-   * builds the JOIN.
-   */
-  private _eagerBypassPreloads: AssociationSpec[] | null = null;
-
   private _table: Table | null = null;
 
   constructor(
@@ -1078,15 +1071,8 @@ export class Relation<T extends Base> {
       // already eager-loaded via JOIN. Order matters now that each spec runs as
       // its own sequential `Preloader.call()`, so the query-issue sequence matches
       // Rails for relations mixing `.preload(...)` and `.includes(...)`.
-      const bypassPreloads = this._eagerBypassPreloads ?? [];
-      this._eagerBypassPreloads = null;
-      const preloadAssocs = [
-        ...this.preloadValues,
-        ...(this.isEagerLoading ? [] : this.includesValues),
-        ...bypassPreloads.filter((n) => !this.preloadValues.includes(n)),
-      ];
       if (!this.skipPreloadingValue) {
-        await this.preloadAssociations(records, preloadAssocs);
+        await this.preloadAssociations(records);
         if (token !== this._loadToken) return [];
       }
 
@@ -1139,15 +1125,6 @@ export class Relation<T extends Base> {
       // Rails' `eager_loading?`, which `exec_main_query` reads for itself
       // (relation.rb:1434) exactly as `exec_queries` does for its preload list.
       if (this.isEagerLoading) {
-        const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-        // trails' remaining capability gap: a composite-PK/CTE/FROM-override
-        // eager load can't emit the aliased JOIN, so it degrades to a preload
-        // (`_eagerLoadBypassesJoinDependency`). Rails always JOINs.
-        if (this._eagerLoadBypassesJoinDependency()) {
-          const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
-          this._eagerBypassPreloads = allEager;
-          return result;
-        }
         // Mirrors: relation.rb:1435-1446.
         return this.applyJoinDependency({}, async (relation, joinDependency) => {
           if (relation.isNullRelation()) return Result.empty();
@@ -1284,25 +1261,6 @@ export class Relation<T extends Base> {
   // interface merge + prototype assignment (see bottom of file)
 
   /**
-   * Whether an eager-load query degrades to plain SQL + preloading instead of
-   * building a JoinDependency. trails can't emit the aliased eager JOIN under
-   * CTEs or a FROM override, so eager specs are preloaded in those cases (a
-   * capability gap — Rails always JOINs). Kept in one place so the `toArray`
-   * builder (`exec_main_query`), the `toSql` builder (`toSql`), and the
-   * calculation/exists raise-check (`_checkEagerLoadable`) agree on exactly when
-   * a JoinDependency is built.
-   *
-   * A composite PK is NOT a bypass: the limited-ids query runs through the
-   * adapter's `distinct_relation_for_primary_key` (schema_statements.rb:1429-1452),
-   * which maps every pk column and rewrites the relation per column, so
-   * `apply_join_dependency` handles a composite key exactly as Rails does.
-   * @internal
-   */
-  private _eagerLoadBypassesJoinDependency(): boolean {
-    return this.withValues.length > 0 || !this.fromClause.isEmpty();
-  }
-
-  /**
    * Surface raise-worthy eager-load specs before building calculation/exists
    * SQL, which never constructs a JoinDependency of its own. Mirrors Rails
    * `apply_join_dependency`, which `count`/`exists?`/`calculate` route through
@@ -1311,11 +1269,6 @@ export class Relation<T extends Base> {
    * (`ConfigurationError`) and polymorphic associations
    * (`EagerLoadPolymorphicError`). Building the JoinDependency and discarding it
    * is the whole check — like Rails, the errors are a side effect of `build`.
-   *
-   * Skips entirely when the query bypasses the JoinDependency (CTEs, set ops,
-   * FROM overrides, composite PK): there `toArray` degrades to preloading
-   * without raising, so the calculation/exists paths must stay consistent and
-   * not raise either.
    *
    * Gated on `eager_loading?`, the condition its Rails counterparts reach
    * `apply_join_dependency` behind (finder_methods.rb:369, calculations.rb:431),
@@ -1333,7 +1286,6 @@ export class Relation<T extends Base> {
    * @internal
    */
   _checkEagerLoadable(): void {
-    if (this._eagerLoadBypassesJoinDependency()) return;
     if (!this.isEagerLoading) return;
     const specs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
@@ -1826,7 +1778,7 @@ export class Relation<T extends Base> {
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
     );
-    return this._buildEagerIdSubquery(jd, basePk);
+    return this._limitedDistinctRelation(jd, basePk).toArel();
   }
 
   /**
@@ -1995,7 +1947,7 @@ export class Relation<T extends Base> {
           rel = rel.where(this.table.get(column).in(tuples.map((tuple) => tuple[i]) as never));
         });
       } else {
-        const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
+        const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).toArel();
         rel = rel.where(this.table.get(basePk).in(ids as never));
       }
       rel.limitValue = null;
@@ -2015,9 +1967,8 @@ export class Relation<T extends Base> {
    *
    * Rails spells this guard inline in `apply_join_dependency`, and so does
    * {@link applyJoinDependency}. This copy serves only the SYNCHRONOUS eager
-   * paths that cannot route through it — `toSql`, the deferred distinct-PK
-   * predicate cluster, and `_eagerLoadBypassesJoinDependency` — pending the
-   * sync/async collapse tracked by
+   * paths that cannot route through it — `toSql` and the deferred distinct-PK
+   * predicate cluster — pending the sync/async collapse tracked by
    * `converge-relation-subquery-distinct-pk-materialization`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
@@ -2038,53 +1989,34 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Builds the DISTINCT-primary-key subquery used to limit collection eager
-   * loads (LEFT OUTER JOINs + WHERE/ORDER + LIMIT/OFFSET). The toSql path
-   * nests it inside `pk IN (...)`; the execution path runs it standalone to
-   * materialize literal IDs (Rails' `distinct_relation_for_primary_key`).
+   * The `limited` relation of Rails' `distinct_relation_for_primary_key`
+   * (schema_statements.rb:1438): the relation `apply_join_dependency` already
+   * spawned — `except(:includes, :eager_load, :preload).joins!(join_dependency)`
+   * (finder_methods.rb:461) — reselected to the DISTINCT primary-key values.
+   * Its arel comes from `build_arel` like every other relation's, so the
+   * LIMIT/OFFSET sanitizers and `build_cast_value` wrap (query_methods.rb:1757-1758),
+   * `build_with`, group/having and hints all apply here without a second
+   * hand-assembled manager to drift from.
    *
-   * When `distinctSelectSql` is provided (the standalone execution path), it is
-   * the precomputed `columns_for_distinct` SELECT list — order columns appended
-   * after the pk, because `SELECT DISTINCT id ... ORDER BY <col>` requires every
-   * ordered column to be projected on PostgreSQL. The pk stays last, so callers
-   * extract it as the final column. The inline `pk IN (...)` path omits it and
-   * projects the pk only (a multi-column subquery is invalid as an `IN` operand)
-   * and is never executed.
-   *
-   * Known limitation (pre-existing): single-column pk only. Callers read the
-   * last column value and emit a scalar `pk IN (...)`. Composite keys (Rails'
-   * `results.last(pk.length)` + `zip`) are unhandled, matching the rest of this
-   * eager path (`basePk`).
+   * `distinctSelectSql` is the precomputed `columns_for_distinct` SELECT list
+   * (schema_statements.rb:1434-1437) used by the standalone execution path.
+   * The inline `pk IN (...)` fallback omits it and reselects the pk alone: a
+   * multi-column subquery is not a valid `IN` operand.
    */
-  private _buildEagerIdSubquery(
+  private _limitedDistinctRelation(
     jd: JoinDependency,
     basePk: string | string[],
     distinctSelectSql?: string,
-  ): SelectManager {
-    const table = this.table;
-    // `table` may be a TableAlias (an aliased relation), which has no
-    // `project` — seed the manager from it instead, as Rails does by spawning
-    // the relation itself (`relation.reselect(values).distinct!`).
-    const idSubquery = new SelectManager(table).project(
-      ...(distinctSelectSql !== undefined
+  ): Relation<T> {
+    const relation = this.except("includes", "eagerLoad", "preload");
+    QueryMethodBangs.joinsBang.call(relation as any, jd as any);
+    const values =
+      distinctSelectSql !== undefined
         ? [new Nodes.SqlLiteral(distinctSelectSql)]
-        : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => table.get(column))),
-    );
-    idSubquery.distinct();
-    // This subquery is its own `build_joins` statement: fold the eager JD into
-    // `stashedJoins` so it emits through the single `emitJoinPlan` port with one
-    // shared `AliasTracker` spanning the eager JoinDependency and the manual
-    // joins, deduping coinciding nodes via `walk` — same threading as the
-    // relation `_applyEagerJoinDependency` yields.
-    const joined = this.clone();
-    QueryMethodBangs.joinsBang.call(joined as any, jd as any);
-    _qm.buildJoins.call(joined as any, idSubquery);
-    if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
-    this.buildOrder(idSubquery);
-    const connection = this._conn();
-    if (this.limitValue !== null) idSubquery.take(connection.sanitizeLimit(this.limitValue));
-    if (this.offsetValue !== null) idSubquery.skip(_qm.toI(this.offsetValue));
-    return idSubquery;
+        : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => this.table.get(column));
+    const limited = (relation as any).reselect(...values) as Relation<T>;
+    (limited as any).distinctBang();
+    return limited;
   }
 
   /**
@@ -2110,7 +2042,7 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     const distinctSelect = this._distinctSelectForLimitedIds(basePk);
     const idResult = await this._conn().selectAll(
-      this._buildEagerIdSubquery(jd, basePk, distinctSelect),
+      this._limitedDistinctRelation(jd, basePk, distinctSelect).toArel(),
       "SQL",
     );
     const idRows = idResult.toArray();
@@ -2184,8 +2116,6 @@ export class Relation<T extends Base> {
    * that under. The plain arel is closer than a broken per-column `IN ()`.
    */
   private _buildEagerOperandManager(): SelectManager | null {
-    if (this._eagerLoadBypassesJoinDependency()) return null;
-
     const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     if (allEager.length === 0) return null;
 
@@ -2227,22 +2157,14 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation#preload_associations (relation.rb:1321)
-   *
-   * Rails derives the spec list itself (`preload_values`, plus `includes_values`
-   * unless `eager_loading?`) — that is the `assocNames` default here. The
-   * internal `load` path passes the list explicitly because this port promotes
-   * `includes` to a JOIN per-association rather than all-or-nothing, so it has
-   * to subtract exactly the specs it promoted.
+   * Mirrors: ActiveRecord::Relation#preload_associations (relation.rb:1321-1329)
    */
-  async preloadAssociations(
-    records: T[],
-    assocNames: AssociationSpec[] = [
+  async preloadAssociations(records: T[]): Promise<void> {
+    const preload: AssociationSpec[] = [
       ...this.preloadValues,
       ...(this.isEagerLoading ? [] : this.includesValues),
-    ],
-  ): Promise<void> {
-    if (assocNames.length === 0) return;
+    ];
+    if (preload.length === 0) return;
     const { Preloader } = await import("./associations/preloader.js");
     // Mirror Rails' `Relation#preload_associations`, which runs one Preloader
     // per association-spec element (`preload.each { |as| Preloader.new(...).call }`,
@@ -2255,10 +2177,10 @@ export class Relation<T extends Base> {
     // row is instantiated as its own anonymous `HABTM_*` join model instead of
     // whichever sibling wins a conflated group.
     const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
-    for (const assocName of assocNames) {
+    for (const associations of preload) {
       const preloader = new Preloader({
         records: records as unknown as import("./base.js").Base[],
-        associations: [assocName],
+        associations: [associations],
         scope,
       });
       await preloader.call();
