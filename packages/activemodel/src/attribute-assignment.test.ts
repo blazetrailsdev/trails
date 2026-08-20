@@ -42,7 +42,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Bob" });
+    void p.assignAttributes({ name: "Bob" });
     expect(p.readAttribute("name")).toBe("Bob");
   });
 
@@ -56,7 +56,7 @@ describe("AttributeAssignmentTest", () => {
     // Rails raises UnknownAttributeError for a key with no setter / column.
     let raised: unknown;
     try {
-      p.assignAttributes({ unknown_attr: "value" });
+      void p.assignAttributes({ unknown_attr: "value" });
     } catch (e) {
       raised = e;
     }
@@ -73,7 +73,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const model = new Person({});
 
-    model.assignAttributes({ unknown: "attribute" });
+    void model.assignAttributes({ unknown: "attribute" });
 
     expect(model.assignedAttributes).toEqual({ unknown: "attribute" });
   });
@@ -85,7 +85,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "private_val" });
+    void p.assignAttributes({ name: "private_val" });
     expect(p.readAttribute("name")).toBe("private_val");
   });
 
@@ -123,7 +123,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const c = new Child({});
-    c.assignAttributes({ name: "bob" });
+    void c.assignAttributes({ name: "bob" });
     expect(c.readAttribute("name")).toBe("BOB");
   });
 
@@ -142,7 +142,7 @@ describe("AttributeAssignmentTest", () => {
       },
       configurable: true,
     });
-    p.assignAttributes({ name: "bob" });
+    void p.assignAttributes({ name: "bob" });
     expect(seen).toEqual(["bob"]);
     expect(p.readAttribute("name")).toBe("BOB");
   });
@@ -157,7 +157,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "  bob  " });
+    void p.assignAttributes({ name: "  bob  " });
     expect(p.readAttribute("name")).toBe("BOB");
   });
 
@@ -219,7 +219,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "test" });
+    void p.assignAttributes({ name: "test" });
     expect(p.readAttribute("name")).toBe("test");
   });
 
@@ -231,7 +231,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Alice", age: 30 });
+    void p.assignAttributes({ name: "Alice", age: 30 });
     expect(p.readAttribute("name")).toBe("Alice");
     expect(p.readAttribute("age")).toBe(30);
   });
@@ -243,7 +243,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Bob" });
+    void p.assignAttributes({ name: "Bob" });
     expect(p.readAttribute("name")).toBe("Bob");
   });
 
@@ -259,7 +259,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Carol" });
+    void p.assignAttributes({ name: "Carol" });
     expect(called).toHaveLength(1);
     expect(called[0]).toEqual({ name: "Carol" });
     expect(p.readAttribute("name")).toBe("Carol");
@@ -277,7 +277,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Dave", role: "admin" });
+    void p.assignAttributes({ name: "Dave", role: "admin" });
     expect(p.readAttribute("name")).toBe("Dave");
     expect(p.readAttribute("role")).toBeNull();
   });
@@ -339,7 +339,7 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    p.assignAttributes({ name: "Eve", age: 5 });
+    void p.assignAttributes({ name: "Eve", age: 5 });
     expect(seen).toContainEqual(["name", "Eve"]);
     expect(seen).toContainEqual(["age", 5]);
     expect(p.readAttribute("name")).toBe("Eve");

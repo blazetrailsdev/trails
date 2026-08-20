@@ -90,12 +90,17 @@ export class PendingDefault implements PendingModification {
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#decorate_attributes
+ * (attribute_registration.rb:26-30):
  *
- * Pushes a PendingDecorator onto the modification queue so it replays in the
- * correct order during _defaultAttributes (after any PendingType entries that
- * precede it). Also updates _attributeDefinitions immediately so backward-compat
- * reads (typeForAttribute, columnForAttribute) and double-decoration guards
- * see the decorated type without waiting for _defaultAttributes to be rebuilt.
+ *   def decorate_attributes(names = nil, &decorator)
+ *     names = names&.map { |name| resolve_attribute_name(name) }
+ *     pending_attribute_modifications << PendingDecorator.new(names, decorator)
+ *     reset_default_attributes
+ *   end
+ *
+ * The decoration itself is applied when `_default_attributes` next
+ * materializes (attribute_registration.rb:32-36) — nothing is written to
+ * `_attributeDefinitions` here.
  */
 export function decorateAttributes(
   this: AttributeHostInternals,
@@ -104,26 +109,7 @@ export function decorateAttributes(
 ): void {
   names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
 
-  // Push to pending queue so _defaultAttributes replays in declaration order.
   pendingAttributeModifications.call(this).push(new PendingDecorator(names, decorator));
-
-  // Also apply immediately to _attributeDefinitions for backward compat and
-  // so guards like `def.type instanceof EncryptedAttributeType` work without
-  // forcing a _defaultAttributes rebuild.
-  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
-    this._attributeDefinitions = new Map(this._attributeDefinitions);
-  }
-  const defs = this._attributeDefinitions as Map<string, { name: string; type: Type }>;
-  const targetNames = names ?? Array.from(defs.keys());
-  for (const name of targetNames) {
-    const def = defs.get(name);
-    // Deviation: Rails has no eager pass, so it cannot bake a decoration over
-    // `Type.default_value` into the definitions AR's seed reads (enum.rb:240).
-    if (def && def.type !== defaultValue()) {
-      const newType = decorator(name, def.type);
-      if (newType) defs.set(name, { ...def, type: newType });
-    }
-  }
 
   resetDefaultAttributes(this);
 }

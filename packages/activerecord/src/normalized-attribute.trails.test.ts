@@ -3,9 +3,10 @@
  * subclass's attribute types. Rails keeps this per-class (`normalized_attributes`
  * is a `class_attribute` and `_default_attributes` replays only the class's own
  * pending decorators), but trails' STI reflection installed the base's shared
- * `_attributeDefinitions` map as an OWN property of the subclass, which fooled
- * the copy-on-write guard in `decorateAttributes` — so the subclass decoration
- * landed on the base's definitions and leaked to sibling subclasses.
+ * `_attributeDefinitions` map as an OWN property of the subclass, so a
+ * subclass decoration could land on the base and leak to sibling subclasses.
+ * The decorated type is read where Rails reads it — `type_for_attribute` over
+ * the replayed attribute set (attribute_registration.rb:43-51).
  *
  * The leak only reproduces when the SUBCLASS drives the first reflection of the
  * STI table (that is the path that installs the base map as an own property), so
@@ -40,9 +41,9 @@ describe("STI subclass normalizes", () => {
       typeof name === "string" ? name.trim().toUpperCase() : name,
     );
 
-    expect(defTypeFor(NormalizedCompany, "name").cast("  acme  ")).toBe("ACME");
-    expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
-    expect(defTypeFor(OtherCompany, "name").cast("  acme  ")).toBe("  acme  ");
+    expect(NormalizedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
+    expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
+    expect(OtherCompany.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
 
     expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
     expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");

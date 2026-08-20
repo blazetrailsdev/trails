@@ -13,10 +13,8 @@ import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import {
   ArgumentError,
-  sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
-  isMassAssignmentEmpty,
 } from "@blazetrails/activemodel";
 import {
   InsertManager,
@@ -32,10 +30,6 @@ import {
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
-import {
-  extractMultiparameterCallstack,
-  executeMultiparameterAssignment,
-} from "./multiparameter-attribute-assignment.js";
 import { threadedConnectionFor, withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import {
@@ -869,8 +863,8 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Instance read-helpers — slice / valuesAt / assignAttributes.
-// Mirror ActiveRecord::Base#slice / #values_at / #assign_attributes.
+// Instance read-helpers — slice / valuesAt.
+// Mirror ActiveRecord::Base#slice / #values_at.
 // ---------------------------------------------------------------------------
 
 /** Mirrors: ActiveRecord::Base#slice */
@@ -1000,7 +994,11 @@ function associationWriter(
  * (has_one_association.rb:69) a write; that promise is returned rather than
  * dropped.
  */
-function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
+export function _assignAttribute(
+  self: AttributeIO,
+  key: string,
+  value: unknown,
+): Promise<void> | void {
   const configs = (self as any).constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
     | undefined;
@@ -1019,130 +1017,17 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
 }
 
 /**
- * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
- * (attribute_assignment.rb:28-34) — raise unless the argument is a Hash, return
- * on a blank one, then sanitize and hand off to `_assign_attributes`.
- *
- * Rails returns nil and so does this. Deliberately not `async`: three of the
- * writers its `each_pair` sends to reach the database at assignment (`replace`,
- * collection_association.rb:46-48; `ids_writer`, :61-83; has_one's displacing
- * writer, has_one_association.rb:59-84), and an `async` body would push even a
- * plain column write past the caller's next line — where Ruby's `assign_attributes`
- * has already done it, and where the synchronous callers `initialize` still has
- * (`_applyScopeAttributes`, `attributes=`) read it. So it answers a promise only
- * when a send owed I/O, the same shape as the `set#{Name}Attributes` writer
- * (nested-attributes.ts).
- */
-export function assignAttributes(
-  this: AttributeIO,
-  attrs: Record<string, unknown>,
-): Promise<void> | void {
-  // `unless new_attributes.respond_to?(:each_pair)` (attribute_assignment.rb:29-31).
-  // ActiveModel's own `assignAttributes` spells the same three lines; this port
-  // exists separately only because it has to be async, so the guard is repeated
-  // rather than shared through a helper Rails does not have.
-  if (!respondToEachPair(attrs)) {
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${classOf(attrs)} passed.`,
-    );
-  }
-  // `new_attributes.empty?` (attribute_assignment.rb:32) runs before the
-  // sanitizer, so a blank strong-params object is a no-op rather than raising;
-  // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
-  if (isMassAssignmentEmpty(attrs)) return;
-  return _assignAttributes(this, sanitizeForMassAssignment(attrs));
-}
-
-/**
  * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36).
  * A TS `set` accessor cannot be awaited, so the alias keeps the Rails name in a
- * `setX()` method (CLAUDE.md § "Fidelity is the job").
+ * `setX()` method (CLAUDE.md § "Fidelity is the job"). `assign_attributes`
+ * itself is not redefined here — as in Rails, it is ActiveModel's
+ * (attribute_assignment.rb:28-34), inherited through `Model`.
  */
 export function setAttributes(
-  this: AttributeIO,
+  this: AttributeIO & { assignAttributes(attrs: Record<string, unknown>): Promise<void> | void },
   attrs: Record<string, unknown>,
 ): Promise<void> | void {
-  return assignAttributes.call(this, attrs);
-}
-
-/**
- * Ruby `v.is_a?(Hash)`. A Date/Temporal/model value is `typeof "object"` in JS
- * but is not a Hash in Ruby, so only plain objects may be deferred.
- */
-function isNestedParameterHash(value: unknown): boolean {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
-/**
- * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
- * (attribute_assignment.rb:6-23).
- *
- * Rails buckets multiparameter keys AND Hash values out of the main loop and
- * assigns the nested hashes only after the scalar pass (:21), so a nested
- * writer's `reject_if` / the built record's callbacks observe an owner whose
- * own attributes are already set. Nested runs before multiparameter (:21-22).
- *
- * `pending` is the one accommodation Rails does not need: its `_assign_attribute`
- * has finished writing by the time the loop reaches the next key, so where a send
- * here answers a promise the rest of the loop is chained behind it to keep that
- * order. Every send that stays in memory keeps running inline.
- */
-function _assignAttributes(
-  self: AttributeIO,
-  attrs: Record<string, unknown>,
-): Promise<void> | void {
-  let multiParameterAttributes: Record<string, unknown> | null = null;
-  let nestedParameterAttributes: Record<string, unknown> | null = null;
-  let pending: Promise<void> | undefined;
-
-  for (const [key, value] of Object.entries(attrs)) {
-    if (key.includes("(")) {
-      (multiParameterAttributes ??= {})[key] = value;
-    } else if (isNestedParameterHash(value)) {
-      (nestedParameterAttributes ??= {})[key] = value;
-    } else if (pending) {
-      pending = pending.then(() => _assignAttribute(self, key, value));
-    } else {
-      pending = _assignAttribute(self, key, value) as Promise<void> | undefined;
-    }
-  }
-
-  const assignDeferred = (): Promise<void> | void => {
-    const nested = (
-      nestedParameterAttributes
-        ? assignNestedParameterAttributes(self, nestedParameterAttributes)
-        : undefined
-    ) as Promise<void> | undefined;
-    const assignMulti = (): void => {
-      if (multiParameterAttributes) {
-        const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
-        executeMultiparameterAssignment(self as any, multi);
-      }
-    };
-    return nested ? nested.then(assignMulti) : assignMulti();
-  };
-
-  return pending ? pending.then(assignDeferred) : assignDeferred();
-}
-
-/**
- * Mirrors: ActiveRecord::AttributeAssignment#assign_nested_parameter_attributes
- * (attribute_assignment.rb:26-28) — assign any deferred nested attributes after
- * the base attributes have been set.
- */
-function assignNestedParameterAttributes(
-  self: AttributeIO,
-  pairs: Record<string, unknown>,
-): Promise<void> | void {
-  let pending: Promise<void> | undefined;
-  for (const [k, v] of Object.entries(pairs)) {
-    pending = (
-      pending ? pending.then(() => _assignAttribute(self, k, v)) : _assignAttribute(self, k, v)
-    ) as Promise<void> | undefined;
-  }
-  return pending;
+  return this.assignAttributes(attrs);
 }
 
 // ---------------------------------------------------------------------------
@@ -2248,24 +2133,3 @@ export function buildDefaultConstraint(this: {
 export const InstanceMethods = {
   _updateRecord: instanceUpdateRecord,
 };
-
-/** The JS spelling of `new_attributes.respond_to?(:each_pair)` (attribute_assignment.rb:29). */
-function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
-  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
-  const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return true;
-  // A params-style wrapper (the `ActionController::Parameters` analogue) is the
-  // other Ruby receiver that answers `each_pair`.
-  const wrapper = attrs as { permitted?: unknown; toH?: unknown };
-  return "permitted" in wrapper || typeof wrapper.toH === "function";
-}
-
-/** The JS spelling of Ruby's `value.class` name, for the guard's message. */
-function classOf(value: unknown): string {
-  if (value === null) return "NilClass";
-  if (Array.isArray(value)) return "Array";
-  const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
-  if (ctorName) return ctorName;
-  const t = typeof value;
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
