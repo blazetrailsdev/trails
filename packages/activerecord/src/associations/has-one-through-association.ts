@@ -5,13 +5,7 @@ import { camelize, underscore } from "@blazetrails/activesupport";
 import { resolveAssocClass, _hmtNotFound } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import { RecordInvalid } from "../validations.js";
-import {
-  ThroughAssociation,
-  sourceReflection,
-  staleStateImpl as throughStaleState,
-  throughForeignKeyPresent,
-  throughTargetScope,
-} from "./through-association.js";
+import { ThroughAssociation, sourceReflection } from "./through-association.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -256,40 +250,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   sourceReflection(): unknown {
     return sourceReflection(this);
-  }
-
-  /**
-   * Mirrors Rails' `ThroughAssociation#target_scope` override.
-   * @internal
-   */
-  protected override targetScope(): unknown {
-    return throughTargetScope(this, super["targetScope"]());
-  }
-
-  /**
-   * Mirrors Rails' `ThroughAssociation#stale_state` — when the through
-   * reflection is a `belongs_to`, the association goes stale as the owner's
-   * through foreign key changes (e.g. `minivan.speedometer_id = …`).
-   * @internal
-   */
-  protected override staleState(): unknown {
-    const vals = throughStaleState(this);
-    if (!vals) return null;
-    return vals.length === 1 ? vals[0] : JSON.stringify(vals);
-  }
-
-  /**
-   * Mirrors Rails' `ThroughAssociation#foreign_key_present?` — a
-   * has_*_through is loadable for a *new* owner only when the through is a
-   * `belongsTo` and every through foreign-key column is set on the owner
-   * (e.g. an unpersisted `Cpk::BookWithOrderAgreements` whose `order` FK is
-   * populated from an in-memory persisted order). Without this override the
-   * base `foreignKeyPresent()` returns false, so `find_target?` refuses to
-   * query and the reader nils out.
-   * @internal
-   */
-  protected override foreignKeyPresent(): boolean {
-    return throughForeignKeyPresent(this);
   }
 
   /**

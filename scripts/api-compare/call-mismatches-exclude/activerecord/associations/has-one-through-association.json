@@ -2,57 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "all?",
-    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "belongs_to?",
-    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "foreign_key",
-    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "replace",
     "call": "create_through_record",
     "reason": "Verified per-site (RFC 0106): `create_through_record(record, save)` (has_one_through_association.rb:10-12) writes the join row, so it is async in trails. `replace` cannot be — it is reached from the synchronous `writer`/`setNewRecord` path that RFC 0087 requires to stay sync — so the body queues `_pendingReplace` and `persistReplace`/`autosaveHasOne` awaits `createThroughRecord` one frame later. Same sync-setter shortcoming as the `setX()` idiom."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "stale_state",
-    "call": "belongs_to?",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "stale_state",
-    "call": "foreign_key",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "target_scope",
-    "call": "drop",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "target_scope",
-    "call": "scope_for_association",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
