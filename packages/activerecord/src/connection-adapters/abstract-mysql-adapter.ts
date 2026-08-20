@@ -39,6 +39,7 @@ import {
   NotImplementedError,
   RecordNotUnique,
   StatementInvalid,
+  SQLWarning,
   StatementTimeout,
   ValueTooLong,
   sqlTypeToMigrationKeyword,
@@ -89,6 +90,7 @@ import {
   MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
 import {
+  ActiveSupport,
   compactBlank,
   include,
   isPresent,
@@ -1630,14 +1632,130 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return null;
   }
 
-  /** @internal */
-  protected async handleWarnings(sql: string): Promise<void> {
-    await this._handleWarnings(sql);
+  /**
+   * Mirrors: AbstractMysqlAdapter#drop_table
+   * (abstract_mysql_adapter.rb:354-357) — one `DROP` statement for every table
+   * name, with MySQL's `TEMPORARY` and `CASCADE` keywords the base adapter has
+   * no arm for.
+   *
+   * @internal
+   */
+  override async dropTable(
+    ...args:
+      | [string, ...string[]]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
+        ]
+  ): Promise<void> {
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && last !== undefined && typeof last === "object";
+    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const options = (hasOptions ? last : {}) as {
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+      temporary?: boolean;
+    };
+    if (tableNames.length === 0) {
+      throw new ArgumentError("dropTable requires at least one table name");
+    }
+    for (const tableName of tableNames) {
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
+    }
+    const temporary = options.temporary ? " TEMPORARY" : "";
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
+    await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
   }
 
-  /** @internal */
-  protected _handleWarnings(_sql: string): Promise<void> {
-    return Promise.resolve();
+  /**
+   * Mirrors: AbstractMysqlAdapter#handle_warnings
+   * (abstract_mysql_adapter.rb:770-784).
+   *
+   * Rails reads `@raw_connection` directly; `_connection` is trails' spelling
+   * of that same ivar, so the SHOW WARNINGS round-trip is sourced the same way
+   * rather than passed in. Rails' `handle_warnings` has no null guard on it
+   * because `perform_query` only runs with a checked-out connection
+   * (mysql2/database_statements.rb:103); trails types `_connection` as
+   * nullable for the disconnected adapter, so the guard joins the `.nil?`
+   * early return rather than becoming a second branch Rails does not have.
+   *
+   * `ActiveRecord.db_warnings_action` is `nil` by default in Rails; trails
+   * spells that default `"ignore"` on `AbstractAdapter` (abstract-adapter.ts),
+   * so both spellings of "unset" take Rails' `.nil?` early return. The symbol
+   * arms below are the behaviors Rails' `db_warnings_action=` bakes into the
+   * Proc it stores (active_record.rb:236-252), which its `handle_warnings`
+   * then reaches through a single `.call`.
+   *
+   * Public rather than Ruby-private for the same reason PostgreSQL's is:
+   * `perform_query` reaches it through a structurally-typed mixin host.
+   *
+   * @internal
+   */
+  async handleWarnings(sql: string): Promise<void> {
+    const rawConnection = this._connection as unknown as {
+      warningCount?: unknown;
+      query(sql: string): Promise<[unknown, unknown]>;
+    } | null;
+    const action = (this.constructor as typeof AbstractMysqlAdapter).dbWarningsAction;
+    if (action == null || action === "ignore" || rawConnection == null) return;
+    const warningCount = await this.warningCount(rawConnection);
+    if (warningCount === 0) return;
+
+    const [rawRows] = await rawConnection.query("SHOW WARNINGS");
+    let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
+    if (result.length === 0) {
+      result = [
+        {
+          Level: "Warning",
+          Code: undefined,
+          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+        },
+      ];
+    }
+    for (const row of result) {
+      const level = row.Level ?? null;
+      const code = row.Code == null ? null : String(row.Code);
+      const message = row.Message ?? "";
+      const warning = new SQLWarning(message, code, level, sql, this.pool);
+      if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
+        continue;
+
+      if (action === "raise") throw warning;
+      if (action === "log") {
+        const codeSuffix = code ? ` (${code})` : "";
+        const line = `[ActiveRecord::SQLWarning] ${message}${codeSuffix}`;
+        const logger = this.logger as { warn?: (msg: string) => void } | null;
+        if (logger?.warn) logger.warn(line);
+        else console.warn(line);
+      }
+      if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
+      if (typeof action === "function") action.call(this, warning);
+    }
+  }
+
+  /**
+   * The `@raw_connection.warning_count` read of `handle_warnings`
+   * (abstract_mysql_adapter.rb:771). Ruby's mysql2 gem exposes it as an
+   * attribute on the connection, so Rails needs no seam; the npm driver only
+   * populates it when the last protocol packet carried it, and falls back to
+   * `SHOW COUNT(*) WARNINGS` — a SHOW, so it does not itself reset the warning
+   * list the following `SHOW WARNINGS` reads.
+   *
+   * @internal
+   */
+  protected async warningCount(rawConnection: {
+    warningCount?: unknown;
+    query(sql: string): Promise<[unknown, unknown]>;
+  }): Promise<number> {
+    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
+    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
+    const row = (rows as Record<string, unknown>[])[0];
+    if (!row) return 0;
+    const value = Object.values(row)[0];
+    return typeof value === "number" ? value : Number(value) || 0;
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter#warning_ignored? */
@@ -1971,16 +2089,6 @@ export interface AbstractMysqlAdapter {
     columnName: string,
     type?: string,
     options?: { ifExists?: boolean },
-  ): Promise<void>;
-
-  dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [
-          string,
-          ...string[],
-          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
-        ]
   ): Promise<void>;
 
   /** @internal */

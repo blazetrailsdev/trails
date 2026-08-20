@@ -2,6 +2,48 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_delete",
+    "call": "affected_rows",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_delete",
+    "call": "internal_execute",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_insert",
+    "call": "internal_exec_query",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_insert",
+    "call": "sql_for_insert",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_update",
+    "call": "affected_rows",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
+    "rubyName": "exec_update",
+    "call": "internal_execute",
+    "reason": "Surfaced, not introduced, by PR #6772: this file used to define each method twice — a dead file-level `export function` and the live mixin body — and the extractor matched the dead copy, which did make Rails' calls. With the duplication removed the live body is measured, and it routes through trails' `executeMutation` invention instead of Rails' `sql_for_insert`/`internal_exec_query` and `affected_rows(internal_execute(...))` (database_statements.rb:157-174). Converging needs `executeMutation` and `internalExecute`'s signature converged with it — tracked by 0112-one-rails-thing-n-trails-things/converge-exec-insert-delete-update-onto-rails-call-shape."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "initialize",
     "call": "reset_transaction",
     "reason": "Per-site verified (RFC 0106 wave 4b): abstract/database_statements.rb:12 is `reset_transaction` inside `initialize`; trails' DatabaseStatements is a mixin with no constructor of its own — the adapter's own constructor calls `resetTransaction()` (abstract-adapter.ts), so the call happens, just not from a body matched to this Ruby method."

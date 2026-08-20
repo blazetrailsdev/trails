@@ -23,34 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "handle_warnings",
-    "call": "call",
-    "reason": "Include stand-in (RFC 0106): `ActiveRecord.db_warnings_action.call(warning)` (abstract_mysql_adapter.rb:782) is dispatched from `mysql2-adapter.ts#handleWarnings` alongside the rest of the body; the abstract method only delegates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "handle_warnings",
-    "call": "new",
-    "reason": "Include stand-in (RFC 0106): `SQLWarning.new(message, code, level, sql, @pool)` (abstract_mysql_adapter.rb:779) is constructed in `mysql2-adapter.ts#handleWarnings`, which owns the raw connection this body reads; the abstract method only delegates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "handle_warnings",
-    "call": "query",
-    "reason": "Include stand-in (RFC 0106): the full `handle_warnings` body — `@raw_connection.warning_count`, the `SHOW WARNINGS` query, `SQLWarning.new`, `warning_ignored?` and the `db_warnings_action.call` dispatch — is ported on the concrete adapter (`mysql2-adapter.ts#handleWarnings`), where the raw mysql2 connection lives; this method is the abstract dispatch point and only delegates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "handle_warnings",
-    "call": "warning_ignored?",
-    "reason": "Include stand-in (RFC 0106): the `warning_ignored?` guard (abstract_mysql_adapter.rb:780) runs in `mysql2-adapter.ts#handleWarnings`; `isWarningIgnored` itself IS overridden in this file, per abstract_mysql_adapter.rb:786-788."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mismatched_foreign_key_details",
     "call": "column_for",
     "reason": "Verified per-site (RFC 0106): `options[:primary_key_column] = column_for(...)` (abstract_mysql_adapter.rb:995) is an async schema read in trails, while this method is reached synchronously from `_translateException`. The lookup is performed instead in `_enrichMismatchedForeignKey`, which rebuilds the error with the referenced column's sql_type once it can await."

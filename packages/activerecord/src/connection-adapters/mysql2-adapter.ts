@@ -28,7 +28,6 @@ import {
   DatabaseConnectionError,
   MismatchedForeignKey,
   NoDatabaseError,
-  SQLWarning,
 } from "../errors.js";
 import { Result } from "../result.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
@@ -1771,87 +1770,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
     }
     return conn;
-  }
-
-  /**
-   * Query `SHOW COUNT(*) WARNINGS` to learn how many warnings the most
-   * recent statement on `conn` produced. SHOW statements do not reset the
-   * warning list (unlike a normal SELECT), so the subsequent SHOW WARNINGS
-   * still returns the rows.
-   *
-   * Exposed as a protected method so tests can stub it via `vi.spyOn` to
-   * exercise the "warning_count does not match returned warnings" branch.
-   * @internal
-   */
-  protected async _warningCount(conn: mysql.Connection): Promise<number> {
-    // Optimization: when the mysql2 npm driver exposes the protocol's
-    // last `serverStatus` packet, the bottom 16 bits of the per-connection
-    // `warningCount` are populated for the most recent statement (mirrors
-    // Rails reading `@raw_connection.warning_count` directly instead of
-    // round-tripping `SHOW COUNT(*) WARNINGS`). Fall back to the SHOW
-    // query when the field is absent or non-numeric.
-    const raw = (conn as unknown as { warningCount?: unknown; _warningCount?: unknown })
-      .warningCount;
-    if (typeof raw === "number") return raw;
-    const [rows] = await conn.query("SHOW COUNT(*) WARNINGS");
-    const row = (rows as Record<string, unknown>[])[0];
-    if (!row) return 0;
-    const v = Object.values(row)[0];
-    return typeof v === "number" ? v : Number(v) || 0;
-  }
-
-  /**
-   * Read pending warnings for the adapter's raw connection, filter via
-   * {@link isWarningIgnored}, and dispatch per the configured
-   * `dbWarningsAction`. Called from `performQuery` where Rails calls it
-   * (mysql2/database_statements.rb:103), while the connection is still held —
-   * warnings are connection-scoped.
-   *
-   * Rails reads `@raw_connection` for the SHOW WARNINGS round-trip
-   * (abstract_mysql_adapter.rb:770-784); `_client` is trails' spelling of that
-   * same ivar, so the connection is sourced the same way rather than passed in.
-   *
-   * Mirrors: AbstractMysqlAdapter#handle_warnings.
-   * @internal
-   */
-  override async handleWarnings(sql: string): Promise<void> {
-    const conn = this._client;
-    if (!conn) return;
-    const ctor = this.constructor as typeof Mysql2Adapter;
-    const action = ctor.dbWarningsAction;
-    if (!action || action === "ignore") return;
-    const count = await this._warningCount(conn);
-    if (count === 0) return;
-    const [rawRows] = await conn.query("SHOW WARNINGS");
-    let rows = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
-    if (rows.length === 0) {
-      rows = [
-        {
-          Level: "Warning",
-          Code: undefined,
-          Message: `Query had warning_count=${count} but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
-        },
-      ];
-    }
-    for (const row of rows) {
-      const level = row.Level ?? null;
-      const code = row.Code == null ? null : String(row.Code);
-      const message = row.Message ?? "";
-      const warning = new SQLWarning(message, code, level, sql, this.pool);
-      if (this.isWarningIgnored({ level: level ?? undefined, code: code ?? undefined, message }))
-        continue;
-      if (action === "raise") throw warning;
-      if (action === "log") {
-        const logger = this.logger as { warn?: (msg: string) => void } | null;
-        const codeSuffix = code ? ` (${code})` : "";
-        const line = `[ActiveRecord::SQLWarning] ${message}${codeSuffix}`;
-        if (logger?.warn) logger.warn(line);
-        else console.warn(line);
-      }
-      // TODO(report): wire Rails.error.report(warning, handled: true) when ErrorReporter
-      // is exposed as a global singleton (PostgreSQL's handleWarnings already does).
-      if (typeof action === "function") action(warning);
-    }
   }
 
   // Mirrors AbstractMysqlAdapter#configure_connection.

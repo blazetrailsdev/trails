@@ -23,9 +23,7 @@ type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 /**
- * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
- * the `temporary: true` option, which emits `DROP TEMPORARY TABLE` — a MySQL/MariaDB
- * extension required to drop temporary tables without affecting base tables.
+ * MySQL-specific SchemaStatements subclass.
  *
  * Mixed into AbstractMysqlAdapter at the bottom of `abstract-mysql-adapter.ts`,
  * mirroring `include MySQL::SchemaStatements`.
@@ -225,40 +223,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       await this.removeForeignKey(tableName, { column: columnName });
     }
     return super.removeColumn(tableName, columnName, type, options);
-  }
-
-  /** Mirrors: AbstractMysqlAdapter#drop_table */
-  override async dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [
-          string,
-          ...string[],
-          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
-        ]
-  ): Promise<void> {
-    // TS has no kwargs, so Rails' `*table_names, **options`
-    // (abstract/schema_statements.rb:540) arrives as a trailing options object
-    // on the rest parameter.
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as {
-      ifExists?: boolean;
-      force?: boolean | "cascade";
-      temporary?: boolean;
-    };
-    if (tableNames.length === 0) {
-      throw new ArgumentError("dropTable requires at least one table name");
-    }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    for (const name of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(name);
-    }
-    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
-    await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
   }
 
   /**

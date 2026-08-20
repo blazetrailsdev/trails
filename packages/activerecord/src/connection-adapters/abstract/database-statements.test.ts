@@ -11,7 +11,6 @@ import {
   toSql,
   toSqlAndBinds,
   cacheableQuery,
-  isWriteQuery,
   explain,
   transaction,
   transactionIsolationLevels,
@@ -33,13 +32,12 @@ import {
   performQuery,
   preprocessQuery,
   select,
-  execInsert,
-  execQuery,
   sqlForInsert,
   arelFromRelation,
   extractTableRefFromInsertSql,
   defaultInsertValue,
   returningColumnValues,
+  DatabaseStatements,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Result } from "../../result.js";
@@ -161,12 +159,6 @@ describe("DatabaseStatements", () => {
         throw new Rollback();
       });
       expect(result).toBeUndefined();
-    });
-  });
-
-  describe("isWriteQuery", () => {
-    it("raises not implemented", () => {
-      expect(() => isWriteQuery("INSERT INTO x")).toThrow();
     });
   });
 
@@ -780,40 +772,47 @@ describe("select", () => {
 
 describe("execInsert", () => {
   function makeInsertHost(supportsReturning: boolean) {
-    let capturedSql = "";
     const host: DatabaseStatementsHost = {
       log,
       pool,
       typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
-      internalExecute: async (sql: string) => {
-        capturedSql = sql;
-        return new Result([], []);
-      },
     };
-    return { host, getCapturedSql: () => capturedSql };
+    return host;
   }
 
-  it("appends RETURNING via sqlForInsert when adapter supports it", async () => {
-    const { host, getCapturedSql } = makeInsertHost(true);
-    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
-    expect(getCapturedSql()).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
-  });
-
-  it("passes sql unchanged when adapter does not support RETURNING", async () => {
-    const { host, getCapturedSql } = makeInsertHost(false);
-    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
-    expect(getCapturedSql()).toBe("INSERT INTO t (x) VALUES (1)");
-  });
-
-  it("uses explicit returning list when provided", async () => {
-    const { host, getCapturedSql } = makeInsertHost(true);
-    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], null, null, [
+  it("appends RETURNING via sqlForInsert when adapter supports it", () => {
+    const [sql] = sqlForInsert.call(
+      makeInsertHost(true),
+      "INSERT INTO t (x) VALUES (1)",
       "id",
-      "created_at",
-    ]);
-    expect(getCapturedSql()).toContain('RETURNING "id", "created_at"');
+      [],
+      null,
+    );
+    expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
+  });
+
+  it("passes sql unchanged when adapter does not support RETURNING", () => {
+    const [sql] = sqlForInsert.call(
+      makeInsertHost(false),
+      "INSERT INTO t (x) VALUES (1)",
+      "id",
+      [],
+      null,
+    );
+    expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
+  });
+
+  it("uses explicit returning list when provided", () => {
+    const [sql] = sqlForInsert.call(
+      makeInsertHost(true),
+      "INSERT INTO t (x) VALUES (1)",
+      null,
+      [],
+      ["id", "created_at"],
+    );
+    expect(sql).toContain('RETURNING "id", "created_at"');
   });
 });
 
@@ -843,16 +842,9 @@ describe("internal_exec_query is a virtual call", () => {
 
   it("execQuery reaches the adapter override", async () => {
     const { host, seen } = makeOverrideHost();
-    const result = await execQuery.call(host, "SELECT 1");
+    const result = await DatabaseStatements.execQuery.call(host as never, "SELECT 1");
     expect(result.columns).toEqual(["overridden"]);
     expect(seen).toEqual(["SELECT 1"]);
-  });
-
-  it("execInsert reaches the adapter override", async () => {
-    const { host, seen } = makeOverrideHost();
-    const result = await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
-    expect(result.columns).toEqual(["overridden"]);
-    expect(seen).toEqual(["INSERT INTO t (x) VALUES (1)"]);
   });
 
   it("select reaches the adapter override", async () => {
