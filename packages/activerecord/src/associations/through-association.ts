@@ -210,13 +210,16 @@ export function ensureMutable(this: ThroughAssociationHost): void {
 
   const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(this.reflection.name);
+  // Rails' `reflection.has_one?`; the lightweight definition is the fallback
+  // when no rich reflection is registered, and carries the macro under `type`.
+  const hasOne: boolean = refl?.isHasOne?.() ?? this.reflection.type === "hasOne";
   const sourceRefl = refl?.sourceReflection as
     | { isBelongsTo?: () => boolean; macro?: string }
     | undefined;
   const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
   if (!isBelongs) {
     const ownerName = (this.owner.constructor as { name: string }).name;
-    if (isHasOne(this.reflection)) {
+    if (hasOne) {
       throw new HasOneThroughCantAssociateThroughHasOneOrManyReflection(
         ownerName,
         this.reflection.name,
@@ -244,19 +247,15 @@ export function ensureNotNested(this: ThroughAssociationHost): void {
   const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(this.reflection.name) as {
     isNested?: () => boolean;
+    isHasOne?: () => boolean;
   } | null;
   if (refl?.isNested?.()) {
-    if (isHasOne(this.reflection)) {
+    if (refl.isHasOne?.() ?? this.reflection.type === "hasOne") {
       throw new HasOneThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
     } else {
       throw new HasManyThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
     }
   }
-}
-
-/** Rails' `reflection.has_one?`; a definition carries the macro under `type`. */
-function isHasOne(reflection: { macro?: string; type?: string }): boolean {
-  return (reflection.macro ?? reflection.type) === "hasOne";
 }
 
 /** @internal */
