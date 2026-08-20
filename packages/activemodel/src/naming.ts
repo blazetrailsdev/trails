@@ -142,12 +142,20 @@ export class ModelName {
   }
 
   /**
-   * Rails `delegate :<=>, to: :name` (naming.rb:151-152) — `String#<=>`.
+   * Rails `delegate :<=>, to: :name` (naming.rb:151-152) — `String#<=>`, which
+   * answers `nil` for an operand that is neither a String nor `to_str`-able
+   * (naming.rb:50-62 documents the String-operand contract). `nil` is spelled
+   * `undefined`, the repo's settled spelling for an incomparable spaceship
+   * (`activerecord/src/core.ts`'s `compare`).
+   *
    * `include Comparable` (naming.rb:10) builds the operators off it; TS has no
    * operator overloading, so call sites spell them `compare(...) < 0` etc.
    */
-  compare(other: string | ModelName): number {
-    const name = String(other);
+  compare(other: unknown): number | undefined {
+    // `Name` answers `to_str`, so a `Name` operand takes String#<=>'s
+    // string-like arm rather than falling through to nil.
+    const name = other instanceof ModelName ? other.name : other;
+    if (typeof name !== "string") return undefined;
     return this.name === name ? 0 : this.name < name ? -1 : 1;
   }
 

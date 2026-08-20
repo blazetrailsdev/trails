@@ -389,6 +389,9 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(mn.compare("Blog")).toBe(1);
     expect(mn.compare("BlogPosts")).toBe(-1);
     expect(mn.compare(new ModelName("BlogPost"))).toBe(0);
+    // `String#<=>` answers nil for an operand that is not string-like.
+    expect(mn.compare(42)).toBe(undefined);
+    expect(mn.compare(null)).toBe(undefined);
   });
 
   it("match tests a regexp against the class name", () => {
