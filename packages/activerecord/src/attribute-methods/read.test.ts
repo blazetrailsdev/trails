@@ -25,6 +25,11 @@ describe("ReadTest", () => {
         ["three", { name: "three" }],
       ]);
       static _attributeMethodsGenerated = false;
+      // read_test.rb:18's `def self.load_schema; end` — the fake klass has no
+      // table, so the `load_schema` `define_attribute_methods` calls
+      // (attribute_methods.rb:114) must be a no-op. trails' sync `loadSchema`
+      // returns immediately once the class is marked loaded.
+      static _schemaLoaded = true;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
       static attributeAliases = {};
       static _aliasesByAttributeName = new Map<string, string[]>();

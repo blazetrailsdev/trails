@@ -1107,6 +1107,7 @@ export function loadSchema(this: SchemaHost): void {
   const reflected = loadSchemaFromCacheSync(this);
   if (reflected) {
     this._schemaLoaded = true;
+    defineAttributeMethodsAfterLoad(this);
     return;
   }
 
@@ -1152,7 +1153,25 @@ export function loadSchema(this: SchemaHost): void {
     }
     this._columnsHash = hash;
   }
-  if (!pkStillMissing) this._schemaLoaded = true;
+  if (!pkStillMissing) {
+    this._schemaLoaded = true;
+    defineAttributeMethodsAfterLoad(this);
+  }
+}
+
+/**
+ * Rails generates attribute methods on demand: `method_missing` calls
+ * `define_attribute_methods` and retries (activemodel/attribute_methods.rb:474-486),
+ * while `load_schema!` itself defines nothing (model_schema.rb:587-597). A
+ * trails reader is a property, not a method, so there is no miss to hook (see
+ * CLAUDE.md, "Generated attribute readers are properties"); the demand point
+ * is instead the end of a schema load — the columns just reflected are exactly
+ * the ones an instance is about to read. It runs *after* `_schemaLoaded` is
+ * set, so `define_attribute_methods`' own `load_schema` (attribute_methods.rb:114)
+ * returns immediately instead of re-entering the load.
+ */
+function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
+  (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.();
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
@@ -1190,18 +1209,6 @@ function reflectedTypeForColumn(
   }
   return host.hookAttributeType?.(name, type) ?? type;
 }
-
-/**
- * Classes whose accessor regeneration is already in flight. `applyColumnsHash`
- * regenerates through `define_attribute_methods`, which reads `attribute_names`
- * (attribute_methods.rb:115) → `columnNames()` → `loadSchema` — and it runs
- * *inside* that load, whose superclass cascade can re-stale this class's memo.
- *
- * @noRailsEquivalent PERMANENT — guards the re-entrancy trails' schema-reflection
- * hook adds to `define_attribute_methods`; Rails' `load_schema!` generates no
- * methods, so the cycle it breaks does not exist upstream.
- */
-const regeneratingAttributeMethods = new WeakSet<object>();
 
 /**
  * Sync worker: apply a columns hash (already fetched from the schema
@@ -1296,24 +1303,11 @@ function applyColumnsHash(
   bag._columns = undefined;
   host._columnsHash = filteredHash;
 
-  // Regenerate attribute accessors through the single define_attribute_methods
-  // path now that schema reflection has settled the attribute definitions AND
-  // the derived caches above have been dropped: generation reads
-  // `attribute_names` → `attribute_types` (attribute_methods.rb:236-242), which
-  // would otherwise answer from the pre-load memo and generate nothing.
-  const methodHost = host as unknown as {
-    _attributeMethodsGenerated?: boolean;
-    defineAttributeMethods?: () => boolean;
-  };
+  // `load_schema!` defines no attribute methods (model_schema.rb:587-597) —
+  // generation is demand-driven, off `define_attribute_methods`. Reflection
+  // only invalidates what it just re-settled, so the next demand regenerates.
+  const methodHost = host as unknown as { _attributeMethodsGenerated?: boolean };
   methodHost._attributeMethodsGenerated = false;
-  if (!regeneratingAttributeMethods.has(host)) {
-    regeneratingAttributeMethods.add(host);
-    try {
-      methodHost.defineAttributeMethods?.();
-    } finally {
-      regeneratingAttributeMethods.delete(host);
-    }
-  }
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
@@ -1404,6 +1398,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (currentAdapter !== startingAdapter) return;
 
   applyColumnsHash(this, startingAdapter, hash);
+  defineAttributeMethodsAfterLoad(this);
 }
 
 /**

@@ -22,7 +22,7 @@ import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js"
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
 // dangerousAttributeMethods from this file)
 import { reload as _reload } from "./persistence.js";
-import { cachedTableExists } from "./model-schema.js";
+import { cachedTableExists, loadSchema } from "./model-schema.js";
 import {
   serializableHash as _serializableHash,
   attributeNamesForSerialization as _attrNamesForSerialization,
@@ -378,6 +378,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // no table, so it generates no per-attribute accessors and no id_value alias —
   // only the superclass cascade (above) and generateAliasAttributes (below) run.
   if (this.abstractClass !== true) {
+    loadSchema.call(this as never);
     amDefineAttributeMethods.call(this as never, ...this.attributeNames());
     if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
   }

@@ -12,12 +12,35 @@ export interface TimezoneAware {
   readonly isUtc: boolean;
 }
 
-export interface TimeValue {
+/** The receiver `Helpers::TimeValue`'s bodies resolve their members against. */
+interface TimeValueHost {
   precision?: number;
-  serializeCastValue(value: unknown): string | null;
-  typeCastForSchema(value: unknown): string;
-  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | Temporal.PlainDateTime | null;
-  applySecondsPrecision<T>(this: TimeValue, value: T): T;
+  applySecondsPrecision<T>(value: T): T;
+}
+
+/**
+ * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
+ * (time_value.rb:10-21)
+ *
+ *   def serialize_cast_value(value)
+ *     value = apply_seconds_precision(value)
+ *
+ *     if value.acts_like?(:time)
+ *       if is_utc?
+ *         value = value.getutc if !value.utc?
+ *       else
+ *         value = value.getlocal
+ *       end
+ *     end
+ *
+ *     value
+ *   end
+ *
+ * The `is_utc?` `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is
+ * tracked by `serialize-cast-value-drops-is-utc-normalization`.
+ */
+export function serializeCastValue<T>(this: TimeValueHost, value: T): T {
+  return this.applySecondsPrecision(value);
 }
 
 /**
@@ -263,6 +286,20 @@ export function fastStringToTime(this: TimezoneAware | void, s: string): Tempora
     return null;
   }
 }
+
+/**
+ * Mirrors: `module ActiveModel::Type::Helpers::TimeValue` (time_value.rb:9-95)
+ * — the module itself, which `Type::DateTime` and `Type::Time` `include`
+ * (date_time.rb:47, time.rb:43).
+ */
+export const TimeValue = {
+  serializeCastValue,
+  applySecondsPrecision,
+  typeCastForSchema,
+  userInputInTimeZone,
+  newTime,
+  fastStringToTime,
+};
 
 function respondToNsec(value: unknown): value is NsecBearing {
   return (
