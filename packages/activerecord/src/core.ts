@@ -24,6 +24,7 @@ import {
   Notifications,
   IsolatedExecutionState,
   ParameterFilter,
+  isPlainObject,
   constantize,
   pluralize,
 } from "@blazetrails/activesupport";
@@ -533,7 +534,7 @@ export function isApplicationRecordClass(this: CoreHost): boolean {
 export type ConnectedToEntry = {
   role?: string;
   shard?: string;
-  klasses: Set<any>;
+  klasses: any[];
   preventWrites?: boolean;
 };
 
@@ -552,55 +553,55 @@ export function withIsolatedConnectionState<T>(fn: () => T): T {
   return IsolatedExecutionState.scope(CONNECTED_TO_STACK_KEY, [] as ConnectedToEntry[], fn);
 }
 
-function klassesInclude(klasses: Set<any>, target: any): boolean {
-  if (klasses.has(target)) return true;
-  for (const k of klasses) {
-    if (typeof k === "function" && Object.prototype.hasOwnProperty.call(k, "_isActiveRecordBase"))
-      return true;
-  }
-  return false;
-}
-
-function matchesStack(entry: ConnectedToEntry, connClass: CoreHost): boolean {
-  return klassesInclude(entry.klasses, connClass) || klassesInclude(entry.klasses, "Base");
+/**
+ * Rails names `Base` directly in `hash[:klasses].include?(Base)`. core.ts is
+ * imported *by* base.ts, so the constant cannot be named here; the own
+ * `_isActiveRecordBase` brand is how the rest of core.ts identifies it.
+ */
+function isBase(klass: any): boolean {
+  return (
+    typeof klass === "function" &&
+    Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
+  );
 }
 
 export function currentRole(this: CoreHost): string {
-  const connClass = connectionClassForSelf.call(this);
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (entry.role && matchesStack(entry, connClass)) {
-      return entry.role;
-    }
+    const hash = stack[i];
+    if (hash.role && hash.klasses.some(isBase)) return hash.role;
+    if (hash.role && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.role;
   }
+
   // Rails: current_role falls back to default_role (core.rb:165), a
   // class_attribute seeded to writing_role.
   return (this as CoreHost & { defaultRole?: string }).defaultRole ?? WRITING_ROLE;
 }
 
 export function currentShard(this: CoreHost): string {
-  const connClass = connectionClassForSelf.call(this);
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (entry.shard && matchesStack(entry, connClass)) {
-      return entry.shard;
-    }
+    const hash = stack[i];
+    if (hash.shard && hash.klasses.some(isBase)) return hash.shard;
+    if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
+
   // Mirrors Rails: default_shard (class_attribute, set by connects_to)
-  return (connClass as any)._defaultShard ?? "default";
+  return (connectionClassForSelf.call(this) as any)._defaultShard ?? "default";
 }
 
 export function currentPreventingWrites(this: CoreHost): boolean {
-  const connClass = connectionClassForSelf.call(this);
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (entry.preventWrites !== undefined && matchesStack(entry, connClass)) {
-      return entry.preventWrites;
-    }
+    const hash = stack[i];
+    if (hash.preventWrites !== undefined && hash.klasses.some(isBase)) return hash.preventWrites;
+    if (
+      hash.preventWrites !== undefined &&
+      hash.klasses.includes(connectionClassForSelf.call(this))
+    )
+      return hash.preventWrites;
   }
+
   return false;
 }
 
@@ -610,16 +611,15 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 export function isPreventingWrites(className?: string): boolean {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
-    const entry = stack[i];
-    if (entry.preventWrites === undefined) continue;
-    if (klassesInclude(entry.klasses, "Base")) return entry.preventWrites;
-    if (className) {
-      for (const klass of entry.klasses) {
-        if (typeof klass !== "function") continue;
-        if (klass.name === className) return entry.preventWrites;
-      }
-    }
+    const hash = stack[i];
+    if (hash.preventWrites !== undefined && hash.klasses.some(isBase)) return hash.preventWrites;
+    if (
+      hash.preventWrites !== undefined &&
+      hash.klasses.some((klass) => typeof klass === "function" && klass.name === className)
+    )
+      return hash.preventWrites;
   }
+
   return false;
 }
 
@@ -631,7 +631,7 @@ export function connectionClass(this: CoreHost, value?: boolean): boolean {
 }
 
 export function isConnectionClass(this: CoreHost): boolean {
-  return this._connectionClass ?? false;
+  return connectionClass.call(this);
 }
 
 /**
@@ -774,7 +774,7 @@ export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
   key: string,
-  block: () => any,
+  block: (params: any) => any,
 ): any {
   // Static fields are inherited via the prototype chain, so a subclass that
   // never initialized its own cache would see the parent's map as truthy and
@@ -791,7 +791,7 @@ export function cachedFindByStatement(
   const prepared = connection?.preparedStatements ?? true;
   const cache = this._findByStatementCache!.get(prepared)!;
   if (!cache.has(key)) {
-    cache.set(key, block());
+    cache.set(key, StatementCache.create(connection, block));
   }
   return cache.get(key);
 }
@@ -1119,26 +1119,19 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   return record;
 }
 
-export function findBy(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
-  return findByThroughCache.call(this, conditions);
-}
-
 /**
- * Rails: Core::ClassMethods#find_by routes a flat-hash lookup through a cached
- * StatementCache, falling back to the relation path for scoped lookups, keys
- * that are not real columns, or unsupported (nil/Array/Range/Hash/Relation/Base)
- * values.
+ * Rails: Core::ClassMethods#find_by (core.rb:283-332) routes a flat-hash lookup
+ * through a cached StatementCache, falling back (`super` — the relation path)
+ * for scoped lookups, keys that are not real columns, or unsupported
+ * (nil/Array/Range/Hash/Relation/Base) values.
  *
  * Before the cache check, Rails resolves each key through attribute_aliases,
  * bails to super on an aggregation, and for a non-polymorphic belongs_to swaps
  * the association name for its join FK column + the value's PK. A plain object
- * value with an `id` is dereferenced to that id. This mirrors core.rb#find_by
- * so aliases and `find_by({author: postInstance})` still hit the cache.
+ * value with an `id` is dereferenced to that id.
  */
-async function findByThroughCache(
-  this: CoreHost,
-  conditions: Record<string, unknown>,
-): Promise<any> {
+export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
+  const conditions = args[0];
   // Mirrors Rails core.rb#find_by: `return super if scope_attributes?`, where
   // `scope_attributes?` (scoping/default.rb) is
   // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
@@ -1146,13 +1139,16 @@ async function findByThroughCache(
   // can't reproduce (it builds a bare `where(...).limit(1)`), so defer the whole
   // lookup to the relation path, which applies the default scope's eager joins.
   if (this.isScopeAttributes()) {
-    return this.all().findBy(conditions);
+    return this.all().findBy(...args);
+  }
+  // Rails: `hash = args.first; return super unless Hash === hash` (core.rb:286-287).
+  if (!isPlainObject(conditions)) {
+    return this.all().findBy(...args);
   }
   const keys = Object.keys(conditions);
   if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
   const aliases: Record<string, string> = (this as any)._attributeAliases ?? {};
-  const columns = columnsHash.call(this as any);
   const resolvedKeys: string[] = [];
   const values: unknown[] = [];
 
@@ -1178,7 +1174,7 @@ async function findByThroughCache(
     }
 
     if (
-      !Object.prototype.hasOwnProperty.call(columns, key) ||
+      !Object.prototype.hasOwnProperty.call(columnsHash.call(this as any), key) ||
       StatementCache.unsupportedValue(value)
     ) {
       return this.all().findBy(conditions);
@@ -1211,13 +1207,11 @@ async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): 
     // Rails keys the cache on the array itself (structural equality); we
     // serialize it so ["a","b"] and ["a,b"] don't collide on a "," join.
     const cacheKey = JSON.stringify(keys);
-    const statement = cachedFindByStatement.call(this, connection, cacheKey, () =>
-      StatementCache.create(connection, (params) => {
-        const wheres: Record<string, unknown> = {};
-        for (const k of keys) wheres[k] = params.bind();
-        return (this as any).where(wheres).limit(1);
-      }),
-    );
+    const statement = cachedFindByStatement.call(this, connection, cacheKey, (params: any) => {
+      const wheres: Record<string, unknown> = {};
+      for (const key of keys) wheres[key] = params.bind();
+      return (this as any).where(wheres).limit(1);
+    });
     try {
       const records = await statement.execute(values, connection, { allowRetry: true });
       return records[0] ?? null;
@@ -1235,6 +1229,12 @@ async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): 
   });
 }
 
-export function findByBang(this: CoreHost, conditions: unknown, ...rest: unknown[]): Promise<any> {
-  return this.all().findByBang(conditions, ...rest);
+/** Rails: `find_by!(*args) = find_by(*args) || where(*args).raise_record_not_found_exception!` (core.rb:334-336). */
+export async function findByBang(this: CoreHost, ...args: any[]): Promise<any> {
+  return (
+    (await findBy.call(this, ...args)) ??
+    this.all()
+      .where(...args)
+      .raiseRecordNotFoundExceptionBang()
+  );
 }

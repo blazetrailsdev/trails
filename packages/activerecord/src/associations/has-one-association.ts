@@ -11,6 +11,7 @@ import {
 } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
+import { queryConstraintsList } from "../persistence.js";
 
 /**
  * Manages has_one associations. Handles dependent destruction,
@@ -173,6 +174,34 @@ export class HasOneAssociation extends SingularAssociation {
           return false;
         }
         break;
+
+      case "destroyAsync": {
+        let primaryKeyColumn: string | string[];
+        let id: unknown;
+        const targetClass = target.constructor as typeof Base;
+        if (queryConstraintsList.call(targetClass as any)) {
+          primaryKeyColumn = queryConstraintsList.call(targetClass as any)!;
+          id = primaryKeyColumn.map((col) => (target as any)[col]);
+        } else {
+          primaryKeyColumn = targetClass.primaryKey as string;
+          id = (target as any)[primaryKeyColumn];
+        }
+
+        this.enqueueDestroyAssociation({
+          ownerModelName: this.owner.constructor.name,
+          ownerId: (this.owner as any).id,
+          associationClass: String((this.reflection.klass as typeof Base).name),
+          associationIds: [id],
+          associationPrimaryKeyColumn: primaryKeyColumn,
+          // Ruby `options.fetch(:ensuring_owner_was, nil)` returns a stored
+          // `nil`/`false`; `??` would substitute the default for it.
+          ensuringOwnerWasMethod:
+            "ensuringOwnerWas" in this.reflection.options
+              ? (this.reflection.options as any).ensuringOwnerWas
+              : null,
+        });
+        break;
+      }
 
       case "nullify":
         if (target.isPersisted()) {

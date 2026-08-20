@@ -382,20 +382,20 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(sql).toContain("NULLS NOT DISTINCT");
   });
 
-  it("emits exclusion constraint without CONSTRAINT clause when name is omitted", async () => {
+  it("emits exclusion constraint with a generated name when name is omitted", async () => {
     const td = new TableDefinition("meetings", { adapter: leased });
     td.exclusionConstraint("room WITH =", { using: "gist" });
     const sql = await toSql(td);
     expect(sql).toContain("EXCLUDE USING gist (room WITH =)");
-    expect(sql).not.toContain('CONSTRAINT ""');
+    expect(sql).toMatch(/CONSTRAINT "excl_rails_[0-9a-f]{10}"/);
   });
 
-  it("emits unique constraint without CONSTRAINT clause when name is omitted", async () => {
+  it("emits unique constraint with a generated name when name is omitted", async () => {
     const td = new TableDefinition("orders", { adapter: leased });
     td.uniqueConstraint("position");
     const sql = await toSql(td);
     expect(sql).toContain('UNIQUE ("position")');
-    expect(sql).not.toContain('CONSTRAINT ""');
+    expect(sql).toMatch(/CONSTRAINT "uniq_rails_[0-9a-f]{10}"/);
   });
 
   it("handles constraint-only table with no columns (id: false)", async () => {

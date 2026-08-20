@@ -167,16 +167,6 @@ describe("PostgreSQL SchemaCreation", () => {
     ).rejects.toThrow("VIRTUAL");
   });
 
-  it("visitExclusionConstraintDefinition: deferrable true → DEFERRABLE without INITIALLY", () => {
-    const ec = new ExclusionConstraintDefinition("t", "e WITH &&", {
-      name: "c",
-      deferrable: true,
-    });
-    const sql = s().visitExclusionConstraintDefinition(ec);
-    expect(sql).toMatch(/DEFERRABLE$/);
-    expect(sql).not.toContain("INITIALLY");
-  });
-
   it("visitExclusionConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
     const ec = new ExclusionConstraintDefinition("t", "e WITH &&", {});
     const sql = s().visitExclusionConstraintDefinition(ec);

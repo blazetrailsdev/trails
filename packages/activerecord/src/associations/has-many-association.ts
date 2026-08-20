@@ -30,8 +30,8 @@ import {
 } from "./errors.js";
 import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
-import { compositeQueryConstraintsList } from "../persistence.js";
-import { camelize, singularize, underscore } from "@blazetrails/activesupport";
+import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
+import { camelize, eachSlice, singularize, underscore } from "@blazetrails/activesupport";
 
 /**
  * Proxy that handles a has_many association.
@@ -142,6 +142,49 @@ export class HasManyAssociation extends CollectionAssociation {
         // calls throwAbort() so the owner's destroy() returns false. destroyBang
         // then calls _raiseRecordNotDestroyed() which re-raises the child exception.
         await this.destroyAll();
+        break;
+      }
+
+      case "destroyAsync": {
+        const records = await this.loadTarget();
+        for (const t of records) {
+          (t as any).destroyedByAssociation = this.reflection;
+        }
+
+        if (this.target.length > 0) {
+          const associationClass = this.target[0].constructor as typeof Base;
+          let primaryKeyColumn: string | string[];
+          let ids: unknown[];
+          if (queryConstraintsList.call(associationClass as any)) {
+            primaryKeyColumn = queryConstraintsList.call(associationClass as any)!;
+            ids = this.target.map((assoc) =>
+              (primaryKeyColumn as string[]).map((col) => (assoc as any)[col]),
+            );
+          } else {
+            primaryKeyColumn = associationClass.primaryKey as string;
+            ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
+          }
+
+          const idsBatches = eachSlice(
+            ids,
+            (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
+          );
+          for (const idsBatch of idsBatches) {
+            this.enqueueDestroyAssociation({
+              ownerModelName: this.owner.constructor.name,
+              ownerId: (this.owner as any).id,
+              associationClass: String((this.reflection.klass as typeof Base).name),
+              associationIds: idsBatch,
+              associationPrimaryKeyColumn: primaryKeyColumn,
+              // Ruby `options.fetch(:ensuring_owner_was, nil)` returns a stored
+              // `nil`/`false`; `??` would substitute the default for it.
+              ensuringOwnerWasMethod:
+                "ensuringOwnerWas" in this.reflection.options
+                  ? (this.reflection.options as any).ensuringOwnerWas
+                  : null,
+            });
+          }
+        }
         break;
       }
 

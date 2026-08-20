@@ -101,7 +101,7 @@ export interface ExclusionConstraintOptions {
   name?: string;
   using?: string;
   where?: string;
-  deferrable?: boolean | "immediate" | "deferred";
+  deferrable?: false | "immediate" | "deferred";
   [key: string]: unknown;
 }
 
@@ -124,7 +124,7 @@ export class ExclusionConstraintDefinition {
     return this.options.where;
   }
 
-  get deferrable(): boolean | "immediate" | "deferred" | undefined {
+  get deferrable(): false | "immediate" | "deferred" | undefined {
     return this.options.deferrable;
   }
 
@@ -135,7 +135,7 @@ export class ExclusionConstraintDefinition {
 
 export interface UniqueConstraintOptions {
   name?: string;
-  deferrable?: boolean | "immediate" | "deferred";
+  deferrable?: false | "immediate" | "deferred";
   usingIndex?: string;
   nullsNotDistinct?: boolean;
   [key: string]: unknown;
@@ -152,7 +152,7 @@ export class UniqueConstraintDefinition {
     return this.options.name;
   }
 
-  get deferrable(): boolean | "immediate" | "deferred" | undefined {
+  get deferrable(): false | "immediate" | "deferred" | undefined {
     return this.options.deferrable;
   }
 
