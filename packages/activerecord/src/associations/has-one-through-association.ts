@@ -4,7 +4,6 @@ import { association, _buildAssociationInstance } from "./instance-methods.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 import { resolveAssocClass, _hmtNotFound } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
-
 import { RecordInvalid } from "../validations.js";
 import {
   ThroughAssociation,

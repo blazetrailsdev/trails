@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { association, _buildAssociationInstance } from "./instance-methods.js";
 import { HasManyAssociation } from "./has-many-association.js";
-
 import { underscore, singularize, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
 import {
   resolveAssocClass,

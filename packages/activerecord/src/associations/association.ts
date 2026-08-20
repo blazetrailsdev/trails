@@ -929,8 +929,8 @@ export class Association {
    *
    * The `@skip_strict_loading` guard reads two flags rather than one: the
    * association-level ivar Rails has, plus the owner-level bypass counter the
-   * explicit loaders (`loadBelongsTo` / `loadHasOne` / `CollectionProxy`'s
-   * `_withoutStrictLoading`) raise. Those loaders are the trails spelling of a
+   * explicit loaders (`loadBelongsTo` / `loadHasOne`) raise. Those loaders are
+   * the trails spelling of a
    * deliberate load, and they run where Ruby would have had an association
    * handle to call `skip_strict_loading` on.
    * @internal

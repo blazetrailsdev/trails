@@ -37,6 +37,11 @@ export interface ThroughAssociationHost {
   ensureMutable(): void;
 }
 
+// A third copy of the subclass files' `safeKlass`: `constructJoinAttributes`
+// needs `reflection.klass` before `checkValidityBang` has run, where the getter
+// throws. Not a Rails member, so hoisting it to a shared home would be new
+// non-Rails surface in a file `parity:api` scores — it stays file-local until
+// the guard itself is retired.
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
     return refl?.klass ?? null;
@@ -57,16 +62,8 @@ export function transaction<R>(
   this: ThroughAssociationHost,
   block: (tx?: any) => Promise<R> | R,
 ): Promise<R | undefined> {
-  const klass = safeKlass(this.throughReflection() as { klass?: unknown } | null) as {
-    transaction?: (...args: any[]) => any;
-  } | null;
-  // Rails names `through_reflection.klass.transaction(&block)` unguarded; a
-  // has_one :through whose join klass cannot be resolved reaches here null,
-  // where Ruby would have raised on the reflection lookup instead.
-  if (klass && typeof klass.transaction === "function") {
-    return klass.transaction(block) as Promise<R | undefined>;
-  }
-  return Promise.resolve(block()) as Promise<R | undefined>;
+  const klass = (this.throughReflection() as { klass: { transaction(b: unknown): unknown } }).klass;
+  return klass.transaction(block) as Promise<R | undefined>;
 }
 
 /**

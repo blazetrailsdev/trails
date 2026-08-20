@@ -722,7 +722,7 @@ async function findTarget(
  * `target_scope.merge!(association_scope)`, where `association_scope` is
  * `AssociationScope.scope(self)`. `findTarget` runs this relation rather than
  * rebuilding it, and the non-executing callers (CollectionProxy's seed and
- * `scope()`, `countHasMany`) reach the same relation through here.
+ * `scope()`) reach the same relation through here.
  *
  * Returns null when the owner-side key values are absent (unsaved owner / null
  * PK), which Rails expresses as the NullRelation fallback.
