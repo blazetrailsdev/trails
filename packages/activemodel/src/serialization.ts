@@ -392,38 +392,18 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
 }
 
 /**
- * `serialization.rb:187-189`'s normalisation, for `preloadIncludes` alone.
- *
- * `serializableAddIncludes` spells this out inline because Rails does; this
- * exists because `preloadIncludes` has no Rails counterpart to inline into and
- * cannot borrow the Rails method's copy — it must reach each association
- * through `resolveIncludeAsync`, where `serializableAddIncludes` reaches it
- * through the synchronous `send` that preloading exists to get ahead of.
- *
- * @noRailsEquivalent Serves trails' awaitable `serializable_hash` (RFC 0022 b2).
- * @internal
- */
-function normalizeIncludes(
-  includeOpt:
-    | string
-    | Array<string | Record<string, SerializeOptions>>
-    | Record<string, SerializeOptions>,
-): Record<string, SerializeOptions> {
-  if (isIncludeHash(includeOpt)) return includeOpt;
-  const includes: Record<string, SerializeOptions> = {};
-  for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
-    if (isIncludeHash(n)) {
-      for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
-    } else {
-      safeSet(includes as Record<string, unknown>, n, {});
-    }
-  }
-  return includes;
-}
-
-/**
  * Recursively lazy-load every `include`d association (and nested includes) via
  * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
+ *
+ * The entry walk is `serialization.rb:188`'s own
+ * `Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }`, taken
+ * without the `Hash[...]` that wraps it there. That wrapper only dedupes, and
+ * dropping it can visit a name twice — which for a preload is a superset of the
+ * work, never a miss, so the sync pass still finds everything loaded.
+ * `serializableAddIncludes` keeps the wrapper, since Rails' own iteration is
+ * over the deduped hash.
+ *
+ * @noRailsEquivalent Serves trails' awaitable `serializable_hash` (RFC 0022 b2).
  */
 async function preloadIncludes(
   record: SerializationRecord,
@@ -431,7 +411,12 @@ async function preloadIncludes(
 ): Promise<void> {
   const includeOpt = options.include;
   if (includeOpt == null || (includeOpt as unknown) === false) return;
-  for (const [name, opts] of Object.entries(normalizeIncludes(includeOpt))) {
+  const entries: Array<[string, SerializeOptions]> = isIncludeHash(includeOpt)
+    ? Object.entries(includeOpt)
+    : (Array.isArray(includeOpt) ? includeOpt : [includeOpt]).flatMap((n) =>
+        isIncludeHash(n) ? Object.entries(n) : [[n, {}] as [string, SerializeOptions]],
+      );
+  for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
       ? Array.isArray(records)
