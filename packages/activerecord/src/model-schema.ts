@@ -1175,6 +1175,12 @@ export function loadSchema(this: SchemaHost): void {
  */
 function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
   (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.();
+  // Generation reads `attribute_names` (attribute_methods.rb:115) → `column_names`,
+  // which re-warms the `columns` memo `applyColumnsHash` cleared a moment ago.
+  // Rails' `load_schema!` never touches `@columns` (model_schema.rb:587-597),
+  // so its memo (`@columns ||= columns_hash.values`, :432-434) is still nil
+  // after a load; clear it again to leave the same state.
+  (host as unknown as { _columns?: unknown })._columns = undefined;
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
