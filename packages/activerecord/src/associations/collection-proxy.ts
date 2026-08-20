@@ -33,7 +33,7 @@ import {
   performLast as basePerformLast,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
+import { singularize, camelize, constantize } from "@blazetrails/activesupport";
 import {
   RecordNotSaved,
   ConfigurationError,
@@ -48,20 +48,17 @@ import {
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
-  CompositePrimaryKeyMismatchError,
   AssociationNotFoundError,
 } from "./errors.js";
-import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
   resolveAssocClass,
-  _routeThroughViaAssociationScope,
   association as associationProxy,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
-import { scope as hasManyScope, setDifference, setIntersection } from "./has-many-association.js";
+import { setDifference, setIntersection } from "./has-many-association.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -1128,147 +1125,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Resolve the composite-aware owner FK / PK column pairs for a through
-   * association, raising on length mismatch. Mirrors how Rails relies on
-   * `Array(association_primary_key)` matching the reflection's foreign key
-   * shape inside `construct_join_attributes` (through_association.rb).
-   * @internal
-   */
-  private _throughOwnerCols(
-    throughAssoc: AssociationDefinition,
-    ctor: typeof Base,
-  ): { fkCols: string[]; pkCols: string[] } {
-    // Rails reads owner attributes straight off the through reflection:
-    // `through_reflection.foreign_key` / `through_reflection.active_record_primary_key`
-    // (through_association.rb:84). The rich Reflection already computes every
-    // case the join/preload paths use — `foreignKey` runs the option →
-    // queryConstraints → deriveFkQueryConstraints resolution (reflection.ts:781),
-    // and `activeRecordPrimaryKey` runs the option → queryConstraintsList →
-    // id-collapse resolution (reflection.ts:1049) — and both derive from the
-    // class that *declared* the association (`reflection.active_record`), so an
-    // STI subclass owner resolves `post_id` not `special_post_id`. Delegate
-    // rather than keep a parallel copy.
-    const reflection = ctor._reflectOnAssociation?.(throughAssoc.name) as
-      | { foreignKey?: string | string[]; activeRecordPrimaryKey?: string | string[] }
-      | undefined;
-
-    // Only the unregistered/anonymous owner (no reflection) falls back to the
-    // conventional `<owner>_id` against the owner's primary key.
-    const ownerFk: string | string[] =
-      reflection?.foreignKey ??
-      throughAssoc.options.foreignKey ??
-      throughAssoc.options.queryConstraints ??
-      `${underscore(ctor.name)}_id`;
-    const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk];
-
-    let ownerPk: string | string[];
-    if (reflection?.activeRecordPrimaryKey !== undefined) {
-      ownerPk = reflection.activeRecordPrimaryKey;
-    } else if (throughAssoc.options.primaryKey !== undefined) {
-      ownerPk = throughAssoc.options.primaryKey;
-    } else if (
-      // Reflection-less fallback only: reproduce Reflection#activeRecordPrimaryKey's
-      // id-collapse (reflection.ts:1063-1065) — a scalar FK against a composite PK
-      // that includes "id" pairs with the scalar "id" column.
-      fkCols.length === 1 &&
-      Array.isArray(ctor.primaryKey) &&
-      ctor.primaryKey.includes("id")
-    ) {
-      ownerPk = "id";
-    } else {
-      ownerPk = ctor.primaryKey;
-    }
-    const pkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk];
-    if (fkCols.length !== pkCols.length) {
-      throw new Error(
-        `Composite primaryKey/foreignKey mismatch on through "${this._assocName}": ${pkCols.length} pk vs ${fkCols.length} fk`,
-      );
-    }
-    return { fkCols, pkCols };
-  }
-
-  /**
-   * Resolve the polymorphic `<as>_id`/`<as>_type` column descriptor for a
-   * polymorphic-through. The schema is intrinsically scalar, so the owner
-   * PK collapses to "id" when composite-with-id (matching Rails' polymorphic
-   * derivation) and otherwise to the scalar/first PK column. Used by every
-   * polymorphic-through write/read site to keep them in lock-step.
-   * @internal
-   */
-  private _throughOwnerPolymorphic(
-    throughAssoc: AssociationDefinition,
-    ctor: typeof Base,
-    asName: string,
-  ): { idCol: string; idValue: unknown; typeCol: string; typeValue: string } {
-    const polyFk = throughAssoc.options.foreignKey ?? `${underscore(asName)}_id`;
-    if (Array.isArray(polyFk)) {
-      // Polymorphic associations have only one `<as>_id`/`<as>_type` pair
-      // in the schema, so a composite foreignKey is unrepresentable.
-      // Matches the rejection at associations.ts:829-833 / :1028-1032.
-      throw new ConfigurationError(
-        `Polymorphic-through "${this._assocName}" cannot use a composite foreign key — ` +
-          `the schema only supports a single \`${underscore(asName)}_id\`/\`${underscore(asName)}_type\` pair.`,
-      );
-    }
-    const idCol = polyFk;
-    // The polymorphic schema (`<as>_id`/`<as>_type`) only carries a scalar
-    // owner identifier. When the owner has a composite PK, Rails' `join_id_for`
-    // (reflection.rb:642-644) collapses to the `id` component when present.
-    // We match that: if the CPK includes "id", use "id"; otherwise the CPK
-    // cannot collapse to a scalar and we raise CompositePrimaryKeyMismatchError.
-    const ownerPkOption = throughAssoc.options.primaryKey;
-    if (Array.isArray(ownerPkOption) && !ownerPkOption.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message.
-      routeThroughCheckValidity(ctor, this._assocName);
-      // No reflection resolvable (polymorphic collapse) — minimal fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: this._assocName,
-        primaryKey: ownerPkOption,
-        foreignKey: idCol,
-      });
-    }
-    const resolvedPkOption = Array.isArray(ownerPkOption) ? "id" : ownerPkOption;
-    const ctorPk = ctor.primaryKey;
-    if (Array.isArray(ctorPk) && !ctorPk.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message.
-      routeThroughCheckValidity(ctor, this._assocName);
-      // No reflection resolvable (polymorphic collapse) — minimal fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: this._assocName,
-        primaryKey: ctorPk,
-        foreignKey: idCol,
-      });
-    }
-    const resolvedCtorPk = Array.isArray(ctorPk) ? "id" : ctorPk;
-    const polyPk = resolvedPkOption ?? resolvedCtorPk;
-    return {
-      idCol,
-      idValue: this._record._readAttribute(polyPk),
-      // Rails derives the type column as reflection.type =
-      // options[:foreign_type] || "#{options[:as]}_type" (reflection.rb:519).
-      typeCol: throughAssoc.options.foreignType ?? `${underscore(asName)}_type`,
-      typeValue: ctor.name,
-    };
-  }
-
-  /** @internal Builds an FK→ownerPkValue map for join-row WHERE/INSERT shapes. */
-  private _throughOwnerAttrs(
-    throughAssoc: AssociationDefinition,
-    ctor: typeof Base,
-  ): Record<string, unknown> {
-    const { fkCols, pkCols } = this._throughOwnerCols(throughAssoc, ctor);
-    const attrs: Record<string, unknown> = {};
-    for (let i = 0; i < fkCols.length; i++) {
-      attrs[fkCols[i]] = this._record._readAttribute(pkCols[i]);
-    }
-    return attrs;
-  }
-
-  /**
    * Rails has no `_pushThrough`: `CollectionProxy#<<` is
    * `proxy_association.concat(records)` (collection_proxy.rb:1053), and every
    * join-row decision lives on `HasManyThroughAssociation#concat_records` /
@@ -1704,33 +1560,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Rails wraps `replace_records` in `transaction`, which
-   * `ThroughAssociation#transaction` overrides to use the through model's.
+   * Rails wraps `replace_records` in `transaction`
+   * (collection_association.rb:418-434), resolved on the association:
+   * `CollectionAssociation#transaction` (collection_association.rb:321-323)
+   * uses the reflection klass's, and `ThroughAssociation#transaction`
+   * (through_association.rb:10-12) overrides it with
+   * `through_reflection.klass.transaction`. Route to the association so the
+   * through arm comes from that override rather than a second, proxy-local
+   * derivation of the join model.
    * @internal
    */
   private async _replaceTransaction(block: () => Promise<void>): Promise<void> {
-    const throughModel = this._isThrough ? this._resolveThroughModel() : null;
-    if (throughModel && typeof throughModel.transaction === "function") {
-      await throughModel.transaction(block);
+    const assoc = this._record.association(this._assocName) as unknown as {
+      transaction?: (block: () => Promise<void>) => Promise<unknown>;
+    };
+    if (typeof assoc?.transaction === "function") {
+      await assoc.transaction(block);
       return;
     }
     await this.transaction(block);
-  }
-
-  /**
-   * The join model class behind a `:through` reflection, or `null` when the
-   * through association can't be resolved (the misconfiguration cases are
-   * already reported by `_ensureThroughWritable`).
-   * @internal
-   */
-  private _resolveThroughModel(): typeof Base | null {
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) return null;
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    return resolveAssocClass(this._record, throughAssoc.name, throughClassName);
   }
 
   /**
@@ -1842,163 +1690,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     };
     return (this._scope ??= assoc.scope() as any);
   }
-
-  private _buildThroughScope(): any {
-    const ctor = this._record.constructor as typeof Base;
-    // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
-    // for every shape it can route, composite keys included. The chain-based
-    // `scope()` seam emits the full composite ON clause, so composite
-    // owner PK, composite target PK, composite belongsTo-source FK, and
-    // composite through-model PK all build correctly here — the single-column
-    // IN-subquery fallback below can't express those tuple matches and would
-    // throw. Only shapes `_routeThroughViaAssociationScope` still declines
-    // (polymorphic-has_many sources, unsaved nested-through) fall through to
-    // that fallback, where the composite guards remain as a loud backstop.
-    const refl = this.reflection as any;
-    if (_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
-      const joinRel = hasManyScope(this._record, this._assocName, this._assocDef);
-      return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
-    }
-    // Below is the single-column IN-subquery fallback, reached only for shapes
-    // `_routeThroughViaAssociationScope` declines (polymorphic-has_many sources,
-    // unsaved nested-through). Every composite shape it CAN route now takes the
-    // JOIN path above, so the composite ConfigurationError guards below are
-    // backstops for the residual unroutable composite shapes the single-column
-    // subquery genuinely can't express — not the common composite-key path.
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) {
-      throw new Error(
-        `Through association "${this._assocDef.options.through}" not found on ${ctor.name}`,
-      );
-    }
-
-    const targetModel = this.model;
-    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
-    // Mirrors Rails ThroughReflection#source_reflection: go through the HMT
-    // reflection's sourceReflection rather than scanning _associations by name.
-    // This avoids the pluralize-fallback ambiguity and respects the source:
-    // option exactly as Rails does (source_reflection_names returns [options[:source]]
-    // only when source: is given — reflection.rb:1108).
-    const sourceRefl = (this.reflection as { sourceReflection?: any }).sourceReflection;
-
-    const throughAs = throughAssoc.options.as;
-    const throughTable = throughModel.arelTable;
-    const targetArelTable = targetModel.arelTable;
-    // sourceRefl.belongsTo?.() returns true for belongs_to, false/undefined otherwise.
-    const isBelongsToSource = sourceRefl == null || sourceRefl.belongsTo?.() !== false;
-
-    let throughSubquery = throughTable.from();
-    if (throughAs) {
-      // Polymorphic-through: defer to the shared polymorphic helper so the
-      // scope reads from the same column _pushThrough writes to.
-      const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAs);
-      if (poly.idValue == null) return (targetModel as any).all().none();
-      throughSubquery = throughSubquery
-        .where(throughTable.get(poly.idCol).eq(poly.idValue))
-        .where(throughTable.get(poly.typeCol).eq(poly.typeValue));
-    } else {
-      const { fkCols: ownerFkCols, pkCols: ownerPkCols } = this._throughOwnerCols(
-        throughAssoc,
-        ctor,
-      );
-      const ownerPkValues = ownerPkCols.map((c) => this._record._readAttribute(c));
-      if (ownerPkValues.some((v) => v == null)) return (targetModel as any).all().none();
-      for (let i = 0; i < ownerFkCols.length; i++) {
-        throughSubquery = throughSubquery.where(
-          throughTable.get(ownerFkCols[i]).eq(ownerPkValues[i]),
-        );
-      }
-    }
-
-    if (isBelongsToSource) {
-      const targetFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
-      if (Array.isArray(targetFk)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite foreign key on the source belongsTo — the target-side IN-subquery needs a single column.`,
-        );
-      }
-      const targetFkStr = targetFk;
-      let targetPkCol: string;
-      if (Array.isArray(targetModel.primaryKey)) {
-        // Mirrors BelongsToReflection#association_primary_key: options[:primary_key]
-        // when set, else "id" when it is part of the composite PK.
-        const srcPk = sourceRefl?.associationPrimaryKey;
-        if (typeof srcPk === "string") {
-          targetPkCol = srcPk;
-        } else if (targetModel.primaryKey.includes("id")) {
-          targetPkCol = "id";
-        } else {
-          throw new ConfigurationError(
-            `Through association "${this._assocName}" has a composite-PK target "${targetModel.name}" but no scalar primaryKey on the source reflection to anchor the IN-subquery. Specify primaryKey: "<col>" on the source belongs_to.`,
-          );
-        }
-      } else {
-        targetPkCol = targetModel.primaryKey;
-      }
-
-      // Handle sourceType for polymorphic belongsTo sources
-      if (sourceRefl?.isPolymorphic?.() && this._assocDef.options.sourceType) {
-        const sourceTypeCol = `${underscore(sourceRefl.name ?? sourceName)}_type`;
-        throughSubquery = throughSubquery.where(
-          throughTable.get(sourceTypeCol).eq(this._assocDef.options.sourceType),
-        );
-      }
-
-      throughSubquery.project(throughTable.get(targetFkStr));
-      const inNode = targetArelTable.get(targetPkCol).in(throughSubquery);
-
-      let rel = (targetModel as any).all().where(inNode);
-      if (this._assocDef.scope) rel = this._assocDef.scope(rel);
-      return rel;
-    } else {
-      const sourceAsName = sourceRefl?.options?.as;
-      const sourceFk = sourceAsName
-        ? (sourceRefl?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-        : (sourceRefl?.foreignKey ?? `${underscore(throughClassName)}_id`);
-      if (Array.isArray(sourceFk)) {
-        // Composite source FK (e.g. CPK `has_many :chapters, through: :book`
-        // where the join model's `has_many` source uses a composite key): the
-        // single-column IN-subquery can't express the tuple match, so route
-        // through the JOIN-based AssociationScope, which builds the composite ON
-        // clause. Falls back to a null scope only when the owner FK is absent.
-        const joinRel = hasManyScope(this._record, this._assocName, this._assocDef);
-        return joinRel ?? (targetModel as any).all().none();
-      }
-      // When the source reflection specifies a primaryKey option (e.g.
-      // `has_many :orderAgreements, primaryKey: "id"` on a CPK through model),
-      // that named column is the one the FK references — use it instead of the
-      // through model's own (possibly composite) primary key.
-      let sourcePk: string | string[] | undefined;
-      try {
-        sourcePk = sourceRefl?.associationPrimaryKey ?? sourceRefl?.options?.primaryKey;
-      } catch {
-        sourcePk = undefined;
-      }
-      const throughPkCol = typeof sourcePk === "string" ? sourcePk : throughModel.primaryKey;
-      if (Array.isArray(throughPkCol)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite primary key on the through model "${throughModel.name}" — the target-side IN-subquery needs a single column.`,
-        );
-      }
-      const sourceFkStr = sourceFk;
-
-      throughSubquery.project(throughTable.get(throughPkCol));
-      const inNode = targetArelTable.get(sourceFkStr).in(throughSubquery);
-
-      let rel = (targetModel as any).all().where(inNode);
-      if (sourceAsName) {
-        rel = rel.where({ [`${underscore(sourceAsName)}_type`]: throughClassName });
-      }
-      if (this._assocDef.scope) rel = this._assocDef.scope(rel);
-      return rel;
-    }
-  }
-
   /**
    * Load and return the target records array.
    *

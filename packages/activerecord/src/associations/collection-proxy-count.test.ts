@@ -224,9 +224,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
       Notifications.unsubscribe(sub);
     }
     // Exactly one SQL, a COUNT — not a row-wise SELECT the loader
-    // path would emit. Shape is `COUNT ... IN (subquery)` via our
-    // `_buildThroughScope`; other valid forms (explicit JOIN) would
-    // also be fine, so we only assert COUNT and no row-wise select.
+    // path would emit. The shape is the JOIN Rails' `AssociationScope`
+    // builds (association_scope.rb:26-40); the assertions stay
+    // shape-agnostic and only require a COUNT and no row-wise select.
     expect(observed.length).toBe(1);
     expect(observed[0]).toMatch(/SELECT\s+COUNT\b/i);
     expect(observed[0]).not.toMatch(/SELECT\s+\*/i);
