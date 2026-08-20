@@ -3006,9 +3006,6 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // the where-subquery path (`relation-handler`); this is intentional, not a
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
-    // `opts.arel` — unconditional in Rails, and `arel` is the acquisition point
-    // (query_methods.rb:1595), so the subquery build gets the same connection
-    // the outer one does.
     return resolved.toArel().as(alias);
   }
   return opts;
