@@ -104,7 +104,7 @@ export class Errors<TBase extends object = object> {
    *   end
    */
   import(error: ActiveModelError, overrideOptions?: { attribute?: string; type?: string }): void {
-    this._errors.push(new NestedError(this.base, error, overrideOptions));
+    this._errors.push(new NestedError(this._base, error, overrideOptions));
   }
 
   /**
@@ -265,7 +265,7 @@ export class Errors<TBase extends object = object> {
     } & Record<string, unknown>,
   ): ActiveModelError {
     const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
-    const error = new ActiveModelError(this.base, normAttr, normType, normOpts);
+    const error = new ActiveModelError(this._base, normAttr, normType, normOpts);
     const strict = normOpts.strict;
     if (strict) {
       const ExceptionClass: new (message?: string) => globalThis.Error =
@@ -341,7 +341,7 @@ export class Errors<TBase extends object = object> {
   }
 
   fullMessage(attribute: string, message: string): string {
-    return ActiveModelError.fullMessage(attribute, message, this.base);
+    return ActiveModelError.fullMessage(attribute, message, this._base);
   }
 
   generateMessage(
@@ -349,7 +349,7 @@ export class Errors<TBase extends object = object> {
     type: string = ":invalid",
     options?: Record<string, unknown>,
   ): string {
-    return ActiveModelError.generateMessage(attribute, type, this.base, options);
+    return ActiveModelError.generateMessage(attribute, type, this._base, options);
   }
 
   /**
@@ -385,10 +385,6 @@ export class Errors<TBase extends object = object> {
    */
   [Symbol.iterator](): IterableIterator<ActiveModelError> {
     return this._errors[Symbol.iterator]();
-  }
-
-  get base(): TBase | null {
-    return this._base;
   }
 
   get count(): number {

@@ -1158,11 +1158,6 @@ describe("Errors<TBase> type parameter", () => {
     age: number;
   }
 
-  it("base getter returns TBase | null", () => {
-    const e = new Errors<User>({ name: "Alice", age: 30 });
-    expectTypeOf(e.base).toEqualTypeOf<User | null>();
-  });
-
   it("add() type callback receives TBase | null", () => {
     const e = new Errors<User>({ name: "Alice", age: 30 });
     e.add("name", (record, _opts) => {
@@ -1194,9 +1189,13 @@ describe("Errors<TBase> type parameter", () => {
 
   it("unparameterized Errors annotation compiles (default = object)", () => {
     // Proves the `= object` default is in effect: the type annotation `Errors`
-    // (no type arg) is accepted and `base` resolves to `object | null`.
+    // (no type arg) is accepted and the record handed to an `add()` callback
+    // resolves to `object | null`.
     const e: Errors = new Errors({} as object);
-    expectTypeOf(e.base).toEqualTypeOf<object | null>();
+    e.add("name", (record, _opts) => {
+      expectTypeOf(record).toEqualTypeOf<object | null>();
+      return "invalid";
+    });
   });
 
   it("where() type callback receives TBase | null", () => {

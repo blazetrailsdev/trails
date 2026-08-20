@@ -1,6 +1,6 @@
 import type { CodeGenerator } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
-import { typeRegistry } from "./type/registry.js";
+import { defaultValue as typeDefaultValue } from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
@@ -144,7 +144,7 @@ export function attribute(
             ? (typeOptions as Record<string, unknown>)
             : undefined,
         )
-    : (existing?.type ?? typeRegistry.lookup("value"));
+    : (existing?.type ?? typeDefaultValue());
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
   // leaves the current default/value untouched.

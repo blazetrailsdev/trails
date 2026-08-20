@@ -13,6 +13,7 @@ import {
   AttributeSet,
   type Type,
   applyPendingAttributeModifications,
+  defaultValue as typeDefaultValue,
   resetDefaultAttributes as amResetDefaultAttributes,
 } from "@blazetrails/activemodel";
 // The pending queue is private on ActiveModel (attribute_registration.rb:77);
@@ -242,8 +243,16 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
         attributesHash.set(name, base.withUserDefault(def.defaultValue));
-      } else {
+      } else if (def.type !== typeDefaultValue()) {
         attributesHash.set(name, Attribute.fromDatabase(name, null, def.type));
+      } else if (!isSchemaLoaded.call(cacheHost as never)) {
+        // Deviation: Rails resolves `columns_hash` synchronously before
+        // `_default_attributes` (attributes.rb:239-248), so a decorator branching
+        // on `subtype == Type.default_value` (enum.rb:240) never has to tell "no
+        // such column" from trails' "not reflected yet". A non-singleton `value`
+        // stands in until reflection; afterwards the name stays absent, as Rails'
+        // columns-only seed leaves it.
+        attributesHash.set(name, Attribute.fromDatabase(name, null, typeLookup("value")));
       }
     }
 

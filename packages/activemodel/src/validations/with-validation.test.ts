@@ -300,7 +300,7 @@ describe("ValidatesWithTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validatesWith(MinLenValidator, { minimum: 5, if: "conditionIsTrue", foo: "bar" });
+        this.validatesWith(MinLenValidator, { minimum: 5, if: ":conditionIsTrue", foo: "bar" });
       }
       conditionIsTrue(): boolean {
         return true;
@@ -308,7 +308,7 @@ describe("ValidatesWithTest", () => {
     }
     expect(capturedOpts).toEqual({
       minimum: 5,
-      if: "conditionIsTrue",
+      if: ":conditionIsTrue",
       foo: "bar",
       class: Person,
     });

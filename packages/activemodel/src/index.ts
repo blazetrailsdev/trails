@@ -127,6 +127,7 @@ import { Type as TypeBase, ValueType } from "./type/value.js";
 import { BinaryType } from "./type/binary.js";
 import { TimeType } from "./type/time.js";
 import { typeRegistry } from "./type/registry.js";
+export { defaultValue } from "./type.js";
 
 export const Types = {
   Type: TypeBase,

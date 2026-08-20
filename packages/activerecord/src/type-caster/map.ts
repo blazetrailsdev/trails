@@ -44,7 +44,7 @@ export class Map {
 
     // Rails' `TypeCaster::Map#type_for_attribute` is a one-line delegation to
     // `klass.type_for_attribute(name)` (type_caster/map.rb:15-16). Delegating gets
-    // alias resolution, the enum `assertEnumTypeDeclared` guard, and the decorated
+    // alias resolution and the decorated
     // default attribute set (`attribute_types`) for free — so pending decorators
     // (serialize/normalizes/encrypts) are honored on the query side without a
     // per-feature post-reflection replay onto `_attributeDefinitions`. `ValueType`

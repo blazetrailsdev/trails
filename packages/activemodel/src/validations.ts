@@ -405,15 +405,20 @@ export function raiseOnMissingTranslations(value?: boolean): boolean {
 }
 
 /**
- * A single `if:` / `unless:` condition — a callable, or the name of a method
- * on the record. Mirrors the Symbol-or-Proc filter Rails hands to
- * `ActiveSupport::Callbacks` (validations.rb:160-185).
+ * A single `if:` / `unless:` condition — the Symbol-or-Proc filter Rails hands
+ * straight to `set_callback` (validations.rb:160-185), resolved by
+ * `ActiveSupport::Callbacks::CallTemplate` (callbacks.rb:326-331, :394-443).
+ * A Ruby Symbol is spelled colon-prefixed: `if: ":conditionIsTrue"`.
  */
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 
 /**
  * The option keys `validate` accepts (validations.rb:160-185) and that
  * `validates` forwards to each validator (validates.rb:162-164).
+ *
+ * @noRailsEquivalent PERMANENT (`vendor/rails/activemodel/lib/active_model/validations.rb:160-185`
+ *   — `VALID_OPTIONS_FOR_VALIDATE`). Ruby's options hash needs no declaration;
+ *   its keys are the members below.
  */
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
@@ -433,23 +438,6 @@ export interface ConditionalOptions {
   exceptOn?: string | string[];
   /** Register ahead of the already-registered validate callbacks. */
   prepend?: boolean;
-}
-
-/**
- * Resolve one `if:`/`unless:` filter against the record. Ruby reaches this
- * through `ActiveSupport::Callbacks::CallTemplate.build(filter, self)` +
- * `make_lambda` (activesupport/lib/active_support/callbacks.rb:394-443),
- * reached because `validate` hands the filters to `set_callback`
- * (validations.rb:160-185).
- *
- * @internal Rails-private helper.
- */
-export function evaluateCondition(record: ValidatableRecord, cond: ConditionFn): boolean {
-  if (typeof cond === "function") return cond(record);
-  const rec = record as unknown as Record<string, unknown>;
-  const method = rec[cond];
-  if (typeof method === "function") return (method as () => boolean).call(record);
-  return !!rec[cond];
 }
 
 /**

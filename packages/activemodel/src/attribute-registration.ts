@@ -1,5 +1,6 @@
 import { DescendantsTracker, registerSubclass } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
+import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -45,25 +46,15 @@ export interface AttributeHostInternals {
 // ---------------------------------------------------------------------------
 
 /**
- * A decorator receives the attribute name and its current type, and — only on
- * the `_default_attributes` replay — the *materializing* class (`host`): the
- * class whose AttributeSet is being built. Rails' `decorate_attributes` block
- * resolves against that class's attributes, so a superclass's decorator replayed
- * into a subclass sees the subclass's columns; trails threads `host` through for
- * that.
- *
- * `host` is absent on the eager pass `decorateAttributes` runs at declaration
- * time, which Rails has no counterpart for. A decorator that must fire only
- * where Rails' block fires — enum's "Undeclared attribute type" raise, which
- * Rails evaluates when the attribute set is built (enum.rb:240-245) — keys off
- * its presence.
+ * A decorator receives the attribute name and its current type — Ruby's
+ * `decorator.call(name, attribute.type)` (attribute_registration.rb:83).
  */
-export type AttributeDecorator = (name: string, type: Type, host?: unknown) => Type;
+export type AttributeDecorator = (name: string, type: Type) => Type;
 
 /** @internal Rails-private helper. */
 export interface PendingModification {
   /** @internal */
-  applyTo(attributeSet: AttributeSet, host?: unknown): void;
+  applyTo(attributeSet: AttributeSet): void;
 }
 
 /** @internal Rails-private helper. */
@@ -126,7 +117,9 @@ export function decorateAttributes(
   const targetNames = names ?? Array.from(defs.keys());
   for (const name of targetNames) {
     const def = defs.get(name);
-    if (def) {
+    // Deviation: Rails has no eager pass, so it cannot bake a decoration over
+    // `Type.default_value` into the definitions AR's seed reads (enum.rb:240).
+    if (def && def.type !== defaultValue()) {
       const newType = decorator(name, def.type);
       if (newType) defs.set(name, { ...def, type: newType });
     }
@@ -165,11 +158,11 @@ export class PendingDecorator implements PendingModification {
   ) {}
 
   /** @internal */
-  applyTo(attributeSet: AttributeSet, host?: unknown): void {
+  applyTo(attributeSet: AttributeSet): void {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = this.decorator(name, existing.type, host);
+      const newType = this.decorator(name, existing.type);
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
@@ -205,7 +198,7 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
   const proxy = new Proxy(cast, {
     get(target, prop, receiver) {
       if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
-        return typeRegistry.lookup("value");
+        return defaultValue();
       }
       return Reflect.get(target, prop, receiver);
     },
@@ -267,27 +260,21 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
  * module function is not a member of the class, so the participation test is
  * the public entry point every AttributeRegistration includer answers.
  *
- * `host` is the class whose AttributeSet is being materialized, threaded down
- * the recursion so a superclass's PendingDecorator resolves against the
- * subclass it is replaying into — the same `host` thread AttributeDecorator
- * documents, which Ruby gets from `self` inside the `decorate_attributes` block.
- *
  * @internal
  */
 export function applyPendingAttributeModifications(
   cls: AttributeHostInternals,
   attributeSet: AttributeSet,
-  host: AttributeHostInternals = cls,
 ): void {
   const superclass = Object.getPrototypeOf(cls) as
     | (AttributeHostInternals & { _defaultAttributes?: unknown })
     | null;
   if (superclass && typeof superclass._defaultAttributes === "function") {
-    applyPendingAttributeModifications(superclass, attributeSet, host);
+    applyPendingAttributeModifications(superclass, attributeSet);
   }
 
   for (const modification of pendingAttributeModifications.call(cls)) {
-    modification.applyTo(attributeSet, host);
+    modification.applyTo(attributeSet);
   }
 }
 

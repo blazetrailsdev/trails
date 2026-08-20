@@ -374,26 +374,4 @@ describe("AttributeRegistrationTest", () => {
 
     expect((Leaf as any)._defaultAttributes().getAttribute("new_attr").value).toBe(7);
   });
-
-  it("replaying pending decorators establishes decorator-replay context", () => {
-    // Mirrors ActiveModel::AttributeRegistration::PendingDecorator#apply_to,
-    // which passes the materializing class. Decorators gated on replay context
-    // (enum's undeclared-type check) change behavior without it.
-    const seen: boolean[] = [];
-    class MyModel extends Model {
-      static {
-        this.attribute("title", "string");
-        this.decorateAttributes(["title"], (_name, type, host) => {
-          seen.push(host !== undefined);
-          return type;
-        });
-      }
-    }
-
-    seen.length = 0;
-    (MyModel as unknown as { _cachedDefaultAttributes: unknown })._cachedDefaultAttributes = null;
-    (MyModel as unknown as { _defaultAttributes(): unknown })._defaultAttributes();
-
-    expect(seen).toEqual([true]);
-  });
 });

@@ -124,9 +124,22 @@ export type CallbackObject = object;
 export interface RunCallbacksOptions {
   strict?: "sync";
 }
+/**
+ * `if:` / `unless:` accept one filter or an array of them, and a filter is a
+ * callable or a Symbol naming a method on the record — the shape Rails hands
+ * straight to `set_callback` (validations.rb:160-185).
+ *
+ * The method-in-object indirection keeps `TRecord` bivariant, which the
+ * `if?(record): boolean` method shorthand this replaced gave for free; a plain
+ * function-property type makes every `CallbackConditions<Subclass>` unassignable
+ * to `CallbackConditions<object>` under `strictFunctionTypes`.
+ */
+export type CallbackConditionFilter<TRecord = CallbackRecord> =
+  { _(record: TRecord, value?: unknown): boolean }["_"] | string;
+
 export interface CallbackConditions<TRecord = CallbackRecord> {
-  if?(record: TRecord): boolean;
-  unless?(record: TRecord): boolean;
+  if?: CallbackConditionFilter<TRecord> | Array<CallbackConditionFilter<TRecord>>;
+  unless?: CallbackConditionFilter<TRecord> | Array<CallbackConditionFilter<TRecord>>;
   prepend?: boolean;
 }
 

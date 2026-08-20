@@ -35,7 +35,15 @@ export function isAbortSignal(e: unknown): boolean {
 // callback chain's `env.value` (the run_callbacks block's return). Most
 // conditions only look at `target`; ActiveModel's after-model-callback
 // conditional (`v != false`, define_model_callbacks) reads `value`.
-export type CallbackCondition<T extends object = object> = (target: T, value?: unknown) => boolean;
+/**
+ * One `if:` / `unless:` filter — a callable, or a Ruby Symbol naming a method on
+ * the target, spelled colon-prefixed (`":someMethod"`).
+ * {@link Callback.conditionsLambdas} resolves it through `CallTemplate.build`
+ * (callbacks.rb:326-331).
+ */
+export type CallbackCondition<T extends object = object> =
+  | ((target: T, value?: unknown) => boolean)
+  | string;
 
 export interface CallbackOptions<T extends object = object> {
   if?: CallbackCondition<T> | CallbackCondition<T>[];
@@ -133,16 +141,8 @@ export class Value {
     return this.block(value);
   }
 
-  static check(options: CallbackOptions, target: object, value?: unknown): boolean {
-    if (options.if) {
-      const conditions = Array.isArray(options.if) ? options.if : [options.if];
-      if (!conditions.every((cond) => cond(target, value))) return false;
-    }
-    if (options.unless) {
-      const conditions = Array.isArray(options.unless) ? options.unless : [options.unless];
-      if (conditions.some((cond) => cond(target, value))) return false;
-    }
-    return true;
+  static check(callback: Callback, target: object, value?: unknown): boolean {
+    return callback.conditionsLambdas().every((cond) => cond(target, value));
   }
 }
 
@@ -524,7 +524,7 @@ export class Before {
   static build(callback: Callback, options: DefineCallbacksOptions): (target: object) => boolean {
     const terminatorFn = options.terminator;
     return (target: object) => {
-      if (!Value.check(callback.options, target)) return true;
+      if (!Value.check(callback, target)) return true;
       const cb = callback.filter as BeforeCallback;
       if (terminatorFn === false) {
         cb.call(target, target);
@@ -584,7 +584,7 @@ export class After {
 
   static build(callback: Callback): (target: object) => void {
     return (target: object) => {
-      if (!Value.check(callback.options, target)) return;
+      if (!Value.check(callback, target)) return;
       (callback.filter as AfterCallback).call(target, target);
     };
   }
@@ -609,7 +609,7 @@ export class Around {
 
   static build(callback: Callback): (target: object, block: () => void) => void {
     return (target: object, block: () => void) => {
-      if (!Value.check(callback.options, target)) {
+      if (!Value.check(callback, target)) {
         block();
         return;
       }
@@ -714,26 +714,39 @@ export class Callback {
     return false;
   }
 
+  /**
+   * Mirrors: ActiveSupport::Callbacks::Callback#conditions_lambdas
+   * (callbacks.rb:326-331) —
+   * `@if.map { |c| CallTemplate.build(c, self).make_lambda } +
+   *  @unless.map { |c| CallTemplate.build(c, self).inverted_lambda }`.
+   *
+   * A callable filter is called directly with `(target, value)` rather than
+   * through `CallTemplate`: `value` is `env.value` (the run_callbacks block's
+   * return), which ActiveModel's after-model-callback guard (`value != false`)
+   * reads, and Rails' Proc arms take that second argument too.
+   *
+   * @internal Rails-private helper.
+   */
+  conditionsLambdas(): Array<(target: object, value: unknown) => boolean> {
+    const conditions = [
+      ...kernelArray(this.options.if as CallbackCondition | CallbackCondition[]).map((c) =>
+        typeof c === "string"
+          ? (CallTemplate.build(c, this).makeLambda() as (t: object, v: unknown) => boolean)
+          : (t: object, v: unknown) => c(t, v),
+      ),
+      ...kernelArray(this.options.unless as CallbackCondition | CallbackCondition[]).map((c) =>
+        typeof c === "string"
+          ? CallTemplate.build(c, this).invertedLambda()
+          : (t: object, v: unknown) => !c(t, v),
+      ),
+    ];
+    return conditions;
+  }
+
   get compiled(): Before | After | Around {
     if (this._compiled) return this._compiled;
 
-    const userConditions: Array<(target: object, value: unknown) => boolean> = [];
-    const ifConds = Array.isArray(this.options.if)
-      ? this.options.if
-      : this.options.if
-        ? [this.options.if]
-        : [];
-    const unlessConds = Array.isArray(this.options.unless)
-      ? this.options.unless
-      : this.options.unless
-        ? [this.options.unless]
-        : [];
-    // Forward `value` (env.value — the run_callbacks block's return) to each
-    // condition. ActiveModel's after-model-callback guard (`value != false`)
-    // reads it to skip after callbacks when the block returned false or the
-    // chain halted. Mirrors Rails conditions_lambdas + Conditionals::Value.
-    for (const c of ifConds) userConditions.push((t, v) => c(t, v));
-    for (const c of unlessConds) userConditions.push((t, v) => !c(t, v));
+    const userConditions = this.conditionsLambdas();
 
     const userCallback = CallTemplate.build(this.filter, this);
 
