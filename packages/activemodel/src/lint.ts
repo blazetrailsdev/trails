@@ -19,6 +19,10 @@ export interface Lint {}
  * these — the failures are test-framework assertions). This ports that
  * assertion-failure identity so the standalone lint functions surface a single
  * named class instead of a bare `Error`.
+ *
+ * @noRailsEquivalent Minitest's assertion-failure class, not an ActiveModel one:
+ * `lint.rb`'s tests are Minitest test methods and raise `Minitest::Assertion`,
+ * which trails has no port of. Named for the Ruby class it stands in for.
  */
 export class MinitestAssertion extends globalThis.Error {
   constructor(message: string) {
@@ -57,25 +61,16 @@ export function assertBoolean(result: unknown, name: string): void {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Tests {
   type ToKeyHost = { toKey(): unknown[] | null; isPersisted(): boolean };
+  /** Mirrors `Lint::Tests#test_to_key` (lint.rb:31-35). */
   export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
     const m = model(input);
-    const key = m.toKey();
-    if (key !== null && !Array.isArray(key)) {
-      throw new MinitestAssertion("toKey must return null or an array");
+    if (typeof m.toKey !== "function") {
+      throw new MinitestAssertion("model must respond to toKey");
     }
-
-    const persisted = m.isPersisted();
-    assertBoolean(persisted, "isPersisted");
-
-    if (persisted && key === null) {
-      throw new MinitestAssertion("toKey must not return null when the model is persisted");
+    m.isPersisted = () => false;
+    if (m.toKey() !== null) {
+      throw new MinitestAssertion("toKey should return null when `isPersisted` returns false");
     }
-
-    withPatchedPersistedFalse(m, () => {
-      if (m.toKey() !== null) {
-        throw new MinitestAssertion("toKey should return null when `isPersisted` returns false");
-      }
-    });
   }
 
   type ToParamHost = {
@@ -83,120 +78,81 @@ export namespace Tests {
     toKey(): unknown[] | null;
     isPersisted(): boolean;
   };
+  /** Mirrors `Lint::Tests#test_to_param` (lint.rb:46-51). */
   export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
     const m = model(input);
-    const param = m.toParam();
-    if (param !== null && typeof param !== "string") {
-      throw new MinitestAssertion("toParam must return null or a string");
+    if (typeof m.toParam !== "function") {
+      throw new MinitestAssertion("model must respond to toParam");
     }
-
-    withPatched(
-      m,
-      "toKey",
-      () => [1],
-      () => {
-        withPatchedPersistedFalse(m, () => {
-          if (m.toParam() !== null) {
-            throw new MinitestAssertion(
-              "toParam should return null when `isPersisted` returns false",
-            );
-          }
-        });
-      },
-    );
+    m.toKey = () => [1];
+    m.isPersisted = () => false;
+    if (m.toParam() !== null) {
+      throw new MinitestAssertion("toParam should return null when `isPersisted` returns false");
+    }
   }
 
   type ToPartialPathHost = { toPartialPath(): string };
+  /** Mirrors `Lint::Tests#test_to_partial_path` (lint.rb:58-61). */
   export function testToPartialPath(
     input: ToPartialPathHost | { toModel(): ToPartialPathHost },
   ): void {
     const m = model(input);
-    const path = m.toPartialPath();
-    if (typeof path !== "string") {
+    if (typeof m.toPartialPath !== "function") {
+      throw new MinitestAssertion("model must respond to toPartialPath");
+    }
+    if (typeof m.toPartialPath() !== "string") {
       throw new MinitestAssertion("toPartialPath must return a string");
     }
   }
 
   type PersistedHost = { isPersisted(): boolean };
+  /** Mirrors `Lint::Tests#test_persisted?` (lint.rb:70-73). */
   export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
-    assertBoolean(model(input).isPersisted(), "isPersisted");
-  }
-
-  export function testErrors(model: { errors: { fullMessages: unknown[] } }): void {
-    const messages = model.errors.fullMessages;
-    if (!Array.isArray(messages)) {
-      throw new MinitestAssertion("errors.fullMessages must return an array");
+    const m = model(input);
+    if (typeof m.isPersisted !== "function") {
+      throw new MinitestAssertion("model must respond to isPersisted");
     }
+    assertBoolean(m.isPersisted(), "isPersisted");
   }
 
   type ModelNamingHost = {
     modelName: { human: () => string; singular: string; plural: string };
     constructor: { modelName?: { human: () => string; singular: string; plural: string } };
   };
+  /** Mirrors `Lint::Tests#test_model_naming` (lint.rb:81-91). */
   export function testModelNaming(model: ModelNamingHost): void {
-    const classModelName = model.constructor.modelName;
-    if (!classModelName) {
+    const modelName = model.constructor.modelName;
+    if (!modelName) {
       throw new MinitestAssertion("model.constructor.modelName must be defined");
     }
-    if (typeof classModelName.human() !== "string") {
+    if (typeof modelName.human() !== "string") {
       throw new MinitestAssertion("modelName.human must return a string");
     }
-    if (typeof classModelName.singular !== "string") {
+    if (typeof modelName.singular !== "string") {
       throw new MinitestAssertion("modelName.singular must return a string");
     }
-    if (typeof classModelName.plural !== "string") {
+    if (typeof modelName.plural !== "string") {
       throw new MinitestAssertion("modelName.plural must return a string");
     }
-    if (model.modelName !== classModelName) {
+    if (model.modelName !== modelName) {
       throw new MinitestAssertion("model.modelName must equal model.constructor.modelName");
     }
   }
 
   /**
-   * Trails uses `errors.get(name)` rather than Ruby's `errors[:name]`
-   * array-access syntax. Behavior matches Rails: must return an array
-   * (empty when no errors are present for the attribute).
+   * Mirrors `Lint::Tests#test_errors_aref` (lint.rb:102-105). Ruby's
+   * `errors[:hello]` is `Errors#[]`, an operator with no TS spelling; the
+   * method it forwards to (`messages_for`, errors.rb:229-231) is the port's
+   * name for it.
    */
-  export function testErrorsAref(model: { errors: { get(attribute: string): string[] } }): void {
-    const result = model.errors.get("attribute");
-    if (!Array.isArray(result)) {
-      throw new MinitestAssertion("errors.get(attribute) must return an array");
+  export function testErrorsAref(model: {
+    errors: { messagesFor(attribute: string): string[] };
+  }): void {
+    const result = model.errors.messagesFor("hello");
+    if (!Array.isArray(result) || result.length !== 0) {
+      throw new MinitestAssertion("errors#[] should return an empty Array");
     }
   }
-}
-
-/**
- * Temporarily replace a method on `target` with `fn` for the duration of `body`.
- * Restores the original property descriptor in a `finally`.
- *
- * @internal Rails-private helper — mirrors `def model.foo() ... end` patches in lint.rb.
- */
-function withPatched<T extends object, K extends keyof T>(
-  target: T,
-  key: K,
-  fn: T[K],
-  body: () => void,
-): void {
-  const original = Object.getOwnPropertyDescriptor(target, key);
-  Object.defineProperty(target, key, {
-    value: fn,
-    configurable: true,
-    writable: true,
-  });
-  try {
-    body();
-  } finally {
-    if (original) {
-      Object.defineProperty(target, key, original);
-    } else {
-      delete (target as Record<PropertyKey, unknown>)[key as PropertyKey];
-    }
-  }
-}
-
-/** @internal Rails-private helper. */
-function withPatchedPersistedFalse(target: { isPersisted(): boolean }, body: () => void): void {
-  withPatched(target, "isPersisted", () => false, body);
 }
 
 export const {
@@ -204,7 +160,6 @@ export const {
   testToParam,
   testToPartialPath,
   testPersisted,
-  testErrors,
   testModelNaming,
   testErrorsAref,
 } = Tests;

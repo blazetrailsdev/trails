@@ -390,13 +390,13 @@ describe("NumericalityValidationTest", () => {
     let topic = new Topic({ title: "numeric test", approved: 10 });
 
     assertNotPredicate(await topic.isValid(), (valid) => valid);
-    expect(topic.errors.get("approved")).toEqual(["smaller than 4"]);
+    expect(topic.errors.messagesFor("approved")).toEqual(["smaller than 4"]);
 
     Topic.validatesNumericalityOf("approved", { greaterThan: 4, message: "greater than %{count}" });
     topic = new Topic({ title: "numeric test", approved: 1 });
 
     assertNotPredicate(await topic.isValid(), (valid) => valid);
-    expect(topic.errors.get("approved")).toEqual(["greater than 4"]);
+    expect(topic.errors.messagesFor("approved")).toEqual(["greater than 4"]);
   });
 
   it("validates numericality of for ruby class", async () => {
@@ -407,7 +407,7 @@ describe("NumericalityValidationTest", () => {
       p.karma = "Pix";
       assertPredicate(await p.isInvalid(), (invalid) => invalid);
 
-      expect(p.errors.get("karma")).toEqual(["is not a number"]);
+      expect(p.errors.messagesFor("karma")).toEqual(["is not a number"]);
 
       p.karma = "1234";
       assertPredicate(await p.isValid(), (valid) => valid);
@@ -484,11 +484,11 @@ describe("NumericalityValidationTest", () => {
         `${value} not rejected as a number`,
       );
       assertPredicate(
-        topic.errors.get("approved"),
+        topic.errors.messagesFor("approved"),
         (errors) => errors.length > 0,
         `FAILED for ${value}`,
       );
-      if (error) expect(topic.errors.get("approved")[0]).toEqual(error);
+      if (error) expect(topic.errors.messagesFor("approved")[0]).toEqual(error);
     });
   }
 
@@ -497,7 +497,7 @@ describe("NumericalityValidationTest", () => {
       assertPredicate(
         await topic.isValid(),
         (valid) => valid,
-        `${value} not accepted as a number with validation error: ${topic.errors.get("approved")[0]}`,
+        `${value} not accepted as a number with validation error: ${topic.errors.messagesFor("approved")[0]}`,
       );
     });
   }

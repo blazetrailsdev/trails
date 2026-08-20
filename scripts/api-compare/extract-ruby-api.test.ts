@@ -1001,6 +1001,26 @@ describe("Ruby extractor alias arity resolution", () => {
     });
     expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
   });
+
+  // Forwardable's `def_delegators :@errors, :each, …` (activemodel errors.rb:103)
+  // is the other generated-forwarding form. The accessor is the leading ivar
+  // symbol and is NOT a generated method; every symbol after it is.
+  it("records each `def_delegators` symbol after the ivar accessor", () => {
+    const r = aliasParams({
+      "e.rb": `
+        module Pkg
+          class Errors
+            extend Forwardable
+            def_delegators :@errors, :each, :clear, :empty?, :size, :uniq!
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Errors#each"]).toMatchObject({ params: [], notes: "delegate" });
+    expect(r["Pkg::Errors#uniq!"]).toMatchObject({ params: [], notes: "delegate" });
+    expect(r["Pkg::Errors#empty?"]).toMatchObject({ params: [], notes: "delegate" });
+    expect(r["Pkg::Errors#@errors"]).toBeUndefined();
+  });
 });
 
 describe("Ruby extractor umbrella module-config scanning", () => {

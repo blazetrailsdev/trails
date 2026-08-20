@@ -56,7 +56,7 @@ describe("ConfirmationValidationTest", () => {
     }
     const p = new Person({ title: "A", titleConfirmation: "B" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("titleConfirmation")).toContain("doesn't match Title");
+    expect(p.errors.messagesFor("titleConfirmation")).toContain("doesn't match Title");
   });
 
   it("title confirmation", async () => {
@@ -113,7 +113,7 @@ describe("ConfirmationValidationTest", () => {
     const p = new Person({ title: "We the People" });
     p._attributes.set("titleConfirmation", "We the Robots");
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("titleConfirmation")[0]).toBe("doesn't match Custom Title");
+    expect(p.errors.messagesFor("titleConfirmation")[0]).toBe("doesn't match Custom Title");
     resetI18n();
   });
 
@@ -131,7 +131,7 @@ describe("ConfirmationValidationTest", () => {
     );
     const p = new Person({ email: "a@b.com", emailConfirmation: "x@y.com" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("emailConfirmation")).toContain("doesn't match Email");
+    expect(p.errors.messagesFor("emailConfirmation")).toContain("doesn't match Email");
   });
 
   it("setup! does not override explicitly declared confirmation attribute", () => {
@@ -196,7 +196,7 @@ describe("confirmation options pass-through", () => {
     const u = new User({ title: "alice" });
     u._attributes.set("titleConfirmation", "bob");
     await u.isValid();
-    expect(u.errors.get("titleConfirmation")).toContain("must match original");
+    expect(u.errors.messagesFor("titleConfirmation")).toContain("must match original");
   });
 
   it("reserved key caseSensitive does not appear in error options", async () => {

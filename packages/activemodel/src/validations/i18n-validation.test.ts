@@ -257,7 +257,7 @@ describe("I18nValidationTest", () => {
     const p = new Person({ title: "A" });
     p._attributes.set("titleConfirmation", "B");
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("titleConfirmation")[0]).toMatch(/doesn't match/);
+    expect(p.errors.messagesFor("titleConfirmation")[0]).toMatch(/doesn't match/);
   });
 
   it("validates_acceptance_of on generated message", async () => {
@@ -269,7 +269,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ terms: "no" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("terms")).toContain("must be accepted");
+    expect(p.errors.messagesFor("terms")).toContain("must be accepted");
   });
 
   it("validates_presence_of on generated message", async () => {
@@ -281,7 +281,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("can't be blank");
+    expect(p.errors.messagesFor("name")).toContain("can't be blank");
   });
 
   it("validates_length_of for :within on generated message when too short", async () => {
@@ -293,7 +293,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "ab" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")[0]).toMatch(/is too short/);
+    expect(p.errors.messagesFor("name")[0]).toMatch(/is too short/);
   });
 
   it("validates_length_of for :too_long generated message", async () => {
@@ -305,7 +305,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "toolong" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")[0]).toMatch(/is too long/);
+    expect(p.errors.messagesFor("name")[0]).toMatch(/is too long/);
   });
 
   it("validates_length_of for :is on generated message", async () => {
@@ -317,7 +317,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "ab" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")[0]).toMatch(/is the wrong length/);
+    expect(p.errors.messagesFor("name")[0]).toMatch(/is the wrong length/);
   });
 
   it("validates_format_of on generated message", async () => {
@@ -329,7 +329,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ email: "invalid" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("email")).toContain("is invalid");
+    expect(p.errors.messagesFor("email")).toContain("is invalid");
   });
 
   it("validates_inclusion_of on generated message", async () => {
@@ -341,7 +341,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ role: "other" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("role")).toContain("is not included in the list");
+    expect(p.errors.messagesFor("role")).toContain("is not included in the list");
   });
 
   it("validates_inclusion_of using :within on generated message", async () => {
@@ -353,7 +353,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ role: "hacker" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("role")).toContain("is not included in the list");
+    expect(p.errors.messagesFor("role")).toContain("is not included in the list");
   });
 
   it("validates_exclusion_of generated message", async () => {
@@ -365,7 +365,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ username: "admin" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("username")).toContain("is reserved");
+    expect(p.errors.messagesFor("username")).toContain("is reserved");
   });
 
   it("validates_exclusion_of using :within generated message", async () => {
@@ -377,7 +377,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ username: "root" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("username")).toContain("is reserved");
+    expect(p.errors.messagesFor("username")).toContain("is reserved");
   });
 
   it("validates_numericality_of generated message", async () => {
@@ -389,7 +389,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ age: "abc" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("is not a number");
+    expect(p.errors.messagesFor("age")).toContain("is not a number");
   });
 
   it("validates_numericality_of for :only_integer on generated message", async () => {
@@ -401,7 +401,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ age: "1.5" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("must be an integer");
+    expect(p.errors.messagesFor("age")).toContain("must be an integer");
   });
 
   it("validates_numericality_of for :odd on generated message", async () => {
@@ -413,7 +413,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ count: "4" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("count")).toContain("must be odd");
+    expect(p.errors.messagesFor("count")).toContain("must be odd");
   });
 
   it("validates_numericality_of for :less_than on generated message", async () => {
@@ -425,7 +425,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ age: "15" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("must be less than 10");
+    expect(p.errors.messagesFor("age")).toContain("must be less than 10");
   });
 
   it("finds custom model key translation when", async () => {
@@ -452,7 +452,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("is required");
+    expect(p.errors.messagesFor("name")).toContain("is required");
   });
 
   it("finds custom model key translation with interpolation when", async () => {
@@ -479,7 +479,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "ab" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("must be at least 5 chars");
+    expect(p.errors.messagesFor("name")).toContain("must be at least 5 chars");
   });
 
   it("finds global default key translation when", async () => {
@@ -491,7 +491,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("can't be blank");
+    expect(p.errors.messagesFor("name")).toContain("can't be blank");
   });
 
   it("validations with message symbol must translate", () => {
@@ -511,7 +511,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({});
     p.errors.add("name", ":custom_blank");
-    expect(p.errors.get("name")).toContain("must not be empty");
+    expect(p.errors.messagesFor("name")).toContain("must not be empty");
   });
 
   it("validates with message symbol must translate per attribute", async () => {
@@ -538,7 +538,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("name is required");
+    expect(p.errors.messagesFor("name")).toContain("name is required");
   });
 
   it("validates with message symbol must translate per model", async () => {
@@ -561,7 +561,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("person field required");
+    expect(p.errors.messagesFor("name")).toContain("person field required");
   });
 
   it("validates with message string", async () => {
@@ -573,6 +573,6 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ name: "" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toContain("custom required");
+    expect(p.errors.messagesFor("name")).toContain("custom required");
   });
 });

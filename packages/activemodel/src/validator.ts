@@ -8,75 +8,6 @@ export interface ValidatableRecord<TBase extends object = object> {
 }
 
 /**
- * Universal validator control keys recognised by `validates(...)`.
- * Shared by `_validatesDefaultKeys` and `filteredErrorOptions`.
- */
-export const VALIDATOR_DEFAULT_KEYS = [
-  "if",
-  "unless",
-  "on",
-  "allowBlank",
-  "allowNil",
-  "strict",
-  "exceptOn",
-] as const;
-
-/**
- * Subset of `VALIDATOR_DEFAULT_KEYS` that must NOT be forwarded to
- * `errors.add`. `strict` is intentionally absent — `errors.add` reads it
- * to raise `StrictValidationFailed`, mirroring Rails errors.rb:342-354.
- */
-const FILTER_FROM_ERROR_OPTIONS = VALIDATOR_DEFAULT_KEYS.filter(
-  (k) => k !== "strict",
-) as readonly string[];
-
-export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
-
-export interface ConditionalOptions {
-  if?: ConditionFn | ConditionFn[];
-  unless?: ConditionFn | ConditionFn[];
-  /**
-   * Validation context(s) under which this condition fires — a single
-   * context name or an array. Mirrors Rails `on:` which accepts
-   * `Symbol | Array<Symbol>` and intersects with the model's current
-   * `validation_context` via `predicate_for_validation_context`
-   * (activemodel/lib/active_model/validations.rb:294-306).
-   */
-  on?: string | string[];
-  /**
-   * Validation context(s) under which this condition is *skipped* — the inverse of
-   * `on:`. Mirrors Rails `except_on:` (validations.rb:175-182).
-   */
-  exceptOn?: string | string[];
-  /** Register ahead of the already-registered validate callbacks. */
-  prepend?: boolean;
-}
-
-export function evaluateCondition(record: ValidatableRecord, cond: ConditionFn): boolean {
-  if (typeof cond === "function") return cond(record);
-  const rec = record as unknown as Record<string, unknown>;
-  const method = rec[cond];
-  if (typeof method === "function") return (method as () => boolean).call(record);
-  return !!rec[cond];
-}
-
-export function shouldValidate(record: ValidatableRecord, options: ConditionalOptions): boolean {
-  if (options.if !== undefined) {
-    const conds = Array.isArray(options.if) ? options.if : [options.if];
-    for (const cond of conds) {
-      if (!evaluateCondition(record, cond)) return false;
-    }
-  }
-  if (options.unless !== undefined) {
-    const conds = Array.isArray(options.unless) ? options.unless : [options.unless];
-    for (const cond of conds) {
-      if (evaluateCondition(record, cond)) return false;
-    }
-  }
-  return true;
-}
-
-/**
  * Base validator class. Subclasses must implement validate().
  *
  * Mirrors: ActiveModel::Validator
@@ -119,7 +50,7 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     if (this.attributes.length === 0 || this.attributes.some((attr) => isBlank(attr))) {
       throw new ArgumentError(":attributes cannot be blank");
     }
-    this.checkValidity();
+    this.checkValidityBang();
   }
 
   async validate(record: ValidatableRecord<TBase>): Promise<void> {
@@ -143,9 +74,12 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     );
   }
 
-  checkValidityBang(): void {
-    this.checkValidity();
-  }
+  /**
+   * Hook method that gets called by the initializer allowing verification
+   * that the arguments supplied are valid. Mirrors
+   * `EachValidator#check_validity!` (validator.rb:167-168).
+   */
+  checkValidityBang(): void {}
 
   /**
    * Mirrors: ActiveModel::EachValidator#prepare_value_for_validation
@@ -182,29 +116,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
       return (rec.readAttribute as (a: string) => unknown)(attribute);
     }
     return rec[attribute];
-  }
-
-  /**
-   * Returns `this.options` minus universal validator control keys and any
-   * additional validator-specific reserved keys, for forwarding to
-   * `errors.add` as i18n interpolation variables.
-   *
-   * Mirrors the `options.except(*RESERVED_OPTIONS)` pattern used in Rails
-   * validators (e.g. acceptance.rb:31, confirmation.rb:19).
-   *
-   * @internal Rails-private helper.
-   */
-  filteredErrorOptions(additionalReserved: string[] = []): Record<string, unknown> {
-    const reserved = new Set([...FILTER_FROM_ERROR_OPTIONS, ...additionalReserved]);
-    const filtered: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(this.options)) {
-      if (!reserved.has(key)) filtered[key] = val;
-    }
-    return filtered;
-  }
-
-  checkValidity(): void {
-    // Override in subclasses to validate options
   }
 }
 

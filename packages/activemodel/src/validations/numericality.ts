@@ -26,7 +26,7 @@ export class NumericalityValidator extends EachValidator {
 
   // Coercion-pipeline privates declared here, attached to the prototype
   // below so they're available during EachValidator's super-time
-  // checkValidity() call (same bootstrapping pattern as PRs #994 / #1002 /
+  // checkValidityBang() call (same bootstrapping pattern as PRs #994 / #1002 /
   // #1009). Class fields don't initialize until after super() returns.
   /** @internal Rails-private helper. */
   declare optionAsNumber: typeof optionAsNumber;
@@ -48,6 +48,27 @@ export class NumericalityValidator extends EachValidator {
   declare prepareValueForValidation: typeof prepareValueForValidation;
   /** @internal Rails-private helper. */
   declare isRecordAttributeChangedInPlace: typeof isRecordAttributeChangedInPlace;
+
+  override checkValidityBang(): void {
+    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+      const value = this.options[option];
+      if (value === undefined) continue;
+      // Rails: unless value.is_a?(Numeric) || value.is_a?(Proc) || value.is_a?(Symbol).
+      // A trails Symbol is a colon-prefixed string, which is what separates
+      // `":maxApproved"` (send it) from `"foo"` (a String — Rails rejects it).
+      if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
+        throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
+      }
+    }
+
+    for (const option of Object.keys(RANGE_CHECKS)) {
+      const value = this.options[option];
+      if (value === undefined) continue;
+      if (!(value instanceof Range)) {
+        throw new ArgumentError(`:${option} must be a range`);
+      }
+    }
+  }
 
   validateEach(
     record: ValidatableRecord,
@@ -111,27 +132,6 @@ export class NumericalityValidator extends EachValidator {
         if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
           record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
         }
-      }
-    }
-  }
-
-  override checkValidity(): void {
-    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
-      const value = this.options[option];
-      if (value === undefined) continue;
-      // Rails: unless value.is_a?(Numeric) || value.is_a?(Proc) || value.is_a?(Symbol).
-      // A trails Symbol is a colon-prefixed string, which is what separates
-      // `":maxApproved"` (send it) from `"foo"` (a String — Rails rejects it).
-      if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
-        throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
-      }
-    }
-
-    for (const option of Object.keys(RANGE_CHECKS)) {
-      const value = this.options[option];
-      if (value === undefined) continue;
-      if (!(value instanceof Range)) {
-        throw new ArgumentError(`:${option} must be a range`);
       }
     }
   }

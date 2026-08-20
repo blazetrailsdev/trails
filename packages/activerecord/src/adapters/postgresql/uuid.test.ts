@@ -648,7 +648,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const r2 = new UuidUniq({ guid: uuid });
         const saved = await r2.save();
         expect(saved).toBe(false);
-        expect(r2.errors.on("guid")).toBeTruthy();
+        expect(r2.errors.messagesFor("guid")).toBeTruthy();
 
         // Different UUID — should save fine.
         const r3 = new UuidUniq({ guid: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" });

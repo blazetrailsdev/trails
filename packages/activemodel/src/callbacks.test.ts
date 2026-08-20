@@ -657,7 +657,7 @@ describe("unified sync/async runner", () => {
     expect(result).toBeInstanceOf(Promise);
     expect(await result).toBe(false);
     expect(seen).toEqual(["test"]);
-    expect(p.errors.get("name")).toEqual(["is remote-invalid"]);
+    expect(p.errors.messagesFor("name")).toEqual(["is remote-invalid"]);
   });
 
   it("async validator method registered via Model.validate runs and awaits", async () => {
@@ -673,7 +673,7 @@ describe("unified sync/async runner", () => {
     }
     const p = new Person({ name: "test" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["failed remote check"]);
+    expect(p.errors.messagesFor("name")).toEqual(["failed remote check"]);
   });
 
   it("async validator registered via validatesWith runs and awaits", async () => {
@@ -691,7 +691,7 @@ describe("unified sync/async runner", () => {
     }
     const p = new Person({ name: "test" });
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["async validatesWith"]);
+    expect(p.errors.messagesFor("name")).toEqual(["async validatesWith"]);
   });
 
   it("an async before_validation callback that halts is awaited", async () => {
@@ -937,7 +937,7 @@ describe("Callbacks (extended)", () => {
     expect(await new WithMethod({ value: 1 }).isValid()).toBe(true);
     const w = new WithMethod({ value: 0 });
     expect(await w.isValid()).toBe(false);
-    expect(w.errors.get("value")).toContain("cannot be zero");
+    expect(w.errors.messagesFor("value")).toContain("cannot be zero");
   });
 });
 
@@ -1042,8 +1042,8 @@ describe("withOptions()", () => {
     const user = new User();
     expect(await user.isValid()).toBe(true);
     expect(await user.isValid("create")).toBe(false);
-    expect(user.errors.on("name")).toContain("can't be blank");
-    expect(user.errors.on("email")).toContain("can't be blank");
+    expect(user.errors.messagesFor("name")).toContain("can't be blank");
+    expect(user.errors.messagesFor("email")).toContain("can't be blank");
   });
 });
 

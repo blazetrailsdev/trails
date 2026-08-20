@@ -186,7 +186,7 @@ describe("ValidatesTest", () => {
     }
     const p = new Person();
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["must be present"]);
+    expect(p.errors.messagesFor("name")).toEqual(["must be present"]);
   });
 
   it("validates with namespaced validator class", async () => {
@@ -207,7 +207,7 @@ describe("ValidatesTest", () => {
     }
     const p = new Person();
     expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["is required"]);
+    expect(p.errors.messagesFor("name")).toEqual(["is required"]);
   });
 
   it("validates with unknown validator", async () => {

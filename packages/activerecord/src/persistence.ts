@@ -1699,10 +1699,10 @@ export function becomes<
       becoming._dirty = this._dirty;
       // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
       // errors across the class swap. Noop if the errors object doesn't expose
-      // a `copy` method (defensive for hosts that stub errors differently).
-      const targetErrors = becoming.errors as { copy?(other: unknown): void };
-      if (typeof targetErrors.copy === "function") {
-        targetErrors.copy(this.errors);
+      // a `copy!` method (defensive for hosts that stub errors differently).
+      const targetErrors = becoming.errors as { copyBang?(other: unknown): void };
+      if (typeof targetErrors.copyBang === "function") {
+        targetErrors.copyBang(this.errors);
       }
     }) as InstanceType<K>;
   } finally {

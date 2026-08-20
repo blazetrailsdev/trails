@@ -36,7 +36,7 @@ export interface HelperMethods {
 export class AbsenceValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!isBlank(value)) {
-      record.errors.add(attribute, ":present", this.filteredErrorOptions());
+      record.errors.add(attribute, ":present", this.options);
     }
   }
 }

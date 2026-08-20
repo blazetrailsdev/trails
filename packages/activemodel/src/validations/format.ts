@@ -23,7 +23,7 @@ import { resolveValue } from "./resolve-value.js";
 export class FormatValidator extends EachValidator {
   // Declarations only — actual functions attached to the prototype below.
   // Prototype attachment (not class fields) so the helpers are present
-  // during EachValidator's constructor-time checkValidity() call. JS class
+  // during EachValidator's constructor-time checkValidityBang() call. JS class
   // fields don't initialize until AFTER super() returns. (Same bootstrapping
   // lesson as PR #994.)
   declare resolveValue: typeof resolveValue;
@@ -53,7 +53,7 @@ export class FormatValidator extends EachValidator {
     }
   }
 
-  override checkValidity(): void {
+  override checkValidityBang(): void {
     // Rails: `unless options.include?(:with) ^ options.include?(:without)`
     // — Hash#include? checks own keys only; use Object.hasOwn to avoid
     // prototype-chain surprises (the `in` operator would include inherited).

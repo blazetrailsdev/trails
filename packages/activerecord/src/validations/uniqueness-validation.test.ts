@@ -163,7 +163,7 @@ describe("UniquenessValidationTest", () => {
     const t2 = new Topic({ title: "I'm uniqué!" });
     expect(await t2.isValid()).toBe(false);
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title")).toEqual(["has already been taken"]);
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
 
     t2.writeAttribute("title", "Now I am really also unique");
     expect(await t2.save()).toBe(true);
@@ -199,7 +199,7 @@ describe("UniquenessValidationTest", () => {
     // collides with the first via `title IS NULL`.
     const t2 = new Topic({ title: null });
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title")).toEqual(["has already been taken"]);
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
   });
 
   it("validates uniqueness with validates", async () => {
@@ -208,17 +208,17 @@ describe("UniquenessValidationTest", () => {
 
     const t2 = new Topic({ title: "abc" });
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title")).toBeTruthy();
+    expect(t2.errors.messagesFor("title")).toBeTruthy();
   });
 
   it("validate uniqueness when integer out of range", async () => {
     const entry = await BigIntTest.create({ engines_count: INT_MAX_VALUE + 1 });
-    expect(entry.errors.get("engines_count")).toEqual(["is not included in the list"]);
+    expect(entry.errors.messagesFor("engines_count")).toEqual(["is not included in the list"]);
   });
 
   it("validate uniqueness when integer out of range show order does not matter", async () => {
     const entry = await BigIntReverseTest.create({ engines_count: INT_MAX_VALUE + 1 });
-    expect(entry.errors.get("engines_count")).toEqual(["is not included in the list"]);
+    expect(entry.errors.messagesFor("engines_count")).toEqual(["is not included in the list"]);
   });
 
   it("validates uniqueness with newline chars", async () => {
@@ -421,14 +421,14 @@ describe("UniquenessValidationTest", () => {
     // fixture topics(:second) has parent_id 1, so parent_id collides too.
     const t2 = new Topic({ title: "I'm UNIQUE!", parent_id: 1 });
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title").length).toBeGreaterThan(0);
-    expect(t2.errors.get("parent_id").length).toBeGreaterThan(0);
-    expect(t2.errors.get("title")).toEqual(["has already been taken"]);
+    expect(t2.errors.messagesFor("title").length).toBeGreaterThan(0);
+    expect(t2.errors.messagesFor("parent_id").length).toBeGreaterThan(0);
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
 
     t2.writeAttribute("title", "I'm truly UNIQUE!");
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title")).toEqual([]);
-    expect(t2.errors.get("parent_id").length).toBeGreaterThan(0);
+    expect(t2.errors.messagesFor("title")).toEqual([]);
+    expect(t2.errors.messagesFor("parent_id").length).toBeGreaterThan(0);
 
     t2.writeAttribute("parent_id", 4);
     expect(await t2.save()).toBe(true);
@@ -463,13 +463,13 @@ describe("UniquenessValidationTest", () => {
     // Fixture topics(:first): title "The First Topic", author_name "David".
     const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
     expect(await collideTitle.save()).toBe(false);
-    expect(collideTitle.errors.get("title")).toEqual(["has already been taken"]);
-    expect(collideTitle.errors.get("author_name")).toEqual([]);
+    expect(collideTitle.errors.messagesFor("title")).toEqual(["has already been taken"]);
+    expect(collideTitle.errors.messagesFor("author_name")).toEqual([]);
 
     const collideAuthor = new Topic({ title: "A Brand New Title", author_name: "David" });
     expect(await collideAuthor.save()).toBe(false);
-    expect(collideAuthor.errors.get("author_name")).toEqual(["has already been taken"]);
-    expect(collideAuthor.errors.get("title")).toEqual([]);
+    expect(collideAuthor.errors.messagesFor("author_name")).toEqual(["has already been taken"]);
+    expect(collideAuthor.errors.messagesFor("title")).toEqual([]);
 
     const unique = new Topic({ title: "A Brand New Title", author_name: "Nobody In Fixtures" });
     expect(await unique.save()).toBe(true);
@@ -523,11 +523,11 @@ describe("UniquenessValidationTest", () => {
 
     const t2 = new Topic({ title: "I'M UNIQUE!" });
     expect(await t2.save()).toBe(true);
-    expect(t2.errors.get("title")).toEqual([]);
+    expect(t2.errors.messagesFor("title")).toEqual([]);
 
     const t3 = new Topic({ title: "I'M uNiQUe!" });
     expect(await t3.save()).toBe(true);
-    expect(t3.errors.get("title")).toEqual([]);
+    expect(t3.errors.messagesFor("title")).toEqual([]);
   });
 
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
@@ -536,13 +536,13 @@ describe("UniquenessValidationTest", () => {
 
     const t2 = new Topic({ title: 101 as any });
     expect(await t2.save()).toBe(false);
-    expect(t2.errors.get("title")).toBeTruthy();
+    expect(t2.errors.messagesFor("title")).toBeTruthy();
   });
 
   it("validate uniqueness with non standard table names", async () => {
     const i1 = await WarehouseThing.create({ value: 1000 });
     expect(i1.isPersisted()).toBe(false);
-    expect(i1.errors.get("value").length).toBeGreaterThan(0);
+    expect(i1.errors.messagesFor("value").length).toBeGreaterThan(0);
   });
 
   it("validates uniqueness inside scoping", async () => {
@@ -601,22 +601,22 @@ describe("UniquenessValidationTest", () => {
     // Uses validation from the (abstract) base class.
     const w2 = new IneptWizard({ name: "Rincewind", city: "Quirm" });
     expect(await w2.save()).toBe(false);
-    expect(w2.errors.get("name")).toEqual(["has already been taken"]);
+    expect(w2.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w3 = new Conjurer({ name: "Rincewind", city: "Quirm" });
     expect(await w3.save()).toBe(false);
-    expect(w3.errors.get("name")).toEqual(["has already been taken"]);
+    expect(w3.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w4 = await Conjurer.create({ name: "The Amazing Bonko", city: "Quirm" });
     expect(w4.isPersisted()).toBe(true);
 
     const w5 = new Thaumaturgist({ name: "The Amazing Bonko", city: "Lancre" });
     expect(await w5.save()).toBe(false);
-    expect(w5.errors.get("name")).toEqual(["has already been taken"]);
+    expect(w5.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w6 = new Thaumaturgist({ name: "Mustrum Ridcully", city: "Quirm" });
     expect(await w6.save()).toBe(false);
-    expect(w6.errors.get("city")).toEqual(["has already been taken"]);
+    expect(w6.errors.messagesFor("city")).toEqual(["has already been taken"]);
   });
 
   it("validate uniqueness with conditions", async () => {
@@ -669,7 +669,7 @@ describe("UniquenessValidationTest", () => {
 
     const topic = new TopicWithUniqEvent({ parent_id: (event as any).id });
     expect(await topic.save()).toBe(false);
-    expect(topic.errors.get("event")).toEqual(["has already been taken"]);
+    expect(topic.errors.messagesFor("event")).toEqual(["has already been taken"]);
   });
 
   it("validate uniqueness on empty relation", async () => {
@@ -724,7 +724,7 @@ describe("UniquenessValidationTest", () => {
 
       const topic2 = new TopicWithAfterCreate({ title: "Title1" });
       expect(await topic2.save()).toBe(false);
-      expect(topic2.errors.get("title")).toEqual(["has already been taken"]);
+      expect(topic2.errors.messagesFor("title")).toEqual(["has already been taken"]);
     } finally {
       TopicWithAfterCreate.clearValidatorsBang();
     }
@@ -740,7 +740,7 @@ describe("UniquenessValidationTest", () => {
 
     const item2 = new CoolTopic({ id: (item as { id: number }).id, title: "MyItem2" });
     expect(await item2.save()).toBe(false);
-    expect(item2.errors.get("id")).toEqual(["has already been taken"]);
+    expect(item2.errors.messagesFor("id")).toEqual(["has already been taken"]);
   });
 });
 
@@ -919,7 +919,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const another = new LessonWithUniqKeyboard({ name: "Keyboard #1" });
     expect(await another.isValid()).toBe(false);
-    expect(another.errors.get("keyboard")).toEqual(["has already been taken"]);
+    expect(another.errors.messagesFor("keyboard")).toEqual(["has already been taken"]);
   });
 
   it("index of sublist of columns", async () => {

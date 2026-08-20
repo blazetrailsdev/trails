@@ -113,7 +113,7 @@ describe("FormatValidationTest", () => {
     }
     const p = new Person({ title: "hello" });
     await p.isValid();
-    expect(p.errors.get("title")).toContain("must start with uppercase");
+    expect(p.errors.messagesFor("title")).toContain("must start with uppercase");
   });
 
   it("validate format with allow blank", async () => {
@@ -219,7 +219,7 @@ describe("format with 'without' option", () => {
   it("rejects values matching 'without'", async () => {
     const n = new NoNumbers({ name: "dean123" });
     expect(await n.isValid()).toBe(false);
-    expect(n.errors.get("name")).toContain("is invalid");
+    expect(n.errors.messagesFor("name")).toContain("is invalid");
   });
 
   it("validate format does not mutate regex lastIndex across calls (g flag)", async () => {

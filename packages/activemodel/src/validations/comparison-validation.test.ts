@@ -392,11 +392,11 @@ describe("ComparisonValidationTest", () => {
     await withEachTopicApprovedValue(values, async (topic, value) => {
       assertPredicate(await topic.isInvalid(), (invalid) => invalid, `${value} failed comparison`);
       assertPredicate(
-        topic.errors.get("approved"),
+        topic.errors.messagesFor("approved"),
         (errors) => errors.length > 0,
         `FAILED for ${value}`,
       );
-      if (error) expect(topic.errors.get("approved")[0]).toEqual(error);
+      if (error) expect(topic.errors.messagesFor("approved")[0]).toEqual(error);
     });
   }
 
@@ -405,7 +405,7 @@ describe("ComparisonValidationTest", () => {
       assertPredicate(
         await topic.isValid(),
         (valid) => valid,
-        `${value} failed comparison with validation error: ${topic.errors.get("approved")[0]}`,
+        `${value} failed comparison with validation error: ${topic.errors.messagesFor("approved")[0]}`,
       );
     });
   }

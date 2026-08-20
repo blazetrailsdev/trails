@@ -21,7 +21,7 @@ describe("ValidationsTest (trails)", () => {
     it("rejects null", async () => {
       const a = new Article();
       expect(await a.isValid()).toBe(false);
-      expect(a.errors.get("title")).toContain("can't be blank");
+      expect(a.errors.messagesFor("title")).toContain("can't be blank");
     });
 
     it("rejects empty string", async () => {
@@ -60,7 +60,7 @@ describe("ValidationsTest (trails)", () => {
     it("rejects a value", async () => {
       const b = new Blank({ name: "dean" });
       expect(await b.isValid()).toBe(false);
-      expect(b.errors.get("name")).toContain("must be blank");
+      expect(b.errors.messagesFor("name")).toContain("must be blank");
     });
   });
 
@@ -78,13 +78,13 @@ describe("ValidationsTest (trails)", () => {
     it("validates length of using minimum", async () => {
       const w = new WithLength({ name: "ab" });
       expect(await w.isValid()).toBe(false);
-      expect(w.errors.get("name")[0]).toMatch(/is too short/);
+      expect(w.errors.messagesFor("name")[0]).toMatch(/is too short/);
     });
 
     it("validates length of using maximum", async () => {
       const w = new WithLength({ name: "abcdefghijk" });
       expect(await w.isValid()).toBe(false);
-      expect(w.errors.get("name")[0]).toMatch(/is too long/);
+      expect(w.errors.messagesFor("name")[0]).toMatch(/is too long/);
     });
 
     it("validates length of using within", async () => {
@@ -138,7 +138,7 @@ describe("ValidationsTest (trails)", () => {
     it("rejects non-numeric strings", async () => {
       const n = new Numeric({ value: "not a number" });
       expect(await n.isValid()).toBe(false);
-      expect(n.errors.get("value")).toContain("is not a number");
+      expect(n.errors.messagesFor("value")).toContain("is not a number");
     });
 
     it("validates numericality of with nil allowed", async () => {
@@ -259,13 +259,13 @@ describe("ValidationsTest (trails)", () => {
     it("rejects values not in inclusion list", async () => {
       const c = new Colorful({ color: "yellow" });
       expect(await c.isValid()).toBe(false);
-      expect(c.errors.get("color")).toContain("is not included in the list");
+      expect(c.errors.messagesFor("color")).toContain("is not included in the list");
     });
 
     it("rejects values in exclusion list", async () => {
       const c = new Colorful({ color: "black" });
       expect(await c.isValid()).toBe(false);
-      expect(c.errors.get("color")).toContain("is reserved");
+      expect(c.errors.messagesFor("color")).toContain("is reserved");
     });
   });
 
@@ -287,7 +287,7 @@ describe("ValidationsTest (trails)", () => {
     it("rejects invalid email", async () => {
       const u = new EmailUser({ email: "invalid" });
       expect(await u.isValid()).toBe(false);
-      expect(u.errors.get("email")).toContain("is invalid");
+      expect(u.errors.messagesFor("email")).toContain("is invalid");
     });
   });
 
@@ -310,7 +310,7 @@ describe("ValidationsTest (trails)", () => {
     it("rejects mismatched password and confirmation", async () => {
       const s = new Signup({ password: "secret", passwordConfirmation: "wrong" });
       expect(await s.isValid()).toBe(false);
-      expect(s.errors.get("passwordConfirmation")).toContain("doesn't match Password");
+      expect(s.errors.messagesFor("passwordConfirmation")).toContain("doesn't match Password");
     });
   });
 
@@ -354,7 +354,7 @@ describe("ValidationsTest (trails)", () => {
       const second = new UniqueUser({ name: "alice" });
       expect(await first.isValid()).toBe(true);
       expect(await second.isValid()).toBe(false);
-      expect(second.errors.get("name")).toContain("has already been taken");
+      expect(second.errors.messagesFor("name")).toContain("has already been taken");
     });
   });
 
@@ -376,8 +376,8 @@ describe("ValidationsTest (trails)", () => {
     it("rejects invalid types", async () => {
       const m = new TypedModel({ age: "not a number", email: "" } as any);
       expect(await m.isValid()).toBe(false);
-      expect(m.errors.get("age").length).toBeGreaterThan(0);
-      expect(m.errors.get("email").length).toBeGreaterThan(0);
+      expect(m.errors.messagesFor("age").length).toBeGreaterThan(0);
+      expect(m.errors.messagesFor("email").length).toBeGreaterThan(0);
     });
   });
 
@@ -397,10 +397,10 @@ describe("ValidationsTest (trails)", () => {
     });
     const present = new Person({ first: "Al" });
     await present.isValid();
-    expect(present.errors.get("fullName")).not.toContain("gotcha");
+    expect(present.errors.messagesFor("fullName")).not.toContain("gotcha");
     const blank = new Person({ first: "" });
     await blank.isValid();
-    expect(blank.errors.get("fullName")).toContain("gotcha");
+    expect(blank.errors.messagesFor("fullName")).toContain("gotcha");
   });
 
   it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
@@ -963,7 +963,7 @@ describe("ValidationsTest (trails)", () => {
       it("rejects null", async () => {
         const a = new Article();
         expect(await a.isValid()).toBe(false);
-        expect(a.errors.get("title")).toContain("can't be blank");
+        expect(a.errors.messagesFor("title")).toContain("can't be blank");
       });
 
       it("rejects empty string", async () => {
@@ -1002,7 +1002,7 @@ describe("ValidationsTest (trails)", () => {
       it("rejects a value", async () => {
         const b = new Blank({ name: "dean" });
         expect(await b.isValid()).toBe(false);
-        expect(b.errors.get("name")).toContain("must be blank");
+        expect(b.errors.messagesFor("name")).toContain("must be blank");
       });
     });
 
@@ -1020,13 +1020,13 @@ describe("ValidationsTest (trails)", () => {
       it("validates length of using minimum", async () => {
         const w = new WithLength({ name: "ab" });
         expect(await w.isValid()).toBe(false);
-        expect(w.errors.get("name")[0]).toMatch(/is too short/);
+        expect(w.errors.messagesFor("name")[0]).toMatch(/is too short/);
       });
 
       it("validates length of using maximum", async () => {
         const w = new WithLength({ name: "abcdefghijk" });
         expect(await w.isValid()).toBe(false);
-        expect(w.errors.get("name")[0]).toMatch(/is too long/);
+        expect(w.errors.messagesFor("name")[0]).toMatch(/is too long/);
       });
 
       it("validates length of using within", async () => {
@@ -1080,7 +1080,7 @@ describe("ValidationsTest (trails)", () => {
       it("rejects non-numeric strings", async () => {
         const n = new Numeric({ value: "not a number" });
         expect(await n.isValid()).toBe(false);
-        expect(n.errors.get("value")).toContain("is not a number");
+        expect(n.errors.messagesFor("value")).toContain("is not a number");
       });
 
       it("validates numericality of with nil allowed", async () => {
@@ -1103,7 +1103,7 @@ describe("ValidationsTest (trails)", () => {
         expect(await new IntOnly({ count: "5" }).isValid()).toBe(true);
         const f = new IntOnly({ count: "5.5" });
         expect(await f.isValid()).toBe(false);
-        expect(f.errors.get("count")).toContain("must be an integer");
+        expect(f.errors.messagesFor("count")).toContain("must be an integer");
       });
 
       it("validates numericality with greater than", async () => {
@@ -1167,7 +1167,7 @@ describe("ValidationsTest (trails)", () => {
       it("rejects non-included values", async () => {
         const s = new Status({ status: "invalid" });
         expect(await s.isValid()).toBe(false);
-        expect(s.errors.get("status")).toContain("is not included in the list");
+        expect(s.errors.messagesFor("status")).toContain("is not included in the list");
       });
     });
 
@@ -1186,7 +1186,7 @@ describe("ValidationsTest (trails)", () => {
       it("validates exclusion of", async () => {
         const n = new NoAdmin({ role: "admin" });
         expect(await n.isValid()).toBe(false);
-        expect(n.errors.get("role")).toContain("is reserved");
+        expect(n.errors.messagesFor("role")).toContain("is reserved");
       });
     });
 
@@ -1206,7 +1206,7 @@ describe("ValidationsTest (trails)", () => {
       it("rejects non-matching format", async () => {
         const e = new Email({ email: "not-an-email" });
         expect(await e.isValid()).toBe(false);
-        expect(e.errors.get("email")).toContain("is invalid");
+        expect(e.errors.messagesFor("email")).toContain("is invalid");
       });
 
       it("skips null", async () => {
@@ -1289,7 +1289,7 @@ describe("ValidationsTest (trails)", () => {
           passwordConfirmation: "wrong",
         });
         expect(await w.isValid()).toBe(false);
-        expect(w.errors.get("passwordConfirmation")).toContain("doesn't match Password");
+        expect(w.errors.messagesFor("passwordConfirmation")).toContain("doesn't match Password");
       });
     });
 
@@ -1345,7 +1345,7 @@ describe("ValidationsTest (trails)", () => {
         expect(await new Custom({ value: 4 }).isValid()).toBe(true);
         const c = new Custom({ value: 3 });
         expect(await c.isValid()).toBe(false);
-        expect(c.errors.get("value")).toContain("must be even");
+        expect(c.errors.messagesFor("value")).toContain("must be even");
       });
     });
 
@@ -1413,7 +1413,7 @@ describe("ValidationsTest (trails)", () => {
       }
       const c = new Custom();
       await c.isValid();
-      expect(c.errors.get("name")).toContain("is required");
+      expect(c.errors.messagesFor("name")).toContain("is required");
     });
 
     it("length with custom tooShort and tooLong", async () => {
@@ -1427,11 +1427,11 @@ describe("ValidationsTest (trails)", () => {
       }
       const short = new Custom({ name: "ab" });
       await short.isValid();
-      expect(short.errors.get("name")).toContain("too few!");
+      expect(short.errors.messagesFor("name")).toContain("too few!");
 
       const long = new Custom({ name: "abcdef" });
       await long.isValid();
-      expect(long.errors.get("name")).toContain("too many!");
+      expect(long.errors.messagesFor("name")).toContain("too many!");
     });
   });
   describe("errors.fullMessagesFor()", () => {
@@ -1595,9 +1595,9 @@ describe("ValidationsTest (trails)", () => {
       const u1 = new User({});
       const u2 = new User({});
       u1.errors.add("name", ":blank");
-      u2.errors.merge(u1.errors);
+      u2.errors.mergeBang(u1.errors);
       expect(u2.errors.count).toBe(1);
-      expect(u2.errors.get("name")).toEqual(["can't be blank"]);
+      expect(u2.errors.messagesFor("name")).toEqual(["can't be blank"]);
     });
 
     it("to_hash returns the error messages hash", () => {
@@ -1724,8 +1724,8 @@ describe("ValidationsTest (trails)", () => {
       }
       const u = new User({});
       expect(await u.isValid()).toBe(false);
-      expect(u.errors.get("name").length).toBeGreaterThan(0);
-      expect(u.errors.get("email").length).toBeGreaterThan(0);
+      expect(u.errors.messagesFor("name").length).toBeGreaterThan(0);
+      expect(u.errors.messagesFor("email").length).toBeGreaterThan(0);
     });
 
     it("validates absence of", async () => {
@@ -1815,8 +1815,8 @@ describe("ValidationsTest (trails)", () => {
       }
       const t = new Topic({ title: "", content: "" });
       expect(await t.isValid()).toBe(false);
-      expect(t.errors.get("title").length).toBeGreaterThan(0);
-      expect(t.errors.get("content").length).toBeGreaterThan(0);
+      expect(t.errors.messagesFor("title").length).toBeGreaterThan(0);
+      expect(t.errors.messagesFor("content").length).toBeGreaterThan(0);
       expect(await new Topic({ title: "ok", content: "ok" }).isValid()).toBe(true);
     });
 

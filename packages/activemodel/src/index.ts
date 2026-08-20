@@ -6,7 +6,7 @@ export { Errors, StrictValidationFailed, UnknownAttributeError, RangeError } fro
 export { NestedError } from "./nested-error.js";
 export { ValidationError, ValidationContext } from "./validations.js";
 export type { ModelWithErrors } from "./validations.js";
-export { Validator, EachValidator, BlockValidator, shouldValidate } from "./validator.js";
+export { Validator, EachValidator, BlockValidator } from "./validator.js";
 export {
   MissingAttributeError,
   missingAttribute,

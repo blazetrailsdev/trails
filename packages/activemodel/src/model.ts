@@ -71,8 +71,9 @@ import {
   type SerializationRecord,
 } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
-import type { ConditionalOptions, ConditionFn, ValidatableRecord } from "./validator.js";
-import { evaluateCondition } from "./validator.js";
+import type { ValidatableRecord } from "./validator.js";
+import type { ConditionalOptions, ConditionFn } from "./validations.js";
+import { evaluateCondition } from "./validations.js";
 import {
   AttributeMethodPattern,
   attributeMethodPrefix,
@@ -832,7 +833,7 @@ export class Model {
         ? [rawExplicit]
         : null;
 
-    type ValidatorCheckable = { checkValidity?(): void; checkValidityBang?(): void };
+    type ValidatorCheckable = { checkValidityBang?(): void };
     for (const klass of args as Array<{
       new (
         options: Record<string, unknown>,
@@ -858,9 +859,7 @@ export class Model {
       // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
       const validator = new klass({ ...options, class: this });
       if (!(validator instanceof EachValidator)) {
-        if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
-          (validator as ValidatorCheckable).checkValidity!();
-        } else if (typeof (validator as ValidatorCheckable).checkValidityBang === "function") {
+        if (typeof (validator as ValidatorCheckable).checkValidityBang === "function") {
           (validator as ValidatorCheckable).checkValidityBang!();
         }
       }

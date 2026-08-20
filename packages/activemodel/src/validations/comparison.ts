@@ -26,6 +26,15 @@ export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
+  override checkValidityBang(): void {
+    if (!Object.keys(COMPARE_CHECKS).some((k) => this.options[k] !== undefined)) {
+      throw new ArgumentError(
+        "Expected one of :greater_than, :greater_than_or_equal_to, " +
+          ":equal_to, :less_than, :less_than_or_equal_to, or :other_than option to be supplied.",
+      );
+    }
+  }
+
   validateEach(record: ValidatableRecord, attrName: string, value: unknown): void {
     for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
       const rawOptionValue = this.options[option];
@@ -89,14 +98,5 @@ export class ComparisonValidator extends EachValidator {
     // boundary: comparison validator accepts Date pairs by Rails parity.
     if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
     throw new ArgumentError(comparisonFailed(a, b));
-  }
-
-  override checkValidity(): void {
-    if (!Object.keys(COMPARE_CHECKS).some((k) => this.options[k] !== undefined)) {
-      throw new ArgumentError(
-        "Expected one of :greater_than, :greater_than_or_equal_to, " +
-          ":equal_to, :less_than, :less_than_or_equal_to, or :other_than option to be supplied.",
-      );
-    }
   }
 }

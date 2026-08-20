@@ -31,14 +31,6 @@ describe("Lint::Tests", () => {
       };
       expect(() => testToKey(broken)).toThrow(/null when `isPersisted` returns false/);
     });
-
-    it("restores isPersisted after running", () => {
-      const fixture = buildKeyFixture();
-      const before = fixture.isPersisted;
-      testToKey(fixture);
-      expect(fixture.isPersisted).toBe(before);
-      expect(fixture.isPersisted()).toBe(true);
-    });
   });
 
   describe("testToParam", () => {
@@ -62,7 +54,6 @@ describe("Lint::Tests", () => {
         },
       };
       expect(() => testToParam(fixture)).not.toThrow();
-      expect(fixture.isPersisted()).toBe(true);
     });
 
     it("throws when toParam is non-null while unpersisted", () => {
@@ -95,13 +86,13 @@ describe("Lint::Tests", () => {
   });
 
   describe("testErrorsAref", () => {
-    it("passes when errors.get returns an array", () => {
-      expect(() => testErrorsAref({ errors: { get: () => [] } })).not.toThrow();
+    it("passes when errors.messagesFor returns an array", () => {
+      expect(() => testErrorsAref({ errors: { messagesFor: () => [] } })).not.toThrow();
     });
 
-    it("throws when errors.get returns a non-array", () => {
-      const broken = { errors: { get: () => "nope" as unknown as string[] } };
-      expect(() => testErrorsAref(broken)).toThrow(/must return an array/);
+    it("throws when errors.messagesFor returns a non-array", () => {
+      const broken = { errors: { messagesFor: () => "nope" as unknown as string[] } };
+      expect(() => testErrorsAref(broken)).toThrow(/should return an empty Array/);
     });
   });
 });

@@ -70,7 +70,7 @@ describe("PresenceValidationTest", () => {
     Boy.validatesPresenceOf("face");
     const b = new Boy();
     expect(await b.isInvalid()).toBe(true);
-    expect(b.errors.get("face").length).toBe(1);
+    expect(b.errors.messagesFor("face").length).toBe(1);
   });
 
   it("validates presence of has one marked for destruction", async () => {

@@ -30,7 +30,7 @@ export class ExclusionValidator extends EachValidator {
   // Declarations only — actual functions attached to the prototype below.
   // Prototype attachment (not class fields) so the Clusivity helpers are
   // available during super() / EachValidator's constructor-time
-  // checkValidity() call.
+  // checkValidityBang() call.
   declare resolveValue: typeof resolveValue;
   /** @internal */
   declare delimiter: typeof delimiter;
@@ -45,7 +45,7 @@ export class ExclusionValidator extends EachValidator {
     }
   }
 
-  override checkValidity(): void {
+  override checkValidityBang(): void {
     checkValidityBang.call(this);
   }
 }

@@ -19,7 +19,7 @@ describe("ErrorsTest", () => {
   it("add creates an error object and returns it", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    expect(e.get("name")).toContain("can't be blank");
+    expect(e.messagesFor("name")).toContain("can't be blank");
   });
 
   it("size calculates the number of error messages", () => {
@@ -76,7 +76,7 @@ describe("ErrorsTest", () => {
   it("custom message overrides default", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { message: "is required" });
-    expect(e.get("name")).toContain("is required");
+    expect(e.messagesFor("name")).toContain("is required");
   });
 
   it("message interpolation with %{count}", () => {
@@ -84,7 +84,7 @@ describe("ErrorsTest", () => {
     e.add("name", ":too_short", { count: 3 });
     // Default message is "is too short" — doesn't have %{count} by default
     // but the mechanism should work for messages that do
-    expect(e.get("name").length).toBe(1);
+    expect(e.messagesFor("name").length).toBe(1);
   });
 
   // =========================================================================
@@ -101,7 +101,7 @@ describe("ErrorsTest", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
     const dup = new Errors({});
-    dup.copy(errors);
+    dup.copyBang(errors);
     expect(dup.count).toBe(1);
     // Modifying dup should not affect original
     dup.add("age", ":invalid");
@@ -135,14 +135,14 @@ describe("ErrorsTest", () => {
   it("error access is indifferent", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
-    expect(errors.get("name")).toEqual(["can't be blank"]);
-    expect(errors.on("name")).toEqual(["can't be blank"]);
+    expect(errors.messagesFor("name")).toEqual(["can't be blank"]);
+    expect(errors.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("add, with type as nil", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid");
-    expect(errors.get("name")).toEqual(["is invalid"]);
+    expect(errors.messagesFor("name")).toEqual(["is invalid"]);
   });
 
   it("add an error message on a specific attribute with a defined type", () => {
@@ -154,13 +154,13 @@ describe("ErrorsTest", () => {
   it("add, with type as Proc, which evaluates to String", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid", { message: (_record: any) => "cannot be empty" });
-    expect(errors.get("name")).toEqual(["cannot be empty"]);
+    expect(errors.messagesFor("name")).toEqual(["cannot be empty"]);
   });
 
   it("initialize options[:message] as Proc, which evaluates to String", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid", { message: () => "proc message" });
-    expect(errors.get("name")).toEqual(["proc message"]);
+    expect(errors.messagesFor("name")).toEqual(["proc message"]);
   });
 
   it("added? when attribute was added through a collection", () => {
@@ -216,7 +216,7 @@ describe("ErrorsTest", () => {
   it("merge does not import errors when merging with self", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
-    errors.merge(errors);
+    errors.mergeBang(errors);
     expect(errors.count).toBe(1);
   });
 
@@ -329,7 +329,7 @@ describe("ErrorsTest", () => {
     const errors2 = new Errors({});
     errors2.import(errors1.objects[0]);
     expect(errors2.count).toBe(1);
-    expect(errors2.get("name")).toEqual(["can't be blank"]);
+    expect(errors2.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("import with attribute override", () => {
@@ -337,19 +337,19 @@ describe("ErrorsTest", () => {
     errors1.add("name", ":blank");
     const errors2 = new Errors({});
     errors2.import(errors1.objects[0], { attribute: "title" });
-    expect(errors2.get("title")).toEqual(["can't be blank"]);
+    expect(errors2.messagesFor("title")).toEqual(["can't be blank"]);
   });
 
   it("add, type being Proc, which evaluates to Symbol", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid");
-    expect(errors.get("name")).toEqual(["is invalid"]);
+    expect(errors.messagesFor("name")).toEqual(["is invalid"]);
   });
 
   it("add, with options[:message] as Proc, which evaluates to String, where type is nil", () => {
     const errors = new Errors({});
     errors.add("name", ":invalid", { message: "custom" });
-    expect(errors.get("name")).toEqual(["custom"]);
+    expect(errors.messagesFor("name")).toEqual(["custom"]);
   });
 
   it("errors are compatible with YAML dumped from Rails 6.x", () => {
@@ -409,7 +409,7 @@ describe("ErrorsTest", () => {
 
   it("attribute_names returns an empty array after try to get a message only", () => {
     const e = new Errors(null);
-    e.get("name"); // should not create an entry
+    e.messagesFor("name"); // should not create an entry
     expect(e.attributeNames).toEqual([]);
   });
 
@@ -434,13 +434,13 @@ describe("ErrorsTest", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
     expect(e.count).toBe(1);
-    expect(e.get("name")).toContain("can't be blank");
+    expect(e.messagesFor("name")).toContain("can't be blank");
   });
 
   it("add, with type as String", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    expect(e.get("name")).toContain("can't be blank");
+    expect(e.messagesFor("name")).toContain("can't be blank");
   });
 
   it("added? detects indifferent if a specific error was added to the object", () => {
@@ -657,9 +657,9 @@ describe("ErrorsTest", () => {
     const e1 = new Errors(null);
     const e2 = new Errors(null);
     e1.add("name", ":blank");
-    e2.copy(e1);
+    e2.copyBang(e1);
     expect(e2.count).toBe(1);
-    expect(e2.get("name")).toContain("can't be blank");
+    expect(e2.messagesFor("name")).toContain("can't be blank");
   });
 
   it("copy! replaces existing errors rather than appending", () => {
@@ -812,7 +812,7 @@ describe("ErrorsTest", () => {
     const e1 = new Errors(null);
     const e2 = new Errors(null);
     e1.add("name", ":blank");
-    e2.merge(e1);
+    e2.mergeBang(e1);
     expect(e2.count).toBe(1);
   });
 
@@ -859,19 +859,7 @@ describe("ErrorsTest", () => {
 
   it("messages returns empty frozen array when accessed with non-existent attribute", () => {
     const e = new Errors(null);
-    expect(e.get("nonexistent")).toEqual([]);
-  });
-
-  it("on() is an alias for get()", () => {
-    const e = new Errors(null);
-    e.add("name", ":blank");
-    expect(e.on("name")).toEqual(e.get("name"));
-    expect(e.on("name")).toContain("can't be blank");
-  });
-
-  it("on() returns empty array for unknown attribute", () => {
-    const e = new Errors(null);
-    expect(e.on("nonexistent")).toEqual([]);
+    expect(e.messagesFor("nonexistent")).toEqual([]);
   });
 
   it("dup duplicates details", () => {
@@ -956,7 +944,7 @@ describe("ErrorsTest", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
     expect(e.details.get("name")![0].error).toBe(":blank");
-    expect(e.get("name")).toContain("can't be blank");
+    expect(e.messagesFor("name")).toContain("can't be blank");
   });
 
   it("added? handles symbol message", () => {
@@ -1228,16 +1216,6 @@ describe("Errors<TBase> type parameter", () => {
     userErrors.copyBang(postErrors);
   });
 
-  it("copy alias accepts Errors<U> for a different U", () => {
-    interface Post {
-      title: string;
-    }
-    const userErrors = new Errors<User>({ name: "Alice", age: 30 });
-    const postErrors = new Errors<Post>({ title: "Hello" });
-    expectTypeOf(userErrors.copy<Post>).toBeFunction();
-    userErrors.copy(postErrors);
-  });
-
   it("mergeBang accepts Errors<U> for a different U", () => {
     interface Post {
       title: string;
@@ -1246,16 +1224,6 @@ describe("Errors<TBase> type parameter", () => {
     const postErrors = new Errors<Post>({ title: "Hello" });
     expectTypeOf(userErrors.mergeBang<Post>).toBeFunction();
     userErrors.mergeBang(postErrors);
-  });
-
-  it("merge alias accepts Errors<U> for a different U", () => {
-    interface Post {
-      title: string;
-    }
-    const userErrors = new Errors<User>({ name: "Alice", age: 30 });
-    const postErrors = new Errors<Post>({ title: "Hello" });
-    expectTypeOf(userErrors.merge<Post>).toBeFunction();
-    userErrors.merge(postErrors);
   });
 
   it("normalizeArguments() type callback receives TBase | null", () => {

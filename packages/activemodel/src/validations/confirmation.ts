@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { humanize } from "@blazetrails/activesupport";
+import { except, humanize } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 
 /**
@@ -44,7 +44,7 @@ export class ConfirmationValidator extends EachValidator {
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
       record.errors.add(confirmationAttr, ":confirmation", {
-        ...this.filteredErrorOptions(["caseSensitive"]),
+        ...except(this.options, "caseSensitive"),
         attribute: humanAttr,
       });
     }

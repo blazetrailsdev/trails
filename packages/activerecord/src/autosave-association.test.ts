@@ -647,11 +647,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // `propagateErrors` underscores the camelCase reflection name so the
     // humanized message matches Rails ("Silly unique replies is invalid"),
     // making the error attribute Rails' own `:silly_unique_replies`.
-    expect(reply.errors.get("silly_unique_replies")).toEqual(["is invalid"]);
+    expect(reply.errors.messagesFor("silly_unique_replies")).toEqual(["is invalid"]);
 
     const built = await reply.sillyUniqueReplies;
     expect(built[0].errors.empty).toBe(true);
-    expect(built[built.length - 1].errors.get("content")).toEqual(["has already been taken"]);
+    expect(built[built.length - 1].errors.messagesFor("content")).toEqual([
+      "has already been taken",
+    ]);
 
     expect(Number(await Reply.count())).toBe(repliesBefore);
     expect(Number(await SillyUniqueReply.count())).toBe(sillyBefore);
