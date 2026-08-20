@@ -20,12 +20,13 @@ export {
   isInstanceMethodAlreadyImplemented,
 } from "./attribute-methods.js";
 export type { InstanceHost } from "./attribute-methods.js";
-export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
+export {
+  ForbiddenAttributesError,
+  sanitizeForMassAssignment,
+} from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
-  assertHashAttributes,
   attributeWriterMissing,
-  sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   ArgumentError,
   NoMethodError,
