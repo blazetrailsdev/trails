@@ -44,8 +44,8 @@ const PARTS_IN_SECONDS: Record<keyof DurationParts, number> = {
   years: SECONDS_PER_YEAR,
 };
 
-// Part ordering for inspect()
-const PART_ORDER: (keyof DurationParts)[] = [
+// Mirrors Rails PARTS (duration.rb:130).
+const PARTS: (keyof DurationParts)[] = [
   "years",
   "months",
   "weeks",
@@ -74,7 +74,7 @@ function mergeParts(
     result[key] = a[key] + (b[key] ?? 0);
   }
   for (const key of Object.keys(b) as (keyof DurationParts)[]) {
-    if (PART_ORDER.includes(key) && b[key] !== undefined && !aKeys.includes(key)) {
+    if (PARTS.includes(key) && b[key] !== undefined && !aKeys.includes(key)) {
       result[key] = a[key] + b[key];
     }
   }
@@ -117,7 +117,7 @@ export class Duration {
     // Ruby's `@parts` is a Hash, and both `sum` and `merge` read it in
     // insertion order, so the argument's own key order is the part order.
     const given = (Object.keys(parts) as (keyof DurationParts)[]).filter(
-      (part) => PART_ORDER.includes(part) && parts[part] !== undefined,
+      (part) => PARTS.includes(part) && parts[part] !== undefined,
     );
     this._partKeys = value === 0 ? given : given.filter((part) => this.parts[part] !== 0);
     this._variable = variable ?? this._partKeys.some((part) => VARIABLE_PARTS.includes(part));
@@ -357,7 +357,7 @@ export class Duration {
   inspect(): string {
     const activeParts: string[] = [];
 
-    for (const key of PART_ORDER) {
+    for (const key of PARTS) {
       const val = this.parts[key];
       if (val !== 0) {
         const abs = Math.abs(val);
@@ -382,7 +382,7 @@ export class Duration {
   }
 
   isEqualTo(other: Duration): boolean {
-    for (const key of PART_ORDER) {
+    for (const key of PARTS) {
       if (this.parts[key] !== other.parts[key]) return false;
     }
     return true;
@@ -614,14 +614,42 @@ export class Duration {
     return new Duration(value, parts);
   }
 
-  // Build from seconds (Rails' Duration.build)
+  /**
+   * Creates a new Duration from a seconds value that is converted
+   * to the individual parts (duration.rb:183-214):
+   *
+   *   Duration.build(31556952).parts // => { years: 1 }
+   *   Duration.build(2716146).parts  // => { months: 1, days: 1 }
+   */
   static build(value: unknown): Duration {
     if (typeof value !== "number") {
       const typeName =
         value === null ? "NilClass" : typeof value === "string" ? "String" : String(typeof value);
       throw new TypeError(`can't build an ActiveSupport::Duration from a ${typeName}`);
     }
-    return new Duration(value, { seconds: value });
+
+    const parts: Partial<DurationParts> = {};
+    const remainderSign = Math.sign(value);
+    let remainder = Math.abs(Number(value.toFixed(9)));
+    let variable = false;
+
+    if (value !== 0) {
+      for (const part of PARTS) {
+        if (part !== "seconds") {
+          const partInSeconds = PARTS_IN_SECONDS[part];
+          parts[part] = Math.floor(remainder / partInSeconds) * remainderSign;
+          remainder %= partInSeconds;
+
+          if (parts[part] !== 0) {
+            variable ||= VARIABLE_PARTS.includes(part);
+          }
+        }
+      }
+    }
+
+    parts.seconds = remainder * remainderSign;
+
+    return new Duration(value, parts, variable);
   }
 }
 

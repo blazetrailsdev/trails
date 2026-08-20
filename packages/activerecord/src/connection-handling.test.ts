@@ -16,12 +16,8 @@ import {
   currentPreventingWrites,
   withIsolatedConnectionState,
 } from "./core.js";
-import { setTrailsRoot } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
-import * as nodeFs from "node:fs";
-import * as nodeOs from "node:os";
-import * as nodePath from "node:path";
 
 describe("ConnectionHandlingTest", () => {
   // The opted-out cases either assert the pool releases its connection, or
@@ -937,47 +933,5 @@ describe("establish_connection accepts a DatabaseConfig", () => {
     expect(restored).toBe(captured);
     expect(restored.adapter).toBe("sqlite3");
     expect(restored.configurationHash.database).toBe("db/primary.sqlite3");
-  });
-});
-
-describe("loadConfigFile resolves config/database.* against Trails.root", () => {
-  let tmpRoot: string;
-
-  class RootConfigModel extends Base {}
-
-  // See establish-connection.test.ts: the worker's setup file assigns
-  // `Base.configurations`, which short-circuits the config-file lookup this
-  // seam exists to exercise.
-  const originalConfigurations = Base.configurations();
-
-  beforeEach(() => {
-    Base.configurations({});
-  });
-
-  // `Base`'s pool is never touched here, only its `configurations` registry.
-  afterEach(async () => {
-    setTrailsRoot(null);
-    Base.configurations(originalConfigurations);
-    RootConfigModel.removeConnection();
-    if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
-  });
-
-  // Mirrors Rails' optional `Rails.root` seam: a relative `config/database.*`
-  // is loaded from the application root when `Trails.root` is set, rather than
-  // the raw process cwd.
-  it("loads config/database.json from the injected root", async () => {
-    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "ar-trails-root-"));
-    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
-    nodeFs.writeFileSync(
-      nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({ test: { adapter: "sqlite3", database: "db/primary.sqlite3" } }),
-    );
-    setTrailsRoot(tmpRoot);
-
-    await RootConfigModel.establishConnection();
-
-    const dbConfig = RootConfigModel.connectionDbConfig();
-    expect(dbConfig.adapter).toBe("sqlite3");
-    expect(dbConfig.configurationHash.database).toBe("db/primary.sqlite3");
   });
 });

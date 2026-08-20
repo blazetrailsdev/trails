@@ -321,21 +321,7 @@ export function registerCounterCachedAssociation(model: any, name: string): void
 
 function counterCachedAssociationNames(ctor: typeof Base): string[] {
   const registered: Set<string> | undefined = (ctor as any)._counterCachedAssociationNames;
-  if (registered && registered.size > 0) return [...registered];
-  // Fallback for models whose belongs_to was registered before the explicit
-  // registry was wired (or via dynamic _associations entries with counterCache).
-  const associations: Array<{ type: string; name: string; options: any }> =
-    (ctor as any)._associations ?? [];
-  // Rails keys reflections by name, so a subclass redeclaring `belongs_to :post`
-  // replaces the inherited one; trails' `_associations` keeps both entries, so
-  // dedupe by name here or the counter fires once per duplicate definition.
-  return [
-    ...new Set(
-      associations
-        .filter((a) => a.type === "belongsTo" && a.options?.counterCache)
-        .map((a) => a.name),
-    ),
-  ];
+  return registered ? [...registered] : [];
 }
 
 /**

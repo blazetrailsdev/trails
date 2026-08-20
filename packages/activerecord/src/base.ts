@@ -943,7 +943,6 @@ export class Base extends Model {
    * @internal
    */
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
-  static _configPath: string | null = null;
   static _abstractClass = false;
   static _connectionClass = false;
   static automaticScopeInversing = false;

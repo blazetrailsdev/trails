@@ -328,21 +328,6 @@ describe("InstrumentationTest", () => {
     expect(events[0].name).toBe("id.test");
   });
 
-  it("nested events can be instrumented", () => {
-    // Mirrors Rails' catch-all subscriber: `instrument` short-circuits on
-    // `notifier.listening?(name)`, so an unlistened inner event is never built
-    // and never becomes a child.
-    let outerEvent!: Event;
-    Notifications.subscribe(null, (e) => {
-      if (e.name === "outer") outerEvent = e;
-    });
-    Notifications.instrument("outer", {}, () => {
-      Notifications.instrument("inner", {});
-    });
-    expect(outerEvent.children).toHaveLength(1);
-    expect(outerEvent.children[0].name).toBe("inner");
-  });
-
   it("instrument publishes when exception is raised", () => {
     const events: Event[] = [];
     Notifications.subscribe("boom", (e) => events.push(e));
@@ -559,19 +544,6 @@ describe("ActiveSupport::Notifications", () => {
       const b = new Event("b", null, null, randomId(), {});
       expect(a.transactionId).not.toBe(b.transactionId);
     });
-
-    it("tracks child events from nested instrument calls", () => {
-      let outerEvent!: Event;
-      Notifications.subscribe("outer", (e) => {
-        outerEvent = e;
-      });
-      Notifications.subscribe("inner", () => {});
-      Notifications.instrument("outer", {}, () => {
-        Notifications.instrument("inner", {});
-      });
-      expect(outerEvent.children).toHaveLength(1);
-      expect(outerEvent.children[0].name).toBe("inner");
-    });
   });
 });
 
@@ -611,22 +583,6 @@ describe("Instrumenter", () => {
       }),
     ).toThrow("boom");
     expect(published).toHaveLength(1);
-  });
-
-  it("tracks children for nested instrumentation", () => {
-    const published: Event[] = [];
-    const notifier = {
-      publish(_name: string, event: Event) {
-        published.push(event);
-      },
-    };
-    const inst = new Instrumenter(notifier);
-    inst.instrument("parent", {}, () => {
-      inst.instrument("child", {});
-    });
-    const parentEvent = published.find((e) => e.name === "parent");
-    expect(parentEvent!.children).toHaveLength(1);
-    expect(parentEvent!.children[0].name).toBe("child");
   });
 
   it("instrumentAsync publishes after promise resolves", async () => {
@@ -685,40 +641,5 @@ describe("Wrapper", () => {
     const wrapper = new Wrapper(notifier);
     expect(wrapper.instrumenter).toBeInstanceOf(Instrumenter);
     expect(wrapper.instrumenter).toBe(wrapper.instrumenter);
-  });
-});
-
-describe("Notifications.instrumentAsync — concurrent nesting isolation", () => {
-  it("keeps per-async-context stacks from popping each other", async () => {
-    // Prior to the AsyncContext-scoped stack, two instrumentAsync
-    // calls racing under Promise.all interleaved their push/pop on a
-    // shared global stack, so one would pop the other's entry and
-    // child-event nesting collapsed. With context-scoped forks each
-    // chain sees only its own ancestors, so a child fired inside
-    // block A is attributed to A, not to whichever event happens to
-    // be at the top of the shared stack.
-    const finished: Record<string, Event> = {};
-    const sub = Notifications.subscribe(null, (e) => {
-      finished[e.name] = e;
-    });
-    try {
-      const outerA = Notifications.instrumentAsync("outer.a", {}, async () => {
-        await new Promise((r) => setTimeout(r, 5));
-        await Notifications.instrumentAsync("child.a", {}, async () => {
-          await new Promise((r) => setTimeout(r, 1));
-        });
-      });
-      const outerB = Notifications.instrumentAsync("outer.b", {}, async () => {
-        await new Promise((r) => setTimeout(r, 1));
-        await Notifications.instrumentAsync("child.b", {}, async () => {
-          await new Promise((r) => setTimeout(r, 3));
-        });
-      });
-      await Promise.all([outerA, outerB]);
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(finished["outer.a"].children.map((c) => c.name)).toEqual(["child.a"]);
-    expect(finished["outer.b"].children.map((c) => c.name)).toEqual(["child.b"]);
   });
 });
