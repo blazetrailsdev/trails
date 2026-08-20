@@ -452,7 +452,7 @@ export class AssociationScope {
    * `ReflectionProxy` with an aliased_table from `AliasTracker` so
    * repeated joins to the same table get unique aliases — e.g. a
    * self-referential `has_many :through` that visits the same table
-   * twice in one chain. `tracker.aliasedTableFor(arelTable, candidate)`
+   * twice in one chain. `tracker.aliasedTableFor(arelTable, null, candidate)`
    * returns the base Arel table on the first visit and, on subsequent
    * visits, an Arel table aliased to the supplied candidate — with a
    * numeric suffix (`candidate_2`, `_3`, ...) only when the candidate
@@ -483,7 +483,7 @@ export class AssociationScope {
         // `aliasCandidate` is only invoked on repeat visits — first
         // visits return the base arel table without ever building
         // the candidate string.
-        aliasedTable = tracker.aliasedTableFor(klass.arelTable, () => {
+        aliasedTable = tracker.aliasedTableFor(klass.arelTable, null, () => {
           const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
           return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
         });

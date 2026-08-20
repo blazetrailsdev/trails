@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
-    "rubyName": "make_constraints",
-    "call": "aliased_table_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
     "rubyName": "walk",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -46,9 +46,8 @@ import {
   nextDay,
   prevDay,
   toDate,
-  xmlschema,
 } from "../time-ext.js";
-import { DATE_FORMATS } from "./time/conversions.js";
+import { DATE_FORMATS, xmlschema } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
 
 afterEach(() => {

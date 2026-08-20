@@ -159,3 +159,29 @@ export function formattedOffset(
   const utcOffset = date instanceof RubyTime ? date.utcOffset : -date.getTimezoneOffset() * 60;
   return TimeZone.secondsToUtcOffset(utcOffset, colon);
 }
+
+/**
+ * Returns an ISO 8601 representation of the receiver.
+ *
+ * `Time#xmlschema` is ruby/time's own — `conversions.rb` declares no body for
+ * it — but it is the method `conversions.rb:74`'s `alias_method :rfc3339,
+ * :xmlschema` points at, so it sits here beside the alias. A JS `Date` is an
+ * instant, and `Date#toISOString` is the same UTC ISO 8601 reading ruby/time's
+ * `time_xmlschema` produces for a UTC `Time`.
+ */
+export function xmlschema(date: Date): string {
+  return date.toISOString();
+}
+
+/**
+ * Aliased to `xmlschema` for compatibility with `DateTime`.
+ *
+ * Mirrors: `alias_method :rfc3339, :xmlschema`
+ * (`core_ext/time/conversions.rb:74`). Note this is the INSTANCE-side
+ * `Time#rfc3339`; the class-side parser `Time.rfc3339(str)`
+ * (`core_ext/time/calculations.rb:69-83`) is a different Ruby method and keeps
+ * its own name in `time-ext.ts`. The two collide in a flat ESM namespace, so
+ * the package barrel pins the class-side one and this alias is reached through
+ * `@blazetrails/activesupport/core-ext/time/conversions`.
+ */
+export { xmlschema as rfc3339 };

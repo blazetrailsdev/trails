@@ -561,107 +561,6 @@ export class JoinDependency {
   }
 
   /**
-   * Emit-time table aliasing for `child`, mirroring Rails `make_constraints`
-   * reading `table_name = @references[reflection.name] || reflection.table_name`
-   * and feeding it to `alias_tracker.aliased_table_for(klass.arel_table,
-   * table_name) { reflection.alias_candidate(parent.table_name) }`
-   * (join_dependency.rb:202, alias_tracker.rb).
-   *
-   * The single point where a join's table alias is assigned — against the shared
-   * `AliasTracker`: the real table on first use, else the referenced name
-   * (`includes(:author).references(:author)` → `authors AS author`), else the
-   * reflection's `alias_candidate` (`{plural}_{parent}`, `_N` on repeat). Every
-   * JoinDependency in a `build_joins` emits against one shared tracker in order,
-   * so a `merge` onto an already-joined table — or a self-join / dup-include
-   * collision WITHIN this dependency — collides and aliases here. The ON is
-   * REBUILT via `joinConstraints` against the resolved alias and the parent's
-   * resolved table (`_rebuildChildJoin`), so a self-join is built correctly
-   * rather than name-rebound. Through nodes share a `throughGroup` resolved in one
-   * pass (`_resolveThroughGroup`), mirroring `JoinAssociation#join_constraints`.
-   * @internal
-   */
-  private _resolveChildAlias(
-    parent: JoinPart,
-    child: JoinPart,
-    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
-    tracker: AliasTracker,
-  ): void {
-    if (child.throughGroup) {
-      this._resolveThroughGroup(parent, child.throughGroup, joinType);
-      return;
-    }
-    if (!(child instanceof JoinAssociation)) {
-      this._claimNodeTable(child);
-      return;
-    }
-    // Rails make_constraints memoizes `[table, terminated]` keyed by each
-    // reflection (join_dependency.rb:193-209) for EVERY child, including a
-    // plain (non-through) include — not just through groups. A direct include
-    // whose reflection equals a chain tail already resolved by an earlier
-    // through/include path reuses that alias (the block's
-    // `table && (!root || !terminated)` branch). Since a direct include's
-    // reflection IS the whole chain it is the root link, so it still projects
-    // its columns and hydrates its association — only the duplicate JOIN is
-    // suppressed (the shared alias already covers the row), and it upgrades the
-    // memo to terminated.
-    const chainKey = reflectionChainKey(child.reflection.chain);
-    const memo = this._joinedTables.get(chainKey);
-    // Rails block: `table && (!root || !terminated)`. A direct include's
-    // reflection IS its whole chain, so it is always the root link — it reuses
-    // the memo only when the entry was written by a NON-root link (a through
-    // intermediate, `terminated == false`). A `terminated` entry was itself a
-    // root resolution, so a fresh self-referential include sharing the same
-    // reflection (e.g. `{ primaryContact: "primaryContact" }`) must mint its own
-    // alias (`primary_contacts_people_2`) rather than collapse onto the first.
-    if (memo && !memo.terminated) {
-      memo.terminated = true;
-      child.arelTable = memo.aliased;
-      child.effectiveSqlName = memo.effectiveName;
-      child.arelJoin = null;
-      child.scopeJoinSources = [];
-      this._aliasesCache = undefined;
-      return;
-    }
-    const referenced = this._references.get(child.immediateAssocName);
-    const lookupName = referenced ?? child.tableName;
-    const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
-    const alias = tracker.aliasNameForTable(lookupName, () =>
-      child.reflection.aliasCandidate(parentTableName),
-    );
-    this._rebuildChildJoin(parent, child, alias ?? lookupName);
-    // Rails: `@joined_tables[reflection] ||= [table, root] if OuterJoin`. The
-    // direct include is the root link of its own one-link chain, so terminated
-    // is true — a later through path sharing this tail reuses the one alias.
-    // Keyed off the PARAMETER `join_type` (not the JD's own `_joinType`), so an
-    // eager OUTER-JOIN dependency folded into an INNER-JOIN primary via
-    // `walk`/`joinConstraints` still memoizes its shared chain tails.
-    if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
-      this._joinedTables.set(chainKey, {
-        aliased: child.arelTable as TableRef,
-        effectiveName: child.effectiveSqlName,
-        terminated: true,
-      });
-    }
-  }
-
-  /**
-   * Claim a node's real table into the tracker without re-aliasing — used for
-   * non-reflection leaf nodes (no chain to rebuild). Mirrors `aliased_table_for`'s
-   * count bookkeeping so a later merged join onto the same table is detected as a
-   * collision.
-   * @internal
-   */
-  private _claimNodeTable(child: JoinPart): void {
-    const t = child.tableName;
-    if (!t) return;
-    if ((this._aliasTracker.aliases.get(t) ?? 0) === 0) this._aliasTracker.aliases.set(t, 1);
-    const eff = child.effectiveSqlName;
-    if (eff && eff !== t) {
-      this._aliasTracker.aliases.set(eff, (this._aliasTracker.aliases.get(eff) ?? 0) + 1);
-    }
-  }
-
-  /**
    * Rebuild `child`'s JOIN at emit-time against the SQL alias `newName`, re-running
    * `JoinAssociation#joinConstraints` with a resolver yielding the aliased target
    * and the parent's already-resolved table as foreign side. Mirrors Rails
@@ -753,11 +652,15 @@ export class JoinDependency {
         // Only the target link (idx 0) consumes a free `@references` entry.
         const referenced = root ? this._references.get(group.targetImmediateName) : undefined;
         const lookupName = referenced ?? tableName;
-        const alias = this._aliasTracker.aliasNameForTable(lookupName, () => {
-          const cand = refl.aliasCandidate(group.parentTableName);
-          return root ? cand : `${cand}_join`;
-        });
-        const effectiveName = alias ?? lookupName;
+        const table = this._aliasTracker.aliasedTableFor(
+          aliasedArelTableForReflection(refl, tableName),
+          lookupName,
+          () => {
+            const name = refl.aliasCandidate(group.parentTableName);
+            return root ? name : `${name}_join`;
+          },
+        );
+        const effectiveName = tableSqlName(table);
         const aliased = aliasedArelTableForReflection(refl, tableName, effectiveName);
         resolvedByIdx[idx] = { effectiveName, aliased };
         // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`. Keyed
@@ -812,17 +715,96 @@ export class JoinDependency {
     this._aliasesCache = undefined;
   }
 
-  /** @internal */
+  /**
+   * Mirrors: `JoinDependency#make_constraints`
+   * (`associations/join_dependency.rb:189-211`). Rails builds `child`'s ON
+   * inside the block it hands to `child.join_constraints(...)`, against the
+   * table `alias_tracker.aliased_table_for` picks; trails pre-builds the ON at
+   * tree construction and REBUILDS it here against that same table
+   * (`_rebuildChildJoin`), so a self-join gets a correct `alias.fk = parent.pk`
+   * rather than a name-rebind that cannot tell the two sides apart.
+   *
+   * Every JoinDependency in a `build_joins` emits against one shared
+   * `AliasTracker` in order, so a `merge` onto an already-joined table — or a
+   * self-join / dup-include collision WITHIN this dependency — collides and
+   * aliases here. Through nodes resolve their whole `reflection.chain` in one
+   * pass (`_resolveThroughGroup`), the shape Rails gets from
+   * `JoinAssociation#join_constraints` walking the chain through this same
+   * block.
+   * @internal
+   */
   private makeConstraints(
     parent: JoinPart,
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    // Rails passes the `alias_tracker` attr_reader into
-    // `child.join_constraints(..., alias_tracker)` (join_dependency.rb:193);
-    // `_resolveChildAlias` is our emit-time port of that call's aliasing
-    // block, so thread the same reader through it.
-    this._resolveChildAlias(parent, child, joinType, this.aliasTracker);
+    if (child.throughGroup) {
+      this._resolveThroughGroup(parent, child.throughGroup, joinType);
+    } else if (!(child instanceof JoinAssociation)) {
+      // A non-reflection leaf has no chain to rebuild, so it only claims its
+      // table — the `aliases[table_name] == 0` arm of `aliased_table_for`
+      // (alias_tracker.rb:60-63) — keeping a later merged join onto the same
+      // table detectable as a collision.
+      const t = child.tableName;
+      if (t) {
+        if ((this.aliasTracker.aliases.get(t) ?? 0) === 0) this.aliasTracker.aliases.set(t, 1);
+        const eff = child.effectiveSqlName;
+        if (eff && eff !== t) {
+          this.aliasTracker.aliases.set(eff, (this.aliasTracker.aliases.get(eff) ?? 0) + 1);
+        }
+      }
+    } else {
+      // Rails memoizes `[table, terminated]` keyed by the remaining reflection
+      // chain (join_dependency.rb:193-197) for EVERY child, including a plain
+      // (non-through) include. A direct include whose reflection equals a chain
+      // tail already resolved by an earlier through/include path reuses that
+      // alias (`table && (!root || !terminated)`). A direct include's reflection
+      // IS its whole chain, so it is always the root link — it still projects
+      // its columns and hydrates its association; only the duplicate JOIN is
+      // suppressed, and it upgrades the memo to terminated. A `terminated` entry
+      // was itself a root resolution, so a fresh self-referential include
+      // sharing the same reflection (`{ primaryContact: "primaryContact" }`)
+      // mints its own alias (`primary_contacts_people_2`) instead.
+      const reflection = child.reflection;
+      const chainKey = reflectionChainKey(reflection.chain);
+      const memo = this._joinedTables.get(chainKey);
+      if (memo && !memo.terminated) {
+        memo.terminated = true;
+        child.arelTable = memo.aliased;
+        child.effectiveSqlName = memo.effectiveName;
+        child.arelJoin = null;
+        child.scopeJoinSources = [];
+        this._aliasesCache = undefined;
+      } else {
+        // `table_name = @references[reflection.name.to_sym]&.to_s`
+        // (join_dependency.rb:200).
+        const tableName = this._references.get(child.immediateAssocName);
+        const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
+        // The block is Rails' `name = reflection.alias_candidate(parent.table_name);
+        // root ? name : "#{name}_join"` (join_dependency.rb:203-206) — `root` is
+        // `reflection == child.reflection`, which this branch is by construction.
+        const table = this.aliasTracker.aliasedTableFor(
+          aliasedArelTableForReflection(reflection, child.tableName),
+          tableName ?? null,
+          () => reflection.aliasCandidate(parentTableName),
+        );
+        this._rebuildChildJoin(parent, child, tableSqlName(table));
+        // `@joined_tables[remaining_reflection_chain] ||= [table, root] if
+        // join_type == Arel::Nodes::OuterJoin` (join_dependency.rb:208). Keyed
+        // off the PARAMETER `join_type` (not the JD's own `_joinType`), so an
+        // eager OUTER-JOIN dependency folded into an INNER-JOIN primary via
+        // `walk`/`joinConstraints` still memoizes its shared chain tails; the
+        // direct include is the root link of its own one-link chain, so
+        // `terminated` is true.
+        if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
+          this._joinedTables.set(chainKey, {
+            aliased: child.arelTable as TableRef,
+            effectiveName: child.effectiveSqlName,
+            terminated: true,
+          });
+        }
+      }
+    }
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {

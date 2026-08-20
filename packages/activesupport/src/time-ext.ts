@@ -680,13 +680,6 @@ export function rfc3339(str: string): Temporal.Instant {
 }
 
 /**
- * xmlschema — returns ISO 8601 representation.
- */
-export function xmlschema(date: Date): string {
-  return date.toISOString();
-}
-
-/**
  * lastWeek — returns the start of last week.
  */
 export function lastWeek(date: Date, startDay = "monday"): Temporal.Instant {

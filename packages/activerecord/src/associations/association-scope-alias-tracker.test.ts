@@ -71,11 +71,11 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
       thunkInvocations++;
       return "comments_alias";
     };
-    const t1 = tracker.aliasedTableFor(AtComment.arelTable, candidate);
+    const t1 = tracker.aliasedTableFor(AtComment.arelTable, null, candidate);
     expect(t1.name).toBe("comments");
     expect(thunkInvocations).toBe(0);
 
-    const t2 = tracker.aliasedTableFor(AtComment.arelTable, candidate);
+    const t2 = tracker.aliasedTableFor(AtComment.arelTable, null, candidate);
     expect(t2.name).not.toBe("comments");
     expect(thunkInvocations).toBe(1);
   });

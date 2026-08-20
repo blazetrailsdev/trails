@@ -15,6 +15,7 @@
  * `makeConstraints`, so a duplicate join collides naturally — no separate
  * seed/re-align pass.
  */
+import { Table } from "@blazetrails/arel";
 import { underscore, pluralize } from "@blazetrails/activesupport";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 
@@ -36,7 +37,11 @@ export function seedJoinClauseAliases(host: MergedJoinAliasHost, tracker: AliasT
       // Association where-join (where.associated): mirror the
       // collision branch of aliased_table_for — first use keeps the real name
       // and claims it, repeats alias to `{plural_name}_{owner_table}`.
-      tracker.aliasNameForTable(c.table, () => `${pluralize(underscore(c.assoc!))}_${ownerTable}`);
+      tracker.aliasedTableFor(
+        new Table(c.table),
+        c.table,
+        () => `${pluralize(underscore(c.assoc!))}_${ownerTable}`,
+      );
     } else if ((tracker.aliases.get(c.table) ?? 0) === 0) {
       // Raw explicit-ON join clause with no reflection (e.g. the
       // `leftJoins(table, on)` form): Rails emits these verbatim and only seeds
