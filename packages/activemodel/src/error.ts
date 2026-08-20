@@ -1,4 +1,4 @@
-import { humanize, deepDup, except } from "@blazetrails/activesupport";
+import { humanize, deepDup, except, isPlainObject } from "@blazetrails/activesupport";
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
@@ -37,11 +37,19 @@ const CALLBACKS_OPTIONS: string[] = [
 const MESSAGE_OPTIONS: string[] = ["message"];
 
 /**
- * Value equality that matches Ruby `==` for the common option shapes:
- * primitives (identity), arrays (elementwise), and plain objects (key-set +
- * recursive value equality). Rails relies on `Array#==` / `Hash#==` here
- * since option values like `in: [1,2,3]` / `count: 2..5` are frequently
- * collections, and reference equality in JS would silently fail to match.
+ * Ruby `==`, which JS `===` is not. Rails leans on it throughout `error.rb` —
+ * `match?` compares option values with `!=` (:171), `strict_match?` compares
+ * whole hashes with `==` (:187), and `==` compares the `attributes_for_hash`
+ * arrays elementwise (:181) — and every one of those is `Array#==` / `Hash#==`
+ * value equality that JS gives no operator for.
+ *
+ * Dispatch mirrors Ruby's: `Array#==` and `Hash#==` recurse (a Ruby Hash is a
+ * plain object here), `Regexp#==` compares source + flags, and everything else
+ * is sent `==` — which for an object that defines one means its own equality,
+ * and otherwise falls back to `BasicObject#==` identity. That last arm is why
+ * `attributes_for_hash`'s `@base` slot compares correctly through this: two
+ * distinct model instances are not `==` in Ruby either unless the model says
+ * so.
  */
 function optionsEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -58,7 +66,7 @@ function optionsEqual(a: unknown, b: unknown): boolean {
     return a.source === b.source && a.flags === b.flags;
   }
   if (a instanceof RegExp || b instanceof RegExp) return false;
-  if (typeof a === "object" && typeof b === "object") {
+  if (isPlainObject(a) && isPlainObject(b)) {
     const ak = Object.keys(a);
     const bk = Object.keys(b);
     if (ak.length !== bk.length) return false;
@@ -68,6 +76,9 @@ function optionsEqual(a: unknown, b: unknown): boolean {
         return false;
     }
     return true;
+  }
+  if (typeof (a as { equals?: unknown }).equals === "function") {
+    return (a as { equals(other: unknown): boolean }).equals(b);
   }
   return false;
 }
@@ -303,12 +314,18 @@ export class Error {
     );
   }
 
+  /**
+   * Mirrors: ActiveModel::Error#== / #eql? (error.rb:190-193):
+   *
+   *   def ==(other)
+   *     other.is_a?(self.class) && attributes_for_hash == other.attributes_for_hash
+   *   end
+   */
   equals(other: Error): boolean {
-    if (!(other instanceof Error)) return false;
-    const a = this.attributesForHash();
-    const b = other.attributesForHash();
-    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
-    return optionsEqual(a[3], b[3]);
+    return (
+      other instanceof this.constructor &&
+      optionsEqual(this.attributesForHash(), other.attributesForHash())
+    );
   }
 
   /**
