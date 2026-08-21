@@ -243,7 +243,6 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
   } else {
     keys = [];
   }
-
   return keys;
 }
 

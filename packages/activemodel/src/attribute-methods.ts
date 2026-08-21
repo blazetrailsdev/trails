@@ -109,7 +109,6 @@ interface ReadWriteHost {
 }
 
 export interface AttributeMethodHost {
-  // Rails' `attribute_names` (attributes.rb:74-75) — `attribute_types.keys`.
   attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
