@@ -596,16 +596,14 @@ export function unreviewedCount(entries: ExcludeEntry[]): number {
  * printing its own permanence tally (extra-surface.ts).
  */
 export function receiptsSection(title: string, receipts: readonly TagReceipt[]): string {
+  const claim = (r: TagReceipt): string => classifyReason(r.reason ?? "");
   return (
-    section(
-      title,
-      tally(receipts, (r) => classifyReason(r.reason ?? "")),
-    ) +
+    section(title, tally(receipts, claim)) +
     "\n" +
     section(
       `${title} — CONVERGEABLE by file`,
       tally(
-        receipts.filter((r) => classifyReason(r.reason ?? "") === "convergeable"),
+        receipts.filter((r) => claim(r) === "convergeable"),
         (r) => `${r.package}/${r.tsFile} ${r.tsName} ${r.call}`,
       ),
     )

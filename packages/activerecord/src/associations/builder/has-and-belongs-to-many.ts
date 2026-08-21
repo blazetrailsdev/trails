@@ -8,7 +8,8 @@ import {
   privateConstant,
 } from "@blazetrails/activesupport";
 import * as Reflection from "../../reflection.js";
-import { habtmTargetFk, joinHabtmTableNames } from "../../associations.js";
+import { joinHabtmTableNames } from "../../associations.js";
+import { ConfigurationError } from "../../errors.js";
 import { CollectionAssociation as CollectionAssociationBuilder } from "./collection-association.js";
 import { HasMany } from "./has-many.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
@@ -104,6 +105,15 @@ export class HasAndBelongsToMany {
       }
     };
 
+    // `Class.new(ActiveRecord::Base)` inherits Base's whole environment; a JS
+    // subclass of the walked-up root inherits none of it, so the trails-only
+    // seats below (connection delegation, module path, the composite primary
+    // key a join table with no id column needs) sit on this class.
+    const ownerFk = this.options.foreignKey;
+    if (Array.isArray(ownerFk)) {
+      throw new ConfigurationError("HABTM associations do not support composite foreign keys");
+    }
+
     Object.defineProperty(joinModel, "name", {
       value: `HABTM_${camelize(this.associationName)}`,
       writable: true,
@@ -112,8 +122,45 @@ export class HasAndBelongsToMany {
     joinModel.tableNameResolver = () => builder._tableName();
     joinModel.leftModel = lhsModel;
 
-    joinModel.addLeftAssociation("leftSide", { anonymousClass: lhsModel });
+    // The module path Ruby gets from the join model's lexical nesting under the
+    // owner: without it the source `belongsTo` cannot resolve an unqualified
+    // "Article" to "Publisher::Article".
+    if (lhsModel.moduleName) {
+      joinModel.moduleName = lhsModel.moduleName;
+    }
+    // `connection_pool` above is all Ruby needs; JS resolves the pool through
+    // `_connectionSpecificationName` and reads `connection` / `adapter`
+    // directly, so those delegate too — required for an alternate database.
+    Object.defineProperty(joinModel, "connection", {
+      get: () => lhsModel.connection,
+      configurable: true,
+    });
+    Object.defineProperty(joinModel, "_connectionSpecificationName", {
+      get: () => lhsModel.connectionSpecificationName,
+      set: () => {},
+      configurable: true,
+    });
+    Object.defineProperty(joinModel, "adapter", {
+      get: () => lhsModel.connection,
+      set: () => {},
+      configurable: true,
+    });
+
+    // Rails passes `anonymous_class:` alone and lets the belongs_to derive
+    // `left_side_id`, which no query reads: the through join uses the MIDDLE
+    // has_many's key, derived from `lhs_model.name.demodulize`. A trails class
+    // name is flattened (`Publisher::Article` → `PublisherArticle`), so the
+    // owner key is resolved here off the Ruby leaf name instead.
+    joinModel.addLeftAssociation("leftSide", {
+      anonymousClass: lhsModel,
+      foreignKey:
+        ownerFk ?? `${underscore(demodulize(lhsModel._demodulizedName ?? lhsModel.name))}_id`,
+    });
     joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
+    joinModel.primaryKey = [
+      joinModel.leftReflection.foreignKey,
+      joinModel.rightReflection.foreignKey,
+    ];
     return joinModel;
   }
 
@@ -130,6 +177,12 @@ export class HasAndBelongsToMany {
     middleOptions.className = `${this.lhsModel.name}::${joinModel.name}`;
     if (this.options.foreignKey) {
       middleOptions.foreignKey = this.options.foreignKey;
+    } else {
+      // Rails stops here and lets the middle has_many derive the owner key from
+      // `lhs_model.name.demodulize`; a flattened JS class name cannot be
+      // demodulized, so the key the join model already resolved is passed on
+      // (see `through_model`'s `add_left_association`).
+      middleOptions.foreignKey = joinModel.leftReflection.foreignKey;
     }
     return middleOptions;
   }
@@ -182,9 +235,6 @@ export class HasAndBelongsToMany {
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     deps: {
-      defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
-      singleFk: (fk: string | string[] | undefined, fallback: string) => string;
-      createHabtmJoinModel: (...args: any[]) => any;
       modelRegistry: Map<string, any>;
     },
   ): void {
@@ -193,9 +243,6 @@ export class HasAndBelongsToMany {
 
   private _build(
     deps: {
-      defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
-      singleFk: (fk: string | string[] | undefined, fallback: string) => string;
-      createHabtmJoinModel: (...args: any[]) => any;
       modelRegistry: Map<string, any>;
     },
     scope: ((...args: any[]) => any) | null = null,
@@ -204,73 +251,30 @@ export class HasAndBelongsToMany {
     const name = this.associationName;
     const options = this.options;
 
-    const targetClassName = (options.className as string) ?? camelize(singularize(name));
-    let memoizedJoinTableName: string | undefined;
-    const joinTableNameResolver = (): string =>
-      (memoizedJoinTableName ??=
-        (options.joinTable as string) ??
-        deps.defaultJoinTableName(model, name, {
-          className: options.className as string | undefined,
-        }));
-    // Rails derives the owner join key from the demodulized class name, so a
-    // namespaced owner like `Publisher::Article` yields `article_id`, not
-    // `publisher_article_id`. `_demodulizedName` carries the Ruby leaf name for
-    // models whose flattened JS class name differs; fall back to `model.name`.
-    const ownerLeafName = model._demodulizedName ?? model.name;
-    const ownerFk = deps.singleFk(
-      options.foreignKey as string | string[] | undefined,
-      `${underscore(demodulize(ownerLeafName))}_id`,
-    );
-    const targetFk = habtmTargetFk(name, options);
+    const joinModel = this.throughModel();
 
-    const joinModelName = `HABTM_${camelize(name)}`;
-    const registryKey = `${model.name}::${joinModelName}`;
-    // Rails' `add_right_association` always names the join-model `belongs_to`
-    // from the association name via `name.to_s.singularize` — even when
-    // `class_name:` is set (e.g. `other_posts, class_name: "Post"` yields
-    // `belongs_to :other_post, class_name: "Post", foreign_key: "post_id"`).
-    // `source_reflection_names` then resolves the through `source:` via the same
-    // `singularize(assoc_name)`. The class-name-derived foreign key (`post_id`)
-    // is carried by `targetFk` (`habtmTargetFk`), passed to the join model below.
-    const sourceName = singularize(name);
-    const JoinModel = deps.createHabtmJoinModel(
-      model,
-      joinModelName,
-      joinTableNameResolver,
-      ownerFk,
-      targetFk,
-      targetClassName,
-      sourceName,
-    );
-
-    deps.modelRegistry.set(registryKey, JoinModel);
+    // `const_set join_model.name, join_model` + `private_constant`
+    // (associations.rb:1868-1869): trails has no constant table, so the join
+    // model is registered under the same `Owner::HABTM_Name` path.
+    const registryKey = `${model.name}::${joinModel.name}`;
+    deps.modelRegistry.set(registryKey, joinModel);
     privateConstant(registryKey);
 
-    const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
-    const middleOptions: Record<string, unknown> = {
-      className: registryKey,
-      // DEVIATION (trails-only, tracked by converge-constantize-ignores-private-constants):
-      // Rails sets only `class_name` here (has_and_belongs_to_many.rb:73) and
-      // resolves the join model straight back out of the constant table —
-      // `private_constant` blocks only a literal `A::B` reference, never
-      // `const_get`, so `Object.const_get("Category::HABTM_Posts")` succeeds in
-      // Ruby (verified on 3.3.11). trails' `constantize` raises for a private
-      // name, which it should not; until that is fixed, hold the join model
-      // directly so `klass` short-circuits before any name lookup. `className`
-      // stays exactly as Rails spells it.
-      anonymousClass: JoinModel,
-      foreignKey: ownerFk,
-      dependent: "delete",
-    };
-    model._associations = [
-      ...model._associations,
-      { type: "hasMany", name: middleName, options: middleOptions },
-    ];
-    const middleReflection = Reflection.create("hasMany", middleName, null, middleOptions, model);
+    const middleReflection = this.middleReflection(joinModel);
+    const middleName = middleReflection.name;
+    // DEVIATION (trails-only, tracked by converge-constantize-ignores-private-constants):
+    // Rails resolves the join model straight back out of the constant table —
+    // `private_constant` blocks only a literal `A::B` reference, never
+    // `const_get`, so `Object.const_get("Category::HABTM_Posts")` succeeds in
+    // Ruby (verified on 3.3.11). trails' `constantize` raises for a private
+    // name, which it should not; until that is fixed, hold the join model
+    // directly so `klass` short-circuits before any name lookup.
+    middleReflection.options.anonymousClass = joinModel;
+    middleReflection.options.dependent = "delete";
     // Rails: `Builder::HasMany.define_callbacks self, middle_reflection`
     // (associations.rb:1878); AutosaveAssociation is one of its extensions.
     addAutosaveAssociationCallbacks.call(model, middleReflection);
-    Reflection.addReflection(model, middleName, middleReflection as any);
+    Reflection.addReflection(model, middleName, middleReflection);
 
     // Mirrors Rails associations.rb:1886-1894 — instead of registering a
     // bare `before_destroy` callback per HABTM, Rails includes an anonymous
@@ -369,7 +373,7 @@ export class HasAndBelongsToMany {
     // the generated join model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
       through: middleName,
-      source: (options.source as string) ?? sourceName,
+      source: (options.source as string) ?? joinModel.rightReflection.name,
     };
     if (options.joinTable != null) habtmOptions.joinTable = options.joinTable;
     for (const k of HABTM_FORWARDED_KEYS) {
@@ -405,7 +409,7 @@ export class HasAndBelongsToMany {
     // — the through middle is owned by the public HABTM reflection. Some
     // reflection-walking code paths (e.g. nested-through resolution and
     // inverse lookup) inspect this link.
-    (middleReflection as any).parentReflection = habtmReflection;
+    middleReflection.parentReflection = habtmReflection;
     CollectionAssociationBuilder.defineAccessors(model, habtmReflection);
   }
 }
