@@ -205,6 +205,33 @@ export class NormalizedValueType {
   itselfIfSerializeCastValueCompatible(): Type {
     return this as unknown as Type;
   }
+
+  /**
+   * Mirrors: ActiveRecord::Normalization::NormalizedValueType#== (normalization.rb:143-148),
+   * whose `eql?` alias is the same method — one TS method serves both.
+   * `equals` is the settled trails spelling of `Type#==`
+   * (activemodel/src/type/value.ts:221), and this override is load-bearing:
+   * without it the DelegateClass forwarding answers `equals` from the WRAPPED
+   * type, so a decorated type would compare equal to an undecorated one.
+   *
+   * `cast_type == other.cast_type` reaches whatever `==` the wrapped type
+   * defines, falling back to Ruby's identity default — hence the `equals?.()`
+   * with an identity fallback, since `equals` is defined on `ValueType` rather
+   * than on the abstract `Type`.
+   */
+  equals(other: Type): boolean {
+    return (
+      this.constructor === (other as object)?.constructor &&
+      this.normalizeNil === (other as unknown as NormalizedValueType).normalizeNil &&
+      this.normalizer === (other as unknown as NormalizedValueType).normalizer &&
+      castTypesEqual(this.castType, (other as unknown as NormalizedValueType).castType)
+    );
+  }
+}
+
+function castTypesEqual(a: Type, b: Type): boolean {
+  const equals = (a as { equals?(other: Type): boolean }).equals;
+  return equals ? equals.call(a, b) : a === b;
 }
 
 /**
