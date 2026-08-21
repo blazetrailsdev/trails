@@ -296,6 +296,16 @@ export interface Model {
   readAttributeForValidation(attribute: string): unknown;
   /** @internal */
   sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+
+  /**
+   * `ActiveModel::Attributes#attribute_names` (attributes.rb:146-148),
+   * installed on the prototype by the `include(Model, Attributes)` at the
+   * bottom of this file. Declared here only for its type, which Model's index
+   * signature otherwise widens to `unknown`; the merge spells it as a method
+   * so ActiveRecord's own `attribute_names` override (attribute_methods.rb:
+   * 334-336) stays assignable.
+   */
+  attributeNames(): string[];
 }
 
 /**
@@ -1907,17 +1917,6 @@ export class Model {
     const ctor = this.constructor as typeof Model;
     const defs = ctor._attributeDefinitions;
     return defs.has(ctor.resolveAttributeName(name));
-  }
-
-  /**
-   * Return the list of attribute names for this instance's class.
-   *
-   * Mirrors: ActiveModel::AttributeMethods#attribute_names (instance)
-   */
-  attributeNames(): string[] {
-    // Copy: the class-level result is frozen (memoized); Rails' instance
-    // method returns a fresh mutable `@attributes.keys` array.
-    return [...(this.constructor as typeof Model).attributeNames()];
   }
 
   /**

@@ -82,3 +82,11 @@ describe("Scalar", () => {
     expect(a.div(2).value).toBe(5);
   });
 });
+
+describe("DurationTest", () => {
+  it("equals", () => {
+    expect(days(1).equals(days(1))).toBe(true);
+    expect(days(1).equals(days(1).toI())).toBe(true);
+    expect(days(1).equals("foo")).toBe(false);
+  });
+});

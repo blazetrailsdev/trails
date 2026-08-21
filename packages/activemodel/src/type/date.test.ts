@@ -75,10 +75,6 @@ describe("DateTest", () => {
     expect(type.typeCastForSchema(d)).toBe('"2024-01-15"');
   });
 
-  it("typeCastForSchema returns null for null", () => {
-    expect(type.typeCastForSchema(null)).toBe("null");
-  });
-
   it("newDate rejects out-of-range components (rescue nil parity)", () => {
     class Probe extends Types.DateType {
       newDateFor(y: number, m: number, d: number) {

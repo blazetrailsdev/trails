@@ -17,6 +17,7 @@ import {
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
+import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
 import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
@@ -1092,7 +1093,40 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  */
 export function loadSchema(this: SchemaHost): void {
   if (ownSchemaMemo(this, "_schemaLoaded")) return;
+  loadSchemaBang.call(this);
+}
 
+/**
+ * Rails builds `load_schema!` as a super chain: `ModelSchema#load_schema!`
+ * (model_schema.rb:587-597) is the anchor, and each concern that needs
+ * schema-time bookkeeping overrides it and calls `super` — `CounterCache`
+ * (counter_cache.rb:186-195), `Encryption::EncryptableRecord`
+ * (encryptable_record.rb:126-130). A TS class cannot splice a module into its
+ * ancestor chain, so the overrides register through
+ * `registerLoadSchemaOverride` (load-schema-overrides-slot.ts) and are wrapped
+ * here by ascending `includeOrder` — the last-included module ends up
+ * outermost, exactly where `include` puts it in the ancestors — each handed the
+ * next link as `superFn`, the idiom `CounterCache._createRecord` already uses
+ * for a `super`-calling override.
+ */
+export function loadSchemaBang(this: SchemaHost): void {
+  runLoadSchemaChain(this, () => loadSchemaBangAnchor.call(this));
+}
+
+function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
+  let next = anchor;
+  for (const { override } of loadSchemaOverrides) {
+    const superFn = next;
+    next = () => override.call(host, superFn);
+  }
+  next();
+}
+
+/**
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#load_schema!
+ * (model_schema.rb:587-597) — the base of the chain.
+ */
+function loadSchemaBangAnchor(this: SchemaHost): void {
   // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
   // Rails' `table_name` is nil for an abstract class; ours computes an inferred
   // name even for abstract classes, so mirror the Rails effect by treating an
@@ -1352,6 +1386,11 @@ function applyColumnsHash(
  * overwritten, matching Rails where the pending replay runs after the column
  * seed so `attribute :foo, :bar` always wins over the reflected type.
  *
+ * This IS `ModelSchema#load_schema!`'s body on the async path, so it ends by
+ * running the concern overrides (counter_cache.rb:186-195,
+ * encryptable_record.rb:126-130) over an already-completed anchor rather than
+ * re-entering `loadSchemaBang`.
+ *
  * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
@@ -1414,6 +1453,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // (attribute_methods.rb:114) and would otherwise re-enter this load.
   this._schemaLoaded = true;
   defineAttributeMethodsAfterLoad(this);
+  runLoadSchemaChain(this, () => {});
 }
 
 /**
@@ -1704,11 +1744,6 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 /** @internal */
 export function isSchemaLoaded(this: SchemaHost): boolean {
   return ownSchemaMemo(this, "_schemaLoaded") ?? false;
-}
-
-/** @internal */
-function loadSchemaBang(this: SchemaHost): void {
-  loadSchema.call(this);
 }
 
 /** @internal */

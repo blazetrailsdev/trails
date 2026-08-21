@@ -5,6 +5,7 @@ import { LengthValidator, type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { encryptionHooks } from "../encryption-hooks.js";
+import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -320,10 +321,18 @@ export class EncryptableRecord {
     });
   }
 
-  /** @internal */
-  static loadSchemaBang(modelClass: any): void {
+  /**
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#load_schema!
+   * (encryptable_record.rb:126-130) — `super`, then the length validations when
+   * `validate_column_size` is on. `superFn` is Ruby `super`: the next link of
+   * the chain assembled in `model-schema.ts`, which this joins at
+   * `include Encryption::EncryptableRecord` (base.rb:313).
+   */
+  static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
+    superFn();
+
     if (Configurable.config.validateColumnSize) {
-      this.addLengthValidationForEncryptedColumns(modelClass);
+      EncryptableRecord.addLengthValidationForEncryptedColumns(this);
     }
   }
 
@@ -696,3 +705,5 @@ export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefin
   }
   return undefined;
 }
+
+registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);

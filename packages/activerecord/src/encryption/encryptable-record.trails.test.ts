@@ -18,6 +18,8 @@ import { EncryptableRecord, deterministicEncryptedAttributes } from "./encryptab
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
+import { Base } from "../base.js";
+import { LengthValidator } from "@blazetrails/activemodel";
 import { BinaryType } from "@blazetrails/activemodel";
 
 /**
@@ -43,6 +45,41 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
   afterEach(() => {
     restoreEncryptionConfig(configSnapshot);
+  });
+
+  /**
+   * `load_schema!` is a super chain in Rails (model_schema.rb:587-597 with
+   * encryptable_record.rb:126-130 layered over it), so the column limit the
+   * schema load reflects is what turns into the length validation. Declaring
+   * `encrypts` runs before any reflection, where no limit is known yet.
+   */
+  it("adds the encrypted column's length validation at schema load", async () => {
+    await freshAdapter();
+    Configurable.config.validateColumnSize = true;
+
+    class EncryptedBookValidatingColumnSize extends Base {
+      static _tableName = "encrypted_books";
+      static {
+        this.encrypts("name", { deterministic: true });
+      }
+    }
+
+    const validatorsFor = (name: string): unknown[] =>
+      (
+        EncryptedBookValidatingColumnSize as unknown as { _validators?: Map<string, unknown[]> }
+      )._validators?.get(name) ?? [];
+
+    expect(validatorsFor("name").some((v) => v instanceof LengthValidator)).toBe(false);
+
+    await EncryptedBookValidatingColumnSize.loadSchema();
+
+    expect(
+      validatorsFor("name").some(
+        (v) =>
+          v instanceof LengthValidator &&
+          (v as { options?: { maximum?: number } }).options?.maximum === 1024,
+      ),
+    ).toBe(true);
   });
 
   // Rails replays pending decorators in declaration order
