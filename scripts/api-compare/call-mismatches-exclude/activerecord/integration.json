@@ -2,28 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "integration.ts",
-    "rubyName": "cache_key",
-    "call": "to_fs",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:cacheTimestampFormat"
-    ],
-    "reason": "integration.rb:83 / :105 call `to_fs(cache_timestamp_format)` on the timestamp; the ported activesupport `toFs` is the core_ext free function, which takes the receiver as argument 1 (same shape as the reviewed relation.ts `compute_cache_version` row)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "integration.ts",
-    "rubyName": "cache_version",
-    "call": "to_fs",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:cacheTimestampFormat"
-    ],
-    "reason": "integration.rb:83 / :105 call `to_fs(cache_timestamp_format)` on the timestamp; the ported activesupport `toFs` is the core_ext free function, which takes the receiver as argument 1 (same shape as the reviewed relation.ts `compute_cache_version` row)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "integration.ts",
     "rubyName": "can_use_fast_cache_version?",
     "call": "with_connection",
     "reason": "integration.rb:180-183 reads `self.class.with_connection(&:default_timezone)`; `withConnection` is async in trails and `canUseFastCacheVersion` is a synchronous predicate on the cacheKey/cacheVersion path, so the port reads the global `ActiveRecord.defaultTimezone` instead — which is what Rails own FIXME on that line asks for (do not check out a connection here)."

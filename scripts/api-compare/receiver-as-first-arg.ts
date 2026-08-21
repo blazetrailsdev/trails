@@ -19,8 +19,9 @@
  * Rails-defined names here would bury them.
  *
  * So the rule for an entry is narrow and closed: the name must be a Ruby
- * LANGUAGE built-in on Object/String/Symbol/Array/Hash, or an ActiveSupport
- * core-ext on one of those, that trails necessarily exports as a free function.
+ * LANGUAGE built-in on Object/String/Symbol/Array/Hash/Time/Date/Class, or an
+ * ActiveSupport core-ext on one of those, that trails necessarily exports as a
+ * free function.
  * A method Rails itself defines on a Rails class NEVER qualifies, however
  * receiver-ish its first argument looks.
  */
@@ -98,6 +99,17 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as
   // `isEmpty(collection)` and the Ruby receiver is TS argument 1.
   "empty?",
+  // Ruby core `Class#subclasses` (3.1+) — `subclasses.each { … }` on a class.
+  // A JS class has no such built-in and TS cannot add one, so ActiveSupport's
+  // DescendantsTracker exports it as `subclasses(cls)` and the Ruby receiver is
+  // TS argument 1.
+  "subclasses",
+  // active_support/core_ext/time/conversions.rb:55 and
+  // core_ext/date/conversions.rb:49 — `timestamp.to_fs(format)`, defined on the
+  // Ruby core classes Time/Date, which TS cannot monkey-patch any more than it
+  // can String. @blazetrails/activesupport exports it as `toFs(date, format)`,
+  // so the Ruby receiver is TS argument 1 at every call site.
+  "to_fs",
   // Ruby core `Array#first` — a language built-in on the same receivers as
   // `empty?` above, and the same shape: `values[0]` is an index read, not a
   // call, so activerecord's `ruby-first.ts` exports it as `first(collection)`

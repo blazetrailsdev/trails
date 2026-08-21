@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "establish_connection",
-    "call": "resolve_pool_config",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:config",
-      "ref:ownerName",
-      "ref:role",
-      "ref:shard"
-    ],
-    "reason": "connection_handler.rb:118 `resolve_pool_config(config, owner_name, role, shard)` — Rails resolves the adapter class from `db_config.adapter` by requiring it at connect time. ESM has no autoload-by-name, so the factory is threaded as an `adapterFactory` kwarg; this is the same cause already reviewed on this file's `resolve_pool_config -> new` row."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
@@ -30,19 +16,5 @@
       "kwargs{initialCapacity=num:2}"
     ],
     "reason": "connection_handler.rb:78 `Concurrent::Map.new(initial_capacity: 2)` — a JS `Map` has no capacity hint, so the kwarg has no counterpart to pass. Language shortcoming, not deferred work."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "resolve_pool_config",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:connectionName",
-      "ref:dbConfig",
-      "ref:role",
-      "ref:shard"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/abstract/connection_handler.rb:279 `ConnectionAdapters::PoolConfig.new(connection_name, db_config, role, shard)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   }
 ]

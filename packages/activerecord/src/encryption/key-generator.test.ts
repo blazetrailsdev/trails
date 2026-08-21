@@ -14,7 +14,9 @@ function assertDeriveKey(
     .toString("base64");
   expect(Buffer.from(expectedDerivedKey, "base64").length).toBe(length);
   Configurable.config.hashDigestClass = digestClass;
-  expect(new KeyGenerator(digestClass).deriveKeyFrom(secret, { length })).toBe(expectedDerivedKey);
+  expect(new KeyGenerator({ hashDigestClass: digestClass }).deriveKeyFrom(secret, { length })).toBe(
+    expectedDerivedKey,
+  );
 }
 
 describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
@@ -84,8 +86,8 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
   });
 
   it("hash_digest_class reflects the configured digest", () => {
-    expect(new KeyGenerator("SHA256").hashDigestClass).toBe("SHA256");
-    expect(new KeyGenerator("SHA1").hashDigestClass).toBe("SHA1");
+    expect(new KeyGenerator({ hashDigestClass: "SHA256" }).hashDigestClass).toBe("SHA256");
+    expect(new KeyGenerator({ hashDigestClass: "SHA1" }).hashDigestClass).toBe("SHA1");
   });
 
   it("default hash_digest_class reads from config", () => {
@@ -103,7 +105,7 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
     });
 
     it("uses config.keyDerivationSalt as the salt", () => {
-      const gen = new KeyGenerator("SHA256");
+      const gen = new KeyGenerator({ hashDigestClass: "SHA256" });
       const expected = new AsKeyGenerator("password", { hashDigestClass: "SHA256" })
         .generateKey("test-salt", 32)
         .toString("base64");
@@ -112,12 +114,12 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
 
     it("raises when config.keyDerivationSalt is not set", () => {
       Configurable.config.keyDerivationSalt = undefined;
-      const gen = new KeyGenerator("SHA256");
+      const gen = new KeyGenerator({ hashDigestClass: "SHA256" });
       expect(() => gen.deriveKeyFrom("password")).toThrow();
     });
 
     it("produces a different key for a different salt", () => {
-      const gen = new KeyGenerator("SHA256");
+      const gen = new KeyGenerator({ hashDigestClass: "SHA256" });
       const withTestSalt = gen.deriveKeyFrom("password");
       Configurable.config.keyDerivationSalt = "other-salt";
       expect(gen.deriveKeyFrom("password")).not.toBe(withTestSalt);

@@ -47,14 +47,5 @@
     "rubyName": "inverse_name",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "join_scopes",
-    "call": "scope",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "reflection.rb:227 calls `scope` on implicit self; the ported scope helper takes its relation host explicitly (`scope(rel)`)."
   }
 ]
