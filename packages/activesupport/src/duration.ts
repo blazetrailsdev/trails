@@ -377,6 +377,20 @@ export class Duration {
     return `${rest}, and ${last}`;
   }
 
+  /**
+   * Mirrors: ActiveSupport::Duration#== (duration.rb:341-347) — another
+   * Duration with the same `value`, or `other == value` for anything else, so
+   * `2.days == 172800` is true. `value` is seconds, a JS number, and Ruby
+   * `==` on it is numeric equality.
+   */
+  equals(other: unknown): boolean {
+    if (other instanceof Duration) {
+      return other.value === this.value;
+    } else {
+      return other === this.value;
+    }
+  }
+
   toString(): string {
     return String(Math.round(this.inSeconds()));
   }

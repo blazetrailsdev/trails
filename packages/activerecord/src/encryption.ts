@@ -32,7 +32,6 @@ import {
   encryptAttribute,
   encryptedAttribute,
   encryptedTypeOf,
-  validateColumnSize,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -105,22 +104,13 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
  * durable PendingDecorator once at declaration time, and every type inspection
  * resolves through `typeForAttribute` (Rails' single lookup surface) — there is
  * no eager `_attributeDefinitions` re-wrap to maintain. What remains is the
- * bookkeeping Rails runs from `load_schema!` / `validate`: column-size
- * validation re-runs and the frozen-encryption validator install.
+ * bookkeeping Rails runs from `validate`: the frozen-encryption validator
+ * install. The column-size validation is `load_schema!`'s
+ * (encryptable_record.rb:126-130) and runs from that chain instead.
  */
 export function applyPendingEncryptions(klass: any): void {
   const pending: PendingEncryption[] | undefined = klass._pendingEncryptions;
   if (!pending || pending.length === 0) return;
-
-  // Re-run column-size validation after schema reflection so limits learned
-  // from the DB (not declared via attribute()) are also picked up. Safe even
-  // if validateColumnSize already ran at encrypts() time — it guards against
-  // registering the same LengthValidator twice.
-  if (Configurable.config.validateColumnSize) {
-    for (const { name } of pending) {
-      validateColumnSize.call(klass, name);
-    }
-  }
 
   // Register the frozen-encryption validator once per class. Own-property check
   // so subclasses that have already snapped their callback chain don't miss it —

@@ -3,6 +3,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { underscore } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
+import { registerLoadSchemaOverride } from "./load-schema-overrides-slot.js";
 import {
   touchAttributesWithTime,
   parseCounterCacheTouch,
@@ -244,7 +245,12 @@ export function isCounterCacheColumn(this: typeof Base, columnName: string): boo
  * belongs_to's target through the model registry rather than a constant, so a
  * counter column staged before its target existed is merged here.
  */
-export function loadSchemaBang(this: typeof Base): void {
+export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
+  superFn();
+
+  // trails resolves a belongs_to's target through the model registry rather
+  // than a constant, so a counter column staged before its target existed is
+  // merged here, at the same schema-load seam.
   getCounterCacheColumns(this);
 
   // `registerModel` also accepts stand-ins that do not descend from `Base`, so
@@ -267,13 +273,9 @@ export function loadSchemaBang(this: typeof Base): void {
  * Merge any pending counter-cache column registrations for a newly registered
  * model class.  Called by `registerModel` so entries accumulated before the
  * target was in the registry are applied immediately rather than on first read.
- *
- * trails has no `load_schema!` super chain to hang counter_cache.rb:186-195 on,
- * so this — the seam already reached once a model and its associations are
- * fully defined — is where `load_schema!` runs.
  */
 export function flushPendingCounterCacheColumns(modelClass: typeof Base): void {
-  loadSchemaBang.call(modelClass);
+  getCounterCacheColumns(modelClass);
 }
 
 function getCounterCacheColumns(modelClass: typeof Base): string[] {
@@ -403,3 +405,7 @@ export function _foreignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
   );
   return arr1.length === arr2.length && arr1.every((k, i) => k === arr2[i]);
 }
+
+// `include CounterCache` (base.rb:309) — its `load_schema!` override
+// (counter_cache.rb:186-195) joins the chain at that ancestor position.
+registerLoadSchemaOverride(309, loadSchemaBang as never);

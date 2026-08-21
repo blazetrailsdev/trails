@@ -6,6 +6,7 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
+import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -37,10 +38,15 @@ export class DateType extends ValueType<DateCastResult> {
     return this.name;
   }
 
+  /**
+   * Mirrors: ActiveModel::Type::Date#type_cast_for_schema (date.rb:34-36) —
+   * `value.to_fs(:db).inspect`. The schema dumper hands in an already-cast
+   * default, so there is no re-cast here; the PG infinity spellings belong to
+   * `PostgreSQL::OID::Date#type_cast_for_schema`
+   * (`postgresql/oid/date.rb:20-26`), which overrides this.
+   */
   typeCastForSchema(value: unknown): string {
-    const cast = this.cast(value);
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return "null";
-    return JSON.stringify(cast.toString());
+    return JSON.stringify(toFs(value as Temporal.PlainDate, "db"));
   }
 
   /**

@@ -5,6 +5,7 @@ import { LengthValidator, type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { encryptionHooks } from "../encryption-hooks.js";
+import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -320,10 +321,16 @@ export class EncryptableRecord {
     });
   }
 
-  /** @internal */
-  static loadSchemaBang(modelClass: any): void {
+  /**
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#load_schema!
+   * (encryptable_record.rb:126-130) — `super`, then the length validations when
+   * `validate_column_size` is on.
+   */
+  static loadSchemaBang(this: any, superFn: () => void): void {
+    superFn();
+
     if (Configurable.config.validateColumnSize) {
-      this.addLengthValidationForEncryptedColumns(modelClass);
+      EncryptableRecord.addLengthValidationForEncryptedColumns(this);
     }
   }
 
@@ -696,3 +703,7 @@ export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefin
   }
   return undefined;
 }
+
+// `include Encryption::EncryptableRecord` (base.rb:313) — later than
+// CounterCache (:309), so this override sits closer to the class and runs first.
+registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);

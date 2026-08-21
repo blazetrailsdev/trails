@@ -18,6 +18,9 @@
       ],
       "@blazetrails/activesupport/key-generator": ["../../activesupport/src/key-generator.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
+      "@blazetrails/activesupport/core-ext/date/conversions": [
+        "../../activesupport/src/core-ext/date/conversions.ts"
+      ],
       "@blazetrails/activesupport/core-ext/date/calculations": [
         "../../activesupport/src/core-ext/date/calculations.ts"
       ],

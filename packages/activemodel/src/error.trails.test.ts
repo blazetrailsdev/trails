@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Range } from "@blazetrails/activesupport";
+import { Duration, Range } from "@blazetrails/activesupport";
 import { Error as ModelError } from "./error.js";
 
 describe("Error option value equality", () => {
@@ -15,6 +15,17 @@ describe("Error option value equality", () => {
     expect(error.strictMatch("name", ":too_long", { count: new Range(5, 20) })).toBe(true);
     expect(
       error.equals(new ModelError(base, "name", ":too_long", { count: new Range(5, 20) })),
+    ).toBe(true);
+  });
+
+  it("compares two separately-constructed equal Durations as equal", () => {
+    const error = new ModelError(base, "startsAt", ":greater_than", { count: Duration.days(2) });
+
+    expect(error.match("startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
+    expect(error.match("startsAt", ":greater_than", { count: Duration.days(3) })).toBe(false);
+    expect(error.strictMatch("startsAt", ":greater_than", { count: Duration.days(2) })).toBe(true);
+    expect(
+      error.equals(new ModelError(base, "startsAt", ":greater_than", { count: Duration.days(2) })),
     ).toBe(true);
   });
 

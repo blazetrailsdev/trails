@@ -335,17 +335,3 @@ function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
     nanosecond: Number(newNsec % 1_000n),
   }) as T;
 }
-
-export function serializeTimeValue(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainTime ||
-    value instanceof Temporal.ZonedDateTime
-  ) {
-    return value.toJSON();
-  }
-  return String(value);
-}
