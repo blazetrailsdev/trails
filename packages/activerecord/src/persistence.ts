@@ -1546,7 +1546,7 @@ interface PersistencePrivateHost {
   isNewRecord(): boolean;
   isDestroyed(): boolean;
   id: unknown;
-  idInDatabase?(): unknown;
+  idInDatabase(): unknown;
   attributeInDatabase?(col: string): unknown;
   _associationInstances?: Map<
     string,
@@ -1655,10 +1655,7 @@ export function _queryConstraintsHash(this: PersistencePrivateHost): Record<stri
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
     const pk = this.constructor.primaryKey as string;
-    // Rails locates the row by `id_in_database`; only fall back to the live
-    // attribute when the in-database accessor is unavailable. A `??` here would
-    // wrongly use the new value whenever the persisted id is legitimately null.
-    return { [pk]: this.idInDatabase ? this.idInDatabase() : this.id };
+    return { [pk]: this.idInDatabase() };
   }
   // Use each constraint column's persisted (`*_in_database`) value, not the live
   // attribute — when a constraint column is itself changing (e.g. a CPK foreign

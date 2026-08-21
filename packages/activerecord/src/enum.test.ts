@@ -638,11 +638,11 @@ describe("EnumTest", () => {
 
     const book1 = await (Klass1 as any).proposed().createBang();
     book1.status = "written";
-    expect(book1.statusChange()).toEqual(["proposed", "written"]);
+    expect(book1.statusChange).toEqual(["proposed", "written"]);
 
     const book2 = await (Klass2 as any).drafted().createBang();
     book2.status = "uploaded";
-    expect(book2.statusChange()).toEqual(["drafted", "uploaded"]);
+    expect(book2.statusChange).toEqual(["drafted", "uploaded"]);
   });
 
   it("enums are inheritable", async () => {
@@ -655,11 +655,11 @@ describe("EnumTest", () => {
 
     const book1 = await (Subklass1 as any).proposed().createBang();
     book1.status = "written";
-    expect(book1.statusChange()).toEqual(["proposed", "written"]);
+    expect(book1.statusChange).toEqual(["proposed", "written"]);
 
     const book2 = await (Subklass2 as any).drafted().createBang();
     book2.status = "uploaded";
-    expect(book2.statusChange()).toEqual(["drafted", "uploaded"]);
+    expect(book2.statusChange).toEqual(["drafted", "uploaded"]);
   });
 
   // Rails: `Book.statuses` is frozen; a mutation raises "can't modify frozen".

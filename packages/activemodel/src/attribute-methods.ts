@@ -452,6 +452,17 @@ export function defineAttributeMethodPattern(
     if (!override) return;
   }
 
+  // A `parameters: false` pattern emits an accessor property, and a property
+  // cannot shadow an inherited method without breaking every caller that
+  // invokes it — the third consequence in CLAUDE.md, "Generated attribute
+  // readers are properties". Rails needs no such check: `id_in_database` stays
+  // a method whether it comes from PrimaryKey or from the `_in_database`
+  // suffix, so a pk-less model (a PostgreSQL foreign table) generating over it
+  // is harmless there and is not there.
+  if (pattern.parameters === false && !override && answersWithAMethod(this, publicMethodName)) {
+    return;
+  }
+
   const generateMethod = pattern.proxyTarget.endsWith("=")
     ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
     : camelize(`define_method_${pattern.proxyTarget}`, false);
@@ -724,6 +735,30 @@ function extractParameters(
  * needs none of this: its `instance_method_already_implemented?` override
  * (attribute_methods.rb:165-179) rejects such a name before the hook runs.
  */
+/**
+ * Whether `name` resolves to a plain method on the class — as opposed to a
+ * generated accessor property, or nothing. The JS spelling of Rails'
+ * `!owner.is_a?(GeneratedAttributeMethods)` test over a name that is already
+ * defined (activerecord/attribute_methods.rb:174-176), narrowed to the one
+ * case where the distinction bites: replacing a method with a property.
+ *
+ * @noRailsEquivalent PERMANENT. See `defineAttributeMethodPattern`'s call site
+ * and CLAUDE.md, "Generated attribute readers are properties".
+ */
+function answersWithAMethod(klass: unknown, name: string): boolean {
+  const start = (klass as { prototype?: object }).prototype;
+  for (
+    let link: object | null = start ?? null;
+    link;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(link, name);
+    if (!descriptor) continue;
+    return typeof descriptor.value === "function";
+  }
+  return false;
+}
+
 function isDefinedByAClassBody(klass: unknown, name: string): boolean {
   const start = (klass as { prototype?: object }).prototype;
   for (
