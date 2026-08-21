@@ -323,7 +323,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       // Validate attributes against the target model's known columns, resolving
       // `alias_attribute` keys the same way the build path does. `childAttrs`
       // already has the PK/`id` addressing keys stripped; the foreign-key
-      // columns are real target columns (present in `_attributeDefinitions`), so
+      // columns are real target columns (present in `attribute_types`), so
       // `assertNestedAttributesAreKnown` accepts them without a bespoke set.
       assertNestedAttributesAreKnown(targetModel, childAttrs);
 
@@ -612,8 +612,8 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
  * explicitly — mirroring the same check the collection flush path already runs.
  * Control keys (`_destroy`, the addressing `id`) are stripped by
  * `except(*UNASSIGNABLE_KEYS)` before this sees them; the primary key is always
- * assignable. When the target schema isn't loaded (`_attributeDefinitions`
- * empty) there is nothing to validate against, so the check is skipped.
+ * assignable. When the target schema isn't loaded (`attribute_types` empty)
+ * there is nothing to validate against, so the check is skipped.
  */
 function assertNestedAttributesAreKnown(
   targetModel: typeof Base,
@@ -621,24 +621,19 @@ function assertNestedAttributesAreKnown(
 ): void {
   const keys = Object.keys(assignable);
   if (keys.length === 0) return;
-  let attrDefs: Map<string, unknown> | undefined = (targetModel as any)._attributeDefinitions;
-  // trails loads a model's schema lazily on first `new`, so `_attributeDefinitions`
-  // may still be empty before the first nested build. Warm it once (and reuse the
-  // instance as an alias-aware probe below); when the model is genuinely
-  // schemaless there is nothing to validate against, so skip.
+  // `attribute_types` reflects the schema on first read (`_default_attributes`),
+  // so no warming construction is needed; a genuinely schemaless model yields an
+  // empty set and there is nothing to validate against.
+  const attributeTypes = targetModel.attributeTypes();
+  if (Object.keys(attributeTypes).length === 0) return;
   let probe: Base | undefined;
-  if (!attrDefs || attrDefs.size === 0) {
-    probe = new (targetModel as any)() as Base;
-    attrDefs = (targetModel as any)._attributeDefinitions;
-  }
-  if (!attrDefs || attrDefs.size === 0) return;
   const pk = (targetModel as any).primaryKey;
   const pkColumns = new Set<string>((Array.isArray(pk) ? pk : [pk]).map(String));
   // `assignable` comes from `except(*UNASSIGNABLE_KEYS)`, which already strips
   // the `id` addressing key (UNASSIGNABLE_KEYS), so only a non-`id` primary key
   // needs an explicit exemption here.
   for (const key of keys) {
-    if (attrDefs.has(key) || pkColumns.has(key)) continue;
+    if (Object.hasOwn(attributeTypes, key) || pkColumns.has(key)) continue;
     // Resolve aliases before raising: `hasAttribute` maps an aliased name onto
     // its real column (matching the flush path's lazy dummy construction).
     probe ??= new (targetModel as any)() as Base;

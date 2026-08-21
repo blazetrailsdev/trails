@@ -23,7 +23,7 @@ import { isPresent, singularize, underscore } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { EncryptableRecord, encryptedAttributes } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
-import type { Type } from "@blazetrails/activemodel";
+import { defaultValue, type Type } from "@blazetrails/activemodel";
 
 /**
  * Mirrors Rails' `ActiveRecord::FixtureSet::TableRow::PrimaryKeyError`.
@@ -745,25 +745,23 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
 function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   const encryptedAttrs = encryptedAttributes.call(ModelClass);
   // Build a name→EncryptedAttributeType map from _pendingEncryptions. This lets
-  // us serialize even before loadSchemaFromAdapter has run (schema-reflected types
-  // won't be in _attributeDefinitions yet, but the scheme is already recorded).
-  // When an existing _attributeDefinitions entry is present (e.g. attribute(:name, :date)
-  // was called before encrypts(:name)), its castType is preserved so the fixture value
-  // is serialized through the correct inner type before encryption — mirrors Rails'
-  // `model_class.type_for_attribute(attribute_name)` which returns the full decorated type.
+  // us serialize even before loadSchemaFromAdapter has run (the scheme is
+  // already recorded, while `type_for_attribute` still answers the fallback
+  // `Type.default_value` for an unreflected column). The resolved type is Rails'
+  // `model_class.type_for_attribute(attribute_name)` — the full decorated type —
+  // so a `attribute(:name, :date)` declared before `encrypts(:name)` keeps its
+  // cast type and the fixture value is serialized through it before encryption.
   const typeMap = new Map<string, EncryptedAttributeType>();
   const pending: Array<{ name: string; scheme: unknown }> =
     (ModelClass as any)._pendingEncryptions ?? [];
-  const defs: Map<string, { type: unknown }> | undefined = (ModelClass as any)
-    ._attributeDefinitions;
   for (const { name, scheme } of pending) {
-    const existingType = defs?.get(name)?.type;
+    const existingType = (ModelClass as any).typeForAttribute(name) as Type;
     const castType =
       existingType instanceof EncryptedAttributeType
         ? existingType.castType
-        : existingType !== undefined
-          ? (existingType as Type)
-          : undefined;
+        : existingType === defaultValue()
+          ? undefined
+          : existingType;
     typeMap.set(name, new EncryptedAttributeType({ scheme: scheme as any, castType }));
   }
 

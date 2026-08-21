@@ -683,7 +683,6 @@ interface SaveRecord {
   isValid(context?: ValidationContextArg): Promise<boolean>;
   constructor: {
     name: string;
-    _attributeDefinitions: Map<string, unknown>;
   };
 }
 
@@ -975,16 +974,11 @@ interface UpdateColumnsRecord {
     name: string;
     primaryKey: string | string[];
     arelTable: InstanceType<typeof ArelTable>;
-    _attributeDefinitions: Map<
-      string,
-      {
-        type: {
-          cast(v: unknown): unknown;
-          serialize?(v: unknown): unknown;
-          type?(): string;
-        };
-      }
-    >;
+    attributeTypes(): Record<string, unknown>;
+    _defaultAttributes(): {
+      isKey(name: string): boolean;
+      getAttribute(name: string): { value: unknown };
+    };
     typeForAttribute(name: string): {
       cast(v: unknown): unknown;
       serialize?(v: unknown): unknown;
@@ -1061,7 +1055,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   // values for the UPDATE's SET clause. Reject unknown keys up-front so a
   // malicious/invalid key can't sneak an un-schema'd identifier into the
   // SQL identifier position. Primary-key columns are implicit on Base and
-  // aren't always in _attributeDefinitions, so allow them through.
+  // aren't always in `attribute_types`, so allow them through.
   const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
   // Rails resolves attribute aliases before writing (update_columns flows
   // through the alias-aware attribute layer), so a model aliasing e.g.
@@ -1084,17 +1078,18 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 
   const setPairs: Array<[unknown, unknown]> = [];
   const updatedKeys: string[] = [];
+  // Rails casts through `@attributes.write_cast_value` (persistence.rb:625),
+  // i.e. the `_default_attributes` type — the pending-decorator chain replayed
+  // — so `attribute_types` is also the set a key is known against, and a
+  // `serialize` / `encrypts` decoration applies here too.
+  const attributeTypes = ctor.attributeTypes();
   for (const [key, value] of resolvedEntries) {
     updatedKeys.push(key);
-    const def = ctor._attributeDefinitions.get(key);
-    if (!def && !pkCols.includes(key)) {
+    const known = Object.hasOwn(attributeTypes, key);
+    if (!known && !pkCols.includes(key)) {
       throw new UnknownAttributeError(this, key);
     }
-    // Rails casts through `@attributes.write_cast_value` (persistence.rb:625),
-    // i.e. the `_default_attributes` type — the pending-decorator chain replayed
-    // — not a per-class definition cache, so a `serialize` / `encrypts`
-    // decoration applies here too.
-    const attrType = def ? (ctor.typeForAttribute(key) ?? def.type) : undefined;
+    const attrType = known ? ctor.typeForAttribute(key) : undefined;
     const cast = attrType ? attrType.cast(value) : value;
     this._attributes.set(key, cast);
     // Bridge the in-memory cast value to its DB representation via the
@@ -1801,9 +1796,9 @@ export async function _createRecord(
   // seed is what actually carries the 0 into the row.
   if (ctor.lockingEnabled) {
     const lockCol = ctor.lockingColumn;
-    const lockDef = ctor._attributeDefinitions.get(lockCol);
-    if (lockDef && this._readAttribute(lockCol) == null) {
-      this._writeAttribute(lockCol, lockDef.type.cast(lockDef.defaultValue));
+    const defaults = ctor._defaultAttributes();
+    if (defaults.isKey(lockCol) && this._readAttribute(lockCol) == null) {
+      this._writeAttribute(lockCol, defaults.getAttribute(lockCol).value);
     }
   }
 
@@ -1813,7 +1808,7 @@ export async function _createRecord(
   // declared columns present in the value map; an explicit `attributeNames`
   // arg overrides it (Persistence#_create_record(attribute_names)).
   const selfNames =
-    attributeNames ?? Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
+    attributeNames ?? Object.keys(attrs).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
   // attribute_names_for_partial_inserts (dirty.rb). The dirty set is populated
   // before the INSERT by reinstateNewRecordChanges (above),
