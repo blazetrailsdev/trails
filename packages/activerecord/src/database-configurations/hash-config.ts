@@ -8,7 +8,7 @@
  * Creates a HashConfig with envName="development", name="primary",
  * and configuration={ database: "db_name" }.
  */
-import { configurationsStore } from "../database-configurations.js";
+import { configurationsStore as configurations } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 
 export class HashConfig extends DatabaseConfig {
@@ -19,12 +19,14 @@ export class HashConfig extends DatabaseConfig {
   /**
    * Mirrors: HashConfig#primary?
    *
-   * Asks the one global registry, exactly as Rails does — the store is read
-   * at call time, so the import back into `database-configurations.ts` never
-   * needs the module to have finished evaluating.
+   * `Base.configurations` reads the one process-global registry and takes no
+   * receiver, so `configurations()` here is that same `@@configurations`
+   * (`core.rb:71-79`) under its Rails name. It is read at call time, so the
+   * import back into `database-configurations.ts` never needs that module to
+   * have finished evaluating.
    */
   isPrimary(): boolean {
-    return configurationsStore().isPrimary(this.name);
+    return configurations().isPrimary(this.name);
   }
 
   /**
