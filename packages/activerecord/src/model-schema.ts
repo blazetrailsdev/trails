@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { pluralize, underscore } from "@blazetrails/activesupport";
+import { pluralize, underscore, DescendantsTracker } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
@@ -44,82 +44,6 @@ function reflectionAdapter(klass: any): any {
 }
 
 /**
- * Global so `_schemaRevision` values stay comparable ACROSS the prototype
- * chain — {@link schemaStaleAgainstAncestors} depends on that ordering.
- *
- * @internal
- */
-let schemaEpoch = 0;
-
-function nextSchemaEpoch(): number {
-  return ++schemaEpoch;
-}
-
-/**
- * Ruby class ivars are not inherited; JS statics are. Reads the memo only when
- * the class owns it, so a subclass never serves an ancestor's value.
- *
- * @internal
- */
-export function ownProp<K extends keyof SchemaHost>(
-  host: SchemaHost,
-  key: K,
-): SchemaHost[K] | undefined {
-  return Object.prototype.hasOwnProperty.call(host, key) ? host[key] : undefined;
-}
-
-/**
- * Stands in for Rails reaching descendants through DescendantsTracker's
- * `inherited` hook (model_schema.rb:566-570); JS has no equivalent for classes
- * that never called `registerSubclass`.
- *
- * Memoized against {@link schemaEpoch}: this runs on every schema-memo read,
- * including the `new Model()` hot path, and nothing can go stale without some
- * class stamping a fresh epoch.
- *
- * @internal
- */
-export function schemaStaleAgainstAncestors(host: SchemaHost): boolean {
-  const cached = ownProp(host, "_staleCheck");
-  if (cached && cached.epoch === schemaEpoch) return cached.stale;
-
-  const own = ownProp(host, "_schemaRevision") ?? 0;
-  let stale = false;
-  let current = Object.getPrototypeOf(host) as SchemaHost | null;
-  while (current && (current as unknown) !== Function.prototype) {
-    if ((ownProp(current, "_schemaRevision") ?? 0) > own) {
-      stale = true;
-      break;
-    }
-    current = Object.getPrototypeOf(current) as SchemaHost | null;
-  }
-  host._staleCheck = { epoch: schemaEpoch, stale };
-  return stale;
-}
-
-/**
- * A load that just ran read the *current* schema state, so the class is no
- * longer behind any ancestor's invalidation: stamp its own revision at the
- * current epoch, which is what {@link schemaStaleAgainstAncestors} compares
- * against, and drop the verdict it memoized before the load.
- *
- * Without this, a class whose ancestor was invalidated after the subclass was
- * defined — an ancestor reload cannot reach a subclass that never called
- * `registerSubclass` — stays permanently stale, so {@link ownSchemaMemo} keeps
- * answering `undefined` for a `_schemaLoaded` that is `true`. `load_schema`
- * then re-enters the load it just finished, through the generation hook at the
- * end of it, until the stack overflows. The reflected arms stamp a revision
- * through `applyColumnsHash`; the synthesize arm below is the one that
- * otherwise settles a load without ever recording that it ran.
- *
- * @internal
- */
-function markSchemaFresh(host: SchemaHost): void {
-  host._schemaRevision = schemaEpoch;
-  host._staleCheck = undefined;
-}
-
-/**
  * Ruby class ivars are not inherited, but JS `static` members ARE — a bare
  * `this._columnsHash` read on a subclass would see the base's memo and skip the
  * subclass's own `load_schema!` (model_schema.rb:587-597).
@@ -130,8 +54,7 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
   host: SchemaHost,
   key: K,
 ): SchemaHost[K] | undefined {
-  if (!Object.prototype.hasOwnProperty.call(host, key)) return undefined;
-  return schemaStaleAgainstAncestors(host) ? undefined : host[key];
+  return Object.prototype.hasOwnProperty.call(host, key) ? host[key] : undefined;
 }
 
 /**
@@ -306,11 +229,11 @@ export function columnNames(this: typeof Base): string[] {
   const memo = Object.prototype.hasOwnProperty.call(host, "_columnNamesMemo")
     ? host._columnNamesMemo
     : undefined;
-  if (memo && memo.revision === (host._schemaRevision ?? 0)) return memo.names as string[];
+  if (memo) return memo.names as string[];
   const names = this.columns().map((c: { name: string }) => c.name);
   if (ownSchemaMemo(host, "_schemaLoaded")) {
     const frozen = Object.freeze(names);
-    host._columnNamesMemo = { revision: host._schemaRevision ?? 0, names: frozen };
+    host._columnNamesMemo = { names: frozen };
     return frozen as string[];
   }
   return names;
@@ -638,12 +561,8 @@ export interface SchemaHost {
   attributeTypes(): Record<string, any>;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
-  /** Global epoch stamped on reflect/invalidate; see {@link schemaEpoch}. @internal */
-  _schemaRevision?: number;
-  /** Memoized {@link schemaStaleAgainstAncestors} result. @internal */
-  _staleCheck?: { epoch: number; stale: boolean };
-  /** Rails' `@column_names` memo, revision-stamped. @internal */
-  _columnNamesMemo?: { revision: number; names: readonly string[] };
+  /** Rails' `@column_names` memo (model_schema.rb:478-480). @internal */
+  _columnNamesMemo?: { names: readonly string[] };
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -651,17 +570,42 @@ export interface SchemaHost {
 }
 
 /**
+ * Rails' `subclasses` / `descendants` are `DescendantsTracker`-backed, so
+ * `inherited` lists every subclass the moment it is defined and
+ * `reload_schema_from_cache`'s recursive push (model_schema.rb:553-568) reaches
+ * all of them. trails has two partial registries instead: `Inheritance`'s
+ * `_subclasses`, filled only by an explicit `registerSubclass`, and the
+ * `DescendantsTracker` that `_default_attributes` registers into. This returns
+ * the classes only the tracker knows about, so the push-down sites can cover
+ * both.
+ *
+ * @internal
+ */
+function withTracked(known: SchemaHost[], tracked: SchemaHost[], host: SchemaHost): SchemaHost[] {
+  const result = [...known];
+  for (const klass of tracked) {
+    if (klass !== host && !result.includes(klass)) result.push(klass);
+  }
+  return result;
+}
+
+/**
  * Drop the memoized class-level `attributeNames` and `columnNames` on `host`
  * and its descendants — Rails' `reload_schema_from_cache` nils
  * `@attribute_names` and `@column_names` recursively (model_schema.rb:553-568).
- * Used by the invalidation paths that don't bump `_schemaRevision`
- * (`attribute`, `table_name=`, `ignored_columns=`).
+ * Used by every invalidation path (`attribute`, `table_name=`,
+ * `ignored_columns=`, `reload_schema_from_cache`, `load_schema!`).
  *
  * @internal
  */
 export function clearAttributeNamesMemo(host: SchemaHost): void {
   const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
-  for (const klass of [host, ...descendants]) {
+  const all = withTracked(
+    descendants,
+    DescendantsTracker.descendants(host as never) as unknown as SchemaHost[],
+    host,
+  );
+  for (const klass of [host, ...all]) {
     for (const memo of ["_attributeNamesMemo", "_columnNamesMemo"] as const) {
       if (Object.prototype.hasOwnProperty.call(klass, memo)) {
         Reflect.deleteProperty(klass, memo);
@@ -1090,7 +1034,6 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
-  this._schemaRevision = nextSchemaEpoch();
   // ActiveRecord::Attributes overrides `reload_schema_from_cache` to call
   // `reset_default_attributes!` before `super` (attributes.rb:268-271), which
   // nils `@attribute_types` as well as `@default_attributes`
@@ -1102,7 +1045,12 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(this);
   }
-  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+  const subclasses = (this as { subclasses?: SchemaHost[] }).subclasses ?? [];
+  for (const sub of withTracked(
+    subclasses,
+    DescendantsTracker.subclasses(this as never) as unknown as SchemaHost[],
+    this,
+  )) {
     reloadSchemaFromCache.call(sub);
   }
 }
@@ -1216,7 +1164,6 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
     this._columnsHash = hash;
   }
   if (!pkStillMissing) {
-    markSchemaFresh(this);
     this._schemaLoaded = true;
     defineAttributeMethodsAfterLoad(this);
   }
@@ -1397,9 +1344,9 @@ function applyColumnsHash(
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
 
-  // Reflection may change a column's type/default without changing the key set,
-  // so the revision stamps cannot infer staleness from key coverage.
-  host._schemaRevision = nextSchemaEpoch();
+  // `load_schema!` re-settles `@columns_hash`, so the derived `@column_names` /
+  // `@attribute_names` memos are nil'd alongside it (model_schema.rb:553-568).
+  clearAttributeNamesMemo(host);
 }
 
 /**
@@ -1529,14 +1476,22 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // that stale view forever — leaving `columnNames()` reading the warm
           // cache's real columns while `attributeNames()` stays minimal. Drop
           // the flag so the next `loadSchema` re-reflects from the warm cache
-          // and merges the real columns into `_attributeDefinitions`. The flag
-          // drop does not bump `_schemaRevision`, so also drop the name memos
-          // stamped against the synthesized view — otherwise `columnNames()`
-          // keeps serving the pre-warm list.
+          // and merges the real columns into `_attributeDefinitions`, and drop
+          // the name memos stamped against the synthesized view — otherwise
+          // `columnNames()` keeps serving the pre-warm list.
           if (ownSchemaMemo(host, "_schemaLoaded")) {
-            host._schemaLoaded = false;
-            host._columnsHash = undefined;
-            host._columns = undefined;
+            // Rails nils these recursively (model_schema.rb:553-568), so a
+            // subclass memo built off the pre-warm synthesized view goes too.
+            const stale = withTracked(
+              (host as { descendants?: SchemaHost[] }).descendants ?? [],
+              DescendantsTracker.descendants(host as never) as unknown as SchemaHost[],
+              host,
+            );
+            for (const klass of [host, ...stale]) {
+              klass._schemaLoaded = false;
+              klass._columnsHash = undefined;
+              klass._columns = undefined;
+            }
             clearAttributeNamesMemo(host);
           }
           return new Set(names);

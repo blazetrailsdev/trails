@@ -655,8 +655,7 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 interface AttributeNamesHost {
   attributeTypes(): Record<string, unknown>;
   abstractClass?: boolean;
-  _schemaRevision?: number;
-  _attributeNamesMemo?: { revision: number; names: readonly string[] };
+  _attributeNamesMemo?: { names: readonly string[] };
 }
 
 /**
@@ -669,13 +668,14 @@ interface AttributeNamesHost {
 function classAttributeNames(this: AttributeNamesHost): string[] {
   // Rails' `@attribute_names ||= ...freeze` memo, own-property per class (a
   // subclass never reads its parent's memo — Rails nils `@attribute_names` in
-  // `inherited`), revision-stamped so the reset paths that clear
-  // `_columns`/`_columnsHash` (resetColumnInformation, applyColumnsHash)
-  // invalidate it, including subclass memos the base's reset can't reach.
+  // `inherited`). The reset paths that clear `_columns`/`_columnsHash`
+  // (resetColumnInformation, applyColumnsHash) drop it through
+  // `clearAttributeNamesMemo`, which recurses into descendants exactly as
+  // `reload_schema_from_cache` does (model_schema.rb:553-568).
   const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
     ? this._attributeNamesMemo
     : undefined;
-  if (memo && memo.revision === (this._schemaRevision ?? 0)) return memo.names as string[];
+  if (memo) return memo.names as string[];
   // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`.
   // trails' tableExists is async, so the table_exists? half runs off the schema
   // cache's already-resolved answer — `false` only after a dataSourceExists
@@ -685,19 +685,17 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
   // The async pipeline (loadSchemaFromAdapter → dataSourceExists) seeds the
   // negative entry, closing the guard once `loadSchema()` has been awaited —
   // which is why the fail-open answer must never be memoized: that resolution
-  // happens without a `_schemaRevision` bump to invalidate it.
+  // happens without any invalidation to drop the memo.
   const exists = cachedTableExists.call(this as never);
   if (this.abstractClass || exists === false) {
     const frozen = Object.freeze([] as string[]);
-    this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
+    this._attributeNamesMemo = { names: frozen };
     return frozen as string[];
   }
   const names = Object.keys(this.attributeTypes());
   if (exists !== undefined) {
     const frozen = Object.freeze(names);
-    // Re-read the revision: `attributeTypes()` above can run the first sync
-    // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
-    this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
+    this._attributeNamesMemo = { names: frozen };
     return frozen as string[];
   }
   return names;

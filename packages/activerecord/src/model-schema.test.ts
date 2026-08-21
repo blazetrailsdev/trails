@@ -57,9 +57,8 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
     expect(cold).not.toContain("tags_count");
 
     // The write path's reconciliation warms the shared cache and clears
-    // `_schemaLoaded` without a `_schemaRevision` bump — the memo must be
-    // dropped with it, not keep serving the pre-warm synthesized list until
-    // some later `loadSchema` happens to bump the revision.
+    // `_schemaLoaded` — the memo must be dropped with it, not keep serving the
+    // pre-warm synthesized list until some later `loadSchema` re-reflects.
     await reconcileVirtualAttributes.call(Post as never, true);
     expect(Post.columnNames()).toContain("tags_count");
   });

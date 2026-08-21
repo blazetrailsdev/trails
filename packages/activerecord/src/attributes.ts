@@ -28,12 +28,7 @@ import {
 import { registerSubclass } from "@blazetrails/activesupport";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
-import {
-  cachedColumnsHash,
-  isSchemaLoaded,
-  pendingAttributeDeclarationQ,
-  schemaStaleAgainstAncestors,
-} from "./model-schema.js";
+import { cachedColumnsHash, isSchemaLoaded, pendingAttributeDeclarationQ } from "./model-schema.js";
 
 type AnyClass = any;
 
@@ -195,8 +190,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 
   if (
     !Object.prototype.hasOwnProperty.call(cacheHost, "_cachedDefaultAttributes") ||
-    !cacheHost._cachedDefaultAttributes ||
-    schemaStaleAgainstAncestors(cacheHost)
+    !cacheHost._cachedDefaultAttributes
   ) {
     // Stands in for Ruby's `inherited` hook, which populates the
     // DescendantsTracker `reset_default_attributes` recurses over
