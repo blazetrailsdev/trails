@@ -1,10 +1,11 @@
 /**
  * Attribute writing methods.
  *
- * `writeAttribute` here is the base `Write#write_attribute`; `Base.prototype`
- * receives `HasReadonlyAttributes#write_attribute` (readonly-attributes.ts),
- * which adds the frozen / readonly guards and reaches this shape through its
- * own `super` call.
+ * `writeAttribute` here is the base `Write#write_attribute`. `Base.prototype`
+ * currently receives `HasReadonlyAttributes#write_attribute`
+ * (readonly-attributes.ts), which inlines this body behind its guards instead
+ * of reaching it the way Ruby's `super` (readonly_attributes.rb:54) does —
+ * tracked by the `converge-readonly-write-attribute-onto-write-super` story.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */

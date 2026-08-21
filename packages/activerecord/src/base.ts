@@ -4754,13 +4754,6 @@ include(Base, {
   // AttributeMethods
   readAttribute: _readAttribute,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
-  // model_schema.rb:183 — `delegate :type_for_attribute, :column_for_attribute,
-  // to: :class`. The class-side method is ModelSchema.columnForAttribute; the
-  // delegate is inlined here so it does not become a second exported symbol
-  // for the same Ruby name.
-  columnForAttribute(this: Base, name: string) {
-    return (this.constructor as typeof Base).columnForAttribute(name);
-  },
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
@@ -4787,6 +4780,7 @@ Object.defineProperty(Base.prototype, "attributesBeforeTypeCast", {
   },
   configurable: true,
 });
+include(Base, ModelSchema.InstanceMethods);
 include(Base, _PrimaryKey);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
