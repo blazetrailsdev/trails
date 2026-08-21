@@ -215,7 +215,9 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
  * realizes Rails' own FIXME to cache this rather than checking out a connection.
  * When default_timezone is not UTC, the raw DB string can't be reused verbatim,
  * so we fall through to the type-casting reader. The `!updated_at_came_from_user?`
- * guard IS implemented (cameFromUser is sync), so a user-assigned DB-format
+ * guard IS implemented — it reads the generated `updated_atCameFromUser`
+ * (before_type_cast.rb:33; the attribute keeps its column name, so the
+ * generated reader does too), which is sync — so a user-assigned DB-format
  * string (e.g. `record.updated_at = "2020-01-01 00:00:00"`) also correctly
  * falls through to the type-casting reader. The shape check (TIMESTAMP_RE) is an
  * additional trails-only safeguard against sub-microsecond raw strings.
@@ -229,7 +231,7 @@ export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown)
   const klass = record.constructor as any;
   if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
   if (ActiveRecord.defaultTimezone !== "utc") return false;
-  if (record.cameFromUser("updated_at")) return false;
+  if ((record as unknown as Record<string, boolean>)["updated_atCameFromUser"]) return false;
   return TIMESTAMP_RE.test(timestamp);
 }
 

@@ -56,7 +56,13 @@ type Rec = Base & Record<string, unknown>;
  * (not on its static type), so on a {@link Rec} they read back as `unknown`.
  * Invoke them through their receiver (preserving `this`) with a typed return.
  */
-const call = <T>(recv: object, name: string): T => (recv as Record<string, () => T>)[name]();
+// A generated dirty method declared `parameters: false` (dirty.rb:242-243) is a
+// zero-arg reader, which trails emits as an accessor property; the `**options`
+// ones stay methods.
+const call = <T>(recv: object, name: string): T => {
+  const member = (recv as Record<string, unknown>)[name];
+  return (typeof member === "function" ? (member as () => T).call(recv) : member) as T;
+};
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(

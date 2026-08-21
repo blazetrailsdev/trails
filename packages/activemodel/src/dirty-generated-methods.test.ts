@@ -31,21 +31,21 @@ describe("DirtyGeneratedMethods", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
-    expect((p as any).nameChange()).toEqual(["Alice", "Bob"]);
+    expect((p as any).nameChange).toEqual(["Alice", "Bob"]);
   });
 
   it("<attr>Was returns the pre-change value", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
-    expect((p as any).nameWas()).toBe("Alice");
+    expect((p as any).nameWas).toBe("Alice");
   });
 
   it("<attr>InDatabase returns the persisted value", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
-    expect((p as any).nameInDatabase()).toBe("Alice");
+    expect((p as any).nameInDatabase).toBe("Alice");
   });
 
   it("<attr>BeforeLastSave surfaces the prior persisted value", () => {
@@ -53,7 +53,7 @@ describe("DirtyGeneratedMethods", () => {
     p.changesApplied();
     (p as any).name = "Bob";
     p.changesApplied();
-    expect((p as any).nameBeforeLastSave()).toBe("Alice");
+    expect((p as any).nameBeforeLastSave).toBe("Alice");
   });
 
   it("<attr>PreviouslyChanged and <attr>PreviousChange reflect the last save", () => {
@@ -62,7 +62,7 @@ describe("DirtyGeneratedMethods", () => {
     (p as any).name = "Bob";
     p.changesApplied();
     expect((p as any).namePreviouslyChanged()).toBe(true);
-    expect((p as any).namePreviousChange()).toEqual(["Alice", "Bob"]);
+    expect((p as any).namePreviousChange).toEqual(["Alice", "Bob"]);
   });
 
   it("<attr>PreviouslyWas is the pre-save value from the last save", () => {
@@ -70,7 +70,7 @@ describe("DirtyGeneratedMethods", () => {
     p.changesApplied();
     (p as any).name = "Bob";
     p.changesApplied();
-    expect((p as any).namePreviouslyWas()).toBe("Alice");
+    expect((p as any).namePreviouslyWas).toBe("Alice");
   });
 
   it("savedChangeTo<Attr> and willSaveChangeTo<Attr> follow save lifecycle", () => {

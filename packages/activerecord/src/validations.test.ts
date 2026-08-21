@@ -25,10 +25,10 @@ import { Parrot } from "./test-helpers/models/parrot.js";
 import { Company } from "./test-helpers/models/company.js";
 import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 
-// `isAttributeCameFromUser` is mixed into Base instances but not surfaced on the
+// `attributeCameFromUser` is mixed into Base instances but not surfaced on the
 // model's declared instance type, so narrow it through a typed shim.
 function cameFromUser(record: object, attr: string): boolean {
-  return (record as { isAttributeCameFromUser(a: string): boolean }).isAttributeCameFromUser(attr);
+  return (record as { attributeCameFromUser(a: string): boolean }).attributeCameFromUser(attr);
 }
 
 describe("ValidationsTest", () => {

@@ -193,8 +193,7 @@ export class StatementCache {
    */
   static create(
     connection: {
-      cacheableQuery?(klass: unknown, arel: unknown): [unknown, unknown[]];
-      toSql(arel: unknown): string;
+      cacheableQuery(klass: unknown, arel: unknown): [unknown, unknown[]];
       preparedStatements?: boolean;
     },
     callable: (params: Params) => {
@@ -205,19 +204,10 @@ export class StatementCache {
     const relation = callable(new Params());
     const arel = typeof relation.arel === "function" ? relation.arel() : relation.arel;
 
-    let queryBuilder: Query | PartialQuery;
-    let binds: unknown[];
-
-    if (connection.cacheableQuery) {
-      [queryBuilder, binds] = connection.cacheableQuery(StatementCache, arel) as [
-        Query | PartialQuery,
-        unknown[],
-      ];
-    } else {
-      const sql = connection.toSql(arel);
-      queryBuilder = new Query(sql);
-      binds = [];
-    }
+    const [queryBuilder, binds] = connection.cacheableQuery(StatementCache, arel) as [
+      Query | PartialQuery,
+      unknown[],
+    ];
 
     // The prepared path (compileWithBinds) already unwraps each collected
     // BindParam to its `.value`; the unprepared PartialQueryCollector path

@@ -235,7 +235,7 @@ import {
   defineMethodAttribute as _defineMethodAttribute,
 } from "./attribute-methods/read.js";
 import { setDefineMethodAttribute as _setDefineMethodAttribute } from "./attribute-methods/write.js";
-import { isAttributeCameFromUser as _isAttributeCameFromUser } from "./attribute-methods/before-type-cast.js";
+import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -1735,7 +1735,10 @@ export class Base extends Model {
 
   /**
    * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-   * parameters: false` (attribute_methods/before_type_cast.rb:32). The
+   * parameters: false` and `attribute_method_suffix "_came_from_user?",
+   * parameters: false` (attribute_methods/before_type_cast.rb:32-33), plus the
+   * `_change_to_be_saved` half of attribute_methods/dirty.rb:59 — the rest of
+   * that block is declared on Model, beside the generics it proxies to. The
    * `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
    */
@@ -1744,6 +1747,8 @@ export class Base extends Model {
       ...this.attributeMethodPatterns,
       new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
       new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
+      new AttributeMethodPattern({ suffix: "CameFromUser", parameters: false }),
+      new AttributeMethodPattern({ suffix: "ChangeToBeSaved", parameters: false }),
     ];
   }
 
@@ -4677,7 +4682,7 @@ include(Base, {
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: ReadonlyAttributes._writeAttribute,
-  cameFromUser: _isAttributeCameFromUser,
+  cameFromUser: _attributeCameFromUser,
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)
@@ -4797,7 +4802,7 @@ include(Base, {
   attributesForDatabase: _attributesForDatabase,
   attributeBeforeTypeCast: _attributeBeforeTypeCast,
   attributeForDatabase: _attributeForDatabase,
-  isAttributeCameFromUser: _isAttributeCameFromUser,
+  attributeCameFromUser: _attributeCameFromUser,
   queryCastAttribute: _queryCastAttribute,
   isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
   idWas: _idWas,

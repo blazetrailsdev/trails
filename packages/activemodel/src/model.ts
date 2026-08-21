@@ -1626,7 +1626,7 @@ export class Model {
     ...suffixes: Array<string | { parameters?: string | null | false }>
   ) => void;
   declare static attributeMethodAffix: (
-    ...affixes: Array<{ prefix: string; suffix: string }>
+    ...affixes: Array<{ prefix: string; suffix: string; parameters?: string | null | false }>
   ) => void;
   declare static aliasAttribute: (newName: string, oldName: string) => void;
   declare static eagerlyGenerateAliasAttributeMethods: (newName: string, oldName: string) => void;
@@ -1640,7 +1640,6 @@ export class Model {
     attrName: string,
     options: { owner: CodeGenerator; as: string; override?: boolean },
   ) => void;
-  declare static defineDirtyAttributeMethods: (attrName: string) => void;
   declare static undefineAttributeMethods: () => void;
   declare static generatedAttributeMethods: () => Module;
   declare static isInstanceMethodAlreadyImplemented: (methodName: string) => boolean;
@@ -2833,7 +2832,6 @@ extend(Model, {
   defineAttributeMethods: AttributeMethods.defineAttributeMethods,
   defineAttributeMethod: AttributeMethods.defineAttributeMethod,
   defineAttributeMethodPattern: AttributeMethods.defineAttributeMethodPattern,
-  defineDirtyAttributeMethods: AttributeMethods.defineDirtyAttributeMethods,
   undefineAttributeMethods: AttributeMethods.undefineAttributeMethods,
   resolveAttributeName: AttributeMethods.resolveAttributeName,
   generatedAttributeMethods: AttributeMethods.generatedAttributeMethods,
@@ -2854,6 +2852,40 @@ include(Model, {
 // so it has to run after the `attributeMethodPatterns` class attribute exists.
 extend(Model, AttributesClassMethods);
 include(Model, Attributes);
+
+// Ruby `include ActiveModel::Dirty`'s `included do` block (dirty.rb:241-245).
+// The Ruby affixes are snake_case fragments of the generated name; trails'
+// are the camelCased halves of the same name (docs/ruby-ts-conventions.md), so
+// `_previously_changed?` is `PreviouslyChanged` — a Ruby `?` disappears into
+// the camel spelling, as it already has for `_before_type_cast` on Base. A `!`
+// does not: `restore_…!` is a `restore` prefix with the bang suffix kept, and
+// `AttributeMethodPattern` strips it to keep the mutator a zero-arg method
+// rather than the accessor property a zero-arg reader becomes.
+Model.attributeMethodSuffix("PreviouslyChanged", "Changed", { parameters: "**options" });
+Model.attributeMethodSuffix("Change", "WillChange!", "Was", { parameters: false });
+Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
+Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
+Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
+
+// ActiveRecord::AttributeMethods::Dirty's `included do` block
+// (activerecord/attribute_methods/dirty.rb:53-59). It belongs on
+// ActiveRecord::Base, and is declared here beside the generic handlers it
+// proxies to — `savedChangeToAttribute`, `willSaveChangeToAttribute`,
+// `attributeBeforeLastSave`, `attributeInDatabase` all live on this class in
+// trails rather than on Base. Moving the pair is one convergence, not two.
+//
+// dirty.rb:54's `attribute_method_prefix("saved_change_to_", parameters: false)`
+// has no declaration here: Ruby tells the array-returning `saved_change_to_name`
+// from the predicate `saved_change_to_name?` by the `?`, which the camel
+// spelling drops, so both would generate `savedChangeToName`. trails spells the
+// array-returner `savedChangeToAttributeValues`, and the generated half of that
+// pair waits on the name. dirty.rb:59's `_change_to_be_saved` half is declared
+// on Base instead, beside `attributeChangeToBeSaved`, the one generic of this
+// set that trails does keep in ActiveRecord.
+Model.attributeMethodAffix({ prefix: "savedChangeTo", suffix: "", parameters: "**options" });
+Model.attributeMethodSuffix("BeforeLastSave", { parameters: false });
+Model.attributeMethodAffix({ prefix: "willSaveChangeTo", suffix: "", parameters: "**options" });
+Model.attributeMethodSuffix("InDatabase", { parameters: false });
 
 const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
 

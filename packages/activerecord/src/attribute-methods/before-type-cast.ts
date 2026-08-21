@@ -83,8 +83,14 @@ export function attributeForDatabase(this: AttributeOwner, attrName: string): un
   return this._attributes.getAttribute(attrName).valueForDatabase;
 }
 
-/** @internal */
-export function isAttributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
+/**
+ * Dispatch target for the `*CameFromUser` attribute methods
+ * (before_type_cast.rb:33).
+ *
+ * @internal Rails-private helper. Mirrors:
+ * ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_came_from_user?
+ */
+export function attributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
   const name = this.constructor.attributeAliases?.[attrName] ?? attrName;
   return this._attributes.getAttribute(name).cameFromUser();
 }
