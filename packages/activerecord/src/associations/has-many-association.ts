@@ -371,14 +371,11 @@ export class HasManyAssociation extends CollectionAssociation {
     if (this.reflection.hasActiveCachedCounter?.()) {
       count = toI((this.owner as any).readAttribute(this.reflection.counterCacheColumn?.()));
     } else {
-      // `:all` keeps a `select` declared on the association off the COUNT.
       count = await (this.scope() as { count(column: string): Promise<number> }).count("all");
     }
 
     if (count === 0) {
-      // Ruby `target.select!(&:new_record?)` — an in-place filter of the same
-      // array object, which the CollectionProxy and any live enumerator share.
-      const target = (this as CollectionAssociation).target;
+      const target = this.target;
       const newRecords = target.filter((record) => record.isNewRecord());
       target.length = 0;
       target.push(...newRecords);
