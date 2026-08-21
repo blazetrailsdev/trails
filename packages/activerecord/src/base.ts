@@ -4365,10 +4365,10 @@ export class Base extends Model {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation> {
   _strictLoading: boolean;
+  _strictLoadingMode?: _Core.StrictLoadingMode;
   _associationCacheStore: _AssociationCache;
   _collectionProxies: Map<string, unknown>;
   _associationInstances: Map<string, AssociationInstance>;
-  _strictLoadingMode?: _Core.StrictLoadingMode;
   association(name: string): AssociationInstance;
   /**
    * Explicitly load a `belongsTo` target and resolve to it.
