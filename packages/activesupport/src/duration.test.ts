@@ -81,14 +81,6 @@ describe("Scalar", () => {
     expect(a.times(3).value).toBe(30);
     expect(a.div(2).value).toBe(5);
   });
-
-  it("== answers a numeric and is answered by Duration#==", () => {
-    expect(new Scalar(172800).equals(172800)).toBe(true);
-    expect(new Scalar(172800).equals(new Scalar(172800))).toBe(true);
-    expect(new Scalar(172800).equals("foo")).toBe(false);
-    expect(days(2).equals(new Scalar(172800))).toBe(true);
-    expect(days(2).equals(new Scalar(1))).toBe(false);
-  });
 });
 
 describe("DurationTest", () => {

@@ -884,21 +884,6 @@ export class Scalar {
     );
   }
 
-  /**
-   * Mirrors: Comparable#== over ActiveSupport::Duration::Scalar#<=>
-   * (duration.rb:31-38) — `Scalar < Numeric` includes Comparable, so `==` is
-   * `(self <=> other) == 0` and `Scalar.new(172800) == 172800` is true.
-   */
-  equals(other: unknown): boolean {
-    if (other instanceof Scalar || other instanceof Duration) {
-      return this.value === other.value;
-    } else if (typeof other === "number") {
-      return this.value === other;
-    } else {
-      return false;
-    }
-  }
-
   /** Mirrors: ActiveSupport::Duration::Scalar#variable? (duration.rb:93-95). */
   isVariable(): boolean {
     return false;
@@ -938,6 +923,35 @@ export class Scalar {
   /** Unary minus (`Scalar#-@`): `Scalar.new(-value)`. */
   negate(): Scalar {
     return new Scalar(-this.value);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration::Scalar#<=> (duration.rb:31-38). Ruby
+   * returns nil for an incomparable receiver; `Duration#compareTo` spells that
+   * NaN, so this does too.
+   */
+  compareTo(other: unknown): number {
+    let b: number;
+    if (other instanceof Scalar || other instanceof Duration) {
+      b = other.value;
+    } else if (typeof other === "number") {
+      b = other;
+    } else {
+      return NaN;
+    }
+    if (this.value < b) return -1;
+    if (this.value > b) return 1;
+    return 0;
+  }
+
+  /**
+   * `Scalar < Numeric` includes Comparable, so `==` is Comparable's
+   * `(self <=> other) == 0` over `<=>` above — which is why
+   * `Scalar.new(172800) == 172800` is true, and why `Duration#==`'s
+   * `other == value` arm (duration.rb:341-347) answers a Scalar.
+   */
+  equals(other: unknown): boolean {
+    return this.compareTo(other) === 0;
   }
 
   times(other: number): Scalar {
