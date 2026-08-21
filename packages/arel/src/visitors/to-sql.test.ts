@@ -656,9 +656,6 @@ describe("the to_sql visitor", () => {
           Temporal.PlainMonthDay.from("04-30"),
         ]) {
           expect(() =>
-            // The cast is the point: these three Temporal types are
-            // deliberately outside NodeOrValue, and this asserts the runtime
-            // raises for anyone who reaches them anyway.
             spy.compile(new Nodes.Equality(attr, value as unknown as Nodes.NodeOrValue)),
           ).toThrow(TypeError);
         }
@@ -691,8 +688,6 @@ describe("the to_sql visitor", () => {
         // caller produces.
         const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
         expect(() => compileRight(instant)).toThrow(Visitors.UnsupportedVisitError);
-        // Rendering shape here is whatever the quoter already does with a
-        // Temporal; this pins only that the wrapped path still inlines.
         expect(compileRight(new Nodes.Quoted(instant))).toContain("2026-04-30");
       });
 
@@ -1199,12 +1194,10 @@ describe("the to_sql visitor", () => {
   it("should visit_Date with fractional seconds retains microseconds", () => {
     const d = Temporal.Instant.from("2026-04-18T13:00:41.729Z");
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(d));
-    // 729 ms → "729000" microseconds
     expect(sql).toBe("'2026-04-18 13:00:41.729000'");
   });
 
   it("should visit_Date-like with 1-digit fraction normalises to microseconds", () => {
-    // ".7" → "700000" μs (not "007000" which a naive ms*1000 approach produced)
     const obj = Temporal.PlainDateTime.from("2020-01-02T03:04:05.7");
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(obj));
     expect(sql).toBe("'2020-01-02 03:04:05.700000'");
@@ -1217,7 +1210,6 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit_Date-like with no fractional part (no trailing Z artifact)", () => {
-    // A Temporal with no sub-second component emits bare seconds.
     const obj = Temporal.PlainDate.from("2026-01-01").toPlainDateTime();
     const sql = new Visitors.ToSql(testConnection).compile(new Nodes.Quoted(obj));
     expect(sql).toBe("'2026-01-01 00:00:00'");
@@ -1465,7 +1457,6 @@ describe("the to_sql visitor", () => {
     const table = new Table("users");
     const mgr = table.project(star).where(table.get("name").eq("alice"));
 
-    // Use a custom collector that tracks parts and binds
     const parts: unknown[] = [];
     const binds: unknown[] = [];
     const collector = {
@@ -1724,8 +1715,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("an infinite-but-bounded BindParam does not short-circuit", () => {
-      // Infinity has no `unboundable?`, so the bind is bounded and renders as a
-      // placeholder rather than collapsing.
       const node = new Nodes.GreaterThan(users.get("id"), new Nodes.BindParam(Infinity));
       expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."id" > ?');
     });
@@ -1763,8 +1752,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("visitTable and visitAttribute now route through quoteTableName / quoteColumnName", () => {
-      // A table name with a double-quote in it would have crashed pre-PR
-      // because the inline replace was string-only; quoteTableName escapes it.
       const weird = new Table('we"ird');
       const sql = new Visitors.ToSql(testConnection).compile(weird.get('co"l').eq(1));
       expect(sql).toBe('"we""ird"."co""l" = 1');
@@ -1782,8 +1769,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("collectNodesFor is a no-op when the list is empty", () => {
-      // SELECT with no projections / no WHERE should not emit those
-      // clauses at all (no stray spacer).
       const sql = new Table("users").project().toSql();
       expect(sql).toBe('SELECT FROM "users"');
       expect(sql).not.toContain("WHERE");
@@ -1816,9 +1801,6 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Comment placement", () => {
     it("emits exactly one space before each comment in SelectCore (no double space)", () => {
-      // Regression: visit_Arel_Nodes_Comment used to prepend its own leading
-      // space, and SelectCore also called maybeVisit() which adds another.
-      // The visitor now leaves the leading space to the caller.
       const tbl = new Table("users");
       const sql = tbl.project(tbl.get("id")).comment("hi", "bye").toSql();
       expect(sql).toBe('SELECT "users"."id" FROM "users" /* hi */ /* bye */');
@@ -1829,26 +1811,15 @@ describe("the to_sql visitor", () => {
   describe("schema-qualified table identifier", () => {
     it("quotes each segment of a schema.table name in SELECT and column refs", () => {
       const tbl = new Table("schema.table");
-      // Dot-splitting is an adapter behaviour, so name a real quoting connection
-      // rather than the suite's FakeRecord engine (which wraps the whole name in
-      // one pair of quotes). Both the FROM clause and the qualified column
-      // reference should emit "schema"."table" — not "schema.table" (which would
-      // be a single identifier and reference a different relation).
       const sql = new Visitors.ToSql(testConnection).compile(tbl.project(tbl.get("col")).ast);
       expect(sql).toBe('SELECT "schema"."table"."col" FROM "schema"."table"');
     });
   });
 
   describe("identifier-escape consistency (helper-routed quoting)", () => {
-    // Regression: four sites used to interpolate `"${name}"` directly,
-    // bypassing quoteColumnName / quoteTableName and silently producing
-    // invalid SQL on identifiers containing a literal double-quote.
     it("UPDATE SET column quotes embedded double-quotes", () => {
       const tbl = new Table('tab"le');
       const mgr = new UpdateManager().table(tbl).set([[tbl.get('co"l'), 1]]);
-      // Identifier-escaping is an adapter behaviour; the suite's FakeRecord
-      // engine leaves the embedded quote intact, so name a real quoting
-      // connection to exercise the escape (matching the sibling CTE test).
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain('"co""l" = 1');
     });
@@ -1907,8 +1878,8 @@ describe("the to_sql visitor", () => {
           .where(tbl.get("name").eq(new Nodes.Casted("hi", tbl.get("name"))))
           .project(tbl.get("id")).ast,
       );
-      expect(sql).toContain("$1"); // BindParam → addBind → $1
-      expect(sql).toContain("'hi'"); // Casted value inlines via quote
+      expect(sql).toContain("$1");
+      expect(sql).toContain("'hi'");
       expect(sql).not.toContain("?");
     });
 
@@ -1939,7 +1910,6 @@ describe("the to_sql visitor", () => {
         AMAttribute.fromDatabase("name", "x", new StringType()),
         collector,
       );
-      // bindIndex starts at 1; the block receives 1, so `$1`
       expect(collector.value).toBe("$1");
     });
 
@@ -2052,8 +2022,6 @@ describe("the to_sql visitor", () => {
       });
 
       it("Equality with null still emits IS NULL (not the unboundable branch)", () => {
-        // Regression guard: null is bounded — sign is 0, so the `IS NULL`
-        // path must still fire, not the new `1=0` short-circuit.
         expect(compile(id.eq(null))).toBe('"users"."id" IS NULL');
         expect(compile(id.notEq(null))).toBe('"users"."id" IS NOT NULL');
       });
@@ -2138,8 +2106,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
-      // Quoted(Temporal.Instant) inlines via quotedDate — toISOString path.
-      // _extractBinds was removed; Quoted always inlines regardless of collector.
       const visitor = new Visitors.ToSql(testConnection);
       const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
       const [sql, binds] = visitor.compileWithBinds(new Nodes.Quoted(instant));
@@ -2154,7 +2120,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted string binds raw under extractBinds", () => {
-      // Quoted("hi") inlines via quote() — _extractBinds was removed.
       const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
         new Nodes.Quoted("hi"),
       );
@@ -2163,7 +2128,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted number binds raw under extractBinds", () => {
-      // Quoted(42) inlines via quote() — _extractBinds was removed.
       const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
         new Nodes.Quoted(42),
       );
@@ -2172,7 +2136,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
-      // Quoted(date-like) inlines via quotedDate() — _extractBinds was removed.
       const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
       const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
         new Nodes.Quoted(value),

@@ -29,7 +29,6 @@ describe("ActiveModelI18nTests", () => {
         this.attribute("name", "string");
       }
     }
-    // Calling multiple times should be idempotent
     expect(Person.humanAttributeName("name")).toBe("Name");
     expect(Person.humanAttributeName("name")).toBe("Name");
   });
@@ -40,7 +39,6 @@ describe("ActiveModelI18nTests", () => {
         this.attribute("first_name", "string");
       }
     }
-    // humanAttributeName provides basic translation
     expect(Person.humanAttributeName("first_name")).toBe("First name");
   });
 
@@ -60,7 +58,6 @@ describe("ActiveModelI18nTests", () => {
   });
 
   it("translated model when missing translation", () => {
-    // Falls back to humanized attribute name
     class Person extends Model {}
     expect(Person.humanAttributeName("unknown_attr")).toBe("Unknown attr");
   });
@@ -166,7 +163,6 @@ describe("ActiveModelI18nTests", () => {
   });
 
   it("raise on missing translations", () => {
-    // humanAttributeName always returns a default, never raises
     expect(Model.humanAttributeName("missing_field")).toBe("Missing field");
   });
 

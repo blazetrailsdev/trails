@@ -208,7 +208,6 @@ describe("DateTimeTest", () => {
 });
 
 describe("DateTimeType#isChanged", () => {
-  // 1_000_000n ns = exactly 1ms from epoch — a clean boundary for all precision tests.
   const MS1 = 1_000_000n;
 
   it("two identical Temporal.Instant references are unchanged", () => {
@@ -227,14 +226,14 @@ describe("DateTimeType#isChanged", () => {
   it("instants differing by one full microsecond are changed (precision=null)", () => {
     const t = new Types.DateTimeType();
     const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1000n); // next μs bucket
+    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1000n);
     expect(t.isChanged(a, b)).toBe(true);
   });
 
   it("instants differing by one full millisecond are changed (precision=3)", () => {
     const t = new Types.DateTimeType({ precision: 3 });
     const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1_000_000n); // next ms bucket
+    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1_000_000n);
     expect(t.isChanged(a, b)).toBe(true);
   });
 

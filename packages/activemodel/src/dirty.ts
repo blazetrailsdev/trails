@@ -279,9 +279,6 @@ export class DirtyTracker {
     name: string,
   ): void {
     this._deleteChange(name);
-    // Fast path: avoid snapshotting every attribute when only one baseline
-    // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
-    // fall back to the full snapshot for plain Maps / other shapes.
     let has: boolean;
     let value: unknown;
     const perAttr = attributes as { has?: unknown; fetchValue?: unknown };
@@ -451,10 +448,6 @@ export class DirtyTracker {
     const currentValue = this.fetchValue(name);
     // Unconditional forced marker (Rails: forced_changes[attr] = fetch_value).
     this._forcedNames.add(name);
-    // Capture the "was" only when the attribute isn't already changed (by this
-    // force or a prior assignment), so a repeat force — or a force after an
-    // assignment — never overwrites the original "was". Clone to keep the stored
-    // snapshot stable under in-place mutation of the live object.
     if (!this._changedAttributes.has(name)) {
       let cloned: unknown;
       try {
@@ -525,9 +518,6 @@ export class DirtyTracker {
     }
     const original = resolveValue(this._originalAttributes.get(name));
     if (type.isChanged(original, newValue, rawValue) || this._forcedNames.has(name)) {
-      // When force-dirtied, preserve the cloned pre-mutation snapshot captured
-      // by forceChange() as the "was" side. For normal writes use the snapshot
-      // original. A force_change must not be silently cleared by a type-equal write.
       const existingFrom = this._forcedNames.has(name)
         ? this._changedAttributes.get(name)?.[0]
         : undefined;
@@ -560,13 +550,9 @@ export class DirtyTracker {
       const attr = currentAttributes.getAttribute(name);
       const currentValue = attr.value;
       if (!this._originalHas.has(name)) {
-        // Attribute added during the TX — mark as a new addition
         this._changedAttributes.set(name, [undefined, currentValue]);
       } else {
         const savedValue = resolveValue(this._originalAttributes.get(name));
-        // Entry: [was=savedValue (pre-TX), now=currentValue (post-TX)] — matches [was, now] convention.
-        // Pass attr.valueBeforeTypeCast as the raw third arg so numeric types can
-        // detect number_to_non_number? changes (e.g. writing `true` to an integer field).
         if (attr.type.isChanged(savedValue, currentValue, attr.valueBeforeTypeCast)) {
           this._changedAttributes.set(name, [savedValue, currentValue]);
         }

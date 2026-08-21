@@ -7,7 +7,6 @@ function cloneValue(value: unknown): unknown {
   // boundary: Date is mutable — clone to protect dirty tracking when a legacy
   // caller hands in a Date attribute value. Temporal types are immutable.
   if (value instanceof Date) return new Date(value.getTime());
-  // Temporal types are immutable — no clone needed
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
@@ -17,7 +16,6 @@ function cloneValue(value: unknown): unknown {
   )
     return value;
   if (Array.isArray(value)) return value.map(cloneValue);
-  // Only deep-clone plain objects; preserve class instances as-is
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return value;
   const result: Record<string, unknown> = proto === null ? Object.create(null) : {};

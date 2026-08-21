@@ -10,25 +10,18 @@ describe("DecimalTypeTrails", () => {
     // rounds the input to 3 significant digits ("1.23") before any scale: pass.
     const type = new Types.DecimalType({ precision: 3 });
     expect(type.cast(1.2346)).toEqual(bd("1.23"));
-    // 1234.5 → 3 significant digits → "1230"
     expect(type.cast(1234.5)).toEqual(bd("1230"));
-    // No precision configured: pass through (preserves the existing default).
     const noPrec = new Types.DecimalType();
     expect(noPrec.cast(1.2346)).toEqual(bd("1.2346"));
   });
 
   it("apply_scale handles leading-dot and trailing-dot numeric forms", () => {
     const type = new Types.DecimalType({ scale: 2 });
-    // `_castWithoutScale` can emit forms like ".5" or "1." — apply_scale
-    // must normalize them, not silently pass through.
     expect(type.cast(".5")).toEqual(bd("0.50"));
     expect(type.cast("1.")).toEqual(bd("1.00"));
   });
 
   it("apply_scale does not OOM on adversarial exponents", () => {
-    // `"1e10000000"` would force splitDecimal to allocate a ~10M-digit
-    // string if expanded naively. The cap leaves the raw form alone — and
-    // BigDecimal can't hold it either, so the raw string passes through.
     const type = new Types.DecimalType({ scale: 2 });
     expect(type.cast("1e10000000")).toBe("1e10000000");
   });

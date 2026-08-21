@@ -236,11 +236,8 @@ export interface Model {
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
-  // Allow dynamic attribute access (e.g., record.title) for properties
-  // defined at runtime via Model.attribute().
   [key: string]: unknown;
 
-  // -- Class-level registries --
   static includeRootInJson: boolean | string = false;
   // Rails: class_attribute :param_delimiter, instance_reader: false, default: "-"
   // (activemodel/lib/active_model/conversion.rb:32)
@@ -270,8 +267,6 @@ export class Model {
   // only the "defined but never written to" window diverges from Rails.
   static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
   declare private static _modelName: ModelName | null;
-
-  // -- Attributes (Phase 1000) --
 
   declare static attribute: Extended<typeof AttributesClassMethods>["attribute"];
   declare static setDefineMethodAttribute: Extended<
@@ -319,7 +314,6 @@ export class Model {
     return Object.keys(this.attributeTypes());
   }
 
-  // -- Normalizations --
   static _normalizations: Map<
     string,
     { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }
@@ -339,7 +333,6 @@ export class Model {
    */
   static normalizes(...args: NormalizesArgs): void {
     if (!Object.hasOwn(this, "_normalizations")) {
-      // Deep copy parent normalizations for stacking
       this._normalizations = new Map();
       const parent = Object.getPrototypeOf(this) as typeof Model;
       if (parent._normalizations) {
@@ -349,7 +342,6 @@ export class Model {
       }
     }
 
-    // Parse args: attributes..., fn, [options]
     let options: { applyToNil?: boolean } = {};
     let fn: (value: unknown) => unknown;
     const lastArg = args[args.length - 1];
@@ -367,7 +359,6 @@ export class Model {
     for (const attr of attributes) {
       const existing = this._normalizations.get(attr);
       if (existing) {
-        // Stack: add new normalizer after existing ones
         existing.fns.push(fn);
         if (applyToNil) existing.applyToNil = true;
       } else {
@@ -381,11 +372,6 @@ export class Model {
       // never double-wrap a non-idempotent normalizer.
       this.decorateAttributes([attr], this._normalizationDecorator(attr));
     }
-    // AR reflects columns after the class body runs, so at declaration time the
-    // immediate `_attributeDefinitions` apply above no-ops on a not-yet-reflected
-    // column — but `decorateAttributes` also pushed a durable pending decorator
-    // that replays on every `_defaultAttributes` rebuild, so the reflected column
-    // is decorated in the default attribute set that `type_for_attribute` reads.
 
     // Rails' ActiveRecord::Normalization registers
     // `before_validation :normalize_changed_in_place_attributes` at include
@@ -465,8 +451,6 @@ export class Model {
       return normalizedValueType(base, normalizer, entry.applyToNil, entry);
     };
   }
-
-  // -- Validations (Phase 1100) --
 
   /**
    * Mirrors: ActiveModel::Validations::ClassMethods#validates (validates.rb:111-133).
@@ -720,10 +704,6 @@ export class Model {
       exceptOn: exceptOnOpt,
     });
 
-    // Extract the explicit `attributes:` option so we can route the validator
-    // into the right bucket even when the validator class doesn't expose
-    // `attributes` on the instance or in `options` (e.g. plain classes that
-    // only implement `validate()`).
     const rawExplicit = (rest as { attributes?: unknown }).attributes;
     const explicitAttributes: string[] | null = Array.isArray(rawExplicit)
       ? rawExplicit.map(String)
@@ -770,11 +750,6 @@ export class Model {
           const origErrors = r.errors;
           const tempErrors = new Errors(r);
           r.errors = tempErrors;
-          // Restore the real errors, then raise if the validator flagged
-          // anything. A DB-backed validator (uniqueness / associated) returns a
-          // Promise — its `errors.add` runs when that promise resolves, so we
-          // must await before inspecting `tempErrors`; otherwise strict would
-          // never fire for async validators (RFC 0063 made the chain async).
           const settle = (): void => {
             r.errors = origErrors;
             if (tempErrors.any) {
@@ -951,8 +926,6 @@ export class Model {
   static validatesSizeOf(...attrNames: unknown[]): void {
     this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
   }
-
-  // -- Callbacks (Phase 1200) --
 
   static beforeValidation<T extends typeof Model>(
     this: T,
@@ -1288,9 +1261,6 @@ export class Model {
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
     options?: CallbackConditions<InstanceType<T>>,
   ): void {
-    // `_registerCallbackOnProto` enforces `on:` applicability (only commit/rollback)
-    // and value validity (:create/:update/:destroy) so every entry point shares the
-    // same gate. No extra guard needed here.
     _registerCallbackOnProto(
       this.prototype,
       timing,
@@ -1335,11 +1305,6 @@ export class Model {
     timing: "before" | "after" | "around",
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
   ): boolean {
-    // Don't force copy-on-first-write on a miss — if there's nothing
-    // matching, we shouldn't clone and trap the subclass in a snapshot
-    // that will never see future parent registrations. Check via the
-    // inherited chain first; only clone when we're actually going to
-    // mutate (match found).
     if (!hasCallbackOnProto(this.prototype, event, timing, fn)) return false;
     return skipCallbackOnProto(this.prototype, event, timing, fn);
   }
@@ -1508,8 +1473,6 @@ export class Model {
     methodName: string,
   ) => Array<{ proxyTarget: string; attrName: string }>;
 
-  // -- Naming (Phase 1300) --
-
   declare static lookupAncestors: () => Array<{
     new (...args: never[]): unknown;
     modelName: ModelName;
@@ -1536,13 +1499,10 @@ export class Model {
       // enclosing-module chain to walk, so nothing can declare relative naming
       // and the detect answers nil.
       const namespace = null;
-      // Model satisfies ModelLike but TS can't prove it due to circular types.
       this._modelName = new ModelName(this as unknown as ModelLike, namespace);
     }
     return this._modelName;
   }
-
-  // -- Instance --
 
   _attributes: AttributeSet = new AttributeSet();
   _accessedFields: Set<string> = new Set();
@@ -1615,7 +1575,6 @@ export class Model {
 
     _resurrectAttributeMethods(ctor as unknown as Parameters<typeof _resurrectAttributeMethods>[0]);
 
-    // Attributes#initialize — @attributes = self.class._default_attributes.deep_dup
     this._attributes = ctor._defaultAttributes().deepDup();
 
     // API#initialize — assign_attributes(attributes) (api.rb:80-82), which runs
@@ -1645,7 +1604,6 @@ export class Model {
       this._initializingAttributes = false;
     }
 
-    // Snapshot after construction — the initial state is "clean"
     this._dirty.snapshot(this._attributes);
 
     // Fire after_initialize callbacks. ActiveRecord intentionally uses the
@@ -1654,13 +1612,9 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      // strict:"sync" guarantees synchronous completion (async callbacks throw),
-      // so the returned Promise is already settled — void the sync-strict result.
       void runAfterCallbacksOnProto(ctor.prototype, "initialize", this, { strict: "sync" });
     }
   }
-
-  // -- Attribute access --
 
   readAttribute(name: string, block?: (name: string) => unknown): unknown {
     // Rails resolves alias_attribute names in `read_attribute`
@@ -1701,9 +1655,6 @@ export class Model {
   /** @internal */
   _writeAttribute(name: string, value: unknown): void {
     this._attributes.writeFromUser(name, value);
-    // `fetchValue` reads the attribute's cast value; the cast type carries the
-    // NormalizedValueType decoration (see `normalizes`), so normalization is
-    // already applied here — no separate imperative hook.
     const newValue = this._attributes.fetchValue(name);
     // Route through type.isChanged so numeric semantics (equal_nan?,
     // number_to_non_number?) are respected — mirrors the Rails path where dirty
@@ -1773,8 +1724,6 @@ export class Model {
     if (typeof value === "string" && value.trim() === "") return false;
     return true;
   }
-
-  // -- Validations --
 
   // Rails `validation_context` holds either a single Symbol or an
   // Array<Symbol> (or nil). `valid?([:create, :publish])` round-trips
@@ -2001,8 +1950,6 @@ export class Model {
     duped.initializeDup(this);
     return duped;
   }
-
-  // -- Dirty tracking --
 
   get changed(): boolean {
     return this._dirty.changed;
@@ -2243,8 +2190,6 @@ export class Model {
     this._dirty.clearAttributeChange(this._attributes, name);
   }
 
-  // -- Serialization --
-
   serializableHash(options?: SerializeOptions): Record<string, unknown> {
     return serializableHash(this, options);
   }
@@ -2315,8 +2260,6 @@ export class Model {
   isPersisted(): boolean {
     return false;
   }
-
-  // -- Naming / Conversion --
 
   get modelName(): ModelName {
     return (this.constructor as typeof Model).modelName;
@@ -2441,13 +2384,6 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place?
    */
   attributeChangedInPlace(name: string): boolean {
-    // trails can't observe true in-place mutation of an immutable JS value, so
-    // we infer it: an attribute was changed *outside* the tracked write path
-    // (e.g. a direct `_attributes` write) when its live value no longer matches
-    // what dirty tracking recorded. A normal assignment records the new value
-    // as the change's right-hand side, so `current === recorded` and this
-    // returns false — the assignment path already normalized the value, and
-    // re-normalizing would double-apply a non-idempotent normalizer.
     const current = this.readAttribute(name);
     const recorded = this._dirty.mutationsFromDatabase[name];
     if (recorded) return current !== recorded[1];
@@ -2515,8 +2451,6 @@ export class Model {
   valuesAt(...methods: (string | string[])[]): unknown[] {
     return methods.flat().map((m) => this.readAttribute(m));
   }
-
-  // -- Callbacks helper for subclasses --
 
   runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown {
     return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);

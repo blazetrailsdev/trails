@@ -94,7 +94,6 @@ describe("DateTest", () => {
   });
 
   it("cast slash string", () => {
-    // ruby 3.3.11: Date._parse("7/4/2020", false) #=> {year: 2020, mon: 4, mday: 7}
     const result = type.cast("7/4/2020");
     expect(result).toBeInstanceOf(Temporal.PlainDate);
     expect((result as Temporal.PlainDate).toString()).toBe("2020-04-07");
@@ -118,7 +117,6 @@ describe("DateTest", () => {
   });
 
   it("multiparameter hash missing day returns null (no defaults for DateType — P21 regression guard)", () => {
-    // Date has no defaults; year/month/day are all required.
     const result = (type as any).valueFromMultiparameterAssignment({ 1: 2025, 2: 7 });
     expect(result).toBeNull();
   });

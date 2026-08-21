@@ -124,10 +124,6 @@ export class AttributeMethodPattern {
   }
 }
 
-// ---------------------------------------------------------------------------
-// ClassMethods — assigned directly to Model's static side
-// ---------------------------------------------------------------------------
-
 /** Minimum shape required of an instance accessed through a generated attribute method closure. */
 interface ReadWriteHost {
   readAttribute(name: string): unknown;
@@ -392,8 +388,6 @@ export function defineAttributeMethods(this: ClassMethods, ...attrNames: string[
   });
 }
 
-// -- Internal helpers (take explicit host arg) --------------------------------
-
 export function defineAttributeMethod(
   this: ClassMethods,
   attrName: string,
@@ -408,7 +402,6 @@ export function defineAttributeMethod(
     }
     this.attributeMethodPatternsCache().clear();
   });
-  // Copy-on-first-write per class, like `aliasesByAttributeName`.
   if (!Object.prototype.hasOwnProperty.call(this, "_patternsGeneratedFor")) {
     this._patternsGeneratedFor = new Map(this._patternsGeneratedFor ?? []);
   }
@@ -449,7 +442,6 @@ export function defineAttributeMethodPattern(
   // Active Record itself defines and to consult the class's own methods
   // (activerecord/attribute_methods.rb:165-179).
   if (this.isInstanceMethodAlreadyImplemented(publicMethodName)) {
-    // However, for `alias_attribute`, we always define the method.
     if (!override) return;
   }
 
@@ -596,9 +588,6 @@ export function defineProxyCall(
   const callArgs = rest.slice(0, -1) as string[];
   const mangledName = buildMangledName(name);
 
-  // We have to use a different namespace for every target method, because if
-  // someone defines an attribute that looks like an attribute method we could
-  // clash, e.g. `attribute :title_was` / `attribute :title`.
   const namespace = `${options.namespace}_${proxyTarget}`;
 
   defineCall(codeGenerator, name, proxyTarget, mangledName, parameters, callArgs, {
@@ -703,8 +692,6 @@ function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknow
   }
   return target.call(record, ...args);
 }
-
-// -- Public ClassMethods (use `this`, assigned to Model directly) -----------
 
 /**
  * @noRailsEquivalent Peels Ruby's trailing `parameters:` keyword back off the

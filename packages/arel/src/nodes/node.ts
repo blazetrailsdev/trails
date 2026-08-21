@@ -117,8 +117,6 @@ interface NodeRegistry {
   And?: new (children: Node[]) => Node;
 }
 
-// Registry for breaking circular dependencies.
-// Populated by the index module after all classes are loaded.
 const _registry: NodeRegistry = {};
 
 function assertRegistered(name: keyof NodeRegistry): void {
@@ -147,7 +145,6 @@ function fnv1a32(input: string): number {
     hash ^= input.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  // Force unsigned 32-bit.
   return hash >>> 0;
 }
 
@@ -164,8 +161,6 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
   if (value instanceof Date) return `Date(${value.toISOString()})`;
 
   if (typeof value === "object") {
-    // Use recursion-stack cycle detection (not global "seen"), so repeated/shared references
-    // serialize consistently rather than being misclassified as circular.
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
 
@@ -193,13 +188,17 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
   return String(value);
 }
 
-// Methods supplied by the FactoryMethods mixin (runtime wiring in ../index.ts).
-// The aliased import keeps this type-only — pulling factory-methods.ts into
-// the static import graph here would create a module-load cycle, since it
-// imports concrete Node subclasses. The explicit `FactoryMethodsModule`
-// interface (vs. `Included<typeof FactoryMethods>`) is required: under
-// composite/declaration emit, the cycle Node ↔ FactoryMethods would force
-// tsc to fall back to a structural shape with a string index signature.
+/**
+ * Methods supplied by the FactoryMethods mixin (runtime wiring in ../index.ts).
+ * The aliased import keeps this type-only — pulling factory-methods.ts into
+ * the static import graph here would create a module-load cycle, since it
+ * imports concrete Node subclasses. The explicit `FactoryMethodsModule`
+ * interface (vs. `Included<typeof FactoryMethods>`) is required: under
+ * composite/declaration emit, the cycle Node ↔ FactoryMethods would force
+ * tsc to fall back to a structural shape with a string index signature.
+ *
+ * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
+ */
 type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModule;
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,

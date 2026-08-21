@@ -137,7 +137,6 @@ describe("TimeTest", () => {
   });
 
   it("valueFromMultiparameterAssignment: hour-only hash returns Time on 2000-01-01 base (P21)", () => {
-    // Regression: was null before P21 because year defaulted to 0 and hit the short-circuit.
     expect(type.cast({ "4": 15 })).toEqual(timeUtc(2000, 1, 1, 15, 0, 0));
   });
 

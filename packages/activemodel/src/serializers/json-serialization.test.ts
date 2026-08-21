@@ -360,7 +360,6 @@ describe("JsonSerializationTest", () => {
     }
     try {
       const m = new Multi({}).fromJson('{"first":{"name":"Carol"},"person":{"name":"Dan"}}');
-      // First key "first" wins, regardless of the configured "person" root.
       expect(m.readAttribute("name")).toBe("Carol");
     } finally {
       Multi.includeRootInJson = false;

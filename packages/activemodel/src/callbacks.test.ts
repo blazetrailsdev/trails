@@ -164,7 +164,6 @@ describe("CallbacksTest", () => {
   });
 
   it("only selects which types of callbacks should be created", async () => {
-    // Test that before/after/around create callbacks exist
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -292,7 +291,6 @@ describe("CallbacksTest", () => {
   });
 
   it("class-based callback object with snake_case method", async () => {
-    // camelCase only — method name is beforeValidation (not before_validation)
     const log: string[] = [];
     const auditor = {
       beforeValidation(record: any) {
@@ -455,14 +453,10 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   });
 
   it("skipCallback miss does NOT isolate subclass from future parent callbacks", async () => {
-    // A miss must preserve copy-on-first-write inheritance so a
-    // subclass that later has callbacks added to its parent still sees
-    // them via the prototype chain.
     const log: string[] = [];
     class Parent extends Model {}
     class Child extends Parent {}
     expect(Child.skipCallback("save", "before", () => undefined)).toBe(false);
-    // Now register on Parent — Child should still see it.
     Parent.setCallback("save", "before", () => log.push("from-parent"));
     await new Child().runCallbacks("save", () => log.push("child-block"));
     expect(log).toEqual(["from-parent", "child-block"]);
@@ -490,10 +484,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   });
 
   it("skipCallback removes a CallbackObject registered via beforeX/afterX helpers", async () => {
-    // The generated `beforeX`/`afterX`/`aroundX` helpers from
-    // `defineModelCallbacks` pass the original filter straight to
-    // `register` so skipCallback(event, timing, originalObject) can
-    // find and remove it by reference.
     const log: string[] = [];
     class Thing extends Model {
       static {
@@ -514,9 +504,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   });
 
   it("CallbackChain.register rejects on: for non-commit/rollback events", () => {
-    // Register-level gate — every path (setCallback, generated
-    // beforeX/afterX, plugin-direct _registerCallbackOnProto) funnels here, so
-    // rejecting once at the registration catches all entry points.
     const proto = Object.create(null);
     expect(() =>
       _registerCallbackOnProto(proto, "before", "save", () => {}, { on: "create" }),
@@ -534,9 +521,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   });
 
   it("resetCallbacks clears CallbackObject-registered callbacks too", async () => {
-    // Companion to the skipCallback-with-object case: resetCallbacks
-    // must sweep the event bucket regardless of whether its entries
-    // came from functions or CallbackObjects.
     const log: string[] = [];
     class Thing extends Model {}
     const obj = {
@@ -712,8 +696,6 @@ describe("unified sync/async runner", () => {
     const p = new Person({ name: "test" });
     const result = p.isValid();
     expect(result).toBeInstanceOf(Promise);
-    // Halted before-validation aborts the chain, so isValid() is false and the
-    // validate callback never runs.
     expect(await result).toBe(false);
     expect(order).toEqual(["before"]);
   });
@@ -811,7 +793,7 @@ describe("Callbacks", () => {
     }
     const n = new NoValidate();
     expect(await n.isValid()).toBe(false);
-    expect(n.errors.count).toBe(0); // validations never ran
+    expect(n.errors.count).toBe(0);
   });
 
   it("complete callback chain", async () => {
@@ -949,7 +931,6 @@ describe("afterCommit / afterRollback callbacks", () => {
         this.afterCommit(() => {});
       }
     }
-    // Should not throw
     expect(await new Order({ total: 1 }).isValid()).toBe(true);
   });
 
@@ -981,7 +962,6 @@ describe("defineModelCallbacks()", () => {
     });
 
     const p = new Payment({ amount: 100 });
-    // Run callbacks manually
     await runBeforeCallbacksOnProto(Payment.prototype, "process", p);
     await runAfterCallbacksOnProto(Payment.prototype, "process", p);
     expect(log).toEqual(["before_process", "after_process"]);
@@ -1038,7 +1018,6 @@ describe("withOptions()", () => {
       m.validates("email", { presence: true });
     });
 
-    // Validations only run with "create" context, not without
     const user = new User();
     expect(await user.isValid()).toBe(true);
     expect(await user.isValid("create")).toBe(false);

@@ -71,9 +71,6 @@ export class Dot extends Visitor {
   private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
 
   override accept(object: Node, collector?: unknown): { value: string } {
-    // Lazily register Table — at static-block time `Table` (imported from
-    // ../table.js) is a partial forwarding ref due to a circular import via
-    // tree-manager.js. By the first instance call the class is fully loaded.
     if (!this.dispatch.has(Table)) {
       this.dispatch.set(Table, "visitArelTable");
     }
@@ -90,10 +87,6 @@ export class Dot extends Visitor {
     sink.append(this.toDot());
     return sink as { value: string };
   }
-
-  // ---------------------------------------------------------------------
-  // visit_* methods (per-node-type edge declarations)
-  // ---------------------------------------------------------------------
 
   protected visitArelNodesFunction(o: Nodes.Function): void {
     this.visitEdge(o, "expressions");
@@ -180,9 +173,7 @@ export class Dot extends Visitor {
   }
 
   /** Aliased to CurrentRow / Distinct in dispatch (Rails: `alias`). */
-  protected visitNoEdges(_o: Node): void {
-    // intentionally left blank
-  }
+  protected visitNoEdges(_o: Node): void {}
 
   /** Rails: `alias :visit_Arel_Nodes_CurrentRow :visit__no_edges` (dot.rb:104). */
   protected visitArelNodesCurrentRow(o: Node): void {
@@ -412,10 +403,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
-  // ---------------------------------------------------------------------
-  // Core machinery (visit, edge, with_node, quote, to_dot)
-  // ---------------------------------------------------------------------
-
   /**
    * Mirrors Rails' Dot#visit_edge — descend into a named field. Rails uses
    * `o.send(method)`, which raises `NoMethodError` on a typo; we mirror
@@ -456,7 +443,7 @@ export class Dot extends Visitor {
     const seenKey: unknown = (() => {
       if (object === null || object === undefined) return Dot.NIL_SENTINEL;
       const t = typeof object;
-      if (t === "object") return object; // reference identity
+      if (t === "object") return object;
       if (t === "boolean") return `boolean:${object as boolean}`;
       if (t === "number") {
         const n = object as number;
@@ -465,8 +452,8 @@ export class Dot extends Visitor {
         return `number:${n}`;
       }
       if (t === "bigint") return `bigint:${(object as bigint).toString()}`;
-      if (t === "symbol") return object; // Symbol identity is reference-like
-      return undefined; // strings: no dedupe
+      if (t === "symbol") return object;
+      return undefined;
     })();
 
     if (seenKey !== undefined) {
@@ -543,10 +530,6 @@ export class Dot extends Visitor {
       });
       return `${n.id} [label="${label}"];`;
     });
-    // Every visit() in this Dot opens a Node and routes through withNode,
-    // which sets the incoming edge's `to`. So `e.to` is always populated
-    // by the time toDot runs — assert it (rather than silently dropping
-    // edges) so a regression that breaks the invariant fails loudly.
     const edgeLines = this.edges.map((e) => {
       if (!e.to) {
         throw new Error(`Dot: edge "${e.name}" has no destination node`);
@@ -615,7 +598,6 @@ export class Dot extends Visitor {
 
   static {
     const reg = (ctor: NodeCtor, m: string) => Dot.dispatchCache().set(ctor, m);
-    // Function family
     reg(Nodes.Function, "visitArelNodesFunction");
     // Each aggregate has its own Rails alias chain; Trails dispatches them
     // explicitly to keep the Rails-named helper visible.
@@ -627,7 +609,6 @@ export class Dot extends Visitor {
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
     reg(Nodes.Count, "visitArelNodesCount");
     reg(Nodes.Extract, "visitArelNodesExtract");
-    // Unary / Binary / specialized
     reg(Nodes.Unary, "visitArelNodesUnary");
     reg(Nodes.Binary, "visitArelNodesBinary");
     reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
@@ -642,14 +623,11 @@ export class Dot extends Visitor {
     reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
     reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
     reg(Nodes.Distinct, "visitArelNodesDistinct");
-    // Statements
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
     reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
     reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
     reg(Nodes.DeleteStatement, "visitArelNodesDeleteStatement");
-    // Misc — `Table` is registered lazily in accept() (it's mid-load
-    // here due to a circular import via tree-manager).
     reg(Nodes.Casted, "visitArelNodesCasted");
     reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
     reg(Nodes.Attribute, "visitArelAttributesAttribute");
@@ -667,8 +645,6 @@ export class Dot extends Visitor {
     // ctor-keyed table (the prototype walk covers Attribute subclasses).
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Set, "visitSet");
-    // Quoted, True, False, BoundSqlLiteral, Fragments don't extend any
-    // ancestor with a useful Dot handler — register explicitly as leaves.
     reg(Nodes.Quoted, "visitNoEdges");
     reg(Nodes.True, "visitNoEdges");
     reg(Nodes.False, "visitNoEdges");
@@ -676,8 +652,5 @@ export class Dot extends Visitor {
     reg(Nodes.Fragments, "visitNoEdges");
     reg(Nodes.SelectOptions, "visitNoEdges");
     reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
-    // Other Trails nodes inherit from registered ancestors (Unary/Binary/
-    // InfixOperation/Ordering/Function), so the Visitor.resolveDispatch
-    // prototype walk routes them through the right handler at first use.
   }
 }

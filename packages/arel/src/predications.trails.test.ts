@@ -8,8 +8,6 @@ import { Table, Nodes, Visitors } from "./index.js";
 describe("PredicationsMixin in/notIn Enumerable arm", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(testConnection);
-  // An InfixOperation, not an Attribute — this exercises the Predications
-  // mixin's own `in`/`notIn`, which Attribute overrides.
   const expr = () => users.get("bitmap").bitwiseAnd(16);
 
   describe("#in", () => {

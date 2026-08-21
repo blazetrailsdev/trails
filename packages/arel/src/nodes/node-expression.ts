@@ -39,23 +39,31 @@ export abstract class NodeExpression extends Node {
   }
 }
 
-// `buildQuoted` lives in casted.ts, which imports NodeExpression (Casted
-// extends it). A direct import would deadlock the class-extends
-// expression at module-load time; instead casted.ts registers itself here
-// at its own module-init.
+/**
+ * `buildQuoted` lives in casted.ts, which imports NodeExpression (Casted
+ * extends it). A direct import would deadlock the class-extends
+ * expression at module-load time; instead casted.ts registers itself here
+ * at its own module-init.
+ *
+ * @noRailsEquivalent ESM has no call-time constant resolution; see CLAUDE.md, "Call-time constant resolution".
+ */
 let buildQuoted: ((other: unknown, ctx: unknown) => Node) | undefined;
 export function registerBuildQuoted(fn: (other: unknown, ctx: unknown) => Node): void {
   buildQuoted = fn;
 }
 
-// Using `typeof import(...)` inline avoids pulling the mixin modules into
-// this file's static import graph (they transitively depend on node
-// classes that extend NodeExpression), while still giving TypeScript the
-// method-surface signatures via declaration merging.
-// AliasPredication / OrderPredications use their explicit module interfaces
-// (method-syntax) so subclasses like Function/Grouping/UnaryOperation that
-// override `as`/`asc`/`desc` with method declarations don't trip the
-// property-vs-method override error.
+/**
+ * Using `typeof import(...)` inline avoids pulling the mixin modules into
+ * this file's static import graph (they transitively depend on node
+ * classes that extend NodeExpression), while still giving TypeScript the
+ * method-surface signatures via declaration merging.
+ * AliasPredication / OrderPredications use their explicit module interfaces
+ * (method-syntax) so subclasses like Function/Grouping/UnaryOperation that
+ * override `as`/`asc`/`desc` with method declarations don't trip the
+ * property-vs-method override error.
+ *
+ * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
+ */
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
 type _Expressions = import("../expressions.js").ExpressionsModule;

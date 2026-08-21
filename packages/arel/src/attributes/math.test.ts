@@ -32,8 +32,6 @@ describe("MathTest", () => {
     expect(visitor.compile(table.get("id").add(2))).toBe('("users"."id" + 2)');
   });
 
-  // Unparenthesized operators: * and /
-
   it("average should be compatible with *", () => {
     expect(visitor.compile(table.get("id").average().multiply(2))).toBe('AVG("users"."id") * 2');
   });
@@ -73,8 +71,6 @@ describe("MathTest", () => {
   it("attribute node should be compatible with /", () => {
     expect(visitor.compile(table.get("id").divide(2))).toBe('"users"."id" / 2');
   });
-
-  // Parenthesized operators: + - & | ^ << >>
 
   it("average should be compatible with +", () => {
     expect(visitor.compile(table.get("id").average().add(2))).toBe('(AVG("users"."id") + 2)');

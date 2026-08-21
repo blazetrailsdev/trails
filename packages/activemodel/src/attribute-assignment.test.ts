@@ -110,7 +110,6 @@ describe("AttributeAssignmentTest", () => {
       set name(v: string) {
         (this as Base).writeAttribute("name", v.toUpperCase());
       }
-      // getter mirrors the default attribute read
       get name(): string {
         return this.readAttribute("name") as string;
       }
@@ -318,8 +317,6 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    // Non-empty (per empty? delegation, not the wrapper's Object.keys) → the
-    // guard proceeds into sanitize_for_mass_assignment, which forbids it.
     const params = new ProtectedParams({ name: "Bob" });
     expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).toThrow(
       ForbiddenAttributesError,

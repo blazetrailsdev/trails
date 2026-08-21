@@ -310,11 +310,9 @@ describe("ValidationsTest", () => {
 
     const t = new Topic({ title: "" });
 
-    // If block should not fire
     assertPredicate(await t.isValid(), (valid) => valid);
     assertPredicate(t.author_name, (authorName) => authorName == null);
 
-    // If block should fire
     assert(await t.isInvalid("update"));
     assert(t.author_name === "bad");
   });
@@ -477,7 +475,6 @@ describe("ValidationsTest", () => {
 
   it("invalid options to validate", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
-      // A common mistake -- we meant to call 'validates'
       Topic.validate("title", { presence: true } as unknown as ConditionalOptions);
     });
     const message =

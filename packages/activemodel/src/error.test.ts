@@ -13,7 +13,6 @@ describe("ErrorTest", () => {
   it("comparing against different class would not raise error", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
-    // Just verify it doesn't throw
     expect(errors.objects[0]).toBeDefined();
   });
 
@@ -95,7 +94,6 @@ describe("ErrorTest", () => {
   });
 
   it("full_message returns the given message when the attribute contains base", () => {
-    // A field named "base_price" should still get a prefix
     const e = new Errors(null);
     expect(e.fullMessage("base_price", "is invalid")).toBe("Base price is invalid");
   });
@@ -260,7 +258,6 @@ describe("ErrorTest", () => {
     expect(msg).toBe("can't be blank");
   });
 
-  // P10: message getter dispatches on rawType shape (identifier vs literal string)
   it("message with identifier-shaped rawType routes through i18n", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
@@ -278,7 +275,6 @@ describe("ErrorTest", () => {
   it("generateMessage with identifier options.message routes through i18n as new type", () => {
     const e = new Errors(null);
     e.add("name", ":blank", { message: ":tooShort" });
-    // ":tooShort" becomes the type, and has no locale entry → the missing-translation message
     expect(e.messagesFor("name")[0]).toContain("errors.messages.tooShort");
   });
 
@@ -309,19 +305,16 @@ describe("ErrorTest", () => {
     expect(msg).toBe("Profile bio can't be blank");
   });
 
-  // P10: fullMessage non-nested regression guard
   it("fullMessage non-nested attribute behaves as before", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
     expect(e.fullMessages[0]).toBe("Name can't be blank");
   });
 
-  // P10: attributesForHash is protected (accessible within the class hierarchy)
   it("attributesForHash is accessible via equals", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
     e.add("name", ":blank");
-    // equals() uses attributesForHash internally; duplicates should be equal
     expect(e.objects[0].equals(e.objects[1])).toBe(true);
   });
 });

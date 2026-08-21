@@ -1201,7 +1201,6 @@ describe("SelectManagerTest", () => {
     mgr.project(star);
     const win = mgr.window("w");
     win.order(users.get("created_at").asc());
-    // The window should be in core.windows
     expect(mgr.toSql()).toContain("WINDOW");
   });
 
@@ -1504,7 +1503,6 @@ describe("SelectManagerTest", () => {
         .project(star)
         .optimizerHints("HINT */ DROP TABLE users --");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
-      // `*/` stripped; `--` left intact, matching sanitize_as_sql_comment.
       expect(sql).toBe('SELECT /*+ HINT DROP TABLE users -- */ * FROM "users"');
     });
 

@@ -83,8 +83,6 @@ describe("WindowPredications.over (mixed into Function)", () => {
   });
 
   it("NamedFunction#over with a NamedWindow doubles embedded quotes in the name", () => {
-    // Embedded `"` characters in a window name must be doubled when quoting
-    // the identifier so they do not terminate it early.
     const fn = new Nodes.NamedFunction("MY_FN", [new Nodes.SqlLiteral("x")]);
     const win = new Nodes.NamedWindow('weird"name');
     expect(compile(fn.over(win))).toBe('MY_FN(x) OVER "weird""name"');

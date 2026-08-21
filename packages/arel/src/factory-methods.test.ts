@@ -95,9 +95,6 @@ describe("TestFactoryMethods", () => {
     expect(new Visitors.ToSql(testConnection).compile(f)).toBe("FALSE");
   });
 
-  // Regression: verifies the include(Node, FactoryMethods) call in index.ts
-  // actually attached methods to Node.prototype. If that wiring is dropped,
-  // an arbitrary Node subclass (Equality below) silently loses the API.
   describe("FactoryMethods is mixed into every Node subclass", () => {
     const eq = users.get("id").eq(1);
     it("createTrue available on Equality", () => {

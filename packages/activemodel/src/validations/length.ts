@@ -56,11 +56,15 @@ export const RESERVED_OPTIONS = [
 ] as const;
 
 export class LengthValidator extends EachValidator {
-  // Declarations only — actual functions attached to the prototype below.
-  // Prototype attachment (not class fields) so the helpers are present
-  // during EachValidator's constructor-time checkValidityBang() call. JS class
-  // fields don't initialize until AFTER super() returns. (Same bootstrapping
-  // lesson as PR #994 / #1002.)
+  /**
+   * Declarations only — actual functions attached to the prototype below.
+   * Prototype attachment (not class fields) so the helpers are present
+   * during EachValidator's constructor-time checkValidityBang() call. JS class
+   * fields don't initialize until AFTER super() returns. (Same bootstrapping
+   * lesson as PR #994 / #1002.)
+   *
+   * @internal Rails-private helpers.
+   */
   declare resolveValue: typeof resolveValue;
   /** @internal Rails-private helper. */
   declare skipNilCheck: typeof skipNilCheck;

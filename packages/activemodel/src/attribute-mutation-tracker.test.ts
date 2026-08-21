@@ -84,7 +84,6 @@ describe("AttributeMutationTracker", () => {
     const tracker = new AttributeMutationTracker(set);
 
     set.writeFromUser("age", 31);
-    // String "30" / "31" cast to integers should match the typed values.
     expect(tracker.isChanged("age", { from: "30", to: "31" })).toBe(true);
     expect(tracker.isChanged("age", { from: "29" })).toBe(false);
     expect(tracker.isChanged("age", { to: "32" })).toBe(false);
@@ -205,7 +204,6 @@ describe("forceChange and type.isChanged independence", () => {
     set.writeFromUser("ratio", NaN);
     expect(tracker.changedAttributeNames()).not.toContain("ratio");
 
-    // forceChange overrides type — must appear as changed regardless
     tracker.forceChange("ratio");
     expect(tracker.changedAttributeNames()).toContain("ratio");
   });

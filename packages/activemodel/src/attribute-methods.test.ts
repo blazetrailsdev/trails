@@ -201,7 +201,6 @@ describe("AttributeMethodsTest", () => {
   it("method missing works correctly even if attributes method is not defined", () => {
     class Bare extends Model {}
     const b = new Bare();
-    // attributeMissing returns null for undefined attributes
     expect(b.readAttribute("nonexistent")).toBe(null);
   });
 
@@ -326,9 +325,6 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("aliased writes propagate to dirty tracking on the canonical name", () => {
-    // The alias write must register a change on the ORIGINAL attribute's
-    // dirty state, not a separate entry — otherwise changedAttributes /
-    // changes would report under the aliased name.
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -359,7 +355,6 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("name clashes are handled", () => {
-    // Attributes with the same name as existing methods should still work via readAttribute
     class Person extends Model {
       static {
         this.attribute("name", "string");

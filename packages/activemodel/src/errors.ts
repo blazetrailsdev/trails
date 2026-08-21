@@ -298,7 +298,6 @@ export class Errors<TBase extends object = object> {
     let normType: string;
     [attribute, normType, options] = this.normalizeArguments(attribute, type, options);
     if (normType.startsWith(":")) {
-      // Symbol branch: strict attribute/type/options match.
       return this._errors.some((e) => e.strictMatch(attribute, normType, options));
     }
     // String branch: full-message lookup (Rails else clause in added?).
@@ -321,7 +320,6 @@ export class Errors<TBase extends object = object> {
   ): boolean {
     [attribute, type] = this.normalizeArguments(attribute, type);
     if (type.startsWith(":")) {
-      // Symbol branch: check for errors of this exact type.
       return this.where(attribute, type).length > 0;
     }
     // String branch: full-message lookup (Rails else clause).

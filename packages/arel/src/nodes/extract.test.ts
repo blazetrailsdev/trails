@@ -48,7 +48,6 @@ describe("Arel::Nodes::ExtractTest", () => {
     it("should not mutate the extract", () => {
       const original = new Nodes.Extract(users.get("created_at"), "YEAR");
       const aliased = original.as("y");
-      // Original should remain unchanged (aliased is a new As node)
       expect(original).toBeInstanceOf(Nodes.Extract);
       expect(aliased).toBeInstanceOf(Nodes.As);
     });

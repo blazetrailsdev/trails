@@ -69,7 +69,6 @@ describe("applySecondsPrecision", () => {
   it("works on Temporal.Instant via .round()", () => {
     const inst = Temporal.Instant.from("2024-01-02T03:04:05.123456789Z");
     const r = applySecondsPrecision.call({ precision: 3 }, inst) as Temporal.Instant;
-    // Compare via the same field path Temporal uses for Instant->ZDT.
     const zdt = r.toZonedDateTimeISO("UTC");
     expect(zdt.millisecond).toBe(123);
     expect(zdt.microsecond).toBe(0);

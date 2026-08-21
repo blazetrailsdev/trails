@@ -220,9 +220,6 @@ describe("MysqlTest", () => {
   });
 });
 
-// Audit follow-up: verify the MySQL dialect overrides land on the
-// previously-missing visit methods (Bin / UnqualifiedColumn /
-// IsDistinctFrom / IsNotDistinctFrom / Regexp / NotRegexp / Cte).
 describe("MySQL dialect overrides (audit follow-up)", () => {
   const users = new Table("users");
   const compile = (n: Nodes.Node): string => new Visitors.MySQL(mysqlTestConnection).compile(n);
@@ -366,9 +363,6 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     });
 
     it("buildSubselect adds DISTINCT when the subselect has no LIMIT/OFFSET/ORDER", () => {
-      // JOIN + GROUP BY + HAVING (no LIMIT/OFFSET/ORDER): super clones
-      // and clears limit/offset/orders on the rewritten stmt, build_subselect
-      // sees an `o` with none of those → MySQL adds DISTINCT to materialize.
       const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
       const out = prep.prepareUpdateStatement(stmt);
       const sql = visitor.compile(out);
@@ -403,7 +397,6 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     const inner = new SelectManager(users).project(users.get("id"));
     const cte = new Nodes.Cte("recent", inner.ast);
     expect(compile(cte)).toMatch(/^`recent` AS \(/);
-    // Embedded backticks must be doubled.
     const weird = new Nodes.Cte("we`ird", inner.ast);
     expect(compile(weird)).toMatch(/^`we``ird` AS \(/);
   });

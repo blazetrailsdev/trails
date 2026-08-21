@@ -3,7 +3,11 @@ import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { RuntimeError } from "./attribute-assignment.js";
 
-// Symbol so identity comparisons work across module copies and can't collide with any user value.
+/**
+ * Symbol so identity comparisons work across module copies and can't collide with any user value.
+ *
+ * Mirrors activemodel/lib/active_model/attribute.rb:243, where this sentinel is `Object.new`; a JS Symbol keeps that identity across module copies.
+ */
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
@@ -33,8 +37,6 @@ export abstract class Attribute {
   private _hasValue: boolean;
   private _cachedValueForDatabase: unknown;
   private _hasValueForDatabase: boolean;
-
-  // --- Factory methods ---
 
   static fromDatabase(
     name: string,

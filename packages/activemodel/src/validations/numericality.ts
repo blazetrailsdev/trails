@@ -23,10 +23,14 @@ export class NumericalityValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
-  // Coercion-pipeline privates declared here, attached to the prototype
-  // below so they're available during EachValidator's super-time
-  // checkValidityBang() call (same bootstrapping pattern as PRs #994 / #1002 /
-  // #1009). Class fields don't initialize until after super() returns.
+  /**
+   * Coercion-pipeline privates declared here, attached to the prototype
+   * below so they're available during EachValidator's super-time
+   * checkValidityBang() call (same bootstrapping pattern as PRs #994 / #1002 /
+   * #1009). Class fields don't initialize until after super() returns.
+   *
+   * @internal Rails-private helpers.
+   */
   /** @internal Rails-private helper. */
   declare optionAsNumber: typeof optionAsNumber;
   /** @internal Rails-private helper. */

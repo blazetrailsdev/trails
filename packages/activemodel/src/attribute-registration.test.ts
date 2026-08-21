@@ -205,7 +205,6 @@ describe("AttributeRegistrationTest", () => {
   });
 
   it("the default type is used when type is omitted", () => {
-    // When using a registered type, lookups use the registry
     const stringType = Types.typeRegistry.lookup("string");
     expect(stringType.name).toBe("string");
     expect(stringType.cast("hello")).toBe("hello");
@@ -234,7 +233,6 @@ describe("AttributeRegistrationTest", () => {
   });
 
   it(".decorate_attributes decorates specified attributes", () => {
-    // We can use normalizes as the TS equivalent of decorate_attributes
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -246,7 +244,6 @@ describe("AttributeRegistrationTest", () => {
   });
 
   it(".decorate_attributes stacks decorators", () => {
-    // Multiple normalizations: last one wins since normalizes replaces
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -264,7 +261,6 @@ describe("AttributeRegistrationTest", () => {
       static {
         this.attribute("name", "string");
         this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toUpperCase() : v));
-        // Re-register normalization
         this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v));
       }
     }
@@ -304,7 +300,6 @@ describe("AttributeRegistrationTest", () => {
     }
     const queue = (MyModel as any)._pendingAttributeModifications;
     expect(queue).toBeDefined();
-    // "name" → PendingType; "age" → PendingType + PendingDefault
     expect(queue.length).toBe(3);
   });
 
@@ -329,7 +324,6 @@ describe("AttributeRegistrationTest", () => {
         this.attribute("role", "string", { default: "admin" });
       }
     }
-    // Child's pending queue replays after parent's, so child's default wins
     const defaults = (Child as any)._defaultAttributes();
     expect(defaults.getAttribute("role").value).toBe("admin");
   });
@@ -342,15 +336,12 @@ describe("AttributeRegistrationTest", () => {
     }
     class Child extends Parent {}
 
-    // Prime the subclass cache
     const before = (Child as any)._defaultAttributes();
     expect(before.keys()).toContain("name");
     expect(before.keys()).not.toContain("age");
 
-    // Add a new attribute to the superclass at runtime
     Parent.attribute("age", "integer", { default: 42 });
 
-    // Child's cache must be invalidated and rebuilt
     const after = (Child as any)._defaultAttributes();
     expect(after.getAttribute("age").value).toBe(42);
   });
@@ -364,12 +355,10 @@ describe("AttributeRegistrationTest", () => {
     class Mid extends Base {}
     class Leaf extends Mid {}
 
-    // Prime all caches
     (Base as any)._defaultAttributes();
     (Mid as any)._defaultAttributes();
     (Leaf as any)._defaultAttributes();
 
-    // Add to root — all descendants must recompute
     Base.attribute("new_attr", "integer", { default: 7 });
 
     expect((Leaf as any)._defaultAttributes().getAttribute("new_attr").value).toBe(7);

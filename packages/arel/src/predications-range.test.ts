@@ -78,10 +78,6 @@ describe("Predications range semantics", () => {
       expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
     });
 
-    // A bound value exposing `isUnboundable()` (a QueryAttribute bind whose
-    // value is out of range for its column, or the RangeHandler sentinel)
-    // participates in the open-ended / unboundable decision tree exactly like
-    // ±Infinity, so an out-of-range bound never reaches the visitor as a bind.
     const unboundable = (sign: 1 | -1) => ({ isUnboundable: () => sign });
 
     it("unboundable begin (+1) collapses to In([])", () => {

@@ -63,7 +63,6 @@ describe("ToSql Array-named identifiers", () => {
     ] as unknown as string;
 
     const quoted = make().quoteColumnName(names);
-    // Undo the adapter's identifier quoting to compare the bare Array#to_s text.
     expect(quoted.slice(1, -1).replaceAll('""', '"')).toBe(
       String.raw`["a\n", "t\tb", "esc\e", "nul\u0000", "del\u007F", "ué", "bs\\", "q\"", "cr\r", "ff\f", "vt\v", "bel\a", "bsp\b", "h\#{x}", "d\#$g", "a\#@i", "plain#hash", "shop_id", "id", "\u0001\u001F", "日本"]`,
     );

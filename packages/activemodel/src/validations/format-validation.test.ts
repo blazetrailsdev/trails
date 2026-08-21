@@ -3,7 +3,6 @@ import { Model } from "../index.js";
 
 describe("FormatValidationTest", () => {
   it("validates format of with multiline regexp and option", () => {
-    // Multiline regexp should raise error
     expect(() => {
       class Person extends Model {
         static {

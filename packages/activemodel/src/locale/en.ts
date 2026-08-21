@@ -11,11 +11,8 @@ import type { TranslationData } from "@blazetrails/i18n";
 
 export const en: TranslationData = {
   errors: {
-    // The default format to use in full error messages.
     format: "%{attribute} %{message}",
 
-    // The values :model, :attribute and :value are always available for interpolation
-    // The value :count is available when applicable. Can be used for pluralization.
     messages: {
       model_invalid: "Validation failed: %{errors}",
       inclusion: "is not included in the list",

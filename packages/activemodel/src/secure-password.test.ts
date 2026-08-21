@@ -77,7 +77,7 @@ describe("SecurePasswordTest", () => {
   it("create a new user with validation and password byte size greater than 72 bytes", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    (u as any).password = "\u{1F600}".repeat(19); // 4 bytes each = 76 bytes, 19 chars
+    (u as any).password = "\u{1F600}".repeat(19);
     expect(await u.isValid()).toBe(false);
   });
 
@@ -363,7 +363,6 @@ describe("SecurePasswordTest", () => {
 
   it("password_challenge validates against existing digest", async () => {
     const User = createUserClass();
-    // Simulate a DB-loaded record: digest is in attributes at snapshot time.
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
     const digest = builder.readAttribute("password_digest");
@@ -385,7 +384,6 @@ describe("SecurePasswordTest", () => {
 
   it("password_challenge validates against existing digest before allowing changes", async () => {
     const User = createUserClass();
-    // Simulate a DB-loaded record with an existing digest as baseline.
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
     const digest = builder.readAttribute("password_digest");
@@ -431,7 +429,6 @@ describe("SecurePasswordTest", () => {
   it("password_challenge fails when no prior digest exists", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    // No password set — password_digest baseline is null.
     (u as any).passwordChallenge = "anything";
     expect(await u.isValid()).toBe(false);
     expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");

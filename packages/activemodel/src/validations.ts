@@ -179,8 +179,6 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
   //
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
-    // Match the guard used by `error.ts`'s I18n lookups — only treat
-    // `i18nScope` as a scope when the class actually exposes a string.
     const rawScope = (model as { constructor?: { i18nScope?: unknown } }).constructor?.i18nScope;
     const scope = typeof rawScope === "string" ? rawScope : "activemodel";
     const message = I18n.t(`${scope}.errors.messages.model_invalid`, {

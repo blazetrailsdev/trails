@@ -37,7 +37,6 @@ describe("Serializers::JSON host", () => {
 
   it("modelName resolves to the subclass and is memoized per-class", () => {
     expect(Person.modelName.name).toBe("Person");
-    // Memoized — repeat call returns same instance.
     expect(Person.modelName).toBe(Person.modelName);
 
     class Other extends JSONHost {}
@@ -131,7 +130,6 @@ describe("Serializers::JSON host", () => {
     }
     const b = new Big();
     b._id = 9007199254740993n;
-    // Without `Numeric#as_json`, JSON.stringify(b.asJson()) would throw.
     expect(() => globalThis.JSON.stringify(b.asJson())).not.toThrow();
   });
 

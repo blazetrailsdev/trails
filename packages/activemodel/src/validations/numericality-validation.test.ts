@@ -80,7 +80,7 @@ describe("NumericalityValidationTest", () => {
 
   const NIL = [null];
   const BLANK = ["", " ", " \t \r \n"];
-  const BIGDECIMAL_STRINGS = ["12345678901234567890.1234567890"]; // 30 significant digits
+  const BIGDECIMAL_STRINGS = ["12345678901234567890.1234567890"];
   const FLOAT_STRINGS = [
     "0.0",
     "+0.0",
@@ -478,8 +478,6 @@ describe("NumericalityValidationTest", () => {
     await assertInvalidValues([Number("65.5"), new BigDecimal("65.7")], "must be equal to 65.6");
     await assertValidValues([Number("65.6"), new BigDecimal("65.6")]);
   });
-
-  // -- private --
 
   async function assertInvalidValues(values: unknown[], error?: string): Promise<void> {
     await withEachTopicApprovedValue(values, async (topic, value) => {

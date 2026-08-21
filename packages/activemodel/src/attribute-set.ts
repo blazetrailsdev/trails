@@ -130,11 +130,6 @@ export class AttributeSet {
   writeFromDatabase(
     name: string,
     value: unknown,
-    // Structural duck type (not the abstract `Type`): callers thread result-set
-    // column types whose only contract on this path is `deserialize`, and
-    // `Attribute.fromDatabase` only calls `type.deserialize` here. Widening to
-    // the structural interface lets call sites pass the column type without an
-    // `as never` cast.
     type?: { deserialize(value: unknown): unknown },
   ): void {
     this.assertNotFrozen();
@@ -391,7 +386,6 @@ export class AttributeSet {
         if (attr.hasBeenRead()) {
           result.set(name, attr.value);
         } else {
-          // Clone so lazy evaluation doesn't affect the live attribute
           const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
           result.set(name, { [LAZY_ATTR]: cloned });
         }

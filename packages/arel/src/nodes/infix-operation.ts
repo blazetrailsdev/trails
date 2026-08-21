@@ -133,14 +133,18 @@ export class Overlaps extends InfixOperation {
   }
 }
 
-// Declaration merging: tell TypeScript that InfixOperation instances carry
-// the Predications + Math method surfaces mixed in from index.ts via
-// `include()`. The runtime wiring lives there to avoid a circular module
-// cycle between infix-operation.ts and math.ts.
-// Inline `typeof import(...)` keeps the mixin modules out of this file's
-// static import graph (math.ts imports InfixOperation for its class
-// references; a static reverse import would cycle).
-// See node-expression.ts for why these use the explicit module interfaces.
+/**
+ * Declaration merging: tell TypeScript that InfixOperation instances carry
+ * the Predications + Math method surfaces mixed in from index.ts via
+ * `include()`. The runtime wiring lives there to avoid a circular module
+ * cycle between infix-operation.ts and math.ts.
+ * Inline `typeof import(...)` keeps the mixin modules out of this file's
+ * static import graph (math.ts imports InfixOperation for its class
+ * references; a static reverse import would cycle).
+ * See node-expression.ts for why these use the explicit module interfaces.
+ *
+ * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
+ */
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
 type _Expressions = import("../expressions.js").ExpressionsModule;

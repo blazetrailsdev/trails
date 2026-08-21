@@ -242,10 +242,6 @@ function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
  * carry an `empty: <boolean>` attribute is unaffected).
  */
 function isParamsLikeWrapper(attrs: object): boolean {
-  // `where`/`exists` funnel raw primitives through this path, and
-  // `Object.getPrototypeOf` box-coerces them (so a number clears the plain-object
-  // gate below) while `in` throws on them outright. A primitive is never a params
-  // wrapper — reject before either check.
   if (typeof attrs !== "object" || attrs === null) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;

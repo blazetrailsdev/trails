@@ -457,7 +457,6 @@ export class SelectManager extends TreeManager {
   protected collapse(exprs: unknown[]): Node {
     exprs = exprs
       .filter((expr) => expr !== null && expr !== undefined)
-      // FIXME: Don't do this automatically
       .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);

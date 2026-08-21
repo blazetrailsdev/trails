@@ -111,8 +111,6 @@ export function serializableHash(
         );
       }
       const items = Array.isArray(records) ? records : Array.from(records);
-      // This callback only runs in the sync build, so nested includes build
-      // sync too (pass `sync: true`) rather than returning their own thenables.
       safeSet(
         result,
         assocName,
@@ -198,14 +196,8 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
   const inRecord = key in (record as object);
   const reader = inRecord ? (record as Record<string, unknown>)[key] : undefined;
 
-  // `send(key)`: a value-returning member (generated getter or user override)
-  // wins.
   if (inRecord && typeof reader !== "function") return reader;
 
-  // A store attribute reads its stored value: covers a store-backed record with
-  // no installed accessor (a bare `_attributes` Map / AttributeSet) and a
-  // reserved-name declared attribute (e.g. toJSON) whose function member would
-  // recurse if invoked.
   const storeHasKey =
     attrStore instanceof Map
       ? attrStore.has(key)
@@ -218,8 +210,6 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
       : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   }
 
-  // A genuine function member is invoked (`send`); an absent member raises like
-  // `send`'s `NoMethodError`.
   if (inRecord) return (reader as () => unknown).call(record);
   throw new NoMethodError(
     `undefined method '${key}' for an instance of ${record.constructor.name}`,
@@ -416,9 +406,7 @@ async function preloadIncludes(
       ? Array.isArray(records)
         ? records
         : Array.from(records)
-      : // Any resolved singular object (AR record or `_attributes`-less PORO)
-        // may itself carry nested includes to preload.
-        records != null && typeof records === "object"
+      : records != null && typeof records === "object"
         ? [records]
         : [];
     for (const child of children) {
@@ -445,8 +433,6 @@ async function resolveIncludeAsync(record: SerializationRecord, name: string): P
   }
   if (raw !== null && raw !== undefined) return raw;
 
-  // `raw` is nil: an unloaded singular reader is indistinguishable from a
-  // genuine nil, so ask the association holder whether it can still load.
   const associationFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof associationFn === "function") {
     let holder: { loaded?: unknown; loadTarget?: () => unknown } | undefined;
@@ -565,7 +551,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
 function isSerializableCollection(value: unknown): value is Iterable<unknown> {
   if (Array.isArray(value)) return true;
   if (value == null || typeof value !== "object") return false;
-  if ((value as SerializationRecord)._attributes) return false; // a single record
+  if ((value as SerializationRecord)._attributes) return false;
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 

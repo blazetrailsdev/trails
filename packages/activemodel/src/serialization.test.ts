@@ -530,16 +530,11 @@ describe("SerializationTest", () => {
       });
       const json = b.asJson({ include: "posts" });
       expect(Array.isArray(json.posts)).toBe(true);
-      // Each post's above-safe-range BigInt id is coerced to a string.
       expect((json.posts as Array<{ id: string }>)[0].id).toBe("10000000000000000000");
       expect(() => JSON.stringify(json)).not.toThrow();
     });
 
     it("attribute named toJSON does not shadow Model#toJSON", () => {
-      // `attribute("toJSON", ...)` must NOT install an accessor on the
-      // subclass prototype if `toJSON` is already resolvable up the
-      // chain — otherwise JSON.stringify would hit the attribute
-      // getter instead of our asJson-backed hook.
       class Weird extends Model {
         static {
           this.attribute("toJSON", "string");
@@ -547,18 +542,11 @@ describe("SerializationTest", () => {
         }
       }
       const w = new Weird({ toJSON: "raw-value", name: "w" });
-      // Direct stringify still routes through Model's toJSON.
       expect(JSON.parse(JSON.stringify(w))).toEqual({ toJSON: "raw-value", name: "w" });
-      // The attribute still roundtrips via `readAttribute`, just not via
-      // `instance.toJSON` (which now stays a framework method).
       expect(w.readAttribute("toJSON")).toBe("raw-value");
     });
 
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
-      // Direct `JSON.stringify(model)` should match `model.toJSON()` —
-      // without the hook, the default walker would enumerate
-      // `_attributes`/`_dirty`/`errors`/etc. and potentially throw on
-      // BigInt state.
       class Row extends Model {
         static {
           this.attribute("id", "big_integer");
@@ -578,13 +566,10 @@ describe("SerializationTest", () => {
           this.attribute("name", "string");
         }
       }
-      // 2^62 — cannot be represented as a JS number without precision loss.
       const big = 2n ** 62n;
       const r = new Row({ id: big, name: "row-2" });
       expect(() => JSON.stringify(r)).not.toThrow();
       const parsed = JSON.parse(JSON.stringify(r));
-      // bigint is coerced to decimal string (not number — JS number loses
-      // precision above 2^53-1). Consumers must parse with BigInt(str).
       expect(typeof parsed.id).toBe("string");
       expect(parsed.id).toBe("4611686018427387904");
       expect(parsed.name).toBe("row-2");
@@ -675,9 +660,6 @@ describe("Serialization", () => {
   });
 });
 
-// ===========================================================================
-// fromJson
-// ===========================================================================
 describe("fromJson", () => {
   it("from_json should work without a root (class attribute)", () => {
     class User extends Model {

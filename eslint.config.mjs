@@ -37,6 +37,7 @@ import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.m
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
+import noFreeformComments from "./eslint/no-freeform-comments.mjs";
 import { readFileSync } from "node:fs";
 
 // See the rails-file-structure-method-order block below: without real order
@@ -255,6 +256,7 @@ export default defineConfig(
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
+          "no-freeform-comments": noFreeformComments,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -719,6 +721,23 @@ export default defineConfig(
     files: ["**/*.ts", "**/*.mts", "**/*.mjs", "**/*.js"],
     rules: {
       "blazetrails/no-raw-control-bytes": "error",
+    },
+  },
+
+  // ── no-freeform-comments: trails is a line-by-line Rails port, so a comment
+  //    that restates the TS competes with the Ruby for authority and rots
+  //    independently of both. The autofix DELETES; it keeps JSDoc, references
+  //    that point AT the Ruby, and tool directives. There is no opt-out marker:
+  //    a comment either earns one of those forms or goes.
+  //    Rails' OWN comments are NOT kept — the Ruby is vendored and cited, so
+  //    copying its annotations across just duplicates them somewhere that goes
+  //    stale on its own. Scoped to the packages whose backlog has been swept —
+  //    widen it a package at a time, after auditing that package's comments,
+  //    never ahead of the audit. ──
+  {
+    files: ["packages/arel/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
+    rules: {
+      "blazetrails/no-freeform-comments": "error",
     },
   },
 

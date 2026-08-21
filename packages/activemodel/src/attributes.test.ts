@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "./index.js";
 
 describe("AttributesTest", () => {
-  // =========================================================================
-  // Phase 1000/1050 — Attributes and Type Casting
-  // =========================================================================
   class User extends Model {
     static {
       this.attribute("name", "string");
@@ -335,8 +332,8 @@ describe("attributesBeforeTypeCast", () => {
     const u = new User({ name: "Alice", age: "25" });
     const raw = u.attributesBeforeTypeCast;
     expect(raw.name).toBe("Alice");
-    expect(raw.age).toBe("25"); // raw, not cast to integer
-    expect(u.readAttribute("age")).toBe(25); // cast version
+    expect(raw.age).toBe("25");
+    expect(u.readAttribute("age")).toBe(25);
   });
 });
 

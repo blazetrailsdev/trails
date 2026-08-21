@@ -50,9 +50,6 @@ export class JSON {
   // accepts a string here too (treated as a custom root key by as_json).
   static includeRootInJson: boolean | string = false;
 
-  // Per-class memo so the static getter can be inherited without
-  // recomputing or sharing state across subclasses (matches Model's
-  // model.ts:1179-1185 pattern).
   declare protected static _modelName?: ModelName;
 
   /**

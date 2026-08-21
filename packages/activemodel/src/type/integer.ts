@@ -66,9 +66,6 @@ export class IntegerType extends NumericValueType {
     // predicate correct for a raw value, whether or not the caller pre-cast.
     const castValue = this.cast(value) as number | bigint | null;
     if (this.isInRange(castValue)) return true;
-    // `in_range?(cast_value) || begin; yield cast_value if block_given?; false; end`
-    // — the block receives the CAST value, which is the only place a caller can
-    // get it without casting a second time.
     block?.(castValue);
     return false;
   }

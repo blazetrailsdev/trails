@@ -88,8 +88,6 @@ describe("TypeRegistry", () => {
   });
 
   it("uuid, json, array are not in AM TypeRegistry defaults (PG-specific types live in AR's OID layer)", () => {
-    // Use a fresh instance — the singleton may be mutated by AR's type.ts
-    // which re-registers "json" for its own purposes.
     const fresh = new TypeRegistry();
     expect(() => fresh.lookup("uuid")).toThrow("Unknown type :uuid");
     expect(() => fresh.lookup("json")).toThrow("Unknown type :json");
@@ -97,9 +95,6 @@ describe("TypeRegistry", () => {
   });
 
   it("a class can be registered for a symbol", () => {
-    // Use a uniquely-scoped name — the type registry is a global singleton,
-    // so generic names ("custom", "mytype") risk colliding as the test set
-    // grows.
     Types.typeRegistry.register("type_registry_test_custom", () => new Types.StringType());
     const t = Types.typeRegistry.lookup("type_registry_test_custom");
     expect(t).toBeInstanceOf(Types.StringType);

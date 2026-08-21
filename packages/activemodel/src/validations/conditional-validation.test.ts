@@ -24,7 +24,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("if validation using method true", async () => {
-    // When the method returns true
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -61,7 +60,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("unless validation using method true", async () => {
-    // When the method returns true
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -95,7 +93,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("if validation using method false", async () => {
-    // When the method returns false
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -107,7 +104,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("unless validation using method false", async () => {
-    // When the method returns false
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -120,7 +116,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("if validation using block true", async () => {
-    // When the block returns true
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -133,7 +128,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("unless validation using block true", async () => {
-    // When the block returns true
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -145,7 +139,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("if validation using block false", async () => {
-    // When the block returns false
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
@@ -157,7 +150,6 @@ describe("ConditionalValidationTest", () => {
   });
 
   it("unless validation using block false", async () => {
-    // When the block returns false
     Topic.validatesLengthOf("title", {
       maximum: 5,
       tooLong: "hoo %{count}",
