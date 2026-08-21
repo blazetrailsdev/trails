@@ -3051,6 +3051,18 @@ export class Base extends Model {
     ) {
       return proxy;
     }
+    // No proxy: the collection's canonical `@target` is the association object
+    // itself (`CollectionAssociation#@target`,
+    // collection_association.rb:284-296) — a proxy only reads through to that
+    // same store — so an inverse-seeded target is visible here without anyone
+    // having materialized the proxy first.
+    if (
+      instance?.isCollection?.() === true &&
+      (instance.isLoaded?.() === true ||
+        (Array.isArray(instance.target) && instance.target.length > 0))
+    ) {
+      return instance;
+    }
     return undefined;
   }
 
