@@ -6,15 +6,15 @@ import type { YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 
 // Injected by base.ts to break the store→serialize→json→store circular dep.
-// store() calls this when wiring IndifferentCoder for plain text/string columns.
-let _serializeAttr: ((klass: typeof Base, attr: string, opts: { coder: unknown }) => void) | null =
-  null;
+// Bound to `serialize` so store() reads as Rails' `serialize store_attribute,
+// coder: IndifferentCoder.new(...)` (store.rb:108).
+let serialize: ((klass: typeof Base, attr: string, opts: { coder: unknown }) => void) | null = null;
 
 /** @internal Called once by base.ts during module init. */
 export function registerSerializeFn(
   fn: (klass: typeof Base, attr: string, opts: { coder: unknown }) => void,
 ): void {
-  _serializeAttr = fn;
+  serialize = fn;
 }
 
 interface CoderLike {
@@ -156,8 +156,10 @@ export function storeAccessorsModule(modelClass: typeof Base): Set<string> {
  *
  * Mirrors: ActiveRecord::Store#local_stored_attributes
  */
-export function localStoredAttributes(modelClass: typeof Base): Record<string, string[]> {
-  return _storedAttributes.get(modelClass) ?? {};
+export function localStoredAttributes(
+  modelClass: typeof Base,
+): Record<string, string[]> | undefined {
+  return _storedAttributes.get(modelClass);
 }
 
 /**
@@ -165,7 +167,9 @@ export function localStoredAttributes(modelClass: typeof Base): Record<string, s
  *
  * Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes
  */
-export function localStoredAttributesMethod(this: typeof Base): Record<string, string[]> {
+export function localStoredAttributesMethod(
+  this: typeof Base,
+): Record<string, string[]> | undefined {
   return localStoredAttributes(this);
 }
 
@@ -181,7 +185,7 @@ export function storedAttributes(this: typeof Base): Record<string, string[]> {
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
   const parentAttrs =
     typeof parent?.storedAttributes === "function" ? parent.storedAttributes() : {};
-  const local = _storedAttributes.get(modelClass);
+  const local = localStoredAttributes(modelClass);
   if (!local) return parentAttrs;
   const merged: Record<string, string[]> = { ...parentAttrs };
   for (const [store, keys] of Object.entries(local)) {
@@ -191,30 +195,13 @@ export function storedAttributes(this: typeof Base): Record<string, string[]> {
 }
 
 /**
- * Registers accessor keys on a store column for `klass`. Uses Set union so
- * repeated calls with overlapping keys deduplicate (mirrors Rails `|=`).
- *
- * Called directly by store(). Base.store() delegates to store(), which
- * calls this — so the WeakMap is the single source of truth for
- * localStoredAttributes / storedAttributes.
- */
-export function addLocalStoredAttribute(
-  klass: typeof Base,
-  storeName: string,
-  keys: string[],
-): void {
-  const existing = _storedAttributes.get(klass) ?? {};
-  const prev = existing[storeName] ?? [];
-  _storedAttributes.set(klass, { ...existing, [storeName]: [...new Set([...prev, ...keys])] });
-}
-
-/**
  * Reads/writes hash keys on a store attribute.
  *
  * Mirrors: ActiveRecord::Store::HashAccessor
  */
 export class HashAccessor {
   static read(object: Base, attribute: string, key: string): unknown {
+    this.prepare(object, attribute);
     const data = object.readAttribute(attribute);
     if (data === null || data === undefined) return null;
     const obj = this._readHash(data);
@@ -222,9 +209,8 @@ export class HashAccessor {
   }
 
   static write(object: Base, attribute: string, key: string, value: unknown): void {
-    const current = this.read(object, attribute, key);
-    if (value !== current) {
-      this.prepare(object, attribute);
+    this.prepare(object, attribute);
+    if (value !== this.read(object, attribute, key)) {
       const raw = object.readAttribute(attribute);
       const obj = this._writeHash(raw);
       obj[key] = value;
@@ -349,38 +335,87 @@ export function storeAccessor(
   storeAttribute: string,
   options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
 ): void {
-  const { accessors: keys = [], prefix, suffix } = options;
+  const { accessors: keys = [], prefix = null, suffix = null } = options;
 
-  addLocalStoredAttribute(modelClass, storeAttribute, keys);
+  const accessorPrefix =
+    typeof prefix === "string" ? `${prefix}_` : prefix === true ? `${storeAttribute}_` : "";
+  const accessorSuffix =
+    typeof suffix === "string" ? `_${suffix}` : suffix === true ? `_${storeAttribute}` : "";
 
+  // Install on the intermediate storeModule prototype so that user overrides
+  // on modelClass.prototype can reach the store accessor via `super`.
+  // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
+  const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
   for (const key of keys) {
-    let accessorKey = key;
-    if (prefix) {
-      const accessorPrefix = prefix === true ? storeAttribute : String(prefix);
-      accessorKey = `${accessorPrefix}_${accessorKey}`;
-    }
-    if (suffix) {
-      const accessorSuffix = suffix === true ? storeAttribute : String(suffix);
-      accessorKey = `${accessorKey}_${accessorSuffix}`;
-    }
-
-    // Install on the intermediate storeModule prototype so that user overrides
-    // on modelClass.prototype can reach the store accessor via `super`.
-    // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
+    const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
     storeAccessorsModule(modelClass).add(accessorKey);
 
-    const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
+    // Rails defines `#{accessor_key}=` first and `#{accessor_key}` second; a JS
+    // property carries both halves in one descriptor, so the writer comes first
+    // inside it (see CLAUDE.md, "Generated attribute readers are properties").
     Object.defineProperty(storeModuleProto, accessorKey, {
-      get: function (this: Base) {
-        return this.readStoreAttribute(storeAttribute, key);
-      },
       set: function (this: Base, value: unknown) {
         this.writeStoreAttribute(storeAttribute, key, value);
       },
+      get: function (this: Base) {
+        return this.readStoreAttribute(storeAttribute, key);
+      },
       configurable: true,
     });
-    defineStoreAccessorDirtyMethods(storeModuleProto, accessorKey, storeAttribute, key);
+
+    const cap = accessorKey.charAt(0).toUpperCase() + accessorKey.slice(1);
+    const define = (name: string, fn: (this: StoreDirtyHost) => unknown): void => {
+      if (Object.prototype.hasOwnProperty.call(storeModuleProto, name)) return;
+      Object.defineProperty(storeModuleProto, name, {
+        value: fn,
+        writable: true,
+        configurable: true,
+      });
+    };
+
+    define(`${accessorKey}Changed`, function (this) {
+      if (!this.attributeChanged(storeAttribute)) return false;
+      const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+      return dig(prevStore, key) !== dig(newStore, key);
+    });
+    define(`${accessorKey}Change`, function (this) {
+      if (!this.attributeChanged(storeAttribute)) return null;
+      const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+      return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
+    });
+    define(`${accessorKey}Was`, function (this) {
+      if (!this.attributeChanged(storeAttribute)) return null;
+      const [prevStore] = this.changes[storeAttribute] ?? [undefined];
+      return dig(prevStore, key) ?? null;
+    });
+    // Matches `Base`'s `savedChangeToAttribute(name)` predicate shape; the value
+    // form is exposed as `savedChangeTo<X>Values()`.
+    define(`savedChangeTo${cap}`, function (this) {
+      if (!this.savedChangeToAttribute?.(storeAttribute)) return false;
+      const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+      return dig(prevStore, key) !== dig(newStore, key);
+    });
+    define(`savedChangeTo${cap}Values`, function (this) {
+      if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
+      const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+      return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
+    });
+    define(`${accessorKey}BeforeLastSave`, function (this) {
+      if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
+      const [prevStore] = this.savedChanges?.[storeAttribute] ?? [undefined];
+      return dig(prevStore, key) ?? null;
+    });
   }
+
+  // assign new store attribute and create new hash to ensure that each class in the hierarchy
+  // has its own hash of stored attributes.
+  let localStored = localStoredAttributes(modelClass);
+  if (!localStored) {
+    localStored = {};
+    _storedAttributes.set(modelClass, localStored);
+  }
+  localStored[storeAttribute] ??= [];
+  localStored[storeAttribute] = [...new Set([...localStored[storeAttribute], ...keys])];
 }
 
 interface StoreDirtyHost {
@@ -400,60 +435,6 @@ function dig(obj: unknown, key: string): unknown {
 }
 
 /**
- * Mirrors Rails' per-accessor dirty methods generated in
- * ActiveRecord::Store::ClassMethods#_define_accessors_module:
- *
- *   <accessor>Changed, <accessor>Change, <accessor>Was,
- *   savedChangeTo<Accessor>, savedChangeTo<Accessor>?,
- *   <accessor>BeforeLastSave
- */
-function defineStoreAccessorDirtyMethods(
-  proto: object,
-  accessorName: string,
-  storeAttribute: string,
-  key: string,
-): void {
-  const cap = accessorName.charAt(0).toUpperCase() + accessorName.slice(1);
-  const define = (name: string, fn: (this: StoreDirtyHost) => unknown): void => {
-    if (Object.prototype.hasOwnProperty.call(proto, name)) return;
-    Object.defineProperty(proto, name, { value: fn, writable: true, configurable: true });
-  };
-
-  define(`${accessorName}Changed`, function (this) {
-    if (!this.attributeChanged(storeAttribute)) return false;
-    const [prev, next] = this.changes[storeAttribute] ?? [undefined, undefined];
-    return dig(prev, key) !== dig(next, key);
-  });
-  define(`${accessorName}Change`, function (this) {
-    if (!this.attributeChanged(storeAttribute)) return null;
-    const [prev, next] = this.changes[storeAttribute] ?? [undefined, undefined];
-    return [dig(prev, key) ?? null, dig(next, key) ?? null];
-  });
-  define(`${accessorName}Was`, function (this) {
-    if (!this.attributeChanged(storeAttribute)) return null;
-    const [prev] = this.changes[storeAttribute] ?? [undefined];
-    return dig(prev, key) ?? null;
-  });
-  // Matches `Base`'s `savedChangeToAttribute(name)` predicate shape; the value
-  // form is exposed as `savedChangeTo<X>Values()`.
-  define(`savedChangeTo${cap}`, function (this) {
-    if (!this.savedChangeToAttribute?.(storeAttribute)) return false;
-    const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
-    return dig(prev, key) !== dig(next, key);
-  });
-  define(`savedChangeTo${cap}Values`, function (this) {
-    if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
-    const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
-    return [dig(prev, key) ?? null, dig(next, key) ?? null];
-  });
-  define(`${accessorName}BeforeLastSave`, function (this) {
-    if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
-    const [prev] = this.savedChanges?.[storeAttribute] ?? [undefined];
-    return dig(prev, key) ?? null;
-  });
-}
-
-/**
  * Store — JSON-backed attribute accessors.
  *
  * Mirrors: ActiveRecord::Store::ClassMethods#store
@@ -465,6 +446,13 @@ function defineStoreAccessorDirtyMethods(
  *   store(User, 'settings', { accessors: ['theme', 'language'] })
  *   store(User, 'settings', { accessors: ['theme'], prefix: true })
  *   store(User, 'settings', { accessors: ['theme'], coder: JSON })
+ *
+ * @missingRailsArgs serialize — CONVERGEABLE: store.rb:108 passes the coder
+ * inline as `coder: IndifferentCoder.new(store_attribute, coder)`. trails has to
+ * hoist it into a local because the same instance is also handed to the
+ * trails-only `_storeCoders` registry (see `setStoreCoder`), which exists only
+ * because the read path resolves the coder separately from the attribute type.
+ * Converges once that registry goes away.
  */
 export function store(
   modelClass: typeof Base,
@@ -491,13 +479,13 @@ export function store(
   // columns that have no type-level accessor.
   const colType = (modelClass as any).typeForAttribute?.(storeAttribute);
   if (!colType || typeof colType.accessor !== "function") {
-    if (!_serializeAttr) {
+    if (!serialize) {
       throw new ConfigurationError(
         `store() requires serialize() to be registered before use. ` +
           `Ensure base.ts (or the activerecord index) is imported before calling store().`,
       );
     }
-    _serializeAttr(modelClass, storeAttribute, { coder: indifferentCoder as any });
+    serialize(modelClass, storeAttribute, { coder: indifferentCoder as any });
   }
 
   if (options.accessors !== undefined) {
@@ -506,9 +494,6 @@ export function store(
       prefix: options.prefix,
       suffix: options.suffix,
     });
-  } else {
-    // Still register the column in storedAttributes even with no accessors.
-    addLocalStoredAttribute(modelClass, storeAttribute, []);
   }
 }
 

@@ -393,7 +393,7 @@ describe("PostgreSQLAdapter#execInsert sequence probe", () => {
         [],
         "id",
         "posts_id_seq",
-      ) as Promise<Result>;
+      );
     const [first, second] = await Promise.all([insert("a"), insert("b")]);
 
     expect(first.rows[0][0]).toBe(1);

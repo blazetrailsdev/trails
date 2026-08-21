@@ -1,5 +1,10 @@
 import type { Base } from "./base.js";
-import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  camelize,
+  isBlank,
+  pluralize,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
   ValueType,
@@ -8,7 +13,7 @@ import {
   defaultValue,
 } from "@blazetrails/activemodel";
 import { lookup as arTypeLookup } from "./type.js";
-import { dangerousAttributeMethods } from "./attribute-methods.js";
+import { dangerousAttributeMethods, isDangerousAttributeMethod } from "./attribute-methods.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
@@ -93,7 +98,14 @@ function enumTypeFrom(
     const rv = reflected as ValueType<unknown>;
     subtype = rv.type() == null ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
-  return new EnumType(name, new Map(Object.entries(mapping)), subtype, raiseOnInvalidValues);
+  // Rails' `enum_values` is an `ActiveSupport::HashWithIndifferentAccess`
+  // (enum.rb:226) and `EnumType` reads it with `fetch`/`has_key?`.
+  return new EnumType(
+    name,
+    new HashWithIndifferentAccess<EnumValue>(mapping),
+    subtype,
+    raiseOnInvalidValues,
+  );
 }
 
 /**
@@ -212,14 +224,14 @@ export function defineEnum(
 export class EnumType extends ValueType<string> {
   /** @internal */
   override readonly name: string;
-  private _mapping: ReadonlyMap<string, EnumValue>;
+  private _mapping: HashWithIndifferentAccess<EnumValue>;
   private _reverseMapping: ReadonlyMap<EnumValue, string>;
   private _raiseOnInvalidValues: boolean;
   private _subtypeType: ValueType<unknown>;
 
   constructor(
     name: string,
-    mapping: ReadonlyMap<string, EnumValue>,
+    mapping: HashWithIndifferentAccess<EnumValue>,
     subtype: ValueType<unknown>,
     raiseOnInvalidValues = true,
   ) {
@@ -227,7 +239,7 @@ export class EnumType extends ValueType<string> {
     this.name = name;
     this._mapping = mapping;
     const reverse = new Map<EnumValue, string>();
-    for (const [k, v] of mapping) {
+    for (const [k, v] of mapping.entries()) {
       // Keep the first label for a given value — mirrors Ruby Hash#key, so an
       // aliased value (e.g. aliased_field: "happy") deserializes to the
       // canonical label ("happy"), not the alias.
@@ -266,8 +278,8 @@ export class EnumType extends ValueType<string> {
   //   elsif mapping.has_value?(value) -> mapping.key(value)  (return the label)
   //   else value.presence
   cast(value: unknown): string | null {
-    if (typeof value === "string" && this._mapping.has(value)) {
-      return value;
+    if (this._mapping.hasKey(value as string)) {
+      return value as string;
     }
     if (this._reverseMapping.has(value as EnumValue)) {
       return this._reverseMapping.get(value as EnumValue)!;
@@ -289,9 +301,11 @@ export class EnumType extends ValueType<string> {
   // maps to its stored value, anything else passes through the subtype's cast
   // (so e.g. the string "true" type-casts to boolean `true` for a query).
   serialize(value: unknown): number | string | boolean | null {
-    const mapped =
-      typeof value === "string" && this._mapping.has(value) ? this._mapping.get(value)! : value;
-    return this._subtypeType.serialize(mapped) as number | string | boolean | null;
+    return this._subtypeType.serialize(this._mapping.fetch(value as string, value as EnumValue)) as
+      | number
+      | string
+      | boolean
+      | null;
   }
 
   // The in-memory value is the label string; the database value is the mapped
@@ -305,9 +319,10 @@ export class EnumType extends ValueType<string> {
 
   // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
-    const mapped =
-      typeof value === "string" && this._mapping.has(value) ? this._mapping.get(value)! : value;
-    return this._subtypeType.isSerializable(mapped, block);
+    return this._subtypeType.isSerializable(
+      this._mapping.fetch(value as string, value as EnumValue),
+      block,
+    );
   }
 
   assertValidValue(value: unknown): void {
@@ -316,13 +331,13 @@ export class EnumType extends ValueType<string> {
     // — a blank value (nil, false, or a whitespace-only string) is always
     // allowed and casts to nil.
     if (isBlank(value)) return;
-    if (typeof value === "string" && this._mapping.has(value)) return;
+    if (this._mapping.hasKey(value as string)) return;
     if (this._reverseMapping.has(value as EnumValue)) return;
     throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
   }
 
   /** @internal */
-  get mapping(): ReadonlyMap<string, EnumValue> {
+  get mapping(): HashWithIndifferentAccess<EnumValue> {
     return this._mapping;
   }
 }
@@ -399,6 +414,13 @@ export class EnumMethods {
    * `#{value_method_name}?` / `#{value_method_name}!` / scope / `not_...`:
    * the predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
    * scope `{name}`, and the auto negative scope `not{Name}`.
+   *
+   * @missingRailsCall define_method — enum.rb:306,310 emit the predicate and
+   * bang with `define_method`. A generated member has to be installed with
+   * `Object.defineProperty` in trails: it carries a descriptor, and the reader
+   * half of the enum surface is a property, not a callable (see CLAUDE.md,
+   * "Generated attribute readers are properties"). `Object.defineProperty` IS
+   * the JS `define_method`; there is no other spelling.
    */
   defineEnumMethods(
     name: string,
@@ -502,6 +524,12 @@ export { enumMethod as enum };
  * Validates values/options, registers the type, and defines all enum methods.
  *
  * Mirrors: ActiveRecord::Enum#_enum (private)
+ *
+ * @missingRailsCall define_method — enum.rb:232
+ * `singleton_class.define_method(name.pluralize) { enum_values }` defines the
+ * class-level values reader. trails installs it with `Object.defineProperty` on
+ * the class object, the JS spelling of `singleton_class.define_method` (see
+ * CLAUDE.md, "Generated attribute readers are properties").
  *
  * @internal
  */
@@ -821,6 +849,14 @@ const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, 
  *
  * Mirrors: ActiveRecord::Enum#_enum_methods_module (private)
  *
+ * @missingRailsCall include — enum.rb:329 `include mod` splices the freshly
+ * built module into the class's ancestors. trails does that splice with
+ * `getOrCreateModuleCarrier` (from `EnumMethods.carrier()`), which interposes a
+ * prototype between the model prototype and its parent — the JS spelling of the
+ * same ancestor insertion. activesupport's `include()` copies a module's
+ * members at call time, so it cannot stand in here: the carrier is populated
+ * later, once per enum value, as `defineEnumMethods` runs.
+ *
  * @internal
  */
 export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumMethods {
@@ -836,6 +872,16 @@ export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumM
  * Raise if the proposed enum method name would conflict with an existing method.
  *
  * Mirrors: ActiveRecord::Enum#detect_enum_conflict! (private)
+ *
+ * @missingRailsCall method_defined_within? — enum.rb:377 and enum.rb:383 both
+ * spell their check as `method_defined_within?`. Neither arm can route through
+ * the port of it: `isMethodDefinedWithin` resolves a method's owner by walking
+ * the CONSTRUCTOR chain (`instanceMethodOwner`), which never reaches
+ * `Object.prototype`, so `method_defined_within?("toString", Relation)` answers
+ * true where Ruby's owner comparison answers false — it would reject a scope
+ * Rails accepts. The second arm (`_enum_methods_module`, "another enum") needs
+ * a `klass.prototype` and trails' enum methods module is an interposed carrier
+ * object, not a class, so it consults `_enumMethodsModuleNames` instead.
  *
  * @internal
  */
@@ -880,7 +926,7 @@ export function detectEnumConflictBang(
     }
     return;
   }
-  if (dangerousAttributeMethods().has(methodName)) {
+  if (isDangerousAttributeMethod.call(this as any, methodName)) {
     raiseConflictError.call(this, enumName, methodName);
   }
 }
