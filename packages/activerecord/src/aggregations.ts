@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
-import { prepend } from "@blazetrails/activesupport";
+import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/activesupport";
 
 /**
  * Aggregation cache and composed-of value-object support.
@@ -31,9 +31,16 @@ export function clearAggregationCache(record: Base): void {
 // ---------------------------------------------------------------------------
 
 interface ComposedOfOptions {
-  className: new (...args: any[]) => any;
-  mapping: [string, string][];
-  constructorFn?: (...args: any[]) => any;
+  /**
+   * Ruby's `:class_name`, constantized at reader/writer time
+   * (aggregations.rb:249-253, 262) and defaulting to `name.camelize`. The class
+   * itself is also accepted, for a value object that is not registered as a
+   * constant.
+   */
+  className?: (new (...args: any[]) => any) | string;
+  mapping?: [string, string][] | [string, string];
+  /** Ruby's `:constructor`; a String names a class method, as `send` does. */
+  constructorFn?: ((...args: any[]) => any) | string;
   converter?: (value: unknown) => unknown;
   allowNil?: boolean;
 }
@@ -48,33 +55,59 @@ export function composedOf(
   partId: string,
   options: ComposedOfOptions,
 ): void {
+  assertValidKeys(options as unknown as Record<string, unknown>, [
+    "className",
+    "mapping",
+    "allowNil",
+    "constructorFn",
+    "converter",
+  ]);
+
   includeAggregations(modelClass);
 
-  readerMethod(modelClass, partId, options.mapping, options.className, options.constructorFn);
-  writerMethod(
-    modelClass,
-    partId,
-    options.className,
-    options.mapping,
-    options.allowNil,
-    options.converter,
-  );
+  const name = partId;
+  const className = options.className ?? camelize(name);
+  // `options[:mapping] || [ name, name ]`, then `[ mapping ] unless
+  // mapping.first.is_a?(Array)` (aggregations.rb:229-230) — the inferred pair
+  // names the attribute after the aggregation itself.
+  let mapping: [string, string][] | [string, string] = options.mapping ?? [name, name];
+  if (!Array.isArray(mapping[0])) mapping = [mapping] as [string, string][];
+  const allowNil = options.allowNil ?? false;
+  const constructor = options.constructorFn ?? "new";
+  const converter = options.converter;
 
-  // ComposedOfOptions carries `className` as the value-object CLASS, not Ruby's
-  // class-name String, so those two keys are overlaid onto the hash Rails
-  // forwards whole (aggregations.rb:265).
+  readerMethod(modelClass, name, className, mapping as [string, string][], allowNil, constructor);
+  writerMethod(modelClass, name, className, mapping as [string, string][], allowNil, converter);
+
+  // Rails forwards the options hash whole (aggregations.rb:244). When
+  // `className` was given as the value-object CLASS rather than its name, the
+  // two keys the reflection reads are overlaid onto it.
   const reflection = create(
     "composedOf",
     partId,
     null,
-    {
-      ...options,
-      className: options.className.name,
-      anonymousClass: options.className,
-    },
+    typeof options.className === "function"
+      ? { ...options, className: options.className.name, anonymousClass: options.className }
+      : { ...options },
     modelClass,
   );
   addAggregateReflection(modelClass, partId, reflection);
+}
+
+/**
+ * `class_name.constantize` (aggregations.rb:249-253, 262) — resolved where Ruby
+ * resolves it, inside the generated method, so a value object registered after
+ * the `composedOf` call still binds. A class passed in place of its name is
+ * already the resolved constant.
+ *
+ * @internal
+ */
+function resolveClass(
+  className: (new (...args: any[]) => any) | string,
+): new (...args: any[]) => any {
+  return typeof className === "string"
+    ? (constantize(className) as new (...args: any[]) => any)
+    : className;
 }
 
 /**
@@ -84,23 +117,33 @@ export function composedOf(
 function readerMethod(
   modelClass: typeof Base,
   name: string,
+  className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
-  klass: new (...args: any[]) => any,
-  constructorFn?: (...args: any[]) => any,
+  allowNil: boolean,
+  constructor: ((...args: any[]) => any) | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
   Object.defineProperty(modelClass.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get(this: Base): unknown {
       const cache = getAggregationCache(this);
-      if (cache.has(name)) return cache.get(name);
-      const args = mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
-      if (args.every((a) => a === null || a === undefined)) return null;
-      const built = constructorFn ? constructorFn(...args) : new klass(...args);
-      if (built == null) return null;
-      const obj = Object.freeze(built);
-      cache.set(name, obj);
-      return obj;
+      if (
+        cache.get(name) == null &&
+        (!allowNil || mapping.some(([key]) => this.readAttribute(key) != null))
+      ) {
+        const attrs = mapping.map(([key]) => this.readAttribute(key));
+        // `constructor.respond_to?(:call)` (aggregations.rb:251-253); the String
+        // arm is Ruby's `class_name.constantize.send(constructor, *attrs)`, whose
+        // default `:new` has no `send`-able JS spelling.
+        const object =
+          typeof constructor === "function"
+            ? constructor(...attrs)
+            : constructor === "new"
+              ? new (resolveClass(className))(...attrs)
+              : (resolveClass(className) as any)[constructor](...attrs);
+        cache.set(name, object == null ? object : Object.freeze(object));
+      }
+      return cache.get(name) ?? null;
     },
     configurable: true,
   });
@@ -137,9 +180,9 @@ function _decompose(
 function writerMethod(
   modelClass: typeof Base,
   name: string,
-  klass: new (...args: any[]) => any,
+  className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
-  allowNil?: boolean,
+  allowNil: boolean,
   converter?: (value: unknown) => unknown,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
@@ -147,6 +190,7 @@ function writerMethod(
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: Base, value: unknown): void {
+      const klass = resolveClass(className);
       const cache = getAggregationCache(this);
       // allow_nil: true → clear all mapped columns when nil and store null in cache.
       // allow_nil: false (default) → fall through so decomposition raises naturally

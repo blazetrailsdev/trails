@@ -616,9 +616,9 @@ describe("MultiParameterAttributeTest", () => {
   it("multiparameter assignment of aggregation with blank values", async () => {
     class Address {
       constructor(
-        public street: string,
-        public city: string,
-        public country: string,
+        public street: string | null,
+        public city: string | null,
+        public country: string | null,
       ) {}
     }
     class Customer extends Base {
@@ -637,11 +637,16 @@ describe("MultiParameterAttributeTest", () => {
     const customer = new Customer();
     await customer.assignAttributes({
       "address(1)": "",
-      "address(2)": "",
-      "address(3)": "",
+      "address(2)": "The City",
+      "address(3)": "The Country",
     });
-    // All blank → assignment skipped; getter returns null (all mapped attrs are null)
-    expect((customer as any).address).toBeNull();
+    // Rails: `assert_equal Address.new(nil, "The City", "The Country"),
+    // customer.address` — a blank parameter reads back as nil, and the
+    // aggregation is still built (multiparameter_attributes_test.rb:367-373).
+    const addr = (customer as any).address as Address;
+    expect(addr.street).toBeNull();
+    expect(addr.city).toBe("The City");
+    expect(addr.country).toBe("The Country");
   });
 
   it("multiparameter assignment of aggregation with large index", async () => {

@@ -722,7 +722,11 @@ export class Association {
     const name = this.reflection.name;
 
     const cached = owner._associationCache(name);
-    if (cached !== undefined) {
+    // A collection's cache seat IS this association object (its `@target` is
+    // the canonical store, collection_association.rb:284-296), so a hit on
+    // ourselves is not cached data — it is the very target `load_target` is
+    // about to merge a fresh `find_target` into.
+    if (cached !== undefined && (cached as unknown) !== (this as unknown)) {
       return cached.target as Base | Base[] | null;
     }
     const preloaded = _preloadedHolderTarget(owner, name);

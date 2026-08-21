@@ -581,7 +581,8 @@ async function findTarget(
   // stale/incorrect data for the diverged query).
   if (!queryExecutor) {
     // Honor an instance-cache hit (a directly-seeded or inverse-seeded
-    // collection target), but ignore the association's *own* collection proxy:
+    // collection target), but ignore the association's *own* seat — its
+    // collection proxy or the association object the proxy reads through:
     // its in-memory built/pushed records are not a complete collection and must
     // still be merged with a DB query (this loader runs inside that proxy's
     // load path, where `proxy.loaded` is false by construction).
@@ -589,6 +590,7 @@ async function findTarget(
     if (
       cache &&
       cache !== record._collectionProxies.get(assocName) &&
+      (cache as unknown) !== (record._associationInstances.get(assocName) as unknown) &&
       Array.isArray(cache.target) &&
       !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
     ) {
