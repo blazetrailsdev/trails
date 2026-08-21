@@ -2863,7 +2863,10 @@ export class Base extends Model {
   declare static updateCounters: typeof CounterCache.updateCounters;
   declare static resetCounters: typeof CounterCache.resetCounters;
   declare static isCounterCacheColumn: typeof CounterCache.isCounterCacheColumn;
-  declare static counterCachedAssociationNames: typeof CounterCache.getCounterCachedAssociationNames;
+  /** counter_cache.rb:9 — `class_attribute :_counter_cache_columns`. */
+  declare static _counterCacheColumns: string[];
+  /** counter_cache.rb:10 — `class_attribute :counter_cached_association_names`. */
+  declare static counterCachedAssociationNames: string[];
 
   /**
    * Instantiate a model from a database row (marks it as persisted).
@@ -4573,6 +4576,11 @@ extend(Base, _Reflection.ClassMethods);
 // `_reflections` it shadows, so the two cannot drift apart.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
+classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
+classAttribute.call(Base, "counterCachedAssociationNames", {
+  instanceWriter: false,
+  default: [],
+});
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,

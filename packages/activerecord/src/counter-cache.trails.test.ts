@@ -31,6 +31,17 @@ describe("CounterCacheTest (trails)", () => {
     const reloaded = await CanonicalPost.find(post.id);
     expect(reloaded.legacy_comments_count).toBe(1);
   });
+
+  // counter_cache.rb:10 — class_attribute, so belongs_to.rb:41's `|=` on a
+  // subclass writes locally; JS class properties have no such default.
+  it("registering a counter cached association does not mutate the superclass list", () => {
+    class ParentModel extends Base {}
+    class ChildModel extends ParentModel {}
+    ChildModel.belongsTo("post", { counterCache: true });
+
+    expect(ChildModel.counterCachedAssociationNames).toEqual(["post"]);
+    expect(ParentModel.counterCachedAssociationNames).toEqual([]);
+  });
 });
 
 describe("CounterCacheTest deferred resolution (trails)", () => {
@@ -83,10 +94,9 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
     // demodulized `books_count`, not the flat `cpk_books_count`.
     const { CpkOrder } = await import("./test-helpers/models/cpk.js");
     registerModel(CpkOrder);
-    const cols = (CpkOrder as unknown as { _counterCacheColumns: Set<string> })
-      ._counterCacheColumns;
-    expect(cols.has("books_count")).toBe(true);
-    expect(cols.has("cpk_books_count")).toBe(false);
+    const cols = (CpkOrder as unknown as { _counterCacheColumns: string[] })._counterCacheColumns;
+    expect(cols).toContain("books_count");
+    expect(cols).not.toContain("cpk_books_count");
   });
 });
 

@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, reverseMerge, trailsRoot } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/activesupport/process-adapter";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
@@ -172,23 +172,61 @@ export async function loadDatabaseConfigModule(
  * (`activerecord/lib/active_record/railtie.rb:256-262`) assigns this to
  * `Base.configurations` and only then calls `establish_connection`.
  *
- * Rails' `shared`-key reverse-merge (configuration.rb:439-458) is not ported
- * yet; tracked by `0112-one-rails-thing-n-trails-things/
- * database-configuration-shared-key-reverse-merge`.
+ * The `shared` key (configuration.rb:439-458) is deleted and reverse-merged
+ * into every environment, with the nested arm for the multi-database shape.
+ * Rails' `reverse_merge!` mutates the parsed YAML in place; the loaded value
+ * here is an imported module's export, shared with (and possibly frozen by) the
+ * module registry, so each merged hash is rebuilt instead.
+ *
+ * Rails then returns `Hash.new(shared).merge(loaded_yaml)`, whose default value
+ * answers an environment the file never listed. A plain object has no default,
+ * so the returned record is a Proxy whose `get` falls back to `shared` — the
+ * one JS construct with `Hash.new`'s semantics, leaving its own keys (and so
+ * its enumeration) exactly the loaded ones, as in Ruby.
  */
+type AnyHash = Record<string, unknown>;
+
 export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
   const fs = await getFsAsync();
   const path = await getPathAsync();
   const resolvedRoot = root ?? trailsRoot() ?? fs.cwd();
 
   const loaded = await loadDatabaseConfigModule(resolvedRoot);
-  if (loaded) return loaded.module;
-
   const jsonPath = path.join(resolvedRoot, "config", "database.json");
-  if (await fs.exists(jsonPath)) {
+  let loadedYaml: DatabaseConfigModule | null = null;
+  if (loaded) {
+    loadedYaml = loaded.module;
+  } else if (await fs.exists(jsonPath)) {
     if (!fs.readFile)
       throw new Error("Config loading requires an fs adapter with readFile support.");
-    return JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule;
+    loadedYaml = JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule;
+  }
+
+  if (loadedYaml) {
+    const shared = loadedYaml.shared;
+    if (shared == null || shared === false) return loadedYaml;
+
+    const merged: Record<string, unknown> = { ...loadedYaml };
+    delete merged.shared;
+    for (const [env, config] of Object.entries(merged)) {
+      if (isMultiDatabaseEnv(config)) {
+        const subConfigs: Record<string, unknown> = {};
+        for (const [name, subConfig] of Object.entries(config)) {
+          subConfigs[name] = isMultiDatabaseEnv(shared)
+            ? reverseMerge(subConfig as AnyHash, (shared as Record<string, AnyHash>)[name] ?? {})
+            : reverseMerge(subConfig as AnyHash, shared as AnyHash);
+        }
+        merged[env] = subConfigs;
+      } else if (config !== null && typeof config === "object") {
+        merged[env] = reverseMerge(config as AnyHash, shared as AnyHash);
+      }
+    }
+    return new Proxy(merged, {
+      get(target, key, receiver) {
+        if (typeof key === "string" && !Reflect.has(target, key)) return shared;
+        return Reflect.get(target, key, receiver);
+      },
+    }) as DatabaseConfigModule;
   }
 
   if (env.DATABASE_URL) return {};

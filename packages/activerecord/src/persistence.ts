@@ -1796,7 +1796,7 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   _attributes?: { keys?(): Iterable<string> };
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
-    _counterCacheColumns?: Set<string>;
+    _counterCacheColumns?: string[];
   };
 };
 
