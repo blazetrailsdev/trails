@@ -401,7 +401,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
   }
   const result = new Set<string>();
   for (const attributeName of encryptedAttributes.call(this)) {
-    const type = encryptedTypeOf(getAttributeType(this, attributeName));
+    const type = encryptedTypeOf(this.typeForAttribute(attributeName));
     if (type?.deterministic) {
       result.add(attributeName);
     }
@@ -532,7 +532,7 @@ export function buildEncryptAttributeAssignments(this: any): Record<string, unkn
 export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const attributeName of encryptedAttributes.call(this.constructor)) {
-    const type = getAttributeType(this.constructor, attributeName) as {
+    const type = this.constructor.typeForAttribute(attributeName) as {
       deserialize: (v: unknown) => unknown;
     };
     const encryptedValue = ciphertextFor.call(this, attributeName);
@@ -631,17 +631,6 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // the original column rides the same replay-safe machinery as its source.
   encrypts.call(this, originalAttributeName);
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
-}
-
-/**
- * Resolve an attribute's type through `typeForAttribute` (Rails' single lookup
- * surface); falls back to `_attributeDefinitions` for plain mock models.
- */
-export function getAttributeType(klass: any, name: string): unknown {
-  if (typeof klass?.typeForAttribute === "function") {
-    return klass.typeForAttribute(name);
-  }
-  return klass._attributeDefinitions?.get?.(name)?.type;
 }
 
 /**

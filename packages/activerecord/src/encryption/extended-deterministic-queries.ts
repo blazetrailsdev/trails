@@ -1,6 +1,6 @@
 import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
+import { encryptedTypeOf } from "./encryptable-record.js";
 
 /**
  * What AdditionalValue needs from its type — one of the attribute's
@@ -133,7 +133,7 @@ export class EncryptedQuery {
       // (extended_deterministic_queries.rb:58-62); `deterministic`/
       // `previous_types` reach the inner EncryptedAttributeType via
       // DelegateClass delegation there, via encryptedTypeOf here.
-      const fullType = getAttributeType(model, attrName) as SerializableType | undefined;
+      const fullType = model.typeForAttribute(attrName) as SerializableType | undefined;
       const type = encryptedTypeOf(fullType);
       if (!fullType || !type) continue;
       if (!type.deterministic) continue;
@@ -226,7 +226,7 @@ export class RelationQueries {
     const scopeAttrs = originalScopeForCreate.call(this) as Record<string, unknown>;
     const wheres = this.whereValuesHash();
     for (const attrName of encryptedAttrs) {
-      const type = encryptedTypeOf(getAttributeType(model, attrName));
+      const type = encryptedTypeOf(model.typeForAttribute(attrName));
       if (!type?.deterministic) continue;
       const values = wheres[attrName];
       // An expanded list is raw plaintext at [0] followed only by
