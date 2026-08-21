@@ -5,18 +5,13 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { zone, isBlank, include } from "@blazetrails/activesupport";
+import { zone, isBlank, include, type Included } from "@blazetrails/activesupport";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
-import {
-  applySecondsPrecision,
-  fastStringToTime,
-  newTime,
-  typeCastForSchema,
-} from "./helpers/time-value.js";
+import { TimeValue } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 /**
@@ -28,24 +23,24 @@ import { ValueType } from "./value.js";
  * instant. `Temporal.Instant` is the port's `::Time` (see `newTime`), so the
  * cast result carries that instant rather than a bare time of day.
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
-export interface TimeType extends Omit<
-  InstanceMethods<Temporal.Instant>,
-  "valueFromMultiparameterAssignment"
-> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
+export interface TimeType
+  extends
+    Omit<InstanceMethods<Temporal.Instant>, "valueFromMultiparameterAssignment">,
+    Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
+  /**
+   * Mixed in from Helpers::TimeValue (time_value.rb:10-21). Declared here
+   * because a merged interface cannot inherit a signature that differs from
+   * `ValueType`'s. The return type is `unknown` so a subclass can widen it, as
+   * ActiveRecord's `Type::Time` does
+   * (activerecord/lib/active_record/type/time.rb:20-22).
+   */
+  serializeCastValue(value: Temporal.Instant | null): unknown;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TimeType extends ValueType<Temporal.Instant> {
   readonly name = "time";
-
-  /** Mixed in from Helpers::TimeValue (time_value.rb:24-34). @internal Rails-private helper. */
-  protected applySecondsPrecision = applySecondsPrecision;
-
-  /** Mixed in from Helpers::TimeValue (time_value.rb:79-89). @internal Rails-private helper. */
-  protected fastStringToTime = fastStringToTime;
-
-  /** Mixed in from Helpers::TimeValue (time_value.rb:48-65). @internal Rails-private helper. */
-  protected newTime = newTime;
 
   type(): string {
     return this.name;
@@ -206,19 +201,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 
   /**
-   * Mirrors: ActiveModel::Type::Helpers::TimeValue#serialize_cast_value
-   * (time_value.rb:10-21) — its `apply_seconds_precision` half. The `is_utc?`
-   * `getutc`/`getlocal` arm (`:12-19`) is not ported; that gap is tracked by
-   * `serialize-cast-value-drops-is-utc-normalization`.
-   *
-   * The return type is `unknown` so a subclass can widen it, as ActiveRecord's
-   * `Type::Time` does (activerecord/lib/active_record/type/time.rb:20-22).
-   */
-  serializeCastValue(value: Temporal.Instant | null): unknown {
-    return this.applySecondsPrecision(value);
-  }
-
-  /**
    * `super` is the mixin's `::Time` assembly (see the `include` at the bottom
    * of this file), whose Rails base date 2000-01-01 lets hour-only form inputs
    * (e.g. { "4": 15 }) produce a valid Time. Rails' Type::Time has no override
@@ -254,11 +236,9 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
 include(TimeType, acceptsMultiparameterTime);
 
 /**
- * Ruby `include Helpers::TimeValue` (time.rb:43) for the one member of that
- * module the class does not carry as a field: `type_cast_for_schema`
- * (time_value.rb:36-38) is the module's only public member, so it lands on the
- * prototype where a subclass's `super` reaches it — as
- * `PostgreSQL::OID::DateTime` does on the sibling class
- * (postgresql/oid/date_time.rb:21-27).
+ * Mirrors: `include Helpers::TimeValue` (time.rb:43). Every member lands on the
+ * prototype rather than on each instance: `type_cast_for_schema` is public and
+ * `PostgreSQL::OID::DateTime` overrides it with a `super` call
+ * (postgresql/oid/date_time.rb:21-27), which only an ancestry can answer.
  */
-include(TimeType, { typeCastForSchema });
+include(TimeType, TimeValue);

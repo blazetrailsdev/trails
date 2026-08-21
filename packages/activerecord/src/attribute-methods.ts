@@ -22,7 +22,7 @@ import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js"
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
 // dangerousAttributeMethods from this file)
 import { reload as _reload } from "./persistence.js";
-import { cachedTableExists } from "./model-schema.js";
+import { cachedTableExists, loadSchema } from "./model-schema.js";
 import {
   serializableHash as _serializableHash,
   attributeNamesForSerialization as _attrNamesForSerialization,
@@ -378,8 +378,23 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // no table, so it generates no per-attribute accessors and no id_value alias —
   // only the superclass cascade (above) and generateAliasAttributes (below) run.
   if (this.abstractClass !== true) {
-    amDefineAttributeMethods.call(this as never, ...this.attributeNames());
-    if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
+    loadSchema.call(this as never);
+    // Rails re-checks `@attribute_methods_generated` after the step that can
+    // yield to another generator — the mutex it takes at attribute_methods.rb:108-110.
+    // trails' yielding step is `load_schema` itself: a cold load ends in the
+    // post-load generation trigger (model-schema.ts), which runs this whole
+    // body first, so the same re-check is what keeps generation single. The
+    // methods still came from this call, so it answers `true` below as the
+    // first generating pass does (attribute_methods.rb:104-125) — only a call
+    // that found them already generated returns false, and that arm is the
+    // flag check above `load_schema`.
+    const generatedByNestedLoad =
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated;
+    if (!generatedByNestedLoad) {
+      amDefineAttributeMethods.call(this as never, ...this.attributeNames());
+      if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
+    }
   }
   generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
