@@ -918,48 +918,6 @@ export function isPrimaryKeyValuesPresent(this: InstanceMethodHost): boolean {
   return this.id != null;
 }
 
-function _readPkWith(record: InstanceMethodHost, method: string): unknown {
-  const pk = (record.constructor as any).primaryKey;
-  const fn = (record as any)[method];
-  if (typeof fn === "function") {
-    if (Array.isArray(pk)) return pk.map((k: string) => fn.call(record, k));
-    return fn.call(record, pk);
-  }
-  if (Array.isArray(pk)) return pk.map((k: string) => record._readAttribute(k));
-  return record._readAttribute(pk);
-}
-
-/** @internal */
-export function idBeforeTypeCast(this: InstanceMethodHost): unknown {
-  return _readPkWith(this, "readAttributeBeforeTypeCast");
-}
-/** @internal */
-export function idWas(this: InstanceMethodHost): unknown {
-  return _readPkWith(this, "attributeWas");
-}
-/** @internal */
-export function idInDatabase(this: InstanceMethodHost): unknown {
-  return _readPkWith(this, "attributeInDatabase");
-}
-/** @internal */
-export function idForDatabase(this: InstanceMethodHost): unknown {
-  const pk = (this.constructor as any).primaryKey;
-  const attrs = this._attributes;
-  if (attrs?.getAttribute) {
-    if (Array.isArray(pk)) {
-      return pk.map((k: string) => {
-        const attr = attrs.getAttribute!(k);
-        return attr != null && "valueForDatabase" in attr
-          ? attr.valueForDatabase
-          : this._readAttribute(k);
-      });
-    }
-    const attr = attrs.getAttribute(pk);
-    if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
-  }
-  if (Array.isArray(pk)) return pk.map((k: string) => this._readAttribute(k));
-  return this._readAttribute(pk);
-}
 /** @internal */
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,

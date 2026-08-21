@@ -110,11 +110,14 @@ const SECONDS_PER_DAY = 86400;
  */
 type UtcConstructed = Temporal.Instant;
 
+/** Ruby's `Time`, whichever Temporal shape carries it. */
+type TimeLike = Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate;
+
 export class TimeWithZone {
   /** `@utc` — `nil` until {@link utc} derives it from `@time`. */
   private _utc: UtcConstructed | null;
   /** `@time` — the local wall clock, `nil` until {@link time} derives it. */
-  private _time: UtcConstructed | null;
+  private _time: TimeLike | null;
   /** The timezone */
   private readonly _timeZone: TimeZone;
   /** `@period` — memoized by {@link period}. */
@@ -129,14 +132,14 @@ export class TimeWithZone {
    * {@link _transferTimeValuesToUtcConstructor} moves onto a UTC constructor.
    */
   constructor(
-    utcTime: Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate | null,
+    utcTime: TimeLike | null,
     timeZone: TimeZone,
-    localTime: Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate | null = null,
+    localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
     this._utc = utcTime ? this._transferTimeValuesToUtcConstructor(utcTime) : null;
     this._timeZone = timeZone;
-    this._time = localTime === null ? null : this._toUtcConstructed(localTime);
+    this._time = localTime;
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
@@ -163,23 +166,18 @@ export class TimeWithZone {
 
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#incorporate_utc_offset`
-   * (time_with_zone.rb:562-568). Ruby's `Date` arm adds
-   * `Rational(offset, SECONDS_PER_DAY)` days rather than seconds; a
-   * `PlainDate` reaches the same value through the day fraction it names.
+   * (time_with_zone.rb:562-568). Ruby's `Date` advances in DAYS, so its arm
+   * spells the offset as the day fraction `Rational(offset, SECONDS_PER_DAY)`;
+   * an instant carrying that date advances by the seconds that fraction names.
    */
   private _incorporateUtcOffset(
     time: UtcConstructed | Temporal.PlainDate,
     offset: number,
   ): UtcConstructed {
     if (time instanceof Temporal.PlainDate) {
-      const days = new Rational(offset, SECONDS_PER_DAY);
-      const seconds = (Number(days.numerator) / Number(days.denominator)) * SECONDS_PER_DAY;
-      return time
-        .toZonedDateTime({ timeZone: "UTC" })
-        .toInstant()
-        .add({ nanoseconds: Math.round(seconds * 1e9) });
+      return time.toZonedDateTime({ timeZone: "UTC" }).toInstant().add({ seconds: offset });
     }
-    return time.add({ nanoseconds: Math.round(offset * 1e9) });
+    return time.add({ seconds: offset });
   }
 
   /**
@@ -189,7 +187,9 @@ export class TimeWithZone {
   private _getPeriodAndEnsureValidLocalTime(period: TimezonePeriod | null): TimezonePeriod {
     // we don't want a Time.local instance enforcing its own DST rules as well,
     // so transfer time values to a utc constructor if necessary
-    this._time = this._transferTimeValuesToUtcConstructor(this._time!);
+    if (!(this._time instanceof Temporal.Instant)) {
+      this._time = this._transferTimeValuesToUtcConstructor(this._time!);
+    }
     for (;;) {
       try {
         return period ?? this._timeZone.periodForLocal(this._time);
@@ -206,12 +206,13 @@ export class TimeWithZone {
    * (time_with_zone.rb:583-587) — `Time.utc(year, month, day, hour, min,
    * sec + subsec)`, which an `Instant` (a UTC `Time`) already is.
    */
-  private _transferTimeValuesToUtcConstructor(
-    time: Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate,
-  ): UtcConstructed {
+  private _transferTimeValuesToUtcConstructor(time: TimeLike): UtcConstructed {
     // avoid creating another Time object if possible
     if (time instanceof Temporal.Instant) return time;
-    return this._toUtcConstructed(time);
+    if (time instanceof Temporal.PlainDate) {
+      return time.toZonedDateTime({ timeZone: "UTC" }).toInstant();
+    }
+    return time.toZonedDateTime("UTC").toInstant();
   }
 
   /**
@@ -220,10 +221,10 @@ export class TimeWithZone {
    */
   private _wrapWithTimeZone(time: unknown): unknown {
     if (ObjectExt.actsLike(time, "time")) {
-      const local = this._toUtcConstructed(
-        time as Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate,
+      const local = time as TimeLike;
+      const periods = this.timeZone.periodsForLocal(
+        this._transferTimeValuesToUtcConstructor(local),
       );
-      const periods = this.timeZone.periodsForLocal(local);
       const period = this.period;
       const matched = periods.some(
         (p) =>
@@ -241,22 +242,6 @@ export class TimeWithZone {
     } else {
       return time;
     }
-  }
-
-  /**
-   * The wall clock of a `PlainDateTime` / `PlainDate` moved onto a UTC
-   * constructor, which is what Ruby's `Time.utc(...)` call sites above build —
-   * Ruby's one `Time.utc(y, m, d, h, min, sec + subsec)` expression, which
-   * TypeScript spells differently for each Temporal shape.
-   */
-  private _toUtcConstructed(
-    time: Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate,
-  ): UtcConstructed {
-    if (time instanceof Temporal.Instant) return time;
-    if (time instanceof Temporal.PlainDate) {
-      return time.toZonedDateTime({ timeZone: "UTC" }).toInstant();
-    }
-    return time.toZonedDateTime("UTC").toInstant();
   }
 
   // ---------------------------------------------------------------------------
@@ -286,7 +271,9 @@ export class TimeWithZone {
    */
   get time(): Temporal.PlainDateTime {
     this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset);
-    return this._time.toZonedDateTimeISO("UTC").toPlainDateTime();
+    return this._transferTimeValuesToUtcConstructor(this._time)
+      .toZonedDateTimeISO("UTC")
+      .toPlainDateTime();
   }
 
   /** Timezone abbreviation (e.g., "EST", "EDT") — time_with_zone.rb:133-135. */
@@ -441,7 +428,10 @@ export class TimeWithZone {
    * `@utc ||= incorporate_utc_offset(@time, -utc_offset)`.
    */
   utc(): Temporal.Instant {
-    return (this._utc ??= this._incorporateUtcOffset(this._time!, -this.utcOffset));
+    return (this._utc ??= this._incorporateUtcOffset(
+      this._time as UtcConstructed,
+      -this.utcOffset,
+    ));
   }
 
   /** Alias for utc() */

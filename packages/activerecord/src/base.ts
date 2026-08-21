@@ -4847,12 +4847,9 @@ include(Base, {
   attributeCameFromUser: _attributeCameFromUser,
   queryCastAttribute: _queryCastAttribute,
   isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
-  // `id_was` / `id_in_database` / `id_for_database` / `id_before_type_cast` are
-  // zero-arg Ruby readers (primary_key.rb:49-66), so they are accessor
-  // properties — the shape `id` and `id?` already have, and the one
-  // `define_attribute_method_pattern` generates for a pk-less model. They come
-  // in with `include(Base, _PrimaryKey)` below, which copies descriptors and so
-  // can carry an accessor; this object literal is read by value and cannot.
+  // The ID_ATTRIBUTE_METHODS readers arrive with `include(Base, _PrimaryKey)`
+  // below: they are accessor properties, and only that call copies descriptors
+  // — this object literal is read by value and would flatten them.
   isSavedChangeToAttribute: _isSavedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
   isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
