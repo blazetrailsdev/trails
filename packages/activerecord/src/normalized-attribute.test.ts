@@ -27,11 +27,15 @@ class NormalizedAircraft extends Aircraft {
   declare validated_name: string | undefined;
 
   static {
-    this.normalizes("name", (name: unknown) => {
-      const present = presence(name as string | null);
-      return present ? titleize(present) : present;
+    this.normalizes("name", {
+      with: (name: unknown) => {
+        const present = presence(name as string | null);
+        return present ? titleize(present) : present;
+      },
     });
-    this.normalizes("manufactured_at", (time: unknown) => noon(time as Temporal.Instant));
+    this.normalizes("manufactured_at", {
+      with: (time: unknown) => noon(time as Temporal.Instant),
+    });
     // Rails: validate { self.validated_name = name.dup }
     this.validate(function (this: NormalizedAircraft) {
       this.validated_name = this.name as string;
@@ -102,11 +106,10 @@ describe("NormalizedAttributeTest", () => {
 
   it("normalizes nil if apply_to_nil", () => {
     const IncludingNil = class extends Aircraft {};
-    IncludingNil.normalizes(
-      "name",
-      (name: unknown) => (name ? titleize(name as string) : "Untitled"),
-      { applyToNil: true },
-    );
+    IncludingNil.normalizes("name", {
+      with: (name: unknown) => (name ? titleize(name as string) : "Untitled"),
+      applyToNil: true,
+    });
 
     expect(IncludingNil.normalizeValueFor("name", null)).toBe("Untitled");
   });
@@ -132,9 +135,9 @@ describe("NormalizedAttributeTest", () => {
 
   it("can stack normalizations", () => {
     const TitlecaseThenReverse = class extends NormalizedAircraft {};
-    TitlecaseThenReverse.normalizes("name", (name: unknown) =>
-      (name as string).split("").reverse().join(""),
-    );
+    TitlecaseThenReverse.normalizes("name", {
+      with: (name: unknown) => (name as string).split("").reverse().join(""),
+    });
 
     expect(TitlecaseThenReverse.normalizeValueFor("name", "titlecase THEN reverse")).toBe(
       "esreveR nehT esaceltiT",
@@ -144,7 +147,7 @@ describe("NormalizedAttributeTest", () => {
 
   it("minimizes number of times normalization is applied", async () => {
     const CountApplied = class extends Aircraft {};
-    CountApplied.normalizes("name", (name: unknown) => succ(name as string));
+    CountApplied.normalizes("name", { with: (name: unknown) => succ(name as string) });
 
     const counted = await CountApplied.createBang({ name: "0" });
     expect(counted.name).toBe("1");
@@ -176,9 +179,9 @@ describe("normalizes on Base", () => {
     class NormalizedUser extends Base {
       static _tableName = "aircraft";
       static {
-        this.normalizes("name", (name: unknown) =>
-          typeof name === "string" ? name.trim().toLowerCase() : name,
-        );
+        this.normalizes("name", {
+          with: (name: unknown) => (typeof name === "string" ? name.trim().toLowerCase() : name),
+        });
       }
     }
 

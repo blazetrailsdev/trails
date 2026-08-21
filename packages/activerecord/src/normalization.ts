@@ -2,10 +2,15 @@ import { methodMissingProxy } from "@blazetrails/activesupport";
 import { SerializeCastValue } from "@blazetrails/activemodel";
 import type { Type } from "@blazetrails/activemodel";
 
-/** Args accepted by `normalizes` — attributes, transform fn, and optional options. */
-export type NormalizesArgs =
-  | [...string[], (value: unknown) => unknown]
-  | [...string[], (value: unknown) => unknown, { applyToNil?: boolean }];
+/**
+ * Args accepted by `normalizes` — Ruby's `*names, with:, apply_to_nil: false`
+ * (normalization.rb:88) in the trails kwargs idiom: the names, then one trailing
+ * options object.
+ */
+export type NormalizesArgs = [
+  ...names: string[],
+  options: { with: (value: unknown) => unknown; applyToNil?: boolean },
+];
 
 /**
  * One attribute's accumulated normalizers. Rails keeps only the attribute
@@ -66,9 +71,10 @@ export const ClassMethods = {
    * Mirrors: ActiveRecord::Normalization::ClassMethods#normalizes (normalization.rb:88)
    *
    * @missingRailsArgs new — PERMANENT: `NormalizedValueType.new` gets every
-   *   Rails kwarg with the same key and value, but Rails' normalizer local is
-   *   named `with` (the kwarg it arrived in) and `with` is a reserved word in
-   *   JavaScript, so it cannot be an identifier here.
+   *   Rails kwarg with the same key and value. Rails passes the local `with`;
+   *   `with` is a reserved word in JavaScript and cannot be an identifier, and
+   *   the value passed here is the composed normalizer over every `with` the
+   *   class has declared for the attribute, so it is spelled `normalizer`.
    */
   normalizes(this: NormalizationClass, ...args: NormalizesArgs): void {
     if (!Object.hasOwn(this, "_normalizations")) {
@@ -81,19 +87,12 @@ export const ClassMethods = {
       }
     }
 
-    let options: { applyToNil?: boolean } = {};
-    let fn: (value: unknown) => unknown;
-    const lastArg = args[args.length - 1];
-    let names: string[];
-    if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
-      options = lastArg as { applyToNil?: boolean };
-      fn = args[args.length - 2] as (value: unknown) => unknown;
-      names = args.slice(0, -2) as string[];
-    } else {
-      fn = lastArg as (value: unknown) => unknown;
-      names = args.slice(0, -1) as string[];
-    }
-    const applyToNil = !!options.applyToNil;
+    const options = args[args.length - 1] as {
+      with: (value: unknown) => unknown;
+      applyToNil?: boolean;
+    };
+    const names = args.slice(0, -1) as string[];
+    const applyToNil = options.applyToNil ?? false;
 
     // trails' analogue of `self.normalized_attributes += names.map(&:to_sym)`
     // (normalization.rb:94), hoisted above `decorate_attributes` because — unlike
@@ -103,10 +102,10 @@ export const ClassMethods = {
     for (const name of names) {
       const existing = this._normalizations.get(name);
       if (existing) {
-        existing.fns.push(fn);
+        existing.fns.push(options.with);
         if (applyToNil) existing.applyToNil = true;
       } else {
-        this._normalizations.set(name, { fns: [fn], applyToNil });
+        this._normalizations.set(name, { fns: [options.with], applyToNil });
       }
     }
 

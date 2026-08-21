@@ -37,9 +37,9 @@ describe("STI subclass normalizes", () => {
     await NormalizedCompany.loadSchema();
     await Company.loadSchema();
 
-    NormalizedCompany.normalizes("name", (name: unknown) =>
-      typeof name === "string" ? name.trim().toUpperCase() : name,
-    );
+    NormalizedCompany.normalizes("name", {
+      with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
+    });
 
     expect(NormalizedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
     expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
@@ -53,9 +53,9 @@ describe("STI subclass normalizes", () => {
     await ReloadedCompany.loadSchema();
     await Company.loadSchema();
 
-    ReloadedCompany.normalizes("name", (name: unknown) =>
-      typeof name === "string" ? name.trim().toUpperCase() : name,
-    );
+    ReloadedCompany.normalizes("name", {
+      with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
+    });
     expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
 
     // Rails re-seeds `_default_attributes` from `columns_hash` and replays the
@@ -73,7 +73,7 @@ describe("STI subclass normalizes", () => {
     await RefreshedCompany.loadSchema();
     await Company.loadSchema();
 
-    RefreshedCompany.normalizes("description", (value: unknown) => value);
+    RefreshedCompany.normalizes("description", { with: (value: unknown) => value });
     const defsOf = (klass: typeof Company) =>
       (klass as unknown as { _attributeDefinitions: Map<string, object> })._attributeDefinitions;
     expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
