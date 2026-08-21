@@ -228,6 +228,7 @@ export {
   deepDup,
   slice,
   except,
+  isInclude as isIncludeObj,
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,

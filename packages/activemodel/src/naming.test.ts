@@ -418,9 +418,20 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
 
   it("match throws ArgumentError on non-RegExp input", () => {
     const mn = new ModelName("Post");
-    expect(() => mn.match("Post")).toThrow(ArgumentError);
+    expect(mn.match("Post")).toBe(true);
+    expect(mn.match("os")).toBe(true);
+    expect(mn.match("\\d")).toBe(false);
     expect(() => mn.match(null)).toThrow(ArgumentError);
     expect(() => mn.match(undefined)).toThrow(ArgumentError);
+  });
+
+  it("caseEquals and eql delegate to the name", () => {
+    const mn = new ModelName("Post");
+    expect(mn.caseEquals("Post")).toBe(true);
+    expect(mn.caseEquals(new ModelName("Post"))).toBe(true);
+    expect(mn.caseEquals("Blog::Post")).toBe(false);
+    expect(mn.eql("Post")).toBe(true);
+    expect(mn.eql(new ModelName("Post"))).toBe(false);
   });
 
   it("equals / compare distinguish namespaced models with the same bare name", () => {

@@ -166,6 +166,20 @@ export class Range<T> {
     return this.cover(value);
   }
 
+  /**
+   * Ruby `Range#==` (range.c `range_eq`): another Range whose `begin`, `end`
+   * and `exclude_end?` are each `==`. Two separately-built `1..5` are equal in
+   * Ruby, where JS `===` sees two distinct objects.
+   */
+  equals(other: unknown): boolean {
+    if (!(other instanceof Range)) return false;
+    return (
+      rbEqual(this.begin, other.begin) &&
+      rbEqual(this.end, other.end) &&
+      this.excludeEnd === other.excludeEnd
+    );
+  }
+
   *each(): Generator<T> {
     yield* this.step(1);
   }
@@ -181,4 +195,18 @@ export class Range<T> {
       current += n;
     }
   }
+}
+
+/**
+ * Ruby's `rb_equal` — the C primitive `range_eq`'s `recursive_equal`
+ * (range.c) applies to each endpoint, which is identity first and then a
+ * `==` send. A `Date`/`Time` endpoint answers its own `equals`.
+ */
+function rbEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof (a as { equals?: unknown }).equals === "function") {
+    return (a as { equals(other: unknown): boolean }).equals(b);
+  }
+  return false;
 }

@@ -65,10 +65,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActiveModel::Type::Value": { "==": ["equals"] },
   // error.rb:190 `def ==(other)` → error.ts `equals`.
   "ActiveModel::Error": { "==": ["equals"] },
-  // naming.rb:151 `delegate :==, :===, :<=>, …, to: :name` → naming.ts `equals`
-  // and `compare`. `===` / `=~` share that line but have no TS member, so they
-  // stay unmapped.
-  "ActiveModel::Name": { "==": ["equals"], "<=>": ["compare"] },
+  // naming.rb:151 `delegate :==, :===, :<=>, :=~, :"!~", :eql?, …, to: :name` →
+  // naming.ts `equals`, `caseEquals` and `compare` (`eql?` is not an operator;
+  // it ports as `eql` and `rubyMethodToTs` already spells it). `=~` and `!~`
+  // stay UNMAPPED under the naming.rb entry in `SCOPED_SKIP_GROUPS`, which
+  // carries the reason.
+  "ActiveModel::Name": { "==": ["equals"], "===": ["caseEquals"], "<=>": ["compare"] },
   // abstract_adapter.rb:252 `def <=>(version_string)` → abstract-adapter.ts
   // `compare`. `Version` does `include Comparable`, so `>=` / `<` are derived
   // and have no TS member of their own.

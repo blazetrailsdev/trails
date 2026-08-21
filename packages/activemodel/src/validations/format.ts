@@ -1,6 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { isIncludeObj as isInclude } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -54,12 +55,7 @@ export class FormatValidator extends EachValidator {
   }
 
   override checkValidityBang(): void {
-    // Rails: `unless options.include?(:with) ^ options.include?(:without)`
-    // — Hash#include? checks own keys only; use Object.hasOwn to avoid
-    // prototype-chain surprises (the `in` operator would include inherited).
-    const hasWith = Object.hasOwn(this.options, "with");
-    const hasWithout = Object.hasOwn(this.options, "without");
-    if (hasWith === hasWithout) {
+    if (isInclude(this.options, "with") === isInclude(this.options, "without")) {
       throw new ArgumentError("Either :with or :without must be supplied (but not both)");
     }
     this.checkOptionsValidity("with");
