@@ -320,7 +320,7 @@ describe("ValidationsTest (trails)", () => {
       override async isValid(): Promise<boolean> {
         const valid = await super.isValid();
         if (!valid) return false;
-        const name = this.readAttribute("name") as string;
+        const name = this._readAttribute("name") as string;
         if (UniqueUser.existingNames.has(name)) {
           this.errors.add("name", "has already been taken");
           return false;
@@ -378,7 +378,7 @@ describe("ValidationsTest (trails)", () => {
         this.attribute("first", "string");
       }
       get fullName(): string {
-        return (this.readAttribute("first") as string) ?? "";
+        return (this._readAttribute("first") as string) ?? "";
       }
     }
     Person.validatesEach(["fullName"], (record, attr, value) => {
@@ -823,7 +823,7 @@ describe("ValidationsTest (trails)", () => {
             },
             {
               if: (record) =>
-                (record as unknown as { readAttribute(a: string): unknown }).readAttribute(
+                (record as unknown as { _readAttribute(a: string): unknown })._readAttribute(
                   "price",
                 ) !== null,
             },
@@ -840,7 +840,7 @@ describe("ValidationsTest (trails)", () => {
     it("validation with class that adds errors", async () => {
       class EvenValidator {
         validate(record: any) {
-          const val = record.readAttribute("count");
+          const val = record._readAttribute("count");
           if (typeof val === "number" && val % 2 !== 0) {
             record.errors.add("count", ":invalid", { message: "must be even" });
           }
@@ -869,7 +869,7 @@ describe("ValidationsTest (trails)", () => {
           this.threshold = options.threshold ?? 10;
         }
         validate(record: any) {
-          const val = record.readAttribute("score");
+          const val = record._readAttribute("score");
           if (typeof val === "number" && val < this.threshold) {
             record.errors.add("score", ":invalid", {
               message: `must be at least ${this.threshold}`,
@@ -904,7 +904,7 @@ describe("ValidationsTest (trails)", () => {
         static {
           this.attribute("active", "boolean");
           this.validatesWith(AlwaysInvalidValidator, {
-            if: (r: any) => r.readAttribute("active") === true,
+            if: (r: any) => r._readAttribute("active") === true,
           });
         }
       }
@@ -1259,7 +1259,7 @@ describe("ValidationsTest (trails)", () => {
             this.attribute("requireName", "boolean", { default: false });
             this.validates("name", {
               presence: {
-                if: (r: any) => r.readAttribute("requireName") === true,
+                if: (r: any) => r._readAttribute("requireName") === true,
               },
             });
           }
@@ -1275,7 +1275,7 @@ describe("ValidationsTest (trails)", () => {
             this.attribute("optional", "boolean", { default: false });
             this.validates("name", {
               presence: {
-                unless: (r: any) => r.readAttribute("optional") === true,
+                unless: (r: any) => r._readAttribute("optional") === true,
               },
             });
           }
@@ -1291,7 +1291,7 @@ describe("ValidationsTest (trails)", () => {
           static {
             this.attribute("value", "integer");
             this.validate(function (record: any) {
-              const val = record.readAttribute("value");
+              const val = record._readAttribute("value");
               if (val !== null && (val as number) % 2 !== 0) {
                 record.errors.add("value", ":even", { message: "must be even" });
               }
@@ -1351,7 +1351,7 @@ describe("ValidationsTest (trails)", () => {
       const c = new Clearable();
       await c.isValid();
       expect(c.errors.count).toBeGreaterThan(0);
-      c.writeAttribute("name", "dean");
+      c._writeAttribute("name", "dean");
       await c.isValid();
       expect(c.errors.count).toBe(0);
     });
@@ -1609,7 +1609,7 @@ describe("ValidationsTest (trails)", () => {
           this.attribute("requires_name", "boolean");
           this.validates("name", {
             presence: true,
-            if: (record: any) => record.readAttribute("requires_name") === true,
+            if: (record: any) => record._readAttribute("requires_name") === true,
           });
         }
       }
@@ -1624,7 +1624,7 @@ describe("ValidationsTest (trails)", () => {
           this.attribute("requires_name", "boolean");
           this.validates("name", {
             presence: true,
-            if: (record: any) => record.readAttribute("requires_name") === true,
+            if: (record: any) => record._readAttribute("requires_name") === true,
           });
         }
       }
@@ -1639,7 +1639,7 @@ describe("ValidationsTest (trails)", () => {
           this.attribute("skip_validation", "boolean");
           this.validates("name", {
             presence: true,
-            unless: (record: any) => record.readAttribute("skip_validation") === true,
+            unless: (record: any) => record._readAttribute("skip_validation") === true,
           });
         }
       }
@@ -1654,7 +1654,7 @@ describe("ValidationsTest (trails)", () => {
           this.attribute("skip_validation", "boolean");
           this.validates("name", {
             presence: true,
-            unless: (record: any) => record.readAttribute("skip_validation") === true,
+            unless: (record: any) => record._readAttribute("skip_validation") === true,
           });
         }
       }

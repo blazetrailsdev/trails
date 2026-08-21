@@ -34,7 +34,7 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attributeMethodSuffix("Short");
       }
       attributeShort(attrName: string): string {
-        return String(this.readAttribute(attrName)).slice(0, 3);
+        return String(this._readAttribute(attrName)).slice(0, 3);
       }
       nicknameShort(): string {
         return "parent";
@@ -71,7 +71,7 @@ describe("AttributeMethodsTest (trails)", () => {
     const person = new Person({ name: "Alexander" });
     expect(person.name).toBe("Alexander");
     person.name = "Bob";
-    expect(person.readAttribute("name")).toBe("Bob");
+    expect(person._readAttribute("name")).toBe("Bob");
   });
 
   it("alias_attribute and attribute_method_suffix write only the declaring class", () => {

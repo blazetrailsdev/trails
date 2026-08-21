@@ -42,7 +42,7 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
       greeting() {
-        return `Hello ${this.readAttribute("name")}`;
+        return `Hello ${this._readAttribute("name")}`;
       }
     }
     const p = new Person({ name: "Alice" });
@@ -59,8 +59,8 @@ describe("JsonSerializationTest", () => {
     }
     const p = new Person();
     p.fromJson('{"name":"Bob","age":30}');
-    expect(p.readAttribute("name")).toBe("Bob");
-    expect(p.readAttribute("age")).toBe(30);
+    expect(p._readAttribute("name")).toBe("Bob");
+    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("as_json should work with root option set to string", () => {
@@ -195,14 +195,14 @@ describe("JsonSerializationTest", () => {
   it("from_json should work without a root (class attribute)", () => {
     const p = new JsonPerson({});
     p.fromJson('{"name":"Alice","age":30}');
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(30);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("from_json should work with a root (method parameter)", () => {
     const p = new JsonPerson({});
     p.fromJson('{"json_person":{"name":"Alice","age":30}}', true);
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("should include root in JSON if include_root_in_json is true", () => {
@@ -360,7 +360,7 @@ describe("JsonSerializationTest", () => {
     }
     try {
       const m = new Multi({}).fromJson('{"first":{"name":"Carol"},"person":{"name":"Dan"}}');
-      expect(m.readAttribute("name")).toBe("Carol");
+      expect(m._readAttribute("name")).toBe("Carol");
     } finally {
       Multi.includeRootInJson = false;
     }
@@ -403,7 +403,7 @@ describe("JsonSerializationTest", () => {
     }
     try {
       const w = new Wrapped({}).fromJson('{"wrapped":{"name":"Alice"}}');
-      expect(w.readAttribute("name")).toBe("Alice");
+      expect(w._readAttribute("name")).toBe("Alice");
     } finally {
       Wrapped.includeRootInJson = false;
     }

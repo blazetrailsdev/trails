@@ -62,7 +62,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    expect(p._readAttribute("name")).toBe("test");
   });
 
   it("#define_attribute_method generates attribute method with invalid identifier characters", () => {
@@ -72,7 +72,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    expect(p._readAttribute("name")).toBe("test");
   });
 
   it("#define_attribute_methods works passing multiple arguments", () => {
@@ -83,8 +83,8 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 30 });
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(30);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("#define_attribute_methods generates attribute methods", () => {
@@ -94,7 +94,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("#alias_attribute generates attribute_aliases lookup hash", () => {
@@ -116,7 +116,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ first_name: "Alice" });
-    expect(p.readAttribute("first_name")).toBe("Alice");
+    expect(p._readAttribute("first_name")).toBe("Alice");
   });
 
   it("#alias_attribute works with attributes with spaces in their names", () => {
@@ -162,7 +162,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    expect(p._readAttribute("name")).toBe("test");
   });
 
   it("should not interfere with respond_to? if the attribute has a private/protected method", () => {
@@ -172,7 +172,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.respondTo("readAttribute")).toBe(true);
+    expect(p.respondTo("_readAttribute")).toBe(true);
   });
 
   it("alias attribute respects user defined method", () => {
@@ -201,7 +201,7 @@ describe("AttributeMethodsTest", () => {
   it("method missing works correctly even if attributes method is not defined", () => {
     class Bare extends Model {}
     const b = new Bare();
-    expect(b.readAttribute("nonexistent")).toBe(null);
+    expect(b._readAttribute("nonexistent")).toBe(null);
   });
 
   it("unrelated classes should not share attribute method matchers", () => {
@@ -242,7 +242,7 @@ describe("AttributeMethodsTest", () => {
     const p = new Person({ name: "Alice" });
     expect((p as any).full_name).toBe("Alice");
     (p as any).full_name = "Bob";
-    expect(p.readAttribute("name")).toBe("Bob");
+    expect(p._readAttribute("name")).toBe("Bob");
   });
 
   it("#undefine_attribute_methods removes attribute methods", () => {
@@ -281,7 +281,7 @@ describe("AttributeMethodsTest", () => {
     }
     const p = new Person({ name: "Alice" });
     expect(p.customName()).toBe("custom");
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("should use attribute_missing to dispatch a missing attribute", () => {
@@ -307,53 +307,6 @@ describe("AttributeMethodsTest", () => {
     expect(match.proxyTarget).toBe("attributeTest");
   });
 
-  it("readAttribute / writeAttribute resolve alias_attribute names transparently", () => {
-    // Rails `read_attribute(name)` does `attribute_aliases[name] || name`
-    // (activemodel attribute_methods.rb) so callers can pass either the
-    // aliased or canonical name and hit the same underlying attribute.
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.aliasAttribute("nickname", "name");
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("nickname")).toBe("Alice");
-    p.writeAttribute("nickname", "Ally");
-    expect(p.readAttribute("name")).toBe("Ally");
-    expect(p.readAttribute("nickname")).toBe("Ally");
-  });
-
-  it("aliased writes propagate to dirty tracking on the canonical name", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.aliasAttribute("nickname", "name");
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    p.writeAttribute("nickname", "Ally");
-    expect(p.changedAttributeNamesToSave).toEqual(["name"]);
-    expect(p.changes).toEqual({ name: ["Alice", "Ally"] });
-  });
-
-  it("hasAttribute and readAttributeBeforeTypeCast resolve alias names", () => {
-    // Rails `has_attribute?` and `read_attribute_before_type_cast` both go
-    // through `attribute_aliases[name] || name` (attribute_methods.rb).
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.aliasAttribute("years", "age");
-      }
-    }
-    const p = new Person({ age: "42" });
-    expect(p.hasAttribute("years")).toBe(true);
-    expect(p.hasAttribute("age")).toBe(true);
-    expect(p.hasAttribute("nope")).toBe(false);
-    expect(p.readAttributeBeforeTypeCast("years")).toBe("42");
-  });
-
   it("name clashes are handled", () => {
     class Person extends Model {
       static {
@@ -361,22 +314,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("name")).toBe("Alice");
-  });
-});
-describe("hasAttribute", () => {
-  it("returns true for defined attributes", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("size", "integer");
-      }
-    }
-
-    const w = new Widget({ name: "Test" });
-    expect(w.hasAttribute("name")).toBe(true);
-    expect(w.hasAttribute("size")).toBe(true);
-    expect(w.hasAttribute("unknown")).toBe(false);
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 });
 describe("attribute method prefix/suffix/affix", () => {
@@ -387,7 +325,7 @@ describe("attribute method prefix/suffix/affix", () => {
         this.attributeMethodPrefix("clear_");
       }
       clear_attribute(attr: string): unknown {
-        return this.readAttribute(attr);
+        return this._readAttribute(attr);
       }
     }
     const u = new User({ name: "Alice" });
@@ -401,7 +339,7 @@ describe("attribute method prefix/suffix/affix", () => {
         this.attributeMethodSuffix("_before_type_cast");
       }
       attribute_before_type_cast(attr: string): unknown {
-        return this.readAttribute(attr);
+        return this._readAttribute(attr);
       }
     }
     const u = new User({ name: "Alice" });
@@ -415,7 +353,7 @@ describe("attribute method prefix/suffix/affix", () => {
         this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
       }
       reset_attribute_to_default(attr: string): unknown {
-        return this.readAttribute(attr);
+        return this._readAttribute(attr);
       }
     }
     const u = new User({ name: "Alice" });
@@ -431,7 +369,7 @@ describe("respondTo", () => {
       }
     }
     const u = new User({ name: "Alice" });
-    expect(u.respondTo("readAttribute")).toBe(true);
+    expect(u.respondTo("_readAttribute")).toBe(true);
     expect(u.respondTo("isValid")).toBe(true);
   });
 
@@ -466,7 +404,7 @@ describe("attributeMissing", () => {
     User.attribute("name", "string");
 
     const u = new User({ name: "Alice" });
-    expect(u.readAttribute("nonexistent")).toBeNull();
+    expect(u._readAttribute("nonexistent")).toBeNull();
   });
 
   it("can be overridden to provide custom behavior", () => {
@@ -492,7 +430,7 @@ describe("attributeMissing", () => {
     );
     // Plain attribute reads still work normally — readAttribute is not
     // routed through attribute_missing in either Rails or trails.
-    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u._readAttribute("name")).toBe("Alice");
   });
 });
 

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
+import { Model } from "@blazetrails/activemodel";
 import { GeneratedAttributeMethods, isMethodDefinedWithin } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
@@ -461,5 +462,31 @@ describe("define_attribute_methods abstract gate (trails)", () => {
     expect("author_name" in ConcreteTopic.prototype).toBe(true);
     expect("author_nameBeforeTypeCast" in ConcreteTopic.prototype).toBe(true);
     expect("author_nameForDatabase" in ConcreteTopic.prototype).toBe(true);
+  });
+});
+
+describe("ActiveRecord attribute read/write surface lives on Base, not Model", () => {
+  it("defines the ActiveRecord-only members on Base.prototype", () => {
+    for (const name of [
+      "readAttribute",
+      "writeAttribute",
+      "readAttributeBeforeTypeCast",
+      "attributesBeforeTypeCast",
+      "columnForAttribute",
+      "hasAttribute",
+      "attributePresent",
+    ]) {
+      expect(Object.getOwnPropertyDescriptor(Base.prototype, name)).toBeDefined();
+      expect(Object.getOwnPropertyDescriptor(Model.prototype, name)).toBeUndefined();
+    }
+  });
+
+  it("keeps attributesBeforeTypeCast a getter rather than a data property", () => {
+    // before_type_cast.rb:82 is a zero-arg reader, so it ports as an accessor
+    // property; include() copies an object literal by value and would flatten
+    // it into a data property holding the getter's one-time result.
+    const descriptor = Object.getOwnPropertyDescriptor(Base.prototype, "attributesBeforeTypeCast")!;
+    expect(typeof descriptor.get).toBe("function");
+    expect("value" in descriptor).toBe(false);
   });
 });

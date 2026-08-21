@@ -112,8 +112,8 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     if (typeof rec.readAttributeForValidation === "function") {
       return (rec.readAttributeForValidation as (a: string) => unknown)(attribute);
     }
-    if (typeof rec.readAttribute === "function") {
-      return (rec.readAttribute as (a: string) => unknown)(attribute);
+    if (typeof rec._readAttribute === "function") {
+      return (rec._readAttribute as (a: string) => unknown)(attribute);
     }
     return rec[attribute];
   }

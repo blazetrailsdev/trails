@@ -7,7 +7,6 @@ export interface SerializationRecord {
   [key: string]: unknown;
   _attributes?: unknown;
   attributes?: Record<string, unknown>;
-  readAttribute?: (key: string) => unknown;
   constructor: { name: string };
 }
 

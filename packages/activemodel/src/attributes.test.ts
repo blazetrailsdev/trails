@@ -13,57 +13,57 @@ describe("AttributesTest", () => {
 
   it("initializes with defaults", () => {
     const u = new User();
-    expect(u.readAttribute("name")).toBe(null);
-    expect(u.readAttribute("age")).toBe(0);
-    expect(u.readAttribute("active")).toBe(true);
+    expect(u._readAttribute("name")).toBe(null);
+    expect(u._readAttribute("age")).toBe(0);
+    expect(u._readAttribute("active")).toBe(true);
   });
 
   it("initializes with provided values", () => {
     const u = new User({ name: "dean", age: 30 });
-    expect(u.readAttribute("name")).toBe("dean");
-    expect(u.readAttribute("age")).toBe(30);
+    expect(u._readAttribute("name")).toBe("dean");
+    expect(u._readAttribute("age")).toBe(30);
   });
 
   it("casts string to integer", () => {
     const u = new User({ age: "25" });
-    expect(u.readAttribute("age")).toBe(25);
+    expect(u._readAttribute("age")).toBe(25);
   });
 
   it("integer truncates floats", () => {
     const u = new User({ age: 25.9 });
-    expect(u.readAttribute("age")).toBe(25);
+    expect(u._readAttribute("age")).toBe(25);
   });
 
   it("casts string to float", () => {
     const u = new User({ score: "9.5" });
-    expect(u.readAttribute("score")).toBe(9.5);
+    expect(u._readAttribute("score")).toBe(9.5);
   });
 
   it("casts string to boolean", () => {
     // Rails BooleanType: only FALSE_VALUES coerce to false; "yes"/"no"
     // are both truthy (not in FALSE_VALUES).
-    expect(new User({ active: "false" }).readAttribute("active")).toBe(false);
-    expect(new User({ active: "true" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "yes" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "no" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "1" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "0" }).readAttribute("active")).toBe(false);
-    expect(new User({ active: 1 }).readAttribute("active")).toBe(true);
-    expect(new User({ active: 0 }).readAttribute("active")).toBe(false);
+    expect(new User({ active: "false" })._readAttribute("active")).toBe(false);
+    expect(new User({ active: "true" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "yes" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "no" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "1" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "0" })._readAttribute("active")).toBe(false);
+    expect(new User({ active: 1 })._readAttribute("active")).toBe(true);
+    expect(new User({ active: 0 })._readAttribute("active")).toBe(false);
   });
 
   it("casts null to null for all types", () => {
     const u = new User({ name: null, age: null, score: null, active: null });
-    expect(u.readAttribute("name")).toBe(null);
-    expect(u.readAttribute("age")).toBe(null);
-    expect(u.readAttribute("score")).toBe(null);
-    expect(u.readAttribute("active")).toBe(null);
+    expect(u._readAttribute("name")).toBe(null);
+    expect(u._readAttribute("age")).toBe(null);
+    expect(u._readAttribute("score")).toBe(null);
+    expect(u._readAttribute("active")).toBe(null);
   });
 
   it("writeAttribute casts the value", () => {
     const u = new User();
-    u.writeAttribute("age", "42");
-    expect(u.readAttribute("age")).toBe(42);
+    u._writeAttribute("age", "42");
+    expect(u._readAttribute("age")).toBe(42);
   });
 
   it("returns all attributes as a hash", () => {
@@ -74,22 +74,6 @@ describe("AttributesTest", () => {
       score: null,
       active: true,
     });
-  });
-
-  it("attributePresent checks for non-blank values", () => {
-    const u = new User({ name: "dean" });
-    expect(u.attributePresent("name")).toBe(true);
-    expect(u.attributePresent("score")).toBe(false);
-  });
-
-  it("attributePresent returns false for empty string", () => {
-    const u = new User({ name: "" });
-    expect(u.attributePresent("name")).toBe(false);
-  });
-
-  it("attributePresent returns false for whitespace-only string", () => {
-    const u = new User({ name: "   " });
-    expect(u.attributePresent("name")).toBe(false);
   });
 
   it("attributeNames returns declared names", () => {
@@ -103,8 +87,8 @@ describe("AttributesTest", () => {
         this.attribute("token", "string", { default: () => `tok_${++counter}` });
       }
     }
-    expect(new WithLambda().readAttribute("token")).toBe("tok_1");
-    expect(new WithLambda().readAttribute("token")).toBe("tok_2");
+    expect(new WithLambda()._readAttribute("token")).toBe("tok_1");
+    expect(new WithLambda()._readAttribute("token")).toBe("tok_2");
   });
 
   it("inheritance: children inherit parent attributes", () => {
@@ -114,8 +98,8 @@ describe("AttributesTest", () => {
       }
     }
     const admin = new Admin({ name: "dean" });
-    expect(admin.readAttribute("name")).toBe("dean");
-    expect(admin.readAttribute("role")).toBe("admin");
+    expect(admin._readAttribute("name")).toBe("dean");
+    expect(admin._readAttribute("role")).toBe("admin");
     expect(Admin.attributeNames()).toContain("name");
     expect(Admin.attributeNames()).toContain("role");
   });
@@ -132,8 +116,8 @@ describe("AttributesTest", () => {
     }
     const a = new ModelA({ name: "Alice" });
     const b = new ModelB({ name: "Bob" });
-    expect(a.readAttribute("name")).toBe("Alice");
-    expect(b.readAttribute("name")).toBe("Bob");
+    expect(a._readAttribute("name")).toBe("Alice");
+    expect(b._readAttribute("name")).toBe("Bob");
   });
 
   it("nonexistent attribute", () => {
@@ -143,7 +127,7 @@ describe("AttributesTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("nonexistent")).toBeNull();
+    expect(m._readAttribute("nonexistent")).toBeNull();
   });
 
   it("attributes with proc defaults can be marshalled", () => {
@@ -153,7 +137,7 @@ describe("AttributesTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("tags")).toBe("default");
+    expect(m._readAttribute("tags")).toBe("default");
   });
 
   it("can't modify attributes if frozen", () => {
@@ -201,8 +185,8 @@ describe("AttributesTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 30 });
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(30);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("reading attributes", () => {
@@ -239,8 +223,8 @@ describe("AttributesTest", () => {
         this.attribute("name", "string", { default: "child" });
       }
     }
-    expect(new Child().readAttribute("name")).toBe("child");
-    expect(new Parent().readAttribute("name")).toBe("parent");
+    expect(new Child()._readAttribute("name")).toBe("child");
+    expect(new Parent()._readAttribute("name")).toBe("parent");
   });
 
   it("attributes can be dup-ed", () => {
@@ -252,7 +236,7 @@ describe("AttributesTest", () => {
     const p = new Person({ name: "Alice" });
     const attrs = { ...p.attributes };
     attrs.name = "Bob";
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("children inherit attributes", () => {
@@ -263,7 +247,7 @@ describe("AttributesTest", () => {
     }
     class Child extends Parent {}
     const data = new Child({ integer_field: "4.4" });
-    expect(data.readAttribute("integer_field")).toBe(4);
+    expect(data._readAttribute("integer_field")).toBe(4);
   });
 
   it("unknown type error is raised", () => {
@@ -285,39 +269,10 @@ describe("attributesBeforeTypeCast", () => {
       }
     }
     const u = new User({ name: "Alice", age: "25" });
-    const raw = u.attributesBeforeTypeCast;
+    const raw = u._attributes.valuesBeforeTypeCast();
     expect(raw.name).toBe("Alice");
     expect(raw.age).toBe("25");
-    expect(u.readAttribute("age")).toBe(25);
-  });
-});
-
-describe("columnForAttribute()", () => {
-  it("returns type info for defined attribute", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const u = new User({ name: "Alice", age: 25 });
-    const col = u.columnForAttribute("name");
-    expect(col).not.toBeNull();
-    expect(col!.name).toBe("name");
-
-    const ageCol = u.columnForAttribute("age");
-    expect(ageCol).not.toBeNull();
-    expect(ageCol!.name).toBe("age");
-  });
-
-  it("returns null for unknown attribute", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    expect(u.columnForAttribute("nonexistent")).toBeNull();
+    expect(u._readAttribute("age")).toBe(25);
   });
 });
 
@@ -345,56 +300,56 @@ describe("Attributes", () => {
 
   it("initializes with defaults", () => {
     const u = new User();
-    expect(u.readAttribute("name")).toBe(null);
-    expect(u.readAttribute("age")).toBe(0);
-    expect(u.readAttribute("active")).toBe(true);
+    expect(u._readAttribute("name")).toBe(null);
+    expect(u._readAttribute("age")).toBe(0);
+    expect(u._readAttribute("active")).toBe(true);
   });
 
   it("initializes with provided values", () => {
     const u = new User({ name: "dean", age: 30 });
-    expect(u.readAttribute("name")).toBe("dean");
-    expect(u.readAttribute("age")).toBe(30);
+    expect(u._readAttribute("name")).toBe("dean");
+    expect(u._readAttribute("age")).toBe(30);
   });
 
   it("casts string to integer", () => {
     const u = new User({ age: "25" });
-    expect(u.readAttribute("age")).toBe(25);
+    expect(u._readAttribute("age")).toBe(25);
   });
 
   it("integer truncates floats", () => {
     const u = new User({ age: 25.9 });
-    expect(u.readAttribute("age")).toBe(25);
+    expect(u._readAttribute("age")).toBe(25);
   });
 
   it("casts string to float", () => {
     const u = new User({ score: "9.5" });
-    expect(u.readAttribute("score")).toBe(9.5);
+    expect(u._readAttribute("score")).toBe(9.5);
   });
 
   it("casts string to boolean", () => {
     // Rails BooleanType: "yes"/"no" both truthy (neither in FALSE_VALUES).
-    expect(new User({ active: "false" }).readAttribute("active")).toBe(false);
-    expect(new User({ active: "true" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "yes" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "no" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "1" }).readAttribute("active")).toBe(true);
-    expect(new User({ active: "0" }).readAttribute("active")).toBe(false);
-    expect(new User({ active: 1 }).readAttribute("active")).toBe(true);
-    expect(new User({ active: 0 }).readAttribute("active")).toBe(false);
+    expect(new User({ active: "false" })._readAttribute("active")).toBe(false);
+    expect(new User({ active: "true" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "yes" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "no" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "1" })._readAttribute("active")).toBe(true);
+    expect(new User({ active: "0" })._readAttribute("active")).toBe(false);
+    expect(new User({ active: 1 })._readAttribute("active")).toBe(true);
+    expect(new User({ active: 0 })._readAttribute("active")).toBe(false);
   });
 
   it("casts null to null for all types", () => {
     const u = new User({ name: null, age: null, score: null, active: null });
-    expect(u.readAttribute("name")).toBe(null);
-    expect(u.readAttribute("age")).toBe(null);
-    expect(u.readAttribute("score")).toBe(null);
-    expect(u.readAttribute("active")).toBe(null);
+    expect(u._readAttribute("name")).toBe(null);
+    expect(u._readAttribute("age")).toBe(null);
+    expect(u._readAttribute("score")).toBe(null);
+    expect(u._readAttribute("active")).toBe(null);
   });
 
   it("writeAttribute casts the value", () => {
     const u = new User();
-    u.writeAttribute("age", "42");
-    expect(u.readAttribute("age")).toBe(42);
+    u._writeAttribute("age", "42");
+    expect(u._readAttribute("age")).toBe(42);
   });
 
   it("returns all attributes as a hash", () => {
@@ -405,22 +360,6 @@ describe("Attributes", () => {
       score: null,
       active: true,
     });
-  });
-
-  it("attributePresent checks for non-blank values", () => {
-    const u = new User({ name: "dean" });
-    expect(u.attributePresent("name")).toBe(true);
-    expect(u.attributePresent("score")).toBe(false);
-  });
-
-  it("attributePresent returns false for empty string", () => {
-    const u = new User({ name: "" });
-    expect(u.attributePresent("name")).toBe(false);
-  });
-
-  it("attributePresent returns false for whitespace-only string", () => {
-    const u = new User({ name: "   " });
-    expect(u.attributePresent("name")).toBe(false);
   });
 
   it("attributeNames returns declared names", () => {
@@ -434,8 +373,8 @@ describe("Attributes", () => {
         this.attribute("token", "string", { default: () => `tok_${++counter}` });
       }
     }
-    expect(new WithLambda().readAttribute("token")).toBe("tok_1");
-    expect(new WithLambda().readAttribute("token")).toBe("tok_2");
+    expect(new WithLambda()._readAttribute("token")).toBe("tok_1");
+    expect(new WithLambda()._readAttribute("token")).toBe("tok_2");
   });
 
   it("inheritance: children inherit parent attributes", () => {
@@ -445,8 +384,8 @@ describe("Attributes", () => {
       }
     }
     const admin = new Admin({ name: "dean" });
-    expect(admin.readAttribute("name")).toBe("dean");
-    expect(admin.readAttribute("role")).toBe("admin");
+    expect(admin._readAttribute("name")).toBe("dean");
+    expect(admin._readAttribute("role")).toBe("admin");
     expect(Admin.attributeNames()).toContain("name");
     expect(Admin.attributeNames()).toContain("role");
   });

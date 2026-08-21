@@ -38,7 +38,7 @@ describe("LengthValidator (trails)", () => {
   it("resolves a Proc maximum against the record", async () => {
     // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`.
     Person.validatesLengthOf("title", {
-      maximum: (r: Person) => r.readAttribute("limit") as number,
+      maximum: (r: Person) => r._readAttribute("limit") as number,
     });
     expect(await new Person({ title: "abc", limit: 5 }).isValid()).toBe(true);
     expect(await new Person({ title: "abcdef", limit: 5 }).isValid()).toBe(false);

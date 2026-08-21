@@ -63,10 +63,10 @@ export function hasSecurePassword(
 
   Object.defineProperty(modelClass.prototype, confirmationAttr, {
     get(this: Model) {
-      return this.readAttribute(confirmationAttr);
+      return this._readAttribute(confirmationAttr);
     },
     set(this: Model, value: unknown) {
-      this.writeAttribute(confirmationAttr, value);
+      this._writeAttribute(confirmationAttr, value);
     },
     configurable: true,
   });
@@ -85,7 +85,7 @@ export function hasSecurePassword(
   const saltMethodName = `${attribute}Salt`;
   Object.defineProperty(modelClass.prototype, saltMethodName, {
     get(this: Model) {
-      const digest = this.readAttribute(digestAttr) as string | null;
+      const digest = this._readAttribute(digestAttr) as string | null;
       if (!digest) return null;
       return bcrypt.getSalt(digest);
     },
@@ -98,7 +98,7 @@ export function hasSecurePassword(
   Object.defineProperty(modelClass.prototype, authMethodName, {
     value: function (this: Model, unencryptedPassword: unknown) {
       if (typeof unencryptedPassword !== "string" || !unencryptedPassword) return false;
-      const digest = this.readAttribute(digestAttr) as string | null;
+      const digest = this._readAttribute(digestAttr) as string | null;
       if (!digest) return false;
       return bcrypt.compareSync(unencryptedPassword, digest) ? this : false;
     },
@@ -108,7 +108,7 @@ export function hasSecurePassword(
 
   modelClass.afterInitialize((record: Model) => {
     if (record._attributes.has(attribute)) {
-      const plaintext = record.readAttribute(attribute);
+      const plaintext = record._readAttribute(attribute);
       record._attributes.delete(attribute);
       setPassword(record, plaintext, attribute, digestAttr, passwordCache);
     }
@@ -117,7 +117,7 @@ export function hasSecurePassword(
   if (validations) {
     modelClass.validate((record: Model) => {
       const pwd = passwordCache.get(record);
-      const digest = record.readAttribute(digestAttr);
+      const digest = record._readAttribute(digestAttr);
 
       if (isBlank(digest) && (pwd === undefined || pwd === null)) {
         record.errors.add(attribute, ":blank");
@@ -142,7 +142,7 @@ export function hasSecurePassword(
         const humanAttr = modelClass.humanAttributeName
           ? modelClass.humanAttributeName(attribute)
           : humanize(attribute);
-        const confirmation = record.readAttribute(confirmationAttr);
+        const confirmation = record._readAttribute(confirmationAttr);
         if (confirmation !== undefined && confirmation !== null && pwd !== confirmation) {
           record.errors.add(attribute, ":confirmation", { attribute: humanAttr });
         }
@@ -160,7 +160,7 @@ function setPassword(
 ) {
   if (value === null || value === undefined) {
     passwordCache.set(instance, null);
-    instance.writeAttribute(digestAttr, null);
+    instance._writeAttribute(digestAttr, null);
     return;
   }
   const str = String(value);
@@ -169,7 +169,7 @@ function setPassword(
   }
   passwordCache.set(instance, str);
   const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
-  instance.writeAttribute(digestAttr, bcrypt.hashSync(str, cost));
+  instance._writeAttribute(digestAttr, bcrypt.hashSync(str, cost));
 }
 
 /**

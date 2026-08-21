@@ -1,10 +1,6 @@
 /**
  * Attribute reading methods.
  *
- * The actual readAttribute implementation lives on Model (from
- * @blazetrails/activemodel). This module exists to match the Rails
- * file structure for ActiveRecord::AttributeMethods::Read.
- *
  * Mirrors: ActiveRecord::AttributeMethods::Read
  */
 
@@ -24,6 +20,28 @@ export interface Read {
 
 interface AttributeHolder {
   _attributes: AttributeSet;
+}
+
+/**
+ * Returns the value of the attribute identified by `attrName` after it has
+ * been type cast.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Read#read_attribute (read.rb:29-34)
+ */
+export function readAttribute(
+  this: ReadAttributeHost,
+  attrName: string,
+  block?: (name: string) => unknown,
+): unknown {
+  const name = (
+    this.constructor as unknown as { resolveAttributeName(n: string): string }
+  ).resolveAttributeName(String(attrName));
+
+  return this._readAttribute(name, block);
+}
+
+interface ReadAttributeHost {
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
 /**

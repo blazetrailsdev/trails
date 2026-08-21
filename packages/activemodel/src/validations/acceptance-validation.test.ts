@@ -46,7 +46,7 @@ describe("AcceptanceValidationTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.hasAttribute("terms")).toBe(true);
+    expect(p._attributes.isKey("terms")).toBe(true);
   });
 
   it("terms of service agreement no acceptance", async () => {

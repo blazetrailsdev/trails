@@ -43,7 +43,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "Bob" });
-    expect(p.readAttribute("name")).toBe("Bob");
+    expect(p._readAttribute("name")).toBe("Bob");
   });
 
   it("assign non-existing attribute", () => {
@@ -86,7 +86,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "private_val" });
-    expect(p.readAttribute("name")).toBe("private_val");
+    expect(p._readAttribute("name")).toBe("private_val");
   });
 
   it("does not swallow errors raised in an attribute writer", () => {
@@ -108,10 +108,10 @@ describe("AttributeAssignmentTest", () => {
         this.attribute("name", "string");
       }
       set name(v: string) {
-        (this as Base).writeAttribute("name", v.toUpperCase());
+        (this as Base)._writeAttribute("name", v.toUpperCase());
       }
       get name(): string {
-        return this.readAttribute("name") as string;
+        return this._readAttribute("name") as string;
       }
     }
     class Child extends Base {
@@ -123,7 +123,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const c = new Child({});
     void c.assignAttributes({ name: "bob" });
-    expect(c.readAttribute("name")).toBe("BOB");
+    expect(c._readAttribute("name")).toBe("BOB");
   });
 
   it("routes through instance-own setter (JS singleton method)", () => {
@@ -137,13 +137,13 @@ describe("AttributeAssignmentTest", () => {
     Object.defineProperty(p, "name", {
       set(v: string) {
         seen.push(v);
-        (this as Person).writeAttribute("name", v.toUpperCase());
+        (this as Person)._writeAttribute("name", v.toUpperCase());
       },
       configurable: true,
     });
     void p.assignAttributes({ name: "bob" });
     expect(seen).toEqual(["bob"]);
-    expect(p.readAttribute("name")).toBe("BOB");
+    expect(p._readAttribute("name")).toBe("BOB");
   });
 
   it("routes through user-defined setter if present", () => {
@@ -152,12 +152,12 @@ describe("AttributeAssignmentTest", () => {
         this.attribute("name", "string");
       }
       set name(v: string) {
-        super.writeAttribute("name", v.trim().toUpperCase());
+        super._writeAttribute("name", v.trim().toUpperCase());
       }
     }
     const p = new Person({});
     void p.assignAttributes({ name: "  bob  " });
-    expect(p.readAttribute("name")).toBe("BOB");
+    expect(p._readAttribute("name")).toBe("BOB");
   });
 
   it("an ArgumentError is raised if a non-hash-like object is passed", () => {
@@ -197,8 +197,8 @@ describe("AttributeAssignmentTest", () => {
     }
     const params = new ProtectedParams({ name: "Guille", description: "desc" }).permitBang();
     const p = new Person(params as unknown as Record<string, unknown>);
-    expect(p.readAttribute("name")).toBe("Guille");
-    expect(p.readAttribute("description")).toBe("desc");
+    expect(p._readAttribute("name")).toBe("Guille");
+    expect(p._readAttribute("description")).toBe("desc");
   });
 
   it("assigning no attributes should not raise, even if the hash is un-permitted", () => {
@@ -219,7 +219,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    expect(p._readAttribute("name")).toBe("test");
   });
 
   it("simple assignment", () => {
@@ -231,8 +231,8 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "Alice", age: 30 });
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(30);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("regular hash should still be used for mass assignment", () => {
@@ -243,7 +243,7 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "Bob" });
-    expect(p.readAttribute("name")).toBe("Bob");
+    expect(p._readAttribute("name")).toBe("Bob");
   });
 
   it("subclass override of _assignAttributes is called by assignAttributes", () => {
@@ -261,7 +261,7 @@ describe("AttributeAssignmentTest", () => {
     void p.assignAttributes({ name: "Carol" });
     expect(called).toHaveLength(1);
     expect(called[0]).toEqual({ name: "Carol" });
-    expect(p.readAttribute("name")).toBe("Carol");
+    expect(p._readAttribute("name")).toBe("Carol");
   });
 
   it("subclass override of sanitizeForMassAssignment is called by assignAttributes", () => {
@@ -277,8 +277,8 @@ describe("AttributeAssignmentTest", () => {
     }
     const p = new Person({});
     void p.assignAttributes({ name: "Dave", role: "admin" });
-    expect(p.readAttribute("name")).toBe("Dave");
-    expect(p.readAttribute("role")).toBeNull();
+    expect(p._readAttribute("name")).toBe("Dave");
+    expect(p._readAttribute("role")).toBeNull();
   });
 
   it("empty params wrapper is a no-op on assignAttributes (empty? delegation)", () => {
@@ -293,7 +293,7 @@ describe("AttributeAssignmentTest", () => {
     // ForbiddenAttributesError despite the wrapper being unpermitted.
     const params = new ProtectedParams({});
     expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).not.toThrow();
-    expect(p.readAttribute("name")).toBeNull();
+    expect(p._readAttribute("name")).toBeNull();
   });
 
   it("empty params wrapper is a no-op at construction (empty? delegation)", () => {
@@ -307,7 +307,7 @@ describe("AttributeAssignmentTest", () => {
     expect(() => {
       record = new Person(params as unknown as Record<string, unknown>);
     }).not.toThrow();
-    expect(record!.readAttribute("name")).toBeNull();
+    expect(record!._readAttribute("name")).toBeNull();
   });
 
   it("non-empty unpermitted params wrapper still raises (empty? delegation)", () => {
@@ -339,6 +339,6 @@ describe("AttributeAssignmentTest", () => {
     void p.assignAttributes({ name: "Eve", age: 5 });
     expect(seen).toContainEqual(["name", "Eve"]);
     expect(seen).toContainEqual(["age", 5]);
-    expect(p.readAttribute("name")).toBe("Eve");
+    expect(p._readAttribute("name")).toBe("Eve");
   });
 });

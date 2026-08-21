@@ -94,7 +94,7 @@ describe("NumericalityValidator (trails-only)", () => {
       errors = { add: vi.fn() };
       scoreCameFromUser = true;
       scoreBeforeTypeCast = "abc";
-      readAttribute(_name: string) {
+      _readAttribute(_name: string) {
         return 0;
       }
     }
@@ -179,7 +179,7 @@ describe("NumericalityValidator (trails-only)", () => {
       errors = { add: vi.fn() };
       scoreCameFromUser = false;
       scoreBeforeTypeCast = "not-a-number-string";
-      readAttribute(_name: string) {
+      _readAttribute(_name: string) {
         return 42;
       }
     }
@@ -202,7 +202,7 @@ describe("NumericalityValidator (trails-only)", () => {
     class MockRecord {
       errors = { add: vi.fn() };
       scoreCameFromUser = false;
-      readAttribute(_name: string) {
+      _readAttribute(_name: string) {
         return 99;
       }
     }

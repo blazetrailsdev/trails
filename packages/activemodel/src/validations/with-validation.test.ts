@@ -12,7 +12,7 @@ describe("ValidatesWithTest", () => {
         this.minLength = options.minLength ?? 3;
       }
       validate(record: any) {
-        const name = record.readAttribute("name");
+        const name = record._readAttribute("name");
         if (typeof name === "string" && name.length < this.minLength) {
           record.errors.add("name", ":invalid", { message: "too short" });
         }
@@ -33,14 +33,14 @@ describe("ValidatesWithTest", () => {
   it("with multiple classes", async () => {
     class V1 {
       validate(record: any) {
-        if (!record.readAttribute("name")) {
+        if (!record._readAttribute("name")) {
           record.errors.add("name", ":blank");
         }
       }
     }
     class V2 {
       validate(record: any) {
-        if (!record.readAttribute("age")) {
+        if (!record._readAttribute("age")) {
           record.errors.add("age", ":blank");
         }
       }
@@ -61,7 +61,7 @@ describe("ValidatesWithTest", () => {
   it("validates_with preserves standard options", async () => {
     class CustomValidator {
       validate(record: any) {
-        if (!record.readAttribute("name")) {
+        if (!record._readAttribute("name")) {
           record.errors.add("name", ":blank");
         }
       }
@@ -200,7 +200,7 @@ describe("ValidatesWithTest", () => {
         this.attribute("name", "string");
       }
       customValidation() {
-        if (!this.readAttribute("name")) {
+        if (!this._readAttribute("name")) {
           this.errors.add("name", ":blank");
         }
       }
@@ -217,7 +217,7 @@ describe("ValidatesWithTest", () => {
         this.attribute("name", "string");
       }
       checkName() {
-        if (!this.readAttribute("name")) {
+        if (!this._readAttribute("name")) {
           this.errors.add("name", ":blank");
         }
       }
@@ -250,7 +250,7 @@ describe("ValidatesWithTest", () => {
   it("validation with class that adds errors", async () => {
     class CustomValidator {
       validate(record: any) {
-        const val = record.readAttribute("name");
+        const val = record._readAttribute("name");
         if (!val || val === "") {
           record.errors.add("name", ":blank");
         }
@@ -290,7 +290,7 @@ describe("ValidatesWithTest", () => {
         this.min = opts.minimum ?? 0;
       }
       validate(record: any) {
-        const val = record.readAttribute("name");
+        const val = record._readAttribute("name");
         if (typeof val === "string" && val.length < this.min) {
           record.errors.add("name", ":too_short");
         }

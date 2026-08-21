@@ -17,7 +17,6 @@ import {
   attributeForInspect as _attrForInspect,
   initializeGeneratedModules as _coreInitializeGeneratedModules,
 } from "./core.js";
-import { writeAttribute as _writeAttribute } from "./readonly-attributes.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
 // dangerousAttributeMethods from this file)
@@ -727,20 +726,6 @@ export function attributeForInspect(this: InstanceMethodHost, attr: string): str
   return _attrForInspect.call(this as any, attr);
 }
 
-/** Mirrors: ActiveRecord::AttributeMethods#read_attribute (read.rb:31-34) */
-export function readAttribute(
-  this: InstanceMethodHost,
-  name: string,
-  block?: (name: string) => unknown,
-): unknown {
-  return this._readAttribute(
-    (
-      this.constructor as unknown as { resolveAttributeName(n: string): string }
-    ).resolveAttributeName(name),
-    block,
-  );
-}
-
 /**
  * Mirrors: ActiveRecord::AttributeMethods#[] (attribute_methods.rb:415-417)
  *
@@ -763,17 +748,6 @@ export function get(this: InstanceMethodHost, attrName: string): unknown {
  */
 export function set(this: InstanceMethodHost, attrName: string, value: unknown): void {
   this.writeAttribute(attrName, value);
-}
-
-/** Mirrors: ActiveRecord::AttributeMethods#write_attribute (write.rb:31-34) */
-export function writeAttribute(this: InstanceMethodHost, name: string, value: unknown): void {
-  _writeAttribute.call(
-    this as any,
-    (
-      this.constructor as unknown as { resolveAttributeName(n: string): string }
-    ).resolveAttributeName(name),
-    value,
-  );
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#query_attribute */

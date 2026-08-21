@@ -1,10 +1,10 @@
 /**
  * Attribute writing methods.
  *
- * The actual writeAttribute implementation lives on Model (from
- * @blazetrails/activemodel), with Base adding encryption and frozen
- * checks. This module exists to match the Rails file structure for
- * ActiveRecord::AttributeMethods::Write.
+ * `writeAttribute` here is the base `Write#write_attribute`; `Base.prototype`
+ * receives `HasReadonlyAttributes#write_attribute` (readonly-attributes.ts),
+ * which adds the frozen / readonly guards and reaches this shape through its
+ * own `super` call.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */
@@ -21,6 +21,19 @@ import { completeHalfAccessor } from "./read.js";
 export interface Write {
   writeAttribute(name: string, value: unknown): void;
   _writeAttribute(name: string, value: unknown): void;
+}
+
+/**
+ * Updates the attribute identified by `attrName` using the specified `value`.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Write#write_attribute (write.rb:31-38)
+ */
+export function writeAttribute(this: Model, attrName: string, value: unknown): void {
+  const name = (
+    this.constructor as unknown as { resolveAttributeName(n: string): string }
+  ).resolveAttributeName(String(attrName));
+
+  this._writeAttribute(name, value);
 }
 
 /**
