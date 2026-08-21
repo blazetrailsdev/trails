@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
+    "rubyName": "through_model",
+    "call": "order:_tableName,computeType",
+    "reason": "Comparator artifact, not a body divergence: Rails' `@table_name ||= table_name_resolver.call` reads an IVAR (has_and_belongs_to_many.rb:24-27), whose trails spelling is the `_tableName` storage field `Base` itself reads, so the extractor records the read as a call to `table_name` and lands it ahead of `compute_type`. Ruby calls the builder's private `table_name` only from the resolver lambda (rb:51), which trails also does; the definition order matches Rails."
+  }
+]
