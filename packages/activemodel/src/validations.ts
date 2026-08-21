@@ -391,7 +391,8 @@ export interface ReadAttributeForValidationHost {
  * eagerly, so this assigns the replacement, as {@link initInternals} does. Like
  * Rails it leaves `@context_for_validation` aliased to the source's — `valid?`
  * sets and restores the context per run, so the copy is never observed in
- * flight. Ruby's `super` is `super_`, the link `prepend()` hands the module.
+ * flight. Ruby's `super` is `super_`, the link `prepend()` hands the module —
+ * and as in Rails the replacement is assigned BEFORE it, not after.
  *
  * @internal Rails-private helper.
  */
@@ -400,8 +401,8 @@ export function initializeDup<TBase extends object>(
   super_: (other: unknown) => void,
   other: unknown,
 ): void {
-  super_.call(this, other);
   this.errors = new Errors(this as unknown as TBase);
+  super_.call(this, other);
 }
 
 /**
