@@ -1408,6 +1408,8 @@ export class HasAndBelongsToManyReflection extends AssociationReflection {
  */
 export class ThroughReflection extends AbstractReflection {
   private _delegate: AssociationReflection;
+  /** `@association_primary_key` — memoized by {@link associationPrimaryKey}. */
+  private _associationPrimaryKey?: string;
 
   /** @internal */
   get delegateReflection(): AssociationReflection {
@@ -1653,23 +1655,24 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /**
-   * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
-   * (reflection.rb:1083-1090) at its name, argument and default.
+   * We want to use the klass from this reflection, rather than just delegate
+   * straight to the source_reflection, because the source_reflection may be
+   * polymorphic. We still need to respect the source_reflection's :primary_key
+   * option, though.
    *
-   * The body deviates: Rails reads `actual_source_reflection.options[:primary_key]`
-   * and otherwise falls to `primary_key(klass || self.klass)`, which for a
-   * query-constraints source answers the target's own single `primary_key`.
-   * trails asks the source reflection instead, so a composite source edge
-   * answers the composite key its foreign key has the arity of — the resolution
-   * `CollectionAssociation`'s delete/find comparison paths are built on. Story
-   * `converge-through-reflection-association-primary-key-body` tracks converging
-   * that cluster; converging here alone breaks the comparison paths.
+   * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
+   * (reflection.rb:1083-1090).
    */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
-    return (
-      this.sourceReflection?.associationPrimaryKey(klass) ??
-      this._delegate.associationPrimaryKey(klass)
-    );
+    // Get the "actual" source reflection if the immediate source reflection has a
+    // source reflection itself
+    const primaryKey = (this.actualSourceReflection() as unknown as ConcreteReflection).options
+      ?.primaryKey;
+    if (primaryKey != null && primaryKey !== false) {
+      return (this._associationPrimaryKey ??= String(primaryKey));
+    } else {
+      return this.primaryKeyForModel(klass || this.klass);
+    }
   }
 
   /**

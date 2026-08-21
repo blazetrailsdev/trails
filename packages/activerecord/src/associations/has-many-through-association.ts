@@ -194,25 +194,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
-   * Resolve the record's key by the association's `association_primary_key`
-   * (for a through reflection this delegates to
-   * `sourceReflection.associationPrimaryKey`), not
-   * the target model's own `klass.primaryKey`. Converges the delete/find
-   * comparison paths in `CollectionAssociation` onto the same resolution
-   * `idsReader` uses via the shared `associationPrimaryKey()` helper, so a
-   * composite (array) source PK compares by every source-key column instead of
-   * falling back to the target model's PK.
-   */
-  protected override primaryKeyValue(record: Base): unknown {
-    const pk = this.associationPrimaryKey();
-    const read = (key: string) =>
-      typeof (record as any)._readAttribute === "function"
-        ? (record as any)._readAttribute(key)
-        : (record as any)[key];
-    return Array.isArray(pk) ? pk.map(read) : read(pk);
-  }
-
-  /**
    * Mirrors Rails' HasManyThroughAssociation#insert_record
    * (has_many_through_association.rb:24-34):
    *
