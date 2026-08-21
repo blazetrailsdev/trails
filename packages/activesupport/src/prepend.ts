@@ -7,7 +7,8 @@
  * method. TypeScript has no prototype-chain prepend; `prepend()` wraps
  * each target method in place. A call like `target.foo(...args)`
  * invokes `module.foo.call(this, originalFoo, ...args)`, letting the
- * module short-circuit or delegate via `originalFoo.call(this, ...)`.
+ * module short-circuit or delegate via `originalFoo(...)` — the link arrives
+ * bound to the receiver, as Ruby's `super` is.
  *
  * Mirrors: Ruby's `Module#prepend` — with the caveat that `super`
  * becomes an explicit first argument because TypeScript has no
@@ -29,7 +30,7 @@
  *
  *   prepend(Relation.prototype, {
  *     where(super_: (...args: unknown[]) => unknown, ...args: unknown[]) {
- *       return super_.call(this, ...processed(args));
+ *       return super_(...processed(args));
  *     },
  *   });
  */
@@ -104,7 +105,11 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
         : NO_METHOD_ROOT;
     const wrapper = mod[name];
     const wrapped = function (this: unknown, ...args: unknown[]) {
-      return wrapper.call(this, original, ...args);
+      // Ruby's `super` is bound to the receiver, so the link is handed over
+      // bound too and the module body spells it `super_(...)`. A caller that
+      // spells it `super_.call(this, ...)` is unaffected — a bound function
+      // ignores the `thisArg`.
+      return wrapper.call(this, original.bind(this), ...args);
     };
     // Preserve the original property descriptor (class methods are
     // non-enumerable by default; direct assignment would make them
