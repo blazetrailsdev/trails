@@ -98,17 +98,17 @@ export class PrimaryKey {
     return readId.call(this as unknown as PrimaryKeyInstance);
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id= (primary_key.rb:28-30). */
-  set id(value: unknown) {
-    writeId.call(this as unknown as PrimaryKeyInstance, value);
-  }
-
   /**
    * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#primary_key_values_present?
    * (primary_key.rb:22-24) — `!!id`.
    */
   isPrimaryKeyValuesPresent(): boolean {
     return (this as unknown as PrimaryKeyRecord).id != null;
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id= (primary_key.rb:28-30). */
+  set id(value: unknown) {
+    writeId.call(this as unknown as PrimaryKeyInstance, value);
   }
 
   /**

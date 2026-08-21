@@ -61,6 +61,17 @@ export class CompositePrimaryKey extends PrimaryKey {
     return super.id;
   }
 
+  /**
+   * Mirrors: CompositePrimaryKey#primary_key_values_present?
+   * (composite_primary_key.rb:16-22) — `id.all?`.
+   */
+  override isPrimaryKeyValuesPresent(): boolean {
+    const record = this as unknown as PrimaryKeyRecord;
+    if ((record.constructor as any).compositePrimaryKey)
+      return (record.id as unknown[]).every((v) => v != null);
+    return super.isPrimaryKeyValuesPresent();
+  }
+
   /** Mirrors: CompositePrimaryKey#id= (composite_primary_key.rb:18-25). */
   override set id(value: unknown) {
     const record = this as unknown as PrimaryKeyInstance;
@@ -86,17 +97,6 @@ export class CompositePrimaryKey extends PrimaryKey {
     primaryKey.forEach((attr, i) =>
       record._writeAttribute(attr, i < values.length ? values[i] : null),
     );
-  }
-
-  /**
-   * Mirrors: CompositePrimaryKey#primary_key_values_present?
-   * (composite_primary_key.rb:16-22) — `id.all?`.
-   */
-  override isPrimaryKeyValuesPresent(): boolean {
-    const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey)
-      return (record.id as unknown[]).every((v) => v != null);
-    return super.isPrimaryKeyValuesPresent();
   }
 
   /** Mirrors: CompositePrimaryKey#id? (composite_primary_key.rb:36-42). */

@@ -35,6 +35,12 @@ type AnyCallable = (...args: any[]) => any;
 /** Constructor shape of the shared `Relation` class and its per-model subclasses. */
 type RelationCtor = new (modelClass: typeof Base, table?: any, predicateBuilder?: any) => any;
 
+/** `Relation#initialize`'s keywords (relation.rb:70-77), as {@link create} takes them. */
+export interface RelationKwargs {
+  table?: any;
+  predicateBuilder?: any;
+}
+
 /**
  * The Delegation module interface.
  *
@@ -483,12 +489,13 @@ export function relationClassFor(modelClass: typeof Base): RelationCtor {
  *
  * Mirrors: ActiveRecord::Delegation::ClassMethods#create
  * (relation/delegation.rb:139-141) — `relation_class_for(model).new(model, ...)`,
- * whose remaining arguments are the `Relation#initialize` ones (`table:`,
- * `predicate_builder:`) and are forwarded verbatim. The scope proxy is the
+ * whose remaining arguments are `Relation#initialize`'s keywords (`table:`,
+ * `predicate_builder:`) and are forwarded unchanged. The scope proxy is the
  * trails half of what Ruby's per-model delegate class does for named scopes, so
  * it is applied here rather than at each construction site.
  */
-export function create(model: typeof Base, table?: any, predicateBuilder?: any): any {
+export function create(model: typeof Base, kwargs: RelationKwargs = {}): any {
+  const { table, predicateBuilder } = kwargs;
   return wrapWithScopeProxy(new (relationClassFor(model))(model, table, predicateBuilder));
 }
 

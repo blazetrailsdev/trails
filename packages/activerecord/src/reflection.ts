@@ -244,7 +244,7 @@ export class AbstractReflection {
    * never carry a wrong-table STI predicate.
    */
   buildScope(table?: TableRef, predicateBuilder?: any, klass?: typeof Base): any {
-    return Relation.create(klass ?? this.klass, table, predicateBuilder);
+    return Relation.create(klass ?? this.klass, { table, predicateBuilder });
   }
 
   joinScope(table: TableRef, foreignTable: TableRef, foreignKlass: typeof Base): any {
