@@ -129,7 +129,7 @@ describe("InheritanceTest", () => {
 
   it("descends from active record", async () => {
     // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
-    // (no type attr → !classHasAttribute). AbstractStiPost/SubAbstractStiPost assertions also
+    // (no type attr → !_hasAttribute). AbstractStiPost/SubAbstractStiPost assertions also
     // require schema loaded. Story: descends-from-active-record-base (RFC 0019).
     expect(LoosePerson.isDescendsFromActiveRecord()).toBe(true);
     expect(LooseDescendant.isDescendsFromActiveRecord()).toBe(true);
@@ -145,7 +145,7 @@ describe("InheritanceTest", () => {
 
   it("company descends from active record", async () => {
     // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
-    // (no type attr → !classHasAttribute); Story: descends-from-active-record-base (RFC 0019).
+    // (no type attr → !_hasAttribute); Story: descends-from-active-record-base (RFC 0019).
     expect(AbstractCompany.isDescendsFromActiveRecord()).toBe(true);
     expect(Company.isDescendsFromActiveRecord()).toBe(true);
     // Rails: assert_not Class.new(Company).descends_from_active_record? — an anonymous

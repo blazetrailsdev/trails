@@ -417,24 +417,6 @@ export function registerSubclass(klass: typeof Base): void {
 }
 
 /**
- * Class-level `_has_attribute?`.
- *
- * Rails' `_has_attribute?(name)` is `attribute_types.key?(name)`
- * (`attribute_methods.rb:260-262`), true for any reflected DB column as well as
- * any explicitly declared `attribute()` — the default attribute set seeds from
- * `columns_hash` and then replays the declarations on top. This is the gate
- * Rails uses to decide whether STI dispatch applies, so that defaulting
- * `inheritance_column` to `"type"` (above) does not make every model with a
- * stray `type` key behave as STI: only models that actually have the column
- * dispatch.
- *
- * @internal
- */
-export function classHasAttribute(modelClass: typeof Base, name: string): boolean {
-  return modelClass._hasAttribute(name);
-}
-
-/**
  * True when STI was explicitly enabled on this class or an ancestor (the
  * inherited `_inheritanceColumn` sentinel). Distinct from `inheritanceColumn`,
  * which resolves to a name (default "type") for any model that hasn't disabled
@@ -445,7 +427,7 @@ export function classHasAttribute(modelClass: typeof Base, name: string): boolea
  * which resolve through the ambiguous global registry and so must stay scoped to
  * explicitly-modeled hierarchies. The `new`-from-attributes path resolves within
  * the class's own subtree and instead gates on the column-aware
- * {@link classHasAttribute} (Rails' `_has_attribute?`).
+ * `_has_attribute?`.
  *
  * @internal
  */
@@ -830,7 +812,7 @@ export function ensureProperType(this: Base): void {
   // wouldn't persist or serialize correctly. Rails needs no such guard: its
   // `attribute_types` loads the schema synchronously on first touch, so
   // `_write_attribute` always lands on a known attribute (`inheritance.rb:333`).
-  if (!classHasAttribute(klass, inheritCol)) return;
+  if (!klass._hasAttribute(inheritCol)) return;
   (this as any)._writeAttribute(inheritCol, stiName(klass));
 }
 
@@ -915,7 +897,7 @@ function stiColumnIsAttribute(
   record: Record<string, unknown>,
 ): boolean {
   if (Object.prototype.hasOwnProperty.call(record, inheritCol)) return true;
-  return classHasAttribute(modelClass, inheritCol);
+  return modelClass._hasAttribute(inheritCol);
 }
 
 /**
@@ -976,7 +958,7 @@ export function subclassFromAttributes(
   if (inheritCol === null) return null;
   // Rails gates STI dispatch on `_has_attribute?(inheritance_column)` — only
   // models that actually carry the column dispatch.
-  if (!classHasAttribute(modelClass, inheritCol)) return null;
+  if (!modelClass._hasAttribute(inheritCol)) return null;
 
   const cast = castStiValueFromAttrs(modelClass, attrsHash, inheritCol);
   if (!cast.found) return null;
@@ -1086,7 +1068,7 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * each through {@link findStiClassInHierarchy} (registry-safe) instead of
  * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
  * resolves to a name (default `"type"`), and the dispatch is gated on the
- * column-aware `_has_attribute?` ({@link classHasAttribute}) — or, for a
+ * column-aware `_has_attribute?` — or, for a
  * receiver that is explicitly STI-enabled ({@link stiEnabled}), on that
  * assignment, which is the same structural fact Rails reads off
  * `_has_attribute?`. Rails reads `_has_attribute?` alone because
@@ -1126,7 +1108,7 @@ export function subclassFromAttributesForNew(
   // `inheritance_column = nil` disables STI even when a real `type` column exists.
   const col = modelClass.inheritanceColumn;
   if (col === null) return null;
-  if (!classHasAttribute(modelClass, col) && !stiEnabled(modelClass)) return null;
+  if (!modelClass._hasAttribute(col) && !stiEnabled(modelClass)) return null;
 
   const resolve = (source: unknown): typeof Base | null => {
     if (!source || typeof source !== "object") return null;
