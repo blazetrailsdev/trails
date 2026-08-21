@@ -47,18 +47,24 @@ export const FileLike = {
  * `ActiveSupport`; here the module namespace object of
  * `./xml-mini/<name>.js` *is* that module.
  *
- * Rails' backends all return the parsed Hash synchronously, and so does the
- * default REXML one here. The Nokogiri backends are the residue: each loads its
- * optional parser package (`@blazetrails/nokogiri`) through a dynamic import —
- * see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99` — so their
- * `parse` returns a Promise, and only the `await XmlMini.parse(...)` path
- * reaches them. `Hash.fromXml`, which Rails calls straight through
- * (conversions.rb:128-130), needs a synchronous backend.
+ * Every backend's `parse` returns the parsed Hash synchronously, as Rails'
+ * do: the Nokogiri backends reach their optional parser package
+ * (`@blazetrails/nokogiri`) from their `_require` hook, which
+ * {@link castBackendNameToModule} awaits at backend-selection time, mirroring
+ * the file-top `require "nokogiri"` Ruby runs there.
  */
 export interface XmlMiniBackend {
-  parse(
-    data: string | StringIO | null | undefined,
-  ): Record<string, unknown> | Promise<Record<string, unknown>>;
+  parse(data: string | StringIO | null | undefined): Record<string, unknown>;
+
+  /**
+   * The backend file's own file-top `require` of its parser library, which
+   * Ruby runs as part of requiring the file (nokogiri.rb:3, nokogirisax.rb:3)
+   * and {@link castBackendNameToModule} awaits here. Backends whose parser
+   * needs no loading (REXML) do not declare it.
+   *
+   * @internal
+   */
+  _require?(): Promise<void>;
 }
 
 /** The name of a backend, or the backend module itself. */
@@ -292,14 +298,9 @@ let _backend: XmlMiniBackend | null | undefined;
 /**
  * Parse an XML document into a hash through the current backend.
  *
- * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99) — the delegation
- * forwards straight to the selected backend, whose result is the Hash itself
- * for a synchronous backend and a Promise for an asynchronous one (see
- * {@link XmlMiniBackend}).
+ * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99).
  */
-export function parse(
-  data: string | StringIO | null | undefined,
-): Record<string, unknown> | Promise<Record<string, unknown>> {
+export function parse(data: string | StringIO | null | undefined): Record<string, unknown> {
   return backend()!.parse(data);
 }
 
@@ -745,14 +746,26 @@ const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
  * is a dynamic import here, since the module namespace object of
  * `xml-mini/<name>.js` is the backend module.
  *
+ * Requiring that file also runs its own file-top `require` of the parser
+ * library (nokogiri.rb:3, nokogirisax.rb:3), so in Ruby a backend module cannot
+ * be named at all — by `name` or as the module object this method returns
+ * unchanged — without its parser already being loaded. An ESM `import` only
+ * evaluates the module body and cannot await, so both arms await the backend's
+ * {@link XmlMiniBackend._require} hook to reach the same state.
+ *
  * @internal
  */
 export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
   if (typeof name !== "string") {
+    await name._require?.();
     return name;
   } else {
     const backend = XML_MINI_BACKENDS[name.toLowerCase()];
-    if (typeof backend === "function") return (await backend()) as XmlMiniBackend;
+    if (typeof backend === "function") {
+      const module = (await backend()) as XmlMiniBackend;
+      await module._require?.();
+      return module;
+    }
     // Ruby's counterpart is the core `LoadError` / `RuntimeError` the file's own
     // `require` or guard raises; there is no Rails error class to port here, the
     // same reason `yaml.ts:16` gives for its own LoadError stand-in.

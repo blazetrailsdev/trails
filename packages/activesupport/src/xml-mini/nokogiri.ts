@@ -44,9 +44,23 @@ interface NokogiriModule {
 // to resolve at type-check time; the cast pins it to the surface above.
 const NOKOGIRI_PACKAGE = "@blazetrails/nokogiri";
 
-async function loadNokogiri(): Promise<NokogiriModule> {
+let nokogiri: NokogiriModule | undefined;
+
+/**
+ * Mirrors: the file-top `require "nokogiri"` (nokogiri.rb:3-8), which Ruby runs
+ * when `cast_backend_name_to_module` requires this file — i.e. at
+ * backend-selection time, so `parse` itself never loads anything.
+ *
+ * ESM has no synchronous `require`, and a top-level `await import()` breaks the
+ * IIFE/CJS bundles, so the file-top `require` is an awaitable hook the loader
+ * calls after importing this module (`xml-mini.ts`'s `XML_MINI_BACKENDS`).
+ *
+ * @internal
+ */
+export async function _require(): Promise<void> {
+  if (nokogiri !== undefined) return;
   try {
-    return (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
+    nokogiri = (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
   } catch (e) {
     if (isModuleNotFound(e, "@blazetrails/nokogiri")) {
       throw new Error(
@@ -103,7 +117,7 @@ function nodeToHash(node: XmlNode): XmlHash {
  * `StringIO` is the shim for Ruby's stdlib `StringIO`, and `instanceof
  * StringIO` stands in for `respond_to?(:read)`.
  */
-export async function parse(data: string | StringIO | null | undefined): Promise<XmlHash> {
+export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (!(data instanceof StringIO)) {
     data = new StringIO(data ?? "");
   }
@@ -111,8 +125,7 @@ export async function parse(data: string | StringIO | null | undefined): Promise
   if (data.isEof()) {
     return {};
   } else {
-    const { parseXml } = await loadNokogiri();
-    const doc = parseXml(data);
+    const doc = nokogiri!.parseXml(data);
     try {
       if (doc.errors.length > 0) {
         throw new Error(doc.errors[0].message);

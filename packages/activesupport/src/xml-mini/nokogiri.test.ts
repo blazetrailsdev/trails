@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { parse } from "./nokogiri.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { parse, _require } from "./nokogiri.js";
+
+// Rails' engine tests load the gem before the suite runs, via
+// `XMLMiniEngineTest.run_with_gem("nokogiri")` (xml_mini_engine_test.rb:8-13).
+beforeAll(async () => {
+  await _require();
+});
 
 describe("NokogiriEngineTest", () => {
   it("blank returns empty hash", async () => {
@@ -66,7 +72,7 @@ describe("NokogiriEngineTest", () => {
   });
 
   it("throws on malformed xml", async () => {
-    await expect(parse("<root>")).rejects.toThrow();
+    expect(() => parse("<root>")).toThrow();
   });
 
   it("decodes entities in content", async () => {
