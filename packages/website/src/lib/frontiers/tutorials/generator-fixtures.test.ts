@@ -195,7 +195,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("name", "string")');
       expect(content).toContain('this.attribute("bio", "text")');
 
-      const mig = findMigration(artistFiles, /db\/migrations\/.+-create-artists\.ts$/);
+      const mig = findMigration(artistFiles, /db\/migrations\/.+_create_artists\.ts$/);
       expect(mig).toContain('t.string("name")');
       expect(mig).toContain('t.text("bio")');
     });
@@ -207,7 +207,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("artist_id", "integer")');
       expect(content).toContain('this.attribute("release_date", "date")');
 
-      const mig = findMigration(albumFiles, /db\/migrations\/.+-create-albums\.ts$/);
+      const mig = findMigration(albumFiles, /db\/migrations\/.+_create_albums\.ts$/);
       expect(mig).toContain('t.integer("artist_id")');
       expect(mig).toContain('t.date("release_date")');
     });
@@ -219,7 +219,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("track_number", "integer")');
       expect(content).toContain('this.attribute("duration", "integer")');
 
-      const mig = findMigration(trackFiles, /db\/migrations\/.+-create-tracks\.ts$/);
+      const mig = findMigration(trackFiles, /db\/migrations\/.+_create_tracks\.ts$/);
       expect(mig).toContain('t.integer("track_number")');
       expect(mig).toContain('t.integer("duration")');
     });
@@ -229,7 +229,7 @@ describe("generator fixtures", () => {
       const content = readFile("src/app/models/genre.ts");
       expect(content).toContain("class Genre extends Base");
 
-      const mig = findMigration(genreFiles, /db\/migrations\/.+-create-genres\.ts$/);
+      const mig = findMigration(genreFiles, /db\/migrations\/.+_create_genres\.ts$/);
       expect(mig).toContain('t.string("name")');
     });
   });
@@ -272,7 +272,7 @@ describe("generator fixtures", () => {
       expect(content).toContain("class Account extends Base");
       expect(content).toContain('this.attribute("balance", "decimal")');
 
-      const mig = findMigration(accountFiles, /db\/migrations\/.+-create-accounts\.ts$/);
+      const mig = findMigration(accountFiles, /db\/migrations\/.+_create_accounts\.ts$/);
       expect(mig).toContain('t.decimal("balance")');
     });
 
@@ -282,7 +282,7 @@ describe("generator fixtures", () => {
       expect(content).toContain("class Category extends Base");
       expect(content).toContain('this.attribute("parent_id", "integer")');
 
-      const mig = findMigration(categoryFiles, /db\/migrations\/.+-create-categories\.ts$/);
+      const mig = findMigration(categoryFiles, /db\/migrations\/.+_create_categories\.ts$/);
       expect(mig).toContain('t.integer("parent_id")');
     });
 
@@ -294,7 +294,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("account_id", "integer")');
       expect(content).toContain('this.attribute("category_id", "integer")');
 
-      const mig = findMigration(transactionFiles, /db\/migrations\/.+-create-transactions\.ts$/);
+      const mig = findMigration(transactionFiles, /db\/migrations\/.+_create_transactions\.ts$/);
       expect(mig).toContain('t.decimal("amount")');
       expect(mig).toContain('t.integer("account_id")');
       expect(mig).toContain('t.date("date")');
@@ -307,7 +307,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("period_start", "date")');
       expect(content).toContain('this.attribute("period_end", "date")');
 
-      const mig = findMigration(budgetFiles, /db\/migrations\/.+-create-budgets\.ts$/);
+      const mig = findMigration(budgetFiles, /db\/migrations\/.+_create_budgets\.ts$/);
       expect(mig).toContain('t.date("period_start")');
       expect(mig).toContain('t.date("period_end")');
     });
