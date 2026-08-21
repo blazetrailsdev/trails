@@ -5,7 +5,9 @@ import {
   _parseHexBinary,
   castBackendNameToModule,
   FileLike,
+  withBackend,
 } from "./xml-mini.js";
+import { fromXml } from "./hash-utils.js";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "./xml-mini/nokogiri.js";
 
@@ -68,4 +70,22 @@ describe("XmlMini", () => {
       "cannot load such file -- active_support/xml_mini/nosuchengine",
     );
   });
+});
+
+// Rails runs the whole `Hash.from_xml` suite under each backend
+// (hash_ext_test.rb:1024 branches on `XmlMini.backend.name`), which trails
+// cannot mirror while its own suites are backend-agnostic. This covers the
+// property that makes that possible: `Hash.from_xml` calls `XmlMini.parse`
+// straight through (conversions.rb:128-130), so every backend must parse
+// synchronously — the Nokogiri ones load their parser from the file-top
+// `require` seat (nokogiri.rb:3-8), which `with_backend` reaches.
+describe("Hash.from_xml under each XmlMini backend", () => {
+  for (const name of ["REXML", "Nokogiri", "NokogiriSAX"]) {
+    it(`parses synchronously under ${name}`, async () => {
+      const hash = await withBackend(name, () =>
+        fromXml('<product><name>Book</name><price type="integer">10</price></product>'),
+      );
+      expect(hash).toEqual({ product: { name: "Book", price: 10 } });
+    });
+  }
 });

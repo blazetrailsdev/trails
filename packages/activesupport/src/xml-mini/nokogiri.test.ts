@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { parse } from "./nokogiri.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { parse, _require } from "./nokogiri.js";
+
+// Ruby's `require "active_support/xml_mini/nokogiri*"` runs the file-top
+// `require "nokogiri"`; `cast_backend_name_to_module` is that seat here, so a
+// direct-import test does the load itself before calling `parse`.
+beforeAll(async () => {
+  await _require();
+});
 
 describe("NokogiriEngineTest", () => {
   it("blank returns empty hash", async () => {
@@ -66,7 +73,7 @@ describe("NokogiriEngineTest", () => {
   });
 
   it("throws on malformed xml", async () => {
-    await expect(parse("<root>")).rejects.toThrow();
+    expect(() => parse("<root>")).toThrow();
   });
 
   it("decodes entities in content", async () => {
