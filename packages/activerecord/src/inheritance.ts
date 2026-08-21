@@ -140,8 +140,7 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  * actually carry the inheritance column, or STI is disabled. The membership
  * test is Rails' own `columns_hash.include?`: a *declared* `attribute :type`
  * with no backing column must not make a model an STI subclass, which is why
- * this reader asks for column metadata rather than `attribute_types`. The one
- * rescued case is trails' table-less abstract class, below.
+ * this reader asks for column metadata rather than `attribute_types`.
  * Decoupled from the explicit `inheritanceColumn` sentinel
  * ({@link isStiSubclass}), which still gates the registry-resolved row-dispatch
  * paths.
@@ -159,10 +158,11 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  // An unreflected model — and every abstract class, which trails never
-  // reflects — falls back to `attribute_types`, seeded from `columns_hash` and
-  // inherited rather than empty. A cold `columnsHash()` would answer from that
-  // same declared-attribute view anyway.
+  // Story: descends-from-active-record-cold-window-reads-attribute-types (RFC
+  // 0078) — an unreflected model, and every abstract class (trails reflects
+  // none), still answers from `attribute_types`, which counts a virtual `type`
+  // where `columns_hash` would not. Closing that window means removing the
+  // re-entry named above, not changing the reader.
   const columnsHash = cachedColumnsHash(modelClass);
   const inheritCol = modelClass.inheritanceColumn;
   if (columnsHash === undefined) {
