@@ -853,6 +853,7 @@ import { queryCastAttribute as _queryCastAttribute } from "./attribute-methods/q
 // import from it here (cycle). These 5 delegates are inlined the same way
 // toKey/id are inlined above (see comment near line 12).
 import {
+  type DirtyOptions,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   savedChangeToAttribute as _savedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
@@ -960,8 +961,12 @@ export function idForDatabase(this: InstanceMethodHost): unknown {
   return this._readAttribute(pk);
 }
 /** @internal */
-export function isSavedChangeToAttribute(this: InstanceMethodHost, attr: string): boolean {
-  return _isSavedChangeToAttribute(this as any, attr);
+export function isSavedChangeToAttribute(
+  this: InstanceMethodHost,
+  attr: string,
+  options?: DirtyOptions,
+): boolean {
+  return _isSavedChangeToAttribute(this as any, attr, options);
 }
 /** @internal */
 export function savedChangeToAttribute(
@@ -983,8 +988,12 @@ export function savedChanges(this: InstanceMethodHost): Record<string, [unknown,
   return _savedChanges(this as any);
 }
 /** @internal */
-export function isWillSaveChangeToAttribute(this: InstanceMethodHost, attr: string): boolean {
-  return _isWillSaveChangeToAttribute(this as any, attr);
+export function isWillSaveChangeToAttribute(
+  this: InstanceMethodHost,
+  attr: string,
+  options?: DirtyOptions,
+): boolean {
+  return _isWillSaveChangeToAttribute(this as any, attr, options);
 }
 /** @internal */
 export function attributeChangeToBeSaved(

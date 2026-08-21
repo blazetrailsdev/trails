@@ -1986,20 +1986,22 @@ export class Base extends Model {
 
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
-   * (attribute_methods/dirty.rb:150-152) — `mutations_before_last_save
-   * .changed?(attr_name.to_s, **options)`. ActiveModel::Dirty defines no
-   * `saved_change_to_*` family (dirty.rb); it is ActiveRecord's, declared
-   * alongside its `attribute_method_suffix` in `attributeMethodPatterns` above.
+   * (attribute_methods/dirty.rb:86-88), declared alongside its
+   * `attribute_method_affix` in `attributeMethodPatterns` above.
    *
-   * The enum cast has no Rails counterpart at this level: Rails normalises
-   * `from:`/`to:` inside `AttributeMutationTracker#changed?` via `type.cast`
-   * on the attribute's `EnumType`, which trails' mutation tracker does not
-   * carry, so the same cast happens here for both the live-change and
-   * persisted-change readers.
+   * The body is the port in `attribute-methods/dirty.ts`. What stays here is
+   * what Rails does inside `AttributeMutationTracker#changed?`
+   * (attribute_mutation_tracker.rb:44-48) and trails cannot: alias resolution
+   * and the `type_cast(attr_name, …)` of each option through the attribute's
+   * `EnumType`, both of which need the class, not the record.
    *
-   * The `?` predicate's trails spelling is `isSavedChangeToAttribute`, which
-   * `attribute-methods/dirty.ts` already ports; converging this name onto it is
-   * story `converge-ar-dirty-generic-names-onto-dirty-ts` (RFC 0096).
+   * The NAME is forced: a generated `savedChangeToName` reaches its target
+   * through the derived `${prefix}Attribute${suffix}` join
+   * (attribute_methods.rb:552), and Ruby tells the predicate from the value
+   * reader by a TRAILING `?` where TypeScript's convention is a LEADING `is` —
+   * so no pattern can derive `isSavedChangeToAttribute`, the spelling the port
+   * carries. Story:
+   * 0096-naming-identifier-burndown/converge-ar-dirty-generic-names-onto-dirty-ts.
    */
   savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     const ctor = this.constructor as typeof Base;
@@ -2007,24 +2009,21 @@ export class Base extends Model {
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
-    name = ctor.resolveAttributeName(name);
-    const changes = this.previousChanges;
-    if (!(name in changes)) return false;
-    if (!options) return true;
-    const change = changes[name];
-    if ("from" in options && change[0] !== options.from) return false;
-    if ("to" in options && change[1] !== options.to) return false;
-    return true;
+    return _isSavedChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
   }
 
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
-   * (attribute_methods/dirty.rb:186-188). Same pending rename as
-   * {@link Base.savedChangeToAttribute} — `isWillSaveChangeToAttribute` is the
-   * spelling `attribute-methods/dirty.ts` already carries.
+   * (attribute_methods/dirty.rb:138-140). Same split and the same forced
+   * spelling as {@link Base.savedChangeToAttribute}.
    */
   willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    return this.attributeChanged(name, options);
+    const ctor = this.constructor as typeof Base;
+    if (options) {
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
+      options = _castEnumDirtyOpts(ctor, canonical, options);
+    }
+    return _isWillSaveChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
   }
 
   // -- Explain --

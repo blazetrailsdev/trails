@@ -9,6 +9,12 @@
 
 import { Temporal } from "@blazetrails/date";
 
+/** Rails' `**options` for the two `changed?`-backed predicates (dirty.rb:86, 138). */
+export interface DirtyOptions {
+  from?: unknown;
+  to?: unknown;
+}
+
 interface DirtyRecord {
   changed: boolean;
   changedAttributes: Record<string, unknown>;
@@ -18,12 +24,39 @@ interface DirtyRecord {
 }
 
 /**
+ * Mirrors: ActiveModel::AttributeMutationTracker#changed?
+ * (attribute_mutation_tracker.rb:44-48) — the one body
+ * `saved_change_to_attribute?` and `will_save_change_to_attribute?` share, over
+ * `mutations_before_last_save` and `mutations_from_database` respectively.
+ * Rails' `type_cast(attr_name, …)` of each option happens on `Base`, where the
+ * enum registry is reachable.
+ */
+function changed(
+  changes: Record<string, [unknown, unknown]>,
+  attr: string,
+  options?: DirtyOptions,
+): boolean {
+  if (!Object.prototype.hasOwnProperty.call(changes, attr)) return false;
+  if (!options) return true;
+  const change = changes[attr];
+  if ("from" in options && change[0] !== options.from) return false;
+  if ("to" in options && change[1] !== options.to) return false;
+  return true;
+}
+
+/**
  * Check if a specific attribute was changed in the last save.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
+ * (dirty.rb:86-88) — `mutations_before_last_save.changed?(attr_name.to_s,
+ * **options)`.
  */
-export function isSavedChangeToAttribute(record: DirtyRecord, attr: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record.previousChanges, attr);
+export function isSavedChangeToAttribute(
+  record: DirtyRecord,
+  attr: string,
+  options?: DirtyOptions,
+): boolean {
+  return changed(record.previousChanges, attr, options);
 }
 
 /**
@@ -70,9 +103,15 @@ export function savedChanges(record: DirtyRecord): Record<string, [unknown, unkn
  * Check if a specific attribute will change on the next save.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
+ * (dirty.rb:138-140) — `mutations_from_database.changed?(attr_name.to_s,
+ * **options)`.
  */
-export function isWillSaveChangeToAttribute(record: DirtyRecord, attr: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record.changes, attr);
+export function isWillSaveChangeToAttribute(
+  record: DirtyRecord,
+  attr: string,
+  options?: DirtyOptions,
+): boolean {
+  return changed(record.changes, attr, options);
 }
 
 /**
