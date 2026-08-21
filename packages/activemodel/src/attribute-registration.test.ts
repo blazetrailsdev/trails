@@ -1,6 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { Model, Types, ValueType } from "./index.js";
 
+/**
+ * Rails' `MyDecorator` (attribute_registration_test.rb:11-19) — a type that
+ * wraps another and defers to it, so a decorated attribute is distinguishable
+ * from an undecorated one.
+ */
+function myDecorator(castType: any, transform: (value: unknown) => unknown): any {
+  const decorated = Object.create(castType);
+  decorated.castType = castType;
+  decorated.cast = (value: unknown) => transform(castType.cast(value));
+  return decorated;
+}
+
 describe("AttributeRegistrationTest", () => {
   it("attributes can be registered", () => {
     class MyModel extends Model {
@@ -236,7 +248,9 @@ describe("AttributeRegistrationTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toUpperCase() : v));
+        this.decorateAttributes(["name"], (_name, type) =>
+          myDecorator(type, (v) => (typeof v === "string" ? v.toUpperCase() : v)),
+        );
       }
     }
     const p = new Person({ name: "alice" });
@@ -247,8 +261,11 @@ describe("AttributeRegistrationTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.normalizes("name", (v: unknown) =>
-          typeof v === "string" ? v.trim().toUpperCase() : v,
+        this.decorateAttributes(["name"], (_name, type) =>
+          myDecorator(type, (v) => (typeof v === "string" ? v.trim() : v)),
+        );
+        this.decorateAttributes(["name"], (_name, type) =>
+          myDecorator(type, (v) => (typeof v === "string" ? v.toUpperCase() : v)),
         );
       }
     }
@@ -257,15 +274,20 @@ describe("AttributeRegistrationTest", () => {
   });
 
   it("re-registering an attribute overrides previous decorators", () => {
-    class Person extends Model {
+    class Parent extends Model {
       static {
         this.attribute("name", "string");
-        this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toUpperCase() : v));
-        this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v));
+        this.decorateAttributes(["name"], (_name, type) =>
+          myDecorator(type, (v) => (typeof v === "string" ? v.toUpperCase() : v)),
+        );
       }
     }
-    const p = new Person({ name: "ALICE" });
-    expect(p.readAttribute("name")).toBe("alice");
+    class Child extends Parent {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(new Child({ name: "alice" }).readAttribute("name")).toBe("alice");
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {

@@ -1,5 +1,4 @@
 export { Model } from "./model.js";
-export type { NormalizesArgs } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";
 export { Errors, StrictValidationFailed, UnknownAttributeError, RangeError } from "./errors.js";
@@ -86,12 +85,6 @@ export type { SerializeOptions, SerializableHash } from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
 export { Type } from "./type/value.js";
-export {
-  normalizedValueType,
-  isNormalizedValueType,
-  normalizedValueToken,
-  unwrapNormalization,
-} from "./type/normalized-value.js";
 export { typeRegistry } from "./type/registry.js";
 
 export { StringType } from "./type/string.js";
