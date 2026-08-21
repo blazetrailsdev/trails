@@ -11,7 +11,7 @@
  * of arguments); in TS it raises TypeError (sources.join is not a function).
  * Different mechanism, same observable outcome: construction fails.
  */
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   SubclassNotFound,
   AssociationTypeMismatch,
@@ -177,14 +177,16 @@ describe("ErrorsTest", () => {
       DeleteRestrictionError,
       TooManyRecords,
     ];
-    for (const errorKlass of errorKlasses) {
-      try {
-        new (errorKlass as any)();
-      } catch {
-        throw new Error(
-          `Instance of ${(errorKlass as any).name} can't be initialized with no arguments`,
-        );
+    expect(() => {
+      for (const errorKlass of errorKlasses) {
+        try {
+          new (errorKlass as any)();
+        } catch {
+          throw new Error(
+            `Instance of ${(errorKlass as any).name} can't be initialized with no arguments`,
+          );
+        }
       }
-    }
+    }).not.toThrow();
   });
 });

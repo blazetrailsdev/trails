@@ -154,6 +154,8 @@ describe("FilterAttributesTest", () => {
     const user = new User({ token: "[FILTERED]", auth_token: "[FILTERED]" });
     const output = user.inspect();
     expect(output).toContain("auth_token: [FILTERED]");
+    // Rails' `assert_includes actual, "token: [FILTERED]"` reads PP output, where
+    // the filtered marker is unquoted; trails' `inspect` quotes the string value.
     expect(output).toContain('token: "[FILTERED]"');
   });
 });

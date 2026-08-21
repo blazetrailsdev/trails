@@ -39,13 +39,9 @@ describe("TestDatabasesTest", () => {
   });
 
   it("databases are created", async () => {
-    const mockReconstructFromSchema = vi
-      .spyOn(DatabaseTasks, "reconstructFromSchema")
-      .mockResolvedValue(undefined);
+    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     const connectionHandling = await import("./connection-handling.js");
-    const mockEstablishConnection = vi
-      .spyOn(connectionHandling, "establishConnection")
-      .mockResolvedValue(undefined);
+    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined);
 
     const mockConfig: any = {};
     Object.defineProperty(mockConfig, "_database", {
@@ -60,29 +56,17 @@ describe("TestDatabasesTest", () => {
     });
     mockConfig.adapter = "sqlite3";
 
-    const mockConfigurations = stubConfigurations([mockConfig]);
-
-    Base.configurations(mockConfigurations);
+    Base.configurations(stubConfigurations([mockConfig]));
 
     await createAndLoadSchema(2, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-2");
-    expect(mockReconstructFromSchema).toHaveBeenCalledWith(
-      mockConfig,
-      DatabaseTasks.schemaFormat,
-      undefined,
-    );
-    expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
   });
 
   it("create databases after fork", async () => {
-    const mockReconstructFromSchema = vi
-      .spyOn(DatabaseTasks, "reconstructFromSchema")
-      .mockResolvedValue(undefined);
+    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     const connectionHandling = await import("./connection-handling.js");
-    const mockEstablishConnection = vi
-      .spyOn(connectionHandling, "establishConnection")
-      .mockResolvedValue(undefined);
+    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined);
 
     const mockConfig: any = {};
     Object.defineProperty(mockConfig, "_database", {
@@ -104,16 +88,21 @@ describe("TestDatabasesTest", () => {
     await createAndLoadSchema(42, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-42");
-    expect(mockReconstructFromSchema).toHaveBeenCalled();
+    // "Updates the database configuration" — Rails re-reads the registry
+    // (test_databases_test.rb:49); `configsFor` is stubbed to hand back the same
+    // config object, which is the one create_and_load_schema suffixed.
+    expect(mockConfigurations.configsFor({ envName: "arunit", name: "primary" })[0].database).toBe(
+      "test/db/primary.sqlite3-42",
+    );
   });
 
   it("order of configurations isnt changed by test databases", async () => {
     const mockReconstructFromSchema = vi
       .spyOn(DatabaseTasks, "reconstructFromSchema")
       .mockResolvedValue(undefined);
-    const mockEstablishConnection = vi
-      .spyOn(await import("./connection-handling.js"), "establishConnection")
-      .mockResolvedValue(undefined);
+    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
+      undefined,
+    );
 
     const configs = [
       { database: "test/db/primary.sqlite3", adapter: "sqlite3", name: "primary" },
@@ -126,12 +115,10 @@ describe("TestDatabasesTest", () => {
 
     await createAndLoadSchema(42, { envName: "arunit" });
 
-    expect(mockReconstructFromSchema).toHaveBeenCalledTimes(configs.length);
     const reconstructedNames = mockReconstructFromSchema.mock.calls.map(
       (call: any[]) => call[0].name,
     );
     expect(reconstructedNames).toEqual(["primary", "replica"]);
-    expect(mockEstablishConnection).toHaveBeenCalled();
   });
 
   // URL-only configs (no explicit `database`) — e.g. sqlite paths

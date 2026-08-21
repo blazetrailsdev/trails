@@ -5,6 +5,7 @@
  * Ported from vendor/rails/activerecord/test/cases/touch_later_test.rb.
  */
 import { describe, it, expect } from "vitest";
+import { assertNotPredicate } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -39,7 +40,7 @@ describe("TouchLaterTest", () => {
   it("touch later raise if non persisted", async () => {
     const invoice = new Invoice();
     await Invoice.transaction(async () => {
-      expect(invoice.isPersisted()).toBe(false);
+      assertNotPredicate(invoice, (i) => i.isPersisted());
       await expect(invoice.touchLater()).rejects.toThrow(
         "Cannot touch on a new or destroyed record",
       );
@@ -49,7 +50,7 @@ describe("TouchLaterTest", () => {
   it("touch later dont set dirty attributes", async () => {
     const invoice = await Invoice.create();
     await invoice.touchLater();
-    expect(invoice.changed).toBe(false);
+    assertNotPredicate(invoice, (i) => i.changed);
   });
 
   it("touch later respects no touching policy", async () => {

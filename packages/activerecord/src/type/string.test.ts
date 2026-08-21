@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
 import { Author } from "../test-helpers/models/author.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -25,17 +26,17 @@ const { authors } = fixtures({
 describe("StringTypeTest", () => {
   it("string mutations are detected", async () => {
     const author = await StringTestAuthor.find(authors("sean").id);
-    expect(author.changed).toBe(false);
+    assertNotPredicate(author, (a) => a.changed);
 
     // JS strings are immutable; assignment goes through the setter rather than mutating in place.
     // nameChanged() fires via dirty-tracker change detection, not isChangedInPlace.
     author.name = String(author.name) + " Griffin";
-    expect((author as any).nameChanged()).toBe(true);
+    assertPredicate(author, (a) => (a as any).nameChanged());
 
     await author.save();
     await author.reload();
 
-    expect(author.name).toBe("Sean Griffin");
-    expect(author.changed).toBe(false);
+    expect(author.name).toEqual("Sean Griffin");
+    assertNotPredicate(author, (a) => a.changed);
   });
 });

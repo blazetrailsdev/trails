@@ -32,7 +32,7 @@ describe("TableMetadataTest", () => {
 
     const associatedTableMetadata = baseTableMetadata.associatedTable("audit_logs");
 
-    expect(associatedTableMetadata.arelTable.typeForAttribute("message")).toBeInstanceOf(
+    expect(associatedTableMetadata.arelTable.typeForAttribute("message").constructor).toEqual(
       StringType,
     );
   });

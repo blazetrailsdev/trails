@@ -25,17 +25,22 @@ describe("TestUnconnectedAdapter", () => {
   });
 
   it("connection no longer established", async () => {
-    await expect(TestRecord.find(1)).rejects.toBeInstanceOf(ConnectionNotDefined);
-    await expect(new TestRecord().save()).rejects.toBeInstanceOf(ConnectionNotDefined);
+    await expect(TestRecord.find(1)).rejects.toThrow(ConnectionNotDefined);
+    await expect(new TestRecord().save()).rejects.toThrow(ConnectionNotDefined);
   });
 
   it("error message when connection not established", async () => {
-    const err = await TestRecord.find(1).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ConnectionNotDefined);
-    expect((err as ConnectionNotDefined).message).toBe("No database connection defined.");
+    // Rails' `error = assert_raise(...) { ... }` both asserts the raise and hands
+    // back the exception; vitest's `rejects.toThrow` returns nothing, so the
+    // rejection is captured first and re-thrown into the raise assertion.
+    const error = await TestRecord.find(1).catch((e: unknown) => e);
+    expect(() => {
+      throw error;
+    }).toThrow(ConnectionNotDefined);
+    expect((error as ConnectionNotDefined).message).toBe("No database connection defined.");
   });
 
   it("underlying adapter no longer active", async () => {
-    expect(await underlying.active()).toBe(false);
+    expect(await underlying.active()).toBeFalsy();
   });
 });

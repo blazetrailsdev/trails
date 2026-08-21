@@ -13,6 +13,7 @@
  * against with `dropExisting`.
  */
 import { describe, it, expect } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 // Side-effect: registers the Relation constructor on Base (the canonical models
 // import only base.js, which doesn't load relation.ts on its own).
@@ -127,7 +128,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
     const remaining = (await Person.where().not(params)).filter(
       (p) => p.readAttribute("first_name") === "Guille",
     );
-    expect(remaining).toHaveLength(0);
+    assertEmpty(remaining);
   });
 
   it("strong params style objects work with singular associations", () => {

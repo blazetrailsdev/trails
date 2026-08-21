@@ -236,18 +236,18 @@ describe("MultiDbMigratorTest", () => {
     const migratorA = migratorClass(sensorsA, schemaMigrationA, internalMetadataA);
 
     await schemaMigrationA.dropTable();
-    expect(await schemaMigrationA.tableExists()).toBe(false);
+    expect(await schemaMigrationA.tableExists()).toBeFalsy();
     await migratorA.migrate(1);
-    expect(await schemaMigrationA.tableExists()).toBe(true);
+    expect(await schemaMigrationA.tableExists()).toBeTruthy();
     await migratorA.rollback();
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorB = migratorClass(sensorsB, schemaMigrationB, internalMetadataB);
 
     await schemaMigrationB.dropTable();
-    expect(await schemaMigrationB.tableExists()).toBe(false);
+    expect(await schemaMigrationB.tableExists()).toBeFalsy();
     await migratorB.migrate(1);
-    expect(await schemaMigrationB.tableExists()).toBe(true);
+    expect(await schemaMigrationB.tableExists()).toBeTruthy();
     await migratorB.rollback();
   });
 

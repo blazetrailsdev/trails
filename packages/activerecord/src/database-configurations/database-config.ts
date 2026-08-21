@@ -311,8 +311,8 @@ export class DatabaseConfig {
     return this.configuration.queryCache;
   }
 
-  get replica(): boolean {
-    return this.configuration.replica === true;
+  get replica(): boolean | undefined {
+    return this.configuration.replica;
   }
 
   get migrationsPaths(): string | string[] | undefined {

@@ -4,6 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/field_ordered_values_test.rb
  */
 import { describe, it, expect } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -28,7 +29,7 @@ describe("FieldOrderedValuesTest", () => {
   it("in order of empty", async () => {
     const posts = Post.inOrderOf("id", []);
 
-    expect(await posts).toEqual([]);
+    assertEmpty(await posts);
   });
 
   it("in order of with enums values", async () => {

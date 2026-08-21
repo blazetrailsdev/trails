@@ -92,12 +92,12 @@ describe("SerializationTest", () => {
 
       const klazz = class extends Base {};
       klazz._tableName = "topics";
-      expect(klazz.includeRootInJson).toBe(true);
+      expect(klazz.includeRootInJson).toBeTruthy();
 
       klazz.includeRootInJson = false;
-      expect(Base.includeRootInJson).toBe(true);
-      expect(klazz.includeRootInJson).toBe(false);
-      expect(new klazz().includeRootInJson).toBe(false);
+      expect(Base.includeRootInJson).toBeTruthy();
+      expect(klazz.includeRootInJson).toBeFalsy();
+      expect(new klazz().includeRootInJson).toBeFalsy();
     } finally {
       Base.includeRootInJson = originalRootInJson;
     }

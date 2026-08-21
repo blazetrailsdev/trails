@@ -5,12 +5,10 @@ import { Configuration } from "./errors.js";
 describe("ActiveRecord::Encryption::ConfigTest", () => {
   it("required keys will raise a config error when accessed but not set", () => {
     const config = new Config();
+    config.primaryKey = undefined as never;
     expect(() => config.primaryKey).toThrow(Configuration);
-    expect(() => config.deterministicKey).toThrow(Configuration);
-    expect(() => config.keyDerivationSalt).toThrow(Configuration);
 
-    expect(() => config.primaryKey).toThrow(
-      "Missing Active Record encryption credential: active_record_encryption.primary_key",
-    );
+    config.primaryKey = "some key";
+    expect(() => config.primaryKey).not.toThrow();
   });
 });

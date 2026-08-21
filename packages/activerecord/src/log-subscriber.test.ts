@@ -355,9 +355,9 @@ describe("LogSubscriberTest", () => {
         type_casted_binds: [1, 2, 3],
       }),
     );
-    expect(subscriber.debugs[subscriber.debugs.length - 1]).toMatch(/\["id",1\]/);
-    expect(subscriber.debugs[subscriber.debugs.length - 1]).toMatch(/\["id",2\]/);
-    expect(subscriber.debugs[subscriber.debugs.length - 1]).toMatch(/\["id",3\]/);
+    expect(subscriber.debugs[subscriber.debugs.length - 1]).toMatch(
+      /\["id",1\].*\["id",2\].*\["id",3\]/,
+    );
   });
 
   it("binary data is not logged", () => {

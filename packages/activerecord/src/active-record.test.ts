@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
 import { Base, disconnectAllBang } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
@@ -11,12 +12,12 @@ describe("ActiveRecordTest", () => {
   // in-memory SQLite database discards its schema.
   it.skipIf(inMemoryDb())(".disconnect_all! closes all connections", async () => {
     await (await Base.leaseConnection()).connectBang();
-    expect(Base.connectedQ()).toBe(true);
+    assertPredicate(Base, (b) => b.connectedQ());
 
     await disconnectAllBang();
-    expect(Base.connectedQ()).toBe(false);
+    assertNotPredicate(Base, (b) => b.connectedQ());
 
     await (await Base.leaseConnection()).connectBang();
-    expect(Base.connectedQ()).toBe(true);
+    assertPredicate(Base, (b) => b.connectedQ());
   });
 });
