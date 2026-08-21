@@ -8,7 +8,7 @@ function col(name: string): Cols[string] {
   return { sqlType: "varchar", name, default: null };
 }
 
-const columns: Cols = { number: col("number"), title: col("title") };
+const columns: Cols = { id: col("id"), title: col("title") };
 
 function makeAdapter(): unknown {
   return {
@@ -24,26 +24,18 @@ function makeAdapter(): unknown {
 
 describe("loadSchema — subclass left stale by an ancestor invalidation", () => {
   it("settles the load instead of re-entering it until the stack overflows", () => {
-    // A subclass that never called `registerSubclass` is unreachable from
-    // `reload_schema_from_cache`'s descendant walk, so an ancestor
-    // invalidation bumps the ancestor's revision past the subclass's own and
-    // leaves the subclass permanently stale. This is the shape the nightly
-    // stats sync hits: its models are plain `extends Base` classes whose
-    // columns come from `attribute()` declarations, so the load settles on the
-    // synthesize arm rather than on a reflected schema-cache entry.
-    class PullRequest extends Base {
+    class Topic extends Base {
       static {
-        this.tableName = "pull_requests";
-        this.primaryKey = "number";
-        this.attribute("number", "integer");
+        this.tableName = "topics";
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
-    (PullRequest as unknown as { adapter: unknown }).adapter = makeAdapter();
+    (Topic as unknown as { adapter: unknown }).adapter = makeAdapter();
 
     reloadSchemaFromCache.call(Base as never);
 
-    expect(() => loadSchema.call(PullRequest as never)).not.toThrow();
-    expect(Object.keys(PullRequest.columnsHash())).toEqual(["number", "title"]);
+    expect(() => loadSchema.call(Topic as never)).not.toThrow();
+    expect(Object.keys(Topic.columnsHash())).toEqual(["id", "title"]);
   });
 });

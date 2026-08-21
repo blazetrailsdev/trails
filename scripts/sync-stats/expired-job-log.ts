@@ -1,11 +1,12 @@
-// GitHub deletes workflow job logs after its retention window, so `gh api
-// .../jobs/<id>/logs` answers 404 forever for an old job. The nightly sync
-// selects unfetched jobs newest-first, so once every remaining job is past
-// retention the whole batch 404s, nothing is fetched, and the run dies on
-// JobLogFetchFailedError — which is how the 2026-08-21 catch-up run died after
-// the schema-recursion fix let it get that far.
-const EXPIRED_JOB_LOG_ERROR_RE = /HTTP 404/;
+const EXPIRED_JOB_LOG_ERROR_RE = /HTTP (404|410)/;
 
+/**
+ * True when `gh api .../actions/jobs/<id>/logs` failed because GitHub has aged
+ * the log out of its retention window — a permanent 404 or 410, not a transport
+ * blip worth retrying. Both codes appear in the same backlog: the newer jobs
+ * answer `HTTP 404` and the oldest answer `Server Error (HTTP 410)`. See
+ * {@link isTransientGhError} for the retryable set.
+ */
 export function isExpiredJobLogError(message: string): boolean {
   return EXPIRED_JOB_LOG_ERROR_RE.test(message);
 }

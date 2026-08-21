@@ -11,6 +11,15 @@ describe("isExpiredJobLogError", () => {
     ).toBe(true);
   });
 
+  it("recognizes the 410 gh returns for the oldest logs", () => {
+    expect(
+      isExpiredJobLogError(
+        "Command failed: gh api --allow-escape-sequences " +
+          "repos/blazetrailsdev/trails/actions/jobs/77412035438/logs\ngh: Server Error (HTTP 410)\n",
+      ),
+    ).toBe(true);
+  });
+
   it("does not claim a transient transport failure is expired", () => {
     expect(isExpiredJobLogError("stream error: stream ID 1; CANCEL; received from peer")).toBe(
       false,

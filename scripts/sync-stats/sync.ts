@@ -1985,10 +1985,6 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
     AND NOT EXISTS (
       SELECT 1 FROM raw_job_logs rjl WHERE rjl.job_id = wj.id
     )
-    -- A log GitHub has already aged out 404s forever. Without this arm the
-    -- newest-first batch fills up with the same dead jobs every night, the run
-    -- fetches nothing, and JobLogFetchFailedError takes down a sync that has
-    -- no live work left to do.
     AND NOT EXISTS (
       SELECT 1 FROM expired_job_logs ejl WHERE ejl.job_id = wj.id
     )
@@ -2059,9 +2055,6 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   if (expired > 0) {
     console.log(`  ${expired} job log(s) past GitHub's retention window — will not be retried`);
   }
-  // Only a batch that neither fetched nor aged out is a stalled feed: an
-  // all-expired batch is the queue draining, and each of its jobs is now
-  // recorded so it never comes back.
   if (fetched === 0 && expired === 0) {
     throw new JobLogFetchFailedError(jobsToFetch.length);
   }
