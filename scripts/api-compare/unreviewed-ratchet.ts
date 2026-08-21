@@ -376,10 +376,34 @@ export function renderSlack(slack: MarkDelta[], markDir: string): string {
     "narrow: this writes ONLY the shards below, never the exclude tree (converging a row and " +
     "retiring it by hand is exactly what lands you here, and a whole-tree reseed would bury " +
     "it):\n" +
-    "  pnpm parity:api:calls:tighten [<shard>...]   (no shard named = every stale one)\n" +
-    slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n")
+    `${tightenCommand(slack)}\n` +
+    slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n") +
+    `\n${REBASE_NOTE}`
   );
 }
+
+/**
+ * The copy-pasteable remedy for a slack shard set, naming each shard explicitly
+ * rather than the `[<shard>...]` placeholder: this text is what an author reads
+ * out of a CI log, and a placeholder there costs a round of re-deriving which
+ * shards moved.
+ */
+export function tightenCommand(slack: MarkDelta[]): string {
+  return `  pnpm parity:api:calls:tighten ${slack.map((d) => d.file).join(" ")}`;
+}
+
+/**
+ * A rebase is the second way into a slack shard, and the one that reads as an
+ * unrelated failure: a branch that deleted an exclude row and tightened has a
+ * LOWERED mark, so when `main` advances over the same shard the rebase takes
+ * main's higher copy with no conflict and nothing in its output. The deletion
+ * still stands, so the shard is stale again on a diff that never touched it —
+ * which is why both this gate and the mark unit test say so out loud.
+ */
+export const REBASE_NOTE =
+  "If your branch already ran --tighten, a rebase restored main's copy of the shard " +
+  "(git takes main's side with no conflict when your commit did not touch it) — re-run " +
+  "the command above after every rebase.";
 
 export function renderWriteSummary(
   count: number,

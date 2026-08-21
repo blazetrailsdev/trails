@@ -4,7 +4,18 @@ import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./call-mismatch-baseline.js";
-import { excessByPath, loadMarks, unreviewedCounts } from "./unreviewed-ratchet.js";
+import {
+  excessByPath,
+  loadMarks,
+  renderSlack,
+  slackByPath,
+  tightenCommand,
+  tightenMarks,
+  unreviewedCounts,
+  writeMarks,
+  REBASE_NOTE,
+  type MarkSet,
+} from "./unreviewed-ratchet.js";
 import {
   DEFAULT_REASON,
   bucketFor,
@@ -362,6 +373,7 @@ describe("renderStaleTags", () => {
 // touches. Pins that the shards stay in step with the baseline they measure.
 describe("the committed per-file unreviewed marks", () => {
   const HERE = path.dirname(fileURLToPath(import.meta.url));
+  const MARK_DIR_REL = "scripts/api-compare/call-mismatches-unreviewed";
   const load = async () => ({
     counts: unreviewedCounts(
       await loadSplitBaseline(path.join(HERE, "call-mismatches-exclude")),
@@ -376,15 +388,71 @@ describe("the committed per-file unreviewed marks", () => {
     expect(excessByPath(counts, marks)).toEqual([]);
   });
 
-  // The slack arm of the gate, run without needing a compare artifact.
+  // The slack arm of the gate, run without needing a compare artifact. The
+  // assertion message carries `renderSlack`'s remedy verbatim: this test is the
+  // `Unit Tests` half of a stale mark, and a bare "expected [...] to equal []"
+  // on a two-line diff reads as an unrelated flake (RFC 0106).
   it("are tight — no shard claims more unreviewed rows than the baseline carries", async () => {
     const { counts, marks } = await load();
-    expect([...marks].filter(([rel, max]) => max > (counts.get(rel) ?? 0))).toEqual([]);
+    const slack = slackByPath(counts, marks);
+    expect(slack, slack.length === 0 ? "" : renderSlack(slack, MARK_DIR_REL)).toEqual([]);
   });
 
   it("key every shard to a source the baseline still has entries for", async () => {
     const { counts, marks } = await load();
     expect([...marks.keys()].filter((rel) => !counts.has(rel))).toEqual([]);
+  });
+});
+
+// The rebase case (RFC 0106): a branch deletes an exclude row and tightens, so
+// its mark is LOWER than main's. `main` then advances over the same shard and
+// the rebase takes main's copy with no conflict — the row deletion still
+// stands, so the shard is stale again on a diff that never touched it. The
+// remedy stays manual (the STALE report is also the signal that a row retired),
+// so what is pinned here is that both jobs name it.
+describe("a rebase that restores a higher mark", () => {
+  const SHARD = "activerecord/associations/has-one-association.json";
+  // Post-rebase: the branch's 8 -> 7 tighten is gone, the deletion is not.
+  const counts: MarkSet = new Map([[SHARD, 7]]);
+  const marks: MarkSet = new Map([[SHARD, 8]]);
+
+  it("is reported as a stale high-water mark", () => {
+    expect(slackByPath(counts, marks)).toEqual([{ file: SHARD, count: 7, mark: 8 }]);
+  });
+
+  it("names the exact tighten command and the rebase cause in the report", () => {
+    const out = renderSlack(slackByPath(counts, marks), "scripts/api-compare/x");
+    expect(out).toContain(`pnpm parity:api:calls:tighten ${SHARD}`);
+    expect(out).toContain(REBASE_NOTE);
+  });
+
+  it("lists every stale shard in one command", () => {
+    const two = slackByPath(
+      new Map([["a.json", 0]]),
+      new Map([
+        ["a.json", 1],
+        [SHARD, 2],
+      ]),
+    );
+    expect(tightenCommand(two)).toBe(`  pnpm parity:api:calls:tighten ${SHARD} a.json`);
+  });
+
+  it("tightens back to the branch's own count, and never raises a mark", () => {
+    expect(tightenMarks(counts, marks)).toEqual(new Map([[SHARD, 7]]));
+    // The reverse direction — a count above its mark — is the excess arm's job.
+    expect(tightenMarks(new Map([[SHARD, 9]]), marks)).toEqual(marks);
+  });
+
+  it('deletes a shard that reached 0 rather than writing {"max": 0}', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "marks-"));
+    try {
+      await fs.mkdir(path.dirname(path.join(dir, SHARD)), { recursive: true });
+      await fs.writeFile(path.join(dir, SHARD), '{\n  "max": 8\n}\n');
+      await writeMarks(dir, tightenMarks(new Map([[SHARD, 0]]), marks));
+      expect(await loadMarks(dir)).toEqual(new Map());
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
