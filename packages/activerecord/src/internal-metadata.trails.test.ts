@@ -76,33 +76,36 @@ describe("InternalMetadata#selectEntry", () => {
   it("sends the key as a bind rather than inlining it", async () => {
     const internalMetadata = new InternalMetadata(Base.connectionPool());
     await internalMetadata.createTable();
-    const connection = await Base.connectionPool().checkout();
-    const selectAll = vi.spyOn(connection, "selectAll");
-    try {
-      await (
-        internalMetadata as unknown as {
-          selectEntry(c: DatabaseAdapter, key: string): Promise<unknown>;
-        }
-      ).selectEntry(connection, "environment");
-      const sm = selectAll.mock.calls[0][0] as {
-        constraints: { right: unknown }[];
-      };
-      const right = sm.constraints[0].right as Nodes.BindParam;
-      expect(right).toBeInstanceOf(Nodes.BindParam);
-      expect(right.value).toBe("environment");
+    // `withConnection` rather than a second `checkout()`: on the
+    // `ARCONN=sqlite3_mem` lane every connection owns its own private database,
+    // so a freshly checked-out one has never seen the table just created.
+    await Base.connectionPool().withConnection(async (connection) => {
+      const selectAll = vi.spyOn(connection, "selectAll");
+      try {
+        await (
+          internalMetadata as unknown as {
+            selectEntry(c: DatabaseAdapter, key: string): Promise<unknown>;
+          }
+        ).selectEntry(connection, "environment");
+        const sm = selectAll.mock.calls[0][0] as {
+          constraints: { right: unknown }[];
+        };
+        const right = sm.constraints[0].right as Nodes.BindParam;
+        expect(right).toBeInstanceOf(Nodes.BindParam);
+        expect(right.value).toBe("environment");
 
-      // A substituting adapter (prepared statements off — MySQL's default)
-      // renders the same node as a literal, so the placeholder is only
-      // observable where the binds actually travel separately.
-      if ((connection as unknown as { preparedStatements?: boolean }).preparedStatements) {
-        const [sql, binds] = toSqlAndBinds.call(connection as never, sm as never);
-        expect(sql).not.toContain("environment");
-        expect(binds).toEqual(["environment"]);
+        // A substituting adapter (prepared statements off — MySQL's default)
+        // renders the same node as a literal, so the placeholder is only
+        // observable where the binds actually travel separately.
+        if ((connection as unknown as { preparedStatements?: boolean }).preparedStatements) {
+          const [sql, binds] = toSqlAndBinds.call(connection as never, sm as never);
+          expect(sql).not.toContain("environment");
+          expect(binds).toEqual(["environment"]);
+        }
+      } finally {
+        selectAll.mockRestore();
       }
-    } finally {
-      selectAll.mockRestore();
-      Base.connectionPool().checkin(connection);
-    }
+    });
   });
 });
 
