@@ -725,8 +725,13 @@ export class Model {
     asResetCallbacks(this.prototype, "validate");
   }
 
+  /**
+   * Mirrors: ActiveModel::Validations::ClassMethods#attribute_method?
+   * (validations.rb:282-284) — `method_defined?(attribute)`. Ruby's
+   * `method_defined?` walks the ancestor chain, which `in` does for a prototype.
+   */
   static isAttributeMethod(attribute: string): boolean {
-    return Object.hasOwn(this.attributeTypes(), attribute);
+    return attribute in this.prototype;
   }
 
   /**
@@ -1910,11 +1915,13 @@ export class Model {
   /**
    * Check if this model has the given attribute defined.
    *
-   * Mirrors: ActiveModel::AttributeMethods#has_attribute?
+   * Mirrors: ActiveRecord::AttributeMethods#has_attribute? — `attr_name =
+   * self.class.attribute_aliases[attr_name] || attr_name` then
+   * `@attributes.key?(attr_name)` (activerecord/attribute_methods.rb:316-320).
    */
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
-    return this._attributes.has(ctor.resolveAttributeName(name));
+    return this._attributes.isKey(ctor.resolveAttributeName(name));
   }
 
   /**
