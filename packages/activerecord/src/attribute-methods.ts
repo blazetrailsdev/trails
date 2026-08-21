@@ -169,7 +169,6 @@ export class GeneratedAttributeMethods extends Module {
 
 interface AttributeMethodsHost {
   name: string;
-  _attributeDefinitions: Map<string, any>;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
   _generatedAttributeMethods?: GeneratedAttributeMethods;
@@ -566,7 +565,8 @@ export function isAttributeMethod(
  * Mirrors ActiveRecord::AttributeMethods#_has_attribute? (instance method):
  * a bare `@attributes.key?(attr_name)` with no alias resolution. Wired onto
  * the prototype as an instance method, so `this` is a record and reads its
- * attribute set — not `_attributeDefinitions`, which lives on the class.
+ * attribute set — not the class's `attribute_types`, which the ClassMethods
+ * predicate of the same name reads.
  *
  * @internal
  */
