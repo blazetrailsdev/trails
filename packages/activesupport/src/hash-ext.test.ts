@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { toXml, fromXml, fromTrustedXml } from "./hash-utils.js";
+import type { ToXmlOptions } from "./xml-mini.js";
+import { DisallowedType } from "./core-ext/hash/conversions.js";
+import { Date as RubyDate } from "@blazetrails/date";
 import { extractBang, sliceBang } from "./core-ext/hash/slice.js";
 import {
   deepMerge,
@@ -594,5 +598,118 @@ describe("HashExtTest", () => {
     const h = Object.freeze({ a: 1, b: 2 });
     const r = except(h as any, "a");
     expect(r).toEqual({ b: 2 });
+  });
+});
+
+describe("HashToXmlTest", () => {
+  const xmlOptions: ToXmlOptions = { root: "person", skipInstruct: true, indent: 0 };
+
+  it("one level", () => {
+    const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level dasherize true", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, dasherize: true },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street-name>Paulina</street-name>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level with types", () => {
+    const xml = toXml(
+      {
+        name: "David",
+        street: "Paulina",
+        age: 26,
+        age_in_millis: 820497600000,
+        moved_on: RubyDate.civil(2005, 11, 15),
+      },
+      xmlOptions,
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age type="integer">26</age>');
+    expect(xml).toContain('<age-in-millis type="integer">820497600000</age-in-millis>');
+    expect(xml).toContain('<moved-on type="date">2005-11-15</moved-on>');
+  });
+
+  it("one level with nils", () => {
+    const xml = toXml({ name: "David", street: "Paulina", age: null }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age nil="true"/>');
+  });
+
+  it("one level with yielding", () => {
+    const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
+      x.tag("creator", "Rails");
+    });
+
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain("<creator>Rails</creator>");
+  });
+
+  it("two levels with array", () => {
+    const xml = toXml(
+      { name: "David", addresses: [{ street: "Paulina" }, { street: "Evergreen" }] },
+      xmlOptions,
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain('<addresses type="array"><address>');
+    expect(xml).toContain("<address><street>Paulina</street></address>");
+    expect(xml).toContain("<address><street>Evergreen</street></address>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("from xml raises on disallowed type attributes", async () => {
+    await expect(
+      fromXml('<product><name type="foo">value</name></product>', ["foo"]),
+    ).rejects.toThrow(DisallowedType);
+  });
+
+  it("from xml array one", async () => {
+    expect(await fromXml('<numbers type="Array"><value>1</value></numbers>')).toEqual({
+      numbers: { type: "Array", value: "1" },
+    });
+  });
+
+  it("from trusted xml allows symbol and yaml types", async () => {
+    expect(await fromTrustedXml('<product><name type="symbol">value</name></product>')).toEqual({
+      product: { name: ":value" },
+    });
+  });
+
+  it("escaping to xml", () => {
+    const hash = { bare_string: "First & Last Name", pre_escaped_string: "First &amp; Last Name" };
+
+    const expectedXml =
+      "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+    expect(toXml(hash, xmlOptions)).toBe(expectedXml);
+  });
+
+  it("unescaping from xml", async () => {
+    const xmlString =
+      "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+    const expectedHash = {
+      bare_string: "First & Last Name",
+      pre_escaped_string: "First &amp; Last Name",
+    };
+    expect(((await fromXml(xmlString)) as Record<string, unknown>)["person"]).toEqual(expectedHash);
+  });
+
+  it("to xml dups options", () => {
+    const options = { skipInstruct: true };
+    toXml({}, options);
+    expect(Object.keys(options)).toEqual(["skipInstruct"]);
   });
 });

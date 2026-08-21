@@ -4,7 +4,9 @@
 
 import { ArgumentError, assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
-import { camelize } from "./inflector.js";
+import { camelize, pluralize, singularize, underscore } from "./inflector.js";
+import * as XmlMini from "./xml-mini.js";
+import { isPlainObject } from "./hash-utils.js";
 import { inspect, toS } from "./core-ext/object/inspect.js";
 import { isEmpty } from "./ruby-empty.js";
 
@@ -230,3 +232,72 @@ export function toFs(self: unknown[], format = "default"): string {
 
 // `alias_method :to_formatted_s, :to_fs` — conversions.rb:106.
 export { toFs as toFormattedS };
+
+/**
+ * Ruby's `value.class.name` for the `all?(first.class)` root inference
+ * (conversions.rb:190-192). JS has one `Number` where Ruby has `Integer` and
+ * `Float`, so the split follows `XmlMini`'s own `TYPE_NAMES` mapping and
+ * `[1, 2]` still roots at `integers` the way Rails does.
+ */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "NilClass";
+  switch (typeof value) {
+    case "boolean":
+      return value ? "TrueClass" : "FalseClass";
+    case "bigint":
+      return "Integer";
+    case "number":
+      return Number.isInteger(value) ? "Integer" : "Float";
+    case "string":
+      return "String";
+    default:
+      return (value as object).constructor.name;
+  }
+}
+
+/**
+ * Returns a string that represents the array in XML by invoking `to_xml` on
+ * each element. Mirrors: `Array#to_xml` (conversions.rb:183-212). Ruby `||=`
+ * replaces only nil/false and `0` is truthy there, so `indent: 0` survives the
+ * defaulting — hence `??=`.
+ */
+export function toXml(
+  self: unknown[],
+  options: XmlMini.ToXmlOptions = {},
+  block?: (builder: XmlMini.XmlBuilder) => void,
+): string {
+  options = { ...options };
+  options.indent ??= 2;
+  options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
+  options.root ??= (() => {
+    const first = self[0];
+    if (!isPlainObject(first) && self.every((e) => rubyClassName(e) === rubyClassName(first))) {
+      const underscored = underscore(rubyClassName(first));
+      return pluralize(underscored).replaceAll("/", "_");
+    } else {
+      return "objects";
+    }
+  })();
+
+  const builder = options.builder;
+  const skipInstruct = options.skipInstruct;
+  delete options.skipInstruct;
+  if (!skipInstruct) builder.instruct();
+
+  const root = XmlMini.renameKey(String(options.root), options);
+  const children = options.children ?? singularize(root);
+  delete options.children;
+  const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
+
+  if (isEmpty(self)) {
+    builder.tag(root, null, attributes);
+  } else {
+    builder.openTag(root, attributes);
+    for (const value of self) {
+      XmlMini.toTag(children, value, options as XmlMini.ToTagOptions);
+    }
+    if (block) block(builder);
+    builder.closeTag(root);
+  }
+  return builder.target();
+}

@@ -78,6 +78,7 @@ import {
   AttributeMethodPattern,
   type AttributeMethodMatch,
   defineMethodAttribute,
+  _resurrectAttributeMethods,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1612,6 +1613,8 @@ export class Model {
     // a single point that subclasses (e.g. ActiveRecord) override.
     this.initInternals();
 
+    _resurrectAttributeMethods(ctor as unknown as Parameters<typeof _resurrectAttributeMethods>[0]);
+
     // Attributes#initialize — @attributes = self.class._default_attributes.deep_dup
     this._attributes = ctor._defaultAttributes().deepDup();
 
@@ -1751,8 +1754,9 @@ export class Model {
    * `@attributes.key?(attr_name)` (activerecord/attribute_methods.rb:316-320).
    */
   hasAttribute(name: string): boolean {
-    const ctor = this.constructor as typeof Model;
-    return this._attributes.isKey(ctor.resolveAttributeName(name));
+    let attrName = String(name);
+    attrName = (this.constructor as typeof Model).attributeAliases[attrName] ?? attrName;
+    return this._attributes.isKey(attrName);
   }
 
   /**

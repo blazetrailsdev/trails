@@ -353,6 +353,10 @@ export interface XmlBuilder {
   openTag(name: string, attributes?: Record<string, string>): void;
   /** Emit a closing `</name>`. */
   closeTag(name: string): void;
+  /** Emit the XML declaration. Mirrors: `Builder::XmlMarkup#instruct!`. */
+  instruct(): void;
+  /** The accumulated XML. Mirrors: `Builder::XmlMarkup#target!`. */
+  target(): string;
 }
 
 /**
@@ -483,6 +487,20 @@ function isHash(value: unknown): value is Record<string, unknown> {
  * array/hash values. This is the single per-value funnel that both
  * `Array#to_xml` and `ActiveModel::Serializers::Xml` route every tag through.
  */
+/** `ToTagOptions` plus the keys `to_xml` sets itself (conversions.rb:77-85). */
+export interface ToXmlOptions extends Omit<ToTagOptions, "builder"> {
+  indent?: number;
+  root?: string;
+  builder?: XmlBuilder;
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby's `:skip_instruct` option key is a Hash
+   * key, not a method, so it has no Ruby member for `parity:api` to match. An
+   * options interface is how TS spells an options hash; there is no Ruby name
+   * for it to converge onto.
+   */
+  skipInstruct?: boolean;
+}
+
 export function toTag(key: unknown, value: unknown, options: ToTagOptions): void {
   const { builder } = options;
   const explicitType = options.type;
@@ -770,6 +788,10 @@ export class XmlStringBuilder implements XmlBuilder {
     this.buffer += `</${name}>`;
   }
 
+  instruct(): void {
+    this.buffer = `<?xml version="1.0" encoding="UTF-8"?>` + this.buffer;
+  }
+
   /** The accumulated XML. Mirrors: `Builder::XmlMarkup#target!`. */
   target(): string {
     return this.buffer;
@@ -787,28 +809,41 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
   private buffer = "";
   private depth = 0;
 
-  constructor(private readonly baseIndent = "") {}
+  constructor(
+    private readonly baseIndent = "",
+    private readonly indentWidth = 2,
+  ) {}
 
   private indent(): string {
-    return this.baseIndent + "  ".repeat(this.depth);
+    return this.baseIndent + " ".repeat(this.indentWidth).repeat(this.depth);
+  }
+
+  /** `Builder::XmlMarkup.new(indent: 0)` emits no layout at all. */
+  private newline(): string {
+    return this.indentWidth === 0 ? "" : "\n";
   }
 
   tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
     const attrs = attributeString(attributes);
     this.buffer +=
       content == null
-        ? `${this.indent()}<${name}${attrs}/>\n`
-        : `${this.indent()}<${name}${attrs}>${htmlEscape(content).toString()}</${name}>\n`;
+        ? `${this.indent()}<${name}${attrs}/>${this.newline()}`
+        : `${this.indent()}<${name}${attrs}>${htmlEscape(content).toString()}</${name}>${this.newline()}`;
   }
 
   openTag(name: string, attributes: Record<string, string> = {}): void {
-    this.buffer += `${this.indent()}<${name}${attributeString(attributes)}>\n`;
+    this.buffer += `${this.indent()}<${name}${attributeString(attributes)}>${this.newline()}`;
     this.depth += 1;
   }
 
   closeTag(name: string): void {
     this.depth -= 1;
-    this.buffer += `${this.indent()}</${name}>\n`;
+    this.buffer += `${this.indent()}</${name}>${this.newline()}`;
+  }
+
+  instruct(): void {
+    this.buffer =
+      `${this.baseIndent}<?xml version="1.0" encoding="UTF-8"?>${this.newline()}` + this.buffer;
   }
 
   /** The accumulated XML. Mirrors: `Builder::XmlMarkup#target!`. */

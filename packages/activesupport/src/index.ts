@@ -267,7 +267,12 @@ export {
   compactBlank as compactBlankObj,
   compactBlankBang,
   valuesAt,
+  toXml,
+  fromXml,
+  fromTrustedXml,
 } from "./hash-utils.js";
+
+export { XMLConverter, DisallowedType, DISALLOWED_TYPES } from "./core-ext/hash/conversions.js";
 
 export {
   asJson,
@@ -283,6 +288,9 @@ export {
   split,
   extractBang,
   toSentence,
+  // `toXml` is Hash#to_xml above; one ESM namespace cannot hold both, the same
+  // collision `compactBlank as compactBlankObj` resolves.
+  toXml as toXmlArray,
 } from "./array-utils.js";
 
 export {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { toXml as toXmlArray } from "./array-utils.js";
 import {
   deepMerge,
   deepDup,
@@ -686,5 +687,50 @@ describe("ToParamTest", () => {
 
   it("array", () => {
     expect([1, 2, 3].join("/")).toBe("1/2/3");
+  });
+});
+
+describe("ToXmlTest", () => {
+  it("to xml with hash elements", () => {
+    const xml = toXmlArray(
+      [
+        { name: "David", age: 26, age_in_millis: 820497600000 },
+        { name: "Jason", age: 31 },
+      ],
+      { skipInstruct: true, indent: 0 },
+    );
+
+    expect(xml.slice(0, 30)).toBe('<objects type="array"><object>');
+    expect(xml).toContain('<age type="integer">26</age>');
+    expect(xml).toContain('<age-in-millis type="integer">820497600000</age-in-millis>');
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age type="integer">31</age>');
+    expect(xml).toContain("<name>Jason</name>");
+  });
+
+  it("to xml with non hash elements", () => {
+    const xml = toXmlArray(["1", "2", "3"], { skipInstruct: true, indent: 0 });
+
+    expect(xml.slice(0, 29)).toBe('<strings type="array"><string');
+    expect(xml).toContain("<string>2</string>");
+  });
+
+  it("to xml with options", () => {
+    const xml = toXmlArray(
+      [
+        { name: "David", street_address: "Paulina" },
+        { name: "Jason", street_address: "Evergreen" },
+      ],
+      { skipInstruct: true, skipTypes: true, indent: 0 },
+    );
+
+    expect(xml.slice(0, 17)).toBe("<objects><object>");
+    expect(xml).toContain("<street-address>Paulina</street-address>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("to xml with empty", () => {
+    const xml = toXmlArray([]);
+    expect(xml).toMatch(/type="array"\/>/);
   });
 });

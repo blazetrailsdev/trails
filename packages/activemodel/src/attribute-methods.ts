@@ -138,6 +138,10 @@ interface ReadWriteHost {
 export interface AttributeMethodHost {
   attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
+  /** @internal Stamps read by {@link _resurrectAttributeMethods}. */
+  _patternsGeneratedFor?: Map<string, AttributeMethodPattern[]>;
+  /** @internal Stamp read by {@link _resurrectAttributeMethods}. */
+  _patternsAtLastResurrection?: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
   _generatedAttributeMethods?: Module;
@@ -274,11 +278,6 @@ export function _readAttribute(
  * (attribute_methods.rb:106-109). TS forbids a keyword after a rest element, so
  * the trailing `parameters:` hash rides in the splat and is peeled off — the
  * same shape `touch(*names, time:)` uses in `activerecord/timestamp.ts`.
- *
- * Rails stops at `undefine_attribute_methods` and regenerates a late-declared
- * pattern lazily via `method_missing` (attribute_methods.rb:504-518). JS has no
- * `method_missing`, so the `defineAttributeMethods` call here — and in
- * `attributeMethodSuffix` / `attributeMethodAffix` — materializes it eagerly.
  */
 export function attributeMethodPrefix(
   this: ClassMethods,
@@ -290,7 +289,6 @@ export function attributeMethodPrefix(
     ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...this.attributeNames());
 }
 
 /** Mirrors: ClassMethods#attribute_method_suffix (attribute_methods.rb:140-143). */
@@ -304,7 +302,6 @@ export function attributeMethodSuffix(
     ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...this.attributeNames());
 }
 
 /** Mirrors: ClassMethods#attribute_method_affix (attribute_methods.rb:175-178). */
@@ -317,7 +314,6 @@ export function attributeMethodAffix(
     ...affixes.map((affix) => new AttributeMethodPattern(affix)),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...this.attributeNames());
 }
 
 export function aliasAttribute(this: ClassMethods, newName: string, oldName: string): void {
@@ -412,6 +408,11 @@ export function defineAttributeMethod(
     }
     this.attributeMethodPatternsCache().clear();
   });
+  // Copy-on-first-write per class, like `aliasesByAttributeName`.
+  if (!Object.prototype.hasOwnProperty.call(this, "_patternsGeneratedFor")) {
+    this._patternsGeneratedFor = new Map(this._patternsGeneratedFor ?? []);
+  }
+  this._patternsGeneratedFor!.set(as, this.attributeMethodPatterns);
 }
 
 // ---------------------------------------------------------------------------
@@ -816,4 +817,29 @@ export function defineMethodAttribute(
       });
     });
   });
+}
+
+/**
+ * The trails stand-in for the resurrection Rails gets from `method_missing`
+ * (attribute_methods.rb:507-514): the three macros end at
+ * `undefine_attribute_methods` (attribute_methods.rb:120-123, 140-143,
+ * 175-178) and Rails re-matches the newly added pattern at call time, so a
+ * pattern declared after the attributes still answers. trails generates them as
+ * accessor properties instead — see CLAUDE.md, "Generated attribute readers are
+ * properties" — and a property cannot be created by a `method_missing`-shaped
+ * hook, so it must exist before the first read; the earliest such moment is
+ * instantiation, where {@link Model}'s constructor calls this. Regenerating
+ * only names whose stamp predates the current
+ * `attribute_method_patterns` is what confines it to the macro case: a bare
+ * `undefine_attribute_methods` leaves the patterns alone and stays undone, and
+ * a class that has generated nothing keeps its own first-generation seat.
+ */
+export function _resurrectAttributeMethods(klass: ClassMethods): void {
+  const patterns = klass.attributeMethodPatterns;
+  if (klass._patternsAtLastResurrection === patterns) return;
+  klass._patternsAtLastResurrection = patterns;
+  const stale = [...(klass._patternsGeneratedFor ?? [])]
+    .filter(([, generatedWith]) => generatedWith !== patterns)
+    .map(([attrName]) => attrName);
+  if (stale.length > 0) klass.defineAttributeMethods(...stale);
 }
