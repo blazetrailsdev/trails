@@ -1734,13 +1734,17 @@ export class Base extends Model {
   }
 
   /**
-   * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-   * parameters: false` and `attribute_method_suffix "_came_from_user?",
-   * parameters: false` (attribute_methods/before_type_cast.rb:32-33), plus the
-   * `_change_to_be_saved` half of attribute_methods/dirty.rb:59 — the rest of
-   * that block is declared on Model, beside the generics it proxies to. The
-   * `class_attribute` writer gives Active Record its own array rather than
+   * The `included do` blocks of AttributeMethods::BeforeTypeCast
+   * (before_type_cast.rb:32-33) and AttributeMethods::Dirty (dirty.rb:53-59).
+   * The `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
+   *
+   * dirty.rb:54's `attribute_method_prefix("saved_change_to_",
+   * parameters: false)` has no entry: Ruby tells the array-returning
+   * `saved_change_to_name` from the predicate `saved_change_to_name?` by the
+   * `?`, which the camel spelling drops, so both would generate
+   * `savedChangeToName`. Story:
+   * 0096-naming-identifier-burndown/saved-change-to-attribute-values-generated-half.
    */
   static {
     this.attributeMethodPatterns = [
@@ -1748,7 +1752,11 @@ export class Base extends Model {
       new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
       new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
       new AttributeMethodPattern({ suffix: "CameFromUser", parameters: false }),
+      new AttributeMethodPattern({ prefix: "savedChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ suffix: "BeforeLastSave", parameters: false }),
+      new AttributeMethodPattern({ prefix: "willSaveChangeTo", parameters: "**options" }),
       new AttributeMethodPattern({ suffix: "ChangeToBeSaved", parameters: false }),
+      new AttributeMethodPattern({ suffix: "InDatabase", parameters: false }),
     ];
   }
 

@@ -580,8 +580,8 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    // `Object.assign` would go through [[Set]] and hit the generated
-    // getter-only `titleWas`; Ruby's module include defines over it.
+    // `Object.assign` goes through [[Set]] and hits the generated getter-only
+    // `titleWas`; Ruby's module include defines over it.
     Object.defineProperty(
       ClassWithDeprecatedAliasAttributeBehaviorFromModule.prototype,
       "titleWas",
