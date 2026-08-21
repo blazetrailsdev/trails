@@ -20,13 +20,11 @@ export class Window extends Node {
   }
 
   order(...expr: (Node | string)[]): this {
-    // FIXME: We SHOULD NOT be converting these to SqlLiteral automatically
     this.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
   partition(...expr: (Node | string)[]): this {
-    // FIXME: We SHOULD NOT be converting these to SqlLiteral automatically
     this.partitions.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }

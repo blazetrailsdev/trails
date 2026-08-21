@@ -70,7 +70,6 @@ export class SqlLiteral extends Node {
   }
 
   toYAML(): string {
-    // Minimal YAML-ish representation for test parity (no external deps).
     const escaped = this.value.replace(/\n/g, "\\n");
     return `---\n!sql_literal\nvalue: ${JSON.stringify(escaped)}`;
   }

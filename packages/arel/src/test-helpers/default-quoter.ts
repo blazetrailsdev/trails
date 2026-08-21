@@ -132,8 +132,6 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
   if (typeof value === "number") return String(value);
   if (typeof value === "bigint") return String(value);
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
-  // Normalise all typed-array views to Uint8Array before handing off so
-  // quotedBinary can rely on a consistent shape.
   if (ArrayBuffer.isView(value)) {
     const bytes =
       value instanceof Uint8Array
@@ -154,16 +152,15 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
     const hasCustomToString =
       proto === Object.prototype && value.toString !== Object.prototype.toString;
     if ((proto === Object.prototype || proto === null) && !hasCustomToString) {
+      let json: string | undefined;
       try {
-        const json = JSON.stringify(value);
-        if (json !== undefined) return `'${json.replace(/'/g, "''")}'`;
+        json = JSON.stringify(value);
       } catch {
-        // circular references, BigInt, etc. — fall through
+        json = undefined;
       }
+      if (json !== undefined) return `'${json.replace(/'/g, "''")}'`;
     }
   }
-  // Only escape single quotes here; backslash escaping is dialect-specific
-  // and handled by quoteString (MySQL/PG adapters override quote() as needed).
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 

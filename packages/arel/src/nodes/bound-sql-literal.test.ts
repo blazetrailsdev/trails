@@ -78,8 +78,6 @@ describe("BoundSqlLiteralTest", () => {
     });
 
     it("JSON.stringify escapes embedded double-quotes in error message", () => {
-      // SQL has 1 placeholder; 2 binds triggers a count mismatch.
-      // Verifies JSON.stringify correctly escapes the embedded double-quote in the SQL.
       expect(() => new Nodes.BoundSqlLiteral('name = "O\'Brien" AND ?', [1, 2])).toThrow(
         'wrong number of bind variables (2 for 1) in: "name = \\"O\'Brien\\" AND ?"',
       );

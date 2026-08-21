@@ -7,10 +7,6 @@ import { resetI18n } from "./test-helpers/i18n.js";
 // here rather than in `validations.test.ts` so the Rails-mirroring file stays a
 // one-to-one port of the Rails case.
 describe("ValidationsTest (trails)", () => {
-  // =========================================================================
-  // Phase 1100/1150 — Validations
-  // =========================================================================
-  // -- Presence --
   describe("presence", () => {
     class Article extends Model {
       static {
@@ -41,7 +37,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Absence --
   describe("absence", () => {
     class Blank extends Model {
       static {
@@ -65,7 +60,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Length --
   describe("length", () => {
     class WithLength extends Model {
       static {
@@ -122,11 +116,10 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Numericality --
   describe("numericality", () => {
     class Numeric extends Model {
       static {
-        this.attribute("value", "string"); // string to test cast behavior
+        this.attribute("value", "string");
         this.validates("value", { numericality: true });
       }
     }
@@ -241,7 +234,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Inclusion / Exclusion --
   describe("inclusion and exclusion", () => {
     class Colorful extends Model {
       static {
@@ -270,7 +262,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Format --
   describe("format", () => {
     class EmailUser extends Model {
       static {
@@ -292,7 +283,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Confirmation --
   describe("confirmation", () => {
     class Signup extends Model {
       static {
@@ -315,7 +305,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Uniqueness (simulated) --
   describe("uniqueness", () => {
     class UniqueUser extends Model {
       static existingNames = new Set<string>();
@@ -333,8 +322,6 @@ describe("ValidationsTest (trails)", () => {
         if (!valid) return false;
         const name = this.readAttribute("name") as string;
         if (UniqueUser.existingNames.has(name)) {
-          // `errors.messages.taken` ships in activerecord's en.yml, not
-          // activemodel's — an Active Model-only case has to supply the literal.
           this.errors.add("name", "has already been taken");
           return false;
         }
@@ -359,7 +346,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
-  // -- Type-based validations --
   describe("type-based validations", () => {
     class TypedModel extends Model {
       static {
@@ -501,9 +487,7 @@ describe("ValidationsTest (trails)", () => {
           this.validates("name", { presence: true, on: "create" });
         }
       }
-      // No context → default context → no validators active → passes.
       expect(await new Scoped({}).validateBang()).toBe(true);
-      // :create context → presence validator active → raises.
       await expect(new Scoped({}).validateBang("create")).rejects.toThrow(/Validation failed/);
     });
 
@@ -519,7 +503,6 @@ describe("ValidationsTest (trails)", () => {
           this.validates("title", { presence: true, on: ["publish"] });
         }
       }
-      // Single-symbol context → only the `on: :create` validator fires.
       const a = new Scoped({});
       expect(await a.isValid("create")).toBe(false);
       expect(a.errors.attributeNames).toEqual(["name"]);
@@ -529,7 +512,6 @@ describe("ValidationsTest (trails)", () => {
       expect(await b.isValid(["create", "publish"])).toBe(false);
       expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
 
-      // Array context matching only one registered value fires that one.
       const c = new Scoped({});
       expect(await c.isValid(["publish"])).toBe(false);
       expect(c.errors.attributeNames).toEqual(["title"]);
@@ -579,8 +561,6 @@ describe("ValidationsTest (trails)", () => {
       const m = new Scoped({});
       await m.isValid("previous");
       await m.isValid(null);
-      // First call saw "previous"; second call saw null (explicit clear),
-      // not "previous" carried over.
       expect(captured).toEqual(["previous", null]);
     });
 
@@ -608,8 +588,6 @@ describe("ValidationsTest (trails)", () => {
     }
 
     it("ValidationError message comes from I18n :model_invalid", async () => {
-      // Default en → "Validation failed: %{errors}"
-      // (activemodel locale/en.yml:9).
       await expect(new Topic({}).validateBang()).rejects.toThrow(
         /^Validation failed: Title can't be blank$/,
       );
@@ -658,7 +636,6 @@ describe("ValidationsTest (trails)", () => {
     it("contextForValidation is callable on a frozen model", () => {
       const t = new Topic({ title: "ok" });
       t.freeze();
-      // freeze() pre-materializes the cache; access must not throw.
       expect(() => t.contextForValidation()).not.toThrow();
     });
   });
@@ -713,14 +690,8 @@ describe("ValidationsTest (trails)", () => {
       }
       class Child extends Base {}
       expect(Child.validatorsOn("name")).toHaveLength(1);
-      // Parent adds another validator AFTER Child is defined, and Child has
-      // not yet registered anything of its own. Copy-on-first-write
-      // semantics: Child still sees Base's map, so the new validator
-      // propagates.
       Base.validates("name", { length: { minimum: 2 } });
       expect(Child.validatorsOn("name")).toHaveLength(2);
-      // As soon as Child writes, it detaches. Further Base writes stay on
-      // Base.
       Child.validates("name", { length: { maximum: 10 } });
       Base.validates("name", { format: { with: /x/ } });
       expect(Child.validatorsOn("name")).toHaveLength(3);
@@ -736,9 +707,7 @@ describe("ValidationsTest (trails)", () => {
         }
       }
       class Child extends Base {}
-      // Subclass sees parent's validators…
       expect(Child.validatorsOn("name")).toHaveLength(1);
-      // …and adding one on the subclass must not affect the parent.
       Child.validates("name", { length: { minimum: 2 } });
       expect(Child.validatorsOn("name")).toHaveLength(2);
       expect(Base.validatorsOn("name")).toHaveLength(1);
@@ -763,9 +732,7 @@ describe("ValidationsTest (trails)", () => {
       // instance or in `options`, so `validatesWith` must route the explicit
       // `attributes:` option through to the bucket lookup.
       class PojoValidator {
-        validate(_record: unknown): void {
-          /* no-op */
-        }
+        validate(_record: unknown): void {}
       }
       class Person extends Model {
         static {
@@ -784,9 +751,7 @@ describe("ValidationsTest (trails)", () => {
       // _registerValidator must check both.
       const { Validator: ValidatorBase } = await import("./validator.js");
       class StaticValidator extends ValidatorBase {
-        override validate(): void {
-          /* no-op */
-        }
+        override validate(): void {}
       }
       class Person extends Model {
         static {
@@ -810,12 +775,10 @@ describe("ValidationsTest (trails)", () => {
       Person.validatorsOn("never_registered");
       expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
 
-      // Mutating the returned array must NOT affect internal state.
       const a = Person.validatorsOn("name");
       a.length = 0;
       expect(Person.validatorsOn("name")).toHaveLength(1);
 
-      // Consecutive calls return independent arrays.
       expect(Person.validatorsOn("name")).not.toBe(Person.validatorsOn("name"));
     });
   });
@@ -954,7 +917,6 @@ describe("ValidationsTest (trails)", () => {
     });
   });
   describe("Validations", () => {
-    // -- Presence --
     describe("presence", () => {
       class Article extends Model {
         static {
@@ -985,7 +947,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Absence --
     describe("absence", () => {
       class Blank extends Model {
         static {
@@ -1009,7 +970,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Length --
     describe("length", () => {
       class WithLength extends Model {
         static {
@@ -1066,11 +1026,10 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Numericality --
     describe("numericality", () => {
       class Numeric extends Model {
         static {
-          this.attribute("value", "string"); // string to test cast behavior
+          this.attribute("value", "string");
           this.validates("value", { numericality: true });
         }
       }
@@ -1154,7 +1113,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Inclusion / Exclusion --
     describe("inclusion", () => {
       class Status extends Model {
         static {
@@ -1193,7 +1151,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Format --
     describe("format", () => {
       class Email extends Model {
         static {
@@ -1227,7 +1184,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Acceptance --
     describe("acceptance", () => {
       // Rails' equivalent uses a virtual attribute; boolean here so `"1"` /
       // `true` round-trip through cast as `true` and match the default accept
@@ -1264,7 +1220,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Confirmation --
     describe("confirmation", () => {
       class WithConfirm extends Model {
         static {
@@ -1296,7 +1251,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Conditional validation --
     describe("conditional", () => {
       it("if validation using block false", async () => {
         class Cond extends Model {
@@ -1331,7 +1285,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- Custom validate --
     describe("custom validate", () => {
       it("function validator", async () => {
         class Custom extends Model {
@@ -1352,7 +1305,6 @@ describe("ValidationsTest (trails)", () => {
       });
     });
 
-    // -- isInvalid --
     it("invalid should be the opposite of valid", async () => {
       class Required extends Model {
         static {
@@ -1364,7 +1316,6 @@ describe("ValidationsTest (trails)", () => {
       expect(await new Required({ name: "dean" }).isInvalid()).toBe(false);
     });
 
-    // -- fullMessages --
     it("fullMessages prefixes attribute name", async () => {
       class FM extends Model {
         static {
@@ -1390,7 +1341,6 @@ describe("ValidationsTest (trails)", () => {
       expect(b.errors.fullMessages).toContain("is broken");
     });
 
-    // -- errors.clear between validations --
     it("errors are cleared between isValid calls", async () => {
       class Clearable extends Model {
         static {
@@ -1482,7 +1432,6 @@ describe("ValidationsTest (trails)", () => {
         }
       }
       const validators = User.validators();
-      // presence on name, presence on email, length on email
       expect(validators.length).toBe(3);
     });
 
@@ -1496,9 +1445,9 @@ describe("ValidationsTest (trails)", () => {
         }
       }
       const nameValidators = User.validatorsOn("name");
-      expect(nameValidators.length).toBe(2); // presence + length
+      expect(nameValidators.length).toBe(2);
       const emailValidators = User.validatorsOn("email");
-      expect(emailValidators.length).toBe(1); // presence only
+      expect(emailValidators.length).toBe(1);
     });
 
     it("returns empty array for attribute with no validators", () => {
@@ -1524,9 +1473,7 @@ describe("ValidationsTest (trails)", () => {
         }
       }
       const u = new User({ name: "Alice" });
-      // Without context, terms_accepted validation is skipped
       expect(await u.isValid()).toBe(true);
-      // With custom context, terms_accepted presence validation runs
       expect(await u.isValid("registration")).toBe(false);
     });
 
@@ -1841,7 +1788,7 @@ describe("ValidationsTest (trails)", () => {
           this.validatesPresenceOf("title", { if: () => true, on: "update" });
         }
       }
-      expect(await new Topic({ title: "" }).isValid()).toBe(true); // no context
+      expect(await new Topic({ title: "" }).isValid()).toBe(true);
       expect(await new Topic({ title: "" }).isInvalid("update")).toBe(true);
     });
 

@@ -32,8 +32,6 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
     // returning `other`. Class dispatch, like Rails.
     if (other instanceof ModelAttribute) return new BindParam(other);
-    // SelectManager / TreeManager — expose a Node `ast`; use that so the
-    // visitor always receives a real Node.
     const maybeAst = (other as { ast?: unknown }).ast;
     if (maybeAst instanceof Node) return maybeAst;
   }

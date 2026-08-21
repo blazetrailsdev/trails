@@ -10,7 +10,6 @@ describe("AttributesDirtyTest", () => {
     }
     const p = new Person({ age: 25 });
     p.writeAttribute("age", "25");
-    // Writing the same value (after cast) should not count as a change
     expect(p.attributeChanged("age")).toBe(false);
   });
 

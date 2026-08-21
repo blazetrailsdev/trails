@@ -85,7 +85,6 @@ describe("YAMLEncoder", () => {
     const decoded = localCoder.decode(json);
     expect(decoded.fetchValue("x")).toBe("hello");
     expect(warnSpy).toHaveBeenCalledOnce();
-    // Second decode: no extra warn
     localCoder.decode(json);
     expect(warnSpy).toHaveBeenCalledOnce();
   });
@@ -127,7 +126,6 @@ describe("YAMLEncoder", () => {
     const set = makeSet(new Map([["flag", attr]]));
     const envelope = JSON.parse(coder.encode(set));
     expect(envelope.types.flag).toBe("immutable_string");
-    // Decode recovers the correct type
     const decoded = coder.decode(coder.encode(set));
     expect(decoded.fetchValue("flag")).toBe("t");
   });

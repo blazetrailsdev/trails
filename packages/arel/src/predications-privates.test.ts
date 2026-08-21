@@ -15,7 +15,6 @@ describe("Predications.groupingAny / groupingAll", () => {
   it("groupingAny dispatches by method-id and folds with OR (Grouping)", () => {
     const out = Predications.groupingAny.call(users.attr("id"), "eq", [1, 2, 3]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
-    // The grouped expression is an Or chain over three Equality nodes.
     const inner = out.expr as Nodes.Or;
     expect(inner).toBeInstanceOf(Nodes.Or);
   });
@@ -62,17 +61,12 @@ describe("Predications.groupingAny / groupingAll", () => {
     expect(m.escape).toEqual(new Nodes.Quoted("!"));
     expect(m.caseSensitive).toBe(true);
 
-    // does_not_match_any passes no case_sensitive, so the predicate default
-    // (false) must win rather than escape leaking into that slot.
     const d = attr.doesNotMatchAny(["a%"], "!").expr as Nodes.DoesNotMatch;
     expect(d.escape).toEqual(new Nodes.Quoted("!"));
     expect(d.caseSensitive).toBe(false);
   });
 
   it("groupingAny throws a clear TypeError when the method-id isn't callable", () => {
-    // Regression for the dispatch-safety concern: a typo in the
-    // method-id should fail loudly, not blow up with "Cannot read
-    // property 'call' of undefined".
     const attr = users.attr("id");
     expect(() => Predications.groupingAny.call(attr, "noSuchMethod", [1])).toThrowError(
       /noSuchMethod.*Attribute/,
@@ -81,8 +75,6 @@ describe("Predications.groupingAny / groupingAll", () => {
 });
 
 describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
-  // A PredicationHost carrying the mixin's own isInfinity / isUnboundable, as a
-  // class including Predications would — isOpenEnded dispatches through `this`.
   const host = {
     quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
     quotedArray: (vs: unknown[]): Nodes.Node[] => vs as Nodes.Node[],
@@ -202,9 +194,6 @@ describe("Attribute private helpers (mirror Predications)", () => {
   });
 
   it("isUnboundable duck-types the protocol rather than always returning false", () => {
-    // Regression for the stub these delegated to: it hardcoded `false`, so
-    // anything routing `between` through Attribute#isOpenEnded silently lost
-    // unboundable collapse (#4433). They now share the real implementation.
     const attr = users.attr("id") as AttributePrivates;
     expect(attr.isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
     expect(attr.isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
@@ -223,7 +212,6 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
 
   it("between honors a host override of isInfinity", () => {
     const attr = new OverridingAttribute(users, "id");
-    // Both bounds read as open-ended, and begin reports +Infinity -> in([]).
     expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.In);
   });
 

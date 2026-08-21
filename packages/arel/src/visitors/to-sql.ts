@@ -309,8 +309,6 @@ export class ToSql extends Visitor {
     return this.visitArelNodesCasted(o as unknown as Nodes.Casted, collector);
   }
 
-  // -- Boolean literals --
-
   protected visitArelNodesTrue(_o: Nodes.True, collector: SQLString): SQLString {
     collector.append("TRUE");
     return collector;
@@ -354,8 +352,6 @@ export class ToSql extends Visitor {
     }
     return collector;
   }
-
-  // -- Statements --
 
   protected visitArelNodesSelectStatement(
     o: Nodes.SelectStatement,
@@ -421,34 +417,26 @@ export class ToSql extends Visitor {
 
   static {
     const d = ToSql.dispatchCache();
-    // Runtime guard: TS `keyof T` only exposes public members, and the
-    // visit methods are mostly protected, so we can't constrain `m` at
-    // compile time. Asserting here catches typos/renames the next time
-    // the static block runs (i.e. as soon as the file is imported).
     const reg = (ctor: NodeCtor, m: string) => {
       if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
         throw new Error(`ToSql dispatch: method '${m}' is not defined on the prototype`);
       }
       d.set(ctor, m);
     };
-    // Statements
     reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
     reg(Nodes.SelectOptions, "visitArelNodesSelectOptions");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
     reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
     reg(Nodes.DeleteStatement, "visitArelNodesDeleteStatement");
-    // Set operations
     reg(Nodes.UnionAll, "visitArelNodesUnionAll");
     reg(Nodes.Union, "visitArelNodesUnion");
     reg(Nodes.Intersect, "visitArelNodesIntersect");
     reg(Nodes.Except, "visitArelNodesExcept");
-    // CTE
     reg(Nodes.WithRecursive, "visitArelNodesWithRecursive");
     reg(Nodes.With, "visitArelNodesWith");
     reg(Nodes.TableAlias, "visitArelNodesTableAlias");
     reg(Nodes.Cte, "visitArelNodesCte");
-    // Joins
     reg(Nodes.JoinSource, "visitArelNodesJoinSource");
     reg(Nodes.InnerJoin, "visitArelNodesInnerJoin");
     reg(Nodes.OuterJoin, "visitArelNodesOuterJoin");
@@ -457,7 +445,6 @@ export class ToSql extends Visitor {
     reg(Nodes.CrossJoin, "visitCrossJoin");
     reg(Nodes.StringJoin, "visitArelNodesStringJoin");
     reg(Nodes.On, "visitArelNodesOn");
-    // Predicates
     reg(Nodes.Equality, "visitArelNodesEquality");
     reg(Nodes.NotEqual, "visitArelNodesNotEqual");
     reg(Nodes.GreaterThan, "visitArelNodesGreaterThan");
@@ -475,7 +462,6 @@ export class ToSql extends Visitor {
     reg(Nodes.IsNotDistinctFrom, "visitArelNodesIsNotDistinctFrom");
     reg(Nodes.Assignment, "visitArelNodesAssignment");
     reg(Nodes.As, "visitArelNodesAs");
-    // Unary
     reg(Nodes.Ascending, "visitArelNodesAscending");
     reg(Nodes.Descending, "visitArelNodesDescending");
     reg(Nodes.Offset, "visitArelNodesOffset");
@@ -487,12 +473,10 @@ export class ToSql extends Visitor {
     reg(Nodes.NullsFirst, "visitArelNodesNullsFirst");
     reg(Nodes.NullsLast, "visitArelNodesNullsLast");
     reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
-    // Boolean
     reg(Nodes.And, "visitArelNodesAnd");
     reg(Nodes.Or, "visitArelNodesOr");
     reg(Nodes.Not, "visitArelNodesNot");
     reg(Nodes.Grouping, "visitArelNodesGrouping");
-    // Window
     reg(Nodes.Over, "visitArelNodesOver");
     reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
     reg(Nodes.Window, "visitArelNodesWindow");
@@ -501,7 +485,6 @@ export class ToSql extends Visitor {
     reg(Nodes.Preceding, "visitArelNodesPreceding");
     reg(Nodes.Following, "visitArelNodesFollowing");
     reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
-    // Filter / Case / Extract / Infix
     reg(Nodes.Filter, "visitArelNodesFilter");
     reg(Nodes.Case, "visitArelNodesCase");
     reg(Nodes.When, "visitArelNodesWhen");
@@ -517,7 +500,6 @@ export class ToSql extends Visitor {
     // raising UnsupportedVisitError.
     reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
-    // Functions
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
     reg(Nodes.Exists, "visitArelNodesExists");
     reg(Nodes.Count, "visitArelNodesCount");
@@ -525,7 +507,6 @@ export class ToSql extends Visitor {
     reg(Nodes.Max, "visitArelNodesMax");
     reg(Nodes.Min, "visitArelNodesMin");
     reg(Nodes.Avg, "visitArelNodesAvg");
-    // Advanced grouping
     reg(Nodes.Cube, "visitArelNodesCube");
     reg(Nodes.RollUp, "visitArelNodesRollUp");
     reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
@@ -534,10 +515,8 @@ export class ToSql extends Visitor {
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
     reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
-    // Boolean literals
     reg(Nodes.True, "visitArelNodesTrue");
     reg(Nodes.False, "visitArelNodesFalse");
-    // Leaf nodes
     reg(Nodes.Distinct, "visitArelNodesDistinct");
     reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
     reg(Nodes.Quoted, "visitArelNodesQuoted");
@@ -596,7 +575,6 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
-    // Generic visitor: just emit the inner expression.
     if (o.expr instanceof Node) {
       this.visit(o.expr, collector);
     } else if (o.expr !== null) {
@@ -604,8 +582,6 @@ export class ToSql extends Visitor {
     }
     return collector;
   }
-
-  // -- Leaf nodes --
 
   private visitArelNodesDistinct(_o: Nodes.Distinct, collector: SQLString): SQLString {
     collector.append("DISTINCT");
@@ -619,8 +595,6 @@ export class ToSql extends Visitor {
     );
   }
 
-  // -- CTE --
-
   private visitArelNodesWith(o: Nodes.With, collector: SQLString): SQLString {
     collector.append("WITH ");
     return this.collectCtes(o.children, collector);
@@ -630,8 +604,6 @@ export class ToSql extends Visitor {
     collector.append("WITH RECURSIVE ");
     return this.collectCtes(o.children, collector);
   }
-
-  // -- Set operations --
 
   protected visitArelNodesUnion(o: Nodes.Union, collector: SQLString): SQLString {
     return this.infixValueWithParen(o, collector, " UNION ");
@@ -660,8 +632,6 @@ export class ToSql extends Visitor {
     return this.visitArelNodesWindow(o, collector);
   }
 
-  // -- Window --
-
   private visitArelNodesWindow(o: Nodes.Window, collector: SQLString): SQLString {
     collector.append("(");
 
@@ -679,8 +649,6 @@ export class ToSql extends Visitor {
     collector.append(")");
     return collector;
   }
-
-  // -- Filter --
 
   private visitArelNodesFilter(o: Nodes.Filter, collector: SQLString): SQLString {
     this.visit(o.left, collector);
@@ -812,8 +780,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // -- Unary --
-
   private visitArelNodesAscending(o: Nodes.Ascending, collector: SQLString): SQLString {
     if (o.expr instanceof Node) this.visit(o.expr, collector);
     collector.append(" ASC");
@@ -825,8 +791,6 @@ export class ToSql extends Visitor {
     collector.append(" DESC");
     return collector;
   }
-
-  // -- NullsFirst / NullsLast --
 
   protected visitArelNodesNullsFirst(o: Nodes.NullsFirst, collector: SQLString): SQLString {
     if (o.expr instanceof Node) this.visit(o.expr, collector);
@@ -848,8 +812,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // -- Functions --
-
   private visitArelNodesNamedFunction(o: Nodes.NamedFunction, collector: SQLString): SQLString {
     collector.retryable = false;
     collector.append(o.name);
@@ -863,8 +825,6 @@ export class ToSql extends Visitor {
     }
     return collector;
   }
-
-  // -- Extract --
 
   private visitArelNodesExtract(o: Nodes.Extract, collector: SQLString): SQLString {
     collector.append(`EXTRACT(${String(o.field).toUpperCase()} FROM `);
@@ -961,8 +921,6 @@ export class ToSql extends Visitor {
     return this.visitBinaryOp(o, "<", collector);
   }
 
-  // -- Matches with ESCAPE --
-
   protected visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
     collector = this.visit(o.left, collector);
     collector.append(" LIKE ");
@@ -986,8 +944,6 @@ export class ToSql extends Visitor {
       return collector;
     }
   }
-
-  // -- Joins --
 
   private visitArelNodesJoinSource(o: Nodes.JoinSource, collector: SQLString): SQLString {
     if (o.left) this.visit(o.left, collector);
@@ -1097,7 +1053,6 @@ export class ToSql extends Visitor {
       }
     }
     this.visit(attr, collector);
-    // Duck-type check for SelectManager subquery - visit wraps it in parens
     if (
       values &&
       typeof values === "object" &&
@@ -1152,8 +1107,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // -- Boolean --
-
   private visitArelNodesAnd(o: Nodes.And, collector: SQLString): SQLString {
     return this.injectJoin(o.children, collector, " AND ");
   }
@@ -1163,8 +1116,6 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesAssignment(o: Nodes.Assignment, collector: SQLString): SQLString {
-    // Column-name unqualification is the responsibility of `UnqualifiedColumn`,
-    // which `UpdateManager#set` wraps each LHS in.
     this.visit(o.left, collector);
     collector.append(" = ");
     // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
@@ -1178,8 +1129,6 @@ export class ToSql extends Visitor {
     }
     return collector;
   }
-
-  // -- Predicates --
 
   private visitArelNodesEquality(o: Nodes.Equality, collector: SQLString): SQLString {
     const right = o.right;
@@ -1249,8 +1198,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // -- Case --
-
   private visitArelNodesCase(o: Nodes.Case, collector: SQLString): SQLString {
     collector.append("CASE");
     if (o.case) {
@@ -1298,8 +1245,6 @@ export class ToSql extends Visitor {
     collector.append(this.quoteColumnName(attr.name));
     return collector;
   }
-
-  // -- Cte --
 
   protected visitArelNodesCte(o: Nodes.Cte, collector: SQLString): SQLString {
     collector.append(`${this.quoteTableName(o.name)} AS `);
@@ -1377,8 +1322,6 @@ export class ToSql extends Visitor {
     collector.append(o.value);
     return collector;
   }
-
-  // -- BoundSqlLiteral --
 
   private visitArelNodesBoundSqlLiteral(o: Nodes.BoundSqlLiteral, collector: SQLString): SQLString {
     collector.retryable = false;
@@ -1531,16 +1474,12 @@ export class ToSql extends Visitor {
     return this.unsupported(o, collector);
   }
 
-  // -- InfixOperation --
-
   private visitArelNodesInfixOperation(o: Nodes.InfixOperation, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(` ${o.operator} `);
     this.visit(o.right, collector);
     return collector;
   }
-
-  // -- UnaryOperation --
 
   private visitArelNodesUnaryOperation(o: Nodes.UnaryOperation, collector: SQLString): SQLString {
     // Mirrors Rails: `collector << " #{o.operator} "` (visitors/to_sql.rb).
@@ -1904,10 +1843,10 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  // -- BindParam --
-
-  // Overridable hook for date bind insertion so PostgreSQLWithBinds can
-  // emit $N placeholders instead of ?.
+  /**
+   * Overridable hook for date bind insertion so PostgreSQLWithBinds can
+   * emit $N placeholders instead of ?.
+   */
   protected addDateBind(value: unknown, collector: SQLString): void {
     collector.addBind(value, this.bindBlock());
   }
@@ -1955,16 +1894,12 @@ export class ToSql extends Visitor {
     }
   }
 
-  // -- Concat --
-
   protected visitArelNodesConcat(o: Nodes.Concat, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(" || ");
     this.visit(o.right, collector);
     return collector;
   }
-
-  // -- Advanced grouping --
 
   protected visitArelNodesCube(o: Nodes.Cube, collector: SQLString): SQLString {
     collector.append("CUBE(");
@@ -2012,8 +1947,6 @@ export class ToSql extends Visitor {
     collector.append(")");
     return collector;
   }
-
-  // -- Helpers --
 
   /**
    * Mirrors `to_sql.rb#unboundable?` (to_sql.rb:905-907), returning the sign

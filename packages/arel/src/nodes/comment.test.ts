@@ -23,9 +23,7 @@ describe("CommentTest", () => {
       const mgr = users.project(star);
       mgr.comment("hello */ DROP TABLE users");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
-      // The */ is stripped so the comment stays enclosed
       expect(sql).toContain("/* hello DROP TABLE users */");
-      // There should be exactly one block comment pair
       expect(sql.match(/\/\*/g)!.length).toBe(1);
       expect(sql.match(/\*\//g)!.length).toBe(1);
     });
@@ -35,7 +33,6 @@ describe("CommentTest", () => {
       const mgr = users.project(star);
       mgr.comment("before /* nested */ after");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
-      // Both /* and */ stripped from the value
       expect(sql).toContain("/* before nested after */");
     });
 

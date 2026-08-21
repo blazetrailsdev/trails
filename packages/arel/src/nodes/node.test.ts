@@ -180,9 +180,7 @@ describe("Table.engine", () => {
   it("Node#toSql() compiles through the engine connection's visitor", () => {
     const users = new Table("users");
     const node = users.get("name").isDistinctFrom(null);
-    // Default engine (generic visitor, supplied by the suite setup).
     expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
-    // An engine whose connection carries the SQLite visitor.
     expect(node.toSql(sqliteEngine)).toBe(`"users"."name" IS NOT NULL`);
   });
 
@@ -195,7 +193,6 @@ describe("Table.engine", () => {
     expect(mgr.toSql()).toContain("END = 0");
     expect(mgr.toSql()).not.toContain("IS NOT DISTINCT FROM");
     const sqlite = mgr.toSql(sqliteEngine);
-    // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
     expect(sqlite).toContain('"users"."active" IS 1');
     expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
   });

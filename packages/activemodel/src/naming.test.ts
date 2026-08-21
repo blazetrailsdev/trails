@@ -328,9 +328,6 @@ describe("ModelName singularRouteKey", () => {
     const name = new ModelName("Sheep");
     expect(name.plural).toBe("sheep");
     expect(name.routeKey).toBe("sheep_index");
-    // singularRouteKey is `singularize(routeKey)`; whatever our activesupport
-    // Inflector returns for "sheep_index" is the expected value — assert it's
-    // derived from routeKey, not independently computed.
     expect(name.singularRouteKey.length).toBeGreaterThan(0);
   });
   it("Naming.singularRouteKey delegates to ModelName.singularRouteKey", () => {
@@ -389,7 +386,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(mn.compare("Blog")).toBe(1);
     expect(mn.compare("BlogPosts")).toBe(-1);
     expect(mn.compare(new ModelName("BlogPost"))).toBe(0);
-    // `String#<=>` answers nil for an operand that is not string-like.
     expect(mn.compare(42)).toBe(undefined);
     expect(mn.compare(null)).toBe(undefined);
   });
@@ -440,8 +436,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
   });
 
   it("equals / compare distinguish namespaced models with the same bare name", () => {
-    // Two ModelName instances share the same `name: "Post"` but differ
-    // in namespace — must not compare equal, must sort deterministically.
     const blogPost = new ModelName("Blog::Post");
     const adminPost = new ModelName("Admin::Post");
     const blogPost2 = new ModelName("Blog::Post");
@@ -450,8 +444,6 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(blogPost.equals(adminPost)).toBe(false);
     expect(blogPost.equals(blogPost2)).toBe(true);
     expect(blogPost.equals(barePost)).toBe(false);
-    // `compare` is `String#<=>` on `@name` ("Admin::Post" vs "Blog::Post"),
-    // so Admin < Blog.
     expect(blogPost.compare(adminPost)).toBe(1);
     expect(adminPost.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(blogPost2)).toBe(0);
@@ -472,10 +464,8 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     // namespace even when its bare name comes later alphabetically.
     const adminOther = new ModelName("Admin::Other");
     const blogPost = new ModelName("Blog::Post");
-    // "Admin::Other" < "Blog::Post"
     expect(adminOther.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(adminOther)).toBe(1);
-    // Comparison is over the raw qualified path, so "Admin::Other" < "Post".
     const barePost = new ModelName("Post");
     expect(adminOther.compare(barePost)).toBe(-1);
     expect(barePost.compare(adminOther)).toBe(1);

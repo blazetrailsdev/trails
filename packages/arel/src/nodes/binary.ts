@@ -311,7 +311,9 @@ export class Intersect extends Binary {
   }
 }
 
-// Registry for breaking circular deps (Equality→Binary, In→Binary)
+/**
+ * Registry for breaking circular deps (Equality→Binary, In→Binary)
+ */
 const _invertRegistry: {
   Equality?: new (left: NodeOrValue, right: NodeOrValue) => Binary;
   In?: new (left: NodeOrValue, right: NodeOrValue) => Binary;

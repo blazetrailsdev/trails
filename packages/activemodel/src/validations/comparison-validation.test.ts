@@ -386,8 +386,6 @@ describe("ComparisonValidationTest", () => {
     );
   });
 
-  // -- private --
-
   async function assertInvalidValues(values: unknown[], error?: string): Promise<void> {
     await withEachTopicApprovedValue(values, async (topic, value) => {
       assertPredicate(await topic.isInvalid(), (invalid) => invalid, `${value} failed comparison`);

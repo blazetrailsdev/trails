@@ -93,7 +93,6 @@ describe("DirtyMutations", () => {
     (p as any).age = 40;
     p.clearAttributeChange("name");
     expect(p.mutationsFromDatabase).toEqual({ age: [30, 40] });
-    // The value stays — only the tracking was cleared.
     expect((p as any).name).toBe("Bob");
   });
 

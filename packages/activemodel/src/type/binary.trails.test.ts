@@ -17,8 +17,6 @@ describe("BinaryTypeTrails", () => {
   });
 
   it("serialize wraps bytes without copying or decoding them", () => {
-    // `super` is Value#serialize (identity), so the raw value reaches Data and
-    // the bytes are preserved exactly — 0x80 is not valid UTF-8 on its own.
     const type = new Types.BinaryType();
     const bytes = new Uint8Array([0x80, 0xde, 0xad]);
     const result = type.serialize(bytes);

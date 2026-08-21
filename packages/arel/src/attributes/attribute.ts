@@ -28,8 +28,10 @@ import { Predications } from "../predications.js";
  * Mirrors: Arel::Attributes::Attribute
  */
 export interface RelationLike {
-  // A `SqlLiteral` name (e.g. a `SelectManager#as` / set-op `from()` derived
-  // table) renders bare; `quoteTableName` returns its value unchanged.
+  /**
+   * A `SqlLiteral` name (e.g. a `SelectManager#as` / set-op `from()` derived
+   * table) renders bare; `quoteTableName` returns its value unchanged.
+   */
   name: string | SqlLiteral;
   // `TableAlias#table_alias` aliases `:name`, which may be a `SqlLiteral`
   // (Arel::Nodes::TableAlias `alias :table_alias :name`, table_alias.rb); a
@@ -39,8 +41,6 @@ export interface RelationLike {
   typeCastForDatabase: (attrName: string, value: unknown) => unknown;
   typeForAttribute: (name: string) => unknown;
   isAbleToTypeCast: () => boolean;
-  // Attribute#lower delegates here (`relation.lower self`), so every relation
-  // that carries attributes must surface FactoryMethods#lower.
   lower: (column: unknown) => NamedFunction;
 }
 
@@ -97,8 +97,6 @@ export class Attribute extends Node {
     return buildQuoted(other, this);
   }
 
-  // -- Ordering --
-
   asc(): Ascending {
     return new Ascending(this);
   }
@@ -154,8 +152,6 @@ export class Attribute extends Node {
     return new BitwiseNot(this);
   }
 
-  // -- Aliasing --
-
   as(other: string): As {
     return new As(this, new SqlLiteral(other, { retryable: true }));
   }
@@ -187,8 +183,6 @@ export class Attribute extends Node {
   average(): Avg {
     return new Avg([this]);
   }
-
-  // -- Extract --
 
   extract(field: string): Extract {
     // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).

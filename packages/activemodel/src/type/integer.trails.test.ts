@@ -91,10 +91,7 @@ describe("IntegerType", () => {
     expect(type.isSerializable(Infinity)).toBe(true);
     expect(type.isSerializable(-Infinity)).toBe(true);
     expect(type.isSerializable(NaN)).toBe(true);
-    // A non-numeric string is `to_i`-able to 0 here ("abc".to_i == 0), which is
-    // in range.
     expect(type.isSerializable("abc")).toBe(true);
-    // Genuinely out-of-range values still answer false.
     expect(type.isSerializable(2 ** 40)).toBe(false);
   });
 

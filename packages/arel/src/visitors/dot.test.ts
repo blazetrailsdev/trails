@@ -19,7 +19,7 @@ import { DotNode } from "./dot.js";
  */
 function visitStandalone(value: unknown): string {
   const v = new Visitors.Dot();
-  v.compile(new Nodes.SqlLiteral("")); // initialize state
+  v.compile(new Nodes.SqlLiteral(""));
   (v as unknown as { visit(o: unknown): void }).visit(value);
   return (v as unknown as { toDot(): string }).toDot();
 }
@@ -100,7 +100,6 @@ describe("TestDot", () => {
     const node = new Nodes.And([users.get("id"), users.get("name")]);
     const out = dot.compile(node);
     expect(out).toContain("And");
-    // visit__children walks each child under an index-labeled edge.
     expect(out).toContain('[label="0"]');
     expect(out).toContain('[label="1"]');
   });
@@ -115,7 +114,6 @@ describe("TestDot", () => {
   it("Arel Nodes SqlLiteral", () => {
     const node = new Nodes.SqlLiteral("RAW SQL");
     const out = dot.compile(node);
-    // visit_String stashes the literal as a side-field, not a child node.
     expect(out).toContain("RAW SQL");
   });
 
@@ -155,12 +153,10 @@ describe("TestDot", () => {
       expect(out).toMatch(/^digraph "Arel" \{\n/);
       expect(out).toContain("node [width=0.375,height=0.25,shape=record];");
       expect(out).toMatch(/\n\}$/);
-      // A leaf node: id [label="<f0>Name"];
       expect(out).toMatch(/^\d+ \[label="<f0>Distinct"\];$/m);
     });
 
     it("emits one edge per visit_edge declaration with the field name as label", () => {
-      // Binary -> left, right (two visit_edge calls).
       const node = new Nodes.Equality(users.get("id"), new Nodes.SqlLiteral("1"));
       const out = dot.compile(node);
       expect(out).toMatch(/-> \d+ \[label="left"\];/);
@@ -180,7 +176,6 @@ describe("TestDot", () => {
 
     it("collapses to a leaf for visit_NoEdges nodes (CurrentRow, Distinct)", () => {
       const out = dot.compile(new Nodes.CurrentRow());
-      // Single node, no edges.
       const edges = (out.match(/->/g) ?? []).length;
       expect(edges).toBe(0);
     });
@@ -188,8 +183,6 @@ describe("TestDot", () => {
     it("escapes embedded double-quotes in side-field labels (quote helper)", () => {
       const node = new Nodes.SqlLiteral('say "hi"');
       const out = dot.compile(node);
-      // SqlLiteral is dispatched as visit_String — the value becomes a
-      // side-field on the parent node with quote() escaping the `"`.
       expect(out).toContain('say \\"hi\\"');
     });
 
@@ -202,10 +195,10 @@ describe("TestDot", () => {
         visit(o: unknown): void;
         toDot(): string;
       };
-      v.compile(new Nodes.SqlLiteral("seed")); // initialize state
+      v.compile(new Nodes.SqlLiteral("seed"));
       (v as unknown as Internals).visit(null);
       const out = (v as unknown as Internals).toDot();
-      expect(out).toMatch(/<f0>NilClass\|<f1>"/); // no characters between |<f1> and the closing "
+      expect(out).toMatch(/<f0>NilClass\|<f1>"/);
       expect(out).not.toContain("null");
       expect(out).not.toContain("undefined");
     });
@@ -228,7 +221,7 @@ describe("TestDot", () => {
         visitSymbol(o: unknown): void;
       };
       const iv = v as unknown as WithBigDecimal;
-      v.compile(new Nodes.SqlLiteral("seed")); // initialize internal state
+      v.compile(new Nodes.SqlLiteral("seed"));
       const node = new DotNode("Integer", 0);
       (v as unknown as { nodes: DotNode[] }).nodes.push(node);
       iv.withNode(node, () => {
@@ -260,7 +253,6 @@ describe("TestDot", () => {
         iv.visitSet(new Set([new Nodes.SqlLiteral("a"), new Nodes.SqlLiteral("b")]));
       });
       const out = iv.toDot();
-      // visit_Array walks each member under an index-labeled edge.
       expect(out).toMatch(/-> \d+ \[label="0"\];/);
       expect(out).toMatch(/-> \d+ \[label="1"\];/);
     });
@@ -378,8 +370,6 @@ describe("TestDot", () => {
       (v as unknown as Internals).visit(42);
       (v as unknown as Internals).visit(42);
       const out = (v as unknown as Internals).toDot();
-      // Booleans and numbers each fire a single labeled node — repeats
-      // shouldn't allocate new ones.
       const trueMatches = out.match(/<f0>TrueClass\|<f1>true"\];/g) ?? [];
       expect(trueMatches.length).toBe(1);
       const fortyTwoMatches = out.match(/<f0>Integer\|<f1>42"\];/g) ?? [];
@@ -399,8 +389,6 @@ describe("TestDot", () => {
       (v as unknown as Internals).visit(a);
       (v as unknown as Internals).visit(b);
       const out = (v as unknown as Internals).toDot();
-      // Two Table nodes (one per Table instance) AND two String "users"
-      // nodes (one per visit_String, since strings shouldn't dedupe).
       const tableMatches = out.match(/<f0>Table"\];/g) ?? [];
       expect(tableMatches.length).toBe(2);
       const stringUsersMatches = out.match(/<f0>String\|<f1>users"\];/g) ?? [];
@@ -419,7 +407,6 @@ describe("TestDot", () => {
       expect(out).toContain("Exists");
       expect(out).toMatch(/-> \d+ \[label="expressions"\];/);
       expect(out).toMatch(/-> \d+ \[label="alias"\];/);
-      // Generic Function visitor would have emitted a `distinct` edge.
       expect(out).not.toMatch(/-> \d+ \[label="distinct"\];/);
     });
 
@@ -433,14 +420,10 @@ describe("TestDot", () => {
     });
 
     it("non-Node bind values (ActiveModel::Attribute shape) don't crash", () => {
-      // Regression: Dot.visit used to call super.visit on any non-primitive
-      // non-array non-plain-object value, throwing UnsupportedVisitError
-      // on a class instance the dispatch table didn't know about.
       const attribute = ModelAttribute.fromDatabase("x", 42, new ValueType());
       const bind = new Nodes.BindParam(attribute);
       const out = dot.compile(bind);
       expect(out).toContain("BindParam");
-      // visitActiveModelAttribute walks valueBeforeTypeCast.
       expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
       expect(out).toContain("42");
     });
@@ -503,9 +486,6 @@ describe("TestDot", () => {
     });
 
     it("a record derived from a null-prototype record routes to visit_Hash", () => {
-      // The prototype here has no `constructor` at all, which must not be
-      // read as "some class other than Object" — both halves are records,
-      // so the derived value is a Hash like any other.
       const base: Record<string, unknown> = Object.create(null);
       base.inherited = "nope";
       const derived: Record<string, unknown> = Object.create(base);

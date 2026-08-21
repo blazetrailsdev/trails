@@ -9,7 +9,6 @@ describe("SqliteTest", () => {
     it("should handle nil", () => {
       const node = users.get("name").isDistinctFrom(null);
       const sql = new Visitors.SQLite(testConnection).compile(node);
-      // SQLite has no IS DISTINCT FROM; it uses IS NOT for null-aware !=.
       expect(sql).toBe('"users"."name" IS NOT NULL');
     });
   });
@@ -41,7 +40,6 @@ describe("SqliteTest", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.SQLite(testConnection).compile(node);
-      // SQLite uses IS for null-aware equality (no IS NOT DISTINCT FROM).
       expect(sql).toBe('"users"."id" IS "posts"."user_id"');
     });
 

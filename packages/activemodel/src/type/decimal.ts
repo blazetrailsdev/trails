@@ -68,9 +68,6 @@ export class DecimalType extends NumericValueType {
       typeof value === "bigint" ||
       value instanceof Rational
     ) {
-      // A Rational is the case that makes the significant-digit count matter
-      // here rather than in the Float arm: it carries an exact fraction, so
-      // `Rational(1, 3)` is `0.333333333333333333E0` at the default 18.
       castedValue = new BigDecimal(value, this.precision ?? BIGDECIMAL_PRECISION);
     } else if (typeof value === "string") {
       castedValue = toD(value);
@@ -106,8 +103,6 @@ export class DecimalType extends NumericValueType {
     if (this.precision !== undefined) {
       return new BigDecimal(this.applyScale(value), this.floatPrecision());
     }
-    // `Float#to_d` reads the float's SHORTEST round-trip decimal string —
-    // what `String(value)` yields — not its binary expansion.
     return new BigDecimal(String(value));
   }
 
@@ -188,8 +183,6 @@ function toD(value: string): BigDecimal | string | null {
   try {
     return new BigDecimal(match ? match[0] : "0");
   } catch {
-    // Adversarial exponents (e.g. "1e10000000") exceed BigDecimal's expansion
-    // cap; leave the raw prefix untouched rather than answering a wrong value.
     return match ? match[0] : "0";
   }
 }

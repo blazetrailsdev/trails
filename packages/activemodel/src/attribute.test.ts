@@ -271,13 +271,11 @@ describe("AttributeTest", () => {
     const p = new Person({ name: "Alice" });
     const attrs = { ...p.attributes };
     attrs.name = "Bob";
-    // Original should be unchanged
     expect(p.readAttribute("name")).toBe("Alice");
   });
 
   it("with_value_from_user returns a new attribute with the value from the user", () => {
     const type = Types.typeRegistry.lookup("integer");
-    // Cast from user input
     const val = type.cast("42");
     expect(val).toBe(42);
   });
@@ -316,7 +314,6 @@ describe("AttributeTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    // The attribute exists but we can check hasAttribute
     expect(p.hasAttribute("name")).toBe(true);
     expect(p.hasAttribute("nonexistent")).toBe(false);
   });
@@ -331,7 +328,6 @@ describe("AttributeTest", () => {
     const p = new Person({ name: "Alice", age: 25 });
     p.writeAttribute("name", "Bob");
     expect(p.readAttribute("name")).toBe("Bob");
-    // age should still be the same
     expect(p.readAttribute("age")).toBe(25);
   });
 
@@ -493,8 +489,7 @@ describe("AttributeTest", () => {
     it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
       const stringType = typeRegistry.lookup("string");
       const attr = Attribute.fromDatabase("name", "hello", stringType);
-      void attr.value; // materialize so hasBeenRead() is true
-      // Simulate mutation by overriding the cast value while raw stays "hello"
+      void attr.value;
       attr.overrideCastValue("world");
       expect(attr.changedInPlace()).toBe(true);
     });
@@ -502,14 +497,13 @@ describe("AttributeTest", () => {
     it("returns false before value is read (hasBeenRead guard)", () => {
       const stringType = typeRegistry.lookup("string");
       const attr = Attribute.fromDatabase("name", "hello", stringType);
-      // Don't access attr.value — hasBeenRead() is false
       expect(attr.changedInPlace()).toBe(false);
     });
 
     it("returns false for immutable type even after value is read", () => {
       const intType = typeRegistry.lookup("integer");
       const attr = Attribute.fromDatabase("count", 5, intType);
-      void attr.value; // materialize
+      void attr.value;
       expect(attr.changedInPlace()).toBe(false);
     });
   });
@@ -530,7 +524,6 @@ describe("AttributeTest", () => {
     });
 
     it("recomputes when in-place object mutation is detected via isChangedInPlace", () => {
-      // Custom mutable type: deserializes JSON strings, detects in-place mutations
       const Types = typeRegistry;
       const baseType = Types.lookup("value");
       const mutableType = Object.create(baseType);
@@ -542,10 +535,8 @@ describe("AttributeTest", () => {
         JSON.stringify(newVal);
 
       const attr = Attribute.fromDatabase("data", '{"x":1}', mutableType);
-      void attr.valueForDatabase; // prime cache — _hasValueForDatabase=true
-      // Mutate the memoized value object in place (no setter, _hasValueForDatabase stays true)
+      void attr.valueForDatabase;
       (attr.value as Record<string, number>).x = 99;
-      // isChangedInPlace('{"x":1}', {x:99}) → true → recompute
       expect(attr.valueForDatabase).toBe('{"x":99}');
     });
   });

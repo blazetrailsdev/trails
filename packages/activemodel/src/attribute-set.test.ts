@@ -292,9 +292,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 25 });
-    // After construction, attributes may already have been read; snapshot current state:
     const accessed = p._attributes.accessed();
-    // At minimum, reading one more attribute increases the set
     p.readAttribute("name");
     expect(p._attributes.accessed().length).toBeGreaterThanOrEqual(accessed.length);
     expect(p.hasAttribute("name")).toBe(true);

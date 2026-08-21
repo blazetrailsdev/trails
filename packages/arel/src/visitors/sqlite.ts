@@ -10,7 +10,6 @@ import { ToSql } from "./to-sql.js";
  */
 export class SQLite extends ToSql {
   protected override visitArelNodesLock(_node: Nodes.Lock, collector: SQLString): SQLString {
-    // SQLite does not support locking — silently ignore.
     return collector;
   }
 

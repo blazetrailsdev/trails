@@ -22,11 +22,13 @@ import { resolveValue } from "./resolve-value.js";
  *     ...
  */
 export class FormatValidator extends EachValidator {
-  // Declarations only — actual functions attached to the prototype below.
-  // Prototype attachment (not class fields) so the helpers are present
-  // during EachValidator's constructor-time checkValidityBang() call. JS class
-  // fields don't initialize until AFTER super() returns. (Same bootstrapping
-  // lesson as PR #994.)
+  /**
+   * Declarations only — actual functions attached to the prototype below.
+   * Prototype attachment (not class fields) so the helpers are present
+   * during EachValidator's constructor-time checkValidityBang() call. JS class
+   * fields don't initialize until AFTER super() returns. (Same bootstrapping
+   * lesson as PR #994.)
+   */
   declare resolveValue: typeof resolveValue;
   /** @internal Rails-private helper. */
   declare recordError: typeof recordError;

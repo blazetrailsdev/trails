@@ -296,10 +296,6 @@ export function resetDefaultAttributesBang(this: AttributeHostInternals): void {
   // cascade that clears _default_attributes, mirroring Rails resetting
   // @attribute_types alongside @default_attributes.
   this._cachedAttributeTypes = null;
-  // _attributesBuilder is an AR-specific derived cache. Shadow with undefined
-  // so prototype-chain lookup never returns a stale superclass builder after
-  // this class's attributes change. STI subclasses remove the shadow after
-  // writing the fresh builder; AM-only classes carry it harmlessly.
   this._attributesBuilder = undefined;
 }
 

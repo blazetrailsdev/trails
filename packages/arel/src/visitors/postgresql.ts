@@ -147,9 +147,11 @@ export class PostgreSQL extends ToSql {
  * PostgreSQL visitor — uses numbered bind parameters ($1, $2, ...).
  */
 export class PostgreSQLWithBinds extends PostgreSQL {
-  // SQLString tracks bindIndex in the collector (starts at 1, increments per
-  // addBind call). Overriding bindBlock() to return the $N renderer is
-  // sufficient — the index state never touches the visitor instance.
+  /**
+   * SQLString tracks bindIndex in the collector (starts at 1, increments per
+   * addBind call). Overriding bindBlock() to return the $N renderer is
+   * sufficient — the index state never touches the visitor instance.
+   */
   protected override bindBlock(): (index: number) => string {
     return (i: number) => `$${i}`;
   }

@@ -20,7 +20,6 @@ class DefaultValueModel extends Model {
 
   declare _attr?: string;
 
-  // `attr_accessor :hello`, added by DefaultValue's `included` hook.
   get hello(): string | undefined {
     return this._hello;
   }

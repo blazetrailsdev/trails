@@ -66,8 +66,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     });
 
     it("compiles an all-non-serializable IN as IN (NULL)", () => {
-      // A multi-value array whose values all filter out of castedValues (e.g.
-      // all out-of-range ids) must render `IN (NULL)`, never the invalid `IN ()`.
       const filteringRelation = {
         name: "users",
         typeForAttribute: () => ({ isSerializable: () => false, serialize: (v: unknown) => v }),

@@ -2,11 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 
 describe("AccessTest", () => {
-  // =========================================================================
-  // Ported from missing-activemodel-stubs.test.ts
-  // =========================================================================
-
-  // ---- Access tests ----
   class SliceModel extends Model {
     static {
       this.attribute("name", "string");

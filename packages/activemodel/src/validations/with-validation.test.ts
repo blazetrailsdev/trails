@@ -173,7 +173,6 @@ describe("ValidatesWithTest", () => {
     });
     const p = new Person({});
     await p.isValid();
-    // null values are skipped
     expect(p.errors.count).toBe(0);
   });
 
@@ -185,7 +184,7 @@ describe("ValidatesWithTest", () => {
     }
     Person.validatesEach(["name"], (record, attr, value) => {
       if (value && typeof value === "string" && value.trim() === "") {
-        return; // skip blank
+        return;
       }
       if (value === null || value === undefined) return;
       record.errors.add(attr, ":invalid");
@@ -354,7 +353,6 @@ describe("WithValidator arity dispatch", () => {
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
-    // Function.length of a rest-param function is 0, so no arg is passed
     expect(received).toHaveLength(0);
   });
 
@@ -368,7 +366,6 @@ describe("WithValidator arity dispatch", () => {
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
-    // Function.length excludes default params, so length is 0 → called without arg
     expect(capturedArg).toBe("");
   });
 });

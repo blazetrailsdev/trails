@@ -29,7 +29,6 @@ describe("BooleanTest", () => {
     expect(type.cast(":on")).toBeTruthy();
     expect(type.cast(":ON")).toBeTruthy();
 
-    // explicitly check for false vs nil
     expect(type.cast(false)).toEqual(false);
     expect(type.cast(0)).toEqual(false);
     expect(type.cast("0")).toEqual(false);

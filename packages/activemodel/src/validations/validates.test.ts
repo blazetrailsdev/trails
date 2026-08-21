@@ -244,9 +244,7 @@ describe("ValidatesTest", () => {
         });
       }
     }
-    // When inactive, both validations should be skipped
     expect(await new Person({ active: false }).isValid()).toBe(true);
-    // When active, both validations should run
     expect(await new Person({ active: true }).isValid()).toBe(false);
     expect(await new Person({ active: true, name: "abc" }).isValid()).toBe(true);
   });

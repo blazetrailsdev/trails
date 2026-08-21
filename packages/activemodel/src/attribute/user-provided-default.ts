@@ -21,7 +21,6 @@ export class UserProvidedDefault extends FromUser {
   private _hasMemoizedVBTC: boolean = false;
 
   constructor(name: string, value: unknown, type: Type, databaseDefault: Attribute | null = null) {
-    // Pass undefined to super — we override valueBeforeTypeCast below
     super(name, undefined, type, databaseDefault);
     this.userProvidedValue = value;
   }
@@ -71,5 +70,4 @@ export class UserProvidedDefault extends FromUser {
   }
 }
 
-// Register with Attribute to resolve circular dependency for withUserDefault
 _registerUserProvidedDefault(UserProvidedDefault);

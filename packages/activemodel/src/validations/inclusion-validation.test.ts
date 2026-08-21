@@ -140,7 +140,6 @@ describe("InclusionValidationTest", () => {
   });
 
   it("validates inclusion of time range", async () => {
-    // Use array of specific time values
     const times = ["morning", "afternoon", "evening"];
     class Schedule extends Model {
       static {

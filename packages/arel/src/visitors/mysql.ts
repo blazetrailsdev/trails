@@ -38,10 +38,6 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  // :'(
-  // To retrieve all rows from a certain offset up to the end of the result set,
-  // you can use some large number for the second parameter.
-  // https://dev.mysql.com/doc/refman/en/select.html
   protected override visitArelNodesSelectStatement(
     o: Nodes.SelectStatement,
     collector: SQLString,
@@ -71,9 +67,11 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  // MySQL's null-safe equality is `<=>`. The standard `IS [NOT] DISTINCT
-  // FROM` is supported only on MySQL 8.0.14+; the operator form works
-  // on every MySQL version.
+  /**
+   * MySQL's null-safe equality is `<=>`. The standard `IS [NOT] DISTINCT
+   * FROM` is supported only on MySQL 8.0.14+; the operator form works
+   * on every MySQL version.
+   */
   protected override visitArelNodesIsNotDistinctFrom(
     o: Nodes.IsNotDistinctFrom,
     collector: SQLString,
@@ -107,7 +105,6 @@ export class MySQL extends ToSql {
     o: Nodes.NullsFirst,
     collector: SQLString,
   ): SQLString {
-    // MySQL has no NULLS FIRST; emulate: col IS NOT NULL, col ASC/DESC
     const expr = o.expr as Nodes.Ascending | Nodes.Descending;
     this.visit(expr.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NOT NULL, ");
@@ -116,7 +113,6 @@ export class MySQL extends ToSql {
   }
 
   protected override visitArelNodesNullsLast(o: Nodes.NullsLast, collector: SQLString): SQLString {
-    // MySQL has no NULLS LAST; emulate: col IS NULL, col ASC/DESC
     const expr = o.expr as Nodes.Ascending | Nodes.Descending;
     this.visit(expr.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NULL, ");

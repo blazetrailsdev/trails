@@ -66,7 +66,6 @@ export abstract class Type<T = unknown> {
   }
 
   typeCastForSchema(value: unknown): string {
-    // JSON.stringify throws on BigInt; use String() directly for it.
     if (typeof value === "bigint") return value.toString();
     return JSON.stringify(value) ?? String(value);
   }
@@ -191,8 +190,6 @@ export abstract class Type<T = unknown> {
       depth++;
     }
     const result = castDepth >= 0 && serializeDepth >= 0 && castDepth <= serializeDepth;
-    // Define as own property so subclasses don't read this through the
-    // static prototype chain.
     Object.defineProperty(this, "_serializeCastValueCompatible", {
       value: result,
       writable: true,

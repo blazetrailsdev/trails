@@ -73,7 +73,6 @@ describe("SqlLiteralTest", () => {
   describe("addition", () => {
     it("fails if joined with something that is not an Arel node", () => {
       const lit = new Nodes.SqlLiteral("foo");
-      // SqlLiteral is a Node, verifying it works correctly
       expect(lit.value).toBe("foo");
       expect(lit).toBeInstanceOf(Nodes.Node);
     });

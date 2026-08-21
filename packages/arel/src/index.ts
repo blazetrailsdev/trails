@@ -29,12 +29,14 @@ registerNodeDeps({ Not, Grouping, Or, And });
 registerBinaryInversions({ Equality, In });
 _registerCteFactory((name, relation) => new Cte(name, relation));
 
-// Mix Predications + Math into NodeExpression (so every expression-valued
-// node — Function, Unary, Case, Casted, ...) and into InfixOperation
-// separately (it extends Binary, not NodeExpression). Done here at package
-// init rather than inside node-expression.ts / infix-operation.ts because
-// the mixin modules transitively import those files via their target-node
-// imports, creating a module-load cycle.
+/**
+ * Mix Predications + Math into NodeExpression (so every expression-valued
+ * node — Function, Unary, Case, Casted, ...) and into InfixOperation
+ * separately (it extends Binary, not NodeExpression). Done here at package
+ * init rather than inside node-expression.ts / infix-operation.ts because
+ * the mixin modules transitively import those files via their target-node
+ * imports, creating a module-load cycle.
+ */
 import { include } from "@blazetrails/activesupport";
 import { Node } from "./nodes/node.js";
 import { NodeExpression } from "./nodes/node-expression.js";
@@ -54,9 +56,12 @@ const _Node = Node as unknown as new (...args: unknown[]) => Node;
 const _NodeExpression = NodeExpression as unknown as new (...args: unknown[]) => NodeExpression;
 const _TreeManager = TreeManager as unknown as new (...args: unknown[]) => TreeManager;
 const _SqlLiteral = SqlLiteral as unknown as new (...args: unknown[]) => SqlLiteral;
-// Modules typed as explicit module interfaces (no string index sig) need
-// a cast to satisfy include()'s runtime constraint. The cast is type-only
-// and runtime semantics are unchanged — include() iterates Object.keys.
+
+/**
+ * Modules typed as explicit module interfaces (no string index sig) need
+ * a cast to satisfy include()'s runtime constraint. The cast is type-only
+ * and runtime semantics are unchanged — include() iterates Object.keys.
+ */
 type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
 const asRuntime = <T>(m: T): RuntimeModule => m as unknown as RuntimeModule;
 include(_Node, asRuntime(FactoryMethods));
@@ -83,7 +88,6 @@ include(_SqlLiteral, Predications);
 include(_SqlLiteral, asRuntime(Expressions));
 include(_SqlLiteral, asRuntime(AliasPredication));
 include(_SqlLiteral, asRuntime(OrderPredications));
-// Function includes WindowPredications and FilterPredications.
 include(FunctionNode, asRuntime(WindowPredications));
 include(FunctionNode, asRuntime(FilterPredications));
 // Filter includes WindowPredications (nodes/filter.rb:6).

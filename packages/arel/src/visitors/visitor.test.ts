@@ -47,8 +47,6 @@ describe("Visitor dispatch", () => {
   });
 
   it("memoizes ancestor lookups in the cache", () => {
-    // Use a fresh subclass so we own the dispatch cache start state —
-    // earlier tests may already have populated TestVisitor's cache for B.
     class FreshVisitor extends Visitor {
       visitA(_n: A): string {
         return "A";
@@ -234,7 +232,6 @@ describe("Visitor dispatch", () => {
       }
     }
     expect(new Sub().accept(new A())).toBe("Sub-A");
-    // Parent visitor still uses its own implementation.
     expect(new TestVisitor().accept(new A())).toBe("A");
   });
 });

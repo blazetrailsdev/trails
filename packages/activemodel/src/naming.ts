@@ -162,8 +162,6 @@ export class ModelName {
    * operator overloading, so call sites spell them `compare(...) < 0` etc.
    */
   compare(other: unknown): number | undefined {
-    // `Name` answers `to_str`, so a `Name` operand takes String#<=>'s
-    // string-like arm rather than falling through to nil.
     const name = other instanceof ModelName ? other.name : other;
     if (typeof name !== "string") return undefined;
     return this.name === name ? 0 : this.name < name ? -1 : 1;

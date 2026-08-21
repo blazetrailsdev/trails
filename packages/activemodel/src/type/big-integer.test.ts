@@ -67,7 +67,6 @@ describe("BigIntegerTest", () => {
   it("numeric string with trailing characters extracts leading digits (Rails to_i)", () => {
     const type = new BigIntegerType();
     expect(type.cast("123abc")).toBe(123);
-    // Preserves precision for large leading-digit runs with trailing chars.
     expect(type.cast("99999999999999999999trailing")).toBe(BigInt("99999999999999999999"));
   });
 

@@ -82,7 +82,6 @@ describe("InsertManagerTest", () => {
     it("noop for empty list", () => {
       const im = new InsertManager();
       im.into(users);
-      // No values set - should still generate partial SQL
       const sql = im.toSql();
       expect(sql).toContain("INSERT INTO");
     });

@@ -78,12 +78,6 @@ describe("NumericalityValidator (trails-only)", () => {
   });
 
   it("rejects plain object values via NumericalityValidator.validateEach directly", () => {
-    // Direct exercise of the non-string/non-number narrowing in kernelFloat.
-    // Going through Model attributes wouldn't work — string-typed attrs
-    // cast objects to "[object Object]" before validation, value-typed
-    // attrs go through their own cast path. Bypass attribute infra and
-    // call the validator with a stub record so a real plain object
-    // reaches the parse pipeline.
     const v = new NumericalityValidator({ attributes: ["x"] });
     const errs = new Errors(null);
     const stubRecord = { errors: errs };
@@ -135,8 +129,8 @@ describe("NumericalityValidator (trails-only)", () => {
         this.validates("score", { numericality: { even: true } });
       }
     }
-    expect(await new Person({ score: 2.5 }).isValid()).toBe(true); // trunc(2.5)=2, even
-    expect(await new Person({ score: 3.5 }).isValid()).toBe(false); // trunc(3.5)=3, odd
+    expect(await new Person({ score: 2.5 }).isValid()).toBe(true);
+    expect(await new Person({ score: 3.5 }).isValid()).toBe(false);
   });
 
   it("odd/even truncates negative float via Math.trunc (-2.5 → -2, even)", async () => {
@@ -147,8 +141,8 @@ describe("NumericalityValidator (trails-only)", () => {
         this.validates("score", { numericality: { odd: true } });
       }
     }
-    expect(await new Person({ score: -3.5 }).isValid()).toBe(true); // trunc(-3.5)=-3, odd
-    expect(await new Person({ score: -2.5 }).isValid()).toBe(false); // trunc(-2.5)=-2, even
+    expect(await new Person({ score: -3.5 }).isValid()).toBe(true);
+    expect(await new Person({ score: -2.5 }).isValid()).toBe(false);
   });
 
   it("odd/even truncation: 2.9 is even (truncates to 2, not rounds to 3)", async () => {
@@ -158,8 +152,8 @@ describe("NumericalityValidator (trails-only)", () => {
         this.validates("score", { numericality: { even: true } });
       }
     }
-    expect(await new Person({ score: 2.9 }).isValid()).toBe(true); // trunc(2.9)=2, even
-    expect(await new Person({ score: 3.9 }).isValid()).toBe(false); // trunc(3.9)=3, odd
+    expect(await new Person({ score: 2.9 }).isValid()).toBe(true);
+    expect(await new Person({ score: 3.9 }).isValid()).toBe(false);
   });
 
   it("cameFromUser absent (AM Model) → validates the cast value", async () => {
@@ -181,8 +175,6 @@ describe("NumericalityValidator (trails-only)", () => {
   });
 
   it("cameFromUser false → validates cast value (readAttribute)", () => {
-    // Mock: scoreCameFromUser is false, but cast value (readAttribute) is
-    // a valid number — validation should pass.
     class MockRecord {
       errors = { add: vi.fn() };
       scoreCameFromUser = false;
@@ -193,12 +185,10 @@ describe("NumericalityValidator (trails-only)", () => {
     }
     const rec = new MockRecord();
     const result = prepareValueForValidation.call(undefined, "initial", rec as never, "score");
-    // Should return the cast value (42), not the raw string
     expect(result).toBe(42);
   });
 
   it("cameFromUser absent → falls back to readAttributeBeforeTypeCast", () => {
-    // A host with no `_came_from_user?` reader takes the `_before_type_cast` arm.
     class MockRecord {
       errors = { add: vi.fn() };
       scoreBeforeTypeCast = "raw-value";

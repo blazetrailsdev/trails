@@ -81,12 +81,6 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   const timings: CallbackTiming[] = options.only ?? ["before", "after", "around"];
   const klass = this as { prototype?: object } & Record<string, unknown>;
 
-  // NB: each `_defineXxxModelCallback` passes `fnOrObject` directly to
-  // `register`; `register` handles object dispatch internally AND stores
-  // the original filter for identity-based removal via `skip()`. Pre-resolving
-  // here would make the stored filter the wrapper function, breaking
-  // `Model.skipCallback(event, timing, originalObject)` for entries registered
-  // through the generated `beforeX`/`afterX`/`aroundX` helpers.
   for (const event of eventNames) {
     // Register the chain on the prototype with the same config used by
     // _registerCallbackOnProto so skipAfterCallbacksIfTerminated is consistent
@@ -126,6 +120,7 @@ export type CallbackObject = object;
 export interface RunCallbacksOptions {
   strict?: "sync";
 }
+
 /**
  * `if:` / `unless:` accept one filter or an array of them, and a filter is a
  * callable or a Symbol naming a method on the record — the shape Rails hands
@@ -314,9 +309,6 @@ export function _registerCallbackOnProto(
       }
     }
   }
-  // Two-step: defineCallbacks creates the chain with the right config (COW if
-  // needed); getCallbackChains re-reads the now-own Map (cheap: hasOwnProperty
-  // true on second call).
   asDefineCallbacks(proto, event, { skipAfterCallbacksIfTerminated: true });
   const chains = asGetCallbackChains(proto);
   const chain = chains.get(event)!;
@@ -344,10 +336,6 @@ export function _registerCallbackOnProto(
     chain.config,
     isObj ? (fn as unknown as ASCallbackObject) : undefined,
   );
-  // Ordinary after-callbacks always run in definition order, achieved by
-  // prepending into activesupport's LIFO-iterated after chain. Transactional
-  // (commit/rollback) callbacks instead honor the explicit `prepend` flag the
-  // caller threads in from ActiveRecord.run_after_transaction_callbacks_in_order_defined.
   const isTransactional = event === "commit" || event === "rollback";
   const prepend = !!conditions?.prepend || (timing === "after" && !isTransactional);
   if (prepend) chain.prepend(entry);
@@ -401,10 +389,6 @@ export function beforeOrAroundCallbackSources(
       continue;
     }
     const src = e.filter.toString();
-    // A bound (`fn.bind(this)`) or native function stringifies to a wrapper with
-    // no body text ("... { [native code] }"), so it exposes no association reads.
-    // Treat it as opaque rather than as a callback that reads nothing, so the
-    // caller falls back to a conservative load instead of skipping the preload.
     if (src.includes("[native code]")) opaque = true;
     else sources.push(src);
   }
@@ -469,8 +453,6 @@ export function restoreCallbacksOnProto(
   event: string,
   snapshot: Callback[] | undefined,
 ): void {
-  // Ensure `proto` owns its chains map (COW) before mutating, so the restore
-  // never bleeds into a parent class's shared chain.
   const chains = asGetCallbackChains(proto);
   const chain = chains.get(event);
   if (!chain) return;

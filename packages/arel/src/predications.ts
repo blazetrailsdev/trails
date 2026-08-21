@@ -267,8 +267,6 @@ export const Predications = {
     ): Node;
   },
 
-  // -- _any / _all variants --
-
   eqAny(
     this: PredicationHost & GroupingFolders & { eq(o: unknown): Node },
     others: unknown[],
@@ -496,11 +494,13 @@ export const Predications = {
   },
 };
 
-// Pins GroupingFolders (above) against the real folder implementations. The
-// interface exists only because the *_any/*_all variants cannot name
-// `Predications` while it is still being defined; this assertion makes the two
-// declarations fail to compile if they ever disagree, so the second
-// declaration cannot become the kind of drifting duplicate this file just
-// removed from the *_any/*_all fold paths.
+/**
+ * Pins GroupingFolders (above) against the real folder implementations. The
+ * interface exists only because the *_any/*_all variants cannot name
+ * `Predications` while it is still being defined; this assertion makes the two
+ * declarations fail to compile if they ever disagree, so the second
+ * declaration cannot become the kind of drifting duplicate this file just
+ * removed from the *_any/*_all fold paths.
+ */
 const _groupingFoldersMatchImplementation: GroupingFolders = Predications;
 void _groupingFoldersMatchImplementation;

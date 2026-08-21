@@ -13,9 +13,6 @@ import type { ValidatableRecord } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 describe("ErrorsTest", () => {
-  // =========================================================================
-  // Phase 1100 — Errors (ported)
-  // =========================================================================
   it("add creates an error object and returns it", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
@@ -82,8 +79,6 @@ describe("ErrorsTest", () => {
   it("message interpolation with %{count}", () => {
     const e = new Errors(null);
     e.add("name", ":too_short", { count: 3 });
-    // Default message is "is too short" — doesn't have %{count} by default
-    // but the mechanism should work for messages that do
     expect(e.messagesFor("name").length).toBe(1);
   });
 
@@ -103,7 +98,6 @@ describe("ErrorsTest", () => {
     const dup = new Errors({});
     dup.copyBang(errors);
     expect(dup.count).toBe(1);
-    // Modifying dup should not affect original
     dup.add("age", ":invalid");
     expect(errors.count).toBe(1);
     expect(dup.count).toBe(2);
@@ -193,7 +187,6 @@ describe("ErrorsTest", () => {
     errors.add("name", ":invalid");
     const hash = errors.toHash();
     expect(hash.get("name")).toEqual(["can't be blank", "is invalid"]);
-    // Accessing a non-existent key should be undefined
     expect(hash.get("age")).toBeUndefined();
   });
 
@@ -209,7 +202,6 @@ describe("ErrorsTest", () => {
     const errors = new Errors({});
     errors.add("name", ":blank");
     errors.add("age", ":invalid");
-    // fullMessages style
     expect(errors.fullMessages).toEqual(["Name can't be blank", "Age is invalid"]);
   });
 
@@ -409,7 +401,7 @@ describe("ErrorsTest", () => {
 
   it("attribute_names returns an empty array after try to get a message only", () => {
     const e = new Errors(null);
-    e.messagesFor("name"); // should not create an entry
+    e.messagesFor("name");
     expect(e.attributeNames).toEqual([]);
   });
 
@@ -692,7 +684,7 @@ describe("ErrorsTest", () => {
     const source = new Errors({});
     source.add("age", ":invalid");
     const wrapper = new Errors({});
-    wrapper.mergeBang(source); // imports as NestedError
+    wrapper.mergeBang(source);
     const target = new Errors({});
     target.copyBang(wrapper);
     expect(target.objects[0].constructor.name).toBe("NestedError");
@@ -740,7 +732,6 @@ describe("ErrorsTest", () => {
       const errors = new Errors({});
       errors.add("email", ":invalid", { with: /^\w+@\w+$/i });
       expect(errors.where("email", ":invalid", { with: /^\w+@\w+$/i })).toHaveLength(1);
-      // Different source or different flags must not match.
       expect(errors.where("email", ":invalid", { with: /^\w+@\w+$/g })).toHaveLength(0);
       expect(errors.where("email", ":invalid", { with: /other/i })).toHaveLength(0);
     });
@@ -765,7 +756,6 @@ describe("ErrorsTest", () => {
       expect(imported.type).toBe("wrong");
       expect(imported.rawType).toBe(":invalid");
 
-      // copy! must preserve the {attribute, type, rawType} split.
       const copy = new Errors({});
       copy.copyBang(target);
       const round = copy.objects[0];
@@ -794,7 +784,6 @@ describe("ErrorsTest", () => {
       target.objects[0] as unknown as { innerError: { options: Record<string, unknown> } }
     ).innerError;
     expect(tgtInner).toBe(srcInner);
-    // The wrapper's own `@options` is independent, though.
     expect(target.objects[0].options).not.toBe(wrapper.objects[0].options);
   });
 
@@ -806,7 +795,6 @@ describe("ErrorsTest", () => {
     const e2 = new Errors(base2);
     e2.copyBang(e1);
     expect(e2.objects[0].base).toBe(base2);
-    // Original is untouched.
     expect(e1.objects[0].base).toBe(base1);
   });
 
@@ -938,7 +926,6 @@ describe("ErrorsTest", () => {
     e.add("name", ":too_short");
     e.add("age", ":invalid");
     expect(e.attributeNames).toEqual(["name", "age"]);
-    // Should not have duplicates
     expect(e.attributeNames.length).toBe(2);
   });
 
@@ -959,7 +946,6 @@ describe("ErrorsTest", () => {
   it("added? returns false when checking for an error, but not providing message argument", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    // When checking with default type "invalid", should return false since we added "blank"
     expect(e.added("name")).toBe(false);
   });
 
@@ -973,7 +959,6 @@ describe("ErrorsTest", () => {
   it("added? returns false when checking for an error by symbol and a different error with same message is present", () => {
     const e = new Errors(null);
     e.add("name", ":blank");
-    // Even if the rendered message might be similar, type must match
     expect(e.added("name", ":present")).toBe(false);
   });
 
@@ -1019,7 +1004,6 @@ describe("ErrorsTest", () => {
     it("add with strict: true raises StrictValidationFailed", () => {
       const errors = new Errors({});
       expect(() => errors.add("name", ":blank", { strict: true })).toThrow(StrictValidationFailed);
-      // Strict raise must NOT append the error to the collection.
       expect(errors.count).toBe(0);
     });
 
@@ -1188,9 +1172,6 @@ describe("Errors<TBase> type parameter", () => {
   });
 
   it("unparameterized Errors annotation compiles (default = object)", () => {
-    // Proves the `= object` default is in effect: the type annotation `Errors`
-    // (no type arg) is accepted and the record handed to an `add()` callback
-    // resolves to `object | null`.
     const e: Errors = new Errors({} as object);
     e.add("name", (record, _opts) => {
       expectTypeOf(record).toEqualTypeOf<object | null>();

@@ -30,7 +30,6 @@ describe("MatchesTest", () => {
       const node = users.get("name").matches("x%", "!");
       const visitor = new Visitors.ToSql(testConnection);
       const [sql] = visitor.compileWithBinds(node);
-      // ESCAPE value must be inlined ('!'), not turned into a bind placeholder.
       expect(sql).toContain("ESCAPE '!'");
       expect(sql).not.toContain("ESCAPE ?");
     });

@@ -159,7 +159,6 @@ describe("AcceptanceValidationTest", () => {
     );
     const a = new Agreement({ terms: "1" });
     expect(await a.isValid()).toBe(true);
-    // The value lives in the accessor slot (attr_accessor), not @attributes.
     expect((a as unknown as { terms: unknown }).terms).toBe("1");
   });
 

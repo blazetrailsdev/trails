@@ -30,9 +30,6 @@ export class NamedFunction extends Function {
     if (!window) return new Over(this, null);
     if (typeof window === "string") return new Over(this, new SqlLiteral(window));
     if (window instanceof NamedWindow) {
-      // Match the identifier-quoting policy used elsewhere in ToSql:
-      // double up embedded quotes so a name like `w"x` doesn't escape
-      // the identifier and produce malformed (or injectable) SQL.
       const escaped = window.name.replace(/"/g, '""');
       return new Over(this, new SqlLiteral(`"${escaped}"`));
     }

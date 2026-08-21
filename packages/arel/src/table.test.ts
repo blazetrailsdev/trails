@@ -224,9 +224,6 @@ describe("TableTest", () => {
     expect(users.star.toSql()).toBe('"users".*');
   });
 
-  // Schema-qualified quoting is an adapter behaviour (ANSI dot-splitting); the
-  // suite's FakeRecord engine wraps the whole name in one pair of quotes, so
-  // these name a real quoting connection at the call site to exercise the split.
   it("star splits schema-qualified name", () => {
     expect(new Visitors.ToSql(testConnection).compile(new Table("test_schema.things").star)).toBe(
       '"test_schema"."things".*',

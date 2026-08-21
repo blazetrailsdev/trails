@@ -3,8 +3,6 @@ import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
-// Cyclic with table.ts (which imports TableAlias); safe because the binding is
-// only dereferenced inside `get()`, never at class-evaluation time.
 import { Table } from "../table.js";
 
 /** Structural view of `TableAlias#relation`.

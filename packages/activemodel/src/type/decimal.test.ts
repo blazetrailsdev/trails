@@ -75,7 +75,6 @@ describe("DecimalTest", () => {
     expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBeFalsy();
     // Rails passes `BigDecimal("0.0") / 0`; trails' NaN decimal is the "NaN" sentinel.
     expect(type.isChanged("NaN", "NaN", "NaN")).toBeFalsy();
-    // Float NaN over BigDecimal NaN: still a change (`instance_of?` guard).
     expect(type.isChanged("NaN", NaN, NaN)).toBeTruthy();
   });
 
@@ -125,8 +124,6 @@ describe("DecimalType", () => {
 
   it("serialize delegates to cast via Helpers::Numeric", () => {
     const type = new Types.DecimalType();
-    // serialize delegates to cast, which yields a BigDecimal so the value
-    // quotes in fixed ("F") form rather than as a single-quoted string.
     expect(type.serialize("1.5")).toEqual(bd("1.5"));
     expect(type.serialize("")).toBeNull();
   });
@@ -138,10 +135,7 @@ describe("DecimalType", () => {
   });
 
   it("isChanged returns true for number_to_non_number? path — same cast value, non-numeric raw", () => {
-    // DecimalType shares applyNumericMixin with Integer/Float — verify the
-    // number_to_non_number? path is exercised on Decimal as well.
     const type = new Types.DecimalType();
-    // old="0", new_cast="0" (same), raw="wibble" (non-numeric) → changed
     expect(type.isChanged("0", "0", "wibble")).toBe(true);
   });
 
@@ -151,9 +145,6 @@ describe("DecimalType", () => {
   });
 
   it("casts NaN (BigDecimal NaN sentinel) — number and string forms", () => {
-    // BigDecimal("NaN") has no decimal string form; it round-trips as the
-    // sentinel "NaN" (the JS NaN on assignment, the string "NaN" from PG on
-    // load).
     const type = new Types.DecimalType();
     expect(type.cast(NaN)).toBe("NaN");
     expect(type.cast("NaN")).toBe("NaN");
@@ -173,8 +164,6 @@ describe("DecimalType", () => {
 
   it("serialize bridges to BigDecimal F-form for quoting", () => {
     const type = new Types.DecimalType();
-    // Whole values gain a trailing ".0" in fixed form, fractional values
-    // drop the quotes — both quote bare, not as 'string' literals.
     expect((type.serialize(42) as BigDecimal).toString("F")).toBe("42.0");
     expect((type.serialize("1.5") as BigDecimal).toString("F")).toBe("1.5");
     expect(type.serialize(null)).toBeNull();
@@ -191,16 +180,12 @@ describe("DecimalType", () => {
   });
 
   it("applyScale leaves the NaN sentinel untouched", () => {
-    // A scaled decimal column (bank_balance is scale: 2) must not mangle the
-    // "NaN" sentinel — roundHalfUpToScale's splitDecimal returns null for it.
     const type = new Types.DecimalType({ precision: 10, scale: 2 });
     expect(type.cast(NaN)).toBe("NaN");
     expect(type.cast("NaN")).toBe("NaN");
   });
 
   it("applyScale leaves the Infinity sentinel untouched", () => {
-    // A scaled decimal column must not mangle the "Infinity"/"-Infinity"
-    // sentinel — roundHalfUpToScale's splitDecimal returns null for it.
     const type = new Types.DecimalType({ precision: 10, scale: 2 });
     expect(type.cast(Infinity)).toBe("Infinity");
     expect(type.cast(-Infinity)).toBe("-Infinity");

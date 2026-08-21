@@ -5,11 +5,6 @@ import { Table, Nodes, Visitors } from "./index.js";
 const users = new Table("users");
 const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
 
-// Behavior tests for the attribute-alignment changes — typed-subclass
-// returns from aggregates / contains / overlaps / concat, plus the
-// `retryable: true` flag on alias SqlLiterals across every per-class
-// `as()` override.
-
 describe("Attribute aggregates return typed Function subclasses", () => {
   it("count compiles to COUNT(...) and is a Count", () => {
     const c = users.get("id").count();
@@ -35,7 +30,6 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
     expect(c).toBeInstanceOf(Nodes.Concat);
     const sql = compile(c);
     expect(sql).toBe('"users"."first" || "users"."last"');
-    // Regression: must NOT emit the old NamedFunction CONCAT(...) form.
     expect(sql).not.toContain("CONCAT(");
   });
 

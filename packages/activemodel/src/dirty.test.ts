@@ -175,7 +175,6 @@ describe("DirtyTest", () => {
   it("model can be dup-ed without Attributes", () => {
     class Bare extends Model {}
     const b = new Bare();
-    // Should not throw
     expect(b.changed).toBe(false);
     expect(b.changedAttributeNamesToSave).toEqual([]);
   });
@@ -335,10 +334,10 @@ describe("Dirty Tracking", () => {
         this.attribute("size", "integer");
       }
     }
-    const s = new Sized({ size: "2" }); // cast to 2
-    s.writeAttribute("size", "2.3"); // cast to 2
+    const s = new Sized({ size: "2" });
+    s.writeAttribute("size", "2.3");
     expect(s.changed).toBe(false);
-    s.writeAttribute("size", "5.1"); // cast to 5
+    s.writeAttribute("size", "5.1");
     expect(s.changed).toBe(true);
   });
 });
@@ -351,8 +350,8 @@ describe("attributeBeforeTypeCast", () => {
     }
 
     const price = new Price({ amount: "42" });
-    expect(price.readAttribute("amount")).toBe(42); // cast to integer
-    expect(price.readAttributeBeforeTypeCast("amount")).toBe("42"); // raw string
+    expect(price.readAttribute("amount")).toBe(42);
+    expect(price.readAttributeBeforeTypeCast("amount")).toBe("42");
   });
 
   it("tracks raw values on writeAttribute", () => {
@@ -396,12 +395,11 @@ describe("clearChangesInformation", () => {
     }
 
     const p = new Person({ name: "Alice", age: 30 });
-    p.changesApplied(); // snapshot as clean
+    p.changesApplied();
     p.writeAttribute("name", "Bob");
-    p.changesApplied(); // this makes name change a "previous change"
+    p.changesApplied();
     expect(Object.keys(p.previousChanges).length).toBeGreaterThan(0);
 
-    // Now make another current change
     p.writeAttribute("age", 31);
     expect(p.changed).toBe(true);
 
@@ -425,8 +423,6 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.clearAttributeChanges(["ratio"]);
-    // After clearAttributeChanges, _forcedNames must also be cleared so a
-    // subsequent type-equal write does not re-appear as dirty.
     m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
@@ -527,7 +523,7 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
     }
     const u = new User({ name: "Alice" });
     u.writeAttribute("name", "Bob");
-    u.changesApplied(); // simulate save — records name change as previous
+    u.changesApplied();
     expect(u.attributePreviouslyChanged("name")).toBe(true);
   });
 
@@ -674,8 +670,6 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.restoreAttributes();
-    // After restoreAttributes(), _forcedNames must be cleared so a subsequent
-    // type-equal write does not re-appear as dirty.
     m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
@@ -694,15 +688,11 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.changesApplied();
-    // After changesApplied(), _forcedNames must be cleared so the next
-    // type-equal write does not appear dirty.
     m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 
   it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
-    // attribute_will_change! (forceChange) must not be wiped out by a write
-    // where type.isChanged returns false.
     class Metric extends Model {
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
@@ -712,8 +702,8 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio"); // mirrors attribute_will_change!
-    m.writeAttribute("ratio", NaN); // type-equal write
+    m._dirty.forceChange("ratio");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,
     // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
@@ -736,9 +726,6 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
   });
 
   it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {
-    // true casts to 1 via NumericMixin, so cast values are equal (1 === 1).
-    // Without type delegation, DirtyTracker would clear the change. With it,
-    // type.isChanged(1, 1, true) fires isNumberToNonNumber? and records dirty.
     class Item extends Model {
       constructor(attrs: Record<string, unknown> = {}) {
         super(attrs);
@@ -779,25 +766,21 @@ describe("DirtyTracker#redetectChanges", () => {
 
   it("marks attributes as dirty where the post-rollback value differs from the restored baseline", () => {
     const m = new Subject({ title: "original", score: 0 });
-    m.changesApplied(); // simulate post-save clean state
+    m.changesApplied();
 
-    // Simulate in-TX user edit
     const postTxAttrs = (m as any)._attributes.deepDup();
     (postTxAttrs as AttributeSet).writeFromUser("title", "tx-edit");
 
-    // Simulate restore to pre-TX state (baseline is already "original" from snapshot)
     const restored = (m as any)._attributes;
     const dirty: DirtyTracker = (m as any)._dirty;
     dirty.snapshot(restored);
     dirty.clearChangesInformation();
     dirty.redetectChanges(postTxAttrs);
 
-    // title differed → dirty, with [was=original (preTX baseline), now=tx-edit (postTX)]
     expect(dirty.attributeChanged("title")).toBe(true);
     expect(dirty.attributeWas("title")).toBe("original");
     expect(dirty.changes).toEqual({ title: ["original", "tx-edit"] });
 
-    // score unchanged → not dirty
     expect(dirty.attributeChanged("score")).toBe(false);
   });
 
@@ -805,7 +788,7 @@ describe("DirtyTracker#redetectChanges", () => {
     const m = new Subject({ title: "same", score: 1 });
     m.changesApplied();
 
-    const postTxAttrs = (m as any)._attributes.deepDup(); // no edits during TX
+    const postTxAttrs = (m as any)._attributes.deepDup();
 
     const restored = (m as any)._attributes;
     const dirty: DirtyTracker = (m as any)._dirty;
@@ -818,22 +801,18 @@ describe("DirtyTracker#redetectChanges", () => {
   });
 
   it("detects number_to_non_number? via valueBeforeTypeCast — score=1 written as `true` is dirty vs numeric baseline", () => {
-    // Numeric type isChanged: isNumberToNonNumber?(oldValue, newValueBeforeTypeCast) fires when
-    // the new raw value is not a number even if the cast value equals the old cast value.
     const m = new Subject({ title: "t", score: 1 });
-    m.changesApplied(); // baseline: score=1 (cast), raw=1
+    m.changesApplied();
 
-    // Simulate in-TX write of `true` to score (casts to 1, but raw is non-numeric)
     const postTxAttrs = (m as any)._attributes.deepDup();
-    (postTxAttrs as AttributeSet).writeFromUser("score", true); // valueBeforeTypeCast=true, value=1
+    (postTxAttrs as AttributeSet).writeFromUser("score", true);
 
-    const restored = (m as any)._attributes; // baseline still score=1
+    const restored = (m as any)._attributes;
     const dirty: DirtyTracker = (m as any)._dirty;
     dirty.snapshot(restored);
     dirty.clearChangesInformation();
     dirty.redetectChanges(postTxAttrs);
 
-    // Cast values are both 1, but raw `true` triggers isNumberToNonNumber? → dirty
     expect(dirty.attributeChanged("score")).toBe(true);
     expect(dirty.changes).toEqual({ score: [1, 1] });
   });

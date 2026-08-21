@@ -335,10 +335,6 @@ describe("PostgresTest", () => {
   });
 });
 
-// Audit follow-up: Postgres dialect overrides for grouping-element
-// formatting (spaces inside parens), Cube/Rollup/GroupingSet wrapping,
-// Lateral parens-only-when-needed, and explicit IsDistinctFrom
-// overrides (behaviorally identical to base, kept for fidelity).
 describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   const users = new Table("users");
   const compile = (n: Nodes.Node): string =>
@@ -380,9 +376,6 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   });
 
   it("Cube/Rollup/GroupingSet route through groupingArrayOrGroupingElement", () => {
-    // Verify the helper is actually wired into the dialect-public path:
-    // CUBE / ROLLUP / GROUPING SETS each emit their prefix followed by the
-    // helper's `( ... )` formatting.
     expect(compile(new Nodes.Cube([users.get("a"), users.get("b")]))).toBe(
       'CUBE( "users"."a", "users"."b" )',
     );
@@ -390,7 +383,6 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     expect(compile(new Nodes.GroupingSet([users.get("a"), users.get("b")]))).toBe(
       'GROUPING SETS( "users"."a", "users"."b" )',
     );
-    // GroupingElement itself uses the helper too.
     expect(compile(new Nodes.GroupingElement([users.get("a")]))).toBe('( "users"."a" )');
   });
 
@@ -427,7 +419,6 @@ describe("Temporal scalar quoting", () => {
     ).toContain("'14:23:55'");
   });
 
-  // A JS Date is rejected AR-wide (#939): it must not be claimed as a Time.
   it("refuses a JS Date rather than formatting it as a Time", () => {
     const d = new Date("2026-04-26T14:23:55Z");
     expect(() =>

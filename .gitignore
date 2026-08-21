@@ -54,3 +54,6 @@ coverage/
 
 # Scratch output from local screenshot/driver runs.
 tmp/
+
+# Local audit page for eslint/no-freeform-comments; published as an Artifact.
+comment-audit.html

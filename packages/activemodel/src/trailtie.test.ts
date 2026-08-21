@@ -8,8 +8,6 @@ import { Error as ActiveModelError } from "./error.js";
 import { deprecator } from "./deprecator.js";
 
 describe("RailtieTest", () => {
-  // Snapshot the global subclasses list so activesupport tests that
-  // truncate it can't make this suite order-dependent.
   let savedSubclasses: (typeof BaseRailtie)[];
   let savedConfig: Record<string, unknown>;
 
@@ -30,12 +28,10 @@ describe("RailtieTest", () => {
     ActiveModelError.i18nCustomizeFullMessage = false;
     BaseRailtie.subclasses.length = 0;
     BaseRailtie.subclasses.push(...savedSubclasses);
-    // Reset per-class config to saved snapshot
     for (const key of Object.keys(Trailtie.config)) {
       delete Trailtie.config[key];
     }
     Object.assign(Trailtie.config, savedConfig);
-    // Clear deprecators registry
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
     }
@@ -78,10 +74,6 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers applies the active_model.secure_password setting", () => {
-    // Simulate a test environment via TRAILS_ENV so the initializer
-    // fires the min_cost branch. Snapshot-and-restore the prior value
-    // so a developer or runner that already had TRAILS_ENV set sees
-    // it back after the test.
     const prev = processEnv.TRAILS_ENV;
     setEnv("TRAILS_ENV", "test");
     try {

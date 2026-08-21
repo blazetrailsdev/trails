@@ -63,7 +63,6 @@ describe("Arel::Nodes.build_quoted", () => {
   it("unwraps a TreeManager-shaped .ast so the visitor receives a real Node", () => {
     const sub = new SelectManager(users).project(users.get("id"));
     const node = buildQuoted(sub);
-    // SelectStatement (or a Node) — NOT the manager itself.
     expect(node).toBeInstanceOf(Nodes.SelectStatement);
   });
 
@@ -166,8 +165,6 @@ describe("Arel::Nodes::Casted#nil?", () => {
     expect(node.isNil()).toBe(true);
   });
 
-  // quoted_node is build_quoted(other, self), so a nil from an Attribute is
-  // Casted — carrying the column's type-cast context — not a bare Quoted.
   it("is what an Attribute's quoted_node builds for nil, and still renders IS NULL", () => {
     const attr = users.get("id");
     const eq = attr.eq(null);

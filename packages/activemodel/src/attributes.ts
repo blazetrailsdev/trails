@@ -90,8 +90,6 @@ export function attribute(
   options?: AttributeOptions,
 ): void {
   name = this.resolveAttributeName(name);
-  // Type-optional form: `attribute(name, options)`. The second positional is
-  // the options hash rather than a type when it isn't a string or Type.
   if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
     options = typeName;
     typeName = undefined;
