@@ -43,9 +43,10 @@ class RateLimitExhaustedError extends Error {
 }
 
 class JobLogFetchFailedError extends Error {
-  constructor(selected: number) {
+  constructor(selected: number, expired: number, failed: number) {
     super(
-      `Job log fetch failed: selected ${selected} jobs and fetched 0. ` +
+      `Job log fetch failed: selected ${selected} jobs and fetched 0 ` +
+        `(${failed} failed, ${expired} past GitHub's retention window). ` +
         `The compare-stats feed is stalled; see the per-job warnings above.`,
     );
   }
@@ -2000,6 +2001,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   console.log(`Fetching logs for ${jobsToFetch.length} jobs...`);
   let fetched = 0;
   let expired = 0;
+  let failed = 0;
 
   for (const job of jobsToFetch) {
     const jobId = job.job_id as number;
@@ -2045,6 +2047,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
         expired++;
         continue;
       }
+      failed++;
       console.warn(
         `  Failed to fetch logs for job ${jobId} "${jobName}" (PR #${prNumber}): ${message}`,
       );
@@ -2055,8 +2058,8 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   if (expired > 0) {
     console.log(`  ${expired} job log(s) past GitHub's retention window — will not be retried`);
   }
-  if (fetched === 0 && expired === 0) {
-    throw new JobLogFetchFailedError(jobsToFetch.length);
+  if (fetched === 0 && (failed > 0 || expired === 0)) {
+    throw new JobLogFetchFailedError(jobsToFetch.length, expired, failed);
   }
   return fetched;
 }

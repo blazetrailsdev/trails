@@ -20,7 +20,7 @@ describe("sync-stats job log fetch", () => {
 
   it("fails the run when jobs were selected but no logs were fetched", () => {
     expect(source).toMatch(
-      /if \(fetched === 0 && expired === 0\) \{\s*throw new JobLogFetchFailedError\(/,
+      /if \(fetched === 0 && \(failed > 0 \|\| expired === 0\)\) \{\s*throw new JobLogFetchFailedError\(/,
     );
     expect(source).toMatch(/class JobLogFetchFailedError extends Error/);
   });
@@ -28,6 +28,11 @@ describe("sync-stats job log fetch", () => {
   it("records a log past GitHub's retention window instead of retrying it forever", () => {
     expect(source).toMatch(/if \(isExpiredJobLogError\(message\)\) \{/);
     expect(source).toMatch(/NOT EXISTS \(\s*\n\s*SELECT 1 FROM expired_job_logs ejl/);
+  });
+
+  it("does not let an expired log excuse a batch that also failed for other reasons", () => {
+    expect(source).toMatch(/failed\+\+;\s*\n\s*console\.warn\(/);
+    expect(source).not.toMatch(/if \(fetched === 0 && expired === 0\)/);
   });
 
   it("does not swallow the fetch failure as a rate-limit stop", () => {
