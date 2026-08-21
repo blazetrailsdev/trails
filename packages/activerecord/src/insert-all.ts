@@ -9,7 +9,7 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
-import { except, many, reverseMerge } from "@blazetrails/activesupport";
+import { except, isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { first } from "./ruby-first.js";
 import { withConnection } from "./connection-handling.js";
 import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
@@ -218,8 +218,8 @@ export class InsertAll {
     if (
       this.onDuplicate === "update" &&
       !this.updateSql &&
-      !this.updateOnly &&
-      this._updatableColumns.length === 0
+      !isPresent(this.updateOnly) &&
+      isEmpty(this._updatableColumns)
     ) {
       this.onDuplicate = "skip";
     }
@@ -325,10 +325,19 @@ export class InsertAll {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall empty? — Language shortcoming: Rails' last branch is
+   * `@on_duplicate == :update && updatable_columns.empty?`
+   * (insert_all.rb:140), but `updatable_columns` subtracts
+   * `unique_by_columns`, which trails can only resolve off an async
+   * schema-cache read; that branch therefore runs at the end of
+   * `_populateUpdatableColumns()`, which every path awaits before
+   * `onDuplicate` is read.
+   */
   private configureOnDuplicateUpdateLogic(): void {
     const onDuplicate = this.onDuplicate;
-    if (this.isCustomUpdateSqlProvided() && this.updateOnly !== undefined) {
+    if (this.isCustomUpdateSqlProvided() && isPresent(this.updateOnly)) {
       // Rails: raise ArgumentError (insert_all.rb).
       throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
@@ -338,14 +347,16 @@ export class InsertAll {
       onDuplicate !== undefined &&
       onDuplicate !== "update" &&
       !this.isCustomUpdateSqlProvided() &&
-      this.updateOnly !== undefined
+      isPresent(this.updateOnly)
     ) {
       throw new Error("Cannot use both onDuplicate and updateOnly");
     }
 
-    if (this.updateOnly !== undefined) {
-      this._updatableColumns = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
-      this.onDuplicate = isEmpty(this._updatableColumns) ? "skip" : "update";
+    if (isPresent(this.updateOnly)) {
+      this._updatableColumns = Array.isArray(this.updateOnly)
+        ? this.updateOnly
+        : [this.updateOnly as string];
+      this.onDuplicate = "update";
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = "update";
