@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { parse, _require } from "./nokogiri.js";
 
-// Ruby's `require "active_support/xml_mini/nokogiri*"` runs the file-top
-// `require "nokogiri"`; `cast_backend_name_to_module` is that seat here, so a
-// direct-import test does the load itself before calling `parse`.
+// Rails' engine tests load the gem before the suite runs, via
+// `XMLMiniEngineTest.run_with_gem("nokogiri")` (xml_mini_engine_test.rb:8-13).
 beforeAll(async () => {
   await _require();
 });

@@ -724,8 +724,7 @@ const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
   libxmlsax: "cannot load such file -- libxml",
   // Ruby's `require "active_support/xml_mini/nokogiri"` also runs that file's
   // own file-top `require "nokogiri"` (nokogiri.rb:3-8); ESM's `import()` only
-  // evaluates the module body, so the loader awaits its `_require` hook here to
-  // reach the optional `@blazetrails/nokogiri` package at the same seat.
+  // evaluates the module body, so the `_require` hook is awaited at the same seat.
   nokogiri: async () => {
     const backend = await import("./xml-mini/nokogiri.js");
     await backend._require();
