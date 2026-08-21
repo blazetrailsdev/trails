@@ -136,9 +136,12 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  *
  * Mirrors Rails' else branch `superclass == Base || !columns_hash.include?(inheritance_column)`:
  * a non-root class still "descends" (is not an STI subclass) when it doesn't
- * actually carry the inheritance column, or STI is disabled. trails uses the
- * column-aware {@link classHasAttribute} (declared attribute or reflected column)
- * in place of Rails' `columns_hash.include?`, since schema reflection is lazy.
+ * actually carry the inheritance column, or STI is disabled. Rails asks
+ * `columns_hash`, whose first touch loads the schema synchronously; trails
+ * reflects lazily and cannot query from a synchronous reader, so the membership
+ * test goes through `attribute_types` — the same set once reflection has run
+ * (it seeds from `columns_hash`), and inherited rather than empty while it has
+ * not.
  * Decoupled from the explicit `inheritanceColumn` sentinel
  * ({@link isStiSubclass}), which still gates the registry-resolved row-dispatch
  * paths.
@@ -149,7 +152,7 @@ export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
   const inheritCol = modelClass.inheritanceColumn;
-  return inheritCol === null || !classHasAttribute(modelClass, inheritCol);
+  return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
 }
 
 /**
@@ -414,13 +417,13 @@ export function registerSubclass(klass: typeof Base): void {
 }
 
 /**
- * Class-level column-aware `_has_attribute?`.
+ * Class-level `_has_attribute?`.
  *
- * Rails' `_has_attribute?(name)` is `attribute_types.key?(name)`, true for any
- * reflected DB column as well as any explicitly declared `attribute()`. trails
- * splits these — declared attributes live in `_attributeDefinitions`, real
- * columns in the lazily reflected schema — so this checks both. This is the
- * gate Rails uses to decide whether STI dispatch applies, so that defaulting
+ * Rails' `_has_attribute?(name)` is `attribute_types.key?(name)`
+ * (`attribute_methods.rb:260-262`), true for any reflected DB column as well as
+ * any explicitly declared `attribute()` — the default attribute set seeds from
+ * `columns_hash` and then replays the declarations on top. This is the gate
+ * Rails uses to decide whether STI dispatch applies, so that defaulting
  * `inheritance_column` to `"type"` (above) does not make every model with a
  * stray `type` key behave as STI: only models that actually have the column
  * dispatch.
@@ -428,13 +431,7 @@ export function registerSubclass(klass: typeof Base): void {
  * @internal
  */
 export function classHasAttribute(modelClass: typeof Base, name: string): boolean {
-  if ((modelClass as any)._attributeDefinitions?.has(name)) return true;
-  if (modelClass.abstractClass) return false;
-  try {
-    return modelClass.columnNames().includes(name);
-  } catch {
-    return false;
-  }
+  return modelClass._hasAttribute(name);
 }
 
 /**
@@ -829,9 +826,11 @@ export function ensureProperType(this: Base): void {
   if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = klass.inheritanceColumn;
   if (inheritCol === null) return;
-  // Only write when the column is a declared attribute — otherwise the value
-  // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
-  if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
+  // Only write when the model actually carries the column — otherwise the value
+  // wouldn't persist or serialize correctly. Rails needs no such guard: its
+  // `attribute_types` loads the schema synchronously on first touch, so
+  // `_write_attribute` always lands on a known attribute (`inheritance.rb:333`).
+  if (!classHasAttribute(klass, inheritCol)) return;
   (this as any)._writeAttribute(inheritCol, stiName(klass));
 }
 
@@ -896,19 +895,17 @@ export function usingSingleTableInheritance(
 /**
  * Rails' class-level `_has_attribute?(name)` is `attribute_types.key?(name)`,
  * true for any real DB column as well as any explicitly declared `attribute()`.
- * trails splits these — declared attributes live in `_attributeDefinitions`,
- * real columns in the (lazily reflected) schema — and reflection is not always
- * warm by the time `instantiate` dispatches. A custom STI column like
- * `Parrot#parrot_sti_class` is a real column but not a declared `attribute()`,
- * and when the schema cache is cold `columnNames()` falls back to the declared
- * set and omits it — which silently hydrated those rows as the base class.
+ * In trails schema reflection is lazy, so it is not always warm by the time
+ * `instantiate` dispatches. A custom STI column like `Parrot#parrot_sti_class`
+ * is a real column but not a declared `attribute()`, and when the schema cache
+ * is cold the default attribute set omits it — which silently hydrated those
+ * rows as the base class.
  *
- * Accept any of three signals that prove the column is a real model attribute:
- *   1. a declared `attribute()` definition;
+ * Accept either of two signals that prove the column is a real model attribute:
+ *   1. `_has_attribute?` itself;
  *   2. the column appearing as a key on the record being instantiated — every
  *      key in an `instantiate` row is a real DB column by construction, and that
- *      DB-row path is the only one that reaches STI dispatch;
- *   3. a reflected schema column, when the cache happens to be warm.
+ *      DB-row path is the only one that reaches STI dispatch.
  *
  * @internal
  */

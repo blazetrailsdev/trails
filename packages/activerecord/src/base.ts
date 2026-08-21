@@ -4347,11 +4347,13 @@ export class Base extends Model {
     return `${name}(${attrList})`;
   }
 
+  /** Mirrors: ActiveRecord::AttributeMethods::ClassMethods#has_attribute?
+   * (attribute_methods.rb:254-258). */
   static hasAttribute(name: string): boolean {
     // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
     // (attribute_methods.rb:256) before checking `attribute_types`.
-    const defs = this._attributeDefinitions;
-    return defs.has(this.resolveAttributeName(String(name)));
+    const attrName = this.resolveAttributeName(String(name));
+    return Object.hasOwn(this.attributeTypes(), attrName);
   }
 
   /**
