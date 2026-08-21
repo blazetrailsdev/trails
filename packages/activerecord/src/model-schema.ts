@@ -98,6 +98,28 @@ export function schemaStaleAgainstAncestors(host: SchemaHost): boolean {
 }
 
 /**
+ * A load that just ran read the *current* schema state, so the class is no
+ * longer behind any ancestor's invalidation: stamp its own revision at the
+ * current epoch, which is what {@link schemaStaleAgainstAncestors} compares
+ * against, and drop the verdict it memoized before the load.
+ *
+ * Without this, a class whose ancestor was invalidated after the subclass was
+ * defined — an ancestor reload cannot reach a subclass that never called
+ * `registerSubclass` — stays permanently stale, so {@link ownSchemaMemo} keeps
+ * answering `undefined` for a `_schemaLoaded` that is `true`. `load_schema`
+ * then re-enters the load it just finished, through the generation hook at the
+ * end of it, until the stack overflows. The reflected arms stamp a revision
+ * through `applyColumnsHash`; the synthesize arm below is the one that
+ * otherwise settles a load without ever recording that it ran.
+ *
+ * @internal
+ */
+function markSchemaFresh(host: SchemaHost): void {
+  host._schemaRevision = schemaEpoch;
+  host._staleCheck = undefined;
+}
+
+/**
  * Ruby class ivars are not inherited, but JS `static` members ARE — a bare
  * `this._columnsHash` read on a subclass would see the base's memo and skip the
  * subclass's own `load_schema!` (model_schema.rb:587-597).
@@ -1188,6 +1210,7 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
     this._columnsHash = hash;
   }
   if (!pkStillMissing) {
+    markSchemaFresh(this);
     this._schemaLoaded = true;
     defineAttributeMethodsAfterLoad(this);
   }
