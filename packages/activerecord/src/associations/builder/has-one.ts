@@ -115,6 +115,22 @@ export class HasOne extends SingularAssociation {
         configurable: true,
       });
     }
+
+    // The same writer under Ruby's own method name — the string key `"#{name}="`
+    // that ActiveModel's `_assign_attribute` reaches with
+    // `public_send(setter, v)` (attribute_assignment.rb:68). A string-keyed
+    // method is not a property setter, so it can return the promise the
+    // displacing writer owes (has_one_association.rb:59-84).
+    Object.defineProperty(mixin, `${name}=`, {
+      value: function (
+        this: { association(n: string): { writer(v: unknown): unknown } },
+        value: unknown,
+      ) {
+        return this.association(name).writer(value);
+      },
+      writable: true,
+      configurable: true,
+    });
   }
 
   static override validDependentOptions(): string[] {

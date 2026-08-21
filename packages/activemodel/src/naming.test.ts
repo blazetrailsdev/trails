@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
-import { ArgumentError } from "./attribute-assignment.js";
+import { TypeError } from "./attribute-assignment.js";
 import { Inflections, assert, assertNot } from "@blazetrails/activesupport";
 
 describe("NamingTest", () => {
@@ -421,8 +421,13 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     expect(mn.match("Post")).toBe(true);
     expect(mn.match("os")).toBe(true);
     expect(mn.match("\\d")).toBe(false);
-    expect(() => mn.match(null)).toThrow(ArgumentError);
-    expect(() => mn.match(undefined)).toThrow(ArgumentError);
+    expect(() => mn.match(null)).toThrow("wrong argument type nil (expected Regexp)");
+    expect(() => mn.match(undefined)).toThrow("wrong argument type nil (expected Regexp)");
+    expect(() => mn.match(42)).toThrow("wrong argument type Integer (expected Regexp)");
+    expect(() => mn.match(1.5)).toThrow("wrong argument type Float (expected Regexp)");
+    expect(() => mn.match(true)).toThrow("wrong argument type true (expected Regexp)");
+    expect(() => mn.match([1])).toThrow("wrong argument type Array (expected Regexp)");
+    expect(() => mn.match(null)).toThrow(TypeError);
   });
 
   it("caseEquals and eql delegate to the name", () => {

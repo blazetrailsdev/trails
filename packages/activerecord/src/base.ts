@@ -4442,7 +4442,6 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
-  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
@@ -4645,7 +4644,6 @@ include(Base, {
   reload: _Persistence.reload,
   slice: _Persistence.slice,
   valuesAt: _Persistence.valuesAt,
-  setAttributes: _Persistence.setAttributes,
   updateAttribute: _Persistence.updateAttribute,
   updateAttributeBang: _Persistence.updateAttributeBang,
   updateColumn: _Persistence.updateColumn,
@@ -4947,7 +4945,7 @@ _setSuperValidates(Model.validates);
         // A TS `set` accessor cannot await, so a key whose writer reaches the
         // database is parked for `save` to drain; `setAttributes` is the
         // awaitable spelling of the same alias (attribute_assignment.rb:36).
-        const pending = this.assignAttributes(attrs);
+        const pending = this.setAttributes(attrs);
         if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
       },
       configurable: true,

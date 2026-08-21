@@ -163,5 +163,27 @@ export class CollectionAssociation extends Association {
   // neither is expressible as one. The awaitable ports carry the Rails names
   // on the association itself — `association(name).writer` / `replace` /
   // `idsWriter` — and are the only collection-mutation surface (RFC 0087 §1).
-  static override defineWriters(_mixin: object, _name: string): void {}
+  //
+  // They are ALSO installed under Ruby's own method names, the string keys
+  // `"#{name}="` and `"#{name.singularize}_ids="` camelCased, which is what
+  // ActiveModel's `_assign_attribute` reaches with `public_send(setter, v)`
+  // (attribute_assignment.rb:68). A string-keyed method is not a property
+  // setter, so it can return the promise the writer owes.
+  static override defineWriters(mixin: object, name: string): void {
+    if (!mixin || typeof mixin !== "object") return;
+    Object.defineProperty(mixin, `${name}=`, {
+      value(this: AssociationInstanceHost, value: unknown): unknown {
+        return this.association(name).writer(value);
+      },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(mixin, `${singularize(name)}Ids=`, {
+      value(this: AssociationInstanceHost, value: unknown): unknown {
+        return this.association(name).idsWriter(value);
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
 }
