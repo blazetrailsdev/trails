@@ -358,9 +358,8 @@ export class Serialized extends ValueType {
   }
 
   private isDefaultValue(value: unknown): boolean {
-    // serialized.rb:61-63 — `value == coder.load(nil)`. Ruby `==` is a value
-    // comparison, so a freshly loaded default still equals an equal object;
-    // JS `===` is reference identity, hence the canonical-key fallback.
+    // Ruby `==` is a value comparison, so a freshly loaded default still equals
+    // an equal object; JS `===` is identity, hence the canonical-key fallback.
     const defaultValue = this.coder.load(null);
     if (value === defaultValue) return true;
     if (value === null || value === undefined)

@@ -91,9 +91,8 @@ export class ColumnSerializer {
 
   /** @internal */
   checkArityOfConstructor(): void {
-    // column_serializer.rb:53-56 — `load(nil)` is what probes the constructor,
-    // since load's nil arm is `@object_class.new`. JS throws a bare TypeError
-    // where Ruby raises ArgumentError, so every failure is caught.
+    // Ruby narrows this to `rescue ArgumentError`; JS throws a bare TypeError
+    // for a constructor that will not take zero arguments, so catch everything.
     try {
       this.load(null);
     } catch (e: unknown) {
