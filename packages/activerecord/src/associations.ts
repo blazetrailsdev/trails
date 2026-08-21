@@ -553,8 +553,10 @@ export function _resolveInverseName(
 export function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
   const childCtor = child.constructor as typeof Base;
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
-  // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:159):
-  // when the inverse is a has_many, wiring is gated on `klass.has_many_inversing`.
+  // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:158-161):
+  // when the inverse is a has_many, wiring is gated on `inverse.klass.has_many_inversing`
+  // — the has_many's OWN target class, which is also the class
+  // `CollectionAssociation#target=` reads the flag off.
   // Without the flag, Rails does NOT touch the parent collection. With it, the
   // write is `set_inverse_instance`'s own `inverse.inversed_from(owner)`
   // (association.rb:132-137, 153-155), whose `self.target = record` reaches
@@ -564,7 +566,7 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
   // canonical target lives on its `CollectionProxy` here (`_associationCache`),
   // so resolving it also materializes that proxy.
   if (inverseRefl?.macro === "hasMany") {
-    if (!childCtor.hasManyInversing) return;
+    if (!inverseRefl.klass?.hasManyInversing) return;
     association(child, inverseName);
     (
       child.association(inverseName) as unknown as { inversedFrom(record: Base): void }

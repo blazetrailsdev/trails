@@ -824,10 +824,19 @@ export function arelTable(this: CoreHost): Table {
  * hence the `super_()` here, which is the same set of links Ruby reaches, entered
  * from the other end.
  *
+ * `@new_record = true` is `Core#initialize`'s own first line (core.rb:390), two
+ * lines above its `init_internals` call and so before `assign_attributes`
+ * (:394) — which is what lets a `#{name}_attributes=` writer dispatched on that
+ * one pass see `new_record?`. A JS constructor cannot touch `this` before
+ * `super()`, so `Base`'s field initializer runs only after ActiveModel has
+ * already assigned; the flag is raised here instead, at the first seat that
+ * runs before the assignment and in Rails' own order.
+ *
  * @internal
  */
 export function initInternals(
   this: CoreRecord & {
+    _newRecord: boolean;
     _readonly: boolean;
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
@@ -837,6 +846,7 @@ export function initInternals(
   },
   super_: () => void,
 ): void {
+  this._newRecord = true;
   super_();
   this._readonly = false;
   this._previouslyNewRecord = false;

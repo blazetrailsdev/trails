@@ -34,11 +34,7 @@ describe("replace_on_target inversing (trails)", () => {
   const { interests } = fixtures(["humans", "interests"]);
 
   it("tracks a persisted record added through the inversing path so a later add replaces in place", async () => {
-    // `has_many_inversing` is a global `class_attribute` in Rails, and both
-    // gates on this path read it off a different class: the belongs_to's
-    // `invertible_for?` off `Human`, `CollectionAssociation#target=` off
-    // `Human#interests`' own klass, `Interest`. Seat it on `Base`.
-    await withHasManyInversing(Base, async () => {
+    await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting") as Base & { id: number };
       const human = (await loadSingularTarget(interest, "human")) as Base & {
         _associationCache(name: string): { target: Base[] } | undefined;
