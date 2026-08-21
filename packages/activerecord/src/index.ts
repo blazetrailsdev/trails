@@ -27,6 +27,10 @@ export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 export type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 export type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+// `ActiveRecord::ConnectionAdapters` itself — `register` / `resolve`
+// (`connection_adapters.rb:9-27`) are how a host application points
+// `db_config.adapter` at an adapter class Rails would otherwise `require`.
+export * as ConnectionAdapters from "./connection-adapters.js";
 export { Migration, MigrationContext } from "./migration.js";
 export {
   TableDefinition,

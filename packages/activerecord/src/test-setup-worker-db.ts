@@ -188,8 +188,8 @@ if (lane === "mysql") {
 }
 
 // Pre-warm the sync adapter-class cache for the active test environment so
-// ConnectionPool.newConnection() can auto-resolve from `dbConfig.adapter`
-// without an explicit `adapterFactory`. Mirrors how Rails' autoload makes
+// ConnectionPool.newConnection() can resolve from `dbConfig.adapter`.
+// Mirrors how Rails' autoload makes
 // adapter classes synchronously available to ConnectionPool#new_connection.
 {
   const { resolve: resolveAdapter } = await import("./connection-adapters.js");

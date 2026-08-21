@@ -20,8 +20,8 @@ const adapters = new Map<string, AdapterLoader>();
 // (like Rails' adapter registry). Cleared when a name is re-registered.
 const resolved = new Map<string, Promise<AdapterClass>>();
 // Sync mirror of `resolved`, populated when each promise settles. Lets
-// sync entry points (like `connectsTo`) hand the pool a sync
-// `adapterFactory` once async adapter loading has completed at least once.
+// `db_config.new_connection` name the adapter class synchronously, as Ruby's
+// `require` lets it, once async adapter loading has completed at least once.
 const resolvedSyncCache = new Map<string, AdapterClass>();
 // Mirror of resolution rejections. Surfaces from `resolveSyncError` so the
 // sync auto-resolve path can re-throw the original loader error (unknown
@@ -31,8 +31,7 @@ const resolveErrors = new Map<string, unknown>();
 /**
  * Synchronous companion to `resolve(name)`. Returns the adapter class if it
  * has been resolved at least once (via `resolve()`), or null. Used by
- * `connectsTo` to build a sync `adapterFactory` without changing its
- * signature.
+ * `db_config.new_connection`, which is synchronous as Rails' is.
  *
  * @internal
  */

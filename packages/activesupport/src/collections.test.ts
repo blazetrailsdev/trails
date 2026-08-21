@@ -729,8 +729,43 @@ describe("ToXmlTest", () => {
     expect(xml).toContain("<name>David</name>");
   });
 
+  it("to xml with dedicated name", () => {
+    const xml = toXmlArray(
+      [
+        { name: "David", age: 26, age_in_millis: 820497600000 },
+        { name: "Jason", age: 31 },
+      ],
+      { skipInstruct: true, indent: 0, root: "people" },
+    );
+
+    expect(xml.slice(0, 29)).toBe('<people type="array"><person>');
+  });
+
+  it("to xml with indent set", () => {
+    const xml = toXmlArray(
+      [
+        { name: "David", street_address: "Paulina" },
+        { name: "Jason", street_address: "Evergreen" },
+      ],
+      { skipInstruct: true, skipTypes: true, indent: 4 },
+    );
+
+    expect(xml.slice(0, 22)).toBe("<objects>\n    <object>");
+    expect(xml).toContain("\n        <street-address>Paulina</street-address>");
+    expect(xml).toContain("\n        <name>David</name>");
+    expect(xml).toContain("\n        <street-address>Evergreen</street-address>");
+    expect(xml).toContain("\n        <name>Jason</name>");
+  });
+
   it("to xml with empty", () => {
     const xml = toXmlArray([]);
     expect(xml).toMatch(/type="array"\/>/);
+  });
+
+  it("to xml dups options", () => {
+    const options = { skipInstruct: true };
+    toXmlArray([], options);
+    // :builder, etc, shouldn't be added to options
+    expect(options).toEqual({ skipInstruct: true });
   });
 });

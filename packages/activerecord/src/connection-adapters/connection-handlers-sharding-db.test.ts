@@ -5,7 +5,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { currentRole, connectedToStack } from "../core.js";
 
 async function withBaseConfigs(
@@ -205,7 +204,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           database: databases[name],
           ...(replica ? { replica: true } : {}),
         }),
-        { ownerName: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
+        { ownerName: "Base", role, shard },
       );
 
     try {
@@ -492,7 +491,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
           ownerName: owner,
           role: "writing",
           shard,
-          adapterFactory: () => new BetterSQLite3Adapter(),
         },
       );
 
@@ -554,7 +552,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
           ownerName: "SecondaryBase",
           role: "writing",
           shard,
-          adapterFactory: () => new BetterSQLite3Adapter(),
         },
       );
 

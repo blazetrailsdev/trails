@@ -160,7 +160,6 @@ export class ConnectionHandler {
       role?: string;
       shard?: string;
       clobber?: boolean;
-      adapterFactory?: () => DatabaseAdapter;
     } = {},
   ): ConnectionPool {
     // `owner_name: Base` (connection_handler.rb:115). `_base` is unset only
@@ -182,9 +181,6 @@ export class ConnectionHandler {
     const clobber = options.clobber ?? false;
 
     const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard);
-    if (options.adapterFactory) {
-      poolConfig.adapterFactory = options.adapterFactory;
-    }
 
     const poolManager = this.setPoolManager(poolConfig.connectionDescriptor);
 
@@ -218,12 +214,12 @@ export class ConnectionHandler {
 
     Notifications.instrument("!connection.active_record", payload);
 
-    // Mirrors connectsTo: when no explicit adapterFactory is given, kick off
-    // an async load so the synchronous adapter cache is warm by the time the
-    // pool first calls newConnection(). Callers that need to await this can
+    // ESM's `import()` is async where Ruby's `require` is not, so kick the
+    // adapter load off here and let the synchronous cache be warm by the time
+    // the pool first calls newConnection(). Callers that need to await this can
     // read `pool.adapterReady`. Detached `.catch` so unhandled-rejection
     // warnings don't fire when callers never await it.
-    if (!options.adapterFactory && poolConfig.dbConfig.adapter) {
+    if (poolConfig.dbConfig.adapter) {
       const adapterReady = resolveConnectionAdapter(poolConfig.dbConfig.adapter);
       adapterReady.catch(() => {});
       poolConfig.pool.adapterReady = adapterReady;

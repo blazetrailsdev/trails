@@ -34,12 +34,12 @@ export async function withSecondAdapter<T>(
     url,
     pool: 1,
   });
+  await dbConfig.loadAdapter();
   const poolConfig = new PoolConfig(
     new ConnectionDescriptor("primary"),
     dbConfig,
     "writing",
     "default",
-    { adapterFactory: () => new PostgreSQLAdapter(url) as unknown as DatabaseAdapter },
   );
   const pool = new ConnectionPool(poolConfig);
   try {

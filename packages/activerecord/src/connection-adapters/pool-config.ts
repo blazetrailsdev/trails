@@ -33,16 +33,6 @@ export class PoolConfig {
   readonly role: string;
   readonly shard: string;
   readonly dbConfig: DatabaseConfig;
-  /**
-   * @noRailsEquivalent CONVERGEABLE — story
-   * `0099-call-argument-convergence/remove-pool-config-adapter-factory`. Ruby
-   * requires the adapter class named by `db_config.adapter` at connect time, so
-   * `connection_handler.rb:279` passes no factory. ESM has no autoloaded
-   * constant lookup, so a caller that cannot await `resolveConnectionAdapter`
-   * hands the pool a ready-made factory. Assigned rather than taken as a fifth
-   * `PoolConfig.new` argument, so that call site keeps Rails' argument list.
-   */
-  adapterFactory?: () => DatabaseAdapter;
   private _pool: ConnectionPool | null = null;
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
@@ -53,15 +43,11 @@ export class PoolConfig {
     dbConfig: DatabaseConfig,
     role: string = "writing",
     shard: string = "default",
-    options: {
-      adapterFactory?: () => DatabaseAdapter;
-    } = {},
   ) {
     this.connectionDescriptor = connectionClass;
     this.dbConfig = dbConfig;
     this.role = role;
     this.shard = shard;
-    this.adapterFactory = options.adapterFactory;
 
     const ref = new WeakRef(this);
     INSTANCES.add(ref);

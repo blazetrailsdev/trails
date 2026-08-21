@@ -611,6 +611,16 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain("<name>David</name>");
   });
 
+  it("one level dasherize false", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, dasherize: false },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street_name>Paulina</street_name>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
   it("one level dasherize true", () => {
     const xml = toXml(
       { name: "David", street_name: "Paulina" },
@@ -618,6 +628,23 @@ describe("HashToXmlTest", () => {
     );
     expect(xml.slice(0, 8)).toBe("<person>");
     expect(xml).toContain("<street-name>Paulina</street-name>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level camelize true", () => {
+    const xml = toXml({ name: "David", street_name: "Paulina" }, { ...xmlOptions, camelize: true });
+    expect(xml.slice(0, 8)).toBe("<Person>");
+    expect(xml).toContain("<StreetName>Paulina</StreetName>");
+    expect(xml).toContain("<Name>David</Name>");
+  });
+
+  it("one level camelize lower", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, camelize: "lower" },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<streetName>Paulina</streetName>");
     expect(xml).toContain("<name>David</name>");
   });
 
@@ -648,6 +675,17 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain('<age nil="true"/>');
   });
 
+  it("one level with skipping types", () => {
+    const xml = toXml(
+      { name: "David", street: "Paulina", age: null },
+      { ...xmlOptions, skipTypes: true },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age nil="true"/>');
+  });
+
   it("one level with yielding", () => {
     const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
       x.tag("creator", "Rails");
@@ -657,6 +695,13 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain("<street>Paulina</street>");
     expect(xml).toContain("<name>David</name>");
     expect(xml).toContain("<creator>Rails</creator>");
+  });
+
+  it("two levels", () => {
+    const xml = toXml({ name: "David", address: { street: "Paulina" } }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<address><street>Paulina</street></address>");
+    expect(xml).toContain("<name>David</name>");
   });
 
   it("two levels with array", () => {
@@ -671,6 +716,14 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain("<name>David</name>");
   });
 
+  it("three levels with array", () => {
+    const xml = toXml(
+      { name: "David", addresses: [{ streets: [{ name: "Paulina" }, { name: "Paulina" }] }] },
+      xmlOptions,
+    );
+    expect(xml).toContain('<addresses type="array"><address><streets type="array"><street><name>');
+  });
+
   it("from xml raises on disallowed type attributes", async () => {
     await expect(
       fromXml('<product><name type="foo">value</name></product>', ["foo"]),
@@ -680,6 +733,24 @@ describe("HashToXmlTest", () => {
   it("from xml array one", async () => {
     expect(await fromXml('<numbers type="Array"><value>1</value></numbers>')).toEqual({
       numbers: { type: "Array", value: "1" },
+    });
+  });
+
+  it("from xml disallows symbol and yaml types by default", async () => {
+    await expect(fromXml('<product><name type="symbol">value</name></product>')).rejects.toThrow(
+      DisallowedType,
+    );
+
+    await expect(fromXml('<product><name type="yaml">value</name></product>')).rejects.toThrow(
+      DisallowedType,
+    );
+  });
+
+  it("from xml array many", async () => {
+    expect(
+      await fromXml('<numbers type="Array"><value>1</value><value>2</value></numbers>'),
+    ).toEqual({
+      numbers: { type: "Array", value: ["1", "2"] },
     });
   });
 
@@ -705,6 +776,14 @@ describe("HashToXmlTest", () => {
       pre_escaped_string: "First &amp; Last Name",
     };
     expect(((await fromXml(xmlString)) as Record<string, unknown>)["person"]).toEqual(expectedHash);
+  });
+
+  it("roundtrip to xml from xml", async () => {
+    const hash = { bare_string: "First & Last Name", pre_escaped_string: "First &amp; Last Name" };
+
+    expect(((await fromXml(toXml(hash, xmlOptions))) as Record<string, unknown>)["person"]).toEqual(
+      hash,
+    );
   });
 
   it("to xml dups options", () => {

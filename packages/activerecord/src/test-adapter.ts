@@ -89,16 +89,22 @@ const _primaryConfiguration: Record<string, unknown> = {
  *
  * @internal
  */
+// The per-connection driver caps the lane wiring below applies to a raw test
+// adapter, as configuration-hash entries. A pool builds its connections through
+// `db_config.new_connection` (`connection_pool.rb`), so a test-local pool caps
+// its connections the same way by carrying these in its `db_config`.
+let rawTestAdapterCaps: Record<string, unknown> = {};
+
 export function ambientPoolConfiguration(): Record<string, unknown> {
-  return { ..._primaryConfiguration };
+  return { ..._primaryConfiguration, ...rawTestAdapterCaps };
 }
 
 /**
  * Synchronous factory that creates a fresh underlying adapter on the PRIMARY
  * lane database — the same database `Base.connection` rides (on the file-backed
  * sqlite lane its connections share the worker DB, exactly like Rails'
- * file-backed `arunit`). This is the `adapterFactory` for a test-local
- * {@link ConnectionPool} — Rails' `ConnectionPool#new_connection`
+ * file-backed `arunit`). This is the raw counterpart of a test-local
+ * {@link ConnectionPool}'s `ConnectionPool#new_connection`
  * (`connection_pool.rb`) — and nothing else: the adapter it returns still
  * carries the constructor's `NullPool` seed (`abstract_adapter.rb:153`) until a
  * pool adopts it. A test that wants a pool-owned adapter calls
@@ -136,9 +142,10 @@ const { ConnectionDescriptor } =
  * (`abstract_adapter.rb:153`) answers none of them — in Ruby it raises
  * `NoMethodError`, and only trails' cast hides that.
  *
- * {@link newRawTestAdapter} is the pool's `adapterFactory`, so the driver-level
- * cap of one server connection per raw adapter (max: 1 / connectionLimit: 1) is
- * untouched, and `pool: 1` says the same thing at the pool layer. One pool per
+ * The pool builds its connection through `db_config.new_connection` from a
+ * config hash carrying the same driver-level cap of one server connection per
+ * adapter (max: 1 / connectionLimit: 1), and `pool: 1` says the same thing at
+ * the pool layer. One pool per
  * raw adapter, not one shared pool, so each keeps the independent schema
  * reflection a standalone adapter has.
  *
@@ -160,6 +167,7 @@ export async function checkoutRawTestAdapter(): Promise<{
 }> {
   const dbConfig = new HashConfig(_primaryEnvConfig.envName, _primaryEnvConfig.name, {
     ..._primaryConfiguration,
+    ...rawTestAdapterCaps,
     pool: 1,
   });
   const poolConfig = new PoolConfig(
@@ -167,7 +175,6 @@ export async function checkoutRawTestAdapter(): Promise<{
     dbConfig,
     "writing",
     "default",
-    { adapterFactory: newRawTestAdapter },
   );
   const pool = new RealConnectionPool(poolConfig);
   return { adapter: await pool.leaseConnection(), pool };
@@ -178,6 +185,7 @@ if (adapterType === "postgres") {
   const [config] = adapterArgs as [Record<string, unknown>];
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
+  rawTestAdapterCaps = { max: 1 };
   newRawTestAdapter = () =>
     new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
@@ -185,6 +193,7 @@ if (adapterType === "postgres") {
   // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
+  rawTestAdapterCaps = { connectionLimit: 1, flags: ["FOUND_ROWS"] };
   newRawTestAdapter = () =>
     new Mysql2Adapter({
       ...config,
@@ -227,6 +236,7 @@ async function buildInTestPool(): Promise<ConnectionPool> {
   // exactly like connection_pool_test.rb derives from `Base.connection_pool.db_config`.
   const dbConfig = new HashConfig(src.envName, src.name, {
     ...src.configurationHash,
+    ...rawTestAdapterCaps,
     checkoutTimeout: 0.2,
   });
 
@@ -235,7 +245,6 @@ async function buildInTestPool(): Promise<ConnectionPool> {
     dbConfig,
     "writing",
     "default",
-    { adapterFactory: newRawTestAdapter },
   );
   return new ConnectionPool(poolConfig);
 }

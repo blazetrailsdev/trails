@@ -17,8 +17,6 @@ import pg from "pg";
 import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
-import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "../connection-adapters/pool-config.js";
@@ -73,15 +71,14 @@ function slotCount(): number {
 // the primary test connection (`connection.ts`, `config.example.yml`).
 async function pooledTemplateAdapter(
   configurationHash: Record<string, unknown>,
-  adapterFactory: () => DatabaseAdapter,
 ): Promise<{ adapter: DatabaseAdapter; pool: ConnectionPool }> {
   const dbConfig = new HashConfig("arunit", "primary", configurationHash);
+  await dbConfig.loadAdapter();
   const poolConfig = new PoolConfig(
     new ConnectionDescriptor("primary"),
     dbConfig,
     "writing",
     "default",
-    { adapterFactory },
   );
   const pool = new ConnectionPool(poolConfig);
   return { adapter: await pool.leaseConnection(), pool };
@@ -145,10 +142,10 @@ const sqliteAdapter: DbTemplateAdapter = {
     const runToken = newRunToken();
     const templatePath = await templatePathFor(runToken);
 
-    const { adapter, pool } = await pooledTemplateAdapter(
-      { adapter: "sqlite3", database: templatePath },
-      () => new BetterSQLite3Adapter(templatePath) as unknown as DatabaseAdapter,
-    );
+    const { adapter, pool } = await pooledTemplateAdapter({
+      adapter: "sqlite3",
+      database: templatePath,
+    });
     await buildTemplateSchema(adapter, runToken, async () => {
       pool.releaseConnection();
       await pool.disconnectBang();
@@ -219,14 +216,11 @@ const pgAdapter: DbTemplateAdapter = {
     await admin.query(`CREATE DATABASE ${quotePgDatabaseName(templateDb)}`);
 
     const templateSettings = withDatabase(settings, templateDb);
-    const { adapter, pool } = await pooledTemplateAdapter(
-      { adapter: "postgresql", ...driverConfig(templateSettings) },
-      () =>
-        new PostgreSQLAdapter({
-          connectionString: settingsUrl("postgres", templateSettings),
-          max: 1,
-        }) as unknown as DatabaseAdapter,
-    );
+    const { adapter, pool } = await pooledTemplateAdapter({
+      adapter: "postgresql",
+      ...driverConfig(templateSettings),
+      max: 1,
+    });
     try {
       await loadSchema(adapter);
       // Stamp ar_internal_metadata so every slot cloned from this template
@@ -349,15 +343,12 @@ const mysqlAdapter: DbTemplateAdapter = {
     await Promise.all(
       Array.from({ length: n }, (_, i) => i + 1).map(async (slot) => {
         const slotSettings = withDatabase(settings, slotDatabaseName(baseDb, runToken, slot));
-        const { adapter, pool } = await pooledTemplateAdapter(
-          { adapter: "mysql2", ...driverConfig(slotSettings) },
-          () =>
-            new Mysql2Adapter({
-              ...driverConfig(slotSettings),
-              connectionLimit: 1,
-              flags: ["FOUND_ROWS"],
-            }) as unknown as DatabaseAdapter,
-        );
+        const { adapter, pool } = await pooledTemplateAdapter({
+          adapter: "mysql2",
+          ...driverConfig(slotSettings),
+          connectionLimit: 1,
+          flags: ["FOUND_ROWS"],
+        });
         await buildTemplateSchema(adapter, runToken, async () => {
           pool.releaseConnection();
           await pool.disconnectBang();
