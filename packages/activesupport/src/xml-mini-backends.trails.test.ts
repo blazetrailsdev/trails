@@ -39,3 +39,28 @@ describe("XmlMini backends", () => {
     }
   });
 });
+
+/**
+ * Rails' Nokogiri engine suites are the shared `EngineTests` module and nothing
+ * else (`nokogiri_engine_test.rb:5-15`), which trails runs from
+ * `xml-mini/xml-mini-engine.test.ts`. These two cases have no Rails
+ * counterpart: they pin behaviour of the trails backends themselves — the
+ * malformed-document raise and entity decoding — which `assert_equal_rexml`
+ * never reaches.
+ */
+describe("Nokogiri XmlMini backends", () => {
+  for (const name of ["Nokogiri", "NokogiriSAX"]) {
+    it(`throws on malformed xml under ${name}`, async () => {
+      const backend = await castBackendNameToModule(name);
+      await expect(async () => backend.parse("<root>")).rejects.toThrow();
+    });
+
+    it(`decodes entities in content under ${name}`, async () => {
+      const backend = await castBackendNameToModule(name);
+      const result = (await backend.parse("<root>&amp;&lt;&gt;</root>")) as {
+        root: { __content__: string };
+      };
+      expect(result.root.__content__).toBe("&<>");
+    });
+  }
+});

@@ -1,5 +1,8 @@
 import { isBlank } from "../string-utils.js";
 import { StringIO } from "../string-io.js";
+// Ruby core `RuntimeError` — what this file's two bare `raise` forms raise
+// (nokogirisax.rb:34,38). `rexml/document.ts` is the one file that declares it.
+import { RuntimeError } from "../rexml/document.js";
 
 function isModuleNotFound(e: unknown, pkg: string): boolean {
   if (!(e instanceof Error)) return false;
@@ -94,12 +97,12 @@ export class HashBuilder {
 
   endDocument(): void {
     if (this._hashStack.length > 1) {
-      throw new Error("Parse stack not empty!");
+      throw new RuntimeError("Parse stack not empty!");
     }
   }
 
   error(errorMessage: string): void {
-    throw new Error(errorMessage);
+    throw new RuntimeError(errorMessage);
   }
 
   startElement(name: string, attrs: ReadonlyArray<[string, string]> = []): void {

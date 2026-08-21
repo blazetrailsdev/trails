@@ -1,7 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { extractBang } from "./hash/slice.js";
+import { RuntimeError } from "../rexml/document.js";
+import * as XmlMini from "../xml-mini.js";
+import * as XmlMini_REXML from "../xml-mini/rexml.js";
+import * as XmlMini_Nokogiri from "../xml-mini/nokogiri.js";
+import * as XmlMini_NokogiriSAX from "../xml-mini/nokogirisax.js";
+import { assertRaises } from "../testing/assertions.js";
 
 import {
+  fromXml,
   deepMerge,
   deepTransformKeys,
   deepTransformValues,
@@ -284,94 +291,173 @@ describe("HashExtTest", () => {
     expect(result).toEqual({ a: 1, c: 3 });
   });
 });
-describe("HashToXmlTest", () => {
-  it.skip("one level");
+/**
+ * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`), which
+ * gates the Nokogiri legs of Rails' backend matrix. Ruby's `rescue LoadError`
+ * catches only the package being absent; `import()` signals that as
+ * `ERR_MODULE_NOT_FOUND` naming the specifier.
+ */
+async function runWithGem(gemName: string, block: () => void): Promise<void> {
+  try {
+    await import(/* @vite-ignore */ gemName);
+  } catch (e) {
+    if (
+      !(
+        e instanceof Error &&
+        (e as { code?: string }).code === "ERR_MODULE_NOT_FOUND" &&
+        e.message.includes(gemName)
+      )
+    ) {
+      throw e;
+    }
+    return;
+  }
+  block();
+}
 
-  it.skip("one level dasherize false");
+function hashToXmlTests(engine: string): void {
+  describe("HashToXmlTest", () => {
+    let defaultBackend: XmlMini.XmlMiniBackend | null | undefined;
 
-  it.skip("one level dasherize true");
+    beforeEach(async () => {
+      defaultBackend = XmlMini.backend();
+      await XmlMini.setBackend(engine);
+    });
 
-  it.skip("one level camelize true");
+    afterEach(async () => {
+      await XmlMini.setBackend(defaultBackend);
+    });
 
-  it.skip("one level camelize lower");
+    it.skip("one level");
 
-  it.skip("one level with types");
+    it.skip("one level dasherize false");
 
-  it.skip("one level with nils");
+    it.skip("one level dasherize true");
 
-  it.skip("one level with skipping types");
+    it.skip("one level camelize true");
 
-  it.skip("one level with yielding");
+    it.skip("one level camelize lower");
 
-  it.skip("two levels");
+    it.skip("one level with types");
 
-  it.skip("two levels with second level overriding to xml");
+    it.skip("one level with nils");
 
-  it.skip("two levels with array");
+    it.skip("one level with skipping types");
 
-  it.skip("three levels with array");
+    it.skip("one level with yielding");
 
-  it.skip("single record from xml");
+    it.skip("two levels");
 
-  it.skip("single record from xml with nil values");
+    it.skip("two levels with second level overriding to xml");
 
-  it.skip("multiple records from xml");
+    it.skip("two levels with array");
 
-  it.skip("single record from xml with attributes other than type");
+    it.skip("three levels with array");
 
-  it.skip("all caps key from xml");
+    it.skip("single record from xml");
 
-  it.skip("empty array from xml");
+    it.skip("single record from xml with nil values");
 
-  it.skip("empty array with whitespace from xml");
+    it.skip("multiple records from xml");
 
-  it.skip("array with one entry from xml");
+    it.skip("single record from xml with attributes other than type");
 
-  it.skip("array with multiple entries from xml");
+    it.skip("all caps key from xml");
 
-  it.skip("file from xml");
+    it.skip("empty array from xml");
 
-  it.skip("file from xml with defaults");
+    it.skip("empty array with whitespace from xml");
 
-  it.skip("tag with attrs and whitespace");
+    it.skip("array with one entry from xml");
 
-  it.skip("empty cdata from xml");
+    it.skip("array with multiple entries from xml");
 
-  it.skip("xsd like types from xml");
+    it.skip("file from xml");
 
-  it.skip("type trickles through when unknown");
+    it.skip("file from xml with defaults");
 
-  it.skip("from xml raises on disallowed type attributes");
+    it.skip("tag with attrs and whitespace");
 
-  it.skip("from xml disallows symbol and yaml types by default");
+    it.skip("empty cdata from xml");
 
-  it.skip("from xml array one");
+    it.skip("xsd like types from xml");
 
-  it.skip("from xml array many");
+    it.skip("type trickles through when unknown");
 
-  it.skip("from trusted xml allows symbol and yaml types");
+    it.skip("from xml raises on disallowed type attributes");
 
-  it.skip("kernel method names to xml");
+    it.skip("from xml disallows symbol and yaml types by default");
 
-  it.skip("empty string works for typecast xml value");
+    it.skip("from xml array one");
 
-  it.skip("escaping to xml");
+    it.skip("from xml array many");
 
-  it.skip("unescaping from xml");
+    it.skip("from trusted xml allows symbol and yaml types");
 
-  it.skip("roundtrip to xml from xml");
+    it.skip("kernel method names to xml");
 
-  it.skip("datetime xml type with utc time");
+    it.skip("empty string works for typecast xml value");
 
-  it.skip("datetime xml type with non utc time");
+    it.skip("escaping to xml");
 
-  it.skip("datetime xml type with far future date");
+    it.skip("unescaping from xml");
 
-  it.skip("to xml dups options");
+    it.skip("roundtrip to xml from xml");
 
-  it.skip("expansion count is limited");
+    it.skip("datetime xml type with utc time");
 
-  it.skip(
-    "multiple records from xml with attributes other than type ignores them without exploding",
-  );
+    it.skip("datetime xml type with non utc time");
+
+    it.skip("datetime xml type with far future date");
+
+    it.skip("to xml dups options");
+
+    it("expansion count is limited", async () => {
+      // hash_ext_test.rb:1023-1032 switches on `XmlMini.backend.name`; a trails
+      // backend is the module namespace object, not a named constant. The
+      // Nokogiri arm is `Error`, not Ruby's `Nokogiri::XML::SyntaxError`,
+      // because `@blazetrails/nokogiri` carries no counterpart for
+      // `raise doc.errors.first` (nokogiri.rb:27) to raise — tracked by
+      // `nokogiri-backend-raises-syntax-error`.
+      const backend = XmlMini.backend();
+      const expected =
+        backend === XmlMini_REXML
+          ? RuntimeError
+          : backend === XmlMini_Nokogiri
+            ? Error
+            : backend === XmlMini_NokogiriSAX
+              ? RuntimeError
+              : undefined;
+
+      await assertRaises([expected!], {}, () => {
+        const attackXml = `
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE member [
+        <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+        <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+        <!ENTITY c "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+        <!ENTITY d "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+        <!ENTITY e "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+        <!ENTITY f "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+        <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      ]>
+      <member>
+      &a;
+      </member>
+      `;
+        return fromXml(attackXml);
+      });
+    });
+
+    it.skip(
+      "multiple records from xml with attributes other than type ignores them without exploding",
+    );
+  });
+}
+
+hashToXmlTests("REXML");
+
+await runWithGem("@blazetrails/nokogiri", () => {
+  hashToXmlTests("Nokogiri");
+  hashToXmlTests("NokogiriSAX");
 });
