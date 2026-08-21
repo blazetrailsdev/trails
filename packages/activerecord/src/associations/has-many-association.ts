@@ -399,9 +399,6 @@ export class HasManyAssociation extends CollectionAssociation {
         limitValue?: number | null;
       } | null
     )?.limitValue;
-    // `[association_scope.limit_value, count].compact.min`
-    // (has_many_association.rb:95) — `compact` drops the nil limit, so `count`
-    // is always present and the receiver is never empty.
     return min([limitValue, count].filter((value) => value != null))!;
   }
 }

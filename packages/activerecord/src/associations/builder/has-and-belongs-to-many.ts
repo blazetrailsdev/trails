@@ -37,8 +37,7 @@ export class HasAndBelongsToMany {
    *
    * Rails writes `Class.new(ActiveRecord::Base)`; this builder cannot import
    * `Base` without closing an import cycle, so the root AR class is reached by
-   * walking up from the left model — the same walk `createHabtmJoinModel`
-   * (associations.ts) does, landing on the same class.
+   * walking up from the left model, landing on the same class.
    *
    * @missingRailsCall call — Language shortcoming: Rails invokes the resolver
    * lambda as `table_name_resolver.call`; JS functions have no `call`-named
@@ -105,10 +104,6 @@ export class HasAndBelongsToMany {
       }
     };
 
-    // `Class.new(ActiveRecord::Base)` inherits Base's whole environment; a JS
-    // subclass of the walked-up root inherits none of it, so the trails-only
-    // seats below (connection delegation, module path, the composite primary
-    // key a join table with no id column needs) sit on this class.
     const ownerFk = this.options.foreignKey;
     if (Array.isArray(ownerFk)) {
       throw new ConfigurationError("HABTM associations do not support composite foreign keys");
@@ -122,15 +117,17 @@ export class HasAndBelongsToMany {
     joinModel.tableNameResolver = () => builder._tableName();
     joinModel.leftModel = lhsModel;
 
-    // The module path Ruby gets from the join model's lexical nesting under the
-    // owner: without it the source `belongsTo` cannot resolve an unqualified
-    // "Article" to "Publisher::Article".
+    // `Class.new(ActiveRecord::Base)` inherits Base's whole environment and the
+    // join model's lexical nesting under the owner; a JS subclass of the
+    // walked-up root inherits neither, so the module path (without which the
+    // source `belongsTo` cannot resolve "Article" to "Publisher::Article") and
+    // the connection seats below are set here.
     if (lhsModel.moduleName) {
       joinModel.moduleName = lhsModel.moduleName;
     }
     // `connection_pool` above is all Ruby needs; JS resolves the pool through
     // `_connectionSpecificationName` and reads `connection` / `adapter`
-    // directly, so those delegate too — required for an alternate database.
+    // directly, so those delegate too.
     Object.defineProperty(joinModel, "connection", {
       get: () => lhsModel.connection,
       configurable: true,
@@ -157,6 +154,8 @@ export class HasAndBelongsToMany {
         ownerFk ?? `${underscore(demodulize(lhsModel._demodulizedName ?? lhsModel.name))}_id`,
     });
     joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
+    // A join table has no id column, and trails' delete/destroy issue PK-based
+    // WHERE clauses where Rails' `delete_all(:delete_all)` builds its own.
     joinModel.primaryKey = [
       joinModel.leftReflection.foreignKey,
       joinModel.rightReflection.foreignKey,
@@ -253,9 +252,8 @@ export class HasAndBelongsToMany {
 
     const joinModel = this.throughModel();
 
-    // `const_set join_model.name, join_model` + `private_constant`
-    // (associations.rb:1868-1869): trails has no constant table, so the join
-    // model is registered under the same `Owner::HABTM_Name` path.
+    // `const_set` + `private_constant` (associations.rb:1868-1869) against the
+    // registry that stands in for Ruby's constant table.
     const registryKey = `${model.name}::${joinModel.name}`;
     deps.modelRegistry.set(registryKey, joinModel);
     privateConstant(registryKey);

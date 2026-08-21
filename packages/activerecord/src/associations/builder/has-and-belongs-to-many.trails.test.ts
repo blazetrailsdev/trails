@@ -38,7 +38,6 @@ describe("Builder::HasAndBelongsToMany#throughModel", () => {
     expect(joinModel.leftModel).toBe(Developer);
     expect(joinModel.leftReflection.name).toBe("leftSide");
     expect(joinModel.rightReflection.name).toBe("project");
-    // A join table has no id column, so the join keys are the primary key.
     expect(joinModel.primaryKey).toEqual(["developer_id", "project_id"]);
   });
 });
