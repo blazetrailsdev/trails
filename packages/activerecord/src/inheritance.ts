@@ -136,12 +136,10 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  *
  * Mirrors Rails' else branch `superclass == Base || !columns_hash.include?(inheritance_column)`:
  * a non-root class still "descends" (is not an STI subclass) when it doesn't
- * actually carry the inheritance column, or STI is disabled. Rails asks
- * `columns_hash`, whose first touch loads the schema synchronously; trails
- * reflects lazily and cannot query from a synchronous reader, so the membership
- * test goes through `attribute_types` — the same set once reflection has run
- * (it seeds from `columns_hash`), and inherited rather than empty while it has
- * not.
+ * actually carry the inheritance column, or STI is disabled. The membership
+ * test is Rails' own `columns_hash.include?`: a *declared* `attribute :type`
+ * with no backing column must not make a model an STI subclass, which is why
+ * this reader asks for column metadata rather than `attribute_types`.
  * Decoupled from the explicit `inheritanceColumn` sentinel
  * ({@link isStiSubclass}), which still gates the registry-resolved row-dispatch
  * paths.
@@ -151,8 +149,23 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  const inheritCol = modelClass.inheritanceColumn;
-  return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
+  let columnsHash: Record<string, unknown>;
+  try {
+    columnsHash = modelClass.columnsHash();
+  } catch {
+    // Rails always gets a `columns_hash` here: `reset_table_name` gives an
+    // abstract class its superclass's table (`model_schema.rb:290-300`), and the
+    // first touch loads the schema synchronously. trails infers a table name for
+    // an abstract class instead of nil, so `load_schema!` treats every abstract
+    // class as table-less (`model-schema.ts` loadSchemaBangAnchor) and reflection
+    // is lazy besides — in both windows fall back to `attribute_types`, which is
+    // seeded from `columns_hash` and inherited rather than empty.
+    const inheritCol = modelClass.inheritanceColumn;
+    return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
+  }
+  // Ruby `columns_hash.include?(inheritance_column)` is false for the nil
+  // `inheritance_column` of an STI-disabled model, so no separate arm.
+  return !Object.keys(columnsHash).includes(modelClass.inheritanceColumn as string);
 }
 
 /**
