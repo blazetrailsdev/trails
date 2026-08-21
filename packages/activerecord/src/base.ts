@@ -638,9 +638,9 @@ function _applyScopeAttributes(
     // `populate_with_current_scope_attributes` runs from `initialize`
     // (scoping.rb:60-66, core.rb:474), which a JS constructor cannot await, so
     // the assignment is parked on the record for `save` to drain — the same
-    // deferral the constructor's nested re-dispatch uses
-    // (`_reapplyNestedAttrSetters`). A scope value naming an association (
-    // `Firm.where(firm: f).new`) is the only one that can still be in flight.
+    // deferral the nested-attribute writers use. A scope value naming an
+    // association (`Firm.where(firm: f).new`) is the only one that can still be
+    // in flight.
     const pending = (record as any).assignAttributes(toApply) as Promise<void> | void;
     if (pending) _NestedAttributes.parkNestedReaderLoad(record as any, pending);
   }
@@ -732,27 +732,6 @@ function _extractAssociationAttrs(
 }
 
 /**
- * Collect every `<assoc>Attributes` nested-attribute setter key registered on
- * `ctor` and its ancestors (the same registry `_reapplyNestedAttrSetters`
- * walks). Used to hold nested-attribute keys out of the Model constructor's
- * setter-dispatching assignment so they fire post-super, once the association
- * caches exist.
- * @internal
- */
-function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<string> {
-  const keys = new Set<string>();
-  let cls: unknown = ctor;
-  while (cls && cls !== Object) {
-    const own = Object.getOwnPropertyDescriptor(cls, "_nestedAttributeSetterKeys");
-    if (own?.value instanceof Set) {
-      for (const k of own.value as Set<string>) keys.add(k);
-    }
-    cls = Object.getPrototypeOf(cls);
-  }
-  return keys;
-}
-
-/**
  * Route a constructor-form composite primary key through the deferred `id`
  * handling: trails holds the `id` key out of super()'s attribute loop and
  * re-dispatches it here, once `initInternals` has run.
@@ -776,26 +755,23 @@ function _applyCompositePrimaryKey(
 }
 
 /**
- * Keys held out of super()'s setter-dispatching attribute loop and re-applied
- * post-`initInternals`: a composite-PK `id` (→ `_applyCompositePrimaryKey`) and
- * `<assoc>Attributes` nested-attribute keys (→ `_reapplyNestedAttrSetters`).
- * Both dispatch setters that touch state (`id=` the key columns, the nested
- * writer the association caches) which isn't wired until after `super()`.
+ * The one key held out of super()'s setter-dispatching attribute loop and
+ * re-applied post-`initInternals`: a composite-PK `id`
+ * (→ `_applyCompositePrimaryKey`), whose `id=` writes key columns that are not
+ * wired until after `super()`.
  * @internal
  */
 function _withoutDeferredConstructionKeys(
   ctor: typeof Base | undefined,
   attrs: Record<string, unknown>,
 ): Record<string, unknown> {
-  const drop = _collectNestedAttributeSetterKeys(ctor);
   if (
-    Array.isArray((ctor as { primaryKey?: unknown } | undefined)?.primaryKey) &&
-    Object.prototype.hasOwnProperty.call(attrs, "id")
+    !Array.isArray((ctor as { primaryKey?: unknown } | undefined)?.primaryKey) ||
+    !Object.prototype.hasOwnProperty.call(attrs, "id")
   ) {
-    drop.add("id");
+    return attrs;
   }
-  if (drop.size === 0) return attrs;
-  return Object.fromEntries(Object.entries(attrs).filter(([k]) => !drop.has(k)));
+  return Object.fromEntries(Object.entries(attrs).filter(([k]) => k !== "id"));
 }
 
 /**
@@ -1539,8 +1515,7 @@ export class Base extends Model {
   static set connectionSpecificationName(name: string) {
     (this as any)._connectionSpecificationName = name;
   }
-  declare static isConnectedQ: typeof ConnectionHandling.isConnectedQ;
-  declare static isConnected: typeof ConnectionHandling.isConnected;
+  declare static connectedQ: typeof ConnectionHandling.connectedQ;
   declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
@@ -1803,7 +1778,6 @@ export class Base extends Model {
   // --- ReadonlyAttributes mixin (wired via extend() after class) ---
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
-  declare static isReadonlyAttribute: typeof ReadonlyAttributes.readonlyAttributeQ;
 
   /**
    * Return the list of readonly attribute names.
@@ -3217,11 +3191,10 @@ export class Base extends Model {
           );
         }
       }
-      // Hold the composite-PK `id` and any `<assoc>Attributes` nested-attribute
-      // keys out of super()'s setter-dispatching loop: their setters (`id=`, the
-      // nested writer) touch state that isn't wired until after super()
-      // (`initInternals`). Re-dispatched post-super by `_applyCompositePrimaryKey`
-      // and `_reapplyNestedAttrSetters`.
+      // Hold the composite-PK `id` out of super()'s setter-dispatching loop:
+      // `id=` touches key columns that aren't wired until after super()
+      // (`initInternals`). Re-dispatched post-super by
+      // `_applyCompositePrimaryKey`.
       attrsForSuper = _withoutDeferredConstructionKeys(ctor2, attrsForSuper);
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
@@ -3293,12 +3266,6 @@ export class Base extends Model {
       // dirty state.
       (this as any)._dirty.snapshot((this as any)._attributes);
     }
-    // Dispatch nested-attribute writers (`<assoc>Attributes=`) that the Model
-    // constructor wrote as plain attribute values rather than through their
-    // generated setter, so `new Model({commentsAttributes: [...]})` builds the
-    // associated records in memory — mirroring Rails' `assign_attributes` →
-    // `public_send(setter)` path. No-op for models without nested attributes.
-    _Persistence._reapplyNestedAttrSetters(this.constructor as typeof Base, this, attrs);
   }
 
   // --- Persistence instance predicates (wired via include() after class body) ---
@@ -4321,7 +4288,7 @@ export class Base extends Model {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;
-    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.isConnectedQ()) {
+    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.connectedQ()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
     }
     // Schema is loaded (or a live connection is available): list the columns'

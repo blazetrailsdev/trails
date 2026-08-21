@@ -1,6 +1,6 @@
 /**
  * Phase D-0 / D-0a: verify that:
- *   1. Base.connectionHandler is bootstrapped per worker (isConnectedQ)
+ *   1. Base.connectionHandler is bootstrapped per worker (connectedQ)
  *   2. Base.connection resolves the adapter from the handler internally
  *   3. A model with no direct `static { this.adapter = ... }` assignment
  *      resolves its adapter via the Rails-shape handler chain
@@ -50,8 +50,8 @@ describe("handler-resolved adapter (Phase D-0)", () => {
     await Base.connection.dropTable("handler_resolved_comments", { ifExists: true });
   });
 
-  it("isConnectedQ() is true after setupHandlerSuite()", () => {
-    expect(Base.isConnectedQ()).toBe(true);
+  it("connectedQ() is true after setupHandlerSuite()", () => {
+    expect(Base.connectedQ()).toBe(true);
   });
 
   it("bare class extends Base loads schema via lazy reflection without deadlock", async () => {

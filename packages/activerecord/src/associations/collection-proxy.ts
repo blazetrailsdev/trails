@@ -37,7 +37,6 @@ import {
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
 import { ConfigurationError, AssociationTypeMismatch } from "../errors.js";
-import { RecordInvalid } from "../validations.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -652,39 +651,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Wire `record` into this collection's target from the inverse side.
-   *
-   * Mirrors the Rails inverse-wiring chain `set_inverse_instance`
-   * (association.rb:132) → `inversed_from` → `self.target =`
-   * (CollectionAssociation#target=, collection_association.rb:285) →
-   * `replace_on_target(record, true, replace: true, inversing: true)`
-   * (the call at collection_association.rb:294), the path Rails takes when a
-   * belongs_to-loaded or preloaded record is folded back into its `has_many`
-   * owner: `skip_callbacks` (no before/after_add — inverse wiring is not a user
-   * `<<`), `replace: true`, and `inversing: true`. The `inversing` arm of that
-   * method's `@replaced_or_added_targets << record if inversing || index ||
-   * record.new_record?` (:476) is what records a *persisted* record here, so a
-   * later `<<`/`push` of the same record replaces in place rather than
-   * appending a duplicate; and because `@_was_loaded` is forced true there we
-   * always append to `@target` — loaded or not. A subsequent real `load()`
-   * merges this in-memory record by primary key (the trails analog of
-   * `merge_target_lists`), so the early append is not double-counted.
-   *
-   * This is the single write entry point for inverse has_many targets. The C2
-   * (#2591) seam, which used to reach into `proxy._replacedOrAddedTargets` from
-   * `associations.ts`, is now internal here. The seeded record lands in
-   * `_target`, which `Base#_associationCache` surfaces to readers (this proxy
-   * is the canonical has_many store).
-   * @internal
-   */
-  _wireInverseTarget(record: T): void {
-    this._collectionAssociation().replaceOnTarget(record, true, {
-      replace: true,
-      inversing: true,
-    }) as Base | null;
-  }
-
-  /**
    * Returns the size of the collection, executing a SELECT COUNT(*) query if
    * the collection hasn't been loaded.
    *
@@ -1279,37 +1245,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async append(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
-  }
-
-  /**
-   * Bang version of append — raises RecordInvalid when a target record or join
-   * record is invalid (mirrors Rails' << / save! behavior).
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#<< (bang semantics)
-   */
-  async appendBang(...records: T[]): Promise<void> {
-    this._raiseOnTypeMismatch(records);
-    if (this._assocDef.options.through) {
-      await this._pushThrough(records);
-      return;
-    }
-    // Non-through: push() assigns the FK and calls save() for each record.
-    // After push(), raise RecordInvalid for any record that is still new (save failed)
-    // or still has dirty changes (save returned false without retry — bang raises on
-    // the initial failure rather than attempting a second save).
-    await this.push(...records);
-
-    for (const record of records) {
-      if (record.isNewRecord()) {
-        // New record still unsaved — push()'s save() returned false
-        throw new RecordInvalid(record as unknown as object);
-      }
-      if (record.hasChangesToSave) {
-        // Persisted record still has unsaved changes after push() — raise without retrying
-        throw new RecordInvalid(record as unknown as object);
-      }
-    }
-    return;
   }
 
   /**

@@ -23,7 +23,7 @@ function seedFiles() {
   vfs.write("src/app/models/post.ts", "class Post {}");
   vfs.write("src/app/controllers/application-controller.ts", "class AppController {}");
   vfs.write("src/config/routes.ts", "// routes");
-  vfs.write("db/migrations/001-create-users.ts", "migration");
+  vfs.write("db/migrations/001_create_users.ts", "migration");
   vfs.write("package.json", "{}");
 }
 

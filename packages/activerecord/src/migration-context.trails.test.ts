@@ -148,19 +148,6 @@ describe("MigrationContext filename spellings", () => {
     ]);
   });
 
-  it("loads hyphen-named migrations as a transitional alias", () => {
-    const migrations = found("spellings_hyphen");
-    expect(migrations).toHaveLength(1);
-    expect(migrations[0].version).toBe(20260101000000);
-    expect(migrations[0].name).toBe("CreatePosts");
-  });
-
-  it("collapses hyphen and underscore variants of the same migration, preferring underscore", () => {
-    const migrations = found("spellings_hyphen_and_underscore");
-    expect(migrations).toHaveLength(1);
-    expect(basename(migrations[0].filename!)).toBe("20260101000000_create_posts.ts");
-  });
-
   it("prefers .ts over .js when both exist for the same migration", () => {
     const migrations = found("spellings_ts_and_js");
     expect(migrations).toHaveLength(1);

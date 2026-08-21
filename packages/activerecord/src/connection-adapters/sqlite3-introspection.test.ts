@@ -298,6 +298,29 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(await adapter.indexExists("aux.customers", ["name"])).toBe(false);
   });
 
+  it("removeIndex drops the index in the named schema, not another attached one", async () => {
+    // An unqualified DROP INDEX name resolves across main, temp and every
+    // ATTACHed database in attach order, so an identically-named index in an
+    // earlier-attached schema would be the one dropped.
+    const onePath = path.join(tmpDir, "one-dup-index.sqlite3");
+    const twoPath = path.join(tmpDir, "two-dup-index.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${onePath}' AS one`);
+    await adapter.executeMutation(`ATTACH DATABASE '${twoPath}' AS two`);
+    // No teardown: both tables live in per-test ATTACHed database files under
+    // tmpDir, which afterEach removes wholesale.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.executeMutation("CREATE TABLE one.customers (id INTEGER PRIMARY KEY, name TEXT)");
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.executeMutation("CREATE TABLE two.customers (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.addIndex("one.customers", ["name"]);
+    await adapter.addIndex("two.customers", ["name"]);
+
+    await adapter.removeIndex("two.customers", ["name"]);
+
+    expect(await adapter.indexExists("two.customers", ["name"])).toBe(false);
+    expect(await adapter.indexExists("one.customers", ["name"])).toBe(true);
+  });
+
   it("copyTableIndexes copies a default-named index on an ATTACHed schema", async () => {
     // The other half of the default-name fix: copy_table_indexes reaches
     // add_index for every index it copies (sqlite3_adapter.rb:668-674), so a

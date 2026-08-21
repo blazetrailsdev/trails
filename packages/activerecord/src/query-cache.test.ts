@@ -570,7 +570,7 @@ describe("QueryCacheTest", () => {
     const originalConnection = Base.removeConnection();
 
     await Base.establishConnection(dbConfig);
-    expect(Task.isConnectedQ()).toBe(false);
+    expect(Task.connectedQ()).toBe(false);
 
     try {
       await Task.cache(async () => {

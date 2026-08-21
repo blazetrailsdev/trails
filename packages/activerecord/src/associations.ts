@@ -553,18 +553,24 @@ export function _resolveInverseName(
 export function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
   const childCtor = child.constructor as typeof Base;
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
-  // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:159):
-  // when the inverse is a has_many, wiring is gated on `klass.has_many_inversing`.
-  // Without the flag, Rails does NOT touch the parent collection. Route the
-  // write through the proxy's `_wireInverseTarget` so the in-memory target and
-  // `@replaced_or_added_targets` are maintained in one place (the proxy). This removes the C2 (#2591)
-  // seam that used to reach into `proxy._replacedOrAddedTargets` from here.
+  // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:158-161):
+  // when the inverse is a has_many, wiring is gated on `inverse.klass.has_many_inversing`
+  // — the has_many's OWN target class, which is also the class
+  // `CollectionAssociation#target=` reads the flag off.
+  // Without the flag, Rails does NOT touch the parent collection. With it, the
+  // write is `set_inverse_instance`'s own `inverse.inversed_from(owner)`
+  // (association.rb:132-137, 153-155), whose `self.target = record` reaches
+  // `CollectionAssociation#target=` (collection_association.rb:284-296) and so
+  // `replace_on_target(record, true, replace: true, inversing: true)`. Rails
+  // resolves the inverse with a bare `record.association(name)`; a has_many's
+  // canonical target lives on its `CollectionProxy` here (`_associationCache`),
+  // so resolving it also materializes that proxy.
   if (inverseRefl?.macro === "hasMany") {
-    if (!childCtor.hasManyInversing) return;
-    const proxy = association(child, inverseName) as unknown as {
-      _wireInverseTarget: (record: Base) => void;
-    };
-    proxy._wireInverseTarget(owner);
+    if (!inverseRefl.klass?.hasManyInversing) return;
+    association(child, inverseName);
+    (
+      child.association(inverseName) as unknown as { inversedFrom(record: Base): void }
+    ).inversedFrom(owner);
     return;
   }
   _cacheSingularTarget(child, inverseName, owner);

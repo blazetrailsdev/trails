@@ -6,8 +6,6 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { camelize } from "@blazetrails/activesupport";
-import { parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import {
@@ -879,46 +877,6 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
   return keys.map((key) => this.readAttribute(key));
 }
 
-/**
- * Re-dispatch any `*Attributes` nested attribute keys that the Base
- * constructor wrote as plain attribute values (via `writeAttribute`) rather
- * than through the generated writer. Called by `create`/`createBang` after
- * construction so that `Model.create({commentsAttributes: [...]})` correctly
- * queues nested attributes for processing on save — mirrors Rails'
- * `new Model(attributes)` → `assign_attributes` → `public_send(setter)` path
- * (activemodel attribute_assignment.rb:35-48), which dispatches by *name*
- * against the `define_method`-generated writer (nested_attributes.rb:582-591).
- *
- * The name is the awaitable `set#{Name}Attributes` writer rather than the
- * `#{name}Attributes=` property setter: it is the one that reproduces Rails'
- * inline timing for the assignments that need I/O, and a JS property setter
- * cannot await. The writer answers a promise only when the assignment owes DB
- * I/O, which a record under construction cannot: it is new, so its has_one never
- * queries (`find_target?` is false) and holds no loaded target. Should one ever
- * arrive, a constructor cannot await it either, so it is parked and drained
- * where the other deferred nested-attributes work is drained — `save`
- * (nested-attributes.ts:182).
- */
-export function _reapplyNestedAttrSetters(
-  ctor: PersistenceHost,
-  record: any,
-  attrs: Record<string, unknown>,
-): void {
-  let cls: any = ctor;
-  while (cls && cls !== Object) {
-    const own = Object.getOwnPropertyDescriptor(cls, "_nestedAttributeSetterKeys");
-    if (own?.value instanceof Set) {
-      for (const k of own.value as Set<string>) {
-        if (Object.prototype.hasOwnProperty.call(attrs, k)) {
-          const pending = record[`set${camelize(k, true)}`](attrs[k]);
-          if (pending) parkNestedReaderLoad(record, pending);
-        }
-      }
-    }
-    cls = Object.getPrototypeOf(cls);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // updateAttribute / updateAttributeBang / updateColumn(s) — single- and
 // multi-column writers. Rails' update_attribute runs callbacks (skips
@@ -1552,7 +1510,7 @@ interface PersistencePrivateHost {
     primaryKey: string | string[];
     currentScope?: unknown | (() => unknown);
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
-    isReadonlyAttribute?(name: string): boolean;
+    readonlyAttributeQ?(name: string): boolean;
     withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
     connection: { execDelete(sql: string, name: string): Promise<number> };
   };
@@ -1914,7 +1872,7 @@ export async function _createRecord(
 
 /** @internal */
 export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
-  if ((this.constructor as any).isReadonlyAttribute?.(name)) {
+  if ((this.constructor as any).readonlyAttributeQ?.(name)) {
     throw new ReadonlyAttributeError(name);
   }
 }

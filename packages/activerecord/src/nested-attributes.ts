@@ -554,12 +554,6 @@ export function generateAssociationWriter(
 ): void {
   const modelClass = this;
   const attrName = `${associationName}Attributes`;
-  // Register so persistence.create/createBang can re-dispatch after construction
-  // (the Base constructor routes attrs through writeAttribute, bypassing setters).
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeSetterKeys")) {
-    (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
-  }
-  (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
   const assign: (record: Base, name: string, value: any) => Promise<void> | void =
     type === "collection"
       ? assignNestedAttributesForCollectionAssociation
@@ -700,9 +694,9 @@ async function detachDisplacedThenSetNewRecord(
  * Rails reads the existing record with `send(association_name)`
  * (nested_attributes.rb:434), a plain synchronous call; ours is a promise for an
  * unloaded association. The writer itself awaits that load; this is for the one
- * caller that cannot — the constructor re-dispatch in `_reapplyNestedAttrSetters`
- * (persistence.ts). The deferral is a *read*, so no DB state is in flight to
- * race an interim insert.
+ * caller that cannot — `populate_with_current_scope_attributes`, run from a
+ * constructor. The deferral is a *read*, so no DB state is in flight to race an
+ * interim insert.
  * @internal
  */
 export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {

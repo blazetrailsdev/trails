@@ -948,7 +948,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
-    await withHasManyInversing(Human, async () => {
+    await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "human")) as any;
       const cached = human._associationCache("interests")?.target as any[];
@@ -963,7 +963,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("with has many inversing should have single record when setting record through attribute in build method", async () => {
-    await withHasManyInversing(Human, async () => {
+    await withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
       association(human, "interests").build({ human });
       expect(await association(human, "interests").size()).toBe(1);
@@ -1190,7 +1190,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
-    await withHasManyInversing(Human, async () => {
+    await withHasManyInversing(Interest, async () => {
       const interest = interests("llama_wrangling");
       const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
       const cached = human._associationCache("polymorphicInterests")?.target as any[];
