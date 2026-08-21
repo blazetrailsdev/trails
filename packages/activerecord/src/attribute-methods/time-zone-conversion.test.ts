@@ -22,7 +22,7 @@ describe("TimeZoneConversionTest", () => {
         this.attribute("published_at", "datetime");
       }
     }
-    const type = Post._attributeDefinitions.get("published_at")?.type;
+    const type = Post.typeForAttribute("published_at");
     expect(type).toBeInstanceOf(TimeZoneConverter);
   });
 
@@ -33,7 +33,7 @@ describe("TimeZoneConversionTest", () => {
         this.attribute("published_at", "datetime");
       }
     }
-    const type = Post._attributeDefinitions.get("published_at")?.type;
+    const type = Post.typeForAttribute("published_at");
     expect(type).not.toBeInstanceOf(TimeZoneConverter);
   });
 
@@ -44,7 +44,7 @@ describe("TimeZoneConversionTest", () => {
         this.attribute("title", "string");
       }
     }
-    const type = Post._attributeDefinitions.get("title")?.type;
+    const type = Post.typeForAttribute("title");
     expect(type).not.toBeInstanceOf(TimeZoneConverter);
   });
 
@@ -56,7 +56,7 @@ describe("TimeZoneConversionTest", () => {
         this.attribute("published_at", "datetime");
       }
     }
-    const type = Post._attributeDefinitions.get("published_at")?.type;
+    const type = Post.typeForAttribute("published_at");
     expect(type).not.toBeInstanceOf(TimeZoneConverter);
   });
 
@@ -67,7 +67,7 @@ describe("TimeZoneConversionTest", () => {
         this.attribute("starts_at", "time");
       }
     }
-    const type = Post._attributeDefinitions.get("starts_at")?.type;
+    const type = Post.typeForAttribute("starts_at");
     expect(type).toBeInstanceOf(TimeZoneConverter);
   });
 
