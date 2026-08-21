@@ -43,10 +43,15 @@ export class BacktraceFilterWithFallback {
  * assignment with `::Rails.respond_to?(:backtrace_cleaner)` because the plugin
  * can run without Rails loaded; `Trails.backtraceCleaner` is the trails seat.
  *
- * @missingRailsCall rails_plugin.rb:122-135 swaps three Minitest reporters
- * (`SummaryReporter`, `ProgressReporter`, `ProfileReporter`). trails has no
- * Minitest reporter surface to swap — vitest owns reporting — so only the
- * backtrace-filter arm (:115-120) is ported.
+ * @missingRailsCall reject! — PERMANENT: rails_plugin.rb:122-135 rejects the
+ * three stock reporters off `reporter.reporters` (`SummaryReporter`,
+ * `ProgressReporter`, `ProfileReporter`). trails has no Minitest reporter
+ * surface to swap — vitest owns reporting — so only the backtrace-filter arm
+ * (:115-120) is ported.
+ *
+ * @missingRailsCall << — PERMANENT: the replacements Rails appends in that same
+ * arm (`SuppressedSummaryReporter`, `Rails::TestUnitReporter`,
+ * `ProfileReporter`), for the same reason.
  *
  * @noRailsEquivalent CONVERGEABLE — comparator gap, not a deviation. Ports
  * `Minitest.plugin_rails_init`, which the comparator cannot see for the libPath
