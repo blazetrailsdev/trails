@@ -333,9 +333,9 @@ describe("AttributeAssignmentTest", () => {
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
-      override _assignAttribute(k: string, v: unknown): void {
+      override _assignAttribute(k: string, v: unknown): Promise<void> | void {
         seen.push([k, v]);
-        super._assignAttribute(k, v);
+        return super._assignAttribute(k, v);
       }
     }
     const p = new Person({});
