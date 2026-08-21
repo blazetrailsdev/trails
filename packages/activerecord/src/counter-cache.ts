@@ -241,16 +241,16 @@ export function isCounterCacheColumn(this: typeof Base, columnName: string): boo
  *     self.counter_cached_association_names |= association_names
  *   end
  *
- * The `super` call stands in for the pending-column flush: trails resolves a
- * belongs_to's target through the model registry rather than a constant, so a
- * counter column staged before its target existed is merged here.
+ * `superFn` is Ruby `super` — the next link of the chain assembled in
+ * `model-schema.ts`, which this joins at `include CounterCache` (base.rb:309).
+ * The `getCounterCacheColumns` call ahead of the reflection scan is the
+ * pending-column flush: trails resolves a belongs_to's target through the model
+ * registry rather than a constant, so a counter column staged before its target
+ * existed is merged at this same schema-load seam.
  */
 export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
   superFn();
 
-  // trails resolves a belongs_to's target through the model registry rather
-  // than a constant, so a counter column staged before its target existed is
-  // merged here, at the same schema-load seam.
   getCounterCacheColumns(this);
 
   // `registerModel` also accepts stand-ins that do not descend from `Base`, so
@@ -406,6 +406,4 @@ export function _foreignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
   return arr1.length === arr2.length && arr1.every((k, i) => k === arr2[i]);
 }
 
-// `include CounterCache` (base.rb:309) — its `load_schema!` override
-// (counter_cache.rb:186-195) joins the chain at that ancestor position.
 registerLoadSchemaOverride(309, loadSchemaBang as never);

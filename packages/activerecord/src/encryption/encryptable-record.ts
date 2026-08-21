@@ -324,9 +324,11 @@ export class EncryptableRecord {
   /**
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#load_schema!
    * (encryptable_record.rb:126-130) — `super`, then the length validations when
-   * `validate_column_size` is on.
+   * `validate_column_size` is on. `superFn` is Ruby `super`: the next link of
+   * the chain assembled in `model-schema.ts`, which this joins at
+   * `include Encryption::EncryptableRecord` (base.rb:313).
    */
-  static loadSchemaBang(this: any, superFn: () => void): void {
+  static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
     superFn();
 
     if (Configurable.config.validateColumnSize) {
@@ -704,6 +706,4 @@ export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefin
   return undefined;
 }
 
-// `include Encryption::EncryptableRecord` (base.rb:313) — later than
-// CounterCache (:309), so this override sits closer to the class and runs first.
 registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);

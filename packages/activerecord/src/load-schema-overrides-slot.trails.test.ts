@@ -12,7 +12,8 @@ import "./encryption/encryptable-record.js";
  * TS-only: Rails gets the ordering from `include` (base.rb:309 CounterCache,
  * :313 Encryption::EncryptableRecord), so a Ruby test would have nothing to
  * assert. trails rebuilds the chain by hand, so the order and the `super`
- * wiring are worth pinning.
+ * wiring are worth pinning. The table-less host makes the anchor throw, which
+ * is all the ordering assertion needs.
  */
 describe("load_schema! super chain", () => {
   it("registers CounterCache and EncryptableRecord at their include positions", () => {
@@ -34,9 +35,6 @@ describe("load_schema! super chain", () => {
 
     try {
       const host = { _schemaLoaded: true } as never;
-      // `_schemaLoaded` short-circuits the concerns' own bodies; the anchor
-      // still throws for a table-less host, which is all we need past the
-      // ordering assertion.
       expect(() => loadSchemaBang.call(host)).toThrow();
       expect(calls).toEqual(["late", "early"]);
     } finally {

@@ -1092,8 +1092,6 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  * isn't populated), call `Base.loadSchema()` (base.ts).
  */
 export function loadSchema(this: SchemaHost): void {
-  // Mirrors: `return if schema_loaded?` (model_schema.rb:535). Rails' Monitor
-  // has no JS counterpart — a single-threaded runtime cannot interleave here.
   if (ownSchemaMemo(this, "_schemaLoaded")) return;
   loadSchemaBang.call(this);
 }
@@ -1106,9 +1104,10 @@ export function loadSchema(this: SchemaHost): void {
  * (encryptable_record.rb:126-130). A TS class cannot splice a module into its
  * ancestor chain, so the overrides register through
  * `registerLoadSchemaOverride` (load-schema-overrides-slot.ts) and are wrapped
- * here innermost-first, each
- * handed the next link as `superFn` — the same idiom
- * `CounterCache._createRecord` already uses for a `super`-calling override.
+ * here by ascending `includeOrder` — the last-included module ends up
+ * outermost, exactly where `include` puts it in the ancestors — each handed the
+ * next link as `superFn`, the idiom `CounterCache._createRecord` already uses
+ * for a `super`-calling override.
  */
 export function loadSchemaBang(this: SchemaHost): void {
   runLoadSchemaChain(this, () => loadSchemaBangAnchor.call(this));
@@ -1116,8 +1115,6 @@ export function loadSchemaBang(this: SchemaHost): void {
 
 function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
   let next = anchor;
-  // Ascending `includeOrder` = Rails' include order, so the last-included
-  // module ends up outermost, exactly where `include` puts it in the ancestors.
   for (const { override } of loadSchemaOverrides) {
     const superFn = next;
     next = () => override.call(host, superFn);
@@ -1389,6 +1386,11 @@ function applyColumnsHash(
  * overwritten, matching Rails where the pending replay runs after the column
  * seed so `attribute :foo, :bar` always wins over the reflected type.
  *
+ * This IS `ModelSchema#load_schema!`'s body on the async path, so it ends by
+ * running the concern overrides (counter_cache.rb:186-195,
+ * encryptable_record.rb:126-130) over an already-completed anchor rather than
+ * re-entering `loadSchemaBang`.
+ *
  * @internal
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
@@ -1451,9 +1453,6 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // (attribute_methods.rb:114) and would otherwise re-enter this load.
   this._schemaLoaded = true;
   defineAttributeMethodsAfterLoad(this);
-  // The reflection above IS `ModelSchema#load_schema!`'s body, so run the
-  // concern overrides (counter_cache.rb:186-195, encryptable_record.rb:126-130)
-  // over an already-completed anchor rather than re-entering it.
   runLoadSchemaChain(this, () => {});
 }
 

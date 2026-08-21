@@ -47,10 +47,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // `load_schema!` is a super chain in Rails (model_schema.rb:587-597 with
-  // encryptable_record.rb:126-130 layered over it), so the column limit
-  // reflected by the schema load is what turns into the length validation.
-  // Declaring `encrypts` runs before any reflection, where no limit is known.
+  /**
+   * `load_schema!` is a super chain in Rails (model_schema.rb:587-597 with
+   * encryptable_record.rb:126-130 layered over it), so the column limit the
+   * schema load reflects is what turns into the length validation. Declaring
+   * `encrypts` runs before any reflection, where no limit is known yet.
+   */
   it("adds the encrypted column's length validation at schema load", async () => {
     await freshAdapter();
     Configurable.config.validateColumnSize = true;
