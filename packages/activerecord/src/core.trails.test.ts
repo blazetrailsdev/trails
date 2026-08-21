@@ -246,15 +246,34 @@ describe("init_internals / initialize_dup super chain", () => {
   // Core#initialize_dup (core.rb:550-562) runs the initialize callbacks and only
   // then unwinds through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
   // (timestamp.rb:50-53), so the hook still observes the source's lock_version
-  // and timestamps; ActiveModel's links (validations.rb:310, dirty.rb:248) sit on
-  // `Model.prototype` and are reached by the same chain rather than shadowed.
-  it("dup runs the whole chain, clearing only after the callbacks", async () => {
+  // and timestamps. Below Core sit ActiveModel's links, which `Model.prototype`
+  // carries and an own `Base.prototype` body used to shadow:
+  // Validations#initialize_dup replaces `@errors` (validations.rb:310-313) and
+  // Dirty#initialize_dup gives the copy its own mutation tracker
+  // (dirty.rb:248-251).
+  it("dup runs the whole chain, including the ActiveModel links", async () => {
     const topic = await Topic.create({ title: "Alice", content: "Hello" });
     topic.title = "Bob";
+    topic.errors.add("title", "is invalid");
+    expect(topic.errors.size).toBe(1);
+
     const duped = topic.dup();
 
+    // Validations#initialize_dup: the copy gets a fresh error set rather than
+    // the source's, so the source's errors do not travel with it.
     expect(duped.errors).not.toBe(topic.errors);
+    expect(duped.errors.empty).toBe(true);
+    expect(topic.errors.size).toBe(1);
+
+    // Dirty#initialize_dup: the copy carries the source's pending changes but on
+    // its own tracker, so writing to one no longer marks the other.
     expect(duped.title).toBe("Bob");
+    expect(duped.willSaveChangeToAttribute("title")).toBe(true);
+    duped.content = "Changed";
+    expect(duped.willSaveChangeToAttribute("content")).toBe(true);
+    expect(topic.willSaveChangeToAttribute("content")).toBe(false);
+    expect(topic.content).toBe("Hello");
+
     expect(duped.isNewRecord()).toBe(true);
     expect(duped.id).toBe(null);
   });
