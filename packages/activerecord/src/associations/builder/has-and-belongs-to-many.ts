@@ -165,7 +165,10 @@ export class HasAndBelongsToMany {
 
   middleReflection(joinModel: any): any {
     const lhsModelName = this.lhsModel.name.toLowerCase();
-    const middleName = [pluralize(lhsModelName), this.associationName].sort().join("_");
+    const middleName = [pluralize(lhsModelName), this.associationName]
+      .sort()
+      .join("_")
+      .replace(/::/g, "_");
     const middleOptions = this.middleOptions(joinModel);
 
     return HasMany.createReflection(this.lhsModel, middleName, null, middleOptions);
