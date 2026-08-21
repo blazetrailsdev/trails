@@ -93,6 +93,21 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(t.hasAttribute("missing")).toBe(false);
   });
 
+  it("returns true for alias_attribute names on the class", () => {
+    // The class-level twin of the test above — Rails resolves
+    // `attribute_aliases` against `attribute_types`
+    // (active_record/attribute_methods.rb:254-258).
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    expect(Topic.hasAttribute("heading")).toBe(true);
+    expect(Topic.hasAttribute("title")).toBe(true);
+    expect(Topic.hasAttribute("missing")).toBe(false);
+  });
+
   it("readonly attributes are not updated after create", async () => {
     // Rails raises ReadonlyAttributeError on a persisted-record write to an
     // attr_readonly column (readonly_attributes.rb line 49). The test name's

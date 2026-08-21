@@ -90,13 +90,12 @@ interface AttributeAccessorHost {
  * Mirrors: ActiveRecord::AttributeMethods#has_attribute?
  */
 export function hasAttribute(this: AttributeRecord, name: string): boolean {
-  // Rails: `attr_name = self.class.attribute_aliases[attr_name] || attr_name`
-  // then `@attributes.key?(attr_name)` (attribute_methods.rb:316-319).
-  return this._attributes.has(
-    (
-      this.constructor as unknown as { resolveAttributeName(n: string): string }
-    ).resolveAttributeName(name),
-  );
+  let attrName = String(name);
+  attrName =
+    (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
+      attrName
+    ] ?? attrName;
+  return this._attributes.has(attrName);
 }
 
 /**

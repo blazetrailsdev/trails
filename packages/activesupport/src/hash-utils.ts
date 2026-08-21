@@ -3,6 +3,9 @@
  */
 
 import { isBlank } from "./core-ext/object/blank.js";
+import * as XmlMini from "./xml-mini.js";
+import { XMLConverter } from "./core-ext/hash/conversions.js";
+import type { StringIO } from "./string-io.js";
 
 type AnyObject = Record<string, unknown>;
 
@@ -594,4 +597,57 @@ export function compactBlankBang<T extends AnyObject>(hash: T): T {
     if (isBlank(hash[key])) delete hash[key];
   }
   return hash;
+}
+
+/**
+ * Returns a string containing an XML representation of its receiver.
+ *
+ * Mirrors: `Hash#to_xml` (`core_ext/hash/conversions.rb:74-91`). Ruby `||=`
+ * replaces only nil/false and `0` is truthy there, so `indent: 0` survives the
+ * defaulting — hence `??=`.
+ */
+export function toXml(
+  self: AnyObject,
+  options: XmlMini.ToXmlOptions = {},
+  block?: (builder: XmlMini.XmlBuilder) => void,
+): string {
+  options = { ...options };
+  options.indent ??= 2;
+  options.root ??= "hash";
+  options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
+
+  const builder = options.builder;
+  const skipInstruct = options.skipInstruct;
+  delete options.skipInstruct;
+  if (!skipInstruct) builder.instruct();
+
+  const root = XmlMini.renameKey(String(options.root), options);
+
+  builder.openTag(root);
+  for (const [key, value] of Object.entries(self)) {
+    XmlMini.toTag(key, value, options as XmlMini.ToTagOptions);
+  }
+  if (block) block(builder);
+  builder.closeTag(root);
+  return builder.target();
+}
+
+/**
+ * Returns a Hash containing a collection of pairs when the key is the node name
+ * and the value is its content. Mirrors: `Hash.from_xml`
+ * (`core_ext/hash/conversions.rb:128-130`) — awaitable because `XmlMini.parse` is.
+ */
+export function fromXml(
+  xml: string | StringIO | null | undefined,
+  disallowedTypes?: string[] | null,
+): Promise<unknown> {
+  return XMLConverter.create(xml, disallowedTypes).then((converter) => converter.toH());
+}
+
+/**
+ * Builds a Hash from XML just like `Hash.from_xml`, but also allows Symbol and
+ * YAML. Mirrors: `Hash.from_trusted_xml` (conversions.rb:133-135).
+ */
+export function fromTrustedXml(xml: string | StringIO | null | undefined): Promise<unknown> {
+  return fromXml(xml, []);
 }

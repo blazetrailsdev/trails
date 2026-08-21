@@ -31,12 +31,6 @@
   },
   {
     "package": "activesupport",
-    "name": "DisallowedType",
-    "rubyFile": "active_support/core_ext/hash/conversions.rb",
-    "reason": "active_support/core_ext/hash/conversions.rb (Hash#to_xml/from_xml) is unported."
-  },
-  {
-    "package": "activesupport",
     "name": "InvalidContentError",
     "rubyFile": "active_support/encrypted_configuration.rb",
     "reason": "active_support/encrypted_configuration.rb (encryption) is unported."

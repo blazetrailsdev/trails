@@ -9,25 +9,9 @@ import {
   type CallbackHost,
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
-import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
-import {
-  associationRelationClassFor,
-  collectionProxyClassFor,
-  wrapWithScopeProxy,
-} from "../relation/delegation.js";
+import { collectionProxyClassFor, wrapWithScopeProxy } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
-// Late-bound AssociationRelation constructor to break circular imports
-// (association-relation.ts extends Relation, which would otherwise
-// transitively load before Base finishes initializing the Relation ctor
-// slot). Set by association-relation.ts when it loads.
-let _AssociationRelationCtor: (new (modelClass: any, assoc: any) => any) | null = null;
-/** @internal */
-export function _setAssociationRelationCtor(
-  ctor: new (modelClass: any, assoc: any) => AssociationRelationType<any>,
-): void {
-  _AssociationRelationCtor = ctor;
-}
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
   findNthFromLast as baseFindNthFromLast,
@@ -36,7 +20,7 @@ import {
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
-import { ConfigurationError, AssociationTypeMismatch } from "../errors.js";
+import { AssociationTypeMismatch } from "../errors.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -1248,22 +1232,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Delegates to the target model class's transaction method.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#transaction
-   */
-  async transaction<R>(
-    fn: (tx: unknown) => Promise<R>,
-    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
-  ): Promise<R | undefined> {
-    const klass = this.model;
-    if (typeof klass.transaction === "function") {
-      return klass.transaction(fn as any, options);
-    }
-    return fn(undefined);
-  }
-
-  /**
    * Raises an error — prepend is not supported on associations.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#prepend
@@ -1314,26 +1282,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     for (const record of records) {
       yield record;
     }
-  }
-
-  /**
-   * Chains off the proxy (`blog.posts.where(...)`) return an
-   * AssociationRelation, not another CollectionProxy — matching Rails,
-   * where `blog.posts` is a CP and `blog.posts.where(...)` is an AR.
-   * AR still routes writes through `_association` (this CP) so the FK,
-   * inverse, and loaded target stay wired up.
-   */
-  override clone(): Relation<T> {
-    if (!_AssociationRelationCtor) {
-      throw new ConfigurationError(
-        "CollectionProxy.clone: AssociationRelation constructor not set — " +
-          "association-relation.ts must be loaded first",
-      );
-    }
-    const Ctor = associationRelationClassFor(this.model);
-    const rel = new Ctor(this.model, this) as Relation<T>;
-    rel.initializeCopy(this as unknown as Relation<T>);
-    return wrapWithScopeProxy(rel);
   }
 }
 
