@@ -140,11 +140,14 @@ function writeId(this: PrimaryKeyInstance, value: unknown): void {
   }
 }
 
+/**
+ * Rails' `CompositePrimaryKey#id?` (composite_primary_key.rb:36-42) branches on
+ * `composite_primary_key?` and answers `@primary_key.all? { |col| ... }`;
+ * trails folds both arms here the way `readId` folds `CompositePrimaryKey#id`.
+ */
 function readIdQuery(this: PrimaryKeyInstance): boolean {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  // Rails' CompositePrimaryKey#id? (composite_primary_key.rb:36-42) branches on
-  // `composite_primary_key?` and answers `@primary_key.all? { |col| ... }`.
   if (Array.isArray(pk)) return pk.every((col) => this._queryAttribute(col));
   return this._queryAttribute(pk as string);
 }

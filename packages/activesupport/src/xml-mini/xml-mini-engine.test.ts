@@ -4,9 +4,17 @@
  * mixes `EngineTests` into the subclass, `xml_mini_engine_test.rb:19-22`).
  * Rails runs it once per backend by subclassing inside
  * `XMLMiniEngineTest.run_with_gem` (`rexml_engine_test.rb:5`,
- * `nokogiri_engine_test.rb:5`, `nokogirisax_engine_test.rb:5`); JavaScript has
- * no `inherited` hook, so `engineTests` is the module and each call is a
- * subclass.
+ * `nokogiri_engine_test.rb:5`, `nokogirisax_engine_test.rb:5`). JavaScript has
+ * no `inherited` hook (CLAUDE.md, "Module mixins"), so `engineTests` is the
+ * `EngineTests` module and each call below is one of Ruby's subclasses:
+ * `REXMLEngineTest`, whose own cases live in `rexml-engine.test.ts`;
+ * `NokogiriEngineTest`, whose `expansion_attack_error` is
+ * `Nokogiri::XML::SyntaxError`; and `NokogiriSAXEngineTest`, whose is
+ * `RuntimeError`. Both trails Nokogiri backends re-raise the parser's own
+ * first error as a plain `Error` (`nokogiri.ts:131`, `nokogirisax.ts:102`).
+ * The three calls live in this one file, rather than in a file per Ruby file,
+ * because `parity:test` credits a Rails test file against its convention TS
+ * file and every one of these names is defined in `xml_mini_engine_test.rb`.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -275,18 +283,12 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
   });
 }
 
-// `REXMLEngineTest < XMLMiniEngineTest` (`rexml_engine_test.rb:5`); its own
-// cases live in `rexml-engine.test.ts`.
 engineTests({
   engine: "REXML",
   backendModule: XmlMini_REXML,
   expansionAttackError: RuntimeError,
 });
 
-// `XMLMiniEngineTest.run_with_gem("nokogiri") { class NokogiriEngineTest < ... }`
-// (`nokogiri_engine_test.rb:5-15`). Its `expansion_attack_error` is
-// `Nokogiri::XML::SyntaxError`; the trails backend re-raises the parser's first
-// error as a plain `Error` (`nokogiri.ts:131`).
 await runWithGem("@blazetrails/nokogiri", () => {
   engineTests({
     engine: "Nokogiri",
@@ -294,8 +296,6 @@ await runWithGem("@blazetrails/nokogiri", () => {
     expansionAttackError: Error,
   });
 
-  // `NokogiriSAXEngineTest` (`nokogirisax_engine_test.rb:5-15`), whose
-  // `expansion_attack_error` is `RuntimeError`.
   engineTests({
     engine: "NokogiriSAX",
     backendModule: XmlMini_NokogiriSAX,

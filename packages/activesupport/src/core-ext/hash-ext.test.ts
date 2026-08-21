@@ -377,12 +377,8 @@ describe("HashToXmlTest", () => {
   it.skip("to xml dups options");
 
   it("expansion count is limited", async () => {
-    // Rails switches on `ActiveSupport::XmlMini.backend.name`
-    // (hash_ext_test.rb:1023-1032) because its whole suite re-runs under each
-    // backend; the trails backend is the module namespace object, so the arms
-    // are keyed off the module rather than its constant name. The trails
-    // Nokogiri backends re-raise the parser's own first error as a plain
-    // `Error` where Ruby has `Nokogiri::XML::SyntaxError` / `RuntimeError`.
+    // hash_ext_test.rb:1023-1032 switches on `XmlMini.backend.name`; a trails
+    // backend is the module namespace object, not a named constant.
     const backend = XmlMini.backend();
     const expected =
       backend === XmlMini_REXML
