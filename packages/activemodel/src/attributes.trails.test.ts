@@ -13,7 +13,7 @@ describe("Attributes#attribute_names", () => {
     expect(new User().attributeNames()).toEqual(["name", "token"]);
   });
 
-  it("the class-level reader still filters virtual attributes", () => {
-    expect(User.attributeNames()).toEqual(["name"]);
+  it("the class-level reader is attribute_types.keys, virtual attributes included", () => {
+    expect(User.attributeNames()).toEqual(["name", "token"]);
   });
 });

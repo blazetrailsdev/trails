@@ -33,7 +33,6 @@ export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
   _cachedAttributeTypes?: Record<string, Type> | null;
   _attributesBuilder?: unknown;
-  _attributeDefinitions?: Map<string, { name: string; type?: Type; virtual?: boolean }>;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */

@@ -109,7 +109,8 @@ interface ReadWriteHost {
 }
 
 export interface AttributeMethodHost {
-  _attributeDefinitions: Map<string, { name: string }>;
+  // Rails' `attribute_names` (attributes.rb:74-75) — `attribute_types.keys`.
+  attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
@@ -263,7 +264,7 @@ export function attributeMethodPrefix(
     ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...Array.from(this._attributeDefinitions.keys()));
+  this.defineAttributeMethods(...this.attributeNames());
 }
 
 /** Mirrors: ClassMethods#attribute_method_suffix (attribute_methods.rb:140-143). */
@@ -277,7 +278,7 @@ export function attributeMethodSuffix(
     ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...Array.from(this._attributeDefinitions.keys()));
+  this.defineAttributeMethods(...this.attributeNames());
 }
 
 /** Mirrors: ClassMethods#attribute_method_affix (attribute_methods.rb:175-178). */
@@ -290,7 +291,7 @@ export function attributeMethodAffix(
     ...affixes.map((affix) => new AttributeMethodPattern(affix)),
   ];
   this.undefineAttributeMethods();
-  this.defineAttributeMethods(...Array.from(this._attributeDefinitions.keys()));
+  this.defineAttributeMethods(...this.attributeNames());
 }
 
 export function aliasAttribute(this: ClassMethods, newName: string, oldName: string): void {

@@ -394,10 +394,9 @@ export class Model {
     );
   }
 
+  /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-75). */
   static attributeNames(): string[] {
-    return Array.from(this._attributeDefinitions.entries())
-      .filter(([, def]) => !def.virtual)
-      .map(([name]) => name);
+    return Object.keys(this.attributeTypes());
   }
 
   // -- Normalizations --
@@ -727,7 +726,7 @@ export class Model {
   }
 
   static isAttributeMethod(attribute: string): boolean {
-    return this._attributeDefinitions.has(attribute);
+    return Object.hasOwn(this.attributeTypes(), attribute);
   }
 
   /**
@@ -1903,9 +1902,9 @@ export class Model {
    * Mirrors: ActiveRecord::Base.column_for_attribute
    */
   columnForAttribute(name: string): { name: string; type: Type } | null {
-    const def = (this.constructor as typeof Model)._attributeDefinitions.get(name);
-    if (!def) return null;
-    return { name: def.name, type: def.type };
+    const klass = this.constructor as typeof Model;
+    if (!Object.hasOwn(klass.attributeTypes(), name)) return null;
+    return { name, type: klass.typeForAttribute(name) };
   }
 
   /**
@@ -1915,8 +1914,7 @@ export class Model {
    */
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
-    const defs = ctor._attributeDefinitions;
-    return defs.has(ctor.resolveAttributeName(name));
+    return this._attributes.has(ctor.resolveAttributeName(name));
   }
 
   /**

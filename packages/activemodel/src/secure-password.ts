@@ -40,14 +40,14 @@ export function hasSecurePassword(
   const challengeAttr = `${attribute}Challenge`;
   const validations = options.validations !== false;
 
-  if (!modelClass._attributeDefinitions.has(digestAttr)) {
+  if (!modelClass._defaultAttributes().isKey(digestAttr)) {
     modelClass.attribute(digestAttr, "string");
   }
 
   // The confirmation is virtual (no DB column) but is genuinely stored in the
   // attribute set (read back via `readAttribute`), so declare it as a known
   // name — `AttributeSet#writeFromUser` raises for any name not in the set.
-  if (!modelClass._attributeDefinitions.has(confirmationAttr)) {
+  if (!modelClass._defaultAttributes().isKey(confirmationAttr)) {
     modelClass.attribute(confirmationAttr, "string");
   }
 
