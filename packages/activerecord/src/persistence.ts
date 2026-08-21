@@ -614,7 +614,7 @@ interface DeleteRecord {
   _destroyed: boolean;
   _previouslyNewRecord: boolean;
   id: unknown;
-  idInDatabase(): unknown;
+  idInDatabase: unknown;
   isPersisted(): boolean;
   freeze(): unknown;
   constructor: {
@@ -1499,7 +1499,7 @@ interface PersistencePrivateHost {
   isNewRecord(): boolean;
   isDestroyed(): boolean;
   id: unknown;
-  idInDatabase(): unknown;
+  idInDatabase: unknown;
   attributeInDatabase?(col: string): unknown;
   _associationInstances?: Map<
     string,
@@ -1609,7 +1609,7 @@ export function _queryConstraintsHash(this: PersistencePrivateHost): Record<stri
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
     const pk = this.constructor.primaryKey as string;
-    return { [pk]: this.idInDatabase() };
+    return { [pk]: this.idInDatabase };
   }
   // Use each constraint column's persisted (`*_in_database`) value, not the live
   // attribute — when a constraint column is itself changing (e.g. a CPK foreign

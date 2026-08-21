@@ -1520,10 +1520,10 @@ describe("PersistenceTest", () => {
     const topic = topics("first");
     const reply = topic.becomes(Reply);
 
-    expect(Number((topic as any).idInDatabase())).toBe(1);
+    expect(Number((topic as any).idInDatabase)).toBe(1);
     expect((topic as any).attributesInDatabase).toEqual({});
 
-    expect(Number((reply as any).idInDatabase())).toBe(1);
+    expect(Number((reply as any).idInDatabase)).toBe(1);
     expect((reply as any).attributesInDatabase).toEqual({});
   });
 

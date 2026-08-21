@@ -56,19 +56,7 @@ function readPkWith(record: PrimaryKeyRecord, method: string): unknown {
   return record._readAttribute(pk);
 }
 
-export function idBeforeTypeCast(this: PrimaryKeyRecord): unknown {
-  return readPkWith(this, "readAttributeBeforeTypeCast");
-}
-
-export function idWas(this: PrimaryKeyRecord): unknown {
-  return readPkWith(this, "attributeWas");
-}
-
-export function idInDatabase(this: PrimaryKeyRecord): unknown {
-  return readPkWith(this, "attributeInDatabase");
-}
-
-export function idForDatabase(this: PrimaryKeyRecord): unknown {
+function readIdForDatabase(this: PrimaryKeyRecord): unknown {
   const pk = (this.constructor as any).primaryKey;
   const attrs = (this as any)._attributes;
   if (attrs?.getAttribute) {
@@ -161,6 +149,30 @@ export class PrimaryKey {
 
   set id(value: unknown) {
     writeId.call(this as unknown as PrimaryKeyInstance, value);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_before_type_cast
+   * (primary_key.rb:49-51). A zero-arg Ruby reader, so an accessor property
+   * here — see CLAUDE.md, "Generated attribute readers are properties".
+   */
+  get idBeforeTypeCast(): unknown {
+    return readPkWith(this as unknown as PrimaryKeyRecord, "readAttributeBeforeTypeCast");
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_was (primary_key.rb:54-56). */
+  get idWas(): unknown {
+    return readPkWith(this as unknown as PrimaryKeyRecord, "attributeWas");
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_in_database (primary_key.rb:59-61). */
+  get idInDatabase(): unknown {
+    return readPkWith(this as unknown as PrimaryKeyRecord, "attributeInDatabase");
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_for_database (primary_key.rb:64-66). */
+  get idForDatabase(): unknown {
+    return readIdForDatabase.call(this as unknown as PrimaryKeyRecord);
   }
 }
 

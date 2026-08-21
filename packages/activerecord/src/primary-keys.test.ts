@@ -134,7 +134,7 @@ describe("PrimaryKeysTest", () => {
     const topic = await Topic.find(topics("first").id);
     expect(Number(topic.id)).toBe(1);
     topic.id = 3;
-    expect(Number((topic as any).idWas())).toBe(1);
+    expect(Number((topic as any).idWas)).toBe(1);
     expect(Number(topic.id)).toBe(3);
   });
 
@@ -611,7 +611,7 @@ describe("CompositePrimaryKeyTest", () => {
     const bookId = book.id as unknown[];
     expect(bookId).not.toEqual([42, 42]);
     book.id = [42, 42];
-    expect((book as any).idWas()).toEqual(bookId);
+    expect((book as any).idWas).toEqual(bookId);
     expect(book.id).toEqual([42, 42]);
   });
 

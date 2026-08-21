@@ -207,9 +207,6 @@ import {
   attributeForDatabase as _attributeForDatabase,
   queryCastAttribute as _queryCastAttribute,
   isPrimaryKeyValuesPresent as _isPrimaryKeyValuesPresent,
-  idWas as _idWas,
-  idInDatabase as _idInDatabase,
-  idForDatabase as _idForDatabase,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
   isWillSaveChangeToAttribute as _isWillSaveChangeToAttribute,
@@ -217,7 +214,6 @@ import {
   attributeInDatabase as _attributeInDatabase,
   attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
-  idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
   get as _get,
   set as _set,
@@ -1537,6 +1533,7 @@ export class Base extends Model {
   // Mirrors: ActiveRecord::Attributes
   declare static defineAttribute: typeof _defineAttribute;
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
+  /** @internal */
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   // ActiveRecord's override of ActiveModel's `define_attribute_methods`
   // (attribute_methods.rb:139-159): no attr-name splat, and it answers whether
@@ -4850,9 +4847,12 @@ include(Base, {
   attributeCameFromUser: _attributeCameFromUser,
   queryCastAttribute: _queryCastAttribute,
   isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
-  idWas: _idWas,
-  idInDatabase: _idInDatabase,
-  idForDatabase: _idForDatabase,
+  // `id_was` / `id_in_database` / `id_for_database` / `id_before_type_cast` are
+  // zero-arg Ruby readers (primary_key.rb:49-66), so they are accessor
+  // properties — the shape `id` and `id?` already have, and the one
+  // `define_attribute_method_pattern` generates for a pk-less model. They come
+  // in with `include(Base, _PrimaryKey)` below, which copies descriptors and so
+  // can carry an accessor; this object literal is read by value and cannot.
   isSavedChangeToAttribute: _isSavedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
   isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
@@ -4860,8 +4860,6 @@ include(Base, {
   attributeInDatabase: _attributeInDatabase,
   attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
-  // idBeforeTypeCast is AR-specific (not on Model); safe to wire.
-  idBeforeTypeCast: _idBeforeTypeCast,
   // isSavedChanges is AR-specific (not on Model); safe to wire.
   isSavedChanges: _isSavedChanges,
   // TouchLater privates — not on Model; safe to wire.
