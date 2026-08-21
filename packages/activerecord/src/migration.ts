@@ -2269,30 +2269,20 @@ export class MigrationContext<
       }
     };
     for (const p of this.migrationsPaths) collect(p);
-    return this.dedupeMigrationFiles(files.sort());
-  }
 
-  /**
-   * @internal The `.ts`-over-`.js` / underscore-over-hyphen precedence
-   * {@link migrationFiles} documents. Rails needs no counterpart: one Ruby
-   * migration is one `.rb` file under one spelling.
-   */
-  private dedupeMigrationFiles(files: string[]): string[] {
+    const isTs = (file: string): boolean => file.endsWith(".ts");
+    const isUnderscore = (file: string): boolean => /^\d+_/.test(file.replace(/.*[/\\]/, ""));
     const byBasename = new Map<string, string>();
-    for (const file of files) {
+    for (const file of files.sort()) {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) continue;
       const key = `${parsed[0]}_${parsed[1]}`;
-      const existing = byBasename.get(key);
-      if (existing === undefined) {
-        byBasename.set(key, file);
-        continue;
-      }
-      const isTs = (name: string): boolean => name.endsWith(".ts");
-      const isUnderscore = (name: string): boolean => /^\d+_/.test(name.replace(/.*[/\\]/, ""));
-      if (isTs(file) && !isTs(existing)) {
-        byBasename.set(key, file);
-      } else if (isTs(file) === isTs(existing) && isUnderscore(file) && !isUnderscore(existing)) {
+      const kept = byBasename.get(key);
+      if (
+        kept === undefined ||
+        (isTs(file) && !isTs(kept)) ||
+        (isTs(file) === isTs(kept) && isUnderscore(file) && !isUnderscore(kept))
+      ) {
         byBasename.set(key, file);
       }
     }
@@ -2303,8 +2293,8 @@ export class MigrationContext<
    * @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename
    * (`migration.rb:1374-1376`). The name segment is folded to the underscore
    * form so a hyphen-alias file and its renamed underscore twin parse to the
-   * same name — which is what lets {@link dedupeMigrationFiles} collapse them
-   * and `Migrator#validate`'s duplicate-name check see one migration.
+   * same name — which is what lets {@link migrationFiles} collapse them and
+   * `Migrator#validate`'s duplicate-name check see one migration.
    */
   private parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");

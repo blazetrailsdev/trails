@@ -291,8 +291,6 @@ describe("SQLite3Adapter schema introspection", () => {
       await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
     ).rows.map((row) => String(row[0]));
     expect(inAux).toEqual(['CREATE INDEX "index_customers_on_name" ON "customers" ("name")']);
-    // removeIndex and indexExists derive the same default name off the bare
-    // table, so the round trip closes.
     expect(await adapter.indexExists("aux.customers", ["name"])).toBe(true);
 
     await adapter.removeIndex("aux.customers", ["name"]);
