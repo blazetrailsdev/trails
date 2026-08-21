@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "encrypt_attribute",
-    "call": "columns_hash",
-    "reason": "Rails reads the column default eagerly with `columns_hash[name.to_s]&.default` (encryptable_record.rb:91); trails' durable decorator resolves that default at attribute-replay time instead, because `encrypts` runs at class-definition time where `columnsHash` would force schema reflection before a connection exists."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "encrypt_attribute",
     "call": "order:constructor,schemeFor",
     "reason": "Rails calls `scheme_for` then `EncryptedAttributeType.new` inside the `decorate_attributes` block (encryptable_record.rb:88-91); trails builds the pending decorator first and hangs `schemeFor` off a lazy `scheme` getter on it, so the constructor is recorded ahead of `schemeFor`."
   },
@@ -26,19 +19,5 @@
     "rubyName": "override_accessors_to_preserve_original",
     "call": "include",
     "reason": "Rails mixes the overriding reader/writer in with `include(Module.new { ... })` (encryptable_record.rb:110-123) so the generated methods can `super()` into the attribute methods; TS has no ancestor chain, so trails defines the accessor pair on the prototype with `Object.defineProperty` and there is no module to include."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "validate_column_size",
-    "call": "columns_hash",
-    "reason": "Rails reads `columns_hash[attribute_name.to_s]&.limit` (encryptable_record.rb:139); trails reads `_attributeDefinitions` because this runs from `encrypts` at class-definition time, where `columnsHash` would force schema reflection before a connection exists."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "validate_column_size",
-    "call": "order:validatesLengthOf,limit",
-    "reason": "Ordering artifact of the `columns_hash` substitution on the same line (encryptable_record.rb:139-140): the limit is read off `_attributeDefinitions`, so the only `limit` call left is the one inside the already-registered LengthValidator check that precedes `validatesLengthOf`."
   }
 ]

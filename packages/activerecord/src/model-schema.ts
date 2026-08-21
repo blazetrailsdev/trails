@@ -314,8 +314,14 @@ export interface ColumnLike {
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#columns_hash
  */
 export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
-  // load_schema! raises TableNotSpecified for abstract (table-less) classes.
-  loadSchema.call(this as SchemaHost);
+  // `load_schema unless @columns_hash` (model_schema.rb:428): the memo guard is
+  // what keeps a `columns_hash` read from inside `load_schema!` — the encryption
+  // decorator's `columns_hash[name]&.default`, the length validations — from
+  // re-entering the load it is already inside of.
+  if (ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") == null) {
+    // load_schema! raises TableNotSpecified for abstract (table-less) classes.
+    loadSchema.call(this as SchemaHost);
+  }
 
   const memoized = ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash");
   if (memoized != null) return memoized as Record<string, ColumnLike>;

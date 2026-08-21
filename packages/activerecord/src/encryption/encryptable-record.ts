@@ -1,7 +1,7 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Contexts } from "./contexts.js";
 import { Configuration as ConfigurationError } from "./errors.js";
-import { LengthValidator, type Type } from "@blazetrails/activemodel";
+import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { encryptionHooks } from "../encryption-hooks.js";
@@ -57,11 +57,6 @@ interface PendingEncryption {
 }
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
-
-// Sentinel distinguishing "column not reflected in the warm cache" from a
-// genuinely-cached `undefined`/`null` column default. Lets columnDefaultFor
-// fall back to the def default only when the schema cache has no answer.
-const NOT_CACHED = Symbol("encryption.columnDefault.notCached");
 
 /**
  * Provides the `encrypts` declaration for model classes, enabling
@@ -128,71 +123,9 @@ export class EncryptableRecord {
         castType,
         // Rails reads `columns_hash[name.to_s]&.default` off the class the
         // block was declared in (encryptable_record.rb:91).
-        default: this.columnDefaultFor(
-          modelClass,
-          attrName,
-          (
-            modelClass as { _attributeDefinitions?: Map<string, unknown> }
-          )._attributeDefinitions?.get?.(attrName),
-        ),
+        default: modelClass.columnsHash()[attrName]?.default ?? undefined,
       });
     });
-  }
-
-  /**
-   * Resolve the column's schema default, mirroring Rails'
-   * `default: columns_hash[name.to_s]&.default` (encryptable_record.rb:91).
-   *
-   * Rails threads the TRUE DB column default — not the possibly-overridden
-   * `attribute(name, { default: X })` value. When a model declares an
-   * `attribute()` default that differs from the column default, the reflected
-   * def's `defaultValue` holds the override, so reading it would thread the
-   * wrong value into `EncryptedAttributeType`.
-   *
-   * So we first peek the already-warm schema cache (query-free, no
-   * `loadSchema`/`columnsHash` — those warm the shared cache and perturb
-   * sibling encryption tests). If the column is reflected there, its `.default`
-   * is the authoritative DB default. Otherwise (plain mock models, or a def
-   * seen before reflection) we fall back to the def's `defaultValue` — which,
-   * absent an `attribute()` override, already carries the column default.
-   * Returns undefined (Rails' nil default) when neither yields a value.
-   * @internal
-   */
-  static columnDefaultFor(modelClass: any, name: string, def: any): unknown {
-    const cached = this.cachedColumnDefaultFor(modelClass, name);
-    if (cached !== NOT_CACHED) return cached ?? undefined;
-    return def?.defaultValue ?? undefined;
-  }
-
-  /**
-   * Query-free peek of a reflected column's DB default from the raw schema
-   * cache, WITHOUT leasing a connection or calling `loadSchema` (either would
-   * warm the shared cache — see the story's sibling-perturbation note). Resolves
-   * the raw sync `SchemaCache` the same connection-less way
-   * `reset_column_information` does: a directly-assigned `_adapter`, else the
-   * pool config's cache slot. Returns `NOT_CACHED` when the table isn't warm
-   * yet or the column isn't present, so callers fall back to the def default.
-   * @internal
-   */
-  static cachedColumnDefaultFor(modelClass: any, name: string): unknown {
-    try {
-      const table: string | undefined = modelClass?.tableName;
-      if (!table) return NOT_CACHED;
-      const direct = modelClass._adapter as
-        | { internalSchemaCache?: { getCachedColumnsHash?: (t: string) => any } }
-        | undefined;
-      const cache =
-        direct?.internalSchemaCache ??
-        modelClass.connectionPool?.()?.poolConfig?.schemaCache ??
-        undefined;
-      if (typeof cache?.getCachedColumnsHash !== "function") return NOT_CACHED;
-      const columns = cache.getCachedColumnsHash(table);
-      const column = columns?.[name];
-      if (!column) return NOT_CACHED;
-      return column.default ?? undefined;
-    } catch {
-      return NOT_CACHED;
-    }
   }
 
   /**
@@ -341,17 +274,8 @@ export class EncryptableRecord {
  * @internal
  */
 export function validateColumnSize(this: any, attributeName: string): void {
-  if (typeof this.validatesLengthOf !== "function") return;
-  const limit = this._attributeDefinitions?.get(attributeName)?.limit;
-  if (limit == null) return;
-  // Guard against double registration (called at encrypts() time and again
-  // after schema reflection). Check whether a LengthValidator with this
-  // exact maximum already exists for the attribute.
-  const existing: unknown[] = this._validators?.get(attributeName) ?? [];
-  const alreadyRegistered = existing.some(
-    (v: unknown) => v instanceof LengthValidator && (v as any).options?.maximum === limit,
-  );
-  if (!alreadyRegistered) {
+  const limit = this.columnsHash()[attributeName]?.limit;
+  if (limit != null) {
     this.validatesLengthOf(attributeName, { maximum: limit });
   }
 }
@@ -580,10 +504,6 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   EncryptableRecord.registerPendingEncryption(this, pending);
   EncryptableRecord.pushEncryptionDecorator(this, name, pending);
   encryptionHooks.applyPendingEncryptions(modelClass);
-
-  if (Configurable.config.validateColumnSize) {
-    validateColumnSize.call(this, name);
-  }
 
   // Mirrors Rails encryptable_record.rb:94 —
   // `preserve_original_encrypted(name) if ignore_case`. Wires the

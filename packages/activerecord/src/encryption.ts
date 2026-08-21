@@ -31,7 +31,6 @@ import {
   encrypt,
   encryptAttribute,
   encryptedAttribute,
-  encryptedTypeOf,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -139,12 +138,6 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
   while (current) {
     const pending: PendingEncryption[] | undefined = current._pendingEncryptions;
     if (pending?.some((p) => p.name === attr)) return true;
-    const defs = current._attributeDefinitions;
-    if (defs) {
-      // Mock-model arm: real Base subclasses no longer hold wrapped defs (the
-      // eager view is retired) — their declarations hit the pending arm above.
-      if (encryptedTypeOf(defs.get(attr)?.type)) return true;
-    }
     current = Object.getPrototypeOf(current);
   }
   return false;
