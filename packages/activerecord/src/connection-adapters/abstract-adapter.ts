@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
  */
 
-import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors, relationName } from "@blazetrails/arel";
@@ -939,32 +938,6 @@ export class AbstractAdapter implements Quoting {
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
   private _inspectId?: number;
   private static _inspectSeq?: number;
-
-  /**
-   * Default header prefix for `Relation#explain` output. Concrete adapters
-   * (PG: `"EXPLAIN (ANALYZE, VERBOSE) for:"`; MySQL: `"EXPLAIN ANALYZE for:"`)
-   * override to include adapter-specific flags. SQLite has no override — it
-   * inherits this default `"EXPLAIN for:"` (the `EXPLAIN QUERY PLAN` keyword
-   * belongs to the executed plan query, not the printed header).
-   *
-   * Mirrors Rails' `ActiveRecord::Explain#build_explain_clause` fallback:
-   * Rails' `AbstractAdapter` defines no `build_explain_clause`; the
-   * `"EXPLAIN for:"` default lives in the `ActiveRecord::Explain` module and
-   * only the PG/MySQL adapters carry a private override.
-   */
-  async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
-    if (options.length === 0) return "EXPLAIN for:";
-    const parts = options.map((o) => {
-      if (typeof o === "string") return o.toUpperCase();
-      if (o && typeof o === "object" && typeof o.format === "string") {
-        return `FORMAT ${o.format.toUpperCase()}`;
-      }
-      throw new TypeError(
-        `EXPLAIN option hash requires a string 'format'; got ${inspectExplainOption(o)}`,
-      );
-    });
-    return `EXPLAIN (${parts.join(", ")}) for:`;
-  }
 
   /**
    * Quote a value for inclusion in a SQL literal. Concrete adapters

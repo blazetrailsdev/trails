@@ -27,17 +27,14 @@ afterAll(() => {
 
 describe("TestDatabasesTest", () => {
   fixtures({});
-  let priorCurrent: DatabaseConfigurations | null;
   let priorConfigs: DatabaseConfigurations;
   beforeEach(() => {
-    priorCurrent = DatabaseConfigurations.current;
     priorConfigs = Base.configurations();
   });
   // Mirrors the Rails case's `ensure ActiveRecord::Base.configurations =
   // prev_configs` (test_databases_test.rb:51).
   afterEach(() => {
     Base.configurations(priorConfigs);
-    DatabaseConfigurations.current = priorCurrent;
     vi.restoreAllMocks();
   });
 

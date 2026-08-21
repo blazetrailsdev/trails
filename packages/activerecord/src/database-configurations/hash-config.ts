@@ -8,16 +8,8 @@
  * Creates a HashConfig with envName="development", name="primary",
  * and configuration={ database: "db_name" }.
  */
+import { configurationsStore } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
-
-// Late-bound reference to the global configurations — set by
-// database-configurations.ts to break circular dependency.
-let _primaryChecker: ((name: string) => boolean) | null = null;
-
-/** @internal */
-export function _setPrimaryChecker(fn: (name: string) => boolean): void {
-  _primaryChecker = fn;
-}
 
 export class HashConfig extends DatabaseConfig {
   constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
@@ -27,12 +19,12 @@ export class HashConfig extends DatabaseConfig {
   /**
    * Mirrors: HashConfig#primary?
    *
-   * True if this config is the primary database for its environment.
-   * Named "primary" is always primary; otherwise checks global configurations.
+   * Asks the one global registry, exactly as Rails does — the store is read
+   * at call time, so the import back into `database-configurations.ts` never
+   * needs the module to have finished evaluating.
    */
   isPrimary(): boolean {
-    if (this.name === "primary") return true;
-    return _primaryChecker ? _primaryChecker(this.name) : false;
+    return configurationsStore().isPrimary(this.name);
   }
 
   /**

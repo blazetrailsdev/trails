@@ -509,10 +509,6 @@ describe("ConnectionHandlingTest", () => {
     const { HashConfig } = await import("./database-configurations/hash-config.js");
     const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
 
-    // _currentConfigurations is a module-level singleton that the
-    // DatabaseConfigurations constructor mutates as a side effect.
-    // Snapshot it so test ordering can't pin the wrong registry.
-    const priorCurrent = (DatabaseConfigurations as any).current;
     const priorConfigs = Base.configurations();
     class InMemoryModel extends Base {}
     try {
@@ -539,7 +535,6 @@ describe("ConnectionHandlingTest", () => {
       // tests in this file do.
       InMemoryModel.removeConnection();
       Base.configurations(priorConfigs);
-      (DatabaseConfigurations as any).current = priorCurrent;
     }
   });
 
@@ -552,7 +547,6 @@ describe("ConnectionHandlingTest", () => {
     const { UrlConfig } = await import("./database-configurations/url-config.js");
     const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
 
-    const priorCurrent = (DatabaseConfigurations as any).current;
     const priorConfigs = Base.configurations();
     class WorkerModel extends Base {}
     try {
@@ -577,7 +571,6 @@ describe("ConnectionHandlingTest", () => {
     } finally {
       await WorkerModel.removeConnection();
       Base.configurations(priorConfigs);
-      (DatabaseConfigurations as any).current = priorCurrent;
     }
   });
 
@@ -775,21 +768,15 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
 });
 
 describe("resolveConfigForConnection / connectsTo with unset configurations", () => {
-  let prevCurrentConfigs: unknown;
   let prevBaseConfigs: DatabaseConfigurations;
 
   beforeEach(async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
-    prevCurrentConfigs = (DatabaseConfigurations as any).current;
     prevBaseConfigs = Base.configurations();
   });
 
   afterEach(async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
-    // fromEnv({}) mutates DatabaseConfigurations.current (the primary-config
-    // registry HashConfig#isPrimary consults), so save and restore it here
-    // — clearing connections alone leaves a stale primary registry behind.
-    (DatabaseConfigurations as any).current = prevCurrentConfigs;
     Base.configurations(prevBaseConfigs);
     await Base.connectionHandler.clearAllConnectionsBang();
     delete (Base as any)._connectionSpecificationName;

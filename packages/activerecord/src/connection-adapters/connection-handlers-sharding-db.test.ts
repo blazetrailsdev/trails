@@ -15,7 +15,6 @@ async function withBaseConfigs(
 ): Promise<void> {
   const prevConfigs = Base.configurations();
   const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-  const prevCurrent = (DatabaseConfigurations as any).current;
   if (opts.defaultEnv) {
     DatabaseConfigurations.defaultEnv = opts.defaultEnv;
     vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
@@ -26,7 +25,6 @@ async function withBaseConfigs(
   } finally {
     Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
-    (DatabaseConfigurations as any).current = prevCurrent;
     if (opts.defaultEnv) vi.unstubAllEnvs();
     await Base.connectionHandler.clearAllConnectionsBang();
   }

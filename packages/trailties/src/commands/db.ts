@@ -266,8 +266,8 @@ function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig 
 
 /**
  * Run `fn` with `DatabaseTasks.databaseConfiguration`, the module-level
- * `DatabaseConfigurations.current` singleton, AND `DatabaseTasks.env`
- * temporarily aligned with `config`. Captures/restores all three so
+ * AND `DatabaseTasks.env` temporarily aligned with `config`.
+ * Captures/restores both so
  * callers can safely invoke methods like `DatabaseTasks.truncateAll(env)`
  * that resolve the env via `_normalizeEnv()` (reads DatabaseTasks.env by
  * default) and then call `configsFor` against it.
@@ -294,7 +294,6 @@ async function withRegisteredConfigurations<T>(
 ): Promise<T> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
   const previousTasksConfig = DatabaseTasks.databaseConfiguration;
-  const previousCurrent = DatabaseConfigurations.current;
   const previousEnv = DatabaseTasks.env;
   DatabaseTasks.databaseConfiguration = new DatabaseConfigurations(configs);
   DatabaseTasks.env = envName;
@@ -302,7 +301,6 @@ async function withRegisteredConfigurations<T>(
     return await fn();
   } finally {
     DatabaseTasks.databaseConfiguration = previousTasksConfig;
-    DatabaseConfigurations.current = previousCurrent;
     DatabaseTasks.env = previousEnv;
   }
 }
@@ -316,22 +314,12 @@ async function withRegisteredConfigurations<T>(
  */
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
-  // DatabaseConfigurations' constructor registers itself as the
-  // module-level "current" singleton (HashConfig.isPrimary consults it),
-  // so swapping DatabaseTasks.databaseConfiguration isn't enough on its
-  // own. Capture BOTH slots — they may differ when other code (e.g.
-  // connection-handling) created a DatabaseConfigurations without
-  // assigning it to DatabaseTasks.databaseConfiguration — and restore
-  // both in finally instead of clobbering the singleton with an empty
-  // fallback.
   const previousTasksConfig = DatabaseTasks.databaseConfiguration;
-  const previousCurrent = DatabaseConfigurations.current;
   DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
   try {
     await DatabaseTasks.checkProtectedEnvironmentsBang(envName);
   } finally {
     DatabaseTasks.databaseConfiguration = previousTasksConfig;
-    DatabaseConfigurations.current = previousCurrent;
   }
 }
 
