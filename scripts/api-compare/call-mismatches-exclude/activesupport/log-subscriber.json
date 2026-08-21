@@ -4,7 +4,7 @@
     "tsFile": "log-subscriber.ts",
     "rubyName": "silenced?",
     "call": "call",
-    "reason": "log_subscriber.rb:143 `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc invoked through `#call`; the JS callable it ports to is invoked as `check(l)`, so there is no `call` to make. Same substitution as the `cache.ts key_matcher -> call` row. Language shortcoming."
+    "reason": "log_subscriber.rb:143 `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc invoked through `#call`; the JS callable it ports to is invoked as `check(l)`, so there is no `call` to make. Same substitution as the `cache.ts key_matcher -> call` row. Language shortcoming. Cluster ruling (RFC 0106): where Ruby `#call` is the OBJECT protocol the port converges instead — `subscriber.ts add_event_subscriber` now hands the Subscriber itself to `notifier.subscribe`, since `Fanout::Subscribers.new` accepts a callable object (fanout.rb:325-331). Only Proc-invocation `#call`, as here, stays substituted."
   },
   {
     "package": "activesupport",
