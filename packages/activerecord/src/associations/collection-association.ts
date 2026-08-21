@@ -1175,11 +1175,11 @@ export class CollectionAssociation extends Association {
     // Records passed as records need no lookup at all, so this stays inline —
     // the arm `delete_or_destroy` takes for a new owner.
     if (!records.some(isId)) return records as Base[];
-    const ids = records.map((r) => (isId(r) ? r : this.primaryKeyValue(r)));
+    const ids = records.map((r) => (isId(r) ? r : (r as any).id));
     if (this.reflection.options.through) {
       return Promise.resolve(this.loadTarget()).then((target) =>
         ids.map((id) => {
-          const found = target.find((r) => String(this.primaryKeyValue(r)) === String(id));
+          const found = target.find((r) => String((r as any).id) === String(id));
           if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
           return found;
         }),
@@ -1316,20 +1316,6 @@ export class CollectionAssociation extends Association {
     return JSON.stringify(ids.length === 1 ? ids[0] : ids);
   }
 
-  protected primaryKeyValue(record: Base): unknown {
-    const pk = (this.klass as any).primaryKey ?? "id";
-    if (Array.isArray(pk)) {
-      return pk.map((key: string) =>
-        typeof (record as any)._readAttribute === "function"
-          ? (record as any)._readAttribute(key)
-          : (record as any)[key],
-      );
-    }
-    return typeof (record as any)._readAttribute === "function"
-      ? (record as any)._readAttribute(pk)
-      : (record as any)[pk];
-  }
-
   private async deleteAllRecords(): Promise<number> {
     const rel = this.scope();
     if (rel && typeof rel.deleteAll === "function") {
@@ -1409,9 +1395,9 @@ export class CollectionAssociation extends Association {
     // `normalizeAssociationKey` first because an in-memory target PK is a
     // BigInt (int8 under PG bigserial) while the `find(id)` argument is a
     // number — folding `1n` to `1` before `String()` reproduces Ruby's
-    // width-agnostic `Integer#to_s`. `primaryKeyValue(r)` returns an *array*
-    // for a composite-PK klass (see `primaryKeyValue`), hence the per-element
-    // map on both sides.
+    // width-agnostic `Integer#to_s`. `r.id` is an *array* for a composite-PK
+    // klass (`CompositePrimaryKey#id`), hence the per-element map on both
+    // sides.
     const normalize = (v: unknown) =>
       Array.isArray(v)
         ? v.map((k) => String(normalizeAssociationKey(k))).join(",")
@@ -1419,14 +1405,12 @@ export class CollectionAssociation extends Association {
     const normalizedIds = [...new Set(ids.map(normalize))];
 
     if (normalizedIds.length === 1) {
-      const record = this.target.find(
-        (r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0],
-      );
+      const record = this.target.find((r) => normalize((r as any).id) === normalizedIds[0]);
       return expectsArray ? [record] : record;
     }
 
     const idSet = new Set(normalizedIds);
-    return this.target.filter((r) => idSet.has(normalize(this.primaryKeyValue(r))));
+    return this.target.filter((r) => idSet.has(normalize((r as any).id)));
   }
 
   /**

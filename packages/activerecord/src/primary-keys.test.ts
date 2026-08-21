@@ -139,12 +139,11 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("id?", async () => {
-    // Rails: assert_changes("topic.id?", from: true, to: false) { topic.id = nil }
-    // TS: no id? predicate exposed on Base instances; test the equivalent check
     const topic = await Topic.find(topics("first").id);
-    expect(topic.id != null).toBe(true);
+
+    expect((topic as any).isId).toBe(true);
     topic.id = null as unknown as number;
-    expect(topic.id != null).toBe(false);
+    expect((topic as any).isId).toBe(false);
   });
 
   it("integer key", async () => {

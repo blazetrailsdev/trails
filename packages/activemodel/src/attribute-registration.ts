@@ -54,7 +54,10 @@ export interface AttributeHostInternals {
  * A decorator receives the attribute name and its current type — Ruby's
  * `decorator.call(name, attribute.type)` (attribute_registration.rb:83).
  */
-export type AttributeDecorator = (name: string, type: Type) => Type;
+// Nullable return, mirroring Rails' `attribute_set[name] = attribute.with_type(type) if type`
+// (attribute_registration.rb:72) — a decorator that answers nil leaves the
+// attribute undecorated, which is how conditional decoration is written.
+export type AttributeDecorator = (name: string, type: Type) => Type | null | undefined;
 
 /** @internal Rails-private helper. */
 export interface PendingModification {

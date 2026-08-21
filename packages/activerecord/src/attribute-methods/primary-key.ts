@@ -92,6 +92,7 @@ function inspectValue(value: unknown): string {
 
 interface PrimaryKeyInstance {
   constructor: unknown;
+  _queryAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
   writeAttribute(name: string, value: unknown): void;
@@ -139,6 +140,15 @@ function writeId(this: PrimaryKeyInstance, value: unknown): void {
   }
 }
 
+function readIdQuery(this: PrimaryKeyInstance): boolean {
+  const ctor = this.constructor as any;
+  const pk = ctor.primaryKey as string | string[] | null;
+  // Rails' CompositePrimaryKey#id? (composite_primary_key.rb:36-42) branches on
+  // `composite_primary_key?` and answers `@primary_key.all? { |col| ... }`.
+  if (Array.isArray(pk)) return pk.every((col) => this._queryAttribute(col));
+  return this._queryAttribute(pk as string);
+}
+
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
@@ -149,6 +159,18 @@ export class PrimaryKey {
 
   set id(value: unknown) {
     writeId.call(this as unknown as PrimaryKeyInstance, value);
+  }
+
+  /**
+   * Queries the primary key column's value. If the primary key is composite,
+   * all primary key column values must be queryable.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id? (primary_key.rb:34-36).
+   * A zero-arg Ruby reader, so an accessor property here — see CLAUDE.md,
+   * "Generated attribute readers are properties".
+   */
+  get isId(): boolean {
+    return readIdQuery.call(this as unknown as PrimaryKeyInstance);
   }
 
   /**

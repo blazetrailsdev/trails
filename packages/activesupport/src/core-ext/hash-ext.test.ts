@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { extractBang } from "./hash/slice.js";
+import { RuntimeError } from "../rexml/document.js";
+import * as XmlMini from "../xml-mini.js";
+import * as XmlMini_REXML from "../xml-mini/rexml.js";
+import * as XmlMini_Nokogiri from "../xml-mini/nokogiri.js";
+import * as XmlMini_NokogiriSAX from "../xml-mini/nokogirisax.js";
+import { assertRaises } from "../testing/assertions.js";
 
 import {
+  fromXml,
   deepMerge,
   deepTransformKeys,
   deepTransformValues,
@@ -369,7 +376,42 @@ describe("HashToXmlTest", () => {
 
   it.skip("to xml dups options");
 
-  it.skip("expansion count is limited");
+  it("expansion count is limited", async () => {
+    // Rails switches on `ActiveSupport::XmlMini.backend.name`
+    // (hash_ext_test.rb:1023-1032) because its whole suite re-runs under each
+    // backend; the trails backend is the module namespace object, so the arms
+    // are keyed off the module rather than its constant name. The trails
+    // Nokogiri backends re-raise the parser's own first error as a plain
+    // `Error` where Ruby has `Nokogiri::XML::SyntaxError` / `RuntimeError`.
+    const backend = XmlMini.backend();
+    const expected =
+      backend === XmlMini_REXML
+        ? RuntimeError
+        : backend === XmlMini_Nokogiri
+          ? Error
+          : backend === XmlMini_NokogiriSAX
+            ? Error
+            : undefined;
+
+    await assertRaises([expected!], {}, () => {
+      const attackXml = `
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE member [
+        <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+        <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+        <!ENTITY c "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+        <!ENTITY d "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+        <!ENTITY e "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+        <!ENTITY f "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+        <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      ]>
+      <member>
+      &a;
+      </member>
+      `;
+      return fromXml(attackXml);
+    });
+  });
 
   it.skip(
     "multiple records from xml with attributes other than type ignores them without exploding",
