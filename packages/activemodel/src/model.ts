@@ -1482,7 +1482,7 @@ export class Model {
     ...suffixes: Array<string | { parameters?: string | null | false }>
   ) => void;
   declare static attributeMethodAffix: (
-    ...affixes: Array<{ prefix: string; suffix: string }>
+    ...affixes: Array<{ prefix: string; suffix: string; parameters?: string | null | false }>
   ) => void;
   declare static aliasAttribute: (newName: string, oldName: string) => void;
   declare static eagerlyGenerateAliasAttributeMethods: (newName: string, oldName: string) => void;
@@ -1496,7 +1496,6 @@ export class Model {
     attrName: string,
     options: { owner: CodeGenerator; as: string; override?: boolean },
   ) => void;
-  declare static defineDirtyAttributeMethods: (attrName: string) => void;
   declare static undefineAttributeMethods: () => void;
   declare static generatedAttributeMethods: () => Module;
   declare static isInstanceMethodAlreadyImplemented: (methodName: string) => boolean;
@@ -2608,7 +2607,6 @@ extend(Model, {
   defineAttributeMethods: AttributeMethods.defineAttributeMethods,
   defineAttributeMethod: AttributeMethods.defineAttributeMethod,
   defineAttributeMethodPattern: AttributeMethods.defineAttributeMethodPattern,
-  defineDirtyAttributeMethods: AttributeMethods.defineDirtyAttributeMethods,
   undefineAttributeMethods: AttributeMethods.undefineAttributeMethods,
   resolveAttributeName: AttributeMethods.resolveAttributeName,
   generatedAttributeMethods: AttributeMethods.generatedAttributeMethods,
@@ -2629,6 +2627,17 @@ include(Model, {
 // so it has to run after the `attributeMethodPatterns` class attribute exists.
 extend(Model, AttributesClassMethods);
 include(Model, Attributes);
+
+// Ruby `include ActiveModel::Dirty`'s `included do` block (dirty.rb:241-245).
+// The Ruby affixes are snake_case fragments of the generated name, trails' the
+// camelCased halves of it, so a `?` disappears into the spelling; a `!` is kept
+// and stripped by `AttributeMethodPattern`, which is how the mutator stays a
+// zero-arg method rather than an accessor property.
+Model.attributeMethodSuffix("PreviouslyChanged", "Changed", { parameters: "**options" });
+Model.attributeMethodSuffix("Change", "WillChange!", "Was", { parameters: false });
+Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
+Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
+Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
 
 const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
 

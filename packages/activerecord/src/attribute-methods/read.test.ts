@@ -43,7 +43,6 @@ describe("ReadTest", () => {
       static aliasAttribute = Base.aliasAttribute;
       static defineAttributeMethod = Base.defineAttributeMethod;
       static defineAttributeMethodPattern = Base.defineAttributeMethodPattern;
-      static defineDirtyAttributeMethods = Base.defineDirtyAttributeMethods;
       static generatedAttributeMethods = Base.generatedAttributeMethods;
       static isInstanceMethodAlreadyImplemented = Base.isInstanceMethodAlreadyImplemented;
       static attributeMethodPatternsCache = Base.attributeMethodPatternsCache;

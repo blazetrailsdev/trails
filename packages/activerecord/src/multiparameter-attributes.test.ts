@@ -686,6 +686,8 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "13",
       "written_on(5i)": "55",
     });
-    expect(topic.cameFromUser("written_on")).toBe(false);
+    expect((topic as unknown as { written_onCameFromUser: boolean }).written_onCameFromUser).toBe(
+      false,
+    );
   });
 });

@@ -847,7 +847,7 @@ import {
   attributesForDatabase as _attributesForDatabase,
   attributeBeforeTypeCast as _attributeBeforeTypeCast,
   attributeForDatabase as _attributeForDatabase,
-  isAttributeCameFromUser as _isAttributeCameFromUser,
+  attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { queryCastAttribute as _queryCastAttribute } from "./attribute-methods/query.js";
 // primary-key.ts imports dangerousAttributeMethods from this file, so we cannot
@@ -895,8 +895,8 @@ export function attributeForDatabase(this: InstanceMethodHost, attrName: string)
   return _attributeForDatabase.call(this as any, attrName);
 }
 /** @internal */
-export function isAttributeCameFromUser(this: InstanceMethodHost, attrName: string): boolean {
-  return _isAttributeCameFromUser.call(this as any, attrName);
+export function attributeCameFromUser(this: InstanceMethodHost, attrName: string): boolean {
+  return _attributeCameFromUser.call(this as any, attrName);
 }
 /** @internal */
 export function queryCastAttribute(

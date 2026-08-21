@@ -92,23 +92,20 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(errs.where("x", ":not_a_number")).toHaveLength(1);
   });
 
-  it("validates against the raw before-type-cast value (prepareValueForValidation)", async () => {
-    // Rails numericality validates what the user typed, not the cast
-    // value. In trails, IntegerType.cast returns null for non-numeric
-    // strings — so without prepareValueForValidation, 'abc' would read
-    // as null and slip past via the allowNil short-circuit. The raw
-    // read through readAttributeBeforeTypeCast surfaces the original
-    // 'abc' so it's caught as not_a_number.
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: true });
+  it("validates against the raw before-type-cast value (prepareValueForValidation)", () => {
+    // numericality.rb:127-132 — a record answering `<attr>_came_from_user?`
+    // truthily is validated on `<attr>_before_type_cast`, so what the user
+    // typed is what gets checked.
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreCameFromUser = true;
+      scoreBeforeTypeCast = "abc";
+      readAttribute(_name: string) {
+        return 0;
       }
     }
-    const p = new Person({ age: "abc" });
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("age")).toContain("is not a number");
+    const rec = new MockRecord();
+    expect(prepareValueForValidation.call(undefined, 0, rec as never, "score")).toBe("abc");
   });
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", async () => {
@@ -165,9 +162,12 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(await new Person({ score: 3.9 }).isValid()).toBe(false); // trunc(3.9)=3, odd
   });
 
-  it("cameFromUser absent (AM Model) → falls back to readAttributeBeforeTypeCast, catches raw string", async () => {
-    // AM's Model has no cameFromUser — prepareValueForValidation degrades to
-    // the readAttributeBeforeTypeCast path and still catches bad raw input.
+  it("cameFromUser absent (AM Model) → validates the cast value", async () => {
+    // A plain ActiveModel model declares neither `_came_from_user?` nor
+    // `_before_type_cast` (both are ActiveRecord's, before_type_cast.rb:32-33),
+    // so prepareValueForValidation takes the `else` arm, finds nothing, and
+    // returns `value`. Ruby's `"abc".to_i` is 0, and so is trails' integer
+    // cast, so the record is valid — exactly as it is in Rails.
     class Person extends Model {
       static {
         this.attribute("age", "integer");
@@ -175,26 +175,20 @@ describe("NumericalityValidator (trails-only)", () => {
       }
     }
     const p = new Person({ age: "abc" });
-    // AM Model does not expose cameFromUser
-    expect(typeof (p as unknown as { cameFromUser?: unknown }).cameFromUser).toBe("undefined");
-    // Validator sees "abc" (raw via readAttributeBeforeTypeCast), reports not_a_number
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("age")).toContain("is not a number");
+    expect("ageCameFromUser" in (p as unknown as object)).toBe(false);
+    expect((p as unknown as { age: unknown }).age).toBe(0);
+    expect(await p.isValid()).toBe(true);
   });
 
   it("cameFromUser false → validates cast value (readAttribute)", () => {
-    // Mock: cameFromUser returns false, but cast value (readAttribute) is
+    // Mock: scoreCameFromUser is false, but cast value (readAttribute) is
     // a valid number — validation should pass.
     class MockRecord {
       errors = { add: vi.fn() };
-      cameFromUser(_name: string) {
-        return false;
-      }
+      scoreCameFromUser = false;
+      scoreBeforeTypeCast = "not-a-number-string";
       readAttribute(_name: string) {
         return 42;
-      }
-      readAttributeBeforeTypeCast(_name: string) {
-        return "not-a-number-string";
       }
     }
     const rec = new MockRecord();
@@ -204,12 +198,10 @@ describe("NumericalityValidator (trails-only)", () => {
   });
 
   it("cameFromUser absent → falls back to readAttributeBeforeTypeCast", () => {
-    // Non-AR hosts that don't implement cameFromUser degrade gracefully.
+    // A host with no `_came_from_user?` reader takes the `_before_type_cast` arm.
     class MockRecord {
       errors = { add: vi.fn() };
-      readAttributeBeforeTypeCast(_name: string) {
-        return "raw-value";
-      }
+      scoreBeforeTypeCast = "raw-value";
     }
     const rec = new MockRecord();
     const result = prepareValueForValidation.call(undefined, "fallback", rec as never, "score");
@@ -219,9 +211,7 @@ describe("NumericalityValidator (trails-only)", () => {
   it("cameFromUser false + no readAttributeBeforeTypeCast → readAttribute fallback", () => {
     class MockRecord {
       errors = { add: vi.fn() };
-      cameFromUser(_name: string) {
-        return false;
-      }
+      scoreCameFromUser = false;
       readAttribute(_name: string) {
         return 99;
       }

@@ -14,12 +14,15 @@ import { ArgumentError } from "../attribute-assignment.js";
 // untyped ValueType here (type/registry.ts:47). `price` is an `attr_writer`
 // plus a `number_to_currency` reader, NOT an attribute, so it is a plain field
 // whose raw value is reached through Rails' `attribute_before_type_cast`
-// override (topic.rb:56-58) — `readAttributeBeforeTypeCast` in trails.
+// override (topic.rb:56-58), reached through the `_before_type_cast` suffix
+// Topic declares for itself (topic.rb:10-11).
 class Topic extends Model {
   static {
     this.attribute("title", "string");
     this.attribute("content", "string");
     this.attribute("approved", "value");
+    this.attributeMethodSuffix("BeforeTypeCast", { parameters: false });
+    this.defineAttributeMethod("price");
   }
 
   // Rails' `@price` ivar. Declared without an initializer because
@@ -44,9 +47,11 @@ class Topic extends Model {
     return false;
   }
 
-  override readAttributeBeforeTypeCast(attrName: string): unknown {
-    if (attrName === "price") return this._price;
-    return super.readAttributeBeforeTypeCast(attrName);
+  // Mirrors: topic.rb:56-58 — the dispatch target of the `_before_type_cast`
+  // suffix, reading the ivar directly.
+  attributeBeforeTypeCast(attr: string): unknown {
+    if (attr === "price") return this._price;
+    return this.readAttributeBeforeTypeCast(attr);
   }
 }
 
@@ -422,7 +427,7 @@ describe("NumericalityValidationTest", () => {
     const topic = new Topic({ price: 50 });
 
     expect(topic.price).toEqual("$50.00");
-    expect(topic.readAttributeBeforeTypeCast("price")).toEqual(50);
+    expect((topic as unknown as { priceBeforeTypeCast: unknown }).priceBeforeTypeCast).toEqual(50);
     assertPredicate(await topic.isValid(), (valid) => valid);
   });
 

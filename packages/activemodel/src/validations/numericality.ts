@@ -422,28 +422,20 @@ export function prepareValueForValidation(
   // now infers genuine in-place mutation (value diverged from tracked change),
   // so wiring the short-circuit is plausible — but left for a focused change
   // with its own coverage rather than as a side effect of this path.
-  //
-  // Trails exposes raw values through the generic
-  // `readAttributeBeforeTypeCast(name)` API on Model rather than the
-  // Rails per-attribute generated `${attr}_before_type_cast` methods.
-  // Duck-type the lookup so other hosts implementing the same shape
-  // (or AR Base subclasses) work too.
   const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
-  if (typeof r.cameFromUser === "function") {
-    if (r.cameFromUser(attrName)) {
-      rawValue =
-        typeof r.readAttributeBeforeTypeCast === "function"
-          ? r.readAttributeBeforeTypeCast(attrName)
-          : undefined;
+  const cameFromUser = `${attrName}CameFromUser`;
+  if (cameFromUser in r) {
+    if (r[cameFromUser]) {
+      rawValue = r[`${attrName}BeforeTypeCast`];
     } else if (typeof r.readAttribute === "function") {
       rawValue = r.readAttribute(attrName);
     }
   } else {
-    rawValue =
-      typeof r.readAttributeBeforeTypeCast === "function"
-        ? r.readAttributeBeforeTypeCast(attrName)
-        : undefined;
+    const beforeTypeCast = `${attrName}BeforeTypeCast`;
+    if (beforeTypeCast in r) {
+      rawValue = r[beforeTypeCast];
+    }
   }
   // Rails: raw_value || value — Ruby `||` falls back on nil/false. Use
   // the same semantic so `false`/`null` raw values fall through to
@@ -453,9 +445,7 @@ export function prepareValueForValidation(
 
 interface RecordWithRawAttribute {
   attributeChangedInPlace?: (name: string) => boolean;
-  cameFromUser?: (name: string) => boolean;
   readAttribute?: (name: string) => unknown;
-  readAttributeBeforeTypeCast?: (name: string) => unknown;
   [key: string]: unknown;
 }
 

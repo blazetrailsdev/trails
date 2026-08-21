@@ -333,10 +333,10 @@ describe("BelongsToAssociationsTest", () => {
 
   it("eager loading wont mutate owner record", async () => {
     const client = await Client.eagerLoad(":firmWithBasicId").first();
-    expect((client as any).firmIdCameFromUser?.()).toBeFalsy();
+    expect((client as any).firmIdCameFromUser).toBeFalsy();
 
     const client2 = await Client.preload(":firmWithBasicId").first();
-    expect((client2 as any).firmIdCameFromUser?.()).toBeFalsy();
+    expect((client2 as any).firmIdCameFromUser).toBeFalsy();
   });
 
   it("missing attribute error is raised when no foreign key attribute", async () => {

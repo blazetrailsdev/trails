@@ -5,10 +5,12 @@ import { Model } from "./index.js";
  * Covers the per-attribute dirty method cascade generated when a typed
  * attribute is declared. Mirrors the ActiveModel::Dirty-generated
  * methods in activemodel/lib/active_model/dirty.rb:
- *   name_changed?, name_change, name_was, name_in_database,
- *   name_before_last_save, name_previously_changed?, name_previous_change,
- *   name_previously_was, saved_change_to_name, will_save_change_to_name,
- *   restore_name!
+ *   name_changed?, name_change, name_was, name_previously_changed?,
+ *   name_previous_change, name_previously_was, restore_name!, clear_name_change
+ *
+ * The `saved_change_to_*` / `*_before_last_save` / `*_in_database` half of the
+ * cascade is declared by ActiveRecord (activerecord/attribute_methods/dirty.rb:53-59)
+ * and covered in activerecord/src/dirty-generated-methods.trails.test.ts.
  */
 describe("DirtyGeneratedMethods", () => {
   class Person extends Model {
@@ -31,29 +33,14 @@ describe("DirtyGeneratedMethods", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
-    expect((p as any).nameChange()).toEqual(["Alice", "Bob"]);
+    expect((p as any).nameChange).toEqual(["Alice", "Bob"]);
   });
 
   it("<attr>Was returns the pre-change value", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     (p as any).name = "Bob";
-    expect((p as any).nameWas()).toBe("Alice");
-  });
-
-  it("<attr>InDatabase returns the persisted value", () => {
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    (p as any).name = "Bob";
-    expect((p as any).nameInDatabase()).toBe("Alice");
-  });
-
-  it("<attr>BeforeLastSave surfaces the prior persisted value", () => {
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    (p as any).name = "Bob";
-    p.changesApplied();
-    expect((p as any).nameBeforeLastSave()).toBe("Alice");
+    expect((p as any).nameWas).toBe("Alice");
   });
 
   it("<attr>PreviouslyChanged and <attr>PreviousChange reflect the last save", () => {
@@ -62,7 +49,7 @@ describe("DirtyGeneratedMethods", () => {
     (p as any).name = "Bob";
     p.changesApplied();
     expect((p as any).namePreviouslyChanged()).toBe(true);
-    expect((p as any).namePreviousChange()).toEqual(["Alice", "Bob"]);
+    expect((p as any).namePreviousChange).toEqual(["Alice", "Bob"]);
   });
 
   it("<attr>PreviouslyWas is the pre-save value from the last save", () => {
@@ -70,18 +57,7 @@ describe("DirtyGeneratedMethods", () => {
     p.changesApplied();
     (p as any).name = "Bob";
     p.changesApplied();
-    expect((p as any).namePreviouslyWas()).toBe("Alice");
-  });
-
-  it("savedChangeTo<Attr> and willSaveChangeTo<Attr> follow save lifecycle", () => {
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    (p as any).name = "Bob";
-    expect((p as any).willSaveChangeToName()).toBe(true);
-    expect((p as any).savedChangeToName()).toBe(false);
-    p.changesApplied();
-    expect((p as any).willSaveChangeToName()).toBe(false);
-    expect((p as any).savedChangeToName()).toBe(true);
+    expect((p as any).namePreviouslyWas).toBe("Alice");
   });
 
   it("restore<Attr> rolls back a single attribute only", () => {

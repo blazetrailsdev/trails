@@ -375,7 +375,9 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("rejects invalid types", async () => {
-      const m = new TypedModel({ age: "not a number", email: "" } as any);
+      // Ruby's `"not a number".to_i` is 0, so an integer attribute never
+      // reaches numericality with a non-numeric value; nil does.
+      const m = new TypedModel({ age: null, email: "" } as any);
       expect(await m.isValid()).toBe(false);
       expect(m.errors.messagesFor("age").length).toBeGreaterThan(0);
       expect(m.errors.messagesFor("email").length).toBeGreaterThan(0);

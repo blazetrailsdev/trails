@@ -235,7 +235,7 @@ import {
   defineMethodAttribute as _defineMethodAttribute,
 } from "./attribute-methods/read.js";
 import { setDefineMethodAttribute as _setDefineMethodAttribute } from "./attribute-methods/write.js";
-import { isAttributeCameFromUser as _isAttributeCameFromUser } from "./attribute-methods/before-type-cast.js";
+import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -1734,16 +1734,29 @@ export class Base extends Model {
   }
 
   /**
-   * Rails: `attribute_method_suffix "_before_type_cast", "_for_database",
-   * parameters: false` (attribute_methods/before_type_cast.rb:32). The
-   * `class_attribute` writer gives Active Record its own array rather than
+   * The `included do` blocks of AttributeMethods::BeforeTypeCast
+   * (before_type_cast.rb:32-33) and AttributeMethods::Dirty (dirty.rb:53-59).
+   * The `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
+   *
+   * dirty.rb:54's `attribute_method_prefix("saved_change_to_",
+   * parameters: false)` has no entry: Ruby tells the array-returning
+   * `saved_change_to_name` from the predicate `saved_change_to_name?` by the
+   * `?`, which the camel spelling drops, so both would generate
+   * `savedChangeToName`. Story:
+   * 0096-naming-identifier-burndown/saved-change-to-attribute-values-generated-half.
    */
   static {
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
       new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
+      new AttributeMethodPattern({ suffix: "CameFromUser", parameters: false }),
+      new AttributeMethodPattern({ prefix: "savedChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ suffix: "BeforeLastSave", parameters: false }),
+      new AttributeMethodPattern({ prefix: "willSaveChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ suffix: "ChangeToBeSaved", parameters: false }),
+      new AttributeMethodPattern({ suffix: "InDatabase", parameters: false }),
     ];
   }
 
@@ -3838,8 +3851,6 @@ export class Base extends Model {
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
   /** @internal */
-  declare cameFromUser: (name: string) => boolean;
-  /** @internal */
   declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
   /** @internal */
   declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
@@ -4677,7 +4688,6 @@ include(Base, {
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: ReadonlyAttributes._writeAttribute,
-  cameFromUser: _isAttributeCameFromUser,
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)
@@ -4797,7 +4807,7 @@ include(Base, {
   attributesForDatabase: _attributesForDatabase,
   attributeBeforeTypeCast: _attributeBeforeTypeCast,
   attributeForDatabase: _attributeForDatabase,
-  isAttributeCameFromUser: _isAttributeCameFromUser,
+  attributeCameFromUser: _attributeCameFromUser,
   queryCastAttribute: _queryCastAttribute,
   isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
   idWas: _idWas,

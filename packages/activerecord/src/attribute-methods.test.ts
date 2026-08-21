@@ -566,7 +566,7 @@ describe("AttributeMethodsTest", () => {
     const obj = new ClassWithDeprecatedAliasAttributeBehavior({}) as any;
     obj.title = "hey";
     expect(obj.subject).toBe("hey");
-    expect(obj.subjectWas()).toBeNull();
+    expect(obj.subjectWas).toBeNull();
   });
   it("#alias_attribute with an overridden original method from a module does not use the overridden original method", async () => {
     const titleWasOverride = {
@@ -580,12 +580,18 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    Object.assign(ClassWithDeprecatedAliasAttributeBehaviorFromModule.prototype, titleWasOverride);
+    // `Object.assign` goes through [[Set]] and hits the generated getter-only
+    // `titleWas`; Ruby's module include defines over it.
+    Object.defineProperty(
+      ClassWithDeprecatedAliasAttributeBehaviorFromModule.prototype,
+      "titleWas",
+      { value: titleWasOverride.titleWas, writable: true, configurable: true },
+    );
     (ClassWithDeprecatedAliasAttributeBehaviorFromModule as any).aliasAttribute("subject", "title");
     const obj = new ClassWithDeprecatedAliasAttributeBehaviorFromModule({}) as any;
     obj.title = "hey";
     expect(obj.subject).toBe("hey");
-    expect(obj.subjectWas()).toBeNull();
+    expect(obj.subjectWas).toBeNull();
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", async () => {
     const { Post } = makeModel();
@@ -1114,9 +1120,9 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "user-set" }) as any;
-    expect(t.cameFromUser("title")).toBe(true);
+    expect(t.titleCameFromUser).toBe(true);
     t._attributes.writeFromDatabase("title", "db-loaded");
-    expect(t.cameFromUser("title")).toBe(false);
+    expect(t.titleCameFromUser).toBe(false);
   });
 
   it("accessed_fields", async () => {
