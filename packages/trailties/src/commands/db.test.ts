@@ -59,10 +59,6 @@ async function establishMigrationConnection(
   extra: Record<string, unknown> = {},
 ): Promise<void> {
   const { Base, HashConfig, ConnectionAdapters } = await import("@blazetrails/activerecord");
-  // Rails reaches a caller-supplied adapter class through
-  // `ConnectionAdapters.register` (`connection_adapters.rb:9-13`) and
-  // `db_config.new_connection`, never by handing the pool a connection. The
-  // `resolve` warms the sync cache the way Ruby's `require` does.
   const adapterName = `sqlite3_migration_${(migrationAdapters += 1)}`;
   ConnectionAdapters.register(
     adapterName,

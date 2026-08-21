@@ -16,10 +16,6 @@ import { resolve as resolveConnectionAdapter } from "../connection-adapters.js";
  * (`alter_table`, and so `add_foreign_key` / `remove_column`) ends there, so
  * those tests check their adapter out of a real pool.
  */
-// `db_config.new_connection` (`database_config.rb`) names the adapter class
-// Ruby's `require` has already loaded. ESM's `import()` is async, so warm the
-// registry's sync cache once at module load and keep `new_connection`
-// synchronous, exactly as Rails' is.
 await resolveConnectionAdapter("sqlite3");
 
 export function newSqlitePool(

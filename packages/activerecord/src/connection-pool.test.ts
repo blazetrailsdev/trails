@@ -119,10 +119,6 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
 }
 
-// Rails reaches a bespoke adapter class through `ConnectionAdapters.register`
-// (`connection_adapters.rb:9-13`) and `db_config.new_connection`, never by
-// handing the pool a ready-made connection. `resolve` warms the sync cache the
-// way Ruby's `require` does, so `new_connection` stays synchronous.
 register("transaction_aware_test", async () => TransactionAwareTestAdapter);
 await resolve("transaction_aware_test");
 

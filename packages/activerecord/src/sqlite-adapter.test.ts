@@ -12,10 +12,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
 import { register, resolve } from "./connection-adapters.js";
 
-// Rails reaches a bespoke adapter through `ConnectionAdapters.register`
-// (`connection_adapters.rb:9-13`) and `db_config.new_connection`, not by handing
-// the pool a ready-made connection. `resolve` warms the sync cache the same way
-// Ruby's `require` does, so `ConnectionPool#new_connection` stays synchronous.
 let registeredTestAdapters = 0;
 async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string> {
   const adapter = `sqlite3_test_${(registeredTestAdapters += 1)}`;

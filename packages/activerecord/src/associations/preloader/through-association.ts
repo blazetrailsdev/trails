@@ -64,19 +64,13 @@ export class ThroughAssociation extends Association {
         continue;
       }
 
-      // Ruby's `through_records_by_owner` / `source_records_by_owner` are
-      // memoized hash reads forced on first use inside the loop; ours are
-      // memoized async methods, so awaiting them here is the same laziness —
-      // an all-owners-loaded preload never forces either and issues no query.
       let throughRecords = (await this.throughRecordsByOwner()).get(owner) ?? [];
 
       if (this.owners[0].association(this.throughReflection!.name).loaded) {
-        const sourceType = (this.reflection as any).options?.sourceType;
+        const sourceType = this.reflection.options.sourceType;
         if (sourceType) {
-          const foreignType =
-            (this.reflection as any).foreignType ?? (this.sourceReflection as any)?.foreignType;
           throughRecords = throughRecords.filter(
-            (record) => (record as any)._readAttribute(foreignType) === sourceType,
+            (record) => record.readAttribute(this.reflection.foreignType!) === sourceType,
           );
         }
       }
@@ -84,7 +78,7 @@ export class ThroughAssociation extends Association {
       const sourceRecordsByOwner = await this.sourceRecordsByOwner();
       let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
 
-      records = records.filter((r) => r != null);
+      records = records.filter((record) => record != null);
       if (this.scope?.orderValues?.length > 0) {
         const preloadIndex = await this.preloadIndex();
         records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));

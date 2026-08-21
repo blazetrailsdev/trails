@@ -117,10 +117,6 @@ export function connectsTo(
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
-      // `establish_connection` resolves the adapter class from
-      // `db_config.adapter` (connection_handler.rb:110-137); trails' resolve is
-      // async, so it hands the pool back an `adapterReady` promise callers can
-      // await before issuing real queries.
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         ownerName: this.connectionClassForSelf(),
         role,
@@ -844,12 +840,11 @@ async function establishWithConfig(
   config?: Record<string, unknown>,
   dbConfigOverride?: DatabaseConfig,
 ): Promise<void> {
-  // Pass the original adapter name to the registry so caller overrides
-  // like register("mysql2", ...) aren't shadowed by normalization. Called for
-  // its effect: Ruby's `require` is synchronous, so `db_config.new_connection`
-  // (`database_configurations/database_config.rb`) can name the adapter class
-  // without a preceding load; warming the sync cache here is what lets
-  // `ConnectionPool#new_connection` stay synchronous like Rails'.
+  // No Rails counterpart: Ruby's `require` is synchronous, so
+  // `db_config.new_connection` names the adapter class with no preceding load.
+  // Warming the sync cache here is what keeps `ConnectionPool#new_connection`
+  // synchronous. The original (un-normalized) name goes to the registry so a
+  // caller override like `register("mysql2", ...)` is not shadowed.
   await _loadAdapter(adapterName);
 
   // Mirror Rails' db_config_handler (database_configurations.rb:65-70):

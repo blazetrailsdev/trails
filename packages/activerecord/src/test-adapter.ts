@@ -89,10 +89,6 @@ const _primaryConfiguration: Record<string, unknown> = {
  *
  * @internal
  */
-// The per-connection driver caps the lane wiring below applies to a raw test
-// adapter, as configuration-hash entries. A pool builds its connections through
-// `db_config.new_connection` (`connection_pool.rb`), so a test-local pool caps
-// its connections the same way by carrying these in its `db_config`.
 let rawTestAdapterCaps: Record<string, unknown> = {};
 
 export function ambientPoolConfiguration(): Record<string, unknown> {
