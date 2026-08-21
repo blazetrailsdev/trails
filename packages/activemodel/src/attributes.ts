@@ -4,8 +4,8 @@ import { defaultValue as typeDefaultValue } from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
-  attributeMethodSuffix,
   attributeMissing,
+  type AttributeMethodHost,
   type AttributeMethodMatch,
   buildMangledName,
 } from "./attribute-methods.js";
@@ -244,6 +244,11 @@ export interface Attributes {
  *
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
+/** A class with `ActiveModel::AttributeMethods` already extended onto it. */
+type AttributeMethodSuffixHost = AttributeMethodHost & {
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attributes {
   /**
@@ -252,8 +257,8 @@ export class Attributes {
    *     attribute_method_suffix "=", parameters: "value"
    *   end
    */
-  static [included](base: AttributeMethodHost): void {
-    attributeMethodSuffix.call(base, "=", { parameters: "value" });
+  static [included](base: AttributeMethodSuffixHost): void {
+    base.attributeMethodSuffix("=", { parameters: "value" });
   }
 
   _attributes: AttributeSet;

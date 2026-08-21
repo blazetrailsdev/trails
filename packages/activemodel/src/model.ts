@@ -25,7 +25,6 @@ import {
   withOptions,
   extend,
   include,
-  extend,
   runLoadHooks,
   wrap,
   ToJsonWithActiveSupportEncoder,
@@ -2811,33 +2810,6 @@ classAttribute.call(Model, "attributeMethodPatterns", {
   default: [new AttributeMethodPattern()],
 });
 
-// `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
-// issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
-// so it has to run after the `attributeMethodPatterns` class attribute exists.
-extend(Model, AttributesClassMethods);
-include(Model, Attributes);
-
-const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
-
-function _validateOnCondition(on: string | string[]): void {
-  const values = Array.isArray(on) ? on : [on];
-  for (const v of values) {
-    if (!VALID_ON_CONDITIONS.has(v)) {
-      throw new ArgumentError(
-        `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
-      );
-    }
-  }
-}
-
-function _rejectOnOption(conditions?: CallbackConditions): void {
-  if (conditions && "on" in conditions) {
-    throw new ArgumentError("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
-  }
-}
-
-include(Model, ToJsonWithActiveSupportEncoder);
-
 // Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
 extend(Model, {
   pendingAttributeModifications: _pendingAttributeModificationsHelper,
@@ -2873,6 +2845,33 @@ include(Model, {
   missingAttribute: AttributeMethods.missingAttribute,
   isRespondToWithoutAttributes: AttributeMethods.isRespondToWithoutAttributes,
 });
+
+// `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
+// issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
+// so it has to run after the `attributeMethodPatterns` class attribute exists.
+extend(Model, AttributesClassMethods);
+include(Model, Attributes);
+
+const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
+
+function _validateOnCondition(on: string | string[]): void {
+  const values = Array.isArray(on) ? on : [on];
+  for (const v of values) {
+    if (!VALID_ON_CONDITIONS.has(v)) {
+      throw new ArgumentError(
+        `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
+      );
+    }
+  }
+}
+
+function _rejectOnOption(conditions?: CallbackConditions): void {
+  if (conditions && "on" in conditions) {
+    throw new ArgumentError("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+  }
+}
+
+include(Model, ToJsonWithActiveSupportEncoder);
 
 // Ruby `include ActiveModel::Validations` (validations.rb:52) and
 // `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
