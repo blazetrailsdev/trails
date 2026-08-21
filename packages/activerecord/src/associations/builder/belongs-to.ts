@@ -8,7 +8,6 @@ import {
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { flushPendingCounterCacheColumns } from "../../counter-cache.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { ActiveRecord } from "../../ar-config.js";
@@ -72,34 +71,32 @@ export class BelongsTo extends SingularAssociation {
   static addCounterCacheCallbacks(model: any, reflection: any): void {
     const name = reflection.name;
 
-    // Register the counter column on the target class so isCounterCacheColumn
-    // works on the has-many side — mirrors Rails' builder/belongs_to.rb line:
-    //   klass._counter_cache_columns |= [cache_column]
-    // Re-derived at flush time, not now: see counter-cache-state.ts. Resolving
-    // eagerly here can fall back to the non-demodulized column (cpk_books_count)
-    // when the target class isn't registered yet.
+    // belongs_to.rb:39-40:
+    //   klass = reflection.class_name.safe_constantize
+    //   klass._counter_cache_columns |= [cache_column] if klass && klass.respond_to?(:_counter_cache_columns)
+    // The column is derived through a thunk rather than eagerly: an unresolved
+    // target has to be re-derived after it registers, or `counterCacheColumn()`
+    // falls back to the non-demodulized `cpk_books_count` instead of
+    // `books_count`. See counter-cache-state.ts.
     const cacheColumn = (): string =>
       (typeof reflection.counterCacheColumn === "function"
         ? reflection.counterCacheColumn()
         : null) ?? `${pluralize(underscore(model.name))}_count`;
-    const targetClassName = reflection.options?.className ?? camelize(name);
-    // Rails: `klass = reflection.class_name.safe_constantize` — silently nil
-    // when the target class isn't loaded yet, then guarded by
-    // `if klass && klass.respond_to?(:_counter_cache_columns)`. We mirror by
-    // always staging into the pending map first, then flushing immediately
-    // when the target is already registered. The unconditional pending stage
-    // ensures the registration survives a target class being later re-defined
-    // (test re-runs, hot reload), at which point registerModel re-flushes —
-    // mirroring Rails' behavior where re-loading the target class re-runs
-    // the include chain.
-    const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<() => string>();
-    pending.add(cacheColumn);
-    pendingCounterCacheColumns.set(targetClassName, pending);
-    // Resolved through the constant table rather than the reflection so a
-    // target class re-defined between tests does not get its `klass` memo
-    // prematurely seeded.
-    const klass = safeConstantize(targetClassName) as any;
-    if (klass) flushPendingCounterCacheColumns(klass);
+    const className = reflection.options?.className ?? camelize(name);
+    const klass = safeConstantize(className) as any;
+    if (klass && "_counterCacheColumns" in klass) {
+      const column = cacheColumn();
+      if (!klass._counterCacheColumns.includes(column)) {
+        klass._counterCacheColumns = [...klass._counterCacheColumns, column];
+      }
+    } else {
+      // The one thing Ruby's autoload gives Rails for free: a target declared
+      // later in the module graph. Staged under the class name the registry
+      // will use, and applied by `registerModel`.
+      const pending = pendingCounterCacheColumns.get(className) ?? new Set<() => string>();
+      pending.add(cacheColumn);
+      pendingCounterCacheColumns.set(className, pending);
+    }
 
     // belongs_to.rb:41 — `model.counter_cached_association_names |= [reflection.name]`
     if (!model.counterCachedAssociationNames.includes(name)) {

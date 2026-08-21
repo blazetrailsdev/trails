@@ -109,6 +109,7 @@ import {
   Attributes,
   attribute,
   setDefineMethodAttribute,
+  freeze as attributesFreeze,
 } from "./attributes.js";
 import {
   _defaultAttributes,
@@ -2139,6 +2140,9 @@ export class Model {
     // `context_for_validation` inside `freeze`. Touching
     // `validationContext` alone would not populate the cache.
     void this.contextForValidation();
+    // Rails' `super` from `Validations#freeze` reaches `Attributes#freeze`
+    // (attributes.rb:150-153), which clones-and-freezes the attribute set.
+    attributesFreeze.call(this);
     Object.freeze(this);
     return this;
   }

@@ -233,6 +233,11 @@ export class AttributeSet {
     return Attribute.null(name);
   }
 
+  /** Mirrors: attribute_set.rb:82-85 — `@attributes = @attributes.clone`. */
+  initializeClone(_other: AttributeSet): void {
+    this._attributes = new Map(this._attributes);
+  }
+
   /**
    * Force a database value to be cast through the supplied `type`, replacing any
    * existing (schema-declared) attribute. Unlike {@link writeFromDatabase}, whose
