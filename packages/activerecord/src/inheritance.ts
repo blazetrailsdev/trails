@@ -6,7 +6,7 @@
 
 import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
-import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
+import { ActiveRecordError, NameError, SubclassNotFound, TableNotSpecified } from "./errors.js";
 import {
   camelize,
   constantize,
@@ -139,7 +139,8 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  * actually carry the inheritance column, or STI is disabled. The membership
  * test is Rails' own `columns_hash.include?`: a *declared* `attribute :type`
  * with no backing column must not make a model an STI subclass, which is why
- * this reader asks for column metadata rather than `attribute_types`.
+ * this reader asks for column metadata rather than `attribute_types`. The one
+ * rescued case is trails' table-less abstract class, below.
  * Decoupled from the explicit `inheritanceColumn` sentinel
  * ({@link isStiSubclass}), which still gates the registry-resolved row-dispatch
  * paths.
@@ -152,14 +153,18 @@ export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   let columnsHash: Record<string, unknown>;
   try {
     columnsHash = modelClass.columnsHash();
-  } catch {
+  } catch (error) {
     // Rails always gets a `columns_hash` here: `reset_table_name` gives an
-    // abstract class its superclass's table (`model_schema.rb:290-300`), and the
-    // first touch loads the schema synchronously. trails infers a table name for
-    // an abstract class instead of nil, so `load_schema!` treats every abstract
-    // class as table-less (`model-schema.ts` loadSchemaBangAnchor) and reflection
-    // is lazy besides — in both windows fall back to `attribute_types`, which is
-    // seeded from `columns_hash` and inherited rather than empty.
+    // abstract class its superclass's table (`model_schema.rb:290-300`), so
+    // `load_schema!`'s `raise TableNotSpecified unless table_name`
+    // (`model_schema.rb:587-590`) never fires for one. trails infers a table
+    // name for an abstract class instead of nil and keys that raise off
+    // `abstractClass` instead (`model-schema.ts` loadSchemaBangAnchor), so this
+    // one error stands in for the columns Rails would have read off the
+    // inherited table — take them from `attribute_types`, which is seeded from
+    // `columns_hash` and inherited rather than empty. Every other failure is
+    // one Rails would raise too.
+    if (!(error instanceof TableNotSpecified)) throw error;
     const inheritCol = modelClass.inheritanceColumn;
     return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
   }
