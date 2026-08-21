@@ -3025,6 +3025,10 @@ export class Relation<T extends Base> {
    * restore rides on it instead of firing under the still-running body. The
    * check is `instanceof Promise` rather than a thenable test because a
    * `Relation` is itself thenable, and `_execScope`'s block answers one.
+   *
+   * Rails defaults `all_queries` to `false` and `_exec_scope` omits it; a TS
+   * default cannot sit usefully before the required block parameter, so the
+   * one caller that relies on the default passes `false` outright.
    */
   private _scoping<R>(scope: any, registry: any, allQueries: boolean | null, fn: () => R): R {
     const previous = registry.currentScope(this.model, true);
