@@ -1642,6 +1642,31 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
   }
 
+  /**
+   * The abstract `index_name` (abstract/schema_statements.rb) with the schema
+   * qualifier taken off the table before the default name is built. Rails
+   * embeds `table_name` verbatim, so an ATTACHed `aux.customers` yields the
+   * dotted identifier `index_aux.customers_on_name`, which the CREATE INDEX
+   * emission then reads as a schema qualifier and rejects. Every other
+   * qualified path in this adapter (`columns`, `foreignKeys`, `primaryKeys`)
+   * already derives from the bare table; the qualifier is re-applied to the
+   * INDEX name by `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
+   *
+   * @noRailsEquivalent PERMANENT — SQLite ATTACHed-schema support, which Rails
+   * has no notion of at all, so there is no Ruby `index_name` behaviour to
+   * converge toward. Same deviation as
+   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
+   */
+  override indexName(
+    tableName: string,
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
+  ): string {
+    return super.indexName(this._splitTableName(tableName).bare, options);
+  }
+
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
   async removeIndex(
     tableName: string,

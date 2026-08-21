@@ -273,6 +273,55 @@ describe("SQLite3Adapter schema introspection", () => {
     ).toEqual(["by_name"]);
   });
 
+  it("addIndex derives the default index name from the bare qualified table", async () => {
+    // index_name embeds the table name verbatim, so a schema-qualified table
+    // would produce `index_aux.customers_on_name` — a dotted identifier the
+    // CREATE INDEX emission reads as a schema qualifier. SQLite3Adapter#indexName
+    // strips the qualifier; SchemaCreation puts it back on the INDEX name.
+    const auxPath = path.join(tmpDir, "aux-default-index-name.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    // No teardown: the table lives in a per-test ATTACHed database file under
+    // tmpDir, which afterEach removes wholesale, so it cannot leak to a sibling.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.executeMutation("CREATE TABLE aux.customers (id INTEGER PRIMARY KEY, name TEXT)");
+
+    await adapter.addIndex("aux.customers", ["name"]);
+
+    const inAux = (
+      await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
+    ).rows.map((row) => String(row[0]));
+    expect(inAux).toEqual(['CREATE INDEX "index_customers_on_name" ON "customers" ("name")']);
+    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(true);
+
+    await adapter.removeIndex("aux.customers", ["name"]);
+
+    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(false);
+  });
+
+  it("copyTableIndexes copies a default-named index on an ATTACHed schema", async () => {
+    // The other half of the default-name fix: copy_table_indexes reaches
+    // add_index for every index it copies (sqlite3_adapter.rb:668-674), so a
+    // rebuild of a qualified table whose index carries the DEFAULT name is the
+    // path that used to need an explicit `name:` to get past
+    // `index_aux.widgets_on_name`. Nothing is hand-named here.
+    const auxPath = path.join(tmpDir, "aux-copy-default-index.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    await adapter.executeMutation(
+      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
+    );
+    await adapter.addIndex("aux.widgets", ["name"]);
+
+    await adapter.removeColumn("aux.widgets", "doomed");
+
+    expect((await adapter.columns("aux.widgets")).map((c) => c.name)).toEqual(["id", "name"]);
+    expect(
+      ((await adapter.indexes("aux.widgets")) as Array<{ name: string }>).map((i) => i.name),
+    ).toEqual(["index_widgets_on_name"]);
+    expect(
+      (await adapter.selectAll("SELECT name FROM main.sqlite_master WHERE type='index'")).rows,
+    ).toEqual([]);
+  });
+
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",

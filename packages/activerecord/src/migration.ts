@@ -2233,7 +2233,26 @@ export class MigrationContext<
     return migrations.sort(byVersion);
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#migration_files (`migration.rb:1369-1372`) */
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#migration_files
+   * (`migration.rb:1369-1372`).
+   *
+   * Rails globs `#{paths}/**\/[0-9]*_*.rb`. trails scaffolds migrations in
+   * TypeScript, so the extension set is `ts|js` and the same migration can be
+   * present twice — the source and its compiled output. The two spellings that
+   * survive discovery, and their precedence, are:
+   *
+   * - `<version>_<name>.ts` — the Rails-faithful form, and what trailties
+   *   generates.
+   * - `<version>-<name>.js` / `<version>-<name>.ts` — the pre-1.12c hyphen
+   *   form, kept as a transitional alias so apps generated against earlier
+   *   releases still load.
+   *
+   * A version+name present in more than one spelling is loaded once: `.ts`
+   * beats `.js` (source over compiled output), and at equal extension the
+   * canonical underscore beats the hyphen alias, so renaming a migration
+   * across the 1.12c boundary does not double-load it.
+   */
   private migrationFiles(): string[] {
     const { readdirSync, existsSync } = getFs();
     const { join } = getPath();
@@ -2244,21 +2263,44 @@ export class MigrationContext<
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
           collect(full);
-        } else if (/^\d+_.*\.(ts|js)$/.test(entry.name)) {
+        } else if (/^\d+[_-].*\.(ts|js)$/.test(entry.name)) {
           files.push(full);
         }
       }
     };
     for (const p of this.migrationsPaths) collect(p);
-    return files.sort();
+
+    const isTs = (file: string): boolean => file.endsWith(".ts");
+    const isUnderscore = (file: string): boolean => /^\d+_/.test(file.replace(/.*[/\\]/, ""));
+    const byBasename = new Map<string, string>();
+    for (const file of files.sort()) {
+      const parsed = this.parseMigrationFilename(file);
+      if (!parsed) continue;
+      const key = `${parsed[0]}_${parsed[1]}`;
+      const kept = byBasename.get(key);
+      if (
+        kept === undefined ||
+        (isTs(file) && !isTs(kept)) ||
+        (isTs(file) === isTs(kept) && isUnderscore(file) && !isUnderscore(kept))
+      ) {
+        byBasename.set(key, file);
+      }
+    }
+    return [...byBasename.values()].sort();
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename (`migration.rb:1374-1376`) */
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename
+   * (`migration.rb:1374-1376`). The name segment is folded to the underscore
+   * form so a hyphen-alias file and its renamed underscore twin parse to the
+   * same name — which is what lets {@link migrationFiles} collapse them and
+   * `Migrator#validate`'s duplicate-name check see one migration.
+   */
   private parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");
-    const m = base.match(/^(\d+)_([a-z0-9_]*)(?:\.([a-z0-9_]*))?$/);
+    const m = base.match(/^(\d+)[_-]([a-z0-9_-]*)(?:\.([a-z0-9_]*))?$/);
     if (!m) return null;
-    return [m[1], m[2], m[3] ?? ""];
+    return [m[1], m[2].replace(/-/g, "_"), m[3] ?? ""];
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#validate_timestamp? (`migration.rb:1378-1380`) */
