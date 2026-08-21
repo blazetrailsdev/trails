@@ -160,7 +160,7 @@ export class Subscriber {
 
     if (sub.patterns.has(pattern)) return;
 
-    const handle = notifier.subscribe(pattern, (e) => sub.call(e));
+    const handle = notifier.subscribe(pattern, sub);
     sub.patterns.set(pattern, handle);
   }
 
