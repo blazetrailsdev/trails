@@ -206,7 +206,6 @@ import {
   attributeBeforeTypeCast as _attributeBeforeTypeCast,
   attributeForDatabase as _attributeForDatabase,
   queryCastAttribute as _queryCastAttribute,
-  isPrimaryKeyValuesPresent as _isPrimaryKeyValuesPresent,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
   isWillSaveChangeToAttribute as _isWillSaveChangeToAttribute,
@@ -231,6 +230,7 @@ import {
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
+import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
 import {
   _readAttribute as _readAttributeFn,
   defineMethodAttribute as _defineMethodAttribute,
@@ -2196,16 +2196,6 @@ export class Base extends Model {
     // the source-type predicate on the alias.
     const rel = new (_relationCtorFor(this))(this, table);
     return this._applyStiTypeCondition(wrapWithScopeProxy(rel));
-  }
-
-  /** @internal Bare relation against an optional Arel table — no default
-   *  scope and no STI `type_condition`. Mirrors Rails' `Relation.create`
-   *  as used by reflection's `build_scope`, where the STI predicate is added
-   *  later by `join_scope` (qualified by the join's, possibly aliased, table)
-   *  rather than baked into the base relation. */
-  static _buildBareRelation(table?: any): any {
-    const rel = new (_relationCtorFor(this))(this, table);
-    return wrapWithScopeProxy(rel);
   }
 
   /** @internal Re-apply the STI `type_condition` WHERE for subclasses.
@@ -4761,6 +4751,11 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, _PrimaryKey);
+// Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
+// Array (primary_key.rb:132); each of its bodies opens with the
+// `composite_primary_key?` guard, so mixing it in once above PrimaryKey is the
+// same behaviour for a scalar-keyed model.
+include(Base, _CompositePrimaryKey);
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
@@ -4876,10 +4871,10 @@ include(Base, {
   attributeForDatabase: _attributeForDatabase,
   attributeCameFromUser: _attributeCameFromUser,
   queryCastAttribute: _queryCastAttribute,
-  isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
-  // The ID_ATTRIBUTE_METHODS readers arrive with `include(Base, _PrimaryKey)`
-  // below: they are accessor properties, and only that call copies descriptors
-  // — this object literal is read by value and would flatten them.
+  // `primary_key_values_present?` and the ID_ATTRIBUTE_METHODS readers arrive
+  // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
+  // above: the readers are accessor properties, and only those calls copy
+  // descriptors — this object literal is read by value and would flatten them.
   isSavedChangeToAttribute: _isSavedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
   isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,

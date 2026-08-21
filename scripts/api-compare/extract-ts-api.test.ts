@@ -3133,7 +3133,7 @@ describe("@missingRailsCall extraction", () => {
       export class Foo {
         /**
          * Prose.
-         * @missingRailsCall synchronize — Ruby guards with Mutex#synchronize; trails is single-threaded.
+         * @missingRailsCall synchronize — PERMANENT: Ruby guards with Mutex#synchronize; trails is single-threaded.
          */
         bar(): void {}
       }
@@ -3144,7 +3144,7 @@ describe("@missingRailsCall extraction", () => {
   it("records a tag written as a one-line comment", () => {
     const cls = extractFromSource(`
       export class Foo {
-        /** @missingRailsCall synchronize — trails is single-threaded. */
+        /** @missingRailsCall synchronize — PERMANENT: trails is single-threaded. */
         bar(): void {}
       }
     `);
@@ -3165,7 +3165,7 @@ describe("@missingRailsCall extraction", () => {
     const cls = extractFromSource(`
       export class Foo {
         /**
-         * @missingRailsCall synchronize — single-threaded.
+         * @missingRailsCall synchronize — PERMANENT: single-threaded.
          */
         bar(): void {}
         baz(): void {}
@@ -3191,12 +3191,12 @@ describe("@missingRailsCall extraction", () => {
     const info = extractFromFiles("/p", {
       "registry.ts": `
         /**
-         * @missingRailsCall each — declared spelling iterates with for-of.
+         * @missingRailsCall each — PERMANENT: declared spelling iterates with for-of.
          */
         function registerModelClass(): void {}
 
         /**
-         * @missingRailsCall first — the alias indexes instead.
+         * @missingRailsCall first — PERMANENT: the alias indexes instead.
          */
         export { registerModelClass as registerModel };
       `,

@@ -15,7 +15,6 @@
   "packages/activerecord/src/associations/preloader/branch.ts",
   "packages/activerecord/src/associations/through-association.ts",
   "packages/activerecord/src/attribute-methods.ts",
-  "packages/activerecord/src/attribute-methods/primary-key.ts",
   "packages/activerecord/src/base.ts",
   "packages/activerecord/src/callbacks.ts",
   "packages/activerecord/src/coders/column-serializer.ts",

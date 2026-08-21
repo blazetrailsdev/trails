@@ -447,7 +447,7 @@ export class Session {
   /**
    * Mirrors: `Session#load!` (`request/session.rb:269-278`).
    *
-   * @missingRailsCall replace — Language shortcoming: Rails' `@delegate.replace`
+   * @missingRailsCall replace — PERMANENT: Language shortcoming: Rails' `@delegate.replace`
    * empties the Hash and refills it in place; a plain JS object has no in-place
    * replace, and `@delegate` is never aliased out of this class, so rebinding it
    * is the same observable state.

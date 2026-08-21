@@ -80,7 +80,7 @@ export class XMLConverter {
   }
 
   /**
-   * @missingRailsCall try — Language shortcoming: Rails writes
+   * @missingRailsCall try — PERMANENT: Language shortcoming: Rails writes
    * `value["__content__"].try(:empty?)` (conversions.rb:192), but `empty?` is a
    * real method on every Ruby receiver where trails' `isEmpty` is a free
    * function — a JS string has no `isEmpty` for `tryCall` to dispatch. The

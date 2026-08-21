@@ -22,7 +22,7 @@ export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimi
   }
 
   /**
-   * @missingRailsCall fetch — Hash#fetch; a JS object has no `fetch`, and the
+   * @missingRailsCall fetch — PERMANENT: Hash#fetch; a JS object has no `fetch`, and the
    * `in` test is what distinguishes a stored `undefined` from an absent key.
    */
   private delimiterPattern(): RegExp {

@@ -49,7 +49,7 @@ export class EngineConfiguration extends RailtieConfiguration {
    * so a relative value resolves to an absolute root. `null` (clear) is left
    * as-is. Re-points `paths.path` so downstream lookups resolve against it.
    *
-   * @missingRailsCall new — the dropped call is `Pathname.new`
+   * @missingRailsCall new — PERMANENT: the dropped call is `Pathname.new`
    * (`engine/configuration.rb:115-117`). `Pathname` is a Ruby stdlib class with
    * no trails counterpart — no package defines one — so there is no receiver to
    * construct; `getPath().resolve` against the working directory is what

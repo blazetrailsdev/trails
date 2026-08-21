@@ -19,7 +19,7 @@ export class RangeHandler {
   }
 
   /**
-   * @missingRailsCall new — `RangeWithBinds.new(begin_bind, end_bind, exclude_end?)`
+   * @missingRailsCall new — PERMANENT: `RangeWithBinds.new(begin_bind, end_bind, exclude_end?)`
    * (range_handler.rb:6, 15). The Struct exists in Ruby because `between` needs a
    * Range-shaped object and a real Range would re-coerce its bounds; a TS object
    * literal is that shape, and `between` reads nothing else off it.

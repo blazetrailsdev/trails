@@ -161,7 +161,7 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
  *
- * @missingRailsCall columns_hash — Language shortcoming: Ruby's `columns_hash`
+ * @missingRailsCall columns_hash — PERMANENT: Language shortcoming: Ruby's `columns_hash`
  * loads the schema on first touch, and this predicate is reachable from inside
  * that load (the relation `define_attribute_methods` builds asks it), so
  * calling `columnsHash()` re-enters `load_schema` — which memoizes only on the

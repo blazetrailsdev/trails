@@ -53,7 +53,7 @@ export class ProcTransliterator {
   }
 
   /**
-   * @missingRailsCall call — Ruby invokes a Proc with `Proc#call`; the JS
+   * @missingRailsCall call — PERMANENT: Ruby invokes a Proc with `Proc#call`; the JS
    * analogue of a Proc is a function, which is invoked by application. There is
    * no `call` to make (JS `Function#call` takes a receiver and means something
    * else).

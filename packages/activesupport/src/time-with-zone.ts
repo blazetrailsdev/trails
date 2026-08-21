@@ -282,19 +282,9 @@ export class TimeWithZone {
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#wrap_with_time_zone`
    * (time_with_zone.rb:593-602).
-   *
-   * `time.acts_like?(:time)` asks the receiver for a marker method, and a
-   * forwarded Temporal value carries none, so — as in
-   * core-ext/date-and-time/calculations.ts' `actsLike` — the arm itself is the
-   * answer: an `Instant` and a `PlainDateTime` are moments, a `PlainDate` is a
-   * calendar day.
    */
   private _wrapWithTimeZone(time: unknown): unknown {
-    if (
-      ObjectExt.actsLike(time, "time") ||
-      time instanceof Temporal.Instant ||
-      time instanceof Temporal.PlainDateTime
-    ) {
+    if (ObjectExt.actsLike(time, "time")) {
       const local = time as TimeLike;
       const periods = this.timeZone.periodsForLocal(
         this._transferTimeValuesToUtcConstructor(local),

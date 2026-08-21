@@ -160,7 +160,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    *
    * Mirrors: DisableJoinsAssociationScope#last_scope_chain (lines 18-31).
    *
-   * @missingRailsCall add_constraints — see `_addConstraintsDj` below: the
+   * @missingRailsCall add_constraints — PERMANENT: see `_addConstraintsDj` below: the
    * subclass cannot reuse Rails' name because the base class declares it
    * `private` with an incompatible signature. This body calls it at Rails'
    * call site (disable_joins_association_scope.rb:23).
@@ -226,7 +226,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    *
    * Mirrors: DisableJoinsAssociationScope#add_constraints (lines 33-56).
    *
-   * @missingRailsCall add_constraints — Rails' subclass method shadows
+   * @missingRailsCall add_constraints — PERMANENT: Rails' subclass method shadows
    * `AssociationScope#add_constraints` with a different arity, which Ruby
    * permits. TypeScript rejects a derived declaration of a name the base
    * declares `private` (TS2415), and the two signatures are not

@@ -170,7 +170,7 @@ export interface EngineInitializerApp {
 /**
  * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).
  *
- * @missingRailsCall draw_paths — Rails concats `paths["config/routes"].paths`
+ * @missingRailsCall draw_paths — CONVERGEABLE: Rails concats `paths["config/routes"].paths`
  * onto `routes.draw_paths` and `app.routes.draw_paths` so `draw` can resolve
  * partial route files relatively. `RouteSet#draw_paths` is not ported, so the
  * external paths are only recorded on the reloader.

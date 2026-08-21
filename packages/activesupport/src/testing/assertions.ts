@@ -294,7 +294,7 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
  * rest parameter here carries the same positions, with the block last — Ruby
  * takes it as a block rather than in `*args`.
  *
- * @missingRailsCall map — `expressions.keys.map` (assertions.rb:112-114) exists
+ * @missingRailsCall map — PERMANENT: `expressions.keys.map` (assertions.rb:112-114) exists
  * only to turn a String expression into `lambda { eval(e, block.binding) }`.
  * Every expression here is already a callable (see this file's header), so the
  * block is the identity and Rails' `map` has nothing left to do.

@@ -39,7 +39,7 @@ export class HasAndBelongsToMany {
    * `Base` without closing an import cycle, so the root AR class is reached by
    * walking up from the left model, landing on the same class.
    *
-   * @missingRailsCall call — Language shortcoming: Rails invokes the resolver
+   * @missingRailsCall call — PERMANENT: Language shortcoming: Rails invokes the resolver
    * lambda as `table_name_resolver.call`; JS functions have no `call`-named
    * invocation of their own (`Function.prototype.call` rebinds `this` and is a
    * different method), so `this.tableNameResolver()` IS the same call.

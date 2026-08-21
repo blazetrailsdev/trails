@@ -155,7 +155,7 @@ export class Application extends Engine {
    * Mirrors `Engine#app` (`engine.rb:516-524`) — builds the middleware
    * stack once and wraps the endpoint in it.
    *
-   * @missingRailsCall build_middleware, merge_into — Rails merges
+   * @missingRailsCall build_middleware, merge_into — CONVERGEABLE: Rails merges
    * `config.app_middleware + config.middleware` (both
    * `MiddlewareStackProxy`s) into the default stack. `MiddlewareStackProxy`
    * is not ported (`trailtie/configuration.ts:87` — `appMiddleware()`

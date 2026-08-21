@@ -45,6 +45,7 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { polymorphicName, typeCondition } from "./inheritance.js";
+import { Relation } from "./relation.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
@@ -235,13 +236,15 @@ export class AbstractReflection {
     return [this];
   }
 
-  buildScope(table?: TableRef, _predicateBuilder?: any, klass?: typeof Base): any {
-    // Rails: `Relation.create(klass, table:, predicate_builder:)` — a genuinely
-    // bare relation. Default scope and the STI `type_condition` are layered on
-    // later by `klassJoinScope` (scope_for_association) and `joinScope`, so the
-    // chain scopes built here never carry a wrong-table STI predicate.
-    const target = (klass ?? this.klass) as any;
-    return target._buildBareRelation?.(table) ?? target.all();
+  /**
+   * Mirrors: ActiveRecord::Reflection::AbstractReflection#build_scope
+   * (reflection.rb:336-338). A genuinely bare relation: the default scope and
+   * the STI `type_condition` are layered on later by `klassJoinScope`
+   * (scope_for_association) and `joinScope`, so the chain scopes built here
+   * never carry a wrong-table STI predicate.
+   */
+  buildScope(table?: TableRef, predicateBuilder?: any, klass?: typeof Base): any {
+    return Relation.create(klass ?? this.klass, table, predicateBuilder);
   }
 
   joinScope(table: TableRef, foreignTable: TableRef, foreignKlass: typeof Base): any {

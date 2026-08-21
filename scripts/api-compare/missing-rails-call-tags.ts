@@ -200,13 +200,28 @@ export function justifies(reason: string): boolean {
 
 /** The Ruby call names one JSDoc comment JUSTIFIES as deliberately not made,
  *  sorted and deduplicated. Throws on a bare or whitespace-only tag (the
- *  empty-reason contract), and skips a tag still carrying
+ *  empty-reason contract) and on a reason making no permanence claim — the same
+ *  discipline `@missingRailsArgs` (RFC 0099) and `@noRailsEquivalent` (RFC 0080)
+ *  carry, so the report can tell permanent debt from burndown work rather than
+ *  filing every receipt as `unclassified`. It skips a tag still carrying
  *  {@link DEFAULT_REASON}: a call only leaves the population when its deviation
  *  is argued in prose at the call site. A line-leading prose `@tag` inside a
  *  reason ends that reason at `parseJsdoc`'s boundary rule, so it can never
  *  mint a suppression for a call nobody tagged. */
 export function suppressedCallsIn(comment: string, origin?: JsdocOrigin): string[] {
   const { entries } = parseJsdoc(comment, origin);
+  for (const entry of entries) {
+    // A seeded reason stands in for a justification rather than making one, so
+    // it is already unjustified below; asking it for a permanence claim would
+    // only turn a known-unreviewed tag into a hard error.
+    if (!justifies(entry.reason)) continue;
+    if (classifyReason(entry.reason) !== "unclassified") continue;
+    throw new Error(
+      `${TAG} needs a permanence claim${origin ? ` in ${origin.fileName}` : ""} — open the ` +
+        `reason for \`${entry.call}\` with PERMANENT (a language- or runtime-level fact no ` +
+        `port can remove) or CONVERGEABLE (work not done yet; name its story).`,
+    );
+  }
   const justified = entries.filter((e) => justifies(e.reason));
   return [...new Set(justified.map((e) => e.call))].sort();
 }

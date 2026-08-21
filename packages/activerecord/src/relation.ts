@@ -31,6 +31,7 @@ import { Batches } from "./relation/batches.js";
 import {
   wrapWithScopeProxy,
   relationClassFor,
+  create as _delegationCreate,
   DelegationMethods,
   type ToSentenceOptions,
   type ToXmlOptions,
@@ -398,6 +399,14 @@ export class Relation<T extends Base> {
    * so `inspect` renders the wrapper Rails names.
    */
   static _railsClassName = "ActiveRecord::Relation";
+
+  /**
+   * Mirrors: ActiveRecord::Delegation::ClassMethods#create
+   * (relation/delegation.rb:139-141) — reached in Rails by `include Delegation`
+   * extending the class with `ClassMethods`; the body lives in
+   * relation/delegation.ts, where Rails writes it.
+   */
+  static create = _delegationCreate;
 
   /** Mirrors: ActiveRecord::Relation::MULTI_VALUE_METHODS (relation.rb:54-57). */
   static readonly MULTI_VALUE_METHODS = [
@@ -1835,7 +1844,7 @@ export class Relation<T extends Base> {
    * through the same connection path (a null manager, e.g. an unresolvable
    * association, falls through to the plain arel).
    *
-   * @missingRailsCall with_connection — Rails' non-eager arm is
+   * @missingRailsCall with_connection — CONVERGEABLE: Rails' non-eager arm is
    * `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`
    * (relation.rb:1217-1219). `withConnection` is a `Promise`-returning checkout
    * in TypeScript, and `to_sql` renders a string with no `await` in it, so
