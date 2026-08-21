@@ -2547,6 +2547,9 @@ export function main() {
     // (file → name → declaring class → tagged calls), so a tag on one class
     // never speaks for a same-named sibling; a top-level function is `""`.
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
+    // The call-ARGUMENT twin (RFC 0099): the `@missingRailsArgs` tags, keyed
+    // identically, read by `checkCallArgs`.
+    const tsMissingArgTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // The same population split by the SEAT each owner declares the name on
@@ -2667,6 +2670,16 @@ export function main() {
         byClass.set(owner, tagged);
         byName.set(m.name, byClass);
         tsMissingCallTagsByFileName.set(file, byName);
+      }
+      if (m.missingRailsArgs !== undefined) {
+        const byName =
+          tsMissingArgTagsByFileName.get(file) ?? new Map<string, Map<string, Set<string>>>();
+        const byClass = byName.get(m.name) ?? new Map<string, Set<string>>();
+        const tagged = byClass.get(owner) ?? new Set<string>();
+        for (const c of m.missingRailsArgs) tagged.add(c);
+        byClass.set(owner, tagged);
+        byName.set(m.name, byClass);
+        tsMissingArgTagsByFileName.set(file, byName);
       }
       if (m.callSeq !== undefined) {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
@@ -3356,6 +3369,7 @@ export function main() {
           rubyOwnersByName.has(name),
         );
         if (rubySites.length === 0) return;
+        const argTags = tagsForOwner(tsMissingArgTagsByFileName.get(tsFile)?.get(tsName), tsClass);
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
             ruby,
@@ -3370,6 +3384,11 @@ export function main() {
           }
           callArgsCompared++;
           if (result.verdict !== "mismatch") continue;
+          // A call-site receipt (`@missingRailsArgs <call> — <reason>`) takes
+          // this deviation off the baseline: the reason is reviewed in the diff
+          // where the code is, exactly as `@missingRailsCall` does for the
+          // call-SET gate.
+          if (argTags?.has(ruby.name)) continue;
           callArgMismatches.push({
             rubyFile,
             tsFile,

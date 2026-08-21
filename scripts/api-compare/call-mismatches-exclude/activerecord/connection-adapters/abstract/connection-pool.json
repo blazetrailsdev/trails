@@ -2,17 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "build_async_executor",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{fallbackPolicy=str:callerRuns,maxQueue=ref:maxQueue,maxThreads=ref:maxThreads,minThreads=ref:minThreads}"
-    ],
-    "reason": "connection_pool.rb:717-722 sizes a `Concurrent::ThreadPoolExecutor` with min_threads/max_threads/max_queue/fallback_policy. trails' AsyncExecutor (ar-config.ts) defers work onto the microtask queue: with one thread there is no pool to size, no queue to bound and no caller-runs fallback to choose, so the four kwargs have no receiver. The `max_threads > 0` guard Rails wraps this in IS ported."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
     "call": "acquire_connection",
     "reason": "Tracked debt (RFC 0073 pool-checkout convergence): connection_pool.rb:548 is `checkout_and_verify(acquire_connection(checkout_timeout))`; trails inlines the acquire at connection-pool.ts:906-925 because its `acquire_connection` does not block on the queue (the wait is `_available.poll`, which is async). Owned by 0073's checkout reshape, not by this burndown."

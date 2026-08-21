@@ -30,56 +30,79 @@ export class HasAndBelongsToMany {
     this.options = options;
   }
 
+  /**
+   * Mirrors `Builder::HasAndBelongsToMany#through_model`
+   * (has_and_belongs_to_many.rb:13-56).
+   *
+   * @missingRailsCall call — Language shortcoming: Rails invokes the resolver
+   * lambda as `table_name_resolver.call`; JS functions have no `call`-named
+   * invocation of their own (`Function.prototype.call` rebinds `this` and is a
+   * different method), so `this.tableNameResolver()` IS the same call.
+   */
   throughModel(): any {
+    const builder = this;
     const lhsModel = this.lhsModel;
-    const associationName = this.associationName;
-    const options = this.options;
 
-    const joinModelName = `HABTM_${camelize(associationName)}`;
-    const tableNameResolver = () => this._tableName();
-    const rightName = singularize(associationName);
+    // Rails writes `Class.new(ActiveRecord::Base)`; the builder cannot import
+    // `Base` without closing an import cycle, so the root AR class is reached by
+    // walking up from the left model — the same walk `createHabtmJoinModel`
+    // (associations.ts) does, and it lands on the same class.
+    let BaseClass: any = lhsModel;
+    let parent = Object.getPrototypeOf(BaseClass);
+    while (parent && parent !== Function.prototype && typeof parent.create === "function") {
+      BaseClass = parent;
+      parent = Object.getPrototypeOf(BaseClass);
+    }
 
-    const joinModel: any = {
-      name: joinModelName,
-      leftModel: lhsModel,
-      tableNameResolver,
-      _tableName: null as string | null,
-      _associations: [],
-      _reflections: {},
-      leftReflection: null as any,
-      rightReflection: null as any,
+    const joinModel: any = class extends BaseClass {
+      static leftModel: any;
+      static tableNameResolver: () => string;
+      static leftReflection: any;
+      static rightReflection: any;
 
-      get tableName() {
+      /** @internal */
+      static get tableName(): string {
         // Table name needs to be resolved lazily
         // because RHS class might not have been loaded
         return (this._tableName ??= this.tableNameResolver());
-      },
+      }
 
-      computeType(className: string) {
-        return lhsModel.computeType?.(className) ?? null;
-      },
+      /** @internal */
+      static set tableName(value: string) {
+        this._tableName = value;
+      }
 
-      connectionPool() {
-        return lhsModel.connectionPool?.() ?? null;
-      },
+      static computeType(className: string): any {
+        return this.leftModel.computeType(className);
+      }
+
+      static addLeftAssociation(name: string, options: Record<string, unknown>): void {
+        this.belongsTo(name, { required: false, ...options });
+        this.leftReflection = this._reflectOnAssociation(name);
+      }
+
+      static addRightAssociation(name: string, options: Record<string, unknown>): void {
+        const rhsName = singularize(name);
+        this.belongsTo(rhsName, { required: false, ...options });
+        this.rightReflection = this._reflectOnAssociation(rhsName);
+      }
+
+      static connectionPool(): any {
+        return this.leftModel.connectionPool();
+      }
     };
+    joinModel._tableName = null;
 
-    joinModel.leftReflection = {
-      name: "leftSide",
-      type: "belongsTo",
-      options: { anonymousClass: lhsModel },
-    };
-    joinModel._associations.push(joinModel.leftReflection);
+    Object.defineProperty(joinModel, "name", {
+      value: `HABTM_${camelize(this.associationName)}`,
+      writable: true,
+      configurable: true,
+    });
+    joinModel.tableNameResolver = () => builder._tableName();
+    joinModel.leftModel = lhsModel;
 
-    const rhsOptions = this.belongsToOptions(options);
-
-    joinModel.rightReflection = {
-      name: rightName,
-      type: "belongsTo",
-      options: { ...rhsOptions },
-    };
-    joinModel._associations.push(joinModel.rightReflection);
-
+    joinModel.addLeftAssociation("leftSide", { anonymousClass: lhsModel });
+    joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
     return joinModel;
   }
 

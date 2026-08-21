@@ -1543,6 +1543,12 @@ export class ConnectionPool implements ReapablePool {
    * caller's stack. The config value still selects between "async enabled" and
    * "run everything inline", which is the behavioral distinction
    * `async_enabled?` reads (abstract_adapter.rb:562).
+   *
+   * @missingRailsArgs new — PERMANENT: connection_pool.rb:717-722 sizes the
+   * executor with `min_threads`/`max_threads`/`max_queue`/`fallback_policy`.
+   * With one thread there is no pool to size, no queue to bound and no
+   * caller-runs fallback to choose, so the four kwargs have no receiver. The
+   * `max_threads > 0` guard Rails wraps this in IS ported.
    */
   private buildAsyncExecutor(): AsyncExecutor | null {
     switch (ActiveRecord.asyncQueryExecutor) {

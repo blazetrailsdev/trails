@@ -69,6 +69,11 @@ export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
   private _preventWrites: boolean;
 
+  /**
+   * @missingRailsArgs new — PERMANENT: connection_handler.rb:78 writes
+   * `Concurrent::Map.new(initial_capacity: 2)`; a JS `Map` has no capacity
+   * hint, so the kwarg has no counterpart to pass.
+   */
   constructor() {
     this._connectionNameToPoolManager = new Map();
     this._preventWrites = false;

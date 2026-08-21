@@ -39,26 +39,19 @@ export class XMLConverter {
   private xml: unknown;
   private disallowedTypes: string[];
 
-  constructor(xml: unknown, disallowedTypes?: string[] | null) {
-    this.xml = xml;
+  /** Mirrors: ActiveSupport::XMLConverter#initialize (conversions.rb:151-154) */
+  constructor(xml: string | StringIO | null | undefined, disallowedTypes?: string[] | null) {
+    const parsed = XmlMini.parse(xml);
+    if (typeof (parsed as PromiseLike<unknown> | null)?.then === "function") {
+      // The Nokogiri backends parse asynchronously (they reach their optional
+      // parser package through a dynamic import); Rails' `XmlMini.parse` is
+      // synchronous on every backend, and a TS constructor cannot await.
+      throw new RuntimeError(
+        "Hash.fromXml requires a synchronous XmlMini backend; the current backend parses asynchronously",
+      );
+    }
+    this.xml = this.normalizeKeys(parsed as Record<string, unknown>);
     this.disallowedTypes = disallowedTypes ?? DISALLOWED_TYPES;
-  }
-
-  /**
-   * `XMLConverter.new` — the `normalize_keys(XmlMini.parse(xml))` seeding of
-   * `@xml` (conversions.rb:151-154).
-   *
-   * @noRailsEquivalent PERMANENT — `XmlMini.parse` is awaitable in trails and a
-   * TS constructor cannot await, so the parsing half of `initialize` moves to a
-   * factory. `to_h` still reads the normalized `@xml` (conversions.rb:157).
-   */
-  static async create(
-    xml: string | StringIO | null | undefined,
-    disallowedTypes?: string[] | null,
-  ): Promise<XMLConverter> {
-    const converter = new XMLConverter(undefined, disallowedTypes);
-    converter.xml = converter.normalizeKeys(await XmlMini.parse(xml));
-    return converter;
   }
 
   /** Mirrors: ActiveSupport::XMLConverter#to_h (conversions.rb:156-158) */

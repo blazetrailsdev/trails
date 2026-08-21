@@ -60,8 +60,14 @@ export interface JsdocOrigin {
   startLine: number;
 }
 
-const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
-const CALL_LESS_TAG_LINE = /^\s*\*?\s*@missingRailsCall(?:\s+—(?:\s.*)?)?\s*$/;
+/** Both regexes are built per TAG so the second member of the family — the
+ *  call-ARGUMENT tag `@missingRailsArgs` (RFC 0099), see
+ *  missing-rails-args-tags.ts — shares ONE parser with `@missingRailsCall`
+ *  rather than growing a near-copy of it. */
+const tagLine = (tag: string): RegExp =>
+  new RegExp(`^\\s*\\*?\\s*${tag}\\s+(\\S+)(?:\\s+—\\s?(.*))?$`);
+const callLessTagLine = (tag: string): RegExp =>
+  new RegExp(`^\\s*\\*?\\s*${tag}(?:\\s+—(?:\\s.*)?)?\\s*$`);
 // A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
 // reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
 // hang indent (`*   `) can place one at line start — deeper-indented `@`
@@ -87,29 +93,29 @@ interface CommentLine {
 /** Split a comment into the lines the tag parser walks, lifting the tags out of
  *  a one-line `/** ... *\/` comment.
  *
- *  `TAG_LINE` is anchored at end of line, so before RFC 0083 a hand-written
+ *  `tagLine` is anchored at end of line, so before RFC 0083 a hand-written
  *  `/** @missingRailsCall first — reason *\/` matched nothing: the trailing
  *  `*\/` is part of the line. The tag was then a silent no-op in all three
  *  consumers at once. The tag-free remainder stays a one-line comment, which
  *  `renderJsdoc` already normalizes to block form under the right indent. */
-function toCommentLines(comment: string): CommentLine[] {
+function toCommentLines(comment: string, tag: string): CommentLine[] {
   const lines: CommentLine[] = [];
   for (const [sourceIndex, text] of comment.split("\n").entries()) {
     const match = text.match(ONE_LINE_COMMENT);
-    if (!match?.[2].includes(TAG)) {
+    if (!match?.[2].includes(tag)) {
       lines.push({ text, sourceIndex, synthetic: false });
       continue;
     }
     const [, indent, inner] = match;
-    const [prose, ...tags] = inner.split(TAG);
+    const [prose, ...tags] = inner.split(tag);
     const stripped = prose.replace(/^\s*\*?\s*/, "").trim();
     lines.push({
       text: `${indent}/**${stripped === "" ? "" : ` ${stripped}`} */`,
       sourceIndex,
       synthetic: false,
     });
-    for (const tag of tags) {
-      lines.push({ text: ` * ${TAG} ${tag.trim()}`, sourceIndex, synthetic: true });
+    for (const entry of tags) {
+      lines.push({ text: ` * ${tag} ${entry.trim()}`, sourceIndex, synthetic: true });
     }
   }
   return lines;
@@ -136,6 +142,7 @@ function toCommentLines(comment: string): CommentLine[] {
 export function parseJsdoc(
   comment: string,
   origin?: JsdocOrigin,
+  tag: string = TAG,
 ): { rest: string[]; entries: TagEntry[] } {
   const rest: string[] = [];
   const entries: TagEntry[] = [];
@@ -143,16 +150,16 @@ export function parseJsdoc(
   let open: TagEntry | null = null;
   const at = (sourceIndex: number): string =>
     origin ? ` ${origin.fileName}:${origin.startLine + sourceIndex}` : "";
-  for (const { text: line, sourceIndex, synthetic } of toCommentLines(comment)) {
-    if (CALL_LESS_TAG_LINE.test(line)) {
+  for (const { text: line, sourceIndex, synthetic } of toCommentLines(comment, tag)) {
+    if (callLessTagLine(tag).test(line)) {
       throw new Error(
-        `${TAG} needs a call:${at(sourceIndex)} — name the Rails call that is ` +
-          `not made here, as \`${TAG} <ruby_call> — <reason>\`.`,
+        `${tag} needs a call:${at(sourceIndex)} — name the Rails call that is ` +
+          `not made here, as \`${tag} <ruby_call> — <reason>\`.`,
       );
     }
-    const m = line.match(TAG_LINE);
+    const m = line.match(tagLine(tag));
     if (m) {
-      // Trimmed at capture: `TAG_LINE` absorbs only one space after the
+      // Trimmed at capture: `tagLine` absorbs only one space after the
       // em-dash, so trailing whitespace would otherwise read as a non-empty
       // reason and slide past the empty-reason gate below. `rawLines` keeps
       // the line verbatim, so idempotency is unaffected.
@@ -174,7 +181,7 @@ export function parseJsdoc(
   for (const entry of entries) {
     if (entry.reason !== "") continue;
     throw new Error(
-      `${TAG} needs a reason:${at(tagLineOf.get(entry) ?? 0)} — state why the Rails call ` +
+      `${tag} needs a reason:${at(tagLineOf.get(entry) ?? 0)} — state why the Rails call ` +
         `\`${entry.call}\` is not made here.`,
     );
   }
@@ -202,4 +209,42 @@ export function suppressedCallsIn(comment: string, origin?: JsdocOrigin): string
   const { entries } = parseJsdoc(comment, origin);
   const justified = entries.filter((e) => justifies(e.reason));
   return [...new Set(justified.map((e) => e.call))].sort();
+}
+
+/**
+ * The permanence claim a tag's reason makes about itself.
+ *
+ * `permanent` — a language-level or runtime-level fact no port can remove.
+ * `convergeable` — unfinished porting, a fixable collision, a comparator gap:
+ * the tag is a placeholder for work, and the reason should name its story.
+ * `unclassified` — the reason makes no claim either way.
+ */
+export type Permanence = "permanent" | "convergeable" | "unclassified";
+
+const PERMANENCE_TOKENS: Record<string, Permanence> = {
+  PERMANENT: "permanent",
+  CONVERGEABLE: "convergeable",
+};
+
+/**
+ * Read the leading classification token off a tag's reason.
+ *
+ * The tag audit (RFC 0080) found 42 of 79 `@noRailsEquivalent` tags describing
+ * convergeable surface: each reason was factually accurate about its mechanism
+ * and merely drew "therefore permanent" from it, so nothing in the report could
+ * tell the two populations apart. Requiring the claim to be stated as a token
+ * makes an unstated one countable — a tag that says neither word is
+ * `unclassified` rather than assumed permanent.
+ *
+ * The token must be the reason's first word (uppercase, on a word boundary, so
+ * prose like "PERMANENTLY" does not qualify); any punctuation may follow it.
+ *
+ * It lives here rather than in extra-surface.ts (which re-exports it) because
+ * the same discipline now governs `@missingRailsArgs` (RFC 0099), and one
+ * classifier keeps the two families honest to the same rule.
+ */
+export function classifyReason(reason: string): Permanence {
+  const first = /^\s*([A-Z]+)\b/.exec(reason);
+  if (!first) return "unclassified";
+  return PERMANENCE_TOKENS[first[1]] ?? "unclassified";
 }

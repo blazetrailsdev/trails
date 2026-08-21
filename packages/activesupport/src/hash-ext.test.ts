@@ -724,10 +724,10 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain('<addresses type="array"><address><streets type="array"><street><name>');
   });
 
-  it("from xml raises on disallowed type attributes", async () => {
-    await expect(
-      fromXml('<product><name type="foo">value</name></product>', ["foo"]),
-    ).rejects.toThrow(DisallowedType);
+  it("from xml raises on disallowed type attributes", () => {
+    expect(() => fromXml('<product><name type="foo">value</name></product>', ["foo"])).toThrow(
+      DisallowedType,
+    );
   });
 
   it("from xml array one", async () => {
@@ -736,12 +736,12 @@ describe("HashToXmlTest", () => {
     });
   });
 
-  it("from xml disallows symbol and yaml types by default", async () => {
-    await expect(fromXml('<product><name type="symbol">value</name></product>')).rejects.toThrow(
+  it("from xml disallows symbol and yaml types by default", () => {
+    expect(() => fromXml('<product><name type="symbol">value</name></product>')).toThrow(
       DisallowedType,
     );
 
-    await expect(fromXml('<product><name type="yaml">value</name></product>')).rejects.toThrow(
+    expect(() => fromXml('<product><name type="yaml">value</name></product>')).toThrow(
       DisallowedType,
     );
   });
