@@ -13,29 +13,35 @@ import {
   resolveEnv,
   resolveSchemaFormat,
 } from "../database.js";
-import { discoverMigrations } from "../migration-loader.js";
 import {
   InternalMetadata,
   MigrationContext,
   Migrator,
+  NullInternalMetadata,
+  NullSchemaMigration,
   SchemaMigration,
 } from "@blazetrails/activerecord";
 import type { MigrationProxy } from "@blazetrails/activerecord";
 
+// Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) — the
+// one path there is — built with the null collaborators `Migration.copy` uses
+// (`migration.rb:1065-1066`), which the discovery half never reaches.
+function discoverMigrations(migrationsPath: string): MigrationProxy[] {
+  return new MigrationContext(
+    [migrationsPath],
+    new NullSchemaMigration(),
+    new NullInternalMetadata(),
+  ).migrations;
+}
+
 // `rollback` / `forward` live on MigrationContext (`migration.rb:1240-1246`);
-// these cases drive discovered migrations, so the context overrides
-// `migrations` the way Rails' own migrator_class helper does.
+// these cases drive the same discovered migrations off the same path.
 function migrationContextFor(
   migrationsPath: string,
-  migrations: MigrationProxy[],
   schemaMigration: SchemaMigration,
   internalMetadata: InternalMetadata,
 ): MigrationContext {
-  return new (class extends MigrationContext {
-    override get migrations(): MigrationProxy[] {
-      return migrations;
-    }
-  })([migrationsPath], schemaMigration, internalMetadata);
+  return new MigrationContext([migrationsPath], schemaMigration, internalMetadata);
 }
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -672,7 +678,7 @@ describe("discoverMigrations", () => {
   });
 
   it("returns empty array for missing directory", async () => {
-    const migrations = await discoverMigrations(path.join(tmpDir, "nonexistent"));
+    const migrations = discoverMigrations(path.join(tmpDir, "nonexistent"));
     expect(migrations).toEqual([]);
   });
 
@@ -687,7 +693,7 @@ describe("discoverMigrations", () => {
     );
     fs.writeFileSync(path.join(tmpDir, "README.md"), "ignore me");
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     expect(migrations).toHaveLength(2);
     expect(migrations[0].version).toBe(20260101000000);
     // discoverMigrations camelizes proxy.name as Rails does
@@ -707,7 +713,7 @@ describe("discoverMigrations", () => {
       `export class First { version = "20260101000000"; }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     expect(migrations[0].version).toBe(20260101000000);
     expect(migrations[1].version).toBe(20260202000000);
   });
@@ -751,13 +757,13 @@ export class CreatePosts extends Migration {
 }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     const schemaMigration = new SchemaMigration(adapter.pool);
     const internalMetadata = new InternalMetadata(adapter.pool);
     const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
     // `rollback` lives on MigrationContext (`migration.rb:1240-1242`); it reads
     // the same bookkeeping tables, over the same discovered migration list.
-    const context = migrationContextFor(tmpDir, migrations, schemaMigration, internalMetadata);
+    const context = migrationContextFor(tmpDir, schemaMigration, internalMetadata);
 
     // Status before migrate
     const beforeStatus = await migrator.migrationsStatus();
@@ -816,10 +822,9 @@ export class CreateComments extends Migration {
 }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     const migrator = migrationContextFor(
       tmpDir,
-      migrations,
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
@@ -860,7 +865,7 @@ export class CreatePosts extends Migration {
 }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     const migrator = new Migrator(
       "up",
       migrations,
@@ -888,7 +893,7 @@ export class CreateWidgets extends Migration {
 }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     const migrator = new Migrator(
       "up",
       migrations,
@@ -940,7 +945,7 @@ export class CreatePosts extends Migration {
 }`,
     );
 
-    const migrations = await discoverMigrations(tmpDir);
+    const migrations = discoverMigrations(tmpDir);
     const migrator = new Migrator(
       "up",
       migrations,

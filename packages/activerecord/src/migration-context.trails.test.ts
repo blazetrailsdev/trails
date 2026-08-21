@@ -10,6 +10,7 @@ import {
   InvalidMigrationTimestampError,
   UnknownMigrationVersionError,
 } from "./migration.js";
+import type { MigrationProxy } from "./migration.js";
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
@@ -123,6 +124,65 @@ describe("MigrationContext", () => {
     } finally {
       ActiveRecord.timestampedMigrations = previous;
     }
+  });
+});
+
+describe("MigrationContext filename spellings", () => {
+  // Moved here from trailties' deleted `migration-loader`, whose second
+  // discovery path these pinned. `migrationFiles` is now the only one.
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    tmpDir = mkdtempSync(join(tmpdir(), "trails-loader-"));
+  });
+
+  afterEach(async () => {
+    const { rmSync } = await import("node:fs");
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const write = async (name: string): Promise<void> => {
+    const { writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    writeFileSync(join(tmpDir, name), "export class M {}");
+  };
+
+  const found = (): MigrationProxy[] =>
+    new MigrationContext([tmpDir], new NullSchemaMigration(), new NullInternalMetadata())
+      .migrations;
+
+  const basename = (file: string): string => file.replace(/.*[/\\]/, "");
+
+  it("loads underscore-named migrations (Rails-faithful)", async () => {
+    await write("20260101000000_create_posts.ts");
+    await write("20260102000000_add_email_to_users.ts");
+    expect(found().map((m) => `${m.version}:${m.name}`)).toEqual([
+      "20260101000000:CreatePosts",
+      "20260102000000:AddEmailToUsers",
+    ]);
+  });
+
+  it("loads hyphen-named migrations as a transitional alias", async () => {
+    await write("20260101000000-create-posts.ts");
+    expect(found()).toHaveLength(1);
+    expect(found()[0].version).toBe(20260101000000);
+  });
+
+  it("collapses hyphen and underscore variants of the same migration, preferring underscore", async () => {
+    await write("20260101000000-create-posts.ts");
+    await write("20260101000000_create_posts.ts");
+    expect(found()).toHaveLength(1);
+    expect(basename(found()[0].filename!)).toBe("20260101000000_create_posts.ts");
+  });
+
+  it("prefers .ts over .js when both exist for the same migration", async () => {
+    await write("20260101000000_create_posts.ts");
+    await write("20260101000000_create_posts.js");
+    expect(found()).toHaveLength(1);
+    expect(basename(found()[0].filename!)).toBe("20260101000000_create_posts.ts");
   });
 });
 

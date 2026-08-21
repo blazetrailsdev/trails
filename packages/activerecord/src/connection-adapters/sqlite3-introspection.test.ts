@@ -273,6 +273,33 @@ describe("SQLite3Adapter schema introspection", () => {
     ).toEqual(["by_name"]);
   });
 
+  it("addIndex derives the default index name from the bare qualified table", async () => {
+    // index_name embeds the table name verbatim, so a schema-qualified table
+    // would produce `index_aux.customers_on_name` — a dotted identifier the
+    // CREATE INDEX emission reads as a schema qualifier. SQLite3Adapter#indexName
+    // strips the qualifier; SchemaCreation puts it back on the INDEX name.
+    const auxPath = path.join(tmpDir, "aux-default-index-name.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    // No teardown: the table lives in a per-test ATTACHed database file under
+    // tmpDir, which afterEach removes wholesale, so it cannot leak to a sibling.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.executeMutation("CREATE TABLE aux.customers (id INTEGER PRIMARY KEY, name TEXT)");
+
+    await adapter.addIndex("aux.customers", ["name"]);
+
+    const inAux = (
+      await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
+    ).rows.map((row) => String(row[0]));
+    expect(inAux).toEqual(['CREATE INDEX "index_customers_on_name" ON "customers" ("name")']);
+    // removeIndex and indexExists derive the same default name off the bare
+    // table, so the round trip closes.
+    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(true);
+
+    await adapter.removeIndex("aux.customers", ["name"]);
+
+    expect(await adapter.indexExists("aux.customers", ["name"])).toBe(false);
+  });
+
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",

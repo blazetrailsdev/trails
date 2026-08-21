@@ -15,17 +15,19 @@ import {
   resolveSchemaFormat,
   type DatabaseConfig as RawConfig,
 } from "../database.js";
-import { discoverMigrations } from "../migration-loader.js";
 import {
   Base,
   DatabaseTasks,
   HashConfig,
   InternalMetadata,
+  MigrationContext,
   Migrator,
+  NullInternalMetadata,
+  NullSchemaMigration,
   SchemaMigration,
   eachCurrentEnvironment,
 } from "@blazetrails/activerecord";
-import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import type { DatabaseAdapter, MigrationProxy } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
   const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
@@ -96,14 +98,18 @@ async function migrationsDirsForConfig(name: string, config: RawConfig): Promise
 }
 
 /**
- * Discover migrations across multiple directories and concatenate them.
- * Duplicate-version validation is handled by Migrator (which throws
- * DuplicateMigrationVersionError) so conflicting migrations are
- * surfaced as errors instead of being silently skipped.
+ * Discover migrations across `dirs`, through the one discovery path there is:
+ * `MigrationContext#migrations` (`migration.rb:1303-1315`), which scans every
+ * one of its `migrations_paths`. Duplicate-version validation is handled by
+ * Migrator (which throws DuplicateMigrationVersionError) so conflicting
+ * migrations are surfaced as errors instead of being silently skipped.
+ *
+ * The context is built with the null collaborators `Migration.copy` uses
+ * (`migration.rb:1065-1066`): discovery never reaches the connected half.
  */
-async function discoverMigrationsFromDirs(dirs: string[]): ReturnType<typeof discoverMigrations> {
-  const all = await Promise.all(dirs.map((d) => discoverMigrations(d)));
-  return all.flat();
+function discoverMigrations(dirs: string[]): MigrationProxy[] {
+  return new MigrationContext(dirs, new NullSchemaMigration(), new NullInternalMetadata())
+    .migrations;
 }
 
 interface DatabaseOpts {
@@ -375,10 +381,7 @@ interface RunOptions {
  * `db migrate:status`, etc. would default to NODE_ENV and potentially
  * stamp a different env than `db migrate`.
  */
-function createMigrator(
-  adapter: DatabaseAdapter,
-  migrations: Awaited<ReturnType<typeof discoverMigrations>>,
-): Migrator {
+function createMigrator(adapter: DatabaseAdapter, migrations: MigrationProxy[]): Migrator {
   return new Migrator(
     "up",
     migrations,
@@ -393,7 +396,7 @@ async function runMigrate(
   targetVersion?: string,
   options: RunOptions = {},
 ): Promise<void> {
-  const migrations = await discoverMigrations(await migrationsDir());
+  const migrations = discoverMigrations([await migrationsDir()]);
   if (migrations.length === 0) {
     console.log("No migrations found.");
     return;
@@ -587,7 +590,7 @@ async function withMigrationTasksForDb(
   opts?: { afterPending?: (pending: number) => void; runWhenEmpty?: boolean },
 ): Promise<void> {
   const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
-  const migrations = await discoverMigrationsFromDirs(mDirs);
+  const migrations = discoverMigrations(mDirs);
   if (migrations.length === 0 && !opts?.runWhenEmpty) {
     console.log(`${ctx.prefix}No migrations found.`);
     return;
@@ -638,9 +641,9 @@ async function withTargetVersionEnv(
 async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
-  const migrationsFor = new Map<string, Awaited<ReturnType<typeof discoverMigrations>>>();
+  const migrationsFor = new Map<string, MigrationProxy[]>();
   for (const { name, raw, hashConfig } of entries) {
-    const migrations = await discoverMigrationsFromDirs(await migrationsDirsForConfig(name, raw));
+    const migrations = discoverMigrations(await migrationsDirsForConfig(name, raw));
     migrationsFor.set(name, migrations);
     DatabaseTasks.registerMigrations(migrations, hashConfig);
   }
@@ -847,7 +850,7 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
+        const migrations = discoverMigrations(mDirs);
         if (migrations.length === 0) return;
         const migrator = createMigrator(adapter, migrations);
         // Use the read-only pending check so running this in a
@@ -979,7 +982,7 @@ export function dbCommand(): Command {
       // its own migrationsPaths.
       const migrationSets = await Promise.all(
         allEntries.map(async (entry) =>
-          discoverMigrationsFromDirs(await migrationsDirsForConfig(entry.name, entry.raw)),
+          discoverMigrations(await migrationsDirsForConfig(entry.name, entry.raw)),
         ),
       );
       // Register the current env's primary set unregistered first: that clears
@@ -1053,7 +1056,7 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
+        const migrations = discoverMigrations(mDirs);
         if (migrations.length === 0) {
           console.log(`${prefix}No migrations found.`);
           return;
