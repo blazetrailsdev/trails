@@ -109,8 +109,8 @@ describe("TimeZoneConversionTest", () => {
     }
     (Post as unknown as { adapter: unknown }).adapter = adapter;
     await loadSchemaFromAdapter.call(Post);
-    expect(Post._attributeDefinitions.get("published_at")?.type).toBeInstanceOf(TimeZoneConverter);
-    expect(Post._attributeDefinitions.get("title")?.type).not.toBeInstanceOf(TimeZoneConverter);
+    expect(Post.typeForAttribute("published_at")).toBeInstanceOf(TimeZoneConverter);
+    expect(Post.typeForAttribute("title")).not.toBeInstanceOf(TimeZoneConverter);
   });
 });
 
