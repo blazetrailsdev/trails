@@ -10,8 +10,12 @@
  * `REXMLEngineTest`, whose own cases live in `rexml-engine.test.ts`;
  * `NokogiriEngineTest`, whose `expansion_attack_error` is
  * `Nokogiri::XML::SyntaxError`; and `NokogiriSAXEngineTest`, whose is
- * `RuntimeError`. Both trails Nokogiri backends re-raise the parser's own
- * first error as a plain `Error` (`nokogiri.ts:131`, `nokogirisax.ts:102`).
+ * `RuntimeError`. `nokogirisax.ts` raises Ruby's `RuntimeError` for its bare
+ * `raise error_message` (`nokogirisax.rb:37-39`); the DOM backend re-raises the
+ * parser's own first error as a plain `Error` (`nokogiri.ts:131`) because
+ * `@blazetrails/nokogiri` carries no `Nokogiri::XML::SyntaxError` counterpart
+ * for Ruby's `raise doc.errors.first` (`nokogiri.rb:27`) to raise — tracked by
+ * `nokogiri-backend-raises-syntax-error`.
  * The three calls live in this one file, rather than in a file per Ruby file,
  * because `parity:test` credits a Rails test file against its convention TS
  * file and every one of these names is defined in `xml_mini_engine_test.rb`.
@@ -28,14 +32,28 @@ import { fromXml } from "../hash-utils.js";
 import { FileLike } from "../xml-mini.js";
 
 /**
+ * Ruby's `rescue LoadError` catches only the package being absent; a syntax or
+ * runtime failure inside it still propagates. `import()` signals the absent
+ * package as `ERR_MODULE_NOT_FOUND` naming the specifier, the same test
+ * `xml-mini/nokogiri.ts`'s own loader makes.
+ */
+function isLoadError(e: unknown, gemName: string): boolean {
+  return (
+    e instanceof Error &&
+    (e as { code?: string }).code === "ERR_MODULE_NOT_FOUND" &&
+    e.message.includes(gemName)
+  );
+}
+
+/**
  * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`): require
  * the gem, yield, and skip the suite on `LoadError`.
  */
 async function runWithGem(gemName: string, block: () => void): Promise<void> {
   try {
     await import(/* @vite-ignore */ gemName);
-  } catch {
-    // Skip tests unless gem is available
+  } catch (e) {
+    if (!isLoadError(e, gemName)) throw e;
     return;
   }
   block();
@@ -76,7 +94,7 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
     expect(hash).toEqual(parsedXml);
   }
 
-  describe(`XMLMiniEngineTest (${engine})`, () => {
+  describe("XMLMiniEngineTest", () => {
     let defaultBackend: XmlMini.XmlMiniBackend | null | undefined;
 
     beforeEach(async () => {
@@ -299,6 +317,6 @@ await runWithGem("@blazetrails/nokogiri", () => {
   engineTests({
     engine: "NokogiriSAX",
     backendModule: XmlMini_NokogiriSAX,
-    expansionAttackError: Error,
+    expansionAttackError: RuntimeError,
   });
 });
