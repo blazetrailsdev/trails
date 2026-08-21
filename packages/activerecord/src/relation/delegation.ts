@@ -16,10 +16,14 @@ import {
   Delegation as ASDelegation,
   renameKey,
   type RenameKeyOptions,
+  IndentedXmlStringBuilder,
+  toTag,
   inGroups,
   inGroupsOf,
+  pluralize,
   singularize,
   split,
+  underscore,
   toSentence,
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
@@ -900,14 +904,6 @@ export type ToXmlOptions = SerializeOptions &
     skipInstruct?: boolean;
   };
 
-/** A record that knows how to serialize itself to XML (ActiveModel#to_xml). */
-interface XmlSerializable {
-  constructor: unknown;
-  toXml(
-    options?: SerializeOptions & RenameKeyOptions & { root?: string; skipTypes?: boolean },
-  ): string;
-}
-
 /**
  * The `delegate ... to: :records` operations (delegation.rb:101) as pure sync
  * functions over an already-loaded `records` array, reused by `DelegationMethods`
@@ -1123,76 +1119,53 @@ export class DelegationMethods {
   }
 
   /**
-   * `Array#to_xml` (active_support/core_ext/array/conversions.rb): serialize the
-   * loaded records as an XML collection by invoking `to_xml` on each element.
+   * `Array#to_xml` (activesupport/lib/active_support/core_ext/array/conversions.rb:183-211):
+   * serialize the loaded records as an XML collection.
    *
-   * The root element reflects the (pluralized, underscored) class name of the
-   * first record — `<posts type="array">` — with each child rendered under
-   * `root.singularize` (`<post>`). Empty collections use `nil-classes` (or the
-   * supplied `:root`) and self-close. `skipTypes` drops every `type=` attribute
-   * (including `type="array"`); `skipInstruct` omits the XML declaration;
-   * The remaining serializer options (`:only`/`:except`/`:methods`/`:include`)
-   * thread down into each record's serialization, mirroring Rails passing the
-   * same options hash to `XmlMini.to_tag` after deleting only `:children` /
-   * `:skip_instruct` (conversions.rb:197-208).
+   * One `XmlMini` builder is created (`:188`) and threaded through every
+   * `to_tag` call (`:208`), which is how nesting and indentation compose. The
+   * default root is `pluralize(underscore(first.class.name)).tr("/", "_")`
+   * (`:190-193`) when `first.class != Hash && all?(first.class)`, else
+   * `"objects"`. `all?` is `Class#===`, so a subclass still matches and an STI
+   * collection roots under its base's plural; the Hash guard is live in
+   * Rails' suite (conversions_test.rb `test_to_xml_with_options` roots an array
+   * of hashes under `<objects>`), and Ruby's Hash is a JS plain object. On an
+   * empty array `first` is nil and `all?` is vacuously true, so the same branch
+   * yields the *pre-rename* `"nil_classes"`, which `renameKey` then dasherizes.
+   *
+   * Rails renames the root first, then singularizes it for the child name, and
+   * deletes `:children` / `:skip_instruct` so neither reaches `to_tag`
+   * (`:199-202`). ActiveModel has carried no per-record `to_xml` since Rails 4.2
+   * moved XML out to the `activemodel-serializers-xml` gem, so records fall
+   * through `to_tag`'s generic arm (xml_mini.rb:132-135) as in gem-less Rails.
    */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
-    const records = (await this.records()) as unknown as XmlSerializable[];
-    // Strip the collection-only keys; everything else (only/except/methods/
-    // include/skipTypes) is forwarded to each record's `toXml`, as Rails passes
-    // the shared options hash down to `XmlMini.to_tag`.
-    const { root: _root, children: _children, skipInstruct = false, ...recordOptions } = options;
-    const skipTypes = options.skipTypes ?? false;
-
-    // Rails (conversions.rb:189-195): the default root reflects the first
-    // element's class only when every element shares that class (`all?(first.class)`);
-    // a heterogeneous collection (e.g. mixed STI subclasses) falls back to
-    // `"objects"`. The `first.class != Hash` guard never trips here — records are
-    // always model instances, never Hashes.
+    const records = await this.records();
+    const builder = new IndentedXmlStringBuilder();
+    const { root: rootOption, children: childrenOption, skipInstruct = false, ...rest } = options;
+    const firstClass = records[0]?.constructor;
     const root =
-      options.root ??
-      (records.length === 0
-        ? // conversions.rb:189-195: the empty default is the *pre-rename* value
-          // `underscore(NilClass.name).pluralize` = "nil_classes"; `renameKey`
-          // below dashes it to "nil-classes" under default options and composes
-          // correctly with `dasherize: false` / `camelize:`.
-          "nil_classes"
-        : records.every((r) => r.constructor === records[0].constructor)
-          ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
-          : "objects");
-    const renameOptions: RenameKeyOptions = {
-      dasherize: options.dasherize,
-      camelize: options.camelize,
-    };
-    // conversions.rb:200-201: Rails renames the root FIRST, then singularizes
-    // the already-renamed root for the child name — never underscoring the
-    // (already snake_case, or caller-supplied) root string. `to_tag` then
-    // re-applies `rename_key` to each child, which is idempotent since the name
-    // is already in target form.
-    const rootTag = renameKey(root, renameOptions);
-    const children = options.children ?? singularize(rootTag);
-    const arrayAttr = skipTypes ? "" : ' type="array"';
+      rootOption ??
+      (firstClass !== Object && records.every((record) => record instanceof firstClass)
+        ? pluralize(underscore(firstClass?.name ?? "NilClass")).replace(/\//g, "_")
+        : "objects");
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-    // Each record's own `toXml` re-applies the same `renameKey` transform to its
-    // `:root`; passing the already-renamed `children` is idempotent, so root,
-    // children, and attribute tags all honor `dasherize:`/`camelize:` uniformly.
-    const childOpts = { ...recordOptions, root: children };
+
+    const rootTag = renameKey(root, rest);
+    const children = childrenOption ?? singularize(rootTag);
+    const attributes: Record<string, string> = rest.skipTypes ? {} : { type: "array" };
 
     if (records.length === 0) {
-      return `${instruct}<${rootTag}${arrayAttr}/>`;
+      builder.tag(rootTag, undefined, attributes);
+    } else {
+      builder.openTag(rootTag, attributes);
+      for (const record of records) {
+        toTag(children, record, { ...rest, builder });
+      }
+      builder.closeTag(rootTag);
     }
-
-    const body = records
-      .map((record) =>
-        record
-          .toXml(childOpts)
-          .split("\n")
-          .map((line) => (line === "" ? line : `  ${line}`))
-          .join("\n"),
-      )
-      .join("\n");
-    return `${instruct}<${rootTag}${arrayAttr}>\n${body}\n</${rootTag}>`;
+    return instruct + builder.target();
   }
 
   // ---- to: :model ----

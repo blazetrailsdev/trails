@@ -189,23 +189,6 @@ describe("RelationTest", () => {
     expect(relationXml).toContain('type="array"');
   });
 
-  it("to xml threads :methods down to each record", async () => {
-    // Rails passes the shared options hash to XmlMini.to_tag, so `:methods`
-    // (topic.rb's `topic_id`) reaches every record's serialization. Filtered to
-    // base Topics (the `topics` fixtures mix Topic/Reply, which Rails would root
-    // under <objects>) so the collection is homogeneous.
-    const baseTopics = Topic.where({ type: null });
-    const xml = await baseTopics.toXml({ only: ["id"], methods: ["topicId"] });
-    const topics = await Topic.where({ type: null });
-    expect(xml).toContain('<topics type="array">');
-    // The camelCase method name `topicId` is underscored then dasherized by
-    // `renameKey`, yielding Rails' `<topic-id>` tag (matching Ruby's snake_case
-    // `topic_id` method). The `type="integer"` attribute is adapter-dependent
-    // (PG/MariaDB return the id as BigInt/string, not JS number), so match the
-    // tag agnostically.
-    expect(xml).toMatch(new RegExp(`<topic-id[^>]*>${topics[0].id}</topic-id>`));
-  });
-
   it("scoped all", async () => {
     const topicsArr = await Topic.all();
     expect(Array.isArray(topicsArr)).toBe(true);

@@ -16,13 +16,7 @@ import {
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
-  renameKey,
-  toTag,
-  IndentedXmlStringBuilder,
-  type RenameKeyOptions,
-  type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
-  withOptions,
   extend,
   include,
   prepend,
@@ -71,7 +65,6 @@ import {
 } from "./callbacks.js";
 import {
   serializableHash,
-  serializableAddIncludes,
   SerializeOptions,
   asJsonThenable,
   readAttributeForSerialization as serializationReadAttributeForSerialization,
@@ -175,96 +168,6 @@ function _validationOnToIf<TRecord extends object>(
     ...rest,
     if: [onPredicate, ...kernelArray(existingIf)],
   };
-}
-
-/**
- * Maps a cast type's symbolic `type()` name to the Rails `XmlMini` `type=`
- * attribute name emitted by `to_xml`. Types absent here (strings, unknown
- * attributes) carry no `type=` attribute, matching Rails.
- *
- * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES (by cast-type, not value class).
- */
-const XML_MINI_TYPE_NAMES: Record<string, string> = {
-  // BigIntegerType.type() returns "integer" (a bigint column's Rails
-  // `column.type` is :integer), so there is no separate "big_integer" key.
-  integer: "integer",
-  float: "float",
-  decimal: "decimal",
-  boolean: "boolean",
-  date: "date",
-  datetime: "dateTime",
-  time: "time",
-  binary: "binary",
-};
-
-/**
- * The empty {@link XmlTypeInfo} used when a level has no cast types (a bare
- * hash with no association metadata). `types` maps each scalar attribute key to
- * its `XmlMini` `type=` name and `nested` carries the same table for each
- * `include`d association, mirroring the per-record column-type table Rails
- * builds in its XML serializer — needed because `serializableHash` flattens
- * associations into plain objects that no longer name their model class.
- */
-const EMPTY_XML_TYPE_INFO: XmlTypeInfo = { types: {}, nested: {} };
-
-/**
- * Build the cast-derived {@link XmlTypeInfo} for a record's serialized `hash`,
- * recursing into each `include`d association so nested numeric columns keep an
- * adapter-stable `type=` attribute. This mirrors the per-record column-type
- * table Rails' XML serializer carries for every included association: the
- * flattened hash `serializableHash` produces no longer names the associated
- * model, so we re-resolve the association readers (already loaded — no DB
- * query) to reach each nested model's `typeForAttribute`.
- *
- * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES applied to each attribute's cast
- * type, threaded through the association tree.
- */
-function _xmlTypeInfo(
-  record: object,
-  hash: Record<string, unknown>,
-  options?: SerializeOptions,
-): XmlTypeInfo {
-  const ctor = record.constructor as typeof Model;
-  const types: Record<string, string> = {};
-  if (typeof ctor.typeForAttribute === "function") {
-    for (const key of Object.keys(hash)) {
-      const typeName = ctor.typeForAttribute(key).type();
-      const xmlName = typeName != null ? XML_MINI_TYPE_NAMES[typeName] : undefined;
-      if (xmlName) types[key] = xmlName;
-    }
-  }
-
-  const nested: Record<string, XmlTypeInfo> = {};
-  if (options?.include != null) {
-    serializableAddIncludes(record as SerializationRecord, options, (assocName, records, opts) => {
-      const subValue = hash[assocName];
-      // A collection include flattens to an array of hashes; a singular include
-      // to one hash. Deriving `type=` needs only the elements' column/cast
-      // types, and every element of one `has_many`/`has_one` shares them: the
-      // association targets a single model class, and STI subclasses ride the
-      // same table with the same column types. (Rails polymorphism is a
-      // `belongs_to`/singular concept, not a per-element property of a
-      // collection.) So the representative (first) record's type map applies to
-      // all `<item>`s. A record whose column types genuinely diverge from the
-      // first would just fall back to runtime inference for the mismatch.
-      let repRecord: unknown;
-      let repHash: unknown;
-      if (Array.isArray(subValue)) {
-        if (subValue.length === 0) return;
-        repHash = subValue[0];
-        const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
-        repRecord = items[0];
-      } else {
-        repHash = subValue;
-        repRecord = records;
-      }
-      if (repRecord && typeof repRecord === "object" && repHash && typeof repHash === "object") {
-        nested[assocName] = _xmlTypeInfo(repRecord, repHash as Record<string, unknown>, opts);
-      }
-    });
-  }
-
-  return { types, nested };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
@@ -560,53 +463,6 @@ export class Model {
       };
       return normalizedValueType(base, normalizer, entry.applyToNil, entry);
     };
-  }
-
-  /**
-   * Auto-nullify blank string values for specified attributes (or all string attributes).
-   * A blank value is an empty string or whitespace-only string.
-   *
-   * Mirrors: Rails pattern of normalizing blank strings to nil
-   *
-   * Usage:
-   *   User.nullifyBlanks("name", "email")  // specific attributes
-   *   User.nullifyBlanks()                 // all string attributes
-   */
-  static nullifyBlanks(...attributes: string[]): void {
-    if (!Object.hasOwn(this, "_nullifyBlanks")) {
-      this._nullifyBlanks = attributes.length > 0 ? [...attributes] : true;
-    } else {
-      if (attributes.length > 0) {
-        if (Array.isArray(this._nullifyBlanks)) {
-          this._nullifyBlanks.push(...attributes);
-        } else {
-          this._nullifyBlanks = [...attributes];
-        }
-      } else {
-        this._nullifyBlanks = true;
-      }
-    }
-  }
-  static _nullifyBlanks: string[] | true | false = false;
-
-  /**
-   * Mirrors: Object#with_options
-   * (activesupport/lib/active_support/core_ext/object/with_options.rb:92),
-   * which Ruby models reach as a receiverless class-body call. TypeScript
-   * cannot monkey-patch Object, so the class carries the entry point and the
-   * ported free function does the work.
-   *
-   * Usage:
-   *   User.withOptions({ if: (r) => r.readAttribute("active") }, (m) => {
-   *     m.validates("name", { presence: true });
-   *     m.validates("email", { presence: true });
-   *   });
-   */
-  static withOptions(
-    options: Record<string, unknown>,
-    block?: (optionMerger: typeof Model) => void,
-  ): typeof Model | void {
-    return withOptions(this, options, block);
   }
 
   // -- Validations (Phase 1100) --
@@ -1846,29 +1702,11 @@ export class Model {
     // `fetchValue` reads the attribute's cast value; the cast type carries the
     // NormalizedValueType decoration (see `normalizes`), so normalization is
     // already applied here — no separate imperative hook.
-    let newValue = this._attributes.fetchValue(name);
-    newValue = this._applyNullifyBlanks(name, newValue);
-    if (!Object.is(newValue, this._attributes.fetchValue(name))) {
-      this._attributes.writeCastValue(name, newValue);
-    }
+    const newValue = this._attributes.fetchValue(name);
     // Route through type.isChanged so numeric semantics (equal_nan?,
     // number_to_non_number?) are respected — mirrors the Rails path where dirty
     // tracking ultimately delegates to type.changed? (attribute.rb:155-160).
     this._dirty.attributeWritten(name, newValue, value, this._attributes.getAttribute(name).type);
-  }
-
-  /**
-   * Apply nullifyBlanks: convert blank strings to null.
-   */
-  private _applyNullifyBlanks(name: string, value: unknown): unknown {
-    const ctor = this.constructor as typeof Model;
-    const config = ctor._nullifyBlanks;
-    if (config === false) return value;
-    if (typeof value !== "string") return value;
-    if (config === true || (Array.isArray(config) && config.includes(name))) {
-      if (value.trim() === "") return null;
-    }
-    return value;
   }
 
   /**
@@ -2521,69 +2359,6 @@ export class Model {
       this.writeAttribute(key, value);
     }
     return this;
-  }
-
-  /**
-   * Serialize this model to XML.
-   *
-   * Mirrors: ActiveModel::Serializers::Xml#to_xml
-   */
-  toXml(
-    options?: SerializeOptions & { root?: string; skipTypes?: boolean } & RenameKeyOptions,
-  ): string {
-    const hash = this.serializableHash(options);
-    const renameOptions: RenameKeyOptions = {
-      dasherize: options?.dasherize,
-      camelize: options?.camelize,
-    };
-    // The root (default `modelName.singular`, already snake_case, or a
-    // caller-supplied literal) is renamed directly — Rails' serializer reformats
-    // the root without underscoring it (conversions.rb:88 / :200). Only the
-    // camelCase per-attribute keys are underscored first (in `_hashToXml`).
-    const root = renameKey(
-      options?.root ?? (this.constructor as typeof Model).modelName.singular,
-      renameOptions,
-    );
-    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, _xmlTypeInfo(this, hash, options), renameOptions)}</${root}>`;
-  }
-
-  private _hashToXml(
-    hash: Record<string, unknown>,
-    indent: string,
-    skipTypes = false,
-    typeInfo: XmlTypeInfo = EMPTY_XML_TYPE_INFO,
-    renameOptions: RenameKeyOptions = {},
-  ): string {
-    // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
-    // attribute on every tag; the `nil="true"` marker is a separate attribute
-    // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
-    //
-    // Every value — leaf, nested hash, or array — routes through the shared
-    // XmlMini `toTag` funnel, so `renameKey`/`type=`/`nil=` have a single call
-    // site. `toTag`'s `emitHash`/`emitArray` recurse into the depth-aware
-    // builder for the pretty-printed layout, and the per-level cast types ride
-    // along in `typeInfo` (bigint ids / string-materialized decimals keep an
-    // adapter-agnostic `type=`). Keys are camelCase, so `underscoreKeys` lets
-    // `renameKey` see `_`/space separators to dasherize.
-    const builder = new IndentedXmlStringBuilder(indent);
-    for (const [key, value] of Object.entries(hash)) {
-      // The cast/column type name (when known) overrides JS-runtime inference so
-      // the `type=` attribute is adapter-agnostic. A leaf JS `number` with no
-      // cast type defaults to `integer` — ActiveModel cannot see the DB scale,
-      // and a float/decimal column supplies its own type. (Containers are
-      // objects, so this default never fires for them.)
-      let type = typeInfo.types[key];
-      if (type == null && typeof value === "number") type = "integer";
-      toTag(key, value, {
-        builder,
-        type,
-        skipTypes,
-        typeInfo: typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO,
-        underscoreKeys: true,
-        ...renameOptions,
-      });
-    }
-    return builder.target();
   }
 
   /**
