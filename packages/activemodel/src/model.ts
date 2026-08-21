@@ -410,10 +410,9 @@ export class Model {
     );
   }
 
+  /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-75). */
   static attributeNames(): string[] {
-    return Array.from(this._attributeDefinitions.entries())
-      .filter(([, def]) => !def.virtual)
-      .map(([name]) => name);
+    return Object.keys(this.attributeTypes());
   }
 
   // -- Normalizations --
@@ -742,8 +741,13 @@ export class Model {
     asResetCallbacks(this.prototype, "validate");
   }
 
+  /**
+   * Mirrors: ActiveModel::Validations::ClassMethods#attribute_method?
+   * (validations.rb:282-284) — `method_defined?(attribute)`. Ruby's
+   * `method_defined?` walks the ancestor chain, which `in` does for a prototype.
+   */
   static isAttributeMethod(attribute: string): boolean {
-    return this._attributeDefinitions.has(attribute);
+    return attribute in this.prototype;
   }
 
   /**
@@ -1897,20 +1901,21 @@ export class Model {
    * Mirrors: ActiveRecord::Base.column_for_attribute
    */
   columnForAttribute(name: string): { name: string; type: Type } | null {
-    const def = (this.constructor as typeof Model)._attributeDefinitions.get(name);
-    if (!def) return null;
-    return { name: def.name, type: def.type };
+    const klass = this.constructor as typeof Model;
+    if (!Object.hasOwn(klass.attributeTypes(), name)) return null;
+    return { name, type: klass.typeForAttribute(name) };
   }
 
   /**
    * Check if this model has the given attribute defined.
    *
-   * Mirrors: ActiveModel::AttributeMethods#has_attribute?
+   * Mirrors: ActiveRecord::AttributeMethods#has_attribute? — `attr_name =
+   * self.class.attribute_aliases[attr_name] || attr_name` then
+   * `@attributes.key?(attr_name)` (activerecord/attribute_methods.rb:316-320).
    */
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
-    const defs = ctor._attributeDefinitions;
-    return defs.has(ctor.resolveAttributeName(name));
+    return this._attributes.isKey(ctor.resolveAttributeName(name));
   }
 
   /**

@@ -8,7 +8,7 @@ export interface SerializationRecord {
   _attributes?: unknown;
   attributes?: Record<string, unknown>;
   readAttribute?: (key: string) => unknown;
-  constructor: { name: string; _attributeDefinitions?: unknown };
+  constructor: { name: string };
 }
 
 /**
@@ -242,13 +242,6 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
     keys = Object.keys(record.attributes);
   } else {
     keys = [];
-  }
-
-  const defs = record.constructor._attributeDefinitions as
-    | Map<string, { virtual?: boolean }>
-    | undefined;
-  if (defs) {
-    keys = keys.filter((k) => !defs.get(k)?.virtual);
   }
   return keys;
 }
