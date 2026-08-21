@@ -260,11 +260,17 @@ const _predicatesForValidationContexts = new Map<
  *
  * Trails eagerly initializes `errors` (rather than Rails' lazy
  * `errors_or_create`), so this assigns a fresh `Errors` and clears
- * the active validation context. Called from the Model constructor.
+ * the active validation context. Ruby's `super` is `super_()`, the
+ * receiver-bound link `prepend()` hands the module (model.ts wires the chain in
+ * include order); the Model constructor enters it.
  *
  * @internal Rails-private helper.
  */
-export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+export function initInternals<TBase extends object>(
+  this: ValidationsInternalsHost<TBase>,
+  super_: () => void,
+): void {
+  super_();
   this.errors = new Errors(this as unknown as TBase);
   this._contextForValidation = undefined;
 }
@@ -384,15 +390,19 @@ export interface ReadAttributeForValidationHost {
  * and lets `errors_or_create` rebuild it lazily; trails initializes `errors`
  * eagerly, so this assigns the replacement, as {@link initInternals} does. Like
  * Rails it leaves `@context_for_validation` aliased to the source's — `valid?`
- * sets and restores the context per run, so the copy is never observed in flight.
+ * sets and restores the context per run, so the copy is never observed in
+ * flight. Ruby's `super` is `super_()`, the receiver-bound link `prepend()`
+ * hands the module — and as in Rails the replacement is assigned BEFORE it.
  *
  * @internal Rails-private helper.
  */
 export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,
-  _other: unknown,
+  super_: (other: unknown) => void,
+  other: unknown,
 ): void {
   this.errors = new Errors(this as unknown as TBase);
+  super_(other);
 }
 
 /**

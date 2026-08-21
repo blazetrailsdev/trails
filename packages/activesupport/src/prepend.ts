@@ -7,11 +7,18 @@
  * method. TypeScript has no prototype-chain prepend; `prepend()` wraps
  * each target method in place. A call like `target.foo(...args)`
  * invokes `module.foo.call(this, originalFoo, ...args)`, letting the
- * module short-circuit or delegate via `originalFoo.call(this, ...)`.
+ * module short-circuit or delegate via `originalFoo(...)` — the link arrives
+ * bound to the receiver, as Ruby's `super` is.
  *
  * Mirrors: Ruby's `Module#prepend` — with the caveat that `super`
  * becomes an explicit first argument because TypeScript has no
  * language-level `super` equivalent for runtime-wrapped methods.
+ *
+ * As in Ruby, the target need not already define the method: prepending a
+ * module that is the only definition is legal, and `super_` is then a no-op
+ * root — which is how a `super`-opening chain (ActiveModel's
+ * `init_internals`, validations.rb:467-471 / dirty.rb:371-376) is built in
+ * include order without a root definition.
  *
  * Idempotency is the caller's responsibility — calling `prepend()` on
  * the same target+module twice will wrap twice, producing a chain.
@@ -23,7 +30,7 @@
  *
  *   prepend(Relation.prototype, {
  *     where(super_: (...args: unknown[]) => unknown, ...args: unknown[]) {
- *       return super_.call(this, ...processed(args));
+ *       return super_(...processed(args));
  *     },
  *   });
  */
@@ -37,15 +44,17 @@ export interface PrependModule {
   readonly [methodName: string]: PrependMethod;
 }
 
+const NO_METHOD_ROOT = function (): void {};
+
 export function prepend<T extends object>(target: T, mod: PrependModule): void {
   if (!target || (typeof target !== "object" && typeof target !== "function")) {
     throw new TypeError("prepend: target must be an object or function");
   }
 
-  // All-or-nothing pre-validation. A missing method, a non-function
-  // wrapper, a frozen/sealed target, or a non-configurable own property
-  // would otherwise throw mid-loop and leave the target in a partial-
-  // patch state. We check all four up front and throw before mutating.
+  // All-or-nothing pre-validation. A non-function wrapper, a frozen/sealed
+  // target, or a non-configurable own property would otherwise throw mid-loop
+  // and leave the target in a partial-patch state. We check all three up front
+  // and throw before mutating.
   if (!Object.isExtensible(target)) {
     throw new TypeError("prepend: target is not extensible (frozen/sealed)");
   }
@@ -55,10 +64,6 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
       throw new TypeError(
         `prepend: module entry ${name} must be a function, got ${typeof mod[name]}`,
       );
-    }
-    const original = (target as Record<string, unknown>)[name];
-    if (typeof original !== "function") {
-      throw new Error(`prepend: cannot wrap ${name} — target has no method with that name`);
     }
     // If an own property exists and is non-configurable, `defineProperty`
     // below can still throw — three sub-cases:
@@ -86,17 +91,31 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
 
   for (const name of names) {
     const descriptor = findPropertyDescriptor(target, name);
-    const original = (target as Record<string, unknown>)[name] as (...args: unknown[]) => unknown;
+    // Ruby's `prepend` does not require the target to define the method: the
+    // module can be the only definition, and a `super` inside it then finds
+    // nothing below (ActiveModel's `init_internals`/`initialize_dup` chains,
+    // whose only Ruby root is `ActiveRecord::Core#init_internals`,
+    // core.rb:834 — absent when the chain is prepended onto a plain model).
+    // That bottom link is a no-op root rather than an error so the chain can be
+    // built in include order without manufacturing a root Rails does not have.
+    const existing = (target as Record<string, unknown>)[name];
+    const original =
+      typeof existing === "function"
+        ? (existing as (...args: unknown[]) => unknown)
+        : NO_METHOD_ROOT;
     const wrapper = mod[name];
     const wrapped = function (this: unknown, ...args: unknown[]) {
-      return wrapper.call(this, original, ...args);
+      // Ruby's `super` is bound to the receiver, so the link is handed over
+      // bound too and the module body spells it `super_(...)`. A caller that
+      // spells it `super_.call(this, ...)` is unaffected — a bound function
+      // ignores the `thisArg`.
+      return wrapper.call(this, original.bind(this), ...args);
     };
     // Preserve the original property descriptor (class methods are
     // non-enumerable by default; direct assignment would make them
     // enumerable and leak into `Object.keys` / `for..in`). Fall back to
     // a non-enumerable writable data property when no descriptor is
-    // found (shouldn't happen — the pre-validation above ensures the
-    // method exists somewhere on the prototype chain).
+    // found — the case where the module is the method's only definition.
     Object.defineProperty(target, name, {
       value: wrapped,
       writable: descriptor?.writable ?? true,

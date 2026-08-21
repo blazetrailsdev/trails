@@ -128,10 +128,12 @@ describe("loadSchemaFromAdapter", () => {
   });
 
   it("falls back to ValueType when adapter has no cast type", async () => {
+    const mysteryHash = { mystery: { sqlType: "weird" } };
     const adapter = {
       internalSchemaCache: {
         dataSourceExists: async () => true,
-        columnsHash: async () => ({ mystery: { sqlType: "weird" } }),
+        columnsHash: async () => mysteryHash,
+        getCachedColumnsHash: () => mysteryHash,
       },
       lookupCastTypeFromColumn: () => null,
     };

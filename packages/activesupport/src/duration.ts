@@ -7,6 +7,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
+import { rbEqual } from "./rb-equal.js";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import { inspect } from "./core-ext/object/inspect.js";
@@ -380,14 +381,15 @@ export class Duration {
   /**
    * Mirrors: ActiveSupport::Duration#== (duration.rb:341-347) — another
    * Duration with the same `value`, or `other == value` for anything else, so
-   * `2.days == 172800` is true. `value` is seconds, a JS number, and Ruby
-   * `==` on it is numeric equality.
+   * `2.days == 172800` is true. The else arm is a `==` SEND to `other`, so a
+   * receiver that answers `==` against a number (a `Scalar`) decides it —
+   * `rbEqual` is that dispatch. `value` is seconds, a JS number.
    */
   equals(other: unknown): boolean {
     if (other instanceof Duration) {
       return other.value === this.value;
     } else {
-      return other === this.value;
+      return rbEqual(other, this.value);
     }
   }
 
@@ -921,6 +923,35 @@ export class Scalar {
   /** Unary minus (`Scalar#-@`): `Scalar.new(-value)`. */
   negate(): Scalar {
     return new Scalar(-this.value);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration::Scalar#<=> (duration.rb:31-38). Ruby
+   * returns nil for an incomparable receiver; `Duration#compareTo` spells that
+   * NaN, so this does too.
+   */
+  compareTo(other: unknown): number {
+    let b: number;
+    if (other instanceof Scalar || other instanceof Duration) {
+      b = other.value;
+    } else if (typeof other === "number") {
+      b = other;
+    } else {
+      return NaN;
+    }
+    if (this.value < b) return -1;
+    if (this.value > b) return 1;
+    return 0;
+  }
+
+  /**
+   * `Scalar < Numeric` includes Comparable, so `==` is Comparable's
+   * `(self <=> other) == 0` over `<=>` above — which is why
+   * `Scalar.new(172800) == 172800` is true, and why `Duration#==`'s
+   * `other == value` arm (duration.rb:341-347) answers a Scalar.
+   */
+  equals(other: unknown): boolean {
+    return this.compareTo(other) === 0;
   }
 
   times(other: number): Scalar {

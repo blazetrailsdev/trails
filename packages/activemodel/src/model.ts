@@ -25,6 +25,7 @@ import {
   withOptions,
   extend,
   include,
+  prepend,
   runLoadHooks,
   wrap,
   ToJsonWithActiveSupportEncoder,
@@ -308,6 +309,19 @@ export interface Model {
    * 334-336) stays assignable.
    */
   attributeNames(): string[];
+
+  /**
+   * The `super`-chained hooks Ruby's included modules define —
+   * `Validations#init_internals` / `#initialize_dup` (validations.rb:467-471,
+   * 310-313) and `Dirty#init_internals` / `#initialize_dup` (dirty.rb:371-376,
+   * 248-251) — prepended in include order at the bottom of this file. As in
+   * `model.rb`, this class defines no body for either.
+   *
+   * @internal
+   */
+  initInternals(): void;
+  /** @internal */
+  initializeDup(other: unknown): void;
 }
 
 /**
@@ -1686,28 +1700,6 @@ export class Model {
   _initializingAttributes = false;
 
   /**
-   * Mirrors the Rails chain `ActiveModel::{Validations,Dirty}#init_internals`
-   * (validations.rb:467-471, dirty.rb:371-376). Each Ruby module defines the
-   * method and opens with `super`, so the chain is the include order itself;
-   * there is no root definition in ActiveModel (the bottom is
-   * `ActiveRecord::Core#init_internals`, core.rb:834).
-   *
-   * TypeScript has no `super` across mixins — `include()` copies onto one
-   * prototype, so the second module's copy would overwrite the first's with no
-   * way to reach it, and `prepend()`'s explicit `super_` needs a root method to
-   * wrap that Rails does not define here. So the chain is written out, in
-   * include order, calling each module's own exported hook. This is the
-   * language shortcoming, not a preference: neither module's body is inlined or
-   * reordered.
-   *
-   * @internal Rails-private helper.
-   */
-  initInternals(): void {
-    validationsInitInternals.call(this);
-    dirtyInitInternals.call(this);
-  }
-
-  /**
    * Build the `if`-predicate that gates a validator on a validation
    * context. Mirrors Rails `predicate_for_validation_context`
    * (validations.rb:296-306).
@@ -2162,22 +2154,6 @@ export class Model {
     duped._attributes = this._attributes.deepDup();
     duped.initializeDup(this);
     return duped;
-  }
-
-  /**
-   * Ruby chains one `initialize_dup` per included module through `super`
-   * (attributes.rb:112-115, validations.rb:310-313, dirty.rb:248-251).
-   * TypeScript has no `super` across mixins — see `initInternals` above for why
-   * neither `include()` nor `prepend()` can express it — so this is the chain,
-   * in include order: `Validations` replaces `@errors` and `Dirty` resets the
-   * mutation tracker (without the latter the copy shares the source's tracker,
-   * so writing to one marks the other dirty). Both run after `dup()` has
-   * deep-dup'd `_attributes`, matching the point in Rails' chain where
-   * `Attributes#initialize_dup` has already replaced `@attributes`.
-   */
-  initializeDup(other: unknown): void {
-    validationsInitializeDup.call(this, other);
-    dirtyInitializeDup.call(this, other);
   }
 
   // -- Dirty tracking --
@@ -2903,6 +2879,22 @@ include(Model, {
   raiseValidationError: validationsRaiseValidationError,
   readAttributeForValidation: validationsReadAttributeForValidation,
   sanitizeForbiddenAttributes: forbiddenSanitize,
+});
+
+// The `super`-opening halves of the Validations and Dirty modules: each
+// defines `init_internals` / `initialize_dup` and opens with `super`
+// (validations.rb:467-471 and :310-313, dirty.rb:371-376 and :248-251), so
+// the chain IS the include order.
+// `prepend()` is that chain — the later include wraps the earlier one and
+// receives it as `super_`, with a no-op root where Ruby's only definition is
+// `ActiveRecord::Core#init_internals` (core.rb:834).
+prepend(Model.prototype, {
+  initInternals: validationsInitInternals,
+  initializeDup: validationsInitializeDup,
+});
+prepend(Model.prototype, {
+  initInternals: dirtyInitInternals,
+  initializeDup: dirtyInitializeDup,
 });
 
 // model.rb:77 — `ActiveSupport.run_load_hooks(:active_model, Model)`.

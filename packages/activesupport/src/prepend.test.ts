@@ -47,11 +47,23 @@ describe("prepend", () => {
     expect(new Toggle().value()).toBe(42);
   });
 
-  it("throws when wrapping a method that doesn't exist on the target", () => {
+  it("wraps a method that doesn't exist on the target over a no-op super_", () => {
     class Empty {}
-    expect(() =>
-      prepend(Empty.prototype, { ghost: (s: (...args: unknown[]) => unknown) => s }),
-    ).toThrow(/no method with that name/);
+    const calls: string[] = [];
+    prepend(Empty.prototype, {
+      ghost(super_: (...args: unknown[]) => unknown) {
+        super_.call(this);
+        calls.push("ghost");
+      },
+    });
+    prepend(Empty.prototype, {
+      ghost(super_: (...args: unknown[]) => unknown) {
+        super_.call(this);
+        calls.push("later");
+      },
+    });
+    (new Empty() as unknown as { ghost(): void }).ghost();
+    expect(calls).toEqual(["ghost", "later"]);
   });
 
   it("throws when the target isn't an object or function", () => {
@@ -162,23 +174,6 @@ describe("prepend", () => {
     ).toThrow(/non-configurable and non-writable/);
     // `loose` must NOT have been wrapped — atomicity guarantee.
     expect(target.loose).toBe(origLoose);
-  });
-
-  it("validates all target methods exist before wrapping anything (atomicity)", () => {
-    class Partial {
-      good(): string {
-        return "ok";
-      }
-    }
-    const originalGood = Partial.prototype.good;
-    expect(() =>
-      prepend(Partial.prototype, {
-        good: (s: (...args: unknown[]) => unknown) => `wrapped-${s.call(undefined)}`,
-        missing: (s: (...args: unknown[]) => unknown) => s,
-      }),
-    ).toThrow(/missing/);
-    // `good` must NOT have been wrapped — atomicity guarantee.
-    expect(Partial.prototype.good).toBe(originalGood);
   });
 
   it("second prepend on the same method chains on top of the first", () => {
