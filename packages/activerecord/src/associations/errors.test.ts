@@ -88,7 +88,7 @@ describe("AssociationErrors", () => {
       activeRecord: { name: "CpkBrokenBook" },
       name: "order",
       belongsTo: () => true,
-      associationPrimaryKey: ["shop_id", "status"],
+      associationPrimaryKey: () => ["shop_id", "status"],
       activeRecordPrimaryKey: "id",
       foreignKey: "order_id",
     };
@@ -107,7 +107,7 @@ describe("AssociationErrors", () => {
       name: "books",
       isCollection: () => true,
       activeRecordPrimaryKey: ["shop_id", "status"],
-      associationPrimaryKey: "id",
+      associationPrimaryKey: () => "id",
       foreignKey: "cpk_broken_order_id",
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);

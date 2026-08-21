@@ -187,7 +187,7 @@ export class BelongsTo extends SingularAssociation {
           klass = association.klass;
         }
         if (klass) {
-          const pk = reflection.associationPrimaryKeyFor(klass);
+          const pk = reflection.associationPrimaryKey(klass);
           const oldFkValue = fkColumns.length === 1 ? oldFkValues[0] : oldFkValues;
           const conditions = BelongsTo.buildFindConditions(pk, oldFkValue);
           if (conditions && typeof klass.findBy === "function") {

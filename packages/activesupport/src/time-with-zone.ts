@@ -113,6 +113,34 @@ type UtcConstructed = Temporal.Instant;
 /** Ruby's `Time`, whichever Temporal shape carries it. */
 type TimeLike = Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate;
 
+/**
+ * Mirrors: `ActiveSupport::TimeWithZone#respond_to_missing?` and the dispatch
+ * Ruby gets for free (time_with_zone.rb:548-557). `respond_to_missing?` is
+ * `time.respond_to?(sym, include_priv)`; the trails leading-underscore
+ * convention is what "private" means here, so an `_`-prefixed name on `time`
+ * is not answered.
+ *
+ * @noRailsEquivalent Ruby dispatches an undefined method through
+ * `method_missing` at the language level; JS has no such hook, only `Proxy`.
+ * This is the same shape `methodMissingProxy` establishes, specialized because
+ * Rails wraps the forwarded result through `wrap_with_time_zone`.
+ */
+const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
+  get(target, prop) {
+    if (Reflect.has(target, prop)) return Reflect.get(target, prop, target);
+    if (!respondToMissing(target, prop)) return undefined;
+    return (...args: unknown[]) => target.methodMissing(prop as string, ...args);
+  },
+  has(target, prop) {
+    return Reflect.has(target, prop) || respondToMissing(target, prop);
+  },
+};
+
+function respondToMissing(target: TimeWithZone, prop: string | symbol): boolean {
+  if (typeof prop !== "string" || prop.startsWith("_")) return false;
+  return typeof (target.time as unknown as Record<string, unknown>)[prop] === "function";
+}
+
 export class TimeWithZone {
   /** `@utc` — `nil` until {@link utc} derives it from `@time`. */
   private _utc: UtcConstructed | null;
@@ -143,6 +171,8 @@ export class TimeWithZone {
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
+
+    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   /**
@@ -162,6 +192,31 @@ export class TimeWithZone {
   /** UTC-zoned snapshot of the underlying instant for component access. */
   private get _utcPlain(): Temporal.PlainDateTime {
     return this.utc().toZonedDateTimeISO("UTC").toPlainDateTime();
+  }
+
+  /**
+   * Send the missing method to +time+ instance, and wrap result in a new
+   * TimeWithZone with the existing +time_zone+.
+   *
+   * Mirrors: `ActiveSupport::TimeWithZone#method_missing`
+   * (time_with_zone.rb:553-557). Ruby resolves an undefined method through
+   * `method_missing` at the language level; JS reaches it only through the
+   * `Proxy` the constructor returns (see {@link METHOD_MISSING_HANDLER}).
+   */
+  methodMissing(method: string, ...args: unknown[]): unknown {
+    const time = this.time as unknown as Record<string, unknown>;
+    try {
+      return this._wrapWithTimeZone(
+        (time[method] as (...a: unknown[]) => unknown).apply(time, args),
+      );
+    } catch (e) {
+      if (e instanceof Error && e.name === "NoMethodError") {
+        e.message = e.message
+          .replace(String(this.time), this.inspect())
+          .replace("Time", "ActiveSupport::TimeWithZone");
+      }
+      throw e;
+    }
   }
 
   /**
@@ -220,7 +275,15 @@ export class TimeWithZone {
    * (time_with_zone.rb:593-602).
    */
   private _wrapWithTimeZone(time: unknown): unknown {
-    if (ObjectExt.actsLike(time, "time")) {
+    // `time.acts_like?(:time)`. A forwarded Temporal value carries no marker
+    // method, so — as in core-ext/date-and-time/calculations.ts' `actsLike` —
+    // the arm itself is the answer: an `Instant` and a `PlainDateTime` are
+    // moments, a `PlainDate` is a calendar day.
+    if (
+      ObjectExt.actsLike(time, "time") ||
+      time instanceof Temporal.Instant ||
+      time instanceof Temporal.PlainDateTime
+    ) {
       const local = time as TimeLike;
       const periods = this.timeZone.periodsForLocal(
         this._transferTimeValuesToUtcConstructor(local),

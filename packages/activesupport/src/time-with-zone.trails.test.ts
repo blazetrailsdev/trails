@@ -3,6 +3,7 @@ import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
 import { Temporal } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
+import { Range } from "./range-ext.js";
 
 // Ruby's Time carries full nanosecond precision, so %N answers nine significant
 // digits (time_with_zone.rb:223-227 delegates strftime to that Time). These
@@ -96,5 +97,41 @@ describe("TimeWithZone local-time construction", () => {
       period,
     );
     expect(twz.zone).toBe("EDT");
+  });
+});
+
+// `method_missing` forwards to `time` and re-wraps the result
+// (time_with_zone.rb:553-557 → :593-602). trails' `time` is a Temporal wall
+// clock, and no Temporal method returns a Range, so the `..` arm of
+// `wrap_with_time_zone` is reached through a `time` that answers one — the
+// stand-in for Ruby's `Time#all_day`.
+describe("TimeWithZone method_missing", () => {
+  const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+
+  class AllDayTime extends TimeWithZone {
+    override get time(): Temporal.PlainDateTime {
+      const t = super.time;
+      const allDay = () =>
+        new Range(
+          t.with({ hour: 0, minute: 0, second: 0 }),
+          t.with({ hour: 23, minute: 59, second: 59 }),
+          true,
+        );
+      return new Proxy(t, {
+        get: (target, prop) => (prop === "allDay" ? allDay : Reflect.get(target, prop, target)),
+      });
+    }
+  }
+
+  it("rebuilds an inclusive range from a range return value", () => {
+    const twz = new AllDayTime(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+    const range = (twz as unknown as { allDay(): Range<TimeWithZone> }).allDay();
+    expect(range).toBeInstanceOf(Range);
+    // `..`, not `...`: the rebuilt range is inclusive whatever the source was.
+    expect(range.excludeEnd).toBe(false);
+    expect(range.begin).toBeInstanceOf(TimeWithZone);
+    expect(range.end).toBeInstanceOf(TimeWithZone);
+    expect(range.begin!.inspect()).toBe("1999-12-31 00:00:00.000000000 EST -05:00");
+    expect(range.end!.inspect()).toBe("1999-12-31 23:59:59.000000000 EST -05:00");
   });
 });

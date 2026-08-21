@@ -158,6 +158,12 @@ export class AbstractReflection {
     return false;
   }
 
+  protected primaryKeyForModel(klass: typeof Base): string | string[] {
+    const pk = klass.primaryKey;
+    if (!pk) throw new UnknownPrimaryKey(klass);
+    return pk;
+  }
+
   get tableName(): string {
     return this.klass.tableName;
   }
@@ -999,12 +1005,8 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
-  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
     return this.primaryKeyForModel(klass || this.klass);
-  }
-
-  get associationPrimaryKey(): string | string[] {
-    return this.associationPrimaryKeyFor();
   }
 
   get associationForeignKey(): string {
@@ -1059,12 +1061,6 @@ export class AssociationReflection extends MacroReflection {
     return this._activeRecordPrimaryKeyCache;
   }
 
-  protected primaryKeyForModel(klass: typeof Base): string | string[] {
-    const pk = klass.primaryKey;
-    if (!pk) throw new UnknownPrimaryKey(klass);
-    return pk;
-  }
-
   associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
     // Rails (`reflection.rb` AssociationReflection#association_scope_cache):
     //   key = self
@@ -1092,7 +1088,7 @@ export class AssociationReflection extends MacroReflection {
           throw new CompositePrimaryKeyMismatchError(this);
         }
       } else if (this.belongsTo()) {
-        if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
+        if (arrayLen(this.associationPrimaryKey()) !== arrayLen(fk)) {
           throw new CompositePrimaryKeyMismatchError(this);
         }
       }
@@ -1342,7 +1338,7 @@ export class BelongsToReflection extends AssociationReflection {
     return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
-  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
     const pk = this.options.primaryKey;
     if (pk !== undefined) {
       return Array.isArray(pk) ? pk.map(String) : String(pk);
@@ -1362,18 +1358,12 @@ export class BelongsToReflection extends AssociationReflection {
     return this.primaryKeyForModel(targetKlass);
   }
 
-  get associationPrimaryKey(): string | string[] {
-    return this.associationPrimaryKeyFor();
-  }
-
   /**
    * Mirrors: ActiveRecord::Reflection::BelongsToReflection#join_primary_key
    * (reflection.rb:944-946).
    */
   joinPrimaryKey(klass?: typeof Base): string | string[] {
-    return this.isPolymorphic()
-      ? this.associationPrimaryKeyFor(klass)
-      : this.associationPrimaryKeyFor();
+    return this.isPolymorphic() ? this.associationPrimaryKey(klass) : this.associationPrimaryKey();
   }
 
   get joinForeignKey(): string | string[] {
@@ -1653,8 +1643,11 @@ export class ThroughReflection extends AbstractReflection {
     );
   }
 
-  get associationPrimaryKey(): string | string[] {
-    return this.sourceReflection?.associationPrimaryKey ?? this._delegate.associationPrimaryKey;
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
+    return (
+      this.sourceReflection?.associationPrimaryKey(klass) ??
+      this._delegate.associationPrimaryKey(klass)
+    );
   }
 
   /**

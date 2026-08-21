@@ -196,7 +196,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * Resolve the record's key by the association's `association_primary_key`
    * (for a through reflection this delegates to
-   * `sourceReflection.associationPrimaryKey`, `reflection.ts:1723-1724`), not
+   * `sourceReflection.associationPrimaryKey`), not
    * the target model's own `klass.primaryKey`. Converges the delete/find
    * comparison paths in `CollectionAssociation` onto the same resolution
    * `idsReader` uses via the shared `associationPrimaryKey()` helper, so a

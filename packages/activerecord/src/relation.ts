@@ -2642,7 +2642,7 @@ export class Relation<T extends Base> {
       name = reflection.foreignKey as string;
       if (value != null) {
         value = (value as { readAttribute(n: string): unknown }).readAttribute(
-          reflection.associationPrimaryKey as string,
+          reflection.associationPrimaryKey() as string,
         );
       }
     }

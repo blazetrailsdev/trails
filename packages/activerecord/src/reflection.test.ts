@@ -634,7 +634,7 @@ describe("ReflectionTest", () => {
   it("association primary key", () => {
     const { Author, Book } = makeModels();
     const ref = reflectOnAssociation(Author, "books") as AssociationReflection;
-    expect(ref.associationPrimaryKey).toBe("id");
+    expect(ref.associationPrimaryKey()).toBe("id");
     // Custom primary key
     class SpecialBook extends Base {
       declare isbn: string | null;
@@ -649,7 +649,7 @@ describe("ReflectionTest", () => {
     registerModel("SpecialBook", SpecialBook);
     Associations.hasMany.call(Author, "specialBooks", { className: "SpecialBook" });
     const specialRef = reflectOnAssociation(Author, "specialBooks") as AssociationReflection;
-    expect(specialRef.associationPrimaryKey).toBe("isbn");
+    expect(specialRef.associationPrimaryKey()).toBe("isbn");
   });
   it("association primary key raises when missing primary key", () => {
     const reflection = createReflection(
@@ -659,7 +659,7 @@ describe("ReflectionTest", () => {
       {},
       Author,
     ) as AssociationReflection;
-    expect(() => reflection.associationPrimaryKey).toThrow(UnknownPrimaryKey);
+    expect(() => reflection.associationPrimaryKey()).toThrow(UnknownPrimaryKey);
 
     class ThroughSub extends ThroughReflection {
       get sourceReflection(): AssociationReflection {
@@ -667,7 +667,7 @@ describe("ReflectionTest", () => {
       }
     }
     const through = new ThroughSub(reflection);
-    expect(() => through.associationPrimaryKey).toThrow(UnknownPrimaryKey);
+    expect(() => through.associationPrimaryKey()).toThrow(UnknownPrimaryKey);
   });
   it("active record primary key raises when missing primary key", () => {
     const reflection = createReflection("hasMany", "author", null, {}, Edge);
@@ -1407,7 +1407,7 @@ describe("ReflectionTest", () => {
   it("association primary key uses explicit primary key option as first priority", () => {
     const ref = reflectOnAssociation(ShardedComment, "blogPostById");
     expect(ref).not.toBeNull();
-    expect(ref!.associationPrimaryKey).toBe("id");
+    expect(ref!.associationPrimaryKey()).toBe("id");
   });
 
   it("belongs to reflection with query constraints infers correct foreign key", () => {
@@ -1437,7 +1437,7 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(RfComment, "blogPost")!;
     expect(ref.foreignKey).toBe("blog_post_id");
     // BelongsTo with composite PK target should infer "id" from [:blog_id, :id]
-    expect(ref.associationPrimaryKey).toBe("id");
+    expect(ref.associationPrimaryKey()).toBe("id");
   });
 });
 
