@@ -779,11 +779,13 @@ export class HashWithIndifferentAccess<V = unknown> {
    * `Symbol === key ? key.name : key`. A Ruby Symbol is a `":name"` string in
    * trails (see CLAUDE.md), so `Symbol#name` is the string without its colon.
    * Ruby's `Symbol === key` guard passes every other object through untouched,
-   * so a non-string key (Ruby lets `h.fetch(0, 0)` through) must not be coerced
-   * or reach `String#start_with?`.
+   * so the parameter is `unknown`: a non-string key (Ruby lets `h.fetch(0, 0)`
+   * through) must not be coerced or reach `String#start_with?`. It is returned
+   * as-is, and the string return type describes the only keys the backing map
+   * can match — a non-string simply misses.
    */
-  private convertKey(key: string): string {
-    return typeof key === "string" && key.startsWith(":") ? key.slice(1) : key;
+  private convertKey(key: unknown): string {
+    return typeof key === "string" && key.startsWith(":") ? key.slice(1) : (key as string);
   }
 
   /**
