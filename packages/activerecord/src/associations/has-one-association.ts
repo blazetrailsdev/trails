@@ -3,7 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
-import { reflectOnAllAssociations } from "../reflection.js";
+import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
   foreignKeyPresentFor,
@@ -653,16 +653,20 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private nullifyOwnerAttributes(record: Base): void {
-    // Source the column list from the Rails-named helper so custom
-    // foreignKey/foreignType (incl. composite PKs and polymorphic `as`)
-    // honor the same derivation rules used by reflection itself.
-    const attrs = nullifiedOwnerAttributes(this);
-    for (const col of Object.keys(attrs)) {
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(col, null);
-      } else {
-        (record as any)[col] = null;
-      }
+    const reflection = _reflectOnAssociation(
+      this.owner.constructor as typeof Base,
+      this.reflection.name,
+    );
+    const foreignKey = reflection?.foreignKey;
+    const primaryKey = (record.constructor as typeof Base).primaryKey;
+    const primaryKeys =
+      primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    for (const foreignKeyColumn of foreignKey == null
+      ? []
+      : Array.isArray(foreignKey)
+        ? foreignKey
+        : [foreignKey]) {
+      if (!primaryKeys.includes(foreignKeyColumn)) record.writeAttribute(foreignKeyColumn, null);
     }
   }
 }

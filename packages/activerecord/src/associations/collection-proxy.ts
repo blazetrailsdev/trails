@@ -962,9 +962,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (collection_association.rb:46-48) does, then answers with the resulting
    * target the way Rails' `replace` does.
    */
-  async replace(records: T[]): Promise<T[]> {
+  async replace(otherArray: T[]): Promise<T[]> {
     const association = this._collectionAssociation();
-    const plan = association.replace(records);
+    const plan = association.replace(otherArray);
     if (plan) await association.persistReplacePlan(plan);
     return this._target;
   }
