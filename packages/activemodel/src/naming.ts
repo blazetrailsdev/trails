@@ -196,10 +196,8 @@ export class ModelName {
   match(pattern: unknown): boolean {
     if (typeof pattern === "string") pattern = new RegExp(pattern);
     if (!(pattern instanceof RegExp)) {
-      // The `rails-error-parity` rule keys on the constructor name, so it flags
-      // this throw whether the class is the global `TypeError` or the ported
-      // mirror imported above; `calculations.ts` and `cache/store.ts` carry the
-      // same suppression for the same reason.
+      // Rule keys on the constructor name, so the ported mirror trips it too —
+      // same suppression `calculations.ts` and `cache/store.ts` carry.
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`wrong argument type ${builtinClassName(pattern)} (expected Regexp)`);
     }

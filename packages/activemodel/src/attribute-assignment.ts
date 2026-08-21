@@ -68,9 +68,6 @@ export function _assignAttributes(
   attributes: Record<string, unknown>,
 ): void {
   for (const [k, v] of Object.entries(attributes)) {
-    // Ruby's loop is plain: only ActiveRecord's override
-    // (activerecord/attribute_assignment.rb:6-23) has writers that reach the
-    // database, and it chains them itself.
     void model._assignAttribute(k, v);
   }
 }

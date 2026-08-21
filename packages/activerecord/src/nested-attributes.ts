@@ -585,11 +585,9 @@ export function generateAssociationWriter(
     configurable: true,
   });
 
-  // The same writer under Ruby's own method name — the string key
-  // `"#{name}_attributes="` camelCased, which is what ActiveModel's
-  // `_assign_attribute` reaches with `public_send(setter, v)`
-  // (attribute_assignment.rb:68). A string-keyed method is not a property
-  // setter, so it can return the promise the writer owes.
+  // Rails' `#{name}_attributes=` (nested_attributes.rb:401-404) — a string key,
+  // not a property setter, so `public_send(setter, v)`
+  // (attribute_assignment.rb:68) reaches it and its promise survives.
   Object.defineProperty(modelClass.prototype, `${attrName}=`, {
     value(this: Base, value: any): Promise<void> | void {
       return assign(this, associationName, value);
