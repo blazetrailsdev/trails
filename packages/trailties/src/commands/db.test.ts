@@ -684,11 +684,11 @@ describe("discoverMigrations", () => {
 
   it("discovers migration files and extracts versions", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-create-users.ts"),
+      path.join(tmpDir, "20260101000000_create_users.ts"),
       `export class CreateUsers { version = "20260101000000"; }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "20260102000000-add-email-to-users.ts"),
+      path.join(tmpDir, "20260102000000_add_email_to_users.ts"),
       `export class AddEmailToUsers { version = "20260102000000"; }`,
     );
     fs.writeFileSync(path.join(tmpDir, "README.md"), "ignore me");
@@ -705,11 +705,11 @@ describe("discoverMigrations", () => {
 
   it("sorts migrations by version", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "20260202000000-second.ts"),
+      path.join(tmpDir, "20260202000000_second.ts"),
       `export class Second { version = "20260202000000"; }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-first.ts"),
+      path.join(tmpDir, "20260101000000_first.ts"),
       `export class First { version = "20260101000000"; }`,
     );
 
@@ -742,7 +742,7 @@ describe("full migration flow", () => {
     await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() {
@@ -803,8 +803,8 @@ export class CreatePosts extends Migration {
     adapter = new BetterSQLite3Adapter(":memory:");
     await establishMigrationConnection(adapter);
 
-    const a = "20260101000000-create-posts.ts";
-    const b = "20260102000000-create-comments.ts";
+    const a = "20260101000000_create_posts.ts";
+    const b = "20260102000000_create_comments.ts";
     fs.writeFileSync(
       path.join(tmpDir, a),
       `import { Migration } from "@blazetrails/activerecord";
@@ -857,7 +857,7 @@ export class CreateComments extends Migration {
     await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -885,7 +885,7 @@ export class CreatePosts extends Migration {
     await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-create-widgets.ts"),
+      path.join(tmpDir, "20260101000000_create_widgets.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateWidgets extends Migration {
   async up() { await this.createTable("widgets", (t) => { t.string("name"); }); }
@@ -937,7 +937,7 @@ export class CreateWidgets extends Migration {
     await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
-      path.join(tmpDir, "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1087,7 +1087,7 @@ describe("db subcommand CLI actions", () => {
 
   it("db abort_if_pending_migrations exits 1 and prints each pending", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1107,7 +1107,7 @@ export class CreatePosts extends Migration {
 
   it("db version reports the highest applied version after migrate", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1141,7 +1141,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1193,7 +1193,7 @@ export class CreatePosts extends Migration {
       ["20260101000002", "authors", "CreateAuthors"],
     ]) {
       fs.writeFileSync(
-        path.join(tmpDir, "db", "migrations", `${version}-create-${table}.ts`),
+        path.join(tmpDir, "db", "migrations", `${version}_create_${table}.ts`),
         `import { Migration } from "@blazetrails/activerecord";
 export class ${cls} extends Migration {
   async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("title"); }); }
@@ -1228,7 +1228,7 @@ export class ${cls} extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1683,7 +1683,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-widgets.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_widgets.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateWidgets extends Migration {
   async up() { await this.createTable("widgets", (t) => { t.string("name"); }); }
@@ -1737,7 +1737,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
     );
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1745,7 +1745,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -1824,7 +1824,7 @@ export class CreateDogs extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1832,7 +1832,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_test_env", "20260101000001-create-fixtures.ts"),
+      path.join(tmpDir, "db", "migrations_test_env", "20260101000001_create_fixtures.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateFixtures extends Migration {
   async up() { await this.createTable("fixtures", (t) => { t.string("label"); }); }
@@ -1886,7 +1886,7 @@ export class CreateFixtures extends Migration {
     );
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1894,7 +1894,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2079,7 +2079,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     // Primary migrations in db/migrations; animals in db/migrations_animals.
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2087,7 +2087,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2162,7 +2162,7 @@ export class CreateDogs extends Migration {
     );
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2170,7 +2170,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2210,7 +2210,7 @@ export class CreateDogs extends Migration {
     );
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2218,7 +2218,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2270,19 +2270,19 @@ export class ${cls} extends Migration {
   async down() { await this.dropTable(${JSON.stringify(table)}); }
 }`;
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000001-one-migration.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000001_one_migration.ts"),
       migration("OneMigration", "ones"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000002-two-migration.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000002_two_migration.ts"),
       migration("TwoMigration", "twos"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000003-three-migration.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000003_three_migration.ts"),
       migration("ThreeMigration", "threes"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000004-four-migration.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000004_four_migration.ts"),
       migration("FourMigration", "fours"),
     );
 
@@ -2336,7 +2336,7 @@ export class ${cls} extends Migration {
     );
     fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2344,7 +2344,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2400,7 +2400,7 @@ export class CreateDogs extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2408,7 +2408,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, customDir, "20260101000001-create-cats.ts"),
+      path.join(tmpDir, customDir, "20260101000001_create_cats.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateCats extends Migration {
   async up() { await this.createTable("cats", (t) => { t.string("breed"); }); }
@@ -2600,7 +2600,7 @@ export class CreateCats extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-things.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_things.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateThings extends Migration {
   async up() { await this.createTable("things", (t) => { t.string("name"); }); }
@@ -2630,7 +2630,7 @@ export class CreateThings extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -2687,7 +2687,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000-create-things.ts"),
+      path.join(tmpDir, "db", "migrations", "20260101000000_create_things.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateThings extends Migration {
   async up() { await this.createTable("things", (t) => { t.string("name"); }); }

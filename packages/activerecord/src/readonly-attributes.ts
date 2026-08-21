@@ -187,5 +187,4 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
 export const ClassMethods = {
   attrReadonly,
   readonlyAttributeQ,
-  isReadonlyAttribute: readonlyAttributeQ,
 };

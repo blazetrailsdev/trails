@@ -9,15 +9,14 @@
  * `@replaced_or_added_targets` only because of the `inversing ||` arm — without
  * it a later add of the same record misses the `:458` index lookup and appends
  * a duplicate instead of replacing in place. This locks that arm: drop
- * `inversing: true` from `CollectionProxy#_wireInverseTarget`'s
- * `_replaceOnTarget` call, or the `inversing ||` factor from the set-add guard,
- * and the second add appends a duplicate.
+ * `inversing: true` from `CollectionAssociation#target=`'s `replaceOnTarget`
+ * call, or the `inversing ||` factor from the set-add guard, and the second add
+ * appends a duplicate.
  */
 import { describe, it, expect } from "vitest";
 import { Base, association } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
-import { Human } from "../test-helpers/models/human.js";
 import { Interest } from "../test-helpers/models/interest.js";
 
 async function withHasManyInversing(model: typeof Base, fn: () => Promise<void>): Promise<void> {
@@ -35,7 +34,11 @@ describe("replace_on_target inversing (trails)", () => {
   const { interests } = fixtures(["humans", "interests"]);
 
   it("tracks a persisted record added through the inversing path so a later add replaces in place", async () => {
-    await withHasManyInversing(Human, async () => {
+    // `has_many_inversing` is a global `class_attribute` in Rails, and both
+    // gates on this path read it off a different class: the belongs_to's
+    // `invertible_for?` off `Human`, `CollectionAssociation#target=` off
+    // `Human#interests`' own klass, `Interest`. Seat it on `Base`.
+    await withHasManyInversing(Base, async () => {
       const interest = interests("trainspotting") as Base & { id: number };
       const human = (await loadSingularTarget(interest, "human")) as Base & {
         _associationCache(name: string): { target: Base[] } | undefined;

@@ -555,16 +555,21 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
   // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:159):
   // when the inverse is a has_many, wiring is gated on `klass.has_many_inversing`.
-  // Without the flag, Rails does NOT touch the parent collection. Route the
-  // write through the proxy's `_wireInverseTarget` so the in-memory target and
-  // `@replaced_or_added_targets` are maintained in one place (the proxy). This removes the C2 (#2591)
-  // seam that used to reach into `proxy._replacedOrAddedTargets` from here.
+  // Without the flag, Rails does NOT touch the parent collection. With it, the
+  // write is `set_inverse_instance`'s own `inverse.inversed_from(owner)`
+  // (association.rb:132-137, 153-155), whose `self.target = record` reaches
+  // `CollectionAssociation#target=` (collection_association.rb:284-296) and so
+  // `replace_on_target(record, true, replace: true, inversing: true)`.
   if (inverseRefl?.macro === "hasMany") {
     if (!childCtor.hasManyInversing) return;
-    const proxy = association(child, inverseName) as unknown as {
-      _wireInverseTarget: (record: Base) => void;
-    };
-    proxy._wireInverseTarget(owner);
+    // Rails resolves the inverse with a bare `record.association(name)`; in
+    // trails a has_many's canonical target lives on its `CollectionProxy`
+    // (`Base#_associationCache`), so resolving it means materializing that
+    // proxy as well as the association object `inversed_from` is sent to.
+    association(child, inverseName);
+    (
+      child.association(inverseName) as unknown as { inversedFrom(record: Base): void }
+    ).inversedFrom(owner);
     return;
   }
   _cacheSingularTarget(child, inverseName, owner);

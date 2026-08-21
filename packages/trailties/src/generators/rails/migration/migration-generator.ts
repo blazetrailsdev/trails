@@ -7,7 +7,7 @@ import {
   tsModule,
 } from "../../../template-builder/index.js";
 import { NamedBase } from "../../named-base.js";
-import { classify, dasherize, migrationTimestamp } from "../../base.js";
+import { classify, migrationTimestamp } from "../../base.js";
 
 // Mirrors railties/lib/rails/generators/rails/migration/migration_generator.rb.
 // hook_for :orm defers to the ORM-provided generator. This skeleton emits a
@@ -55,7 +55,7 @@ export class MigrationGenerator extends NamedBase {
       timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
     }
     lastTimestamp = timestamp;
-    const filename = `db/migrations/${timestamp}-${dasherize(this.fileName)}${this.ext()}`;
+    const filename = `db/migrations/${timestamp}_${this.fileName}${this.ext()}`;
     this.createFile(filename, emitMigrationSource(classify(this.fileName), timestamp));
     return this.getCreatedFiles();
   }

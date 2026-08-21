@@ -455,15 +455,13 @@ export function retrieveConnection(this: typeof Base): Promise<DatabaseAdapter> 
   });
 }
 
-export function isConnectedQ(this: typeof Base): boolean {
+export function connectedQ(this: typeof Base): boolean {
   const name = connectionSpecificationName.call(this);
   return this.connectionHandler.isConnected(name, {
     role: coreCurrentRole.call(this as any),
     shard: coreCurrentShard.call(this as any),
   });
 }
-
-export const isConnected = isConnectedQ;
 
 const CONNECTION_DEPRECATION_MSG =
   "Called deprecated `ActiveRecord::Base.connection` method. " +
@@ -987,8 +985,7 @@ export const ClassMethods = {
   connectionDbConfig,
   connectionPool,
   retrieveConnection,
-  isConnectedQ,
-  isConnected,
+  connectedQ,
   connection,
   isPrimaryClass,
   adapterClass,

@@ -112,7 +112,7 @@ export const ClassMethods = {
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
    */
   async cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
-    if (this.isConnected() || !this.configurations().empty) {
+    if (this.connectedQ() || !this.configurations().empty) {
       const pool = this.connectionPool();
       const wasEnabled = pool.queryCacheEnabled;
       try {
@@ -135,7 +135,7 @@ export const ClassMethods = {
     block: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
   ): Promise<T> {
-    if (this.isConnected() || !this.configurations().empty) {
+    if (this.connectedQ() || !this.configurations().empty) {
       return this.connectionPool().disableQueryCache(block, options);
     }
     return Promise.resolve(block());

@@ -11,12 +11,12 @@ describe("ActiveRecordTest", () => {
   // in-memory SQLite database discards its schema.
   it.skipIf(inMemoryDb())(".disconnect_all! closes all connections", async () => {
     await (await Base.leaseConnection()).connectBang();
-    expect(Base.isConnectedQ()).toBe(true);
+    expect(Base.connectedQ()).toBe(true);
 
     await disconnectAllBang();
-    expect(Base.isConnectedQ()).toBe(false);
+    expect(Base.connectedQ()).toBe(false);
 
     await (await Base.leaseConnection()).connectBang();
-    expect(Base.isConnectedQ()).toBe(true);
+    expect(Base.connectedQ()).toBe(true);
   });
 });

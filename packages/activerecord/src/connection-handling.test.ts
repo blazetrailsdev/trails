@@ -308,7 +308,7 @@ describe("ConnectionHandlingTest", () => {
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
     await (await pool.leaseConnection()).verifyBang();
-    expect(Base.isConnectedQ()).toBe(true);
+    expect(Base.connectedQ()).toBe(true);
     pool.releaseConnection();
   });
 
@@ -459,10 +459,6 @@ describe("ConnectionHandlingTest", () => {
     expect(results).toContain("task2: writing");
     expect(currentRole.call(Base)).toBe("writing");
     expect(connectedToStack()).toHaveLength(0);
-  });
-
-  it("#isConnected delegates to isConnectedQ", async () => {
-    expect(Base.isConnected()).toBe(Base.isConnectedQ());
   });
 
   it("#connection leases a connection when none is active", async () => {

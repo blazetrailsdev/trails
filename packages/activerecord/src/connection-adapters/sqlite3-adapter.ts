@@ -1692,7 +1692,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
+    // An unqualified `DROP INDEX` name resolves across main, temp and every
+    // ATTACHed database in attach order, so two schemas carrying the same index
+    // name would have this drop whichever SQLite reaches first. Name the
+    // catalog, the same qualified/unqualified fork
+    // `SQLite3::SchemaCreation#visit_CreateIndexDefinition` takes on create.
+    const { schema } = this._splitTableName(tableName);
+    const qualified =
+      schema === ""
+        ? quoteColumnName(indexName)
+        : `${quoteColumnName(schema)}.${quoteColumnName(indexName)}`;
+
+    await this.execQuery(`DROP INDEX ${qualified}`);
   }
 
   createSchemaDumper(
