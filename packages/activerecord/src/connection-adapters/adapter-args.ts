@@ -128,8 +128,8 @@ export function parseSqliteUrl(url: string): string {
  *  - PG/MySQL: `[config]` — single config object (or URL string).
  *
  * Mirrors the inline normalization in `connectsTo` / `establishWithConfig`
- * and is the resolver used by {@link ConnectionPool#newConnection} when no
- * `adapterFactory` is provided.
+ * and is the resolver {@link ConnectionPool#newConnection} builds every
+ * connection through.
  */
 export function buildAdapterArg(
   adapterName: string,
@@ -156,6 +156,7 @@ export function buildAdapterArg(
       driver,
       pragmas,
       strict,
+      foreignKeys,
       timeout,
       retries,
       statementLimit,
@@ -169,6 +170,9 @@ export function buildAdapterArg(
     if (driver !== undefined) options.driver = driver;
     if (pragmas !== undefined) options.pragmas = pragmas;
     if (strict !== undefined) options.strict = strict;
+    // `DEFAULT_PRAGMAS["foreign_keys"]` (sqlite3_adapter.rb:84-85) — a config
+    // key the adapter reads, so it belongs in the options it is built with.
+    if (foreignKeys !== undefined) options.foreignKeys = foreignKeys;
     // Rails' SQLite3Adapter reads `@config[:timeout]` and applies it as the
     // driver's busy timeout (sqlite3_adapter.rb:821-826); `config.example.yml:84`
     // sets it on both arunit entries.

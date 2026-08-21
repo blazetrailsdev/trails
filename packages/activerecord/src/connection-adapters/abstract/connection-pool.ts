@@ -391,8 +391,8 @@ export class ConnectionPool implements ReapablePool {
    * Resolves once the adapter class for this pool has been loaded by the
    * async ConnectionAdapters resolver. Set by sync entry points like
    * `connectsTo` so callers can await preload before issuing real queries;
-   * defaults to a resolved promise for pools whose adapterFactory is
-   * supplied directly.
+   * defaults to a resolved promise until `establish_connection` kicks the
+   * async adapter resolve off.
    *
    * @internal Adapter-loading plumbing, not a Rails surface: Rails' `require` is
    * synchronous, so `establish_connection` returns with the adapter class
@@ -1337,15 +1337,9 @@ export class ConnectionPool implements ReapablePool {
    *     connection
    *   end
    *
-   * Falls back to `poolConfig.adapterFactory` when one is given (trails-
-   * specific extension for tests that need to inject a specific adapter
-   * instance), but the default path now delegates to `dbConfig.newConnection`
-   * just like Rails.
    */
   newConnection(): DatabaseAdapter {
-    const conn = this.poolConfig.adapterFactory
-      ? this.poolConfig.adapterFactory()
-      : (this.dbConfig.newConnection() as DatabaseAdapter);
+    const conn = this.dbConfig.newConnection() as DatabaseAdapter;
     // Set the back-reference so AbstractAdapter#schemaCache can reach
     // pool.poolConfig.schemaCache to share the raw SchemaCache across
     // every connection in this pool. Rails' AbstractAdapter has the

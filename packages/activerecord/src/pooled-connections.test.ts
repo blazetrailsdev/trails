@@ -3,20 +3,17 @@ import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.j
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter } from "./test-adapter.js";
+import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { ConnectionTimeoutError } from "./errors.js";
 
 function establishConnection(poolSize: number, checkoutTimeout: number): ConnectionPool {
   const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
+    ...rawTestAdapterConfiguration(),
     pool: poolSize,
     checkoutTimeout,
     reapingFrequency: null,
   });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: newRawTestAdapter,
-  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
   return new ConnectionPool(pc);
 }
 

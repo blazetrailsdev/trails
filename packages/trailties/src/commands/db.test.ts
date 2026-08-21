@@ -52,21 +52,30 @@ import * as os from "node:os";
 // (migration.rb:1036-1038, 1488-1491) — nothing pins an adapter to the
 // Migrator any more — so a case that drives a hand-built adapter has to
 // establish it as the migration pool's connection for the duration.
+let migrationAdapters = 0;
 async function establishMigrationConnection(
   adapter: unknown,
   database = ":memory:",
   extra: Record<string, unknown> = {},
 ): Promise<void> {
-  const { Base, HashConfig } = await import("@blazetrails/activerecord");
+  const { Base, HashConfig, ConnectionAdapters } = await import("@blazetrails/activerecord");
+  const adapterName = `sqlite3_migration_${(migrationAdapters += 1)}`;
+  ConnectionAdapters.register(
+    adapterName,
+    async () =>
+      function () {
+        return adapter;
+      } as never,
+  );
+  await ConnectionAdapters.resolve(adapterName);
   const config = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
+    adapter: adapterName,
     database,
     ...extra,
   });
   const pool = Base.connectionHandler.establishConnection(config, {
     ownerName: Base,
     clobber: true,
-    adapterFactory: () => adapter as never,
   });
   // Lease eagerly so the adapter's `pool` back-reference is in place before the
   // caller reads or overrides it (`record_environment` goes through

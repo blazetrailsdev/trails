@@ -1308,8 +1308,8 @@ export class DatabaseTasks {
         clobber,
       });
       // Deviation: ESM cannot import synchronously, so the handler resolves the
-      // adapter class through a dynamic `import()` when given no adapterFactory
-      // (connection-handler.ts:181-186) and the pool is not leasable until it
+      // adapter class through a dynamic `import()`
+      // (connection-handler.ts:178-186) and the pool is not leasable until it
       // settles. Ruby resolves the constant inline at :543.
       await pool.adapterReady;
       return await fn(pool);

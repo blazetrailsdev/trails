@@ -9,22 +9,9 @@ import {
   DatabaseConfig,
   _setConfigurationHash,
 } from "./database-configurations/database-config.js";
-import {
-  resolve as resolveConnectionAdapter,
-  resolveSync as resolveConnectionAdapterSync,
-} from "./connection-adapters.js";
-import {
-  adapterNameFromUrl,
-  buildAdapterArg,
-  normalizeAdapterName,
-  parseSqliteUrl,
-} from "./connection-adapters/adapter-args.js";
-import {
-  AdapterNotSpecified,
-  ConnectionNotEstablished,
-  NotImplementedError,
-  ActiveRecordError,
-} from "./errors.js";
+import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
+import { adapterNameFromUrl } from "./connection-adapters/adapter-args.js";
+import { AdapterNotSpecified, NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -130,42 +117,11 @@ export function connectsTo(
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
-      const adapterName = dbConfig.adapter ?? "";
-      const adapterArg = buildAdapterArg(adapterName, dbConfig.configuration);
-      // Kick off async load so the sync adapter cache is populated by the
-      // time the pool first asks for a connection. The returned promise is
-      // attached to the pool as `adapterReady` so callers running real
-      // queries can await it before leaseConnection(). Capture any
-      // rejection in `loadError` so the sync factory below can surface the
-      // real cause (AdapterNotFound, loader import error, ...) instead of
-      // a generic "not preloaded" message — and swallow the rejection on a
-      // detached `.catch` so callers that never await `adapterReady` don't
-      // trip an unhandled-promise warning.
-      let loadError: unknown = null;
-      const adapterReady: Promise<unknown> = adapterName
-        ? resolveConnectionAdapter(adapterName).catch((err) => {
-            loadError = err;
-            throw err;
-          })
-        : Promise.resolve(null);
-      adapterReady.catch(() => {});
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         ownerName: this.connectionClassForSelf(),
         role,
         shard,
-        adapterFactory: () => {
-          if (loadError) throw loadError;
-          const AdapterClass = resolveConnectionAdapterSync(adapterName);
-          if (!AdapterClass) {
-            throw new ConnectionNotEstablished(
-              `Adapter ${adapterName || "(missing)"} for ${this.name} pool not preloaded; ` +
-                `await the pool's \`adapterReady\` promise after \`connectsTo\` returns.`,
-            );
-          }
-          return new AdapterClass(...adapterArg);
-        },
       });
-      pool.adapterReady = adapterReady;
       connections.push(pool);
     }
   }
@@ -884,22 +840,12 @@ async function establishWithConfig(
   config?: Record<string, unknown>,
   dbConfigOverride?: DatabaseConfig,
 ): Promise<void> {
-  const normalized = normalizeAdapterName(adapterName);
-  // Pass the original adapter name to the registry so caller overrides
-  // like register("mysql2", ...) aren't shadowed by normalization.
-  const AdapterClass = await _loadAdapter(adapterName);
-
-  // For SQLite, preserve adapter options (pragmas, strict, readonly, driver,
-  // etc.) by routing through buildAdapterArg whenever a config hash is given;
-  // bare-URL inputs fall through to the simple filename path.
-  let adapterArgs: unknown[];
-  if (config) {
-    adapterArgs = buildAdapterArg(adapterName, config);
-  } else if (normalized === "sqlite") {
-    adapterArgs = [parseSqliteUrl(url || ":memory:")];
-  } else {
-    adapterArgs = [url];
-  }
+  // No Rails counterpart: Ruby's `require` is synchronous, so
+  // `db_config.new_connection` names the adapter class with no preceding load.
+  // Warming the sync cache here is what keeps `ConnectionPool#new_connection`
+  // synchronous. The original (un-normalized) name goes to the registry so a
+  // caller override like `register("mysql2", ...)` is not shadowed.
+  await _loadAdapter(adapterName);
 
   // Mirror Rails' db_config_handler (database_configurations.rb:65-70):
   // `url ? UrlConfig.new(env, name, url, config) : HashConfig.new(...)`.
@@ -943,8 +889,6 @@ async function establishWithConfig(
     ownerName: modelClass.connectionClassForSelf(),
     role,
     shard,
-    adapterFactory: () =>
-      new (AdapterClass as new (...args: unknown[]) => DatabaseAdapter)(...adapterArgs),
   });
 }
 

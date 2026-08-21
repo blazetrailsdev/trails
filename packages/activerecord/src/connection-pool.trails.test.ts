@@ -25,7 +25,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter, ambientPoolConfiguration, adapterType } from "./test-adapter.js";
+import { adapterType, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
@@ -47,19 +47,17 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
  */
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
-    ...ambientPoolConfiguration(),
+    ...rawTestAdapterConfiguration(),
     checkoutTimeout: 0.2,
     reapingFrequency: null,
     ...overrides,
   });
 }
 
-/** Build a pool-under-test from the ambient lane config + adapter factory. */
+/** Build a pool-under-test from the ambient lane config. */
 function makeAmbientPool(overrides: Record<string, unknown> = {}): ConnectionPool {
   const dbConfig = makeAmbientDbConfig(overrides);
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: newRawTestAdapter,
-  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
   return new ConnectionPool(pc);
 }
 
@@ -771,7 +769,6 @@ describe("ConnectionPool schema cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: newRawTestAdapter },
       );
       expect(
         (pc.schemaReflection as unknown as { _cachePath: string | null })._cachePath,
@@ -794,7 +791,6 @@ describe("ConnectionPool schema cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: newRawTestAdapter },
       );
       const cachePath = (pc.schemaReflection as unknown as { _cachePath: string | null })
         ._cachePath;
@@ -810,9 +806,7 @@ describe("ConnectionPool schema cache", () => {
     // (or defaultSchemaCachePath fallback), which the reflection
     // remembers for its first on-disk load.
     const dbConfig = makeAmbientDbConfig({ schemaCachePath: "db/custom_cache.json" });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: newRawTestAdapter,
-    });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
     const reflection = pc.schemaReflection;
     expect(reflection).toBeInstanceOf(SchemaReflection);
     // Internal state check: the cache path reached the reflection.
@@ -1072,7 +1066,6 @@ describe("ConnectionPoolConfiguration query cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: newRawTestAdapter },
       );
       const pool = new ConnectionPool(pc);
       const max = (pool.queryCache as unknown as { _maxSize: number })._maxSize;

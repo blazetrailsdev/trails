@@ -51,44 +51,12 @@ export class ThroughAssociation extends Association {
     return this._throughPreloadedRecords;
   }
 
+  /** Mirrors: Preloader::ThroughAssociation#records_by_owner
+   *  (`preloader/through_association.rb:11-37`). */
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
     const result = new Map<Base, Base[]>();
-
-    // When every owner already carries this association loaded — e.g. an outer
-    // through query eager-loaded this source sub-chain via `includes!`/
-    // `references!`, so the middle records arrive with their source association
-    // populated — return those targets directly. This is the hoisted
-    // loop-invariant of Rails' `records_by_owner`
-    // (preloader/through_association.rb:11-15): if every owner is loaded, every
-    // iteration takes the early `next`, so `through_records_by_owner` /
-    // `source_records_by_owner` are never forced and no fetch happens. The
-    // per-owner `isLoaded` check inside our loop only avoids re-associating, not
-    // the unconditional fetch above it, so the guard must be hoisted here.
-    if (this.owners.length > 0 && this.owners.every((owner) => this.isLoaded(owner))) {
-      for (const owner of this.owners) {
-        result.set(owner, this.targetFor(owner));
-      }
-      this._recordsByOwner = result;
-      return result;
-    }
-
-    const throughRecordsByOwner = await this.throughRecordsByOwner();
-    const sourceRecordsByOwner = await this.sourceRecordsByOwner();
-
-    const throughRefl = this.throughReflection;
-    const firstOwner = this.owners[0] as any;
-    const throughLoadedOnFirst =
-      throughRefl != null &&
-      firstOwner != null &&
-      (() => {
-        try {
-          return !!firstOwner.association?.(throughRefl.name)?.loaded;
-        } catch {
-          return false;
-        }
-      })();
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -96,38 +64,33 @@ export class ThroughAssociation extends Association {
         continue;
       }
 
-      let throughRecords = throughRecordsByOwner.get(owner) ?? [];
+      let throughRecords = (await this.throughRecordsByOwner()).get(owner) ?? [];
 
-      if (throughLoadedOnFirst) {
-        const sourceType = (this.reflection as any).options?.sourceType;
-        const foreignType =
-          (this.reflection as any).foreignType ?? (this.sourceReflection as any)?.foreignType;
-        if (sourceType && foreignType) {
+      if (this.owners[0].association(this.throughReflection!.name).loaded) {
+        const sourceType = this.reflection.options.sourceType;
+        if (sourceType) {
           throughRecords = throughRecords.filter(
-            (record) => (record as any)._readAttribute(foreignType) === sourceType,
+            (record) => record.readAttribute(this.reflection.foreignType!) === sourceType,
           );
         }
       }
 
-      let records = throughRecords.flatMap((tr) => sourceRecordsByOwner.get(tr) ?? []);
-      records = records.filter((r) => r != null);
+      const sourceRecordsByOwner = await this.sourceRecordsByOwner();
+      let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
 
-      // Preserve scope ordering via preload index
+      records = records.filter((record) => record != null);
       if (this.scope?.orderValues?.length > 0) {
-        const index = await this.preloadIndex();
-        records.sort((a, b) => (index.get(a) ?? 0) - (index.get(b) ?? 0));
+        const preloadIndex = await this.preloadIndex();
+        records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
       }
-
-      // Apply distinct
       if (this.scope?.distinctValue) {
         const seen = new Set<Base>();
-        records = records.filter((r) => {
-          if (seen.has(r)) return false;
-          seen.add(r);
+        records = records.filter((rhs) => {
+          if (seen.has(rhs)) return false;
+          seen.add(rhs);
           return true;
         });
       }
-
       result.set(owner, records);
     }
 

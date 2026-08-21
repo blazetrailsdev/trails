@@ -10,6 +10,21 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
+import { register, resolve } from "./connection-adapters.js";
+
+let registeredTestAdapters = 0;
+async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string> {
+  const adapter = `sqlite3_test_${(registeredTestAdapters += 1)}`;
+  register(
+    adapter,
+    async () =>
+      function () {
+        return build();
+      } as unknown as new () => DatabaseAdapter,
+  );
+  await resolve(adapter);
+  return adapter;
+}
 
 // Async-only drivers (no `openSync()`) exercising the async construction path
 // the way expo-sqlite / WASM drivers do, backed by better-sqlite3 so they run
@@ -232,18 +247,16 @@ describe("SQLite adapter driver binding", () => {
     // End-to-end: ConnectionPool#checkout is synchronous and hands back the
     // freshly-constructed (still-pending) adapter without awaiting the open.
     // The first query on the checked-out connection must complete it.
-    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const adapter = await registerTestAdapter(
+      () =>
+        new SQLite3Adapter(":memory:", { driver: asyncOnlyDriver }) as unknown as DatabaseAdapter,
+    );
+    const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
       new ConnectionDescriptor("primary"),
       dbConfig,
       "writing",
       "default",
-      {
-        adapterFactory: () =>
-          new SQLite3Adapter(":memory:", {
-            driver: asyncOnlyDriver,
-          }) as unknown as DatabaseAdapter,
-      },
     );
     const pool = new ConnectionPool(poolConfig);
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
@@ -286,16 +299,15 @@ describe("SQLite adapter driver binding", () => {
         },
       });
     });
-    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const adapter = await registerTestAdapter(
+      () => new SQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
+    );
+    const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
       new ConnectionDescriptor("primary"),
       dbConfig,
       "writing",
       "default",
-      {
-        adapterFactory: () =>
-          new SQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
-      },
     );
     const pool = new ConnectionPool(poolConfig);
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
@@ -313,18 +325,18 @@ describe("SQLite adapter driver binding", () => {
   it("pool disconnect no-ops to a resolved promise for a sync driver", async () => {
     // better-sqlite3 closes synchronously inside disconnectBang(); the drain
     // contributes nothing and disconnect() still resolves.
-    const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    const adapter = await registerTestAdapter(
+      () =>
+        new SQLite3Adapter(":memory:", {
+          driver: betterSqlite3Driver,
+        }) as unknown as DatabaseAdapter,
+    );
+    const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
       new ConnectionDescriptor("primary"),
       dbConfig,
       "writing",
       "default",
-      {
-        adapterFactory: () =>
-          new SQLite3Adapter(":memory:", {
-            driver: betterSqlite3Driver,
-          }) as unknown as DatabaseAdapter,
-      },
     );
     const pool = new ConnectionPool(poolConfig);
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
@@ -370,20 +382,17 @@ describe("SQLite adapter driver binding", () => {
     return { driver, release: () => resolveClose(), isClosed: () => closed };
   };
 
-  const makePoolConfig = (adapterFactory: () => DatabaseAdapter): PoolConfig =>
+  const makePoolConfig = async (build: () => DatabaseAdapter): Promise<PoolConfig> =>
     new PoolConfig(
       new ConnectionDescriptor("primary"),
-      new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-      }),
+      new HashConfig("test", "primary", { adapter: await registerTestAdapter(build) }),
       "writing",
       "default",
-      { adapterFactory },
     );
 
   it("pool clearReloadableConnections drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
-    const poolConfig = makePoolConfig(
+    const poolConfig = await makePoolConfig(
       () =>
         new Proxy(new SQLite3Adapter(":memory:", { driver }), {
           get(target, prop, receiver) {
@@ -410,7 +419,7 @@ describe("SQLite adapter driver binding", () => {
   it("pool flushBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
-      makePoolConfig(
+      await makePoolConfig(
         () => new SQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
       ),
     );
@@ -429,7 +438,7 @@ describe("SQLite adapter driver binding", () => {
   it("pool discardBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
-      makePoolConfig(
+      await makePoolConfig(
         () => new SQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
       ),
     );
@@ -452,7 +461,7 @@ describe("SQLite adapter driver binding", () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     let failCheckout = false;
     const pool = new ConnectionPool(
-      makePoolConfig(
+      await makePoolConfig(
         () =>
           new Proxy(new SQLite3Adapter(":memory:", { driver }), {
             get(target, prop, receiver) {
@@ -486,7 +495,7 @@ describe("SQLite adapter driver binding", () => {
     // better-sqlite3 closes synchronously inside disconnectBang(); each async
     // seam variant contributes nothing and resolves immediately.
     const pool = new ConnectionPool(
-      makePoolConfig(
+      await makePoolConfig(
         () =>
           new SQLite3Adapter(":memory:", {
             driver: betterSqlite3Driver,

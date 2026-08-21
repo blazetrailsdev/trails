@@ -7,7 +7,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type {
@@ -17,16 +17,16 @@ import type {
 import { Result } from "./result.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
+import { register, resolve } from "./connection-adapters.js";
 
 interface AmbientPoolOptions {
   role?: string;
   shard?: string;
-  adapterFactory?: () => DatabaseAdapter;
 }
 
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
-    ...ambientPoolConfiguration(),
+    ...rawTestAdapterConfiguration(),
     checkoutTimeout: 0.2,
     reapingFrequency: null,
     ...overrides,
@@ -35,18 +35,13 @@ function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfi
 
 function makeAmbientPool(
   overrides: Record<string, unknown> = {},
-  {
-    role = "writing",
-    shard = "default",
-    adapterFactory = newRawTestAdapter,
-  }: AmbientPoolOptions = {},
+  { role = "writing", shard = "default" }: AmbientPoolOptions = {},
 ): ConnectionPool {
   const pc = new PoolConfig(
     new ConnectionDescriptor("primary"),
     makeAmbientDbConfig(overrides),
     role,
     shard,
-    { adapterFactory },
   );
   return new ConnectionPool(pc);
 }
@@ -124,11 +119,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
 }
 
+register("transaction_aware_test", async () => TransactionAwareTestAdapter);
+await resolve("transaction_aware_test");
+
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  return makeAmbientPool(
-    { pool: size },
-    { adapterFactory: () => new TransactionAwareTestAdapter() },
-  );
+  return makeAmbientPool({ adapter: "transaction_aware_test", pool: size });
 }
 
 it("checkout after close", async () => {
