@@ -12,8 +12,9 @@
  * concerns that register, so holding the registry in `model-schema.ts` itself
  * evaluates `registerLoadSchemaOverride` while its `const` is still in TDZ.
  *
- * @noRailsEquivalent Ruby `super` over an included module; see CLAUDE.md
- * "Module mixins".
+ * @noRailsEquivalent PERMANENT — a TS class cannot splice a module into its
+ * ancestor chain, so Ruby `super` over an included module has no direct
+ * spelling; see CLAUDE.md "Module mixins".
  */
 
 /**
@@ -25,8 +26,9 @@ export type LoadSchemaOverride = (this: unknown, superFn: () => void) => void;
 /**
  * Sorted ascending by `includeOrder`, i.e. by Rails' ancestor position.
  *
- * @noRailsEquivalent Ruby `super` over an included module; see CLAUDE.md
- * "Module mixins".
+ * @noRailsEquivalent PERMANENT — a TS class cannot splice a module into its
+ * ancestor chain, so Ruby `super` over an included module has no direct
+ * spelling; see CLAUDE.md "Module mixins".
  */
 export const loadSchemaOverrides: Array<{
   includeOrder: number;
@@ -38,8 +40,9 @@ export const loadSchemaOverrides: Array<{
  * `include` line in `activerecord/lib/active_record/base.rb`, which is what
  * fixes its position in Ruby's ancestor chain.
  *
- * @noRailsEquivalent Ruby `super` over an included module; see CLAUDE.md
- * "Module mixins".
+ * @noRailsEquivalent PERMANENT — a TS class cannot splice a module into its
+ * ancestor chain, so Ruby `super` over an included module has no direct
+ * spelling; see CLAUDE.md "Module mixins".
  */
 export function registerLoadSchemaOverride(
   includeOrder: number,
