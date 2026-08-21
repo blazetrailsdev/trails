@@ -1386,10 +1386,10 @@ function applyColumnsHash(
  * overwritten, matching Rails where the pending replay runs after the column
  * seed so `attribute :foo, :bar` always wins over the reflected type.
  *
- * This IS `ModelSchema#load_schema!`'s body on the async path, so it ends by
- * running the concern overrides (counter_cache.rb:186-195,
- * encryptable_record.rb:126-130) over an already-completed anchor rather than
- * re-entering `loadSchemaBang`.
+ * This is the async half of `schema_cache.columns_hash` (schema_cache.rb):
+ * it warms the cache and then enters the single `load_schema!` body, so the
+ * concern overrides (counter_cache.rb:186-195, encryptable_record.rb:126-130)
+ * run over a real anchor.
  *
  * @internal
  */
@@ -1445,15 +1445,11 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
-  applyColumnsHash(this, startingAdapter, hash);
-  // Rails' `load_schema` sets `@schema_loaded = true` before returning
-  // (model_schema.rb:534-546), and the reflected columns just applied are the
-  // authoritative ones — so mark the load settled before the generation hook,
-  // whose `define_attribute_methods` calls `load_schema` first
-  // (attribute_methods.rb:114) and would otherwise re-enter this load.
-  this._schemaLoaded = true;
-  defineAttributeMethodsAfterLoad(this);
-  runLoadSchemaChain(this, () => {});
+  // The cache is warm now, so `load_schema!` — the one body, chain and all —
+  // reflects from it exactly as it does on the sync path
+  // (model_schema.rb:534-546 puts the cache-vs-adapter distinction inside
+  // `schema_cache.columns_hash`, not in a second `load_schema!`).
+  loadSchemaBang.call(this);
 }
 
 /**

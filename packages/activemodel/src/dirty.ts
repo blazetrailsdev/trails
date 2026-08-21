@@ -43,12 +43,14 @@ export interface Dirty {
  *   end
  *
  * Trails consolidates Rails' two mutation trackers into a single
- * `DirtyTracker`, so a fresh tracker is the equivalent reset.
- * Called from the Model constructor.
+ * `DirtyTracker`, so a fresh tracker is the equivalent reset. Ruby's `super`
+ * is `super_`, the link `prepend()` hands the module (model.ts wires the
+ * chain in include order); the Model constructor enters it.
  *
  * @internal Rails-private helper.
  */
-export function initInternals(this: DirtyInternalsHost): void {
+export function initInternals(this: DirtyInternalsHost, super_: () => void): void {
+  super_.call(this);
   this._dirty = new DirtyTracker();
 }
 
@@ -639,11 +641,17 @@ export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string):
  * so writing to one no longer marks the other dirty. Rails nils the ivar and lets
  * it rebuild from the deep-dup'd `@attributes`, which reproduces the source's
  * `changes` on the copy; {@link DirtyTracker.deepDup} is that rebuild, since a
- * fresh empty tracker would instead wipe pending changes.
+ * fresh empty tracker would instead wipe pending changes. Ruby's `super` is
+ * `super_`, the link `prepend()` hands the module.
  *
  * @internal Rails-private helper.
  */
-export function initializeDup(this: DirtyDupHost, _other: unknown): void {
+export function initializeDup(
+  this: DirtyDupHost,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  super_.call(this, other);
   this._dirty = this._dirty.deepDup(this._attributes);
 }
 

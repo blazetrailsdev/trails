@@ -7,6 +7,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
+import { rbEqual } from "./rb-equal.js";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import { inspect } from "./core-ext/object/inspect.js";
@@ -380,14 +381,15 @@ export class Duration {
   /**
    * Mirrors: ActiveSupport::Duration#== (duration.rb:341-347) — another
    * Duration with the same `value`, or `other == value` for anything else, so
-   * `2.days == 172800` is true. `value` is seconds, a JS number, and Ruby
-   * `==` on it is numeric equality.
+   * `2.days == 172800` is true. The else arm is a `==` SEND to `other`, so a
+   * receiver that answers `==` against a number (a `Scalar`) decides it —
+   * `rbEqual` is that dispatch. `value` is seconds, a JS number.
    */
   equals(other: unknown): boolean {
     if (other instanceof Duration) {
       return other.value === this.value;
     } else {
-      return other === this.value;
+      return rbEqual(other, this.value);
     }
   }
 
@@ -880,6 +882,21 @@ export class Scalar {
     throw new TypeError(
       `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Scalar`,
     );
+  }
+
+  /**
+   * Mirrors: Comparable#== over ActiveSupport::Duration::Scalar#<=>
+   * (duration.rb:31-38) — `Scalar < Numeric` includes Comparable, so `==` is
+   * `(self <=> other) == 0` and `Scalar.new(172800) == 172800` is true.
+   */
+  equals(other: unknown): boolean {
+    if (other instanceof Scalar || other instanceof Duration) {
+      return this.value === other.value;
+    } else if (typeof other === "number") {
+      return this.value === other;
+    } else {
+      return false;
+    }
   }
 
   /** Mirrors: ActiveSupport::Duration::Scalar#variable? (duration.rb:93-95). */

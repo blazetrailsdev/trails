@@ -9,6 +9,7 @@
  */
 
 import { succ } from "./core-ext/string/succ.js";
+import { rbEqual } from "./rb-equal.js";
 
 /** Ruby's `a <=> b` over the endpoint types trails' ranges carry. */
 function cmp(a: unknown, b: unknown): number {
@@ -195,18 +196,4 @@ export class Range<T> {
       current += n;
     }
   }
-}
-
-/**
- * Ruby's `rb_equal` — the C primitive `range_eq`'s `recursive_equal`
- * (range.c) applies to each endpoint, which is identity first and then a
- * `==` send. A `Date`/`Time` endpoint answers its own `equals`.
- */
-function rbEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  if (typeof (a as { equals?: unknown }).equals === "function") {
-    return (a as { equals(other: unknown): boolean }).equals(b);
-  }
-  return false;
 }
