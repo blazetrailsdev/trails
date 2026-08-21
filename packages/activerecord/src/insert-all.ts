@@ -79,7 +79,7 @@ export class InsertAll {
   }
 
   /**
-   * @missingRailsCall find_unique_index_for — Language shortcoming: Rails
+   * @missingRailsCall find_unique_index_for — PERMANENT: Language shortcoming: Rails
    * resolves `@unique_by` here (insert_all.rb:42) off a synchronous
    * `schema_cache.indexes`; that read is async in trails, so the call rides
    * the deferral in `_populateUpdatableColumns()`, which every path awaits
@@ -226,7 +226,7 @@ export class InsertAll {
   }
 
   /**
-   * @missingRailsCall table_name — Language shortcoming: Rails reads
+   * @missingRailsCall table_name — PERMANENT: Language shortcoming: Rails reads
    * `schema_cache.primary_keys(model.table_name)` here (insert_all.rb:61);
    * that schema-cache read is async in trails, so the table name is passed
    * at the deferred read in `dbPrimaryKeys()` and this reader returns the
@@ -327,7 +327,7 @@ export class InsertAll {
 
   /**
    * @internal
-   * @missingRailsCall empty? — Language shortcoming: Rails' last branch is
+   * @missingRailsCall empty? — PERMANENT: Language shortcoming: Rails' last branch is
    * `@on_duplicate == :update && updatable_columns.empty?`
    * (insert_all.rb:140), but `updatable_columns` subtracts
    * `unique_by_columns`, which trails can only resolve off an async
