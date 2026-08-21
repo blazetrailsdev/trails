@@ -4,6 +4,7 @@ import { Contexts } from "./contexts.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encrypts } from "./encryptable-record.js";
+import { Model } from "@blazetrails/activemodel";
 import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 import type { SchemeOptions } from "./scheme.js";
 
@@ -72,7 +73,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      const modelClass = { _attributeDefinitions: new Map() };
+      const modelClass = class extends Model {};
       encrypts.call(modelClass, "isbn");
 
       expect(capturedKlass).toBe(modelClass);
@@ -93,8 +94,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       // Named class: filter key is "underscore(ClassName).attribute"
-      class NamedPirate {}
-      const modelClass = Object.assign(NamedPirate, { _attributeDefinitions: new Map() });
+      class NamedPirate extends Model {}
+      const modelClass = NamedPirate;
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
@@ -113,8 +114,9 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      // Truly anonymous class (empty .name): filter key is just the attribute name
-      const modelClass = Object.assign(class {}, { _attributeDefinitions: new Map() });
+      // Truly anonymous class (empty .name): filter key is just the attribute
+      // name. Returned from a function so JS name inference doesn't kick in.
+      const modelClass = (() => class extends Model {})();
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toContain("catchphrase");
@@ -136,7 +138,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      const modelClass = Object.assign(class {}, { _attributeDefinitions: new Map() });
+      const modelClass = class extends Model {};
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toEqual([]);
@@ -173,8 +175,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      class PaymentModel {}
-      const modelClass = Object.assign(PaymentModel, { _attributeDefinitions: new Map() });
+      class PaymentModel extends Model {}
+      const modelClass = PaymentModel;
       encrypts.call(modelClass, "card_number");
       encrypts.call(modelClass, "secret_token");
 

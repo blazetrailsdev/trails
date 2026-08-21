@@ -5,6 +5,7 @@ import { Configurable } from "./configurable.js";
 import { Decryption } from "./errors.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { encrypts } from "./encryptable-record.js";
+import { Model } from "@blazetrails/activemodel";
 import type { SchemeOptions } from "./scheme.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
@@ -285,13 +286,13 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       { encryptor: new TestEncryptor({ "STEPHEN KING": "cipher_nondet" }) } as SchemeOptions,
     ];
 
-    const modelClass = { _attributeDefinitions: new Map() };
+    const modelClass = class extends Model {};
     // Non-deterministic attribute — only the non-deterministic global scheme is compatible.
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 
-    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    const type = modelClass.typeForAttribute("name") as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_nondet")).toBe("STEPHEN KING");
     expect(() => type.deserialize("cipher_det")).toThrow(Decryption);
@@ -397,14 +398,14 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
     ];
 
-    const modelClass = { _attributeDefinitions: new Map() };
+    const modelClass = class extends Model {};
     // Deterministic attribute — only the deterministic global scheme is compatible.
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
       deterministic: true,
     });
 
-    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    const type = modelClass.typeForAttribute("name") as EncryptedAttributeType;
     // Only the deterministic global previous scheme is wired in.
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_det")).toBe("STEPHEN KING");
@@ -434,12 +435,12 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
       { encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }) } as SchemeOptions,
     ];
 
-    const modelClass = { _attributeDefinitions: new Map() };
+    const modelClass = class extends Model {};
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 
-    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    const type = modelClass.typeForAttribute("name") as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(2);
 
     // value encrypted with first global previous scheme decrypts correctly
@@ -461,12 +462,12 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
       { encryptor: new TestEncryptor({ legacy_non: "cipher_non" }) } as SchemeOptions,
     ];
 
-    const modelClass = { _attributeDefinitions: new Map() };
+    const modelClass = class extends Model {};
     encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 
-    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    const type = modelClass.typeForAttribute("name") as EncryptedAttributeType;
     // non-deterministic attribute: only the non-deterministic global scheme is compatible
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_non")).toBe("legacy_non");

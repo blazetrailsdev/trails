@@ -25,6 +25,7 @@ import {
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
+import { Model as ActiveModel } from "@blazetrails/activemodel";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
@@ -981,9 +982,8 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   });
 
   function makeMockModel(columns: string[]) {
-    class MockModel {}
+    class MockModel extends ActiveModel {}
     return Object.assign(MockModel, {
-      _attributeDefinitions: new Map(),
       columnNames: () => columns,
     }) as any;
   }
