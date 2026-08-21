@@ -267,9 +267,6 @@ let _uncacheableMethodsCache: Set<string> | undefined;
 let _uncacheableMethodsCacheVersion = -1;
 
 export function uncacheableMethods(): Set<string> {
-  // Recompute only when a relation-family class registers (import-time only);
-  // the version stamp stabilizes before any delegation runs, so this memoizes
-  // permanently without depending on which/how many classes have loaded.
   if (
     _uncacheableMethodsCache &&
     _uncacheableMethodsCacheVersion === _relationFamilyState.version
@@ -305,8 +302,6 @@ export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string)
   while (typeof base === "function" && (base as { name?: string }).name !== "Base") {
     base = Object.getPrototypeOf(base);
   }
-  // No class named `Base` in the chain (e.g. an unexpected hierarchy) — don't
-  // ban; better to under-enforce than to mis-fire on a non-AR class.
   if (typeof base !== "function") return;
   // Reachability check restricted to the static chain at/above `Base`, stopping
   // before `Function.prototype` so its builtins (`call`, `apply`, `bind`, `name`,
@@ -421,8 +416,6 @@ function perModelCarrier(
 ): FamilyCtor {
   let subclass = cache.get(modelClass);
   if (!subclass) {
-    // The family slot is always registered at its class module's init, before
-    // any instance is constructed for that class, so `base` is set here.
     const baseCtor = base as unknown as new (...args: never[]) => object;
     subclass = class extends baseCtor {} as FamilyCtor;
     // A class expression assigned to a `let` infers `.name` from the variable
@@ -632,24 +625,23 @@ export function name(): string {
  */
 const DELEGATED_ARRAY_METHODS = new Set<string>([
   // curated delegate-to-records list (delegation.rb) → JS equivalents
-  "forEach", // each
+  "forEach",
   "join",
   "reverse",
-  "slice", // slice / []
-  "at", // []
-  "indexOf", // index
-  "lastIndexOf", // rindex
-  "concat", // +
-  // Enumerable methods (`Relation` includes Enumerable) with JS analogues
-  "map", // map / collect
-  "filter", // select
-  "find", // detect
-  "some", // any?
-  "every", // all?
-  "includes", // include?
-  "reduce", // inject / reduce
+  "slice",
+  "at",
+  "indexOf",
+  "lastIndexOf",
+  "concat",
+  "map",
+  "filter",
+  "find",
+  "some",
+  "every",
+  "includes",
+  "reduce",
   "sort",
-  "flatMap", // flat_map
+  "flatMap",
 ]);
 
 /**
@@ -782,7 +774,6 @@ export function delegateEnumerableMethod(
       return [matched, unmatched];
     };
   }
-  // DELEGATED_ARRAY_METHODS: async path for unloaded targets.
   return delegateArrayMethodAsync(prop, loadRecords);
 }
 
@@ -1030,11 +1021,6 @@ export function delegateRecordMethodSync(
 }
 
 export class DelegationMethods {
-  // ---- to: :records (Array / Enumerable) ----
-  // Each loads via `records()` (trails has no blocking IO) then applies the
-  // shared `RECORD_DELEGATES` helper — the same pure function the synchronous
-  // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses.
-
   /** `Array#length` — the number of loaded records. */
   async length(this: DelegationHost): Promise<number> {
     return RECORD_DELEGATES.length(await this.records()) as number;
@@ -1185,8 +1171,6 @@ export class DelegationMethods {
     }
     return instruct + builder.target();
   }
-
-  // ---- to: :model ----
 
   /** `delegate :connection, to: :model`. */
   get connection(): DatabaseAdapter {

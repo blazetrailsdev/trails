@@ -141,12 +141,8 @@ export function normalizeFindArgs(
     } else {
       ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
     }
-    // `find_some` (size > 1) always returns an array; only a deduped size-1
-    // list stays unwrapped when the caller did not pass a tuple list.
     wantArray = expectsArray || ids.length !== 1;
   } else if (rest.length > 0) {
-    // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
-    // canonicalize to `[1, 2, 3]`.
     ids = compactUniqIds(args.flat(Infinity));
     wantArray = true;
   } else if (Array.isArray(first)) {
@@ -373,11 +369,6 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
     ? ""
     : ` [${this.arel().whereSql(this._model)?.value ?? ""}]`;
 
-  // Composite PK: OR over per-tuple WHERE conditions. The
-  // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
-  // control flow instead of a cast. `tuples !== null` is a
-  // stronger invariant (the normalizer only returns tuples when pk
-  // is composite) but TS can't correlate them, so we check both.
   if (tuples && Array.isArray(pk)) {
     const orConditions = tuples.map((tuple) => buildPkWhere(pk, tuple));
     let rel: any = this.where(orConditions[0]);
@@ -390,10 +381,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
     return wantArray ? records : records[0];
   }
 
-  // Simple PK from here on — pk is narrowed to `string`.
   if (Array.isArray(pk)) {
-    // Unreachable: tuples-null + pk-array would mean the normalizer
-    // violated its contract.
     throw new Error("performFind: composite PK without tuples (normalizer invariant violation)");
   }
 
@@ -412,7 +400,6 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
     return wantArray ? [records[0]] : records[0];
   }
 
-  // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3]).
   const records = await this.where({ [pk]: ids }).toArray();
   if (records.length !== ids.length)
     raiseNotFoundAll(modelName, pk, normalized, records.length, ids.length, conditions);
@@ -698,9 +685,6 @@ export async function performCreateOrFindByBang(
         }),
       { requiresNew: true },
     );
-    // transaction() returns undefined when the block raises Rollback.
-    // Treat that as a persist failure rather than leaking undefined to
-    // the bang caller.
     if (result === undefined) {
       throw new RecordNotSaved(
         `${this._model.name}.createOrFindByBang rolled back before persist`,
@@ -964,7 +948,6 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
     const [sql, ...binds] = conditions as unknown[];
     if (sql !== undefined) relation = relation.where(sql, ...binds);
   } else if (conditions instanceof Nodes.Node) {
-    // Arel node — pass directly rather than wrapping as a PK value.
     relation = relation.where(conditions);
   } else if (conditions !== null && typeof conditions === "object") {
     // Hash-like: Rails' `when Hash` branch — skip if empty.

@@ -43,7 +43,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await CpkAuthor.create({ id: 1, name: "Author One" });
     await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 1 });
     await CpkBook.create({ id: [1, 2], title: "Beta", revision: 2 });
-    // Two chapters on book 1 would fan the row count to 3 without DISTINCT.
     await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
     await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
   }
@@ -71,8 +70,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:assoc).count(column) counts distinct non-null values of the column", async () => {
     await seedBooksWithChapters();
-    // A specific requested column counts distinctly inline (COUNT(DISTINCT col))
-    // rather than through the pk subquery.
     expect(await CpkBook.eagerLoad("chapters").count("cpk_books.revision")).toBe(2);
   });
 
@@ -85,8 +82,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 5 });
     await CpkBook.create({ id: [1, 2], title: "Beta", revision: 5 });
     await CpkBook.create({ id: [1, 3], title: "Gamma", revision: 9 });
-    // Chapters on book 1 fan the LEFT OUTER JOIN so the DISTINCT-pk id fetch
-    // must de-duplicate.
     await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
     await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
   }
@@ -105,7 +100,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     // `WHERE pk IN (...)` — the two rows both have revision 5, so the answer is 1.
     // Value-bounding (`DISTINCT revision LIMIT 2`) would wrongly return 2.
     expect(count).toBe(2 - 1);
-    // A separate DISTINCT-pk id-materialization query runs before the count.
     const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();
     // The recount restricts via per-column IN (author_id IN ... AND id IN ...),
@@ -124,21 +118,12 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      // Order by a NON-pk column (title) that is NOT in the DISTINCT-pk select
-      // list. Without routing the ordered `SELECT DISTINCT author_id, id ...
-      // ORDER BY title` through the adapter's `columnsForDistinct` hook, PG /
-      // MySQL reject it ("ORDER BY expressions must appear in select list").
-      // titles Alpha(1,rev5) < Beta(2,rev5) < Gamma(3,rev9); limit(2) bounds to
-      // books 1 & 2 → COUNT(DISTINCT revision) over the two rev-5 rows = 1.
       count = (await CpkBook.eagerLoad("chapters")
         .order("cpk_books.title")
         .limit(2)
         .count("cpk_books.revision")) as number;
     });
     expect(count).toBe(1);
-    // The id-materialization query orders by the non-pk column; PG/MySQL alias
-    // it into the select list, sqlite leaves the pk projection unchanged — but
-    // in every case the ordered DISTINCT-pk fetch must run and be valid.
     const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();
     expect(idSql).toMatch(/ORDER BY .*title/i);
@@ -146,9 +131,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:assoc).offset(n).count(column) bounds ROWS via the id fetch", async () => {
     await seedBooksDuplicateRevisions();
-    // order+offset(1) drops book 1 (rev 5); remaining rows are books 2 (rev 5)
-    // and 3 (rev 9) → COUNT(DISTINCT revision) = 2. Value-bounding would offset
-    // into the distinct value list {5, 9} and (wrongly) return 1.
     const count = await CpkBook.eagerLoad("chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .offset(1)
@@ -165,9 +147,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await CpkBook.create({ id: [1, 3], shop_id: 1, order_id: 200, title: "Gamma" });
   }
 
-  // Re-key a Map<Order record, value> by the order's `id` component, coercing
-  // both key and value to Number so the assertions are adapter-agnostic (MySQL /
-  // PG may hand back the composite-id components / aggregate as strings).
   function byOrderId(result: Map<unknown, unknown>): Map<number | null, number> {
     const out = new Map<number | null, number>();
     for (const [order, n] of result) {
@@ -182,9 +161,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:x).group(:composite_fk_belongs_to).count folds the eager JD", async () => {
     await seedBooksWithOrders();
-    // group by the composite-FK belongs_to `order`, eager-loading the same
-    // association: `walk` dedups the coinciding join so the grouped count keys
-    // by the loaded Order records.
     let result!: Map<unknown, unknown>;
     const sqls = await captureSql(async () => {
       // Counted over a named column: with no column Rails' `calculate` installs
@@ -197,8 +173,6 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
         unknown
       >;
     });
-    // The eager `order` JD coincides with the grouped belongs_to; `walk` dedups
-    // it into a single LEFT OUTER JOIN rather than emitting a parallel join.
     const groupSql = sqls.find((s) => /GROUP BY/i.test(s)) ?? "";
     expect(groupSql).toMatch(/LEFT OUTER JOIN .*cpk_orders/i);
     const counts = byOrderId(result);
@@ -213,7 +187,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
       unknown
     >;
     const sums = byOrderId(result);
-    expect(sums.get(100)).toBe(3); // book ids 1 + 2
-    expect(sums.get(200)).toBe(3); // book id 3
+    expect(sums.get(100)).toBe(3);
+    expect(sums.get(200)).toBe(3);
   });
 });

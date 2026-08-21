@@ -84,11 +84,6 @@ describe("UpdateAllTest", () => {
     "cpkOrders",
     "cpkOrderAgreements",
   ]);
-  // "update all doesnt ignore order" deliberately raises a DB error to test
-  // ORDER BY semantics; on PG this aborts the transaction. It still runs
-  // transactionally because the fixture teardown skips its redundant DELETEs
-  // while the pinned transaction is open, so the abort no longer poisons the
-  // rollback.
 
   it("update all with scope", async () => {
     const tag = tags("general");
@@ -139,8 +134,6 @@ describe("UpdateAllTest", () => {
     expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
   });
 
-  // TRACKED DEVIATION: includes + where referencing included table should switch to JOIN strategy.
-  // Trails `includes` does a separate SELECT so toys.name is not available in the WHERE clause.
   it("update all with includes", async () => {
     const petsScope = Pet.includes("toys").where({ toys: { name: "Bone" } });
 
@@ -285,7 +278,6 @@ describe("UpdateAllTest", () => {
     await topic2.reload();
     expect(topic1.title).toBe("adequaterecord");
     expect(topic2.title).toBe("adequaterecord");
-    // before_update set author_name = "David" when blank
     expect(topic1.author_name).toBe("David");
     expect(topic2.author_name).toBe("David");
   });

@@ -120,11 +120,8 @@ describe("QueryAttribute", () => {
     const a = new QueryAttribute("age", "25", intType);
     const b = new QueryAttribute("age", "25", intType);
     const d = new QueryAttribute("name", "25", intType);
-    // Same type instance → equal
     expect(a.equals(b)).toBe(true);
-    // Different name → not equal
     expect(a.equals(d)).toBe(false);
-    // Different instances of same Type class → equal (constructor-based)
     const intType2 = new IntType();
     const e = new QueryAttribute("age", "25", intType2);
     expect(a.equals(e)).toBe(true);
@@ -144,7 +141,6 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("id", -(2 ** 40), int4).isUnboundable()).toBe(-1);
     expect(new QueryAttribute("id", 5, int4).isUnboundable()).toBe(false);
 
-    // The #4433 bignum path: a bigint column is Integer(limit: 8).
     const int8 = new IntegerType({ limit: 8 });
     expect(new QueryAttribute("id", 2n ** 63n, int8).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", -(2n ** 63n) - 1n, int8).isUnboundable()).toBe(-1);
@@ -180,7 +176,6 @@ describe("QueryAttribute", () => {
     const int4 = new IntegerType({ limit: 4 });
     expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBe(false);
     expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBe(false);
-    // isInfinite reads value_before_type_cast, so it still reports the sign.
     expect(new QueryAttribute("id", Infinity, int4).isInfinite()).toBe(1);
     expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
   });

@@ -18,8 +18,6 @@ registerModel(Topic);
 const sortedIds = (rows: Array<{ id: unknown }>) =>
   rows.map((r) => Number(r.id)).sort((a, b) => a - b);
 
-// The builders are private instance methods on Relation (relation.ts wrappers
-// that delegate to the query-methods module fns); reach them through this shape.
 type BoundSqlLiteralBuilders = {
   buildBoundSqlLiteral(statement: string, values: unknown[]): Nodes.BoundSqlLiteral;
   buildNamedBoundSqlLiteral(

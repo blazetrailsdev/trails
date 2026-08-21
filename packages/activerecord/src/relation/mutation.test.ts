@@ -128,7 +128,6 @@ describe("RelationMutationTest", () => {
   });
 
   it("#reorder! with symbol prepends the table name", () => {
-    // Same symbol→qualified-attribute analogue as `#order! with symbol`.
     const rel = relation();
     const attr = Post.arelTable.get("title");
     expect(rel.reorderBang(attr)).toBe(rel);
@@ -207,7 +206,6 @@ describe("RelationMutationTest", () => {
   // one for MULTI_VALUE_METHODS (above) and one for SINGLE_VALUE_METHODS (here).
   // The duplicate name is intentional — parity:test matches by description count.
   it("#!", () => {
-    // Every single-value bang returns self and sets its `*_value` scalar.
     const SINGLE: ReadonlyArray<[string, unknown, string, unknown]> = [
       ["limitBang", 5, "limitValue", 5],
       ["offsetBang", 5, "offsetValue", 5],

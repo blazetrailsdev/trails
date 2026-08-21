@@ -735,7 +735,11 @@ export default defineConfig(
   //    widen it a package at a time, after auditing that package's comments,
   //    never ahead of the audit. ──
   {
-    files: ["packages/arel/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activerecord/src/relation/**/*.ts",
+    ],
     rules: {
       "blazetrails/no-freeform-comments": "error",
     },

@@ -38,7 +38,6 @@ describe("WhereChain associated join guard (trails)", () => {
     const sql = Post.joins(":author").where().associated("author").toSql();
     expect(authorsJoinCount(sql)).toBe(1);
     expect(sql).toMatch(/INNER JOIN/i);
-    // The IS NOT NULL predicate still lands on the (unaliased) target table.
     expect(sql).toMatch(/["`]?authors["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });
 
@@ -50,11 +49,6 @@ describe("WhereChain associated join guard (trails)", () => {
     expect(sql).toMatch(/["`]?authors["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });
 
-  // Self-join (Comment#children): routing the join through JoinDependency
-  // (`joins!`) unions the pending join-value with the where-join, so there is
-  // still exactly one join. The `:class_name` self-join predicate is keyed by
-  // the association name (`self.not(children => …)`), so it resolves to the
-  // same aliased join table (`children`) rather than the owner PK.
   it("does not duplicate a self-join already in joins_values", () => {
     const inner = Comment.joins(":children").where().associated("children").toSql();
     expect(joinCount(inner)).toBe(1);
@@ -77,8 +71,6 @@ describe("WhereChain not inversion shapes (trails)", () => {
     const relation = Post.where().not({
       title: [null, "Welcome to the weblog", "So I was thinking"],
     });
-    // Positive ArrayHandler shape `(title IN (...) OR title IS NULL)`, inverted
-    // once at the clause level — not the threaded `NOT IN ... AND IS NOT NULL`.
     expect(relation.toSql()).toMatch(/NOT \(.*IN \(.*\).*OR.*IS NULL\)/is);
     const posts = await relation;
     expect(posts.length).toBeGreaterThan(0);
@@ -91,13 +83,9 @@ describe("WhereChain not inversion shapes (trails)", () => {
   it("inverts a multi-column aggregate group as one NOT over the AND group", async () => {
     const david = await Customer.find(1);
     const relation = Customer.where().not({ address: david.address });
-    // expand_from_hash builds the three mapped-column equalities positively;
-    // WhereClause#invert wraps them in a single NOT(...) group.
     expect(relation.toSql()).toMatch(
       /NOT \(.*address_street.*AND.*address_city.*AND.*address_country.*\)/is,
     );
-    // The flat positive predicates invert via NOT(ast) — no per-branch
-    // Grouping double-wrap (`NOT ((...))`) like the old negation threading.
     expect(relation.toSql()).not.toMatch(/NOT \(\(/);
     const customers = await relation;
     expect(customers.length).toBeGreaterThan(0);
@@ -105,9 +93,6 @@ describe("WhereChain not inversion shapes (trails)", () => {
   });
 
   it("inverts an exclusive range as NOT over the positive bound pair", () => {
-    // Arel builds `gteq(begin) AND lt(end)`; And has no invert override, so
-    // Node#invert yields `NOT (id >= 1 AND id < 5)` — not a re-derived
-    // `(id < 1 OR id >= 5)`.
     const sql = Post.where()
       .not({ id: new Range(1, 5, true) })
       .toSql();
@@ -125,9 +110,6 @@ describe("WhereChain not inversion shapes (trails)", () => {
   });
 });
 
-// Routing the join through JoinDependency (`joins!` / `left_outer_joins!`) makes
-// through-association shapes work for free — the bespoke resolver threw for them.
-// `Author has_many :comments, through: :posts` emits both intermediate joins.
 describe("WhereChain through association (trails)", () => {
   fixtures(["authors", "posts", "comments", "authorAddresses"]);
 
@@ -136,7 +118,6 @@ describe("WhereChain through association (trails)", () => {
     expect(relation.toSql()).toMatch(
       /INNER JOIN\s+["`]?posts["`]?.*INNER JOIN\s+["`]?comments["`]?.*["`]?comments["`]?\.["`]?id["`]?\s+IS NOT NULL/is,
     );
-    // Authors 1 and 2 have comments through their posts; author 3 has none.
     const authors = await relation.distinct();
     expect(ids(authors)).toEqual([1, 2]);
   });
@@ -146,7 +127,6 @@ describe("WhereChain through association (trails)", () => {
     expect(relation.toSql()).toMatch(
       /LEFT OUTER JOIN\s+["`]?posts["`]?.*LEFT OUTER JOIN\s+["`]?comments["`]?.*["`]?comments["`]?\.["`]?id["`]?\s+IS NULL/is,
     );
-    // Author 3 has no comments through posts, so it is reported missing.
     const authors = await relation.distinct();
     expect(ids(authors)).toContain(3);
   });

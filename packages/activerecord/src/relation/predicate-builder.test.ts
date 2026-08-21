@@ -214,7 +214,6 @@ describe("PredicateBuilderTest", () => {
       const node = builder.build(table.get("title"), { id: 5 });
       const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
       expect(sql).toContain('"posts"."title" = ?');
-      // The whole object is bound, not the dereferenced `5`.
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
 
@@ -236,8 +235,6 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("id"), [new NotARecord(5), new NotARecord(7)]);
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      // The objects flow into HomogeneousIn untouched — they are NOT flattened
-      // to `IN (5, 7)` the way a real AR record would be.
       expect(sql).not.toMatch(/IN \(5, 7\)/);
     });
 
@@ -269,7 +266,6 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, feTable));
       const node = builder.build(feTable.get("tags"), [1, 2]);
       const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
-      // Single equality bind, NOT `IN (?, ?)`.
       expect(sql).toContain('"posts"."tags" = ?');
       expect(sql).not.toMatch(/IN \(/);
       expect(binds).toHaveLength(1);
@@ -322,14 +318,10 @@ describe("PredicateBuilderTest", () => {
       // Rails inverts a positively-built, bound predicate, so the value rides a
       // QueryAttribute bind rather than being inlined.
       expect(sql).toContain('"posts"."title" !=');
-      // The whole object is bound, not the dereferenced `5`.
       const bound = (node as unknown as { right: { value: { value: unknown } } }).right.value.value;
       expect(bound).toEqual({ id: 5 });
     });
 
-    // Mirror of the positive ArrayHandler convergence on the inverted path:
-    // non-Base objects carrying an `id` are not collapsed into a
-    // `NOT IN (5, 7)` PK list the way real AR records would be.
     it("does not dereference non-Base objects carrying an id inside a negated array", () => {
       class NotARecord {
         constructor(public id: number) {}
@@ -370,8 +362,6 @@ describe("PredicateBuilderTest", () => {
       const [sql, binds] = visitor.compileWithBinds(node);
       expect(sql).toContain('"users"."name" = ?');
       expect(binds).toHaveLength(1);
-      // The bind is the raw QueryAttribute wrapping the Substitute —
-      // compileWithBinds preserves bind objects for BindMap indexing
       expect((binds[0] as any).valueBeforeTypeCast).toBeInstanceOf(Substitute);
     });
 
@@ -389,16 +379,10 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("nested table-keyed hash expansion", () => {
-    // Mirror of Post.belongs_to(:author) plus a deliberately-renamed
-    // belongs_to(:writer, class_name: "Author") to exercise the
-    // associated_table aliasing path. Both ride the canonical posts/authors
-    // tables. The canonical Post has no `writer` association, so we build a
-    // throwaway model carrying both.
     class PbTestPost extends Base {
       static {
         this.tableName = "posts";
         this.belongsTo("author");
-        // Association name (writer) deliberately differs from the table (authors).
         this.belongsTo("writer", { className: "Author" });
       }
     }
@@ -451,9 +435,6 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("does not expand when key is a known column on the current table (mirrors Rails !table.has_column? guard)", () => {
-      // products.price is a real canonical column, so a nested hash keyed by it
-      // must NOT be treated as an association — it stays an equality on the
-      // current table.
       class PbTestProduct extends Base {
         static {
           this.tableName = "products";

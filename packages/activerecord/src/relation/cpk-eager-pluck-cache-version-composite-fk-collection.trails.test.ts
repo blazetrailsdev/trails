@@ -74,9 +74,6 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     const outerJoin = joins[0] as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
-    // belongsTo keys target.association_primary_key = source.foreign_key per
-    // column: cpk_orders.shop_id = cpk_books.shop_id AND
-    // cpk_orders.id = cpk_books.order_id.
     expect(and.children).toHaveLength(2);
     type Attr = { name: string; relation: { name: string } };
     const [c0, c1] = and.children as Nodes.Equality[];
@@ -131,10 +128,6 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck of a nested-hash spec's inner composite-FK belongsTo joins both segments", async () => {
     await seedBooks();
-    // `{ chapters: "book" }` nests a composite-FK `belongsTo` (`chapters.book`).
-    // Both segments now JOIN: `chapters` keys the composite FK↔PK tuple, and the
-    // inner `book` belongsTo keys `cpk_books.author_id = cpk_chapters.author_id
-    // AND cpk_books.id = cpk_chapters.book_id`.
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
       null,

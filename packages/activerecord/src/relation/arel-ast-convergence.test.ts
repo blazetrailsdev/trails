@@ -31,8 +31,6 @@ import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
 
-// Establish the primary (boot-laid canonical-schema) pool so the bespoke
-// `Post` model's SQL compiles through `Base.connection`.
 fixtures({});
 
 class Post extends Base {
@@ -51,12 +49,10 @@ function compile(rel: unknown): [string, unknown[]] {
   return [sql, binds];
 }
 
-// Pre-substitution SQL (raw `?` / `$N` placeholders) for the relation.
 function rawSql(rel: unknown): string {
   return compile(rel)[0];
 }
 
-// The single ordered bind array the collector threaded, projected to values.
 function bindValues(rel: unknown): unknown[] {
   return compile(rel)[1].map((b) => (b as { _value?: unknown })?._value ?? b);
 }
@@ -96,8 +92,6 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     });
   });
 
-  // Cluster 3: from(subquery) threads through the SelectManager (`build_from`)
-  // — a derived table, not a `sql.replace(/FROM …/)` rewrite.
   describe("Relation#from(subquery) on the manager", () => {
     it("renders a derived-table subquery with a qualified projection", () => {
       const sub = Post.where({ author: "alice" });

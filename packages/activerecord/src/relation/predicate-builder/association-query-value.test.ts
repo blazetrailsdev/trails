@@ -48,7 +48,6 @@ describe("AssociationQueryValue", () => {
         },
         comment,
       );
-      // Single record → one query hash with fk[i] mapped to pk[i] value.
       expect(av.queries()).toEqual([{ blog_id: 11, id: 22 }]);
     });
 
@@ -62,7 +61,6 @@ describe("AssociationQueryValue", () => {
         },
         [c1, c2],
       );
-      // One hash per record — PredicateBuilder OR-groups them.
       expect(av.queries()).toEqual([
         { blog_id: 11, id: 22 },
         { blog_id: 12, id: 33 },
@@ -74,9 +72,8 @@ describe("AssociationQueryValue", () => {
       // `id_value` reads the scalar id column. We mirror via readAttribute('id').
       const record = {
         blog_id: 5,
-        id: [5, 99], // composite-pk id surface
+        id: [5, 99],
         readAttribute(name: string) {
-          // Scalar id column under the surface.
           return name === "id" ? 99 : (this as any)[name];
         },
       };

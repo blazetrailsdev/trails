@@ -50,8 +50,6 @@ describe("rubyInspect", () => {
     expect(rubyInspect("cr\r\n")).toBe('"cr\\r\\n"');
     expect(rubyInspect("null\0char")).toBe('"null\\0char"');
     expect(rubyInspect("esc\x1bseq")).toBe('"esc\\eseq"');
-    // Output stays single-line so an EXPLAIN header can't span
-    // multiple lines based on bind contents.
     expect(rubyInspect("a\nb")).not.toContain("\n");
   });
 

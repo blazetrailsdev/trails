@@ -11,8 +11,6 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 
-// Establish the primary (boot-laid canonical-schema) pool so `Post.connection`
-// and the bespoke da_pets/da_toys models resolve through `Base.connection`.
 fixtures({});
 
 class Post extends Base {
@@ -242,8 +240,6 @@ describe("where-hash key resolves to the referenced join alias", () => {
       .joins(":toys")
       .where({ toys: { name: "Bone" } })
       .toSql();
-    // Identifier quote char differs by adapter (" on sqlite/pg, ` on
-    // mysql/mariadb); strip quotes so the shape assertion holds everywhere.
     const bare = sql.replace(/["`]/g, "");
     expect(bare).toMatch(/INNER JOIN da_toys (?:AS )?toys\b/);
     expect(bare).toMatch(/WHERE toys\.name\b/);

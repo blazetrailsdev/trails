@@ -23,7 +23,6 @@ describe("order blank arg compaction", () => {
   });
 
   it("raises from the bang method, which does not compact", () => {
-    // orderBang is mixed onto the relation, so it is not on Relation's public type.
     const rel = Post.all() as unknown as { orderBang(arg: string): unknown };
     expect(() => rel.orderBang("")).toThrow(UnknownAttributeReference);
   });

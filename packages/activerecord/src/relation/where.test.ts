@@ -231,9 +231,6 @@ describe("WhereTest", () => {
   it("array first arg discards extra positional rest", () => {
     const withStray = (Post.all().where as any)(["id = ?", 1], 2);
     const withoutStray = (Post.all().where as any)(["id = ?", 1]);
-    // The stray 2 is dropped: the SQL is identical to the no-rest call, which
-    // binds only the array's own tail (1) — never the extra positional. (An
-    // appended 2 would emit a second bind and diverge the SQL.)
     expect(withStray.toSql()).toEqual(withoutStray.toSql());
   });
 
@@ -493,9 +490,6 @@ describe("WhereTest", () => {
   });
 
   it("where with blank conditions", async () => {
-    // `where([])` now short-circuits as blank (`opts.blank?` → no-op),
-    // matching `{}` / `null` / `""` — see relation.ts#where. (RFC 0023
-    // finder-array-conditions-composite-ambiguity.)
     for (const blank of [[], {}, null, ""]) {
       const result = await Edge.where(blank as any).order("sink_id");
       expect(result).toHaveLength(4);
@@ -627,8 +621,6 @@ describe("WhereTest", () => {
   });
 
   it("to sql with large number", async () => {
-    // The out-of-range bind is dropped from the generated SQL (not bound as a
-    // value the column can't hold), so replaying it via findBySql matches [bob].
     const bob = authors("bob") as any;
     const sql1 = Author.where({ id: [3, 9223372036854775808n] }).toSql();
     expect(ids(await Author.findBySql(sql1))).toStrictEqual([bob.id]);

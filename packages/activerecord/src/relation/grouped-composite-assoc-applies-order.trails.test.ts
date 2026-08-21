@@ -30,15 +30,6 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
     [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
   });
 
-  // An aggregate order expression must go through `Arel.sql`: a bare
-  // "COUNT(*) DESC" string is a non-attribute argument, so `disallowRawSql`
-  // rejects it once `allowUnsafeRawSql` is disabled (as it is under the full
-  // suite run).
-  //
-  // Three orders in shop 1. Book counts per order: 1 → 1, 2 → 3, 3 → 2.
-  // Grouping by the composite belongs_to and ordering by COUNT(*) DESC makes
-  // the ordered top-2 orders (2, 3) differ from the unordered/insertion-order
-  // top-2 (1, 2), so a dropped ORDER BY changes the answer.
   async function seedOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
     for (const id of [1, 2, 3]) {
@@ -98,15 +89,11 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
       (order as CpkOrder | null)?.id,
       count,
     ]);
-    // Ordered groups are (2 → 3), (3 → 2), (1 → 1); offset(2) leaves order 1.
     expect(counts).toEqual([[[1, 1], 1]]);
   });
 
   it("group by a composite-key belongs_to with a group-key column order and limit returns the ordered groups", async () => {
     await seedOrders();
-    // A bare column order (rather than an aggregate expression) must resolve
-    // against the model's table: descending order_id makes the top-2 groups
-    // (3, 2) rather than the insertion-order (1, 2).
     const result = (await CpkBook.group("order").order("order_id DESC").limit(2).count()) as Map<
       unknown,
       number

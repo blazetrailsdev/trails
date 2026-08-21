@@ -67,7 +67,6 @@ describe("Relation#where — composite-key form", () => {
   it("filters null/undefined-bearing tuples instead of emitting IS NULL (SQL tuple-equality semantics)", async () => {
     await CpkBook.create({ id: [1, 100], title: "valid" });
     await CpkBook.create({ id: [2, 200], title: "also-valid" });
-    // [1, null] is filtered out; [2, 200] remains.
     const matched = await (CpkBook as any)
       .where(
         ["author_id", "id"],
@@ -156,8 +155,6 @@ describe("Relation#where — composite-key form", () => {
       .all()
       .where(["author_id", "id"], [[1, 100]])
       .toSql();
-    // Quote-agnostic (backtick on MySQL/MariaDB, double-quote elsewhere): the
-    // point is the two equalities are ANDed flat, with NO wrapping parens.
     const col = (name: string) => `["\`]?cpk_books["\`]?\\.["\`]?${name}["\`]?`;
     expect(sql).toMatch(new RegExp(`WHERE ${col("author_id")} = 1 AND ${col("id")} = 100`));
     expect(sql).not.toMatch(/\(/);
@@ -205,11 +202,7 @@ describe("Relation#where — composite-key form", () => {
       }
     };
     rel.whereClause.predicates.forEach(walk);
-    // Attribute re-rooted onto the join-only `contracts` table…
     expect(eq.left.relation.name).toBe("contracts");
-    // …and the bind is typed by Contract's `attribute("metadata", "json")`
-    // override (JSON-serialized, quoted), not the raw DB `t.string` column the
-    // generic `TypeCasterConnection` would have used (unquoted `x`).
     expect(eq.right.value.valueForDatabase).toBe('"x"');
   });
 
@@ -221,10 +214,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("single-column composite values flow through the column type as binds, not inlined literals", () => {
-    // Regression: the single-column branch used `attribute.in(rawValues)`,
-    // which inlines untyped `Casted` literals — so a string "2" for an
-    // integer column stayed a string and never became a bind (breaking
-    // compileWithBinds / prepared-statement caching).
     const rel = (Post as any).all();
     const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [["1"], ["2"]])[0];
     expect(node.constructor.name).toBe("HomogeneousIn");
@@ -249,9 +238,6 @@ describe("Relation#where — composite-key form", () => {
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {
     const rel = (CpkBook as any).all();
     const node = rel.predicateBuilder.buildComposite(["author_id"], [[1], [2], [3]])[0];
-    // The HomogeneousIn node renders as `author_id IN (?, ?, ?)`, which
-    // `toSql` substitutes to `IN (1, 2, 3)`; an OR-chain would render as
-    // `author_id = 1 OR author_id = 2 OR author_id = 3`.
     expect(node.constructor.name).toBe("HomogeneousIn");
     const sql = (CpkBook as any).all().where(node).toSql();
     expect(sql).toMatch(/IN \(1,\s*2,\s*3\)/);
@@ -264,8 +250,6 @@ describe("Relation#where — composite-key form", () => {
     // Grouping(Or([And([eq, eq]), And([eq, eq])])) — the per-tuple Grouping
     // an earlier hand-rolled version added is not part of that shape.
     const rel = (CpkBook as any).all();
-    // Multiple tuples collapse to grouping_queries' single node: one
-    // Grouping(Or([And, And])), returned as a length-1 array.
     const nodes: any = rel.predicateBuilder.buildComposite(
       ["author_id", "id"],
       [
@@ -350,10 +334,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("whereNot(mixed-type cols, tuples) routes to sanitize (symmetric with where), not a bogus composite", () => {
-    // The composite form requires an all-strings column list, kept symmetric
-    // with `where`. A non-string element means it is NOT composite cols, so it
-    // routes to the sanitized-conditions path (which surfaces a bind-arity
-    // error) rather than building a predicate off a coerced `5` column.
     expect(() =>
       (CpkBook as any)
         .all()
@@ -366,8 +346,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("where([], tuples) is the composite form and raises on the empty column list, not a silent no-op", () => {
-    // The blank short-circuit (`where([])`) applies only to the single-argument
-    // call; a supplied tuples arg keeps this on the composite path.
     expect(() => (CpkBook as any).all().where([], [[1, 2]])).toThrow(/empty column list/);
     expect(() => (CpkBook as any).where([], [[1, 2]])).toThrow(/empty column list/);
   });
@@ -394,8 +372,6 @@ describe("Relation#where — composite-key form", () => {
   it("whereNot(cols, tuples) on all-filtered tuples is a no-op (matches Rails' empty-hash behavior)", async () => {
     await CpkBook.create({ id: [1, 100], title: "a" });
     await CpkBook.create({ id: [2, 200], title: "b" });
-    // All tuples have a null component → filtered out → no predicate
-    // added → all rows returned.
     const matched = await (CpkBook as any)
       .all()
       .where()

@@ -49,7 +49,6 @@ describe("string limit_value / offset_value read sites", () => {
   it("inBatches raises ArgumentError rather than comparing falsely", async () => {
     await expect(async () => {
       for await (const _batch of Topic.limit("asdfadf").inBatches()) {
-        // unreachable
       }
     }).rejects.toThrow(/comparison of String with \d+ failed/);
   });

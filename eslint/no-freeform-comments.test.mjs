@@ -113,6 +113,16 @@ tester.run("no-freeform-comments (boundary directives)", rule, {
   invalid: [],
 });
 
+// `@nie disposition=` is required on every `throw new NotImplementedError(...)`
+// by `nie-requires-annotation`, so deleting one reds that rule.
+tester.run("no-freeform-comments (nie disposition directives)", rule, {
+  valid: [
+    { code: `// @nie disposition=TODO\nconst x = 1;\n` },
+    { code: `// @nie disposition=port-real rails=relation.rb:12 cluster=foo\nconst x = 1;\n` },
+  ],
+  invalid: [],
+});
+
 // Rails' OWN comments go too. The Ruby is vendored at `vendor/rails/` and the
 // ported file cites it, so copying its annotations across duplicates them into
 // a second place that rots the moment Rails edits them. A comment that names

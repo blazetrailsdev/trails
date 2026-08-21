@@ -36,7 +36,6 @@ describe("DeleteAllTest", () => {
   it("destroy all", async () => {
     const davids = Author.where({ name: "David" });
 
-    // Force load
     expect(await davids).toEqual([authors("david")]);
     expect(davids.isLoaded).toBe(true);
 
@@ -71,7 +70,6 @@ describe("DeleteAllTest", () => {
   it("delete all loaded", async () => {
     const davids = Author.where({ name: "David" });
 
-    // Force load
     expect(await davids).toEqual([authors("david")]);
     expect(davids.isLoaded).toBe(true);
 

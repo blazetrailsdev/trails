@@ -70,29 +70,21 @@ describe("SpawnAlreadyInScopeTest", () => {
   });
 
   test("spawn inside a scope body re-derives model.all instead of cloning", async () => {
-    // The discriminating case: the current scope is a *different* relation from
-    // the receiver. `clone` would keep the receiver's `title` condition;
-    // `model.all` re-derives from the current scope and carries `type` instead.
     const currentScope = model.where({ type: "SpecialPost" });
     let spawned: ScopeInternals | undefined;
 
     defineAndCallScope("spawnsInsideBody", (rel) => {
       withCurrentScope(currentScope, () => {
-        // Drive spawn on `rel` itself, which `_execScope` marked
-        // delegate-to-model — a clone would not carry the flag.
         spawned = rel.spawn();
       });
       return rel;
     });
 
-    // `spawn` re-derived `model.all` (the current scope) rather than cloning
-    // the receiver, so it carries the current scope's condition.
     expect(await spawned!.toSql()).toMatch(/SpecialPost/);
   });
 
   test("already in scope requires both the flag and a current scope", () => {
     const outside = model.where({ type: "Post" });
-    // Flag unset (not in a scope body) — a current scope alone is not enough.
     withCurrentScope(outside, (registry) => {
       expect(outside.isAlreadyInScope(registry)).toBe(false);
     });
@@ -105,7 +97,6 @@ describe("SpawnAlreadyInScopeTest", () => {
     defineAndCallScope("checksBothConditions", (rel) => {
       bodyRelation = rel;
       const registry = model.scopeRegistry();
-      // `_exec_scope` nils the current scope, so the flag alone is not enough.
       flagWithoutScope = rel.isAlreadyInScope(registry);
       withCurrentScope(rel, (reg) => {
         flagWithScope = rel.isAlreadyInScope(reg);
@@ -119,7 +110,6 @@ describe("SpawnAlreadyInScopeTest", () => {
 
     expect(flagWithoutScope).toBe(false);
     expect(flagWithScope).toBe(true);
-    // The flag is cleared once `_execScope` returns.
     expect(flagAfterBody).toBe(false);
   });
 
@@ -140,9 +130,6 @@ describe("SpawnAlreadyInScopeTest", () => {
     expect(clonedFlag).toBe(false);
   });
 
-  // A plain composition sanity check on the `_execScope` rewiring — it does not
-  // discriminate the clone-flag leak, since `_exec_scope` nils the current scope
-  // for the duration of the body (the test above covers the leak).
   test("chaining inside a scope body accumulates conditions", async () => {
     const scoped = defineAndCallScope("chainedInBody", (rel) =>
       rel.where({ type: "Post" }).where({ title: "Welcome to the weblog" }),

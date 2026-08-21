@@ -31,10 +31,6 @@ export class DeferredDistinctPkIn extends Nodes.In {
     super(attribute, inlineSubquery);
   }
 
-  // Inherited In#invert would build a plain NotIn and drop the deferred
-  // innerRelation, so the load pipeline would never materialize the ids.
-  // `where.not(col: relationWithLimit)` reaches the negated marker through
-  // here (WhereClause#invert over the positively-built predicate).
   invert(): DeferredDistinctPkNotIn {
     return new DeferredDistinctPkNotIn(
       this.left as Nodes.Attribute,
@@ -94,9 +90,6 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
     super(attribute, inlineSubquery);
   }
 
-  // Inherited NotIn#invert would build a plain In carrying only the
-  // display-fallback subquery and drop literalIds/innerRelations, so the load
-  // pipeline would never materialize the ids (see DeferredDistinctPkIn#invert).
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
       this.left as Nodes.Attribute,
