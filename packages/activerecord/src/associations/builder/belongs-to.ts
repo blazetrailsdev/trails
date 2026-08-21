@@ -1,10 +1,4 @@
-import {
-  underscore,
-  pluralize,
-  camelize,
-  isBlank,
-  safeConstantize,
-} from "@blazetrails/activesupport";
+import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
@@ -71,31 +65,24 @@ export class BelongsTo extends SingularAssociation {
   static addCounterCacheCallbacks(model: any, reflection: any): void {
     const name = reflection.name;
 
-    // belongs_to.rb:39-40:
-    //   klass = reflection.class_name.safe_constantize
-    //   klass._counter_cache_columns |= [cache_column] if klass && klass.respond_to?(:_counter_cache_columns)
-    // The column is derived through a thunk rather than eagerly: an unresolved
-    // target has to be re-derived after it registers, or `counterCacheColumn()`
-    // falls back to the non-demodulized `cpk_books_count` instead of
-    // `books_count`. See counter-cache-state.ts.
+    // belongs_to.rb:39-40 — `klass = reflection.class_name.safe_constantize` then
+    // `klass._counter_cache_columns |= [cache_column] if klass && klass.respond_to?(...)`.
     const cacheColumn = (): string =>
       (typeof reflection.counterCacheColumn === "function"
         ? reflection.counterCacheColumn()
         : null) ?? `${pluralize(underscore(model.name))}_count`;
-    const className = reflection.options?.className ?? camelize(name);
-    const klass = safeConstantize(className) as any;
+    const klass = safeConstantize(reflection.className) as any;
     if (klass && "_counterCacheColumns" in klass) {
       const column = cacheColumn();
       if (!klass._counterCacheColumns.includes(column)) {
         klass._counterCacheColumns = [...klass._counterCacheColumns, column];
       }
     } else {
-      // The one thing Ruby's autoload gives Rails for free: a target declared
-      // later in the module graph. Staged under the class name the registry
-      // will use, and applied by `registerModel`.
-      const pending = pendingCounterCacheColumns.get(className) ?? new Set<() => string>();
+      // The arm Ruby's autoload reaches and ESM cannot: see counter-cache-state.ts.
+      const pending =
+        pendingCounterCacheColumns.get(reflection.className) ?? new Set<() => string>();
       pending.add(cacheColumn);
-      pendingCounterCacheColumns.set(className, pending);
+      pendingCounterCacheColumns.set(reflection.className, pending);
     }
 
     // belongs_to.rb:41 — `model.counter_cached_association_names |= [reflection.name]`

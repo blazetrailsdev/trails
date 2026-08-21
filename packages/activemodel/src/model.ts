@@ -2140,8 +2140,7 @@ export class Model {
     // `context_for_validation` inside `freeze`. Touching
     // `validationContext` alone would not populate the cache.
     void this.contextForValidation();
-    // Rails' `super` from `Validations#freeze` reaches `Attributes#freeze`
-    // (attributes.rb:150-153), which clones-and-freezes the attribute set.
+    // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
     attributesFreeze.call(this);
     Object.freeze(this);
     return this;

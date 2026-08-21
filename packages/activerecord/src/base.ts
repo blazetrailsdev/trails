@@ -1935,6 +1935,8 @@ export class Base extends Model {
   }
 
   // --- Reflection::ClassMethods (wired via extend() after class body) ---
+  /** reflection.rb:11 — `class_attribute :_reflections, instance_writer: false, default: {}`. */
+  declare static _reflections: Record<string, _Reflection.AssociationReflection>;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
   declare static reflections: typeof _Reflection.ClassMethods.reflections;
   declare static normalizedReflections: typeof _Reflection.ClassMethods.normalizedReflections;

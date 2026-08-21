@@ -173,11 +173,7 @@ export function attribute(
             : undefined,
         )
     : (existing?.type ?? typeDefaultValue());
-  // Mirrors: `type = hook_attribute_type(name, type) if type`
-  // (attribute_registration.rb:15) — the hooked type IS the declared type, so
-  // the queued PendingType and `_attributeDefinitions` both carry the wrap
-  // (TimeZoneConverter, LockingType). Rails' `if type` guard is the
-  // type-was-provided arm: on a no-type call Rails' `type` is nil.
+  // attribute_registration.rb:15 — `type = hook_attribute_type(name, type) if type`.
   if (typeProvided) type = this.hookAttributeType(name, type);
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and

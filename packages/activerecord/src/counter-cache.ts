@@ -243,9 +243,8 @@ export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
   superFn();
 
   const associationNames: string[] = [];
-  const _reflections = (this as unknown as { _reflections: Record<string, unknown> })._reflections;
-  for (const [name, reflection] of Object.entries(_reflections)) {
-    if (!(reflection as any).belongsTo?.() || !(reflection as any).counterCacheColumn?.()) continue;
+  for (const [name, reflection] of Object.entries(this._reflections)) {
+    if (!reflection.belongsTo?.() || !reflection.counterCacheColumn?.()) continue;
     associationNames.push(name);
   }
   let names = this.counterCachedAssociationNames;
