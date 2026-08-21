@@ -10,7 +10,6 @@ import {
 } from "../attribute-methods.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
-import { cachedTableExists } from "../model-schema.js";
 import type { Base } from "../base.js";
 
 interface PrimaryKeyRecord {
@@ -400,19 +399,18 @@ export function resetPrimaryKey(this: PrimaryKeyHost): void {
  * (primary_key.rb:101-108).
  *
  * The `ActiveRecord::Base != self && table_exists?` arm reads the already-warmed
- * schema cache rather than Rails' `table_exists?` + `schema_cache.primary_keys`,
- * because both are async in trails and `primary_key` is read from synchronous
- * hot paths (model construction). `cachedTableExists` is the sync, cache-only
- * view of `table_exists?` (model-schema.ts) and `getCachedPrimaryKeys` the sync
- * view of `schema_cache.primary_keys`; a cold cache falls through to the "id"
- * convention. `ActiveRecord::Base != self` is carried by the `tableName` guard —
- * `Base` itself has none.
+ * schema cache through `cachedSchemaCacheFor` (below), which resolves it without
+ * leasing a connection; a cold cache falls through to the "id" convention.
+ * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
+ * itself has none.
  *
  * @missingRailsCall table_exists? — CONVERGEABLE: `table_exists?` is async in
- * trails, so only `cachedTableExists`, its cache-only sync view, can be read
- * from the synchronous `primary_key`.
+ * trails, and its sync cache-only view (`cachedTableExists`) leases a connection
+ * to reach the cache, which `primary_key` must not do — see `cachedSchemaCacheFor`.
+ * A table absent from the schema cache has no cached primary keys either, so the
+ * guard is subsumed by the `primaryKeys !== undefined` check.
  * @missingRailsCall primary_keys — CONVERGEABLE: `schema_cache.primary_keys` is
- * async in trails; `getCachedPrimaryKeys` is its cache-only sync view.
+ * async in trails; `getCachedPrimaryKeys` is its lease-free cache-only view.
  */
 export function getPrimaryKey(
   this: PrimaryKeyHost & { primaryKeyPrefixType?: string | null },
@@ -425,7 +423,7 @@ export function getPrimaryKey(
   }
   try {
     const tableName = this.tableName;
-    if (tableName != null && cachedTableExists.call(this as any) !== false) {
+    if (tableName != null) {
       const primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName);
       if (primaryKeys !== undefined) return primaryKeys;
     }
