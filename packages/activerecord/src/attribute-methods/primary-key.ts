@@ -3,17 +3,22 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
-import { underscore } from "@blazetrails/activesupport";
+import { foreignKey } from "@blazetrails/activesupport";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
 } from "../attribute-methods.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { baseClass, isBaseClass } from "../inheritance.js";
+import type { Base } from "../base.js";
 
 interface PrimaryKeyRecord {
   id: unknown;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
+  attributeBeforeTypeCast(attrName: string): unknown;
+  attributeWas(attrName: string): unknown;
+  attributeInDatabase(attrName: string): unknown;
 }
 
 /**
@@ -43,17 +48,6 @@ export function isPrimaryKeyValuesPresent(this: PrimaryKeyRecord): boolean {
     });
   }
   return this.id != null;
-}
-
-function readPkWith(record: PrimaryKeyRecord, method: string): unknown {
-  const pk = (record.constructor as any).primaryKey;
-  const fn = (record as any)[method];
-  if (typeof fn === "function") {
-    if (Array.isArray(pk)) return pk.map((k: string) => fn.call(record, k));
-    return fn.call(record, pk);
-  }
-  if (Array.isArray(pk)) return pk.map((k: string) => record._readAttribute(k));
-  return record._readAttribute(pk);
 }
 
 function readIdForDatabase(this: PrimaryKeyRecord): unknown {
@@ -182,17 +176,26 @@ export class PrimaryKey {
    * here — see CLAUDE.md, "Generated attribute readers are properties".
    */
   get idBeforeTypeCast(): unknown {
-    return readPkWith(this as unknown as PrimaryKeyRecord, "readAttributeBeforeTypeCast");
+    const record = this as unknown as PrimaryKeyRecord;
+    const pk = (record.constructor as any).primaryKey;
+    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeBeforeTypeCast(col));
+    return record.attributeBeforeTypeCast(pk);
   }
 
   /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_was (primary_key.rb:54-56). */
   get idWas(): unknown {
-    return readPkWith(this as unknown as PrimaryKeyRecord, "attributeWas");
+    const record = this as unknown as PrimaryKeyRecord;
+    const pk = (record.constructor as any).primaryKey;
+    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeWas(col));
+    return record.attributeWas(pk);
   }
 
   /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_in_database (primary_key.rb:59-61). */
   get idInDatabase(): unknown {
-    return readPkWith(this as unknown as PrimaryKeyRecord, "attributeInDatabase");
+    const record = this as unknown as PrimaryKeyRecord;
+    const pk = (record.constructor as any).primaryKey;
+    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeInDatabase(col));
+    return record.attributeInDatabase(pk);
   }
 
   /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_for_database (primary_key.rb:64-66). */
@@ -257,19 +260,17 @@ function cachedSchemaCacheFor(
  * contract — never null for a persistable model — so hot paths that read
  * `primary_key` are not forced to null-guard. That narrowing is the accepted
  * deviation; this function is where the truth lives.
+ * Rails' `primary_key` runs `reset_primary_key` on first read
+ * (primary_key.rb:78-81) and latches the answer into `@primary_key`. trails
+ * resolves through `get_primary_key` on EVERY read instead, because
+ * `table_exists?` is async here: a read taken before the schema cache is warm
+ * would otherwise cache the "id" convention forever.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
   if (configured !== undefined) return configured;
-  try {
-    const table = this.tableName;
-    const cached = table ? cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(table) : undefined;
-    if (cached !== undefined) return cached;
-  } catch {
-    // No connection/schema configured — fall through to the convention.
-  }
-  return "id";
+  return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
 }
 
 /**
@@ -379,33 +380,55 @@ export function quotedPrimaryKey(this: PrimaryKeyHost & { connection?: DatabaseA
   return quoter ? quoter.quoteColumnName(primaryKey) : fallback(primaryKey);
 }
 
+/** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#reset_primary_key (primary_key.rb:92-98) */
 export function resetPrimaryKey(this: PrimaryKeyHost): void {
-  const parent = Object.getPrototypeOf(this);
-  const parentPk =
-    parent && typeof parent === "function"
-      ? (parent as Partial<PrimaryKeyHost>).primaryKey
-      : undefined;
-  this._primaryKey = parentPk ?? "id";
+  if (isBaseClass(this as unknown as typeof Base)) {
+    setPrimaryKeyAttr.call(
+      this,
+      getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name) as
+        | string
+        | string[],
+    );
+  } else {
+    setPrimaryKeyAttr.call(this, baseClass.call(this as unknown as typeof Base).primaryKey);
+  }
 }
 
 /**
- * Rails: foreign_key(false) → "admin_userid", foreign_key → "admin_user_id".
- * Falls back to "id" when no prefix type is configured.
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#get_primary_key
+ * (primary_key.rb:101-108).
+ *
+ * The `ActiveRecord::Base != self && table_exists?` arm reads the already-warmed
+ * schema cache through `cachedSchemaCacheFor` (below), which resolves it without
+ * leasing a connection; a cold cache falls through to the "id" convention.
+ * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
+ * itself has none.
+ *
+ * @missingRailsCall table_exists? — CONVERGEABLE: `table_exists?` is async in
+ * trails, and its sync cache-only view (`cachedTableExists`) leases a connection
+ * to reach the cache, which `primary_key` must not do — see `cachedSchemaCacheFor`.
+ * A table absent from the schema cache has no cached primary keys either, so the
+ * guard is subsumed by the `primaryKeys !== undefined` check.
+ * @missingRailsCall primary_keys — CONVERGEABLE: `schema_cache.primary_keys` is
+ * async in trails; `getCachedPrimaryKeys` is its lease-free cache-only view.
  */
 export function getPrimaryKey(
-  this: PrimaryKeyHost & { tableExists?(): Promise<boolean> },
-  baseName?: string,
-): string {
-  if (baseName) {
-    const prefixType = (this as any).primaryKeyPrefixType;
-    if (prefixType === "table_name") {
-      // foreign_key(false): underscore + "id" with no separator
-      return underscore(baseName) + "id";
+  this: PrimaryKeyHost & { primaryKeyPrefixType?: string | null },
+  baseName?: string | null,
+): string | string[] | null {
+  if (baseName != null && this.primaryKeyPrefixType === "table_name") {
+    return foreignKey(baseName, false);
+  } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
+    return foreignKey(baseName);
+  }
+  try {
+    const tableName = this.tableName;
+    if (tableName != null) {
+      const primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName);
+      if (primaryKeys !== undefined) return primaryKeys;
     }
-    if (prefixType === "table_name_with_underscore") {
-      // foreign_key: underscore + "_id"
-      return underscore(baseName) + "_id";
-    }
+  } catch {
+    // No connection/schema configured — fall through to the convention.
   }
   return "id";
 }

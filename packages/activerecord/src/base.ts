@@ -225,6 +225,7 @@ import {
   PrimaryKey as _PrimaryKey,
   getPrimaryKeyAttr as _getPrimaryKeyAttr,
   getPrimaryKey as _getPrimaryKey,
+  resetPrimaryKey as _resetPrimaryKey,
   setPrimaryKeyAttr as _setPrimaryKeyAttr,
   isInstanceMethodAlreadyImplemented as _pkIsInstanceMethodAlreadyImplemented,
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
@@ -4052,6 +4053,9 @@ export class Base extends Model {
 
   static getPrimaryKey = _getPrimaryKey;
 
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#reset_primary_key */
+  static resetPrimaryKey = _resetPrimaryKey;
+
   // Column used to order records when no explicit order is given (e.g. for
   // `first`/`last`). nil by default. Read by relation/finder-methods.ts.
   // Mirrors: ActiveRecord::ModelSchema.implicit_order_column (model_schema.rb:169).
@@ -5015,7 +5019,7 @@ registerTableNameOptions({
     return Base.pluralizeTableNames;
   },
   getPrimaryKey(baseName: string) {
-    return Base.getPrimaryKey(baseName);
+    return Base.getPrimaryKey(baseName) as string;
   },
 });
 
