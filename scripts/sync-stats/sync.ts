@@ -9,6 +9,7 @@ import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
 import { classifyCompareStep } from "./classify-compare-step.js";
 import { isTransientGhError } from "./gh-transient-error.js";
+import { isExpiredJobLogError } from "./expired-job-log.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -446,6 +447,17 @@ class RawJobLog extends Base {
   }
 }
 
+class ExpiredJobLog extends Base {
+  static {
+    this.tableName = "expired_job_logs";
+    this.primaryKey = "job_id";
+    this.attribute("job_id", "big_integer");
+    this.attribute("job_name", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("checked_at", "string");
+  }
+}
+
 class SyncLog extends Base {
   static {
     this.tableName = "sync_log";
@@ -700,6 +712,15 @@ async function migrateDb(adapter: SQLite3Adapter) {
       });
     }
 
+    if (!(await tableExists(adapter, "expired_job_logs"))) {
+      await adapter.createTable("expired_job_logs", { id: false }, (t) => {
+        t.integer("job_id", { primaryKey: true });
+        t.string("job_name");
+        t.integer("pr_number");
+        t.string("checked_at");
+      });
+    }
+
     return;
   }
 
@@ -946,6 +967,13 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.text("log_output");
       t.index(["merge_commit_sha"]);
       t.index(["run_id"]);
+    });
+
+    await adapter.createTable("expired_job_logs", { id: false }, (t) => {
+      t.integer("job_id", { primaryKey: true });
+      t.string("job_name");
+      t.integer("pr_number");
+      t.string("checked_at");
     });
 
     await adapter.createTable("sync_log", {}, (t) => {
@@ -1957,6 +1985,13 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
     AND NOT EXISTS (
       SELECT 1 FROM raw_job_logs rjl WHERE rjl.job_id = wj.id
     )
+    -- A log GitHub has already aged out 404s forever. Without this arm the
+    -- newest-first batch fills up with the same dead jobs every night, the run
+    -- fetches nothing, and JobLogFetchFailedError takes down a sync that has
+    -- no live work left to do.
+    AND NOT EXISTS (
+      SELECT 1 FROM expired_job_logs ejl WHERE ejl.job_id = wj.id
+    )
     ORDER BY wr.pr_number DESC, wj.run_id, wj.id
     ${limitClause}
   `);
@@ -1968,6 +2003,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
 
   console.log(`Fetching logs for ${jobsToFetch.length} jobs...`);
   let fetched = 0;
+  let expired = 0;
 
   for (const job of jobsToFetch) {
     const jobId = job.job_id as number;
@@ -1997,14 +2033,36 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
       }
     } catch (err) {
       if (err instanceof RateLimitExhaustedError) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      if (isExpiredJobLogError(message)) {
+        await ExpiredJobLog.upsertAll(
+          [
+            {
+              job_id: jobId,
+              job_name: jobName,
+              pr_number: prNumber,
+              checked_at: new Date().toISOString(),
+            },
+          ],
+          { uniqueBy: "job_id" },
+        );
+        expired++;
+        continue;
+      }
       console.warn(
-        `  Failed to fetch logs for job ${jobId} "${jobName}" (PR #${prNumber}): ${err instanceof Error ? err.message : err}`,
+        `  Failed to fetch logs for job ${jobId} "${jobName}" (PR #${prNumber}): ${message}`,
       );
     }
   }
 
   console.log(`  Fetched ${fetched} job logs`);
-  if (fetched === 0) {
+  if (expired > 0) {
+    console.log(`  ${expired} job log(s) past GitHub's retention window — will not be retried`);
+  }
+  // Only a batch that neither fetched nor aged out is a stalled feed: an
+  // all-expired batch is the queue draining, and each of its jobs is now
+  // recorded so it never comes back.
+  if (fetched === 0 && expired === 0) {
     throw new JobLogFetchFailedError(jobsToFetch.length);
   }
   return fetched;
