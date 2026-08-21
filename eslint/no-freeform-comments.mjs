@@ -35,6 +35,12 @@
  * declaration it sits on is the same drift this rule deletes, and should be
  * deleted in review.
  *
+ * Requiring a tag or a Rails reference on every JSDoc block was measured and
+ * rejected: it flags 94 pre-existing blocks in these two packages that are
+ * ordinary API documentation ("Set the FROM table.", "Add GROUP BY."), which
+ * is JSDoc doing its job. Tracked as
+ * 0023-surfaced-deviations/close-jsdoc-bypass-in-no-freeform-comments.
+ *
  * The fix is destructive by design: the point is to run it, then read the diff
  * and rescue whatever turns out to be load-bearing. Run it with
  * `--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'` to
