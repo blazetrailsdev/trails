@@ -186,6 +186,16 @@ export class HasAndBelongsToMany {
       // (see `through_model`'s `add_left_association`).
       middleOptions.foreignKey = joinModel.leftReflection.foreignKey;
     }
+    // DEVIATION (trails-only, tracked by converge-constantize-ignores-private-constants):
+    // Rails resolves the join model straight back out of the constant table —
+    // `private_constant` blocks only a literal `A::B` reference, never
+    // `const_get`, so `Object.const_get("Category::HABTM_Posts")` succeeds in
+    // Ruby (verified on 3.3.11). trails' `constantize` raises for a private
+    // name, so the join model is held directly and `klass` short-circuits
+    // before any name lookup. `dependent` stands in for the
+    // `delete_all(:delete_all)` Rails writes into `destroy_associations`.
+    middleOptions.anonymousClass = joinModel;
+    middleOptions.dependent = "delete";
     return middleOptions;
   }
 
@@ -263,15 +273,6 @@ export class HasAndBelongsToMany {
 
     const middleReflection = this.middleReflection(joinModel);
     const middleName = middleReflection.name;
-    // DEVIATION (trails-only, tracked by converge-constantize-ignores-private-constants):
-    // Rails resolves the join model straight back out of the constant table —
-    // `private_constant` blocks only a literal `A::B` reference, never
-    // `const_get`, so `Object.const_get("Category::HABTM_Posts")` succeeds in
-    // Ruby (verified on 3.3.11). trails' `constantize` raises for a private
-    // name, which it should not; until that is fixed, hold the join model
-    // directly so `klass` short-circuits before any name lookup.
-    middleReflection.options.anonymousClass = joinModel;
-    middleReflection.options.dependent = "delete";
     // Rails: `Builder::HasMany.define_callbacks self, middle_reflection`
     // (associations.rb:1878); AutosaveAssociation is one of its extensions.
     addAutosaveAssociationCallbacks.call(model, middleReflection);
