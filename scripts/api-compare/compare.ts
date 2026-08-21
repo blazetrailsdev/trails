@@ -1019,6 +1019,10 @@ export interface SuppressedCall {
   /** See `CallMismatch.tsClass`. */
   tsClass?: string;
   call: string;
+  /** The tag's reason, carried so the report can group the receipts by the
+   *  permanence claim it opens with (RFC 0099). `""` when the artifact the
+   *  entry was read from predates the reasons. */
+  reason?: string;
 }
 
 /** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
@@ -1331,15 +1335,35 @@ export function writerPairedWithReader(
  *  silence a flag raised against this one. With no owner resolved the tags of
  *  the file's single tagged class — or, ambiguously, their union — apply. */
 export function tagsForOwner(
-  byClass: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+  byClass: ReadonlyMap<string, ReadonlyMap<string, string>> | undefined,
   owner: string | undefined,
-): ReadonlySet<string> | undefined {
+): ReadonlyMap<string, string> | undefined {
   if (!byClass || byClass.size === 0) return undefined;
   if (owner !== undefined) return byClass.get(owner);
   if (byClass.size === 1) return [...byClass.values()][0];
-  const union = new Set<string>();
-  for (const calls of byClass.values()) for (const c of calls) union.add(c);
+  const union = new Map<string, string>();
+  for (const calls of byClass.values()) for (const [c, reason] of calls) union.set(c, reason);
   return union;
+}
+
+/** Record one declaration's tagged calls (call → the reason that justified it,
+ *  `""` for an artifact predating the reasons) under (file, name, owner). The
+ *  two families are recorded identically, so they share one writer. */
+function recordTaggedCalls(
+  byFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
+  file: string,
+  name: string,
+  owner: string,
+  calls: string[],
+  reasons: Record<string, string> | undefined,
+): void {
+  const byName = byFileName.get(file) ?? new Map<string, Map<string, Map<string, string>>>();
+  const byClass = byName.get(name) ?? new Map<string, Map<string, string>>();
+  const tagged = byClass.get(owner) ?? new Map<string, string>();
+  for (const c of calls) tagged.set(c, reasons?.[c] ?? "");
+  byClass.set(owner, tagged);
+  byName.set(name, byClass);
+  byFileName.set(file, byName);
 }
 
 /** Drop the flagged calls a tag on this declaration justifies, recording each
@@ -1348,7 +1372,7 @@ export function tagsForOwner(
  *  name. */
 export function suppressTaggedCalls(
   missing: string[],
-  tags: ReadonlySet<string>,
+  tags: ReadonlyMap<string, string> | ReadonlySet<string>,
   used: Set<string>,
 ): string[] {
   return missing.filter((m) => {
@@ -1364,7 +1388,7 @@ export function suppressTaggedCalls(
  *  artifact. A pair whose owning class stayed unresolved recorded its
  *  suppressions under the `"*"` class, so both keys are consulted. */
 export function staleCallTags(
-  tagsByFileName: Map<string, Map<string, Map<string, Set<string>>>>,
+  tagsByFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
   used: Map<string, Set<string>>,
 ): StaleCallTag[] {
   const out: StaleCallTag[] = [];
@@ -1375,7 +1399,7 @@ export function staleCallTags(
           used.get(callTagKey(tsFile, tsClass, tsName)) ??
           used.get(callTagKey(tsFile, "*", tsName));
         if (hit === undefined) continue;
-        for (const call of calls) {
+        for (const call of calls.keys()) {
           if (!hit.has(call)) out.push({ tsFile, tsName, call });
         }
       }
@@ -1485,6 +1509,9 @@ interface CallArgsResult {
   /** `@missingRailsArgs` tags on a COMPARED pair that suppressed nothing —
    *  the tag's only-shrink half, read by lint-call-args.ts. */
   staleTags: StaleCallTag[];
+  /** The mismatches those tags DID suppress, each with its reason — the
+   *  permanence report's population (RFC 0099). */
+  suppressed: SuppressedCall[];
 }
 
 function emptySkipTally(): Record<CallArgSkipReason, number> {
@@ -2549,10 +2576,16 @@ export function main() {
     const tsCallArgsByFileNameOwner = new Map<string, Map<string, Map<string, CallSite[][]>>>();
     // (file → name → declaring class → tagged calls), so a tag on one class
     // never speaks for a same-named sibling; a top-level function is `""`.
-    const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
+    const tsMissingCallTagsByFileName = new Map<
+      string,
+      Map<string, Map<string, Map<string, string>>>
+    >();
     // The call-ARGUMENT twin (RFC 0099): the `@missingRailsArgs` tags, keyed
     // identically, read by `checkCallArgs`.
-    const tsMissingArgTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
+    const tsMissingArgTagsByFileName = new Map<
+      string,
+      Map<string, Map<string, Map<string, string>>>
+    >();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // The same population split by the SEAT each owner declares the name on
@@ -2665,24 +2698,24 @@ export function main() {
         }
       }
       if (m.missingRailsCalls !== undefined) {
-        const byName =
-          tsMissingCallTagsByFileName.get(file) ?? new Map<string, Map<string, Set<string>>>();
-        const byClass = byName.get(m.name) ?? new Map<string, Set<string>>();
-        const tagged = byClass.get(owner) ?? new Set<string>();
-        for (const c of m.missingRailsCalls) tagged.add(c);
-        byClass.set(owner, tagged);
-        byName.set(m.name, byClass);
-        tsMissingCallTagsByFileName.set(file, byName);
+        recordTaggedCalls(
+          tsMissingCallTagsByFileName,
+          file,
+          m.name,
+          owner,
+          m.missingRailsCalls,
+          m.missingRailsCallReasons,
+        );
       }
       if (m.missingRailsArgs !== undefined) {
-        const byName =
-          tsMissingArgTagsByFileName.get(file) ?? new Map<string, Map<string, Set<string>>>();
-        const byClass = byName.get(m.name) ?? new Map<string, Set<string>>();
-        const tagged = byClass.get(owner) ?? new Set<string>();
-        for (const c of m.missingRailsArgs) tagged.add(c);
-        byClass.set(owner, tagged);
-        byName.set(m.name, byClass);
-        tsMissingArgTagsByFileName.set(file, byName);
+        recordTaggedCalls(
+          tsMissingArgTagsByFileName,
+          file,
+          m.name,
+          owner,
+          m.missingRailsArgs,
+          m.missingRailsArgsReasons,
+        );
       }
       if (m.callSeq !== undefined) {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
@@ -2999,6 +3032,9 @@ export function main() {
     // mismatch is STALE, the only-shrink half `@missingRailsCall` already has.
     const argTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
+    // The call-ARGUMENT twin, reported in that artifact for the same reason:
+    // its receipts carry a permanence claim and are a population of their own.
+    const suppressedArgCalls: SuppressedCall[] = [];
     const callSkeletons: CallSkeleton[] = [];
     let callArgsCompared = 0;
     const callArgsSkipped = emptySkipTally();
@@ -3280,7 +3316,15 @@ export function main() {
           kept = suppressTaggedCalls(missing, tags, used);
           for (const m of missing) {
             const call = callOf(m);
-            if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, call });
+            if (tags.has(call))
+              suppressedCalls.push({
+                tsFile,
+                rubyName,
+                tsName,
+                tsClass,
+                call,
+                reason: tags.get(call) ?? "",
+              });
           }
         }
         const rubySkeleton = rubySkeletonByName.get(rubyName);
@@ -3399,6 +3443,14 @@ export function main() {
             (argTagsUsed.get(tagKey) ?? argTagsUsed.set(tagKey, new Set()).get(tagKey)!).add(
               ruby.name,
             );
+            suppressedArgCalls.push({
+              tsFile,
+              rubyName,
+              tsName,
+              tsClass,
+              call: ruby.name,
+              reason: argTags.get(ruby.name) ?? "",
+            });
             continue;
           }
           callArgMismatches.push({
@@ -3941,6 +3993,7 @@ export function main() {
         skipped: callArgsSkipped,
         mismatches: callArgMismatches,
         staleTags: staleCallTags(tsMissingArgTagsByFileName, argTagsUsed),
+        suppressed: suppressedArgCalls,
       },
       bodyHashes: bodyHashRecords,
     });
@@ -4090,6 +4143,9 @@ export function main() {
     const staleArgTagsFlat = results.flatMap((r) =>
       r.callArgs.staleTags.map((t) => ({ package: r.package, ...t })),
     );
+    const suppressedArgsFlat = results.flatMap((r) =>
+      r.callArgs.suppressed.map((c) => ({ package: r.package, ...c })),
+    );
     fs.writeFileSync(
       callArgsPath,
       JSON.stringify(
@@ -4107,6 +4163,7 @@ export function main() {
           ),
           mismatches: callArgsFlat,
           staleTags: staleArgTagsFlat,
+          suppressed: suppressedArgsFlat,
         },
         null,
         2,

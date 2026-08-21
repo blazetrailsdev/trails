@@ -129,6 +129,7 @@ import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import {
   type Artifact,
   type CallMismatchKey,
+  type TagReceipt,
   type ExcludeEntry,
   compareKeys,
   compareShardKeys,
@@ -179,7 +180,7 @@ import {
   writeMarks,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
-import { DEFAULT_REASON, TAG } from "./missing-rails-call-tags.js";
+import { DEFAULT_REASON, TAG, classifyReason } from "./missing-rails-call-tags.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
@@ -355,7 +356,7 @@ export function bucketFor(key: CallMismatchKey, index: TsMemberIndex): CauseBuck
     : "same-file zero-arg member";
 }
 
-export function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
+export function tally<T>(items: readonly T[], keyFn: (item: T) => string): [string, number][] {
   const counts = new Map<string, number>();
   for (const item of items) {
     const k = keyFn(item);
@@ -583,11 +584,40 @@ export function unreviewedCount(entries: ExcludeEntry[]): number {
   return unreviewedEntries(entries, DEFAULT_REASON).length;
 }
 
+/**
+ * The call-site receipts (`@missingRailsCall` / `@missingRailsArgs`), grouped
+ * by the permanence claim their reason opens with — the report half of the
+ * receipt contract (RFC 0099).
+ *
+ * A receipt takes its deviation off the baseline, so it leaves the row count
+ * the baselines are measured by. Without this section a CONVERGEABLE receipt is
+ * as invisible as a PERMANENT one and never surfaces as work again, which is
+ * exactly the failure `parity:api:extra` fixed for `@noRailsEquivalent` by
+ * printing its own permanence tally (extra-surface.ts).
+ */
+export function receiptsSection(title: string, receipts: readonly TagReceipt[]): string {
+  return (
+    section(
+      title,
+      tally(receipts, (r) => classifyReason(r.reason ?? "")),
+    ) +
+    "\n" +
+    section(
+      `${title} — CONVERGEABLE by file`,
+      tally(
+        receipts.filter((r) => classifyReason(r.reason ?? "") === "convergeable"),
+        (r) => `${r.package}/${r.tsFile} ${r.tsName} ${r.call}`,
+      ),
+    )
+  );
+}
+
 export function renderReport(
   entries: ExcludeEntry[],
   index: TsMemberIndex | undefined,
   top: number,
   mark?: number,
+  receipts: readonly TagReceipt[] = [],
 ): string {
   const files = new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size;
   const parts = [
@@ -609,6 +639,7 @@ export function renderReport(
       top,
     ),
   ];
+  parts.push(receiptsSection("Call-site receipts by permanence claim", receipts));
   parts.push(
     index === undefined
       ? `\nBy cause bucket: SKIPPED — ${path.relative(ROOT_DIR, TS_API_PATH)} is missing ` +
@@ -848,6 +879,7 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
       manifest && indexTsMembers(manifest),
       top,
       totalMark(await loadMarks(MARK_DIR)),
+      artifact?.suppressed ?? [],
     ),
   );
   return 0;

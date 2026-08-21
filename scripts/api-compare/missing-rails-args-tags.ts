@@ -34,6 +34,7 @@ import {
   classifyReason,
   justifies,
   parseJsdoc,
+  suppressedCallReasonsIn,
 } from "./missing-rails-call-tags.js";
 
 export const TAG = "@missingRailsArgs";
@@ -54,4 +55,13 @@ export function suppressedArgCallsIn(comment: string, origin?: JsdocOrigin): str
     );
   }
   return [...new Set(entries.filter((e) => justifies(e.reason)).map((e) => e.call))].sort();
+}
+
+/** The call-ARGUMENT twin of `suppressedCallReasonsIn`: each suppressed call
+ *  mapped to its reason, for the permanence report (RFC 0099). */
+export function suppressedArgReasonsIn(
+  comment: string,
+  origin?: JsdocOrigin,
+): Record<string, string> {
+  return suppressedCallReasonsIn(comment, origin, TAG);
 }

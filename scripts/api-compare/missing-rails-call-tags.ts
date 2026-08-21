@@ -211,6 +211,25 @@ export function suppressedCallsIn(comment: string, origin?: JsdocOrigin): string
   return [...new Set(justified.map((e) => e.call))].sort();
 }
 
+/** The same suppressions as {@link suppressedCallsIn}, each mapped to the
+ *  REASON that justified it, so a consumer can group the receipts by the
+ *  permanence claim {@link classifyReason} reads off that reason (RFC 0099).
+ *  Two tags for one call on one comment keep the first reason, matching the
+ *  dedup {@link suppressedCallsIn} already does. */
+export function suppressedCallReasonsIn(
+  comment: string,
+  origin?: JsdocOrigin,
+  tag: string = TAG,
+): Record<string, string> {
+  const { entries } = parseJsdoc(comment, origin, tag);
+  const reasons: Record<string, string> = {};
+  for (const entry of entries) {
+    if (!justifies(entry.reason)) continue;
+    reasons[entry.call] ??= entry.reason;
+  }
+  return reasons;
+}
+
 /**
  * The permanence claim a tag's reason makes about itself.
  *

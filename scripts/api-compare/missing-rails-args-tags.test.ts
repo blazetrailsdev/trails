@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { suppressedArgCallsIn, TAG } from "./missing-rails-args-tags.js";
+import { suppressedArgCallsIn, suppressedArgReasonsIn, TAG } from "./missing-rails-args-tags.js";
 
 const block = (body: string): string => `/**\n * ${body}\n */`;
 
@@ -36,5 +36,17 @@ describe("suppressedArgCallsIn", () => {
     expect(
       suppressedArgCallsIn(block(`${TAG} where — CONVERGEABLE: pending the scope port.`)),
     ).toEqual(["where"]);
+  });
+});
+
+describe("suppressedArgReasonsIn", () => {
+  it("maps each suppressed call to the reason that justified it", () => {
+    expect(
+      suppressedArgReasonsIn(block(`${TAG} new — PERMANENT: a JS Map takes no capacity.`)),
+    ).toEqual({ new: "PERMANENT: a JS Map takes no capacity." });
+  });
+
+  it("returns nothing for an untagged comment", () => {
+    expect(suppressedArgReasonsIn(block("Just prose."))).toEqual({});
   });
 });

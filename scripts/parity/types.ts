@@ -120,6 +120,18 @@ export interface MethodInfo {
    */
   missingRailsArgs?: string[];
   /**
+   * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
+   * suppression above, keyed by Ruby call. Carried so a receipt's permanence
+   * claim — `PERMANENT` / `CONVERGEABLE`, read by `classifyReason` — survives
+   * into the artifact and the suppressions can be reported as the two separate
+   * populations they are, the way `parity:api:extra` already reports
+   * `@noRailsEquivalent`.
+   */
+  missingRailsCallReasons?: Record<string, string>;
+  /** TS-side only (RFC 0099): the `@missingRailsArgs` twin of
+   *  {@link missingRailsCallReasons}. */
+  missingRailsArgsReasons?: Record<string, string>;
+  /**
    * Normalized digest of the Ruby method BODY (source-hash pinning, RFC 0025).
    * Whitespace/comment-insensitive, body-only; changes when the ported code
    * changes upstream. Ruby-side only (the TS extractor does not emit it); used
