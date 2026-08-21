@@ -298,6 +298,30 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(await adapter.indexExists("aux.customers", ["name"])).toBe(false);
   });
 
+  it("copyTableIndexes copies a default-named index on an ATTACHed schema", async () => {
+    // The other half of the default-name fix: copy_table_indexes reaches
+    // add_index for every index it copies (sqlite3_adapter.rb:668-674), so a
+    // rebuild of a qualified table whose index carries the DEFAULT name is the
+    // path that used to need an explicit `name:` to get past
+    // `index_aux.widgets_on_name`. Nothing is hand-named here.
+    const auxPath = path.join(tmpDir, "aux-copy-default-index.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    await adapter.executeMutation(
+      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
+    );
+    await adapter.addIndex("aux.widgets", ["name"]);
+
+    await adapter.removeColumn("aux.widgets", "doomed");
+
+    expect((await adapter.columns("aux.widgets")).map((c) => c.name)).toEqual(["id", "name"]);
+    expect(
+      ((await adapter.indexes("aux.widgets")) as Array<{ name: string }>).map((i) => i.name),
+    ).toEqual(["index_widgets_on_name"]);
+    expect(
+      (await adapter.selectAll("SELECT name FROM main.sqlite_master WHERE type='index'")).rows,
+    ).toEqual([]);
+  });
+
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",
