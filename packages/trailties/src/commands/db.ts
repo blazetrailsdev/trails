@@ -265,9 +265,8 @@ function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig 
 }
 
 /**
- * Run `fn` with `DatabaseTasks.databaseConfiguration`, the module-level
- * AND `DatabaseTasks.env` temporarily aligned with `config`.
- * Captures/restores both so
+ * Run `fn` with `DatabaseTasks.databaseConfiguration` and `DatabaseTasks.env`
+ * temporarily aligned with `config`. Captures/restores both so
  * callers can safely invoke methods like `DatabaseTasks.truncateAll(env)`
  * that resolve the env via `_normalizeEnv()` (reads DatabaseTasks.env by
  * default) and then call `configsFor` against it.

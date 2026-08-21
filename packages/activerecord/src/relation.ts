@@ -3017,7 +3017,15 @@ export class Relation<T extends Base> {
     return (this.model as any).createBang(attributes, block);
   }
 
-  // Mirrors relation.rb:1365-1379.
+  /**
+   * Mirrors: ActiveRecord::Relation#_scoping (`relation.rb:1365-1379`).
+   *
+   * Ruby's `ensure` runs once the block has finished, where a JS `finally`
+   * fires the moment an async body yields — so when `fn` answers a promise the
+   * restore rides on it instead of firing under the still-running body. The
+   * check is `instanceof Promise` rather than a thenable test because a
+   * `Relation` is itself thenable, and `_execScope`'s block answers one.
+   */
   private _scoping<R>(scope: any, registry: any, allQueries: boolean | null, fn: () => R): R {
     const previous = registry.currentScope(this.model, true);
     registry.setCurrentScope(this.model, scope);
@@ -3026,9 +3034,6 @@ export class Relation<T extends Base> {
       previousGlobal = registry.globalCurrentScope(this.model, true);
       registry.setGlobalCurrentScope(this.model, scope);
     }
-    // Ruby's `ensure` runs after the block has finished; a JS `finally` runs as
-    // soon as an async block yields, so an awaitable result has to carry the
-    // restore rather than have it fire under the still-running body.
     const ensure = () => {
       registry.setCurrentScope(this.model, previous);
       if (allQueries) {

@@ -6,6 +6,7 @@ import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { toSqlAndBinds } from "./connection-adapters/abstract/database-statements.js";
+import { Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
@@ -71,10 +72,7 @@ describe("InternalMetadata built from a connection pool", () => {
 });
 
 describe("InternalMetadata#selectEntry", () => {
-  // `select_entry` wraps the key in `Arel::Nodes::BindParam`
-  // (internal_metadata.rb:157), so the key travels as a bind rather than being
-  // inlined at compile time. A create+find roundtrip cannot see the difference,
-  // so this asserts on the SQL the manager compiles to.
+  // internal_metadata.rb:157
   it("sends the key as a bind rather than inlining it", async () => {
     const internalMetadata = new InternalMetadata(Base.connectionPool());
     await internalMetadata.createTable();
@@ -86,12 +84,21 @@ describe("InternalMetadata#selectEntry", () => {
           selectEntry(c: DatabaseAdapter, key: string): Promise<unknown>;
         }
       ).selectEntry(connection, "environment");
-      const [sql, binds] = toSqlAndBinds.call(
-        connection as never,
-        selectAll.mock.calls[0][0] as never,
-      );
-      expect(sql).not.toContain("environment");
-      expect(binds).toEqual(["environment"]);
+      const sm = selectAll.mock.calls[0][0] as {
+        constraints: { right: unknown }[];
+      };
+      const right = sm.constraints[0].right as Nodes.BindParam;
+      expect(right).toBeInstanceOf(Nodes.BindParam);
+      expect(right.value).toBe("environment");
+
+      // A substituting adapter (prepared statements off — MySQL's default)
+      // renders the same node as a literal, so the placeholder is only
+      // observable where the binds actually travel separately.
+      if ((connection as unknown as { preparedStatements?: boolean }).preparedStatements) {
+        const [sql, binds] = toSqlAndBinds.call(connection as never, sm as never);
+        expect(sql).not.toContain("environment");
+        expect(binds).toEqual(["environment"]);
+      }
     } finally {
       selectAll.mockRestore();
       Base.connectionPool().checkin(connection);

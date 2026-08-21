@@ -14,6 +14,7 @@ import {
   returningColumnValues as mysqlReturningColumnValues,
   buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { rubyInspect } from "../relation/ruby-inspect.js";
@@ -1327,7 +1328,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * body lives in `mysql/database-statements.ts` like `write_query?` and
    * `returning_column_values`.
    */
-  buildExplainClause = mysqlBuildExplainClause;
+  buildExplainClause(options: ExplainOption[] = []): Promise<string> {
+    return mysqlBuildExplainClause.call(this, options);
+  }
 
   /**
    * @internal
