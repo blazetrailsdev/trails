@@ -315,8 +315,8 @@ export class AbstractReflection {
     // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
-    const klass = this.klass as any;
     const relation = this.buildScope(table, predicateBuilder);
+    const klass = this.klass as any;
     return klass.scopeForAssociation ? klass.scopeForAssociation(relation) : relation;
   }
 

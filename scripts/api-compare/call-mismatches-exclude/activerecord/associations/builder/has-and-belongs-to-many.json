@@ -18,6 +18,6 @@
     "tsFile": "associations/builder/has-and-belongs-to-many.ts",
     "rubyName": "through_model",
     "call": "order:_tableName,computeType",
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. has_and_belongs_to_many.rb:57-99 names the join table before resolving the two `compute_type` class names; the port resolves the classes first and derives the table name from them."
+    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. has_and_belongs_to_many.rb:23-32 resolves the join table LAZILY ('RHS class might not have been loaded') and defines `compute_type` first; trails computes the table name eagerly on a plain object. Filed as 0106/converge-habtm-through-model-lazy-table-name."
   }
 ]

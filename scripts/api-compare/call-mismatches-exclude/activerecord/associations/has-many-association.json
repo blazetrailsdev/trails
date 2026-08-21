@@ -4,7 +4,7 @@
     "tsFile": "associations/has-many-association.ts",
     "rubyName": "count_records",
     "call": "select!",
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. has_many_association.rb:91 `target.select!(&:new_record?)` mutates the target array in place; the port hands the retained subset to `_writeTargetStore`, the only sanctioned way to replace the target store."
+    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. has_many_association.rb:91 `target.select!(&:new_record?)` filters the target in place; trails routes the whole body through a host-callback object that replaces the target store. Filed as 0106/converge-has-many-count-records-select-bang."
   },
   {
     "package": "activerecord",

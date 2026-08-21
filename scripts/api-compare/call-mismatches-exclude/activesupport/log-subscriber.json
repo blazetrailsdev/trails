@@ -4,7 +4,7 @@
     "tsFile": "log-subscriber.ts",
     "rubyName": "set_event_levels",
     "call": "transform_keys",
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. log_subscriber.rb:123 `log_levels.transform_keys { ... }`; `logLevels` is a JS `Map` and trails' `transformKeys` (hash-utils.ts:217) is object-only, so the port rebuilds the Map in a loop."
+    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. log_subscriber.rb:123 `log_levels.transform_keys { ... }`; `logLevels` is a JS `Map` and trails' `transformKeys` (hash-utils.ts:217) is object-only, so the port rebuilds it in a loop. Filed as 0106/converge-log-subscriber-transform-keys-and-proc."
   },
   {
     "package": "activesupport",

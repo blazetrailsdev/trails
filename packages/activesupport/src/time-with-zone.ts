@@ -234,11 +234,9 @@ export class TimeWithZone {
       );
       return new TimeWithZone(null, this.timeZone, local, matched ? period : null);
     } else if (time instanceof Range) {
-      return new Range(
-        this._wrapWithTimeZone(time.begin),
-        this._wrapWithTimeZone(time.end),
-        time.excludeEnd,
-      );
+      // `..`, not `...`: Rails rebuilds an INCLUSIVE range whatever the source
+      // range was (time_with_zone.rb:598).
+      return new Range(this._wrapWithTimeZone(time.begin), this._wrapWithTimeZone(time.end));
     } else {
       return time;
     }

@@ -9,6 +9,6 @@
       "ref:pattern",
       "ref:subscriber"
     ],
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): `_addEventSubscriber` only now pairs with `add_event_subscriber`. subscriber.rb:94 `notifier.subscribe(pattern, subscriber)` passes the Subscriber object, which Notifications invokes through `#call`; the JS notifier takes a callable, so trails passes `(e) => sub.call(e)`. Same Proc-vs-callable substitution as the `log-subscriber.ts silenced? -> call` row. Language shortcoming."
+    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. subscriber.rb:94 `notifier.subscribe(pattern, subscriber)` passes the Subscriber object, which Notifications invokes through `#call`; the JS notifier takes a callable, so trails passes `(e) => sub.call(e)` — the same Proc-vs-callable substitution as the `log-subscriber.ts silenced? -> call` row. Filed for a deliberate ruling as 0106/converge-log-subscriber-transform-keys-and-proc."
   }
 ]

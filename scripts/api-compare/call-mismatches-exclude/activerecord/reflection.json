@@ -51,15 +51,8 @@
   {
     "package": "activerecord",
     "tsFile": "reflection.ts",
-    "rubyName": "klass_join_scope",
-    "call": "order:klass,buildScope",
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. reflection.rb:441-444 builds the scope before resolving `klass`; the port resolves the class first. Real divergence, filed for burndown."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
     "rubyName": "strict_loading_violation_message",
     "call": "klass",
-    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. reflection.rb:346 interpolates `klass`; the port interpolates `className` so the message builds without resolving the constant. Real divergence, filed for burndown."
+    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. reflection.rb:346 interpolates `klass` inside the non-polymorphic arm only; trails splits the method into a module function taking a pre-built `{ className }` object, which is built eagerly and so cannot resolve `klass` lazily. The split is the defect — filed as 0106/converge-strict-loading-violation-message-klass."
   }
 ]
