@@ -20,8 +20,10 @@ import {
   toTag,
   inGroups,
   inGroupsOf,
+  pluralize,
   singularize,
   split,
+  underscore,
   toSentence,
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
@@ -1135,26 +1137,27 @@ export class DelegationMethods {
     // conversions.rb:188 — the builder is created once and threaded through
     // every `to_tag` call, which is how nesting and indentation compose.
     const builder = new IndentedXmlStringBuilder();
+    // conversions.rb:202 deletes `:children`, and :199 deletes `:skip_instruct`,
+    // so neither reaches `to_tag`; `:root` is overridden by `to_tag`'s merge.
+    const { root: rootOption, children: childrenOption, skipInstruct = false, ...rest } = options;
     const root =
-      options.root ??
+      rootOption ??
+      // conversions.rb:190-195. `all?(first.class)` is `Class#===`, so a
+      // subclass instance still matches — an STI collection whose first element
+      // is the base class roots under the base's plural, not "objects".
       (records.length === 0
-        ? // conversions.rb:189-195: the empty default is the *pre-rename* value
+        ? // The empty default is the *pre-rename* value
           // `underscore(NilClass.name).pluralize` = "nil_classes"; `renameKey`
           // below dashes it to "nil-classes" under default options and composes
           // correctly with `dasherize: false` / `camelize:`.
           "nil_classes"
-        : records.every((record) => record.constructor === records[0].constructor)
-          ? (records[0].constructor as unknown as { modelName: { plural: string } }).modelName
-              .plural
+        : records.every((record) => record instanceof records[0].constructor)
+          ? pluralize(underscore(records[0].constructor.name)).replace(/\//g, "_")
           : "objects");
 
-    // conversions.rb:199: `builder.instruct! unless options.delete(:skip_instruct)`,
-    // and `:skip_instruct` is *deleted* so it never reaches `to_tag` (where the
-    // merged options set it unconditionally anyway).
-    const { root: _root, children: childrenOption, skipInstruct = false, ...rest } = options;
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
 
-    // conversions.rb:200-201: Rails renames the root FIRST, then singularizes
+    // conversions.rb:200-202: Rails renames the root FIRST, then singularizes
     // the already-renamed root for the child name — never underscoring the
     // (already snake_case, or caller-supplied) root string.
     const rootTag = renameKey(root, rest);

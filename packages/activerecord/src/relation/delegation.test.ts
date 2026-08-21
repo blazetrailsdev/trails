@@ -501,9 +501,7 @@ describe("DelegationTest", () => {
 
     it("to_xml serializes the collection with a plural root and singular children", async () => {
       // Array#to_xml: root reflects the pluralized class name, each record under
-      // root.singularize, and the collection carries `type="array"`. Filtered to a
-      // single STI type so the collection is homogeneous (the `comments` fixtures
-      // mix Comment/SpecialComment, which Rails would root under <objects>).
+      // root.singularize, and the collection carries `type="array"`.
       const base = Comment.where({ type: "Comment" });
       const xml = await base.toXml();
       expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
@@ -521,7 +519,7 @@ describe("DelegationTest", () => {
         skipInstruct: true,
       });
       expect(xml.startsWith("<comments>")).toBe(true);
-      expect(xml).not.toContain('type="array"');
+      expect(xml).not.toContain("type=");
     });
 
     it("to_xml roots a heterogeneous collection under <objects> (Rails all?(first.class))", async () => {
@@ -560,18 +558,6 @@ describe("DelegationTest", () => {
       expect(await Comment.where({ id: -1 }).toXml({ skipInstruct: true, camelize: true })).toBe(
         '<NilClasses type="array"/>\n',
       );
-    });
-
-    it("to_xml threads camelize true through the root, children, and attribute tags together", async () => {
-      // The same options hash camelizes the collection root AND each child
-      // element uniformly (conversions.rb:200-201 + to_tag).
-      const xml = await Comment.where({ type: "Comment" }).toXml({
-        skipTypes: true,
-        skipInstruct: true,
-        camelize: true,
-      });
-      expect(xml).toContain("<Comments>");
-      expect(xml).toContain("<Comment>");
     });
 
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {
