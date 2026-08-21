@@ -1661,7 +1661,9 @@ export class ThroughReflection extends AbstractReflection {
    * option, though.
    *
    * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
-   * (reflection.rb:1083-1090).
+   * (reflection.rb:1083-1090). Unlike BelongsToReflection's (:928), this branch
+   * has no Array arm — it is `-primary_key.to_s` whatever the option holds, and
+   * Ruby's `Array#to_s` is an alias of `inspect`.
    */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     // Get the "actual" source reflection if the immediate source reflection has a
@@ -1669,7 +1671,9 @@ export class ThroughReflection extends AbstractReflection {
     const primaryKey = (this.actualSourceReflection() as unknown as ConcreteReflection).options
       ?.primaryKey;
     if (primaryKey != null && primaryKey !== false) {
-      return (this._associationPrimaryKey ??= String(primaryKey));
+      return (this._associationPrimaryKey ??= Array.isArray(primaryKey)
+        ? rubyInspectArray(primaryKey)
+        : String(primaryKey));
     } else {
       return this.primaryKeyForModel(klass || this.klass);
     }
