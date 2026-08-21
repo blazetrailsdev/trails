@@ -16,6 +16,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";
 
 /**
@@ -86,11 +87,24 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
  * Return direct subclasses of a model class.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#subclasses
+ *
+ * Ruby's `Class#subclasses` is maintained by the VM, so
+ * `DescendantsTracker.subclasses(klass)` is a plain delegation to it
+ * (descendants_tracker.rb:97-100) and there is exactly one registry. JS has no
+ * such hook, so trails fills two by hand — `_subclasses` from an explicit
+ * `registerSubclass`, and `ActiveSupport`'s `DescendantsTracker` from
+ * `_default_attributes`. Read both, so callers get the one answer Ruby gets.
  */
 export function subclasses(modelClass: typeof Base): (typeof Base)[] {
-  return Object.prototype.hasOwnProperty.call(modelClass, "_subclasses")
-    ? (modelClass as any)._subclasses
+  const result: (typeof Base)[] = Object.prototype.hasOwnProperty.call(modelClass, "_subclasses")
+    ? [...((modelClass as any)._subclasses as (typeof Base)[])]
     : [];
+  for (const klass of DescendantsTracker.subclasses(
+    modelClass as never,
+  ) as unknown as (typeof Base)[]) {
+    if (klass !== modelClass && !result.includes(klass)) result.push(klass);
+  }
+  return result;
 }
 
 /**

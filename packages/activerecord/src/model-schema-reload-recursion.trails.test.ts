@@ -47,12 +47,13 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
 
     await Ticket.loadSchema();
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeDefined();
-    const revisionBefore = own<number>(Ticket, "_schemaRevision");
+    expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
 
     reloadSchemaFromCache.call(Shape as never);
 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
-    expect(own<number>(Ticket, "_schemaRevision")).toBeGreaterThan(revisionBefore ?? 0);
+    expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
+    expect(own<Record<string, unknown>>(Ticket, "_columnsHash")).toBeUndefined();
   });
 
   it("reloads an own-table descendant in full when it is the reload target, without redirecting to the STI base", async () => {
@@ -75,13 +76,13 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     }
 
     await Ticket.loadSchema();
-    const ticketRevisionBefore = own<number>(Ticket, "_schemaRevision");
-    const shapeRevisionBefore = own<number>(Shape, "_schemaRevision");
+    expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
+    const shapeLoadedBefore = own<boolean>(Shape, "_schemaLoaded");
 
     reloadSchemaFromCache.call(Ticket as never);
 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
-    expect(own<number>(Ticket, "_schemaRevision")).toBeGreaterThan(ticketRevisionBefore ?? 0);
-    expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
+    expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
+    expect(own<boolean>(Shape, "_schemaLoaded")).toBe(shapeLoadedBefore);
   });
 });
