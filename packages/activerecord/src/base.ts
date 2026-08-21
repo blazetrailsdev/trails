@@ -2984,28 +2984,11 @@ export class Base extends Model {
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
-  // No initializers: `init_internals` (core.rb:834-849) assigns both from the
-  // class during `super()`, and a field initializer here would run afterwards
-  // and clobber them back to the class-less defaults. Declared on the merged
-  // `Base` interface below instead.
   // No Rails counterpart: Rails' strict_loading is tripped by `load_target`
   // alone. Trails keeps the counter only for `loadBelongsTo` / `loadHasOne`
   // (associations/instance-methods.ts) — explicit lazy loads the caller asked
   // for by name, which Rails has no method to express an exemption for.
   _strictLoadingBypassCount = 0;
-  /**
-   * The single backing slot for this record's association cache — RFC-0022's
-   * fold of the three formerly-separate maps into one store keyed by name (see
-   * `_resetAssociationCaches`). The three public accessors below are
-   * `Map`-compatible facet views onto one field of this shared store, mirroring
-   * Rails' single `@association_cache`.
-   *
-   * @internal
-   */
-  // No initializers, for the same reason as `_strictLoading` above: Rails
-  // allocates `@association_cache` in `init_internals` (associations.rb:75-77),
-  // which now runs during `super()`, and a field initializer here would replace
-  // the store afterwards. `_resetAssociationCaches` is the allocation site.
 
   /**
    * Return the *loaded* cached association object for `name` — callers read
@@ -4364,10 +4347,30 @@ export class Base extends Model {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation> {
+  /**
+   * Assigned by `init_internals` (core.rb:834-849) during `super()`. Declared
+   * here rather than as a class field because a field initializer runs after
+   * `super()` returns and would clobber what the chain just assigned.
+   *
+   * @internal
+   */
   _strictLoading: boolean;
+  /** @internal */
   _strictLoadingMode?: _Core.StrictLoadingMode;
+  /**
+   * The single backing slot for this record's association cache — RFC-0022's
+   * fold of the three formerly-separate maps into one store keyed by name (see
+   * `_resetAssociationCaches`). The two accessors below are `Map`-compatible
+   * facet views onto one field of this shared store, mirroring Rails' single
+   * `@association_cache`, which `Associations#init_internals` allocates
+   * (associations.rb:75-77) — hence no class field here either.
+   *
+   * @internal
+   */
   _associationCacheStore: _AssociationCache;
+  /** @internal */
   _collectionProxies: Map<string, unknown>;
+  /** @internal */
   _associationInstances: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
   /**
