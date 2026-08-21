@@ -157,7 +157,7 @@ const rule = {
     type: "suggestion",
     docs: {
       description:
-        "Delete free-form comments; keep JSDoc, Rails references, tool directives, and explicitly marked comments.",
+        "Delete free-form comments; keep only JSDoc, references to the Rails source, and tool directives.",
     },
     fixable: "code",
     schema: [
