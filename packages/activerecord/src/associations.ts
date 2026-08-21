@@ -559,13 +559,12 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
   // write is `set_inverse_instance`'s own `inverse.inversed_from(owner)`
   // (association.rb:132-137, 153-155), whose `self.target = record` reaches
   // `CollectionAssociation#target=` (collection_association.rb:284-296) and so
-  // `replace_on_target(record, true, replace: true, inversing: true)`.
+  // `replace_on_target(record, true, replace: true, inversing: true)`. Rails
+  // resolves the inverse with a bare `record.association(name)`; a has_many's
+  // canonical target lives on its `CollectionProxy` here (`_associationCache`),
+  // so resolving it also materializes that proxy.
   if (inverseRefl?.macro === "hasMany") {
     if (!childCtor.hasManyInversing) return;
-    // Rails resolves the inverse with a bare `record.association(name)`; in
-    // trails a has_many's canonical target lives on its `CollectionProxy`
-    // (`Base#_associationCache`), so resolving it means materializing that
-    // proxy as well as the association object `inversed_from` is sent to.
     association(child, inverseName);
     (
       child.association(inverseName) as unknown as { inversedFrom(record: Base): void }

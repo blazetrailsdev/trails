@@ -639,8 +639,8 @@ function _applyScopeAttributes(
     // (scoping.rb:60-66, core.rb:474), which a JS constructor cannot await, so
     // the assignment is parked on the record for `save` to drain — the same
     // deferral the nested-attribute writers use. A scope value naming an
-    // association (
-    // `Firm.where(firm: f).new`) is the only one that can still be in flight.
+    // association (`Firm.where(firm: f).new`) is the only one that can still be
+    // in flight.
     const pending = (record as any).assignAttributes(toApply) as Promise<void> | void;
     if (pending) _NestedAttributes.parkNestedReaderLoad(record as any, pending);
   }

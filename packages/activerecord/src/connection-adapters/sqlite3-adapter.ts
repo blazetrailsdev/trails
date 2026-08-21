@@ -1667,7 +1667,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return super.indexName(this._splitTableName(tableName).bare, options);
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
+   * (`sqlite3_adapter.rb:286-292`), with the schema qualifier put back on the
+   * INDEX name for a qualified table — the same fork
+   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition` takes on create, and
+   * ratified in the same place. Rails emits the bare name because it has no
+   * ATTACHed-schema notion; SQLite resolves a bare `DROP INDEX` name across
+   * main, temp and each ATTACHed database in attach order, so two schemas
+   * carrying one index name would otherwise drop whichever it reaches first.
+   * An unqualified table takes the Rails emission untouched.
+   */
   async removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -1692,18 +1702,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    // An unqualified `DROP INDEX` name resolves across main, temp and every
-    // ATTACHed database in attach order, so two schemas carrying the same index
-    // name would have this drop whichever SQLite reaches first. Name the
-    // catalog, the same qualified/unqualified fork
-    // `SQLite3::SchemaCreation#visit_CreateIndexDefinition` takes on create.
     const { schema } = this._splitTableName(tableName);
-    const qualified =
-      schema === ""
-        ? quoteColumnName(indexName)
-        : `${quoteColumnName(schema)}.${quoteColumnName(indexName)}`;
 
-    await this.execQuery(`DROP INDEX ${qualified}`);
+    await this.execQuery(
+      schema === ""
+        ? `DROP INDEX ${quoteColumnName(indexName)}`
+        : `DROP INDEX ${quoteColumnName(schema)}.${quoteColumnName(indexName)}`,
+    );
   }
 
   createSchemaDumper(
