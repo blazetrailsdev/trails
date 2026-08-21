@@ -1588,14 +1588,15 @@ type PersistenceInstanceChainHost = {
   _writeAttribute(name: string, value: unknown): void;
 };
 
-/** @internal */
-function initInternals(this: PersistencePrivateHost): void {
-  this._newRecord = true;
-  this._destroyed = false;
+/**
+ * Mirrors `ActiveRecord::Persistence#init_internals` (persistence.rb:814-818).
+ *
+ * @internal
+ */
+export function initInternals(this: PersistencePrivateHost, super_: () => void): void {
+  super_();
+  (this as any)._triggerDestroyCallback = (this as any)._triggerUpdateCallback = null;
   this._previouslyNewRecord = false;
-  // Mirrors the Transactions#init_internals super chain — those fields live here too.
-  (this as any)._triggerUpdateCallback = null;
-  (this as any)._triggerDestroyCallback = null;
 }
 
 /** @internal */

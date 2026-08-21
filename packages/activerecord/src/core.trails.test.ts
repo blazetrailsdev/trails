@@ -206,3 +206,56 @@ describe("compare", () => {
     expect(reply.compare(first)).toBeUndefined();
   });
 });
+
+describe("init_internals / initialize_dup super chain", () => {
+  fixtures(["topics"]);
+
+  // core.rb:834 is the chain root and every other concern's `init_internals`
+  // opens with `super` (persistence.rb:814, attribute_methods/dirty.rb:196,
+  // timestamp.rb:102, associations.rb:75, autosave_association.rb:290,
+  // transactions.rb:432, touch_later.rb:49). Each hook's fields are only ever
+  // assigned by the chain, so an unwired link leaves its fields `undefined`.
+  it("every concern's init_internals link runs on construction", () => {
+    const topic = new Topic({ title: "Alice" }) as unknown as Record<string, unknown>;
+    // Core (core.rb:834-849)
+    expect(topic._readonly).toBe(false);
+    expect(topic._destroyedByAssociation).toBe(null);
+    // Persistence (persistence.rb:814-818)
+    expect(topic._triggerUpdateCallback).toBe(null);
+    expect(topic._triggerDestroyCallback).toBe(null);
+    // AttributeMethods::Dirty (attribute_methods/dirty.rb:196-201)
+    expect(topic._mutationsBeforeLastSave).toBe(null);
+    expect(topic._mutationsFromDatabase).toBe(null);
+    expect(topic._touchAttrNames).toBe(null);
+    expect(topic._skipDirtyTracking).toBe(null);
+    // Timestamp (timestamp.rb:102-105)
+    expect(topic._touchRecord).toBe(null);
+    // Associations (associations.rb:75-77)
+    expect((topic._associationInstances as Map<string, unknown>).size).toBe(0);
+    // AutosaveAssociation (autosave_association.rb:290-293)
+    expect(topic._alreadyCalled).toBe(null);
+    // Transactions (transactions.rb:432-437)
+    expect(topic._startTransactionState).toBe(null);
+    expect(topic._committedAlreadyCalled).toBe(null);
+    expect(topic._newRecordBeforeLastCommit).toBe(null);
+    // TouchLater (touch_later.rb:49-52)
+    expect(topic._deferTouchAttrs).toBe(null);
+    expect(topic._touchTime).toBe(null);
+  });
+
+  // Core#initialize_dup (core.rb:550-562) runs the initialize callbacks and only
+  // then unwinds through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
+  // (timestamp.rb:50-53), so the hook still observes the source's lock_version
+  // and timestamps; ActiveModel's links (validations.rb:310, dirty.rb:248) sit on
+  // `Model.prototype` and are reached by the same chain rather than shadowed.
+  it("dup runs the whole chain, clearing only after the callbacks", async () => {
+    const topic = await Topic.create({ title: "Alice", content: "Hello" });
+    topic.title = "Bob";
+    const duped = topic.dup();
+
+    expect(duped.errors).not.toBe(topic.errors);
+    expect(duped.title).toBe("Bob");
+    expect(duped.isNewRecord()).toBe(true);
+    expect(duped.id).toBe(null);
+  });
+});

@@ -554,10 +554,11 @@ export function _triggerDestroyCallback(this: Base): boolean | null {
   return (this as any)._triggerDestroyCallback ?? null;
 }
 
-// Mirrors: ActiveRecord::Transactions#init_internals
+// Mirrors: ActiveRecord::Transactions#init_internals (transactions.rb:432-437)
 /** @internal */
-function initInternals(record: Base): void {
-  const r = record as any;
+export function initInternals(this: Base, super_: () => void): void {
+  super_();
+  const r = this as any;
   r._startTransactionState = null;
   r._committedAlreadyCalled = null;
   r._newRecordBeforeLastCommit = null;

@@ -582,8 +582,14 @@ function propagateErrors(parent: Base, reflectionName: string): void {
   parent.errors.add(underscore(reflectionName));
 }
 
-/** @internal */
-function initInternals(this: AutosaveAssociationHost): void {
+/**
+ * Mirrors `ActiveRecord::AutosaveAssociation#init_internals`
+ * (autosave_association.rb:290-293).
+ *
+ * @internal
+ */
+export function initInternals(this: AutosaveAssociationHost, super_: () => void): void {
+  super_();
   this._alreadyCalled = null;
 }
 

@@ -209,9 +209,10 @@ export const InstanceMethods = {
  *
  * @internal
  */
-export function initInternals(record: any): void {
-  record._deferTouchAttrs = null;
-  record._touchTime = null;
+export function initInternals(this: any, super_: () => void): void {
+  super_();
+  this._deferTouchAttrs = null;
+  this._touchTime = null;
 }
 
 /**

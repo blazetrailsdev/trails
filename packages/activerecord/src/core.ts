@@ -41,7 +41,7 @@ import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
-import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError, runAllCallbacks } from "@blazetrails/activemodel";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -812,7 +812,20 @@ export function arelTable(this: CoreHost): Table {
   return new Table((this as any).tableName, { klass: this as any });
 }
 
-/** @internal */
+/**
+ * The root of the `init_internals` chain — every other concern's hook is
+ * prepended onto `Base.prototype` above it and opens with `super_`
+ * (core.rb:834-849).
+ *
+ * Rails' root has no `super`: `include Core` (base.rb:299) sits below every
+ * later include, so ActiveModel's `Validations`/`Dirty` links (validations.rb:467,
+ * dirty.rb:372) are *above* Core in the MRO. In trails those links are prepended
+ * onto `Model.prototype`, the superclass prototype, so they sit BELOW this one —
+ * hence the `super_()` here, which is the same set of links Ruby reaches, entered
+ * from the other end.
+ *
+ * @internal
+ */
 export function initInternals(
   this: CoreRecord & {
     _readonly: boolean;
@@ -822,7 +835,9 @@ export function initInternals(
     _strictLoading: boolean;
     _strictLoadingMode?: StrictLoadingMode;
   },
+  super_: () => void,
 ): void {
+  super_();
   this._readonly = false;
   this._previouslyNewRecord = false;
   this._destroyed = false;
@@ -830,6 +845,55 @@ export function initInternals(
   const klass = this.constructor as any;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
+}
+
+/**
+ * Mirrors `ActiveRecord::Core#initialize_dup` (core.rb:550-562). The
+ * `init_attributes(other)` half and the dirty-baseline rebind are performed by
+ * `dup` (persistence.ts) before the chain is entered, because the duplicate is
+ * built by `new ctor({})` rather than Ruby's `Object#dup`; what remains here is
+ * Rails' order — the initialize callbacks run against the duped attributes, the
+ * new-record state is reset, and only then does `super` unwind through
+ * Locking::Optimistic (optimistic.rb:72-75) and Timestamp (timestamp.rb:50-53),
+ * so the hook still observes the source's `lock_version` / timestamps.
+ *
+ * As with {@link initInternals}, Ruby reaches ActiveModel's links from above and
+ * trails from below; `super_` is the receiver-bound link `prepend()` hands the
+ * module.
+ *
+ * @internal
+ */
+export function initializeDup(
+  this: CoreRecord & {
+    _newRecord: boolean;
+    _previouslyNewRecord: boolean;
+    _destroyed: boolean;
+    _startTransactionState: unknown;
+  },
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  // `super_` leads DOWN to ActiveModel's links here, where Ruby reaches them
+  // going up (see initInternals), so it is spelled first to keep Rails'
+  // observable order: `Attributes`/`Validations`/`Dirty` (attributes.rb:111,
+  // validations.rb:310, dirty.rb:248) all sit ABOVE Core in the MRO and have
+  // already replaced `@errors` and the mutation trackers by the time Core runs
+  // the initialize callbacks.
+  super_(other);
+  // `initialize` is registered `only: :after`, so this fires just the
+  // after_initialize chain. strict:"sync" guarantees synchronous completion —
+  // void the settled result.
+  void runAllCallbacks(
+    (this.constructor as { prototype: object }).prototype,
+    "initialize",
+    this,
+    undefined,
+    { strict: "sync" },
+  );
+  this._newRecord = true;
+  this._previouslyNewRecord = false;
+  this._destroyed = false;
+  this._startTransactionState = null;
 }
 
 /** @internal */

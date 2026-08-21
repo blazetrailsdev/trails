@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Client } from "./test-helpers/models/company.js";
+import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import { Author } from "./test-helpers/models/author.js";
 
 describe("_instantiate STI dispatch", () => {
@@ -38,5 +39,22 @@ describe("descends_from_active_record? column test", () => {
     }
 
     expect(VirtualTypeAuthor.isDescendsFromActiveRecord()).toBe(true);
+  });
+});
+
+describe("ensure_proper_type on an unreflected subclass", () => {
+  fixtures([]);
+
+  // `ensure_proper_type` writes the STI type unconditionally once
+  // `finder_needs_type_condition?` says so (inheritance.rb:331-336) — no
+  // membership test on the inheritance column. trails carried one because a
+  // strict `_writeAttribute` raises on an attribute the model does not know and
+  // trails reflects lazily; construction now resolves the column itself, so the
+  // guard is gone and a subclass that has never been queried still gets its type.
+  it("writes the sti name without a membership guard", () => {
+    class ColdClient extends Client {}
+
+    expect(isFinderNeedsTypeCondition(ColdClient)).toBe(true);
+    expect(new ColdClient({}).type).toBe("ColdClient");
   });
 });

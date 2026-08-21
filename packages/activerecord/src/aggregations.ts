@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
+import { prepend } from "@blazetrails/activesupport";
 
 /**
  * Aggregation cache and composed-of value-object support.
@@ -276,9 +277,8 @@ export function includeAggregations(modelClass: typeof Base): void {
   // Aggregations#reload clears the aggregation cache then calls super. Capture
   // the inherited reload (Ruby `super`) at include time so the delegation walks
   // the real ancestry (Aggregations → AutosaveAssociation → Persistence) rather
-  // than hardcoding a jump straight to Persistence#reload — mirroring the
-  // inheritedInitializeDup capture below. Keeps the autosave hop live for when
-  // AutosaveAssociation#reload is ported.
+  // than hardcoding a jump straight to Persistence#reload. Keeps the autosave hop
+  // live for when AutosaveAssociation#reload is ported.
   const inheritedReload = proto.reload as ReloadFn<Base>;
   Object.defineProperty(proto, "reload", {
     value: reload(inheritedReload),
@@ -287,17 +287,14 @@ export function includeAggregations(modelClass: typeof Base): void {
     enumerable: false,
   });
 
-  const inheritedInitializeDup = proto.initializeDup as
-    | ((this: Base, other: unknown) => void)
-    | undefined;
-  Object.defineProperty(proto, "initializeDup", {
-    value: function (this: Base, other: unknown): void {
+  // Aggregations#initialize_dup copies the aggregation cache, then supers
+  // (aggregations.rb:6-9). `prepend()` is that ancestry splice: the link sits
+  // above the Core → Locking::Optimistic → Timestamp chain base.ts wires.
+  prepend(proto, {
+    initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
       copyAggregationCacheForDup.call(this, other);
-      if (inheritedInitializeDup) inheritedInitializeDup.call(this, other);
+      super_(other);
     },
-    writable: true,
-    configurable: true,
-    enumerable: false,
   });
 }
 
@@ -305,6 +302,7 @@ export function includeAggregations(modelClass: typeof Base): void {
  * @internal
  * Mirrors: ActiveRecord::Aggregations#init_internals
  */
-function initInternals(this: Base): void {
+function initInternals(this: Base, super_: () => void): void {
+  super_();
   (this as any)._aggregationCache = new Map<string, unknown>();
 }

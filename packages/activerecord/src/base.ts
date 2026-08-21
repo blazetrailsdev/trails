@@ -87,6 +87,7 @@ import {
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
   _registerAssociationBuilderExtension,
+  initInternals as _autosaveInitInternals,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
 import {
@@ -171,11 +172,13 @@ import * as Querying from "./querying.js";
 import * as QueryCacheClassMethods from "./query-cache.js";
 import {
   include,
+  prepend,
   extend,
   classAttribute,
   benchmark as benchmarkable,
   runLoadHooks,
   isBlank as _isBlankValue,
+  type PrependMethod,
   singularize as _singularize,
   type Included,
   type ParameterFilter,
@@ -263,6 +266,7 @@ import {
   filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
+import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
@@ -315,6 +319,7 @@ import {
   afterCreateCommit as _afterCreateCommit,
   afterUpdateCommit as _afterUpdateCommit,
   afterDestroyCommit as _afterDestroyCommit,
+  initInternals as _transactionsInitInternals,
 } from "./transactions.js";
 
 import {
@@ -330,6 +335,7 @@ import {
   associationInstanceGet as _associationInstanceGet,
   associationInstanceSet as _associationInstanceSet,
   registerModelConstant,
+  initInternals as _associationsInitInternals,
   type AssociationDefinition,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
@@ -2978,8 +2984,10 @@ export class Base extends Model {
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
-  _strictLoading = false;
-  _strictLoadingMode?: _Core.StrictLoadingMode;
+  // No initializers: `init_internals` (core.rb:834-849) assigns both from the
+  // class during `super()`, and a field initializer here would run afterwards
+  // and clobber them back to the class-less defaults. Declared on the merged
+  // `Base` interface below instead.
   // No Rails counterpart: Rails' strict_loading is tripped by `load_target`
   // alone. Trails keeps the counter only for `loadBelongsTo` / `loadHasOne`
   // (associations/instance-methods.ts) — explicit lazy loads the caller asked
@@ -2994,10 +3002,10 @@ export class Base extends Model {
    *
    * @internal
    */
-  _associationCacheStore: _AssociationCache = createAssociationCache();
-  _collectionProxies: Map<string, unknown> = this._associationCacheStore.proxies;
-  _associationInstances: Map<string, AssociationInstance> = this._associationCacheStore
-    .instances as Map<string, AssociationInstance>;
+  // No initializers, for the same reason as `_strictLoading` above: Rails
+  // allocates `@association_cache` in `init_internals` (associations.rb:75-77),
+  // which now runs during `super()`, and a field initializer here would replace
+  // the store afterwards. `_resetAssociationCaches` is the allocation site.
 
   /**
    * Return the *loaded* cached association object for `name` — callers read
@@ -3069,6 +3077,18 @@ export class Base extends Model {
    * @internal
    */
   _resetAssociationCaches(): void {
+    if (this._associationCacheStore === undefined) {
+      // First call is `init_internals`' `@association_cache = {}`; later calls
+      // (reload/destroy) clear in place so callers holding a facet view keep
+      // seeing the record's cache.
+      this._associationCacheStore = createAssociationCache();
+      this._collectionProxies = this._associationCacheStore.proxies;
+      this._associationInstances = this._associationCacheStore.instances as Map<
+        string,
+        AssociationInstance
+      >;
+      return;
+    }
     this._associationCacheStore.clear();
   }
 
@@ -3144,10 +3164,6 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
-      // Mirrors Rails Core#initialize: init_internals runs before
-      // initialize_internals_callback and after_initialize, regardless of
-      // callback suppression (found records run it via `new this()` too).
-      _Core.initInternals.call(this as any);
       _applyCompositePrimaryKey(this as unknown as Base, ctor, attrs);
       executeMultiparameterAssignment(this as any, multiparams);
       // Re-snapshot so mp attrs are part of the initial clean state.
@@ -3228,10 +3244,6 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
-      // Mirrors Rails Core#initialize: init_internals runs before
-      // initialize_internals_callback and after_initialize, regardless of
-      // callback suppression (found records run it via `new this()` too).
-      _Core.initInternals.call(this as any);
       _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
         inheritanceInitializeInternalsCallback.call(this as any);
@@ -4352,6 +4364,11 @@ export class Base extends Model {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation> {
+  _strictLoading: boolean;
+  _associationCacheStore: _AssociationCache;
+  _collectionProxies: Map<string, unknown>;
+  _associationInstances: Map<string, AssociationInstance>;
+  _strictLoadingMode?: _Core.StrictLoadingMode;
   association(name: string): AssociationInstance;
   /**
    * Explicitly load a `belongsTo` target and resolve to it.
@@ -4696,32 +4713,34 @@ include(Base, Timestamp.InstanceMethods);
 // composed_of (see aggregations.ts includeAggregations), so models without a
 // composed_of declaration never carry its reload/initialize_dup overrides.
 include(Base, TouchLater.InstanceMethods);
-// Compose the initialize_dup chain. This stays hand-wired (not a last-wins
-// override) because Ruby builds it via module super-calls
-// (Core → Locking::Optimistic → Timestamp); trails has no super chain across
-// mixins, so invoke each module's hook explicitly in that order. Aggregations'
-// initialize_dup slots in above this chain, wired by includeAggregations on
-// composed_of models only.
-//
-// Mirrors ActiveRecord::Core#initialize_dup (core.rb): fire the initialize
-// callbacks against the duped attributes, THEN run the Locking/Timestamp
-// clears. In Rails those modules `super` into Core (which runs the callbacks)
-// and clear only as the stack unwinds (optimistic.rb:72-75, timestamp.rb:50-53),
-// so the hook observes the source's lock_version / timestamps before they are
-// nulled. `initialize` is defined `only: :after`, so runAllCallbacks fires just
-// the after_initialize chain. persistence.ts `dup` calls this after the duped
-// attributes and dirty baseline are in place.
-(Base.prototype as any).initializeDup = function (this: Base, _other: unknown): void {
-  void cbRunAll((this.constructor as typeof Base).prototype, "initialize", this, undefined, {
-    strict: "sync",
-  });
-  if ((this.constructor as typeof Base).lockingEnabled) {
-    LockingOptimistic._clearLockingColumn.call(this as any);
-  }
-  Timestamp.clearTimestampAttributes.call(this as any);
-};
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);
+// The `init_internals` chain (core.rb:834 is the root; every other definition
+// opens with `super`). Prepended in Rails' `include` order (base.rb:299-322), so
+// the last one wired is the outermost link and the stack unwinds into Core —
+// and, below it, into the ActiveModel links `Model.prototype` carries
+// (validations.rb:467, dirty.rb:372).
+prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
+prepend(Base.prototype, {
+  initInternals: _AttributeMethodsDirty.initInternals as PrependMethod,
+});
+prepend(Base.prototype, { initInternals: Timestamp.initInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: _associationsInitInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: _autosaveInitInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: _transactionsInitInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMethod });
+// The `initialize_dup` chain, same construction: Core (core.rb:550) fires the
+// initialize callbacks and resets the new-record state, then `super` unwinds
+// through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
+// (timestamp.rb:50-53), whose clears therefore run AFTER the callbacks have seen
+// the source's `lock_version` / timestamps. Aggregations' link (aggregations.rb:6)
+// is prepended above these by `includeAggregations` on composed_of models only.
+// `dup` (persistence.ts) enters the chain once the duped attributes and dirty
+// baseline are in place.
+prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
+prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
+prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 // AutosaveAssociation#reload resets marked-for-destruction / destroyed-by-
 // association state, then calls super. Capture the inherited reload (Persistence)
