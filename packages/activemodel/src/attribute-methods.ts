@@ -402,7 +402,6 @@ export function defineAttributeMethod(
     }
     this.attributeMethodPatternsCache().clear();
   });
-  // Copy-on-first-write per class, like `aliasesByAttributeName`.
   if (!Object.prototype.hasOwnProperty.call(this, "_patternsGeneratedFor")) {
     this._patternsGeneratedFor = new Map(this._patternsGeneratedFor ?? []);
   }
