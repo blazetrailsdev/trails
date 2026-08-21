@@ -548,8 +548,18 @@ export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: s
   return typeof (this as any)[methodName] === "function";
 }
 
-export function isAttributeMethod(this: AttributeMethodsHost, name: string): boolean {
-  return this._attributeDefinitions.has(name);
+/**
+ * Mirrors: ActiveRecord::AttributeMethods#attribute_method?
+ * (attribute_methods.rb:499-501) — `@attributes&.key?(attr_name)`. The private
+ * *instance* predicate, which is what `matched_attribute_method` filters with;
+ * the ClassMethods predicate of the same name (attribute_methods.rb:224) reads
+ * the class's attribute definitions instead.
+ */
+export function isAttributeMethod(
+  this: { _attributes?: { isKey(name: string): boolean } },
+  attrName: string,
+): boolean {
+  return this._attributes?.isKey(attrName) ?? false;
 }
 
 /**

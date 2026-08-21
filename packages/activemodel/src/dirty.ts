@@ -1,14 +1,6 @@
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
-import {
-  attributeMissing as attributeMissingDispatch,
-  isAttributeMethod as _isAttributeMethod,
-  matchedAttributeMethod as _matchedAttributeMethod,
-  missingAttribute as _missingAttribute,
-  _readAttribute as __readAttribute,
-  isRespondToWithoutAttributes as _isRespondToWithoutAttributes,
-  type InstanceHost,
-} from "./attribute-methods.js";
+import { attributeMissing as attributeMissingDispatch } from "./attribute-methods.js";
 
 /**
  * Dirty mixin contract — tracks attribute changes on a model.
@@ -659,15 +651,6 @@ function resolveValue(value: unknown): unknown {
   return AttributeSet.resolveSnapshotValue(value);
 }
 
-// ---------------------------------------------------------------------------
-// Rails privates surfaced by dirty.rb
-// ---------------------------------------------------------------------------
-
-/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
-export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return _isAttributeMethod.call(this, attrName);
-}
-
 type DirtyDispatchHost = {
   _dirty: DirtyTracker;
   _attributes: AttributeSet;
@@ -676,34 +659,3 @@ type DirtyDispatchHost = {
   writeAttribute?(name: string, value: unknown): void;
   clearAttributeChange?(name: string): void;
 };
-
-/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
-export function matchedAttributeMethod(
-  this: InstanceHost,
-  methodName: string,
-): { proxyTarget: string; attrName: string } | null {
-  return _matchedAttributeMethod.call(this, methodName);
-}
-
-/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
-  return _missingAttribute.call(this, attrName, stack);
-}
-
-/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
-export function _readAttribute(this: InstanceHost, attr: string): unknown {
-  type ReadAttributeThis = InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
-  };
-  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
-}
-
-/** @internal Rails-private helper. Mirrors: #respond_to_without_attributes? (via AttributeMethods include) */
-export function isRespondToWithoutAttributes(
-  this: object,
-  method: string,
-  includePrivateMethods: boolean = false,
-): boolean {
-  return _isRespondToWithoutAttributes.call(this, method, includePrivateMethods);
-}

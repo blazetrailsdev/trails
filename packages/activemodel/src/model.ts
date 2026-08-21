@@ -23,6 +23,7 @@ import {
   type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
   withOptions,
+  extend,
   include,
   extend,
   runLoadHooks,
@@ -30,6 +31,8 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
   type Extended,
+  type CodeGenerator,
+  Module,
   classAttribute,
   kernelArray,
 } from "@blazetrails/activesupport";
@@ -77,20 +80,11 @@ import {
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions, ConditionFn } from "./validations.js";
+import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,
-  attributeMethodPrefix,
-  attributeMethodSuffix,
-  attributeMethodAffix,
-  aliasAttribute,
-  resolveAttributeName as _resolveAttributeNameHelper,
-  type AttributeMethodHost,
+  type AttributeMethodMatch,
   defineMethodAttribute,
-  undefineAttributeMethods,
-  attributeMissing,
-  missingAttribute,
-  isRespondToWithoutAttributes,
-  type InstanceHost,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -116,7 +110,6 @@ import {
   Attributes,
   attribute,
   setDefineMethodAttribute,
-  matchedAttributeMethod as _matchedAttributeMethod,
 } from "./attributes.js";
 import {
   _defaultAttributes,
@@ -276,6 +269,34 @@ function _xmlTypeInfo(
 export interface Model {
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+
+  /**
+   * The instance half of Ruby `include ActiveModel::AttributeMethods`
+   * (attribute_methods.rb:73), installed by the `include(Model, …)` at the
+   * bottom of this file. Declared as methods, not properties, so a subclass
+   * may override `attribute_missing` the way Rails' cascade expects.
+   */
+  attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
+  isAttributeMethod(attrName: string): boolean;
+  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+  missingAttribute(attrName: string, stack?: string): never;
+  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+
+  /**
+   * The instance halves of Ruby `include ActiveModel::Validations`
+   * (validations.rb:52) and `include ForbiddenAttributesProtection`
+   * (model.rb:12-14), installed by the `include(Model, …)` calls at the bottom
+   * of this file.
+   *
+   * @internal
+   */
+  contextForValidation(): ValidationContext;
+  /** @internal */
+  runValidationsBang(): Promise<boolean>;
+  raiseValidationError(): never;
+  readAttributeForValidation(attribute: string): unknown;
+  /** @internal */
+  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
 }
 
 /**
@@ -335,14 +356,10 @@ export class Model {
   static _toPartialPath = _toPartialPath;
 
   /** @internal Rails-private helper. */
-  static pendingAttributeModifications(): ReturnType<typeof _pendingAttributeModificationsHelper> {
-    return _pendingAttributeModificationsHelper.call(this as unknown as AttributeHostInternals);
-  }
+  declare static pendingAttributeModifications: typeof _pendingAttributeModificationsHelper;
 
   /** @internal Rails-private helper. */
-  static resetDefaultAttributesBang(): void {
-    _resetDefaultAttributesBangHelper.call(this as unknown as AttributeHostInternals);
-  }
+  declare static resetDefaultAttributesBang: typeof _resetDefaultAttributesBangHelper;
 
   /**
    * @internal Rails-private helper.
@@ -351,17 +368,10 @@ export class Model {
    * its alias-resolving override (attribute_methods.rb:396-398) wins over
    * AttributeRegistration's `name.to_s` (attribute_registration.rb:101-103).
    */
-  static resolveAttributeName(name: string): string {
-    return _resolveAttributeNameHelper.call(this as unknown as AttributeMethodHost, name);
-  }
+  declare static resolveAttributeName: (name: string) => string;
 
   /** @internal Rails-private helper. */
-  static resolveTypeName(
-    name: string,
-    options?: Record<string, unknown>,
-  ): import("./type/value.js").Type {
-    return _resolveTypeNameHelper.call(this as unknown as AttributeHostInternals, name, options);
-  }
+  declare static resolveTypeName: typeof _resolveTypeNameHelper;
 
   /** @internal Rails-private helper. */
   static hookAttributeType(
@@ -380,13 +390,6 @@ export class Model {
       .filter(([, def]) => !def.virtual)
       .map(([name]) => name);
   }
-
-  /**
-   * Create an alias for an existing attribute.
-   *
-   * Mirrors: ActiveModel::AttributeMethods.alias_attribute
-   */
-  static aliasAttribute = aliasAttribute;
 
   // -- Normalizations --
   static _normalizations: Map<
@@ -407,7 +410,7 @@ export class Model {
    *   User.normalizes("email", (v) => typeof v === "string" ? v.trim().toLowerCase() : v);
    */
   static normalizes(...args: NormalizesArgs): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_normalizations")) {
+    if (!Object.hasOwn(this, "_normalizations")) {
       // Deep copy parent normalizations for stacking
       this._normalizations = new Map();
       const parent = Object.getPrototypeOf(this) as typeof Model;
@@ -546,7 +549,7 @@ export class Model {
    *   User.nullifyBlanks()                 // all string attributes
    */
   static nullifyBlanks(...attributes: string[]): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_nullifyBlanks")) {
+    if (!Object.hasOwn(this, "_nullifyBlanks")) {
       this._nullifyBlanks = attributes.length > 0 ? [...attributes] : true;
     } else {
       if (attributes.length > 0) {
@@ -1472,7 +1475,7 @@ export class Model {
     // independent top-level Map whose per-attribute arrays are also fresh,
     // matching Rails' `dup.each { |k, v| dup[k] = v.dup }` — downward
     // writes from the subclass never leak up to the parent.
-    if (!Object.prototype.hasOwnProperty.call(this, "_validators")) {
+    if (!Object.hasOwn(this, "_validators")) {
       const cloned = new Map<string | null, Array<ValidatorLike>>();
       for (const [k, arr] of this._validators) cloned.set(k, [...arr]);
       this._validators = cloned;
@@ -1584,11 +1587,41 @@ export class Model {
     return "activemodel";
   }
 
-  static attributeMethodPrefix = attributeMethodPrefix;
-  static attributeMethodSuffix = attributeMethodSuffix;
-  static attributeMethodAffix = attributeMethodAffix;
-  static undefineAttributeMethods = undefineAttributeMethods;
-  isRespondToWithoutAttributes = isRespondToWithoutAttributes;
+  // Ruby `include ActiveModel::AttributeMethods` (attribute_methods.rb:73)
+  // brings the whole ClassMethods surface along; the `extend(Model, …)` at the
+  // bottom of this file installs it, and these declarations are its type side.
+  declare static attributeMethodPrefix: (
+    ...prefixes: Array<string | { parameters?: string | null | false }>
+  ) => void;
+  declare static attributeMethodSuffix: (
+    ...suffixes: Array<string | { parameters?: string | null | false }>
+  ) => void;
+  declare static attributeMethodAffix: (
+    ...affixes: Array<{ prefix: string; suffix: string }>
+  ) => void;
+  declare static aliasAttribute: (newName: string, oldName: string) => void;
+  declare static eagerlyGenerateAliasAttributeMethods: (newName: string, oldName: string) => void;
+  declare static defineAttributeMethods: (...attrNames: string[]) => void;
+  declare static defineAttributeMethod: (
+    attrName: string,
+    options?: { _owner?: Module | CodeGenerator; as?: string },
+  ) => void;
+  declare static defineAttributeMethodPattern: (
+    pattern: AttributeMethodPattern,
+    attrName: string,
+    options: { owner: CodeGenerator; as: string; override?: boolean },
+  ) => void;
+  declare static defineDirtyAttributeMethods: (attrName: string) => void;
+  declare static undefineAttributeMethods: () => void;
+  declare static generatedAttributeMethods: () => Module;
+  declare static isInstanceMethodAlreadyImplemented: (methodName: string) => boolean;
+  declare static attributeMethodPatternsCache: () => Map<
+    string,
+    Array<{ proxyTarget: string; attrName: string }>
+  >;
+  declare static attributeMethodPatternsMatching: (
+    methodName: string,
+  ) => Array<{ proxyTarget: string; attrName: string }>;
 
   // -- Naming (Phase 1300) --
 
@@ -1779,48 +1812,6 @@ export class Model {
     return this._attributes.fetchValue(name, block) ?? null;
   }
 
-  /**
-   * Mirrors: attribute_methods.rb:520-522
-   *   def attribute_missing(match, ...)
-   *     __send__(match.proxy_target, match.attr_name, ...)
-   *   end
-   *
-   * Per-attribute methods generated by `defineDirtyAttributeMethods`
-   * route through this hook so subclasses can intercept the entire
-   * cascade (`name_changed?`, `name_was`, `restore_name`, …) by
-   * overriding a single method — same shape as Rails.
-   *
-   * Defined as a prototype method (not a class field) so subclass
-   * `override attributeMissing(...)` declarations correctly shadow it.
-   * Class fields would create per-instance properties that mask the
-   * prototype override.
-   */
-  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
-    return attributeMissing.call(this as Record<string, unknown>, match, ...args);
-  }
-
-  /**
-   * Mirrors: ActiveModel::AttributeMethods#missing_attribute
-   * (attribute_methods.rb:535-537) — the raise the generated readers' block
-   * runs for a known-but-unselected attribute.
-   *
-   * @internal Rails-private helper.
-   */
-  missingAttribute(attrName: string, stack?: string): never {
-    return missingAttribute.call(this as unknown as InstanceHost, attrName, stack);
-  }
-
-  /**
-   * Mirrors: ActiveModel::AttributeMethods#matched_attribute_method
-   * (attribute_methods.rb:530-533) — the pattern lookup `method_missing` uses
-   * to recognize an attribute method that has not been generated.
-   *
-   * @internal Rails-private helper.
-   */
-  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null {
-    return _matchedAttributeMethod.call(this as unknown as InstanceHost, methodName);
-  }
-
   /** Mirrors: ActiveModel::Attributes `alias :attribute= :_write_attribute` (attributes.rb:159). */
   "attribute="(name: string, value: unknown): void {
     this._writeAttribute(name, value);
@@ -1973,9 +1964,6 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  contextForValidation(): ValidationContext {
-    return validationsContextForValidation.call(this);
-  }
 
   /**
    * Run the `:validate` callbacks and report whether the model has no
@@ -1983,9 +1971,6 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  runValidationsBang(): Promise<boolean> {
-    return validationsRunValidationsBang.call(this);
-  }
 
   /**
    * Throw `ValidationError` for the current model. Mirrors Rails
@@ -1993,9 +1978,6 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  raiseValidationError(): never {
-    return validationsRaiseValidationError.call(this);
-  }
 
   /**
    * Mirrors: ActiveModel::Validations#valid? (validations.rb:361-368) — read the
@@ -2675,18 +2657,12 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
-    return forbiddenSanitize.call(this, attributes);
-  }
 
   /**
    * Mirrors: ActiveModel::Validations
    * (`alias :read_attribute_for_validation :send`). Reads the attribute by
    * name; ActiveRecord overrides to resolve associations.
    */
-  readAttributeForValidation(attribute: string): unknown {
-    return validationsReadAttributeForValidation.call(this, attribute);
-  }
 
   /**
    * Mirrors: ActiveModel::Serialization
@@ -2861,6 +2837,52 @@ function _rejectOnOption(conditions?: CallbackConditions): void {
 }
 
 include(Model, ToJsonWithActiveSupportEncoder);
+
+// Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
+extend(Model, {
+  pendingAttributeModifications: _pendingAttributeModificationsHelper,
+  resetDefaultAttributesBang: _resetDefaultAttributesBangHelper,
+  resolveTypeName: _resolveTypeNameHelper,
+});
+// `include ActiveModel::AttributeMethods` lands after AttributeRegistration
+// (model.rb:12-14), so its alias-resolving `resolve_attribute_name` override
+// (attribute_methods.rb:396-398) wins over the registration one. The module's
+// ClassMethods land on the class and its instance methods on instances, which
+// is what lets every ported body self-send them.
+extend(Model, {
+  attributeMethodPrefix: AttributeMethods.attributeMethodPrefix,
+  attributeMethodSuffix: AttributeMethods.attributeMethodSuffix,
+  attributeMethodAffix: AttributeMethods.attributeMethodAffix,
+  aliasAttribute: AttributeMethods.aliasAttribute,
+  eagerlyGenerateAliasAttributeMethods: AttributeMethods.eagerlyGenerateAliasAttributeMethods,
+  defineAttributeMethods: AttributeMethods.defineAttributeMethods,
+  defineAttributeMethod: AttributeMethods.defineAttributeMethod,
+  defineAttributeMethodPattern: AttributeMethods.defineAttributeMethodPattern,
+  defineDirtyAttributeMethods: AttributeMethods.defineDirtyAttributeMethods,
+  undefineAttributeMethods: AttributeMethods.undefineAttributeMethods,
+  resolveAttributeName: AttributeMethods.resolveAttributeName,
+  generatedAttributeMethods: AttributeMethods.generatedAttributeMethods,
+  isInstanceMethodAlreadyImplemented: AttributeMethods.isInstanceMethodAlreadyImplemented,
+  attributeMethodPatternsCache: AttributeMethods.attributeMethodPatternsCache,
+  attributeMethodPatternsMatching: AttributeMethods.attributeMethodPatternsMatching,
+});
+include(Model, {
+  attributeMissing: AttributeMethods.attributeMissing,
+  isAttributeMethod: AttributeMethods.isAttributeMethod,
+  matchedAttributeMethod: AttributeMethods.matchedAttributeMethod,
+  missingAttribute: AttributeMethods.missingAttribute,
+  isRespondToWithoutAttributes: AttributeMethods.isRespondToWithoutAttributes,
+});
+
+// Ruby `include ActiveModel::Validations` (validations.rb:52) and
+// `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
+include(Model, {
+  contextForValidation: validationsContextForValidation,
+  runValidationsBang: validationsRunValidationsBang,
+  raiseValidationError: validationsRaiseValidationError,
+  readAttributeForValidation: validationsReadAttributeForValidation,
+  sanitizeForbiddenAttributes: forbiddenSanitize,
+});
 
 // model.rb:77 — `ActiveSupport.run_load_hooks(:active_model, Model)`.
 runLoadHooks("active_model", Model);

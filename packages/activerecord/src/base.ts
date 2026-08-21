@@ -1573,6 +1573,10 @@ export class Base extends Model {
   declare static defineAttribute: typeof _defineAttribute;
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
+  // ActiveRecord's override of ActiveModel's `define_attribute_methods`
+  // (attribute_methods.rb:139-159): no attr-name splat, and it answers whether
+  // the class's methods were generated.
+  declare static defineAttributeMethods: typeof _defineAttributeMethods;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
   /** @internal */
   declare static resolveTypeName: typeof _resolveTypeName;

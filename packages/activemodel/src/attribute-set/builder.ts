@@ -58,9 +58,7 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      (Object.prototype.hasOwnProperty.call(this.values, name) ||
-        this.types.has(name) ||
-        this._attributes.has(name)) &&
+      (Object.hasOwn(this.values, name) || this.types.has(name) || this._attributes.has(name)) &&
       this.getAttribute(name).isInitialized()
     );
   }
@@ -84,7 +82,7 @@ export class LazyAttributeSet extends AttributeSet {
 
     let valuePresent = true;
     let value: unknown;
-    if (Object.prototype.hasOwnProperty.call(this.values, name)) {
+    if (Object.hasOwn(this.values, name)) {
       value = this.values[name];
     } else {
       valuePresent = false;
@@ -122,7 +120,7 @@ export class LazyAttributeSet extends AttributeSet {
     value?: unknown,
   ): Attribute {
     if (valuePresent === undefined) {
-      valuePresent = Object.prototype.hasOwnProperty.call(this.values, name);
+      valuePresent = Object.hasOwn(this.values, name);
       value = valuePresent ? this.values[name] : undefined;
     }
 
@@ -340,11 +338,7 @@ export class LazyAttributeHash {
   }
 
   has(name: string): boolean {
-    return (
-      this.delegate.has(name) ||
-      Object.prototype.hasOwnProperty.call(this.values, name) ||
-      this.types.has(name)
-    );
+    return this.delegate.has(name) || Object.hasOwn(this.values, name) || this.types.has(name);
   }
 
   private static cloneAttr(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
@@ -361,7 +355,7 @@ export class LazyAttributeHash {
 
   private assignDefault(name: string): Attribute {
     const type = this.additionalTypes.get(name) ?? this.types.get(name);
-    if (Object.prototype.hasOwnProperty.call(this.values, name) && type) {
+    if (Object.hasOwn(this.values, name) && type) {
       const attr = Attribute.fromDatabase(name, this.values[name], type);
       this.delegate.set(name, attr);
       return attr;

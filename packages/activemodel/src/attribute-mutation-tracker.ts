@@ -155,10 +155,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   changeToAttribute(attrName: string): [unknown, unknown] | null {
-    if (
-      this.finalizedChanges &&
-      Object.prototype.hasOwnProperty.call(this.finalizedChanges, attrName)
-    ) {
+    if (this.finalizedChanges && Object.hasOwn(this.finalizedChanges, attrName)) {
       return [...this.finalizedChanges[attrName]];
     }
     return super.changeToAttribute(attrName);

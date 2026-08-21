@@ -41,6 +41,12 @@ describe("ReadTest", () => {
       static _hasAttribute = ClassMethods._hasAttribute;
       static attributeTypes = () => ({});
       static aliasAttribute = Base.aliasAttribute;
+      static defineAttributeMethod = Base.defineAttributeMethod;
+      static defineAttributeMethodPattern = Base.defineAttributeMethodPattern;
+      static defineDirtyAttributeMethods = Base.defineDirtyAttributeMethods;
+      static generatedAttributeMethods = Base.generatedAttributeMethods;
+      static isInstanceMethodAlreadyImplemented = Base.isInstanceMethodAlreadyImplemented;
+      static attributeMethodPatternsCache = Base.attributeMethodPatternsCache;
     }
     return Klass;
   }

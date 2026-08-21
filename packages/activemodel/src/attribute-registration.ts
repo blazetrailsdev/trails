@@ -38,6 +38,12 @@ export interface AttributeHostInternals {
   attributeAliases?: Record<string, string>;
   /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
   resolveAttributeName(name: string): string;
+
+  // The rest of the ClassMethods `extend(Model, …)` installs (see model.ts), so
+  // one ported body self-sends the next the way Ruby does.
+  attributeTypes(): Record<string, Type>;
+  /** @internal Rails-private helper. */
+  pendingAttributeModifications(): PendingModification[];
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +115,7 @@ export function decorateAttributes(
 ): void {
   names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
 
-  pendingAttributeModifications.call(this).push(new PendingDecorator(names, decorator));
+  this.pendingAttributeModifications().push(new PendingDecorator(names, decorator));
 
   resetDefaultAttributes(this);
 }
@@ -169,10 +175,7 @@ export class PendingDecorator implements PendingModification {
  * per schema/attribute revision rather than rebuilt on every call.
  */
 export function attributeTypes(this: AttributeHostInternals): Record<string, Type> {
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_cachedAttributeTypes") &&
-    this._cachedAttributeTypes
-  ) {
+  if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
     return this._cachedAttributeTypes;
   }
   // Dispatch through `this._defaultAttributes()` (not the bare AM function) so a
@@ -212,9 +215,9 @@ export function typeForAttribute(
   attributeName: string,
   block?: () => Type,
 ): Type {
-  attributeName = resolveAttributeName.call(this, attributeName);
+  attributeName = this.resolveAttributeName(attributeName);
 
-  const types = attributeTypes.call(this);
+  const types = this.attributeTypes();
   if (block) {
     // Ruby `attribute_types.fetch(attribute_name, &block)` — the block runs only
     // when the hash has no such KEY, so the `Type.default_value` hash default
@@ -232,7 +235,7 @@ export function typeForAttribute(
  * @internal Rails-private helper.
  */
 export function pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
-  if (!Object.prototype.hasOwnProperty.call(this, "_pendingAttributeModifications")) {
+  if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
     this._pendingAttributeModifications = [];
   }
   return this._pendingAttributeModifications as PendingModification[];

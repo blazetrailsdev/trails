@@ -134,7 +134,7 @@ export function isAcceptableOption(
   this: { options: Record<string, unknown> },
   value: unknown,
 ): boolean {
-  const hasAccept = Object.prototype.hasOwnProperty.call(this.options, "accept");
+  const hasAccept = Object.hasOwn(this.options, "accept");
   let accepted: unknown[];
   if (!hasAccept) accepted = ["1", true];
   else {
