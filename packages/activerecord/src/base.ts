@@ -1996,6 +1996,10 @@ export class Base extends Model {
    * on the attribute's `EnumType`, which trails' mutation tracker does not
    * carry, so the same cast happens here for both the live-change and
    * persisted-change readers.
+   *
+   * The `?` predicate's trails spelling is `isSavedChangeToAttribute`, which
+   * `attribute-methods/dirty.ts` already ports; converging this name onto it is
+   * story `converge-ar-dirty-generic-names-onto-dirty-ts` (RFC 0096).
    */
   savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     const ctor = this.constructor as typeof Base;
@@ -2014,34 +2018,13 @@ export class Base extends Model {
   }
 
   /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute
-   * (attribute_methods/dirty.rb:157-159).
-   */
-  savedChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
-    const ctor = this.constructor as typeof Base;
-    return this.previousChanges[ctor.resolveAttributeName(name)];
-  }
-
-  // `attribute_before_last_save` and `attribute_in_database`
-  // (attribute_methods/dirty.rb:164-166, 200-202) are NOT redeclared here: they
-  // are already ported in attribute-methods/dirty.ts and mixed onto the
-  // prototype below, and a class-body definition would win over the mixin
-  // (include never replaces a class-body method) and silently displace them.
-
-  /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
-   * (attribute_methods/dirty.rb:186-188).
+   * (attribute_methods/dirty.rb:186-188). Same pending rename as
+   * {@link Base.savedChangeToAttribute} — `isWillSaveChangeToAttribute` is the
+   * spelling `attribute-methods/dirty.ts` already carries.
    */
   willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     return this.attributeChanged(name, options);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
-   * (attribute_methods/dirty.rb:193-195).
-   */
-  willSaveChangeToAttributeValues(name: string): [unknown, unknown] | null {
-    return this.attributeChange(name);
   }
 
   // -- Explain --
@@ -4423,14 +4406,24 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   loadHasOne(name: string): Promise<Base | null>;
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
-   * (attribute_methods/dirty.rb:164-166) — ported in attribute-methods/dirty.ts
-   * and mixed onto the prototype, so the signature is declared here.
+   * (attribute_methods/dirty.rb:164-166).
+   *
+   * Ported in `attribute-methods/dirty.ts` and mixed onto the prototype, so
+   * only the signature lives here. A class-body definition would win over the
+   * mixin — `include()` never replaces a class-body method — and displace the
+   * port.
    */
   attributeBeforeLastSave(attr: string): unknown;
   /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
+   * (attribute_methods/dirty.rb:193-195). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
+  /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
-   * (attribute_methods/dirty.rb:200-202) — ported in attribute-methods/dirty.ts
-   * and mixed onto the prototype, so the signature is declared here.
+   * (attribute_methods/dirty.rb:200-202). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
    */
   attributeInDatabase(attr: string): unknown;
   readAttributeForValidation(attribute: string): unknown;

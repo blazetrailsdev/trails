@@ -510,7 +510,6 @@ describe("auto-tightening the shards a branch's own diff modifies", () => {
 
   it("only ever shrinks: the auto arm routes through tightenMarks", () => {
     const marks = new Map([[MINE, 8]]);
-    // A count ABOVE the mark is the excess arm's job — tightening must not raise.
     expect(tightenMarks(new Map([[MINE, 9]]), marks, [MINE])).toEqual(marks);
     expect(tightenMarks(new Map([[MINE, 7]]), marks, [MINE])).toEqual(new Map([[MINE, 7]]));
   });

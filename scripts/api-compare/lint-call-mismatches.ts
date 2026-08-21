@@ -674,6 +674,14 @@ async function gitChangedPaths(): Promise<string[]> {
   return `${committed}\n${working}`.split("\n").filter((l) => l.length > 0);
 }
 
+/**
+ * `autoTighten` runs {@link partitionSlack}'s auto arm: a stale high-water mark
+ * whose shard this branch's own diff already rewrites is lowered here instead of
+ * costing a round on the one-command manual re-run. Every other stale shard
+ * still fails. Callers pass `false` under CI, where the checkout is throwaway —
+ * a write there would pass the gate over a stale COMMITTED mark and hand the
+ * failure to whoever touches that shard next.
+ */
 async function main(
   write: boolean,
   showSeededKeys: boolean,
@@ -752,11 +760,6 @@ async function main(
   // seeded row added in another, and one stale-high shard is enough to fail.
   const excess = excessByPath(counts, marks);
   if (excess.length > 0) console.error(renderExcess(excess, markDir));
-  // The auto arm (RFC 0106): a shard this branch's own diff already rewrites is
-  // tightened here rather than costing a round on a one-command manual re-run.
-  // Every other stale shard still fails, and `autoTighten` is off in CI — a
-  // silent write there would land a stale mark on `main` and hand the failure
-  // to whoever touches that shard next.
   let slack = slackByPath(counts, marks);
   if (slack.length > 0 && autoTighten) {
     const { auto, blocked } = partitionSlack(slack, shardsFromDiffPaths(await gitChangedPaths()));
@@ -991,10 +994,6 @@ async function runAsScript(): Promise<void> {
       console.error(staleArtifactMessage("call-mismatches ratchet", ARTIFACT_PATH));
       process.exit(2);
     }
-    // `process.env.CI` at the CLI entry guard, the file's one sanctioned
-    // `process.*` site: the auto-tighten arm writes a shard, and CI's checkout
-    // is throwaway — a write there would pass the gate over a stale committed
-    // mark instead of telling the author to re-run `--tighten` and commit it.
     process.exit(
       await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG), !process.env.CI),
     );

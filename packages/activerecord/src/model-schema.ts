@@ -75,15 +75,16 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name
  *
+ * Also folds in `reset_table_name` (model_schema.rb:290-300), whose arms Rails
+ * evaluates eagerly at `inherited` time and trails evaluates lazily here (the
+ * `table_name` reader routes through this function, not through
+ * `resetTableName`): `self == Base` is nil, and an abstract class takes
+ * `superclass.table_name` rather than a name computed from its own class name.
+ *
  * @internal
  */
 export function resolveTableName(this: typeof Base): string {
   if ((this as any)._tableName != null) return (this as any)._tableName;
-  // `reset_table_name` (model_schema.rb:290-300) decides this before
-  // `compute_table_name` ever runs: `self == Base` is nil, and an abstract
-  // class takes `superclass.table_name` — never a name computed from its own
-  // class name. Abstract-of-`Base` is therefore table-less, and
-  // `AbstractStiPost < Post` reflects `posts`.
   if (this.name === "Base") return "";
   if ((this as any).abstractClass) {
     const superclass = Object.getPrototypeOf(this) as typeof Base | null;
@@ -1073,13 +1074,12 @@ function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
 
 /**
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#load_schema!
- * (model_schema.rb:587-597) — the base of the chain.
+ * (model_schema.rb:587-597) — the base of the chain. Its guard is
+ * `raise TableNotSpecified unless table_name` (model_schema.rb:587-590): the
+ * table name alone, with no `abstract_class?` term, so an abstract class that
+ * inherits a concrete superclass's table reflects that table's columns.
  */
 function loadSchemaBangAnchor(this: SchemaHost): void {
-  // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`
-  // (model_schema.rb:587-590). The guard is the table name alone — an abstract
-  // class that inherits a concrete superclass's table (`AbstractStiPost < Post`)
-  // reflects that table's columns rather than raising.
   const klass = this as unknown as typeof Base;
   if (!klass.tableName) {
     throw new TableNotSpecified(

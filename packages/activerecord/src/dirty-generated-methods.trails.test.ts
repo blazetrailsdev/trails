@@ -78,7 +78,7 @@ describe("willSaveChangeToAttribute", () => {
     expect(w.willSaveChangeToAttribute("size")).toBe(false);
   });
 
-  it("willSaveChangeToAttributeValues returns [old, new]", () => {
+  it("attributeChangeToBeSaved returns [old, new]", () => {
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -88,7 +88,7 @@ describe("willSaveChangeToAttribute", () => {
     const w = new Widget({ name: "Test" });
     w.changesApplied();
     w.writeAttribute("name", "Changed");
-    expect(w.willSaveChangeToAttributeValues("name")).toEqual(["Test", "Changed"]);
+    expect(w.attributeChangeToBeSaved("name")).toEqual(["Test", "Changed"]);
   });
 
   it("willSaveChangeToAttribute supports from/to", () => {
