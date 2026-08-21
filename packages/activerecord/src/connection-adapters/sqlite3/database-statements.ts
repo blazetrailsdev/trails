@@ -26,6 +26,7 @@ type ExecutableAdapter = {
   internalExecute(
     sql: string,
     name?: string | null,
+    binds?: unknown[],
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
 };
@@ -67,14 +68,14 @@ export async function beginIsolatedDbTransaction(
 }
 
 export async function commitDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.internalExecute("COMMIT TRANSACTION", "TRANSACTION", {
+  await adapter.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });
 }
 
 export async function execRollbackDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", {
+  await adapter.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });
@@ -100,6 +101,7 @@ export async function resetIsolationLevel(
     await adapter.internalExecute(
       `PRAGMA read_uncommitted=${previousReadUncommitted}`,
       "TRANSACTION",
+      [],
       { allowRetry: true, materializeTransactions: false },
     );
   }
@@ -109,6 +111,7 @@ interface InternalBeginTransactionHost {
   internalExecute(
     sql: string,
     name?: string | null,
+    binds?: unknown[],
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
   queryValue(sql: string, name?: string): Promise<unknown>;
@@ -174,13 +177,13 @@ export async function internalBeginTransaction(
       );
     }
   }
-  await this.internalExecute(`BEGIN ${mode.toUpperCase()} TRANSACTION`, "TRANSACTION", {
+  await this.internalExecute(`BEGIN ${mode.toUpperCase()} TRANSACTION`, "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });
   if (isolation) {
     this._previousReadUncommitted = await this.queryValue("PRAGMA read_uncommitted");
-    await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
+    await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", [], {
       allowRetry: true,
       materializeTransactions: false,
     });

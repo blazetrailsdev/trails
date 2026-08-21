@@ -31,6 +31,7 @@ export interface SavepointHost {
   internalExecute(
     sql: string,
     name: string,
+    binds?: unknown[],
     opts?: { materializeTransactions?: boolean },
   ): Promise<unknown>;
   currentSavepointName(): string | null;

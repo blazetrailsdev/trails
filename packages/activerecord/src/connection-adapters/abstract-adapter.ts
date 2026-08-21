@@ -683,11 +683,11 @@ export interface AbstractAdapter {
   internalExecute(
     sql: string,
     name?: string,
+    binds?: unknown[],
     opts?: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
       prepare?: boolean;
-      binds?: unknown[];
     },
   ): Promise<unknown>;
   /** @internal */
@@ -2897,14 +2897,18 @@ function ensureAbstractAdapterMixinsApplied(): void {
   // by a concrete adapter here — they're only defined on AbstractAdapter, and a
   // subclass prototype doesn't yet inherit them when the per-adapter module runs
   // (circular-import load order), so they must be wired on AbstractAdapter. The
-  // OVERRIDDEN write methods (`execInsert`, `execute`,
-  // `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's `truncate`) are
+  // OVERRIDDEN write methods (`execute`, `rollbackDbTransaction`,
+  // `rollbackToSavepoint`, and sqlite's `truncate`) are
   // wired on each concrete adapter instead — wiring them here too would leave the
   // override unwrapped. Reads route through `internalExecQuery` and never trip
-  // the wrapper.
+  // the wrapper. `execInsert` is wired here rather than per-adapter: only
+  // PostgreSQL still overrides it (postgresql/database_statements.rb:45), and its
+  // override delegates to `super`, so one wrapper on the shared method clears
+  // exactly once for every adapter.
   dirtiesQueryCache(
     AbstractAdapter,
     "execQuery",
+    "execInsert",
     "execUpdate",
     "execDelete",
     "execInsertAll",

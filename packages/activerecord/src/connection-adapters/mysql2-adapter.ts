@@ -4,7 +4,6 @@ import { BigDecimal, KeyError } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -33,6 +32,7 @@ import { Result } from "../result.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
+  lastInsertedId as mysql2LastInsertedId,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
   type Mysql2RawResult,
@@ -589,42 +589,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#perform_query
    * (the `prepare:` keyword routing) + Rails' exec_query tolerating no-result DML.
    */
-  /**
-   * Mirrors Rails' abstract `exec_insert`: `sql_for_insert` first, then
-   * `internal_exec_query` (abstract/database_statements.rb:157-160). MariaDB
-   * supports `INSERT ... RETURNING`, and `sql_for_insert` derives
-   * `returning_columns = returning || Array(pk)` (line 702-713), so an insert
-   * with no explicit `returning:` still gets `RETURNING <pk>` — which the
-   * `executeMutation` primitive cannot carry, since it reports only the
-   * generated id (0 when the PK is trigger-populated rather than
-   * AUTO_INCREMENT). MySQL 8 has no insert returning, so it keeps the
-   * `executeMutation` fast path via `super`, where `sql_for_insert` would append
-   * nothing anyway.
-   */
-  override async execInsert(
-    sql: string,
-    name: string | null = null,
-    binds: unknown[] = [],
-    pk?: string | false | null,
-    sequenceName?: string | null,
-    returning?: string[] | null,
-  ): Promise<Result | number> {
-    const inferredFromPk = pk !== false && pk != null;
-    if ((await this.supportsInsertReturning()) && (returning?.length || inferredFromPk)) {
-      const [returningSql, returningBinds] = sqlForInsert.call(
-        this as never,
-        sql,
-        pk ?? null,
-        binds,
-        returning ?? null,
-      );
-      const result = await this.internalExecQuery(returningSql, name, returningBinds);
-      this.dirtyCurrentTransaction();
-      return result;
-    }
-    return super.execInsert(sql, name, binds, pk, sequenceName, returning);
-  }
-
   // Rails' Mysql2Adapter has no `exec_query` override: the abstract
   // `exec_query` (abstract/database_statements.rb:147-149) funnels into
   // `internal_exec_query`, which is the one we override below.
@@ -926,6 +890,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id
+   * @internal
+   */
+  lastInsertedId(result: Result): Promise<unknown> {
+    return mysql2LastInsertedId.call(this as never, result);
+  }
+
+  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
@@ -1051,7 +1023,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `super.materializeBang()` runs after this returns.
    */
   async beginDbTransaction(): Promise<void> {
-    await this.internalExecute("BEGIN", "TRANSACTION", {
+    await this.internalExecute("BEGIN", "TRANSACTION", [], {
       materializeTransactions: false,
       allowRetry: true,
     });
@@ -1090,10 +1062,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const level = transactionIsolationLevels()[isolation];
     if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
     await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
-      await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
+      await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
         materializeTransactions: false,
       });
-      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+      await this.internalExecute("BEGIN", "TRANSACTION", [], { materializeTransactions: false });
       this._inTransaction = true;
     });
   }
@@ -1153,15 +1125,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
+    binds: unknown[] = [],
     {
       materializeTransactions = true,
       allowRetry = false,
-      binds = [],
       prepare: prepareOption,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
-      binds?: unknown[];
       prepare?: boolean;
     } = {},
   ): Promise<Mysql2RawResult> {
@@ -1960,13 +1931,13 @@ function isMysql2ConnectionError(e: unknown): boolean {
 // `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
 // query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
 // not on AbstractAdapter, or the override would run unwrapped. The write methods
-// this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
+// this adapter does NOT override (`execInsert`/`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
 // `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
-dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+dirtiesQueryCache(Mysql2Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
 dirtiesQueryCache(Mysql2Adapter, "execute");
 
 // Mirrors `include Mysql2::DatabaseStatements` — `perform_query` is an instance

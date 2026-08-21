@@ -33,7 +33,6 @@ import {
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
-import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   ActiveRecordError,
@@ -726,37 +725,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
-   * for the multi-column RETURNING read-back. `executeMutation` returns a single
-   * number (the id from `lastInsertRowid` / the changes readback), not the
-   * RETURNING row set, so a multi-column auto-populated-columns list (Rails
-   * `_create_record` zips every returning column) would come back with only the
-   * generated id. Route just that case through the row-returning
-   * `internalExecQuery` (`.all()`, bind-aware, and it materializes the
-   * transaction) and mark the transaction dirty as `executeMutation` would.
-   * Single-column / no-RETURNING inserts keep the `executeMutation` path.
-   */
-  override async execInsert(
-    sql: string,
-    name: string | null = null,
-    binds: unknown[] = [],
-    pk?: string | false | null,
-    _sequenceName?: string | null,
-    returning?: string[] | null,
-  ): Promise<Result | number> {
-    const readback = await execInsertReturningReadback.call(
-      this as never,
-      sql,
-      name,
-      binds,
-      pk,
-      returning,
-    );
-    if (readback !== undefined) return readback;
-    return this.executeMutation(sql, binds, name);
-  }
-
-  /**
    * Begin a transaction.
    */
   private _previousReadUncommitted: unknown = null;
@@ -787,14 +755,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         );
       }
     }
-    await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", {
+    await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", [], {
       allowRetry: true,
       materializeTransactions: false,
     });
     this._inTransaction = true;
     if (isolation) {
       this._previousReadUncommitted = (await this.queryValue("PRAGMA read_uncommitted")) ?? 0;
-      await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
+      await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", [], {
         allowRetry: true,
         materializeTransactions: false,
       });
@@ -807,6 +775,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       await this.internalExecute(
         `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
         "TRANSACTION",
+        [],
         { allowRetry: true, materializeTransactions: false },
       );
       this._previousReadUncommitted = null;
@@ -823,14 +792,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async internalExecute(
     sql: string,
     name: string = "SQL",
+    binds: unknown[] = [],
     {
       materializeTransactions = true,
-      binds = [],
       prepare = false,
       allowRetry = false,
     }: {
       materializeTransactions?: boolean;
-      binds?: unknown[];
       prepare?: boolean;
       allowRetry?: boolean;
     } = {},
@@ -919,7 +887,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", {
+    await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
       allowRetry: true,
       materializeTransactions: false,
     });
@@ -935,7 +903,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackDbTransaction(): Promise<void> {
     try {
-      await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", {
+      await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", [], {
         allowRetry: true,
         materializeTransactions: false,
       });
@@ -3239,14 +3207,14 @@ function translateException(
 // `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
 // query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
 // not on AbstractAdapter, or the override would run unwrapped. The write methods
-// this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
+// this adapter does NOT override (`execInsert`/`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncate`/`truncateTables`/`restartDbTransaction`) are wired once on
 // AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
 // `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
-dirtiesQueryCache(SQLite3Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+dirtiesQueryCache(SQLite3Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
 dirtiesQueryCache(SQLite3Adapter, "execute");
 
 // Mirrors `include SQLite3::DatabaseStatements` — `perform_query` is an

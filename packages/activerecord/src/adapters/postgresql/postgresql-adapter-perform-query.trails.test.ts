@@ -106,8 +106,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     const subscriber = new SQLSubscriber();
     subscriber.start();
     try {
-      await adapter.internalExecute("SELECT $1::integer", "SQL", {
-        binds: [bind],
+      await adapter.internalExecute("SELECT $1::integer", "SQL", [bind], {
         prepare: true,
       });
       const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer");
@@ -122,8 +121,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     const subscriber = new SQLSubscriber();
     subscriber.start();
     try {
-      await adapter.internalExecute("SELECT $1::integer + 0", "SQL", {
-        binds: [bind],
+      await adapter.internalExecute("SELECT $1::integer + 0", "SQL", [bind], {
         prepare: false,
       });
       const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer + 0");
