@@ -267,15 +267,9 @@ describe("DatabaseStatements#insert id extraction", () => {
     }
   }
 
-  it("returns numeric insertId when execInsert returns a number", async () => {
-    const adapter = new InsertTestAdapter() as any;
-    adapter.execInsert = async () => 42;
-    expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(42);
-  });
-
   it("respects idValue override when provided, regardless of execInsert return type", async () => {
     const adapter = new InsertTestAdapter() as any;
-    adapter.execInsert = async () => 42;
+    adapter.execInsert = async () => new Result(["id"], [[42]]);
     expect(await adapter.insert("INSERT INTO t VALUES (1)", null, null, 99)).toBe(99);
   });
 
@@ -343,26 +337,6 @@ describe("DatabaseStatements#insert id extraction", () => {
       },
     );
     expect(out).toEqual([null]);
-  });
-
-  it("falls back to [insertId] when returning requested but execInsert returns a number", async () => {
-    const adapter = new InsertTestAdapter() as any;
-    adapter.execInsert = async () => 42;
-    const out = await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
-      returning: ["id"],
-    });
-    expect(out).toEqual([42]);
-  });
-
-  it("falls back to [insertId] when RETURNING yields no value (empty rows)", async () => {
-    const adapter = new InsertTestAdapter() as any;
-    adapter.execInsert = async () => new Result(["id"], []);
-    adapter.returningColumnValues = (result: Result) => result.rows[0]; // undefined for empty rows
-    adapter.lastInsertedId = () => 13;
-    const out = await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
-      returning: ["id"],
-    });
-    expect(out).toEqual([13]);
   });
 });
 

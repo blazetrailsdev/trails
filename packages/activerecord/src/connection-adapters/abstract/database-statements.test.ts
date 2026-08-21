@@ -401,8 +401,8 @@ describe("DatabaseStatements", () => {
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async (sql: string, name: string | null, opts?: { binds?: unknown[] }) =>
-          log(sql, name, opts?.binds ?? [], [], false, async () => {
+        internalExecute: async (sql: string, name: string | null, binds?: unknown[]) =>
+          log(sql, name, binds ?? [], [], false, async () => {
             throw new StatementInvalid("duplicate key value violates unique constraint");
           }),
       } as unknown as DatabaseStatementsHost;
@@ -423,8 +423,8 @@ describe("DatabaseStatements", () => {
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async (sql: string, name: string | null, opts?: { binds?: unknown[] }) =>
-          log(sql, name, opts?.binds ?? [], [], false, async () => {
+        internalExecute: async (sql: string, name: string | null, binds?: unknown[]) =>
+          log(sql, name, binds ?? [], [], false, async () => {
             throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
           }),
       } as unknown as DatabaseStatementsHost;

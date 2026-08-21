@@ -27,8 +27,7 @@ async function captureUpdate(
   const original = conn[key];
   const calls: { sql: string; binds: unknown[] }[] = [];
   conn[key] = function (sql: string, ...rest: unknown[]) {
-    const opts = rest[1] as { binds?: unknown[] } | undefined;
-    calls.push({ sql, binds: opts?.binds ?? (rest[0] as unknown[]) ?? [] });
+    calls.push({ sql, binds: (rest[1] as unknown[]) ?? [] });
     return original.call(this, sql, ...rest);
   };
   try {
