@@ -287,10 +287,12 @@ export function includeAggregations(modelClass: typeof Base): void {
     enumerable: false,
   });
 
-  // Aggregations#initialize_dup copies the aggregation cache, then supers
-  // (aggregations.rb:6-9). `prepend()` is that ancestry splice: the link sits
-  // above the Core → Locking::Optimistic → Timestamp chain base.ts wires.
+  // Aggregations#init_internals supers then allocates the cache
+  // (aggregations.rb:21-23); Aggregations#initialize_dup copies it, then supers
+  // (aggregations.rb:6-9). `prepend()` is the ancestry splice `include
+  // Aggregations` performs: both links sit above the chains base.ts wires.
   prepend(proto, {
+    initInternals,
     initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
       copyAggregationCacheForDup.call(this, other);
       super_(other);
