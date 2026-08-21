@@ -1124,12 +1124,19 @@ export class DelegationMethods {
    *
    * One `XmlMini` builder is created (`:188`) and threaded through every
    * `to_tag` call, which is how nesting and indentation compose. The default
-   * root is `pluralize(underscore(first.class.name)).tr("/", "_")` (`:190-193`),
-   * but only when `all?(first.class)` holds — that is `Class#===`, so a subclass
-   * instance still matches and an STI collection whose first element is the base
-   * class roots under the base's plural rather than `<objects>`. An empty
-   * collection's default is the *pre-rename* `underscore(NilClass.name).pluralize`
-   * = `"nil_classes"`, which composes with `dasherize: false` / `camelize:`.
+   * root is `pluralize(underscore(first.class.name)).tr("/", "_")` (`:190-193`)
+   * when `first.class != Hash && all?(first.class)`, else `"objects"`:
+   *
+   * - `all?` is `Class#===`, so a subclass instance still matches — an STI
+   *   collection whose first element is the base class roots under the base's
+   *   plural rather than `<objects>`.
+   * - The Hash guard is live in Rails' own suite: an array of hashes roots under
+   *   `<objects>` (conversions_test.rb `test_to_xml_with_options`). Ruby's Hash
+   *   is a JS plain object, whose constructor is `Object`.
+   * - Ruby's `first` on an empty array is `nil`, so this same branch yields
+   *   `underscore(NilClass.name).pluralize` = `"nil_classes"` — the *pre-rename*
+   *   value, which is what composes with `dasherize: false` / `camelize:`. An
+   *   empty `all?` is vacuously true, matching `Array#every`.
    *
    * Rails renames the root first, then singularizes the already-renamed root for
    * the child name (`:200-202`), and deletes `:children` and `:skip_instruct` so
@@ -1144,13 +1151,12 @@ export class DelegationMethods {
     const records = await this.records();
     const builder = new IndentedXmlStringBuilder();
     const { root: rootOption, children: childrenOption, skipInstruct = false, ...rest } = options;
+    const firstClass = records[0]?.constructor;
     const root =
       rootOption ??
-      (records.length === 0
-        ? "nil_classes"
-        : records.every((record) => record instanceof records[0].constructor)
-          ? pluralize(underscore(records[0].constructor.name)).replace(/\//g, "_")
-          : "objects");
+      (firstClass !== Object && records.every((record) => record instanceof firstClass)
+        ? pluralize(underscore(firstClass?.name ?? "NilClass")).replace(/\//g, "_")
+        : "objects");
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
 
