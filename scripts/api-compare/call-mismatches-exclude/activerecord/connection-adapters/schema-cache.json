@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "columns_hash?",
-    "call": "cache",
-    "reason": "Satisfied by a different path: Rails' `columns_hash?(pool, t)` is `cache(pool).columns_hash?(...)` (schema_cache.rb:57), but trails' `cache(pool)` is async while `columns_hash?` is a sync predicate, so `SchemaReflection#isColumnsHash` calls the sync `ensureSyncCache()` analogue instead. `size`/`cache` in this file is the structurally identical omission (Rails `cache(pool).size`; trails `ensureSyncCache()` then `_cache?.size`), though that entry carries only the generic RFC 0047 seed reason rather than this explanation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "derive_columns_hash_and_deduplicate_values",
     "call": "deep_deduplicate",
     "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with Ruby's `-@`; JS has no string-interning primitive and identical string literals are already shared, so trails derives `columnsHash` only (schema-cache.ts:617-627)."
@@ -40,12 +33,5 @@
     "rubyName": "read",
     "call": "open",
     "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:246 is `Zlib::GzipReader.open(filename) { |gz| ... }`; trails reads the bytes and calls the pure `Gzip.decompress` (schema-cache.ts:149-156) — there is no reader object to open."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "size",
-    "call": "cache",
-    "reason": "Per-site verified (RFC 0106 wave 4b): schema_cache.rb:69-71 is `cache(pool).size`; trails' `cache(pool)` is promise-returning while `size` is synchronous, so it reads the resolved `_cache` via `ensureSyncCache()` (schema-cache.ts:827-830). Tracked with the rest of the sync/async schema-reflection surface."
   }
 ]

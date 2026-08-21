@@ -2,6 +2,13 @@
   {
     "package": "activesupport",
     "tsFile": "log-subscriber.ts",
+    "rubyName": "set_event_levels",
+    "call": "transform_keys",
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. log_subscriber.rb:123 `log_levels.transform_keys { ... }`; `logLevels` is a JS `Map` and trails' `transformKeys` (hash-utils.ts:217) is object-only, so the port rebuilds the Map in a loop."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "log-subscriber.ts",
     "rubyName": "silenced?",
     "call": "call",
     "reason": "log_subscriber.rb:143 `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc invoked through `#call`; the JS callable it ports to is invoked as `check(l)`, so there is no `call` to make. Same substitution as the `cache.ts key_matcher -> call` row. Language shortcoming."

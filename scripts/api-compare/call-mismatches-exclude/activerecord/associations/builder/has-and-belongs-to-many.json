@@ -12,5 +12,12 @@
     "rubyName": "through_model",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
+    "rubyName": "through_model",
+    "call": "order:_tableName,computeType",
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. has_and_belongs_to_many.rb:57-99 names the join table before resolving the two `compute_type` class names; the port resolves the classes first and derives the table name from them."
   }
 ]

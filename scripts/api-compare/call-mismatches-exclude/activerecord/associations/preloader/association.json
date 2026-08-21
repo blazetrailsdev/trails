@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/association.ts",
+    "rubyName": "association_key_name",
+    "call": "klass",
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. preloader/association.rb:162 `reflection.join_primary_key(klass)`; the port reads `reflection.joinPrimaryKey` without passing the klass. Real divergence, filed for burndown."
+  }
+]

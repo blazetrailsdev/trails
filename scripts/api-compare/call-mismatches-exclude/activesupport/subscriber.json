@@ -1,0 +1,14 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "subscriber.ts",
+    "rubyName": "add_event_subscriber",
+    "call": "subscribe",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:pattern",
+      "ref:subscriber"
+    ],
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): `_addEventSubscriber` only now pairs with `add_event_subscriber`. subscriber.rb:94 `notifier.subscribe(pattern, subscriber)` passes the Subscriber object, which Notifications invokes through `#call`; the JS notifier takes a callable, so trails passes `(e) => sub.call(e)`. Same Proc-vs-callable substitution as the `log-subscriber.ts silenced? -> call` row. Language shortcoming."
+  }
+]

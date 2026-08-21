@@ -39,7 +39,7 @@
     "tsFile": "reflection.ts",
     "rubyName": "derive_join_table",
     "call": "derive_join_table_name",
-    "reason": "Equivalent (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `migration/join-table.ts#joinTableName` deliberately duplicates `model-schema.ts#deriveJoinTableName` rather than importing it — the import edge is a TDZ cycle, guarded by `scripts/test-deps/adapter-graph-import-tdz.test.ts`. Documented deviation; do not route."
+    "reason": "Equivalent (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `migration/join-table.ts#joinTableName` deliberately duplicates `model-schema.ts#deriveJoinTableName` rather than importing it \u2014 the import edge is a TDZ cycle, guarded by `scripts/test-deps/adapter-graph-import-tdz.test.ts`. Documented deviation; do not route."
   },
   {
     "package": "activerecord",
@@ -47,5 +47,19 @@
     "rubyName": "inverse_name",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "reflection.ts",
+    "rubyName": "klass_join_scope",
+    "call": "order:klass,buildScope",
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. reflection.rb:441-444 builds the scope before resolving `klass`; the port resolves the class first. Real divergence, filed for burndown."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "reflection.ts",
+    "rubyName": "strict_loading_violation_message",
+    "call": "klass",
+    "reason": "Pre-existing divergence surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opens the ported-with-args gate on this call, which previously withheld the row. reflection.rb:346 interpolates `klass`; the port interpolates `className` so the message builds without resolving the constant. Real divergence, filed for burndown."
   }
 ]
