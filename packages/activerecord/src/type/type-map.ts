@@ -45,7 +45,7 @@ export class TypeMap {
   }
 
   /**
-   * @missingRailsCall call — type_map.rb:44 invokes the matched Proc with
+   * @missingRailsCall call — type_map.rb:49 invokes the matched Proc with
    * `matching_pair.last.call(lookup_key)`. A Proc is a plain function in JS and
    * a plain function invocation has no `.call`-named form.
    */

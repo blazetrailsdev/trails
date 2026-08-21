@@ -120,7 +120,7 @@ export class HashLookupTypeMap {
   }
 
   /**
-   * @missingRailsCall fetch — hash_lookup_type_map.rb:50 is
+   * @missingRailsCall fetch — hash_lookup_type_map.rb:52-53 is
    * `@mapping.fetch(type, block)`; a JS Map has no fetch-with-default, so the
    * port reads the entry and falls back to `block` in the same order.
    * @missingRailsCall call — the matched Proc's `#call` is a plain function

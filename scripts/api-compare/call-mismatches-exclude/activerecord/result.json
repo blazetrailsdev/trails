@@ -4,21 +4,21 @@
     "tsFile": "result.ts",
     "rubyName": "cast_values",
     "call": "first",
-    "reason": "result.rb:108 `type_overrides.first` indexes an Array; the faithful TS is `overridesArray[0]`, an index form with no call name (RFC 0092 positional-idiom-analogues)."
+    "reason": "result.rb:170 `type_overrides.first` indexes an Array; the faithful TS is `overridesArray[0]`, an index form with no call name (RFC 0092 positional-idiom-analogues)."
   },
   {
     "package": "activerecord",
     "tsFile": "result.ts",
     "rubyName": "cast_values",
     "call": "new",
-    "reason": "result.rb:124 `Array.new(values.size) { |i| ... }` builds a same-length Array from each row; the faithful TS is `row.map((value, i) => ...)` — one allocation, same order, no `new`."
+    "reason": "result.rb:186 `Array.new(values.size) { |i| ... }` builds a same-length Array from each row; the faithful TS is `row.map((value, i) => ...)` — one allocation, same order, no `new`."
   },
   {
     "package": "activerecord",
     "tsFile": "result.ts",
     "rubyName": "cast_values",
     "call": "one?",
-    "reason": "result.rb:104 `columns.one?` is a size test on a plain Array; the faithful TS is `this.columns.length === 1`, a property form with no call name (RFC 0092 positional-idiom-analogues routes these to a reason)."
+    "reason": "result.rb:166 `columns.one?` is a size test on a plain Array; the faithful TS is `this.columns.length === 1`, a property form with no call name (RFC 0092 positional-idiom-analogues routes these to a reason)."
   },
   {
     "package": "activerecord",
