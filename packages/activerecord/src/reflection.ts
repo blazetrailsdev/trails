@@ -68,7 +68,7 @@ export interface ConcreteReflection {
   readonly type?: string;
   readonly foreignKey?: string | string[];
   readonly scope?: ((...args: any[]) => any) | null;
-  readonly joinPrimaryKey?: string | string[];
+  joinPrimaryKey?(klass?: typeof Base): string | string[];
   readonly joinForeignKey?: string | string[];
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
   scopeFor(relation: any, owner?: any): any;
@@ -254,7 +254,7 @@ export class AbstractReflection {
       scope = scope.merge(chainScope);
     }
 
-    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey);
+    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey!());
     const foreignKeys = this._arrayWrap(this._concrete().joinForeignKey);
 
     if (primaryKeys.length !== foreignKeys.length) {
@@ -1021,15 +1021,10 @@ export class AssociationReflection extends MacroReflection {
   /**
    * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_primary_key
    * (reflection.rb:606-608) — the klass argument is accepted and unused, as in
-   * Ruby. The zero-arg spelling below is the reader Rails' `join_primary_key`
-   * also answers to.
+   * Ruby.
    */
-  joinPrimaryKeyFor(_klass?: typeof Base): string | string[] {
+  joinPrimaryKey(_klass?: typeof Base): string | string[] {
     return this.foreignKey;
-  }
-
-  get joinPrimaryKey(): string | string[] {
-    return this.joinPrimaryKeyFor();
   }
 
   get joinPrimaryType(): string | null {
@@ -1371,21 +1366,27 @@ export class BelongsToReflection extends AssociationReflection {
     return this.associationPrimaryKeyFor();
   }
 
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    return this.isPolymorphic()
-      ? this.associationPrimaryKeyFor(klass)
-      : this.associationPrimaryKeyFor();
-  }
-
-  get joinPrimaryKey(): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#join_primary_key
+   * (reflection.rb:944-946).
+   *
+   * Rails' polymorphic arm is `association_primary_key(klass)`, which reaches
+   * `self.klass` when the caller passes none — and a polymorphic belongs_to has
+   * no klass to reach. Rails' own callers always pass one; trails still has
+   * readers that do not, so the no-klass polymorphic case answers
+   * `options[:primary_key] || "id"` rather than raising at them. Tracked by
+   * 0106/converge-reflection-primary-key-readers-onto-rails-argument-shape.
+   */
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
     if (this.isPolymorphic()) {
-      const pk = this.options.primaryKey;
-      if (pk !== undefined) {
-        return Array.isArray(pk) ? pk.map(String) : String(pk);
+      if (klass === undefined) {
+        const pk = this.options.primaryKey;
+        if (pk !== undefined) return Array.isArray(pk) ? pk.map(String) : String(pk);
+        return "id";
       }
-      return "id";
+      return this.associationPrimaryKeyFor(klass);
     }
-    return this.joinPrimaryKeyFor();
+    return this.associationPrimaryKeyFor();
   }
 
   get joinForeignKey(): string | string[] {
@@ -1606,31 +1607,16 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.joinTable;
   }
 
-  get joinPrimaryKey(): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::ThroughReflection#join_primary_key
+   * (reflection.rb:1093-1095) — `source_reflection.join_primary_key(klass)`.
+   * The klass matters when the source is a polymorphic belongsTo with a
+   * sourceType: the resolved class may use a different PK column (e.g. `uuid`).
+   */
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
     const src = this.sourceReflection;
     if (!src) this.checkValidityBang();
-    return src!.joinPrimaryKey;
-  }
-
-  /**
-   * Resolve the join primary key against a runtime klass, mirroring
-   * BelongsToReflection#joinPrimaryKeyFor. Needed when the source is
-   * a polymorphic belongsTo with sourceType: the static joinPrimaryKey
-   * hardcodes "id", but the resolved sourceType class may use a
-   * different PK column (e.g. `uuid`).
-   */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const src = this.sourceReflection as unknown as {
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey: string | string[];
-    } | null;
-    if (!src) {
-      this.checkValidityBang();
-    }
-    if (src && typeof src.joinPrimaryKeyFor === "function") {
-      return src.joinPrimaryKeyFor(klass);
-    }
-    return src!.joinPrimaryKey;
+    return src!.joinPrimaryKey(klass);
   }
 
   get joinForeignKey(): string | string[] {
@@ -1936,20 +1922,11 @@ export class PolymorphicReflection extends AbstractReflection {
 
   /**
    * Mirrors: ActiveRecord::Reflection::PolymorphicReflection#join_primary_key
-   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`.
+   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`, whose
+   * default is `self.klass`.
    */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const refl = this._reflection as unknown as {
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey: string | string[];
-    };
-    return typeof refl.joinPrimaryKeyFor === "function"
-      ? refl.joinPrimaryKeyFor(klass ?? this.klass)
-      : refl.joinPrimaryKey;
-  }
-
-  get joinPrimaryKey(): string | string[] {
-    return (this._reflection as any).joinPrimaryKey;
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
+    return (this._reflection as AssociationReflection).joinPrimaryKey(klass ?? this.klass);
   }
 
   get joinForeignKey(): string | string[] {
@@ -2047,8 +2024,15 @@ export class RuntimeReflection extends AbstractReflection {
     return (this.klass as any).arelTable;
   }
 
-  get joinPrimaryKey(): string | string[] {
-    return this.joinPrimaryKeyFor();
+  /**
+   * Mirrors: ActiveRecord::Reflection::RuntimeReflection#join_primary_key
+   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`. The
+   * head's klass is the RUNTIME one (`association.klass`), which is the whole
+   * point of RuntimeReflection: a polymorphic belongs_to cannot compute its
+   * target class from the reflection alone.
+   */
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
+    return (this._reflection as AssociationReflection).joinPrimaryKey(klass ?? this.klass);
   }
 
   allIncludes(callback: () => any): any {
@@ -2084,20 +2068,6 @@ export class RuntimeReflection extends AbstractReflection {
   /** @internal */
   scopeFor(relation: unknown, owner?: unknown): unknown {
     return asConcrete(this._reflection).scopeFor?.(relation, owner) ?? relation;
-  }
-
-  /** @internal */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const refl = this._reflection as unknown as {
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey: string | string[];
-    };
-    // The head's klass is the runtime one (`association.klass`), which is the
-    // whole point of RuntimeReflection: a polymorphic belongs_to can't compute
-    // its target class from the reflection alone.
-    return typeof refl.joinPrimaryKeyFor === "function"
-      ? refl.joinPrimaryKeyFor(klass ?? this.klass)
-      : refl.joinPrimaryKey;
   }
 
   /** @internal */

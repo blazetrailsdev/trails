@@ -138,7 +138,7 @@ describe("AssociationScope", () => {
     const reflection = (AsAuthor as any)._reflectOnAssociation("as_posts");
     const proxy = new ReflectionProxy(reflection, /* aliasedTable */ null);
 
-    expect(proxy.joinPrimaryKey).toBe(reflection.joinPrimaryKey);
+    expect(proxy.joinPrimaryKey()).toBe(reflection.joinPrimaryKey());
     expect(proxy.joinForeignKey).toBe(reflection.joinForeignKey);
     expect(proxy.klass).toBe(AsPost);
     // Rails' all_includes; block returns nil → we return null.

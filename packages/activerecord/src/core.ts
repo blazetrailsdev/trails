@@ -1239,7 +1239,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
       if (respondsToId(value)) value = (value as any).id;
     } else if (reflection.belongsTo() && !reflection.isPolymorphic()) {
       const fk = reflection.joinForeignKey;
-      const pkey = reflection.joinPrimaryKey;
+      const pkey = reflection.joinPrimaryKey();
       // Composite-key belongs_to yields array key/value pairs the single-column
       // StatementCache below can't bind — defer to the relation path.
       if (Array.isArray(fk) || Array.isArray(pkey)) return this.all().findBy(conditions);

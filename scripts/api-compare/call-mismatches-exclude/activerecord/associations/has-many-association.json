@@ -3,8 +3,10 @@
     "package": "activerecord",
     "tsFile": "associations/has-many-association.ts",
     "rubyName": "count_records",
-    "call": "select!",
-    "reason": "has_many_association.rb:91 `target.select!(&:new_record?)` filters the target array IN PLACE; trails routes the whole body through a `CountRecordsHost` callback object (shared with CollectionProxy) whose `retainOnlyNewRecords` replaces the target store instead. The host object is the defect — it is decomposition Rails does not have — and deleting it is a collection-association refactor, not a call fix. Surfaced by the leading-underscore candidate (RFC 0106) and filed as 0106/converge-has-many-count-records-select-bang."
+    "call": "min",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "has_many_association.rb:95 `[association_scope.limit_value, count].compact.min` — Ruby's Enumerable#min is a RECEIVER method taking no arguments; JS's is `Math.min(...values)`, which takes the values as arguments. Same values, same result, and the only spellings that would report zero args (an Array.prototype extension, or a receiver-shaped helper named `min`) are surface trails does not add. Language shortcoming."
   },
   {
     "package": "activerecord",

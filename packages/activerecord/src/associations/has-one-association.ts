@@ -2,7 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
@@ -560,31 +560,41 @@ export class HasOneAssociation extends SingularAssociation {
   private setOwnerAttributes(record: Base): void {
     if (this.reflection.options.through) return;
 
+    // `join_primary_key` / `join_foreign_key` / `type` live on the rich
+    // reflection, which the Association is not constructed with — it is
+    // resolved off the owner's class, the lookup the `type` read below has
+    // always used.
     const ctor = (this.owner as any).constructor;
-    const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
-    const fk = this.foreignKeyColumn();
-    const fks = Array.isArray(this.reflection.foreignKey) ? this.reflection.foreignKey : [fk];
+    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) as {
+      joinPrimaryKey?: (klass?: typeof Base) => string | string[];
+      joinForeignKey?: string | string[];
+      type?: string | null;
+    } | null;
 
-    for (let i = 0; i < fks.length; i++) {
-      const pkCol = pks[i] ?? pks[0];
-      const pkValue =
+    const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
+    const primaryKeyAttributeNames = arrayWrap(
+      richReflection?.joinPrimaryKey?.() ??
+        (Array.isArray(this.reflection.foreignKey)
+          ? this.reflection.foreignKey
+          : this.foreignKeyColumn()),
+    );
+    const foreignKeyAttributeNames = arrayWrap(richReflection?.joinForeignKey ?? configuredPk);
+
+    for (const [i, primaryKey] of primaryKeyAttributeNames.entries()) {
+      const foreignKey = foreignKeyAttributeNames[i] ?? foreignKeyAttributeNames[0];
+      const value =
         typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(pkCol)
-          : (this.owner as any)[pkCol];
+          ? (this.owner as any)._readAttribute(foreignKey)
+          : (this.owner as any)[foreignKey];
 
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(fks[i], pkValue);
+        (record as any)._writeAttribute(primaryKey, value);
       } else {
-        (record as any)[fks[i]] = pkValue;
+        (record as any)[primaryKey] = value;
       }
     }
 
-    // `reflection.type` (foreign_association.rb:35) lives on the rich
-    // reflection, which the Association is not constructed with.
-    const type =
-      (ctor._reflectOnAssociation?.(this.reflection.name) as { type?: string | null } | null)
-        ?.type ?? null;
+    const type = richReflection?.type ?? null;
     if (type) {
       // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
       // subclasses store their base class name in the `as:` type column.

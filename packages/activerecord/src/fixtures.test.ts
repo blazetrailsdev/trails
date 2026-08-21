@@ -579,7 +579,7 @@ describe("PrimaryKeyError", () => {
         ownedEssay: {
           macro: "belongsTo",
           isPolymorphic: () => false,
-          joinPrimaryKey: "name",
+          joinPrimaryKey: () => "name",
           klass: { primaryKey: "id", name: "Essay" },
           foreignKey: "owned_essay_id",
         },

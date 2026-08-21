@@ -954,7 +954,7 @@ export async function prepareModelFixtures(
       macro?: string;
       isPolymorphic?: () => boolean;
       foreignKey?: string | string[];
-      joinPrimaryKey?: string | string[];
+      joinPrimaryKey?: () => string | string[];
       klass?: { primaryKey?: unknown };
     }[]) {
       if (refl.macro !== "belongsTo" || refl.isPolymorphic?.()) continue;
@@ -965,7 +965,7 @@ export async function prepareModelFixtures(
       let jpk: string | string[] | undefined;
       try {
         targetPk = refl.klass?.primaryKey;
-        jpk = refl.joinPrimaryKey;
+        jpk = refl.joinPrimaryKey?.();
       } catch {
         continue;
       }
@@ -1054,7 +1054,7 @@ export async function prepareModelFixtures(
           | {
               macro?: string;
               isPolymorphic?: () => boolean;
-              joinPrimaryKey?: unknown;
+              joinPrimaryKey?: () => unknown;
               klass?: { primaryKey?: unknown; name?: string };
               foreignKey?: string | string[];
             }
@@ -1063,7 +1063,7 @@ export async function prepareModelFixtures(
           const fkName = refl.foreignKey;
           const fkStr = Array.isArray(fkName) ? fkName[0] : fkName;
           if (col !== fkStr) {
-            const jpk = refl.joinPrimaryKey;
+            const jpk = refl.joinPrimaryKey?.();
             const klasspk = refl.klass?.primaryKey;
             if (typeof jpk === "string" && typeof klasspk === "string" && jpk !== klasspk) {
               throw new FixtureSetPrimaryKeyError(

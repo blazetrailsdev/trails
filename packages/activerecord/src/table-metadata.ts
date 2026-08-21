@@ -134,8 +134,13 @@ export class TableMetadata {
     return this._reflection;
   }
 
-  get joinPrimaryKey(): string | string[] | null {
-    return this._reflection?.joinPrimaryKey ?? null;
+  /**
+   * Mirrors: `delegate :join_primary_key, ... to: :reflection`
+   * (table_metadata.rb:5) — a method, and one that forwards the klass its
+   * polymorphic callers pass (predicate_builder/polymorphic_array_value.rb:33).
+   */
+  joinPrimaryKey(klass?: typeof Base): string | string[] | null {
+    return this._reflection?.joinPrimaryKey(klass) ?? null;
   }
 
   get joinPrimaryType(): string | null {

@@ -104,7 +104,7 @@ export class ReflectionProxy {
   // ThroughReflection, PolymorphicReflection) but not declared on the
   // AbstractReflection base.
   private get _r(): {
-    joinPrimaryKey: string | string[];
+    joinPrimaryKey(klass?: typeof Base): string | string[];
     joinForeignKey: string | string[];
     type?: string | null;
     klass: typeof Base;
@@ -115,8 +115,8 @@ export class ReflectionProxy {
     return this.reflection as unknown as ReturnType<() => ReflectionProxy["_r"]>;
   }
 
-  get joinPrimaryKey(): string | string[] {
-    return this._r.joinPrimaryKey;
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
+    return this._r.joinPrimaryKey(klass);
   }
 
   get joinForeignKey(): string | string[] {
@@ -382,8 +382,8 @@ export class AssociationScope {
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
   ): unknown {
-    const r = reflection as {
-      joinPrimaryKey: string | string[];
+    const r = reflection as unknown as {
+      joinPrimaryKey(klass?: typeof Base): string | string[];
       joinForeignKey: string | string[];
       type?: string | null;
     };
@@ -404,7 +404,7 @@ export class AssociationScope {
         tableName = null;
       }
     }
-    const joinPk = r.joinPrimaryKey;
+    const joinPk = r.joinPrimaryKey();
     const joinPks = Array.isArray(joinPk) ? joinPk : [joinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     // Same guard `AbstractReflection#joinScope` uses — mismatched
@@ -511,19 +511,20 @@ export class AssociationScope {
     reflection: AbstractReflection | ReflectionProxy,
     nextReflection: AbstractReflection | ReflectionProxy,
   ): unknown {
-    const r = reflection as {
-      joinPrimaryKey: string | string[];
+    const r = reflection as unknown as {
+      joinPrimaryKey(klass?: typeof Base): string | string[];
       joinForeignKey: string | string[];
       klass?: { tableName?: string };
       type?: string | null;
     };
     const nr = nextReflection as {
-      joinPrimaryKey: string | string[];
+      joinPrimaryKey(klass?: typeof Base): string | string[];
       joinForeignKey: string | string[];
       klass?: { tableName?: string };
       aliasedTable?: string | { name?: string };
     };
-    const joinPks = Array.isArray(r.joinPrimaryKey) ? r.joinPrimaryKey : [r.joinPrimaryKey];
+    const rJoinPk = r.joinPrimaryKey();
+    const joinPks = Array.isArray(rJoinPk) ? rJoinPk : [rJoinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     if (joinPks.length !== joinFks.length) {
       // Unwrap ReflectionProxy so activeRecord/name come from the
