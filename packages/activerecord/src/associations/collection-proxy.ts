@@ -20,13 +20,8 @@ import {
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { singularize, camelize, constantize } from "@blazetrails/activesupport";
-import { AssociationTypeMismatch } from "../errors.js";
 import type { AssociationDefinition } from "../associations.js";
-import {
-  autoloadModel,
-  resolveAssocClass,
-  association as associationProxy,
-} from "../associations.js";
+import { autoloadModel, association as associationProxy } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
@@ -686,7 +681,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * callbacks all land on this proxy too.
    */
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
-    this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
@@ -735,23 +729,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     // `@offsets = @take = nil; @scope = nil` (collection_proxy.rb:1112-1116).
     this.resetScope();
-  }
-
-  private _raiseOnTypeMismatch(records: T[]): void {
-    const opts = this._assocDef.options;
-    // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
-    if (opts.polymorphic) return;
-    const className = opts.className ?? camelize(singularize(this._assocName));
-    const klass = resolveAssocClass(this._record, this._assocName, className);
-    for (const record of records) {
-      if (record == null || !(record instanceof klass)) {
-        const actual =
-          record == null
-            ? String(record)
-            : `an instance of ${(record as any)?.constructor?.name ?? "unknown"}`;
-        throw new AssociationTypeMismatch(`${className}`, actual);
-      }
-    }
   }
 
   /**

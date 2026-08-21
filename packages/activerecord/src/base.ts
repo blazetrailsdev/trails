@@ -1984,16 +1984,64 @@ export class Base extends Model {
     return super.attributeChanged(name, options);
   }
 
-  override savedChangeToAttribute(
-    name: string,
-    options?: { from?: unknown; to?: unknown },
-  ): boolean {
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
+   * (attribute_methods/dirty.rb:150-152) — `mutations_before_last_save
+   * .changed?(attr_name.to_s, **options)`. ActiveModel::Dirty defines no
+   * `saved_change_to_*` family (dirty.rb); it is ActiveRecord's, declared
+   * alongside its `attribute_method_suffix` in `attributeMethodPatterns` above.
+   *
+   * The enum cast has no Rails counterpart at this level: Rails normalises
+   * `from:`/`to:` inside `AttributeMutationTracker#changed?` via `type.cast`
+   * on the attribute's `EnumType`, which trails' mutation tracker does not
+   * carry, so the same cast happens here for both the live-change and
+   * persisted-change readers.
+   */
+  savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    const ctor = this.constructor as typeof Base;
     if (options) {
-      const ctor = this.constructor as typeof Base;
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
-    return super.savedChangeToAttribute(name, options);
+    name = ctor.resolveAttributeName(name);
+    const changes = this.previousChanges;
+    if (!(name in changes)) return false;
+    if (!options) return true;
+    const change = changes[name];
+    if ("from" in options && change[0] !== options.from) return false;
+    if ("to" in options && change[1] !== options.to) return false;
+    return true;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute
+   * (attribute_methods/dirty.rb:157-159).
+   */
+  savedChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
+    const ctor = this.constructor as typeof Base;
+    return this.previousChanges[ctor.resolveAttributeName(name)];
+  }
+
+  // `attribute_before_last_save` and `attribute_in_database`
+  // (attribute_methods/dirty.rb:164-166, 200-202) are NOT redeclared here: they
+  // are already ported in attribute-methods/dirty.ts and mixed onto the
+  // prototype below, and a class-body definition would win over the mixin
+  // (include never replaces a class-body method) and silently displace them.
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
+   * (attribute_methods/dirty.rb:186-188).
+   */
+  willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    return this.attributeChanged(name, options);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
+   * (attribute_methods/dirty.rb:193-195).
+   */
+  willSaveChangeToAttributeValues(name: string): [unknown, unknown] | null {
+    return this.attributeChange(name);
   }
 
   // -- Explain --
@@ -4373,6 +4421,18 @@ export interface Base extends Included<typeof AutosaveAssociation> {
    * the explicit call doubles as the strict-loading bypass.
    */
   loadHasOne(name: string): Promise<Base | null>;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
+   * (attribute_methods/dirty.rb:164-166) — ported in attribute-methods/dirty.ts
+   * and mixed onto the prototype, so the signature is declared here.
+   */
+  attributeBeforeLastSave(attr: string): unknown;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
+   * (attribute_methods/dirty.rb:200-202) — ported in attribute-methods/dirty.ts
+   * and mixed onto the prototype, so the signature is declared here.
+   */
+  attributeInDatabase(attr: string): unknown;
   readAttributeForValidation(attribute: string): unknown;
   validate(context?: ValidationContextArg): Promise<boolean>;
   customValidationContext(): boolean;

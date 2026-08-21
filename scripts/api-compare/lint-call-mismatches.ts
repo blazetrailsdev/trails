@@ -123,6 +123,7 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import {
@@ -165,6 +166,8 @@ import {
   renderDroppedReviewed,
   renderDroppedSeeded,
   DROPPED_SEEDED_KEYS_ARG,
+  partitionSlack,
+  renderAutoTightened,
   renderSlack,
   renderWriteSummary,
   slackByPath,
@@ -627,7 +630,55 @@ async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
   }
 }
 
-async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
+/**
+ * Map repo-relative paths out of a `git diff` onto mark shard paths
+ * (`<package>/<tsFile .ts→.json>`).
+ *
+ * Both trees are keyed the same way, so a diff that rewrites the EXCLUDE shard
+ * (deleting a converged row — the usual way into a stale mark) names the same
+ * shard as one that rewrites the mark itself. Anything outside the two trees
+ * is not a shard and is dropped.
+ */
+export function shardsFromDiffPaths(paths: readonly string[]): Set<string> {
+  const roots = [BASELINE_DIR, MARK_DIR].map((d) => `${path.relative(ROOT_DIR, d)}/`);
+  const out = new Set<string>();
+  for (const p of paths) {
+    const root = roots.find((r) => p.startsWith(r));
+    if (root !== undefined && p.endsWith(".json")) out.add(p.slice(root.length));
+  }
+  return out;
+}
+
+/**
+ * Repo-relative paths this branch's diff touches: everything since the
+ * merge-base with `origin/main`, plus the uncommitted working tree (a converged
+ * row is usually deleted but not yet committed when the gate first runs).
+ *
+ * Every failure mode — no git, no `origin/main`, a shallow clone — resolves to
+ * an EMPTY set, which auto-tightens nothing and leaves the gate exactly as it
+ * was. This must never be the reason a gate passes.
+ */
+async function gitChangedPaths(): Promise<string[]> {
+  const run = (args: string[]): Promise<string> =>
+    new Promise((resolve) => {
+      const child = spawn("git", args, { cwd: ROOT_DIR, stdio: ["ignore", "pipe", "ignore"] });
+      let out = "";
+      child.stdout.on("data", (c: Buffer) => (out += c.toString()));
+      child.on("error", () => resolve(""));
+      child.on("close", (code) => resolve(code === 0 ? out : ""));
+    });
+  const [committed, working] = await Promise.all([
+    run(["diff", "--name-only", "--merge-base", "origin/main", "HEAD"]),
+    run(["diff", "--name-only", "HEAD"]),
+  ]);
+  return `${committed}\n${working}`.split("\n").filter((l) => l.length > 0);
+}
+
+async function main(
+  write: boolean,
+  showSeededKeys: boolean,
+  autoTighten: boolean,
+): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
   const current = flattenArtifact(artifact);
@@ -701,7 +752,26 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   // seeded row added in another, and one stale-high shard is enough to fail.
   const excess = excessByPath(counts, marks);
   if (excess.length > 0) console.error(renderExcess(excess, markDir));
-  const slack = slackByPath(counts, marks);
+  // The auto arm (RFC 0106): a shard this branch's own diff already rewrites is
+  // tightened here rather than costing a round on a one-command manual re-run.
+  // Every other stale shard still fails, and `autoTighten` is off in CI — a
+  // silent write there would land a stale mark on `main` and hand the failure
+  // to whoever touches that shard next.
+  let slack = slackByPath(counts, marks);
+  if (slack.length > 0 && autoTighten) {
+    const { auto, blocked } = partitionSlack(slack, shardsFromDiffPaths(await gitChangedPaths()));
+    if (auto.length > 0) {
+      const next = tightenMarks(
+        counts,
+        marks,
+        auto.map((d) => d.file),
+      );
+      await writeMarks(MARK_DIR, next);
+      for (const [file, max] of next) marks.set(file, max);
+      console.error(renderAutoTightened(auto, markDir));
+    }
+    slack = blocked;
+  }
   if (slack.length > 0) console.error(renderSlack(slack, markDir));
 
   if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
@@ -921,7 +991,13 @@ async function runAsScript(): Promise<void> {
       console.error(staleArtifactMessage("call-mismatches ratchet", ARTIFACT_PATH));
       process.exit(2);
     }
-    process.exit(await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG)));
+    // `process.env.CI` at the CLI entry guard, the file's one sanctioned
+    // `process.*` site: the auto-tighten arm writes a shard, and CI's checkout
+    // is throwaway — a write there would pass the gate over a stale committed
+    // mark instead of telling the author to re-run `--tighten` and commit it.
+    process.exit(
+      await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG), !process.env.CI),
+    );
   }
   let top: number;
   try {

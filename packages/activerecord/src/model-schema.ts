@@ -79,6 +79,16 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
  */
 export function resolveTableName(this: typeof Base): string {
   if ((this as any)._tableName != null) return (this as any)._tableName;
+  // `reset_table_name` (model_schema.rb:290-300) decides this before
+  // `compute_table_name` ever runs: `self == Base` is nil, and an abstract
+  // class takes `superclass.table_name` — never a name computed from its own
+  // class name. Abstract-of-`Base` is therefore table-less, and
+  // `AbstractStiPost < Post` reflects `posts`.
+  if (this.name === "Base") return "";
+  if ((this as any).abstractClass) {
+    const superclass = Object.getPrototypeOf(this) as typeof Base | null;
+    return superclass ? resolveTableName.call(superclass) : "";
+  }
   // Rails compute_table_name: non-base subclasses always use base_class.table_name.
   // This covers both STI hierarchies and any subclass of a non-abstract AR model.
   if (!isBaseClass(this)) {
@@ -616,13 +626,6 @@ export function resetTableName(this: SchemaHost): string {
   if (this.name === "Base") {
     return "";
   }
-  if ((this as any).abstractClass) {
-    const parent = Object.getPrototypeOf(this) as SchemaHost | null;
-    if (parent?.tableName != null) {
-      this._tableName = parent.tableName;
-      return this._tableName;
-    }
-  }
   const name = resolveTableName.call(this as any);
   this._tableName = name;
   return name;
@@ -1073,12 +1076,12 @@ function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
  * (model_schema.rb:587-597) — the base of the chain.
  */
 function loadSchemaBangAnchor(this: SchemaHost): void {
-  // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
-  // Rails' `table_name` is nil for an abstract class; ours computes an inferred
-  // name even for abstract classes, so mirror the Rails effect by treating an
-  // abstract class (or an explicitly cleared `table_name`) as table-less.
+  // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`
+  // (model_schema.rb:587-590). The guard is the table name alone — an abstract
+  // class that inherits a concrete superclass's table (`AbstractStiPost < Post`)
+  // reflects that table's columns rather than raising.
   const klass = this as unknown as typeof Base;
-  if ((this as any).abstractClass || !klass.tableName) {
+  if (!klass.tableName) {
     throw new TableNotSpecified(
       `${klass.name} has no table configured. Set one with ${klass.name}.table_name=`,
     );

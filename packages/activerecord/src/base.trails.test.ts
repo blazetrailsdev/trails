@@ -215,6 +215,8 @@ describe("instantiate override types for absent keys (trails)", () => {
 });
 
 describe("BasicsTest (trails)", () => {
+  fixtures(["posts"]);
+
   it("columnNames raises TableNotSpecified on an abstract class", () => {
     // Rails column_names has no abstract-class fallback — load_schema! raises
     // TableNotSpecified. Guards against reintroducing the attribute-walk branch.
@@ -227,6 +229,17 @@ describe("BasicsTest (trails)", () => {
     expect(() => AbstractIntrospected.columnNames()).toThrow(
       "AbstractIntrospected has no table configured",
     );
+  });
+
+  it("an abstract subclass of a concrete model reflects the inherited table", async () => {
+    // `reset_table_name`'s `abstract_class?` arm is `superclass.table_name`
+    // (model_schema.rb:293-294), and `load_schema!` raises only `unless
+    // table_name` (model_schema.rb:587-590) — so `AbstractStiPost < Post`
+    // (test/models/post.rb:232-234) reflects `posts`, type column included.
+    const { AbstractStiPost } = await import("./test-helpers/models/post.js");
+    expect(AbstractStiPost.tableName).toBe("posts");
+    await AbstractStiPost.loadSchema();
+    expect(Object.keys(AbstractStiPost.columnsHash())).toContain("type");
   });
 });
 

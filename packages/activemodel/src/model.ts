@@ -2041,16 +2041,6 @@ export class Model {
     return true;
   }
 
-  /**
-   * Check if a specific attribute will be saved on the next save.
-   * Supports from: and to: options like Rails.
-   *
-   * Mirrors: ActiveModel::Dirty#will_save_change_to_attribute?
-   */
-  willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    return this.attributeChanged(name, options);
-  }
-
   attributeWas(name: string): unknown {
     return this._dirty.attributeWas((this.constructor as typeof Model).resolveAttributeName(name));
   }
@@ -2060,15 +2050,6 @@ export class Model {
     return this._dirty.attributeChange(
       (this.constructor as typeof Model).resolveAttributeName(name),
     );
-  }
-
-  /**
-   * Get the before/after values of a change that will be saved.
-   *
-   * Mirrors: ActiveModel::Dirty#will_save_change_to_attribute
-   */
-  willSaveChangeToAttributeValues(name: string): [unknown, unknown] | null {
-    return this.attributeChange(name);
   }
 
   get previousChanges(): Record<string, [unknown, unknown]> {
@@ -2082,49 +2063,6 @@ export class Model {
    */
   get savedChanges(): Record<string, [unknown, unknown]> {
     return this._dirty.previousChanges;
-  }
-
-  /**
-   * Check if a specific attribute was saved in the last save.
-   *
-   * Mirrors: ActiveModel::Dirty#saved_change_to_attribute?
-   */
-  savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = (this.constructor as typeof Model).resolveAttributeName(name);
-    const changes = this._dirty.previousChanges;
-    if (!(name in changes)) return false;
-    if (!options) return true;
-    const change = changes[name];
-    if ("from" in options && change[0] !== options.from) return false;
-    if ("to" in options && change[1] !== options.to) return false;
-    return true;
-  }
-
-  /**
-   * Get the before/after values of a specific attribute from the last save.
-   *
-   * Mirrors: ActiveModel::Dirty#saved_change_to_attribute
-   */
-  /**
-   * Get the attribute value before the last save.
-   *
-   * Mirrors: ActiveModel::Dirty#attribute_before_last_save
-   */
-  attributeBeforeLastSave(name: string): unknown {
-    name = (this.constructor as typeof Model).resolveAttributeName(name);
-    const change = this._dirty.previousChanges[name];
-    return change ? change[0] : this.readAttribute(name);
-  }
-
-  /**
-   * Get the attribute value as it currently exists in the database
-   * (i.e. the value from before any unsaved changes).
-   *
-   * Mirrors: ActiveModel::Dirty#attribute_in_database
-   */
-  attributeInDatabase(name: string): unknown {
-    name = (this.constructor as typeof Model).resolveAttributeName(name);
-    return this._dirty.attributeWas(name) ?? this.readAttribute(name);
   }
 
   /**
@@ -2155,14 +2093,9 @@ export class Model {
   get attributesInDatabase(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this._dirty.changedAttributeNames) {
-      result[name] = this.attributeInDatabase(name);
+      result[name] = this._dirty.attributeWas(name) ?? this.readAttribute(name);
     }
     return result;
-  }
-
-  savedChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
-    const changes = this._dirty.previousChanges;
-    return changes[(this.constructor as typeof Model).resolveAttributeName(name)];
   }
 
   /**
@@ -2172,7 +2105,14 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_previously_changed?
    */
   attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    return this.savedChangeToAttribute(name, options);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
+    const changes = this._dirty.previousChanges;
+    if (!(name in changes)) return false;
+    if (!options) return true;
+    const change = changes[name];
+    if ("from" in options && change[0] !== options.from) return false;
+    if ("to" in options && change[1] !== options.to) return false;
+    return true;
   }
 
   /**
@@ -2182,7 +2122,9 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_previously_was
    */
   attributePreviouslyWas(name: string): unknown {
-    return this.attributeBeforeLastSave(name);
+    name = (this.constructor as typeof Model).resolveAttributeName(name);
+    const change = this._dirty.previousChanges[name];
+    return change ? change[0] : this.readAttribute(name);
   }
 
   restoreAttributes(): void {
