@@ -33,31 +33,13 @@ export function attributes(attrs: AttributeSet): Record<string, unknown> {
   return attrs.toHash();
 }
 
-/**
- * Mirrors: ActiveModel::Attributes#freeze (attributes.rb:150-153)
- *
- *   def freeze # :nodoc:
- *     @attributes = @attributes.clone.freeze unless frozen?
- *     super
- *   end
- *
- * One link of Rails' `freeze` chain; `Model#freeze` runs it where Rails' `super`
- * from `Validations#freeze` (validations.rb:372-377) reaches it, since TS has no
- * `super` across mixins. Ruby's `Object#clone` copies the ivars and dispatches
- * `initialize_clone`, which `AttributeSet` overrides to dup its inner hash
- * (attribute_set.rb:82-85) — spelled here as the same allocate-and-copy `dup()`
- * uses.
- *
- * @internal Rails-private helper.
- */
-export function freeze(this: AttributeInstanceHost): void {
-  if (!Object.isFrozen(this)) {
-    const attributes = this._attributes;
-    const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
-    Object.assign(cloned, attributes);
-    cloned.initializeClone(attributes);
-    this._attributes = cloned.freeze();
-  }
+/** @internal */
+export function _writeAttribute(
+  this: AttributeInstanceHost,
+  attrName: string,
+  value: unknown,
+): void {
+  this._attributes.writeFromUser(attrName, value);
 }
 
 /**
@@ -69,42 +51,6 @@ export function freeze(this: AttributeInstanceHost): void {
  * @internal Rails-private helper.
  */
 type AttributeInstanceHost = { _attributes: AttributeSet };
-
-/** @internal */
-export function _writeAttribute(
-  this: AttributeInstanceHost,
-  attrName: string,
-  value: unknown,
-): void {
-  this._attributes.writeFromUser(attrName, value);
-}
-
-// ---------------------------------------------------------------------------
-// Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
-// ---------------------------------------------------------------------------
-
-/**
- * Declare a typed attribute with an optional default.
- *
- * Mirrors: ActiveModel::Attributes::ClassMethods#attribute
- *
- * Model.attribute() delegates here. This is the canonical implementation
- * of the class-level `attribute` declaration.
- *
- * @internal
- */
-export interface AttributeOptions {
-  default?: unknown;
-  virtual?: boolean;
-  limit?: number | null;
-  /**
-   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
-   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
-   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
-   */
-  array?: boolean;
-  range?: boolean;
-}
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
@@ -213,6 +159,33 @@ export function attribute(
   this.defineAttributeMethod(name);
 }
 
+// ---------------------------------------------------------------------------
+// Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
+// ---------------------------------------------------------------------------
+
+/**
+ * Declare a typed attribute with an optional default.
+ *
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute
+ *
+ * Model.attribute() delegates here. This is the canonical implementation
+ * of the class-level `attribute` declaration.
+ *
+ * @internal
+ */
+export interface AttributeOptions {
+  default?: unknown;
+  virtual?: boolean;
+  limit?: number | null;
+  /**
+   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
+   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
+   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
+   */
+  array?: boolean;
+  range?: boolean;
+}
+
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
  * (attributes.rb:92-102) — the writer hook `define_attribute_method_pattern`
@@ -255,6 +228,33 @@ export function setDefineMethodAttribute(
       });
     });
   });
+}
+
+/**
+ * Mirrors: ActiveModel::Attributes#freeze (attributes.rb:150-153)
+ *
+ *   def freeze # :nodoc:
+ *     @attributes = @attributes.clone.freeze unless frozen?
+ *     super
+ *   end
+ *
+ * One link of Rails' `freeze` chain; `Model#freeze` runs it where Rails' `super`
+ * from `Validations#freeze` (validations.rb:372-377) reaches it, since TS has no
+ * `super` across mixins. Ruby's `Object#clone` copies the ivars and dispatches
+ * `initialize_clone`, which `AttributeSet` overrides to dup its inner hash
+ * (attribute_set.rb:82-85) — spelled here as the same allocate-and-copy `dup()`
+ * uses.
+ *
+ * @internal Rails-private helper.
+ */
+export function freeze(this: AttributeInstanceHost): void {
+  if (!Object.isFrozen(this)) {
+    const attributes = this._attributes;
+    const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
+    Object.assign(cloned, attributes);
+    cloned.initializeClone(attributes);
+    this._attributes = cloned.freeze();
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
