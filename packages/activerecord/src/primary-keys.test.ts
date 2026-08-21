@@ -229,10 +229,22 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("primary key prefix", () => {
-    // Rails: sets Base.primary_key_prefix_type to :table_name and :table_name_with_underscore,
-    // then asserts Topic.primary_key is "topicid" and "topic_id". TS only tests the
-    // nil/default case — prefix type is not wired into resetPrimaryKey yet.
-    expect(Topic.primaryKey).toBe("id");
+    const oldPrimaryKeyPrefixType = Base.primaryKeyPrefixType;
+    try {
+      Base.primaryKeyPrefixType = "table_name";
+      Topic.resetPrimaryKey();
+      expect(Topic.primaryKey).toBe("topicid");
+
+      Base.primaryKeyPrefixType = "table_name_with_underscore";
+      Topic.resetPrimaryKey();
+      expect(Topic.primaryKey).toBe("topic_id");
+
+      Base.primaryKeyPrefixType = null;
+      Topic.resetPrimaryKey();
+      expect(Topic.primaryKey).toBe("id");
+    } finally {
+      Base.primaryKeyPrefixType = oldPrimaryKeyPrefixType;
+    }
   });
 
   it("delete should quote pkey", async () => {
