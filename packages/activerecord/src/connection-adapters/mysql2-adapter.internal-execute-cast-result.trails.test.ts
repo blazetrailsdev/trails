@@ -57,7 +57,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
   it("preserves duplicate column names via positional array-mode rows", async () => {
     const adapter = makeAdapter();
 
-    const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", {
+    const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", [], {
       materializeTransactions: false,
     })) as unknown as Mysql2RawResult;
 

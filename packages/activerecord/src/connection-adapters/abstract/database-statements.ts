@@ -133,11 +133,11 @@ export interface DatabaseStatementsHost {
   internalExecute?(
     sql: string,
     name?: string | null,
+    binds?: unknown[],
     opts?: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
       prepare?: boolean;
-      binds?: unknown[];
     },
   ): Promise<unknown>;
   /** @internal */
@@ -196,11 +196,11 @@ export interface DatabaseStatementsHost {
   /** @internal */
   checkIfWriteQuery?(sql: string): void;
   /** @internal */
-  supportsInsertReturning?(): boolean;
+  supportsInsertReturning?(): boolean | Promise<boolean>;
   /** @internal */
   quoteColumnName?(col: string): string;
   /** @internal */
-  primaryKey?(table: string): string | null;
+  primaryKey?(table: string): string | null | Promise<string | null>;
   /** @internal */
   preprocessQuery?(sql: string): string;
   /** @internal */
@@ -486,52 +486,6 @@ export async function query(
  */
 export function execute(_sql: string, _binds?: unknown[], _name?: string | null): Promise<unknown> {
   throw new Error("execute must be implemented by adapter subclass");
-}
-
-/**
- * Shared multi-column RETURNING read-back for exec_insert.
- *
- * Rails' abstract exec_insert runs sql_for_insert then internal_exec_query,
- * returning the full RETURNING row. trails' adapters keep an executeMutation
- * fast path for single-column / no-RETURNING inserts (lastInsertRowid +
- * prepared-statement-cache retry), so this helper handles ONLY the multi-column
- * auto-populated-columns read-back (Rails `_create_record` zips every returning
- * column): it appends the RETURNING columns via sql_for_insert and runs the
- * bound INSERT through the adapter's bind-aware internalExecQuery (which
- * materializes the transaction) to hand back the whole Result, dirtying the
- * transaction as executeMutation would. Returns undefined when the caller should
- * keep its fast path (≤1 returning column, or sql_for_insert produced no
- * RETURNING clause — e.g. MySQL 8, which lacks INSERT ... RETURNING).
- *
- * @internal
- */
-export async function execInsertReturningReadback(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null,
-  binds: unknown[],
-  pk: string | false | null | undefined,
-  returning: string[] | null | undefined,
-): Promise<Result | undefined> {
-  if (!returning || returning.length <= 1) return undefined;
-  // Gate on the capability flag sql_for_insert itself checks
-  // (supports_insert_returning?) rather than sniffing the generated SQL — on a
-  // backend without INSERT ... RETURNING (MySQL 8) sql_for_insert appends
-  // nothing, so the caller keeps its executeMutation fast path.
-  if (!this.supportsInsertReturning?.()) return undefined;
-  const [returningSql, returningBinds] = sqlForInsert.call(
-    this as never,
-    sql,
-    pk ?? null,
-    binds,
-    returning,
-  );
-  // Dispatch through the instance so SQLite's bind-aware internalExecQuery
-  // override (`.all()`) is used; PG/MySQL fall to the mixed-in default.
-  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  const result = await run(returningSql, name, returningBinds);
-  this.dirtyCurrentTransaction?.();
-  return result;
 }
 
 /**
@@ -1263,9 +1217,7 @@ export async function internalExecQuery(
     // Thread binds and exec options through so a bound INSERT ... RETURNING
     // reaches the driver and allow_retry / materialize_transactions survive
     // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
-    // trails carries all of them in the opts object rather than positionally.
-    const rawResult = await this.internalExecute(sql, name, {
-      binds,
+    const rawResult = await this.internalExecute(sql, name, binds, {
       prepare: options?.prepare,
       allowRetry: options?.allowRetry,
       materializeTransactions: options?.materializeTransactions,
@@ -1369,6 +1321,26 @@ interface DatabaseStatementsDefaultsHost {
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
+  /** @internal */
+  internalExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: {
+      prepare?: boolean;
+      allowRetry?: boolean;
+      materializeTransactions?: boolean;
+    },
+  ): Promise<unknown>;
+  /** @internal */
+  affectedRows(rawResult: unknown): number;
+  /** @internal */
+  sqlForInsert(
+    sql: string,
+    pk: string | false | null | undefined,
+    binds: unknown[],
+    returning: string[] | null | undefined,
+  ): Promise<[string, unknown[]]>;
 }
 
 /**
@@ -1395,34 +1367,14 @@ async function insertStatement(
 ): Promise<unknown> {
   let sql: string;
   [sql, binds] = toSqlAndBinds.call(this, arel, binds);
-  const result = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  // execInsert may return a Result (PG/adapter with RETURNING support) or a
-  // number/insertId (MySQL/SQLite via executeMutation). Delegate to the
-  // adapter's lastInsertedId when available; fall back to treating the
-  // result directly as the id (matches executeMutation returning insertId).
-  const insertedId = (): unknown => {
-    if (idValue != null) return idValue;
-    if (this.lastInsertedId && result instanceof Result) return this.lastInsertedId(result);
-    if (result instanceof Result) return lastInsertedId(result);
-    return result; // numeric insertId from executeMutation
-  };
+  const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
   if (opts?.returning != null) {
-    // Adapters that emit a RETURNING clause surface the values via the result
-    // rows; those that can't (MySQL, SQLite < 3.35) fall back to the generated
-    // id so the single PK/auto-populated column is still filled. Returned as an
-    // array to match Rails' `returning_column_values` shape.
-    if (result instanceof Result) {
-      const rv = await (this.returningColumnValues ?? returningColumnValues).call(this, result);
-      // `undefined` first element means no value was extracted (no RETURNING
-      // clause emitted) — fall back to the insert id. A real `null` is a
-      // legitimate RETURNING value and must be preserved, so guard on
-      // `!== undefined`, not `!= null` (Rails has no such guard because its
-      // adapter dispatch never yields the no-value case here).
-      if (rv != null && rv.length > 0 && rv[0] !== undefined) return rv;
-    }
-    return [insertedId()];
+    return this.returningColumnValues(value);
   }
-  return insertedId();
+  // Ruby's `id_value || last_inserted_id(value)` (database_statements.rb:205)
+  // falls through only on nil/false, so a caller-supplied id of 0 is kept.
+  if (idValue != null && idValue !== false) return idValue;
+  return this.lastInsertedId(value);
 }
 
 export const DatabaseStatements = {
@@ -1552,30 +1504,31 @@ export const DatabaseStatements = {
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
-    binds?: unknown[],
-    _pk?: string | false | null,
+    binds: unknown[] = [],
+    pk?: string | false | null,
     _sequenceName?: string | null,
-    _returning?: string[] | null,
-  ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
+    returning?: string[] | null,
+  ): Promise<Result> {
+    [sql, binds] = await this.sqlForInsert(sql, pk, binds, returning);
+    return this.internalExecQuery(sql, name, binds);
   },
 
   async execDelete(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
-    binds?: unknown[],
+    binds: unknown[] = [],
   ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
+    return this.affectedRows(await this.internalExecute(sql, name, binds));
   },
 
   async execUpdate(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = null,
-    binds?: unknown[],
+    binds: unknown[] = [],
   ): Promise<number> {
-    return this.executeMutation(sql, binds, name);
+    return this.affectedRows(await this.internalExecute(sql, name, binds));
   },
 
   isWriteQuery(sql: string): boolean {
@@ -1797,13 +1750,12 @@ export function internalExecute(
   this: DatabaseStatementsHost,
   sql: string,
   name: string | null = "SQL",
+  binds: unknown[] = [],
   {
-    binds = [],
     prepare = false,
     allowRetry = false,
     materializeTransactions = true,
   }: {
-    binds?: unknown[];
     prepare?: boolean;
     allowRetry?: boolean;
     materializeTransactions?: boolean;
@@ -2066,24 +2018,29 @@ function currentTransactionJoinable(host: DatabaseStatementsHost): boolean {
 /**
  * Appends a RETURNING clause when the adapter supports it, then returns [sql, binds].
  *
+ * Async where Ruby is sync: `supports_insert_returning?` and `primary_key` are
+ * plain predicates in Ruby (a constant and a schema-cache read) but both are
+ * async here, and an un-awaited Promise is always truthy — so a sync body would
+ * append RETURNING on every backend.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert
  * @internal
  */
-export function sqlForInsert(
+export async function sqlForInsert(
   this: DatabaseStatementsHost,
   sql: string,
   pk: string | false | null | undefined,
   binds: unknown[],
   returning: string[] | null | undefined,
-): [string, unknown[]] {
-  if (this.supportsInsertReturning?.()) {
+): Promise<[string, unknown[]]> {
+  if (await this.supportsInsertReturning?.()) {
     // Mirrors Rails: `pk == false` is the explicit caller opt-out — skip
     // any pk-derived RETURNING column (caller may still pass `returning:`
     // for an alternate column list).
     let resolvedPk: string | null | undefined = pk === false ? null : pk;
     if (pk !== false && resolvedPk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) resolvedPk = this.primaryKey?.(tableRef) ?? null;
+      if (tableRef) resolvedPk = (await this.primaryKey?.(tableRef)) ?? null;
     }
     const returningColumns = returning ?? (resolvedPk != null ? [resolvedPk] : []);
     if (returningColumns.length > 0) {
@@ -2102,7 +2059,7 @@ export function sqlForInsert(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#last_inserted_id
  * @internal
  */
-function lastInsertedId(result: Result): unknown {
+export function lastInsertedId(result: Result): unknown {
   return singleValueFromRows(result.rows);
 }
 

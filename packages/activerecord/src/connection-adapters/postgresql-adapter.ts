@@ -90,8 +90,6 @@ import {
   transactionIsolationLevels,
   preprocessQuery,
   extractTableRefFromInsertSql,
-  sqlForInsert,
-  execInsertReturningReadback,
 } from "./abstract/database-statements.js";
 import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
@@ -1231,8 +1229,7 @@ export class PostgreSQLAdapter
       // unreachable: `cast_result` would resolve every pg_type column through
       // `get_oid_type`, re-entering this method. Ruby's PG::Result already
       // yields hash rows; node-pg's array mode needs the field names put back.
-      const result = (await this.internalExecute(query, "SCHEMA", {
-        binds: [],
+      const result = (await this.internalExecute(query, "SCHEMA", [], {
         allowRetry: true,
         materializeTransactions: false,
       })) as { fields?: Array<{ name: string }>; rows?: unknown[][] };
@@ -1552,38 +1549,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Run a single query on an already-acquired client with the same
-   * instrumentation, exception translation, and warning flushing that
-   * execQuery/executeMutation use. Used when two queries must share a
-   * session (e.g. INSERT + SELECT currval in the returning-disabled path).
-   * @internal
-   */
-  private async _instrumentedQueryOnClient(
-    client: pg.Client,
-    sql: string,
-    name: string | null,
-    binds: unknown[],
-  ): Promise<Result> {
-    const bindArray = this.typeCastedBinds(binds) ?? [];
-    const rewritten = this.rewriteBinds(sql, bindArray);
-    const pgResult = await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
-      try {
-        const r = await this._performQuery(client, rewritten, binds, bindArray, {
-          prepare: this._shouldPrepare(bindArray),
-          notificationPayload: payload,
-          rowMode: "array",
-        });
-        payload.row_count = r.rowCount ?? 0;
-        return r;
-      } catch (e: any) {
-        const translated = this._translateException(e, rewritten, bindArray);
-        throw translated;
-      }
-    });
-    return castResult.call(this, pgResult);
-  }
-
-  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
@@ -1824,7 +1789,7 @@ export class PostgreSQLAdapter
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this.internalExecute("BEGIN", "TRANSACTION", {
+      await this.internalExecute("BEGIN", "TRANSACTION", [], {
         materializeTransactions: false,
         allowRetry: true,
       });
@@ -1901,7 +1866,7 @@ export class PostgreSQLAdapter
     }
     if (!this._client) throw new ActiveRecordError("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", {
+      await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
         allowRetry: false,
         materializeTransactions: true,
       });
@@ -1938,7 +1903,7 @@ export class PostgreSQLAdapter
   async execRollbackDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", {
+      await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
         allowRetry: false,
         materializeTransactions: true,
       });
@@ -1997,7 +1962,7 @@ export class PostgreSQLAdapter
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
   async execRestartDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
-    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", {
+    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });
@@ -2157,7 +2122,7 @@ export class PostgreSQLAdapter
     if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
-      await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", {
+      await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
         materializeTransactions: false,
         allowRetry: true,
       });
@@ -2211,15 +2176,14 @@ export class PostgreSQLAdapter
   override async internalExecute(
     sql: string,
     name: string | null = "SQL",
+    binds: unknown[] = [],
     {
       materializeTransactions = true,
       allowRetry = false,
-      binds = [],
       prepare,
     }: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
-      binds?: unknown[];
       prepare?: boolean;
     } = {},
   ): Promise<unknown> {
@@ -2501,7 +2465,7 @@ export class PostgreSQLAdapter
   async sessionAuth(user: string): Promise<void> {
     await this.clearCacheBang();
     const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
-    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, {
+    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, [], {
       materializeTransactions: true,
     });
   }
@@ -2522,63 +2486,12 @@ export class PostgreSQLAdapter
     pk?: string | false | null,
     sequenceName?: string | null,
     returning?: string[] | null,
-  ): Promise<Result | number> {
+  ): Promise<Result> {
     // Mirrors Rails' single `if use_insert_returning? || pk == false` arm
-    // (postgresql/database_statements.rb:46-47).
+    // (postgresql/database_statements.rb:46-47) — `super` is the abstract
+    // `sql_for_insert` + `internal_exec_query` pair, which honours the
+    // `pk == false` opt-out inside `sql_for_insert` itself.
     if (this._useInsertReturning || pk === false) {
-      if (pk === false) {
-        // Explicit caller opt-out: skip the pk-derived RETURNING column.
-        // Cannot delegate to super here — our mixed-in DatabaseStatements
-        // default routes through executeMutation, which auto-appends
-        // `RETURNING id` for bare INSERTs when use_insert_returning is on
-        // (postgresql-adapter.ts:1238-1243). That would defeat the opt-out.
-        // Cannot use execQuery either — it intentionally skips
-        // materializeTransactions / dirtyCurrentTransaction (read-path
-        // optimisation), so an INSERT inside a lazy transaction would
-        // escape rollback. Use the same write-path scaffolding the
-        // pk-non-false branch below uses, just without the currval probe.
-        if (returning && returning.length > 0) {
-          const cols = returning.map((c) => this.quoteColumnName(c)).join(", ");
-          sql = `${sql} RETURNING ${cols}`;
-        }
-        sql = this.preprocessQuery(sql);
-        return this.withRawConnection(async (conn) => {
-          const client = conn as unknown as pg.Client;
-          return this._instrumentedQueryOnClient(client, sql, name, binds);
-        });
-      }
-      // A multi-column RETURNING list is the auto-populated-columns read-back
-      // (Rails `_create_record` zips every returning column). The shared helper
-      // runs it through the bind-aware internalExecQuery (which materializes) and
-      // dirties the transaction, handing back the whole Result — `super`/
-      // `executeMutation` would collapse the row to its first column. A single-
-      // column list falls through to the `super`/`executeMutation` fast path
-      // (scalar id + prepared-statement-cache retry).
-      const readback = await execInsertReturningReadback.call(
-        this as never,
-        sql,
-        name,
-        binds,
-        pk,
-        returning,
-      );
-      if (readback !== undefined) return readback;
-      // When the caller names RETURNING columns (a custom-named serial/identity
-      // PK), append them up front via sql_for_insert so executeMutation reads the
-      // DB-generated value back from the right column instead of falling back to
-      // its auto-appended `RETURNING id` (which errors on tables without an `id`
-      // column and leaves the in-memory PK stale). Mirrors Rails, where the
-      // abstract exec_insert runs sql_for_insert before the query.
-      if (returning && returning.length > 0) {
-        const [sqlWithReturning, resolvedBinds] = sqlForInsert.call(
-          this as never,
-          sql,
-          pk ?? null,
-          binds,
-          returning,
-        );
-        return super.execInsert(sqlWithReturning, name, resolvedBinds, pk, sequenceName, returning);
-      }
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);
     }
     // Rails' else arm (database_statements.rb:48-59). In Rails the whole method
@@ -4946,11 +4859,15 @@ const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?
 // not on AbstractAdapter, or the override would run unwrapped. The write methods
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
+// `execInsert` is wired on AbstractAdapter too, even though this adapter
+// overrides it: the override's `use_insert_returning?` arm delegates to `super`
+// (postgresql/database_statements.rb:46-47), so wiring it here as well would
+// clear the cache twice for one logical insert.
 // Each logical write clears the cache exactly once; the still-lower
 // `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
-dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+dirtiesQueryCache(PostgreSQLAdapter, "rollbackDbTransaction", "rollbackToSavepoint");
 dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).

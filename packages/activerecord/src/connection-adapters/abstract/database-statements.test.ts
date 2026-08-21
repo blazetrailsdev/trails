@@ -401,8 +401,8 @@ describe("DatabaseStatements", () => {
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async (sql: string, name: string | null, opts?: { binds?: unknown[] }) =>
-          log(sql, name, opts?.binds ?? [], [], false, async () => {
+        internalExecute: async (sql: string, name: string | null, binds?: unknown[]) =>
+          log(sql, name, binds ?? [], [], false, async () => {
             throw new StatementInvalid("duplicate key value violates unique constraint");
           }),
       } as unknown as DatabaseStatementsHost;
@@ -423,8 +423,8 @@ describe("DatabaseStatements", () => {
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async (sql: string, name: string | null, opts?: { binds?: unknown[] }) =>
-          log(sql, name, opts?.binds ?? [], [], false, async () => {
+        internalExecute: async (sql: string, name: string | null, binds?: unknown[]) =>
+          log(sql, name, binds ?? [], [], false, async () => {
             throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
           }),
       } as unknown as DatabaseStatementsHost;
@@ -782,8 +782,8 @@ describe("execInsert", () => {
     return host;
   }
 
-  it("appends RETURNING via sqlForInsert when adapter supports it", () => {
-    const [sql] = sqlForInsert.call(
+  it("appends RETURNING via sqlForInsert when adapter supports it", async () => {
+    const [sql] = await sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -793,8 +793,8 @@ describe("execInsert", () => {
     expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
   });
 
-  it("passes sql unchanged when adapter does not support RETURNING", () => {
-    const [sql] = sqlForInsert.call(
+  it("passes sql unchanged when adapter does not support RETURNING", async () => {
+    const [sql] = await sqlForInsert.call(
       makeInsertHost(false),
       "INSERT INTO t (x) VALUES (1)",
       "id",
@@ -804,8 +804,8 @@ describe("execInsert", () => {
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 
-  it("uses explicit returning list when provided", () => {
-    const [sql] = sqlForInsert.call(
+  it("uses explicit returning list when provided", async () => {
+    const [sql] = await sqlForInsert.call(
       makeInsertHost(true),
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -856,19 +856,25 @@ describe("internal_exec_query is a virtual call", () => {
 });
 
 describe("sqlForInsert", () => {
-  it("returns sql and binds unchanged when adapter does not support RETURNING", () => {
+  it("returns sql and binds unchanged when adapter does not support RETURNING", async () => {
     const host: DatabaseStatementsHost = {
       pool,
       typeCastedBinds,
       log,
       supportsInsertReturning: () => false,
     };
-    const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    const [sql, binds] = await sqlForInsert.call(
+      host,
+      "INSERT INTO t (x) VALUES (1)",
+      "id",
+      [],
+      null,
+    );
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
   });
 
-  it("appends RETURNING clause when pk is supplied and adapter supports it", () => {
+  it("appends RETURNING clause when pk is supplied and adapter supports it", async () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
@@ -876,11 +882,11 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
   });
 
-  it("uses explicit returning list when provided", () => {
+  it("uses explicit returning list when provided", async () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
@@ -888,7 +894,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = sqlForInsert.call(
+    const [sql] = await sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       null,
@@ -898,7 +904,7 @@ describe("sqlForInsert", () => {
     expect(sql).toContain('RETURNING "id", "created_at"');
   });
 
-  it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", () => {
+  it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", async () => {
     // Mirrors Rails sql_for_insert: pk=false signals the caller does not
     // want any pk-derived RETURNING column. extractTableRefFromInsertSql /
     // primaryKey lookup must be skipped too.
@@ -912,11 +918,11 @@ describe("sqlForInsert", () => {
         throw new Error("primaryKey() must not be called when pk=false");
       },
     };
-    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
+    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 
-  it("still honours explicit returning list when pk=false", () => {
+  it("still honours explicit returning list when pk=false", async () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
@@ -924,7 +930,7 @@ describe("sqlForInsert", () => {
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
-    const [sql] = sqlForInsert.call(
+    const [sql] = await sqlForInsert.call(
       host,
       "INSERT INTO t (x) VALUES (1)",
       false,

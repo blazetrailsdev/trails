@@ -95,7 +95,7 @@ describeIfMysqlAdapter("Mysql2Adapter savepoint statements dirty the parent (tra
 
       // materialize:false — the withRawConnection loop's own (suppressed) finally
       // must NOT dirty the parent on the reconnect path.
-      await adapter.internalExecute("SAVEPOINT `sp_clean`", "TRANSACTION", {
+      await adapter.internalExecute("SAVEPOINT `sp_clean`", "TRANSACTION", [], {
         materializeTransactions: false,
         allowRetry: true,
       });
@@ -105,7 +105,9 @@ describeIfMysqlAdapter("Mysql2Adapter savepoint statements dirty the parent (tra
       // materialize:true (the savepoint default) — the relocated internalExecute
       // finally dirties the parent on the very same reconnect path.
       rawForBlock.mockRejectedValueOnce(new ConnectionFailed("Lost connection to MySQL server"));
-      await adapter.internalExecute("SAVEPOINT `sp_dirty`", "TRANSACTION", { allowRetry: true });
+      await adapter.internalExecute("SAVEPOINT `sp_dirty`", "TRANSACTION", [], {
+        allowRetry: true,
+      });
       expect(reconnect).toHaveBeenCalledTimes(2);
       expect(tm.isRestorable()).toBe(false);
     });

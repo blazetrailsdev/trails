@@ -94,13 +94,13 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   // statements through `_trackPrepared` + `conn.execute`, so an explicit
   // `prepare: true` must land the SQL in the statement pool.
   it("internalExecute prepares when prepare is true", async () => {
-    await adapter.internalExecute("SELECT 1", "SQL", { prepare: true });
+    await adapter.internalExecute("SELECT 1", "SQL", [], { prepare: true });
     const pool = adapter._statementPoolForTest();
     expect(pool?.get("SELECT 1")).toBeTruthy();
   });
 
   it("internalExecute does not prepare when prepare is false", async () => {
-    await adapter.internalExecute("SELECT 2", "SQL", { prepare: false });
+    await adapter.internalExecute("SELECT 2", "SQL", [], { prepare: false });
     const pool = adapter._statementPoolForTest();
     expect(pool?.get("SELECT 2")).toBeFalsy();
   });

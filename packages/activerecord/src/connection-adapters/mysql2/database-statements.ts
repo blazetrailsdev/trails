@@ -6,9 +6,9 @@
 
 import type { Type } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
-import { NotImplementedError } from "../../errors.js";
 import { Result, type ColumnTypes } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
+import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -118,11 +118,18 @@ export function buildColumnTypes(
 /** @internal */
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
+  _lastId?: number;
   _statements?: Map<string, unknown>;
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   _shouldPrepare?(binds: unknown[]): boolean;
   _trackPrepared?(conn: unknown, sql: string): void;
+}
+
+/** @internal */
+interface LastInsertedIdHost {
+  _lastId?: number;
+  supportsInsertReturning(): Promise<boolean>;
 }
 
 /** @internal */
@@ -169,12 +176,22 @@ export async function executeBatch(
   }
 }
 
-/** @internal */
-function lastInsertedId(result: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2/database_statements.rb:23 cluster=mysql-mysql2-adapter
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id is not implemented",
-  );
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id
+ * (mysql2/database_statements.rb:22-29)
+ *
+ * Ruby's `@raw_connection&.last_id` reads the driver's own session accessor;
+ * the node mysql2 client exposes the value only on the result header, so
+ * `perform_query` above stashes it as `_lastId` — the same session-scoped
+ * "id of the last INSERT on this connection" the Ruby accessor returns.
+ *
+ * @internal
+ */
+export async function lastInsertedId(this: LastInsertedIdHost, result: Result): Promise<unknown> {
+  if (await this.supportsInsertReturning()) {
+    return abstractLastInsertedId(result);
+  }
+  return this._lastId;
 }
 
 /**
@@ -290,6 +307,7 @@ export async function performQuery(
   }
 
   this._affectedRowsBeforeWarnings = affectedRows;
+  if (insertId !== undefined) this._lastId = insertId;
 
   if (notificationPayload) {
     notificationPayload["affected_rows"] = this._affectedRowsBeforeWarnings;

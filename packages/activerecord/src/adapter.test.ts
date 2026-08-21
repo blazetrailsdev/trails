@@ -152,10 +152,11 @@ async function remoteDisconnect(conn: DatabaseAdapter): Promise<void> {
         internalExecute(
           sql: string,
           name?: string,
+          binds?: unknown[],
           opts?: { materializeTransactions?: boolean },
         ): Promise<unknown>;
       }
-    ).internalExecute("set @@wait_timeout=1", "SQL", { materializeTransactions: false });
+    ).internalExecute("set @@wait_timeout=1", "SQL", [], { materializeTransactions: false });
     await sleep(1200);
   }
 }

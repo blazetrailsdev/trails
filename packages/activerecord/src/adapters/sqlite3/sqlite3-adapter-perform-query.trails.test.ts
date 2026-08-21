@@ -324,28 +324,35 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("internalExecute prepares when prepare is true", async () => {
     const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
       ._statementPool;
-    await adapter.internalExecute(`SELECT 1`, "SQL", { prepare: true });
+    await adapter.internalExecute(`SELECT 1`, "SQL", [], { prepare: true });
     expect(pool.get(`SELECT 1`)).toBeTruthy();
   });
 
   it("internalExecute does not prepare when prepare is false", async () => {
     const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
       ._statementPool;
-    await adapter.internalExecute(`SELECT 2`, "SQL", { prepare: false });
+    await adapter.internalExecute(`SELECT 2`, "SQL", [], { prepare: false });
     expect(pool.get(`SELECT 2`)).toBeFalsy();
   });
   it("internalExecute binds through to the driver", async () => {
-    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
-      binds: [7, "bound"],
-    });
+    await adapter.internalExecute(
+      `INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`,
+      "SQL",
+      [7, "bound"],
+      {},
+    );
     expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 7`)).toBe("bound");
   });
 
   it("internalExecute binds through to the driver when prepare is true", async () => {
-    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
-      binds: [8, "prepared"],
-      prepare: true,
-    });
+    await adapter.internalExecute(
+      `INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`,
+      "SQL",
+      [8, "prepared"],
+      {
+        prepare: true,
+      },
+    );
     expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 8`)).toBe("prepared");
   });
 

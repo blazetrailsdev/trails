@@ -87,7 +87,7 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
 
       // materialize:false — the withRawConnection loop's own (suppressed) finally
       // must NOT dirty the parent on the reconnect path.
-      await adapter.internalExecute('SAVEPOINT "sp_clean"', "TRANSACTION", {
+      await adapter.internalExecute('SAVEPOINT "sp_clean"', "TRANSACTION", [], {
         materializeTransactions: false,
         allowRetry: true,
       });
@@ -99,7 +99,9 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
       rawForBlock.mockRejectedValueOnce(
         new ConnectionFailed("server closed the connection unexpectedly"),
       );
-      await adapter.internalExecute('SAVEPOINT "sp_dirty"', "TRANSACTION", { allowRetry: true });
+      await adapter.internalExecute('SAVEPOINT "sp_dirty"', "TRANSACTION", [], {
+        allowRetry: true,
+      });
       expect(reconnect).toHaveBeenCalledTimes(2);
       expect(tm.isRestorable()).toBe(false);
     });

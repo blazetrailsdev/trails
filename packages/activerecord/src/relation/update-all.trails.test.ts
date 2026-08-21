@@ -19,11 +19,15 @@ async function captureUpdate(
   fn: () => Promise<unknown>,
 ): Promise<{ sql: string; binds: unknown[] }> {
   const conn = (rel as { _conn(): Record<string, Mutator> })._conn();
-  const key = conn.executeMutation ? "executeMutation" : "execute";
+  // `update_all` reaches the adapter through `exec_update`, which is
+  // `affected_rows(internal_execute(sql, name, binds))`
+  // (abstract/database_statements.rb:172-174) — so the binds arrive in
+  // `internalExecute`'s options object, not as a positional argument.
+  const key = conn.internalExecute ? "internalExecute" : "execute";
   const original = conn[key];
   const calls: { sql: string; binds: unknown[] }[] = [];
   conn[key] = function (sql: string, ...rest: unknown[]) {
-    calls.push({ sql, binds: (rest[0] as unknown[]) ?? [] });
+    calls.push({ sql, binds: (rest[1] as unknown[]) ?? [] });
     return original.call(this, sql, ...rest);
   };
   try {
