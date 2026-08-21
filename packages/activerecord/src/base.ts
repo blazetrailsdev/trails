@@ -5019,8 +5019,6 @@ registerTableNameOptions({
     return Base.pluralizeTableNames;
   },
   getPrimaryKey(baseName: string) {
-    // Called on `Base` itself, whose `get_primary_key` never reaches the
-    // schema-cache arm — so the nullable return narrows to the convention here.
     return Base.getPrimaryKey(baseName) as string;
   },
 });

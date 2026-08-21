@@ -261,16 +261,16 @@ function cachedSchemaCacheFor(
  * contract — never null for a persistable model — so hot paths that read
  * `primary_key` are not forced to null-guard. That narrowing is the accepted
  * deviation; this function is where the truth lives.
+ * Rails' `primary_key` runs `reset_primary_key` on first read
+ * (primary_key.rb:78-81) and latches the answer into `@primary_key`. trails
+ * resolves through `get_primary_key` on EVERY read instead, because
+ * `table_exists?` is async here: a read taken before the schema cache is warm
+ * would otherwise cache the "id" convention forever.
  * @internal
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
   if (configured !== undefined) return configured;
-  // Rails' `primary_key` runs `reset_primary_key` on first read
-  // (primary_key.rb:78-81). trails resolves lazily on EVERY read instead of
-  // latching the first answer into `@primary_key`, because `table_exists?` is
-  // async here: a read before the schema cache is warm would otherwise cache
-  // the "id" convention forever.
   return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
 }
 
