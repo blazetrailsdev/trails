@@ -25,12 +25,6 @@ import { Parrot } from "./test-helpers/models/parrot.js";
 import { Company } from "./test-helpers/models/company.js";
 import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 
-// `attributeCameFromUser` is mixed into Base instances but not surfaced on the
-// model's declared instance type, so narrow it through a typed shim.
-function cameFromUser(record: object, attr: string): boolean {
-  return (record as { attributeCameFromUser(a: string): boolean }).attributeCameFromUser(attr);
-}
-
 describe("ValidationsTest", () => {
   // Rails `fixtures :topics, :developers`. Loading the topics set registers the
   // Topic/Reply STI subtree; loading developers builds the developers table.
@@ -234,12 +228,16 @@ describe("ValidationsTest", () => {
     expect(priceEstimate.readAttributeBeforeTypeCast("price")).toBe(50);
     expect(priceEstimate.readAttribute("price")).toBe(50);
 
-    expect(cameFromUser(priceEstimate, "price")).toBe(true);
+    expect((priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser).toBe(
+      true,
+    );
     expect(await priceEstimate.isValid()).toBe(true);
 
     await priceEstimate.saveBang();
 
-    expect(cameFromUser(priceEstimate, "price")).toBe(false);
+    expect((priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser).toBe(
+      false,
+    );
     expect(await priceEstimate.isValid()).toBe(true);
   });
 

@@ -15,7 +15,6 @@ interface Identifiable {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   readAttributeBeforeTypeCast(name: string): unknown;
-  cameFromUser(name: string): boolean;
 }
 
 type TemporalTimestamp = Temporal.Instant;

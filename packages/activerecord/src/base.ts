@@ -3851,8 +3851,6 @@ export class Base extends Model {
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
   /** @internal */
-  declare cameFromUser: (name: string) => boolean;
-  /** @internal */
   declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
   /** @internal */
   declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
@@ -4690,7 +4688,6 @@ include(Base, {
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: ReadonlyAttributes._writeAttribute,
-  cameFromUser: _attributeCameFromUser,
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)
