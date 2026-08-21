@@ -71,7 +71,7 @@ export interface ConcreteReflection {
   readonly joinPrimaryKey?: string | string[];
   readonly joinForeignKey?: string | string[];
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
-  scopeFor?(relation: any, owner?: any): any;
+  scopeFor(relation: any, owner?: any): any;
 }
 
 /** One branch of the `macro` discriminated union. */
@@ -324,9 +324,7 @@ export class AbstractReflection {
 
   joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     if (this.scope) {
-      const rel = this.buildScope(table, predicateBuilder, klass);
-      const result = this._concrete().scopeFor?.(rel, record) ?? this.scope(rel);
-      return [result || rel];
+      return [this._concrete().scopeFor(this.buildScope(table, predicateBuilder, klass), record)];
     }
     return [];
   }

@@ -3,21 +3,6 @@
     "package": "activerecord",
     "tsFile": "aggregations.ts",
     "rubyName": "composed_of",
-    "call": "create",
-    "kind": "args",
-    "rubyArgs": [
-      "str:composedOf",
-      "ref:partId",
-      "nil",
-      "ref:options",
-      "ref:this"
-    ],
-    "reason": "aggregations.rb:265 forwards its own `options` hash; trails' ComposedOfOptions holds `className` as the value-object class rather than a Ruby class-name String, so composed_of rebuilds the reflection options (className/mapping/anonymousClass) at the call site instead of passing the caller's hash through."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "aggregations.ts",
-    "rubyName": "composed_of",
     "call": "include",
     "reason": "aggregations.rb `include Aggregations` — Ruby `include` has no TS equivalent; the settled trails idiom names the mixin helper after the module, so the call is `includeAggregations(modelClass)` (aggregations.ts:50, :262) and the `unless self < Aggregations` guard lives inside it. Language shortcoming."
   }

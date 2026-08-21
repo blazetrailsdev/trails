@@ -100,9 +100,8 @@ export async function createAndLoadSchema(
     // Rails ensure order: establish_connection first, then restore VERBOSE
     // (test_databases.rb:18-21). Nest VERBOSE restore in its own finally so
     // it always runs even if establishConnection throws.
-    const { establishConnection } = await import("./connection-handling.js");
     try {
-      await establishConnection(Base);
+      await Base.establishConnection();
     } finally {
       if (old !== undefined) {
         process.env.VERBOSE = old;

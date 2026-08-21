@@ -72,7 +72,7 @@ describe("TestDatabasesTest", () => {
       DatabaseTasks.schemaFormat,
       undefined,
     );
-    expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
+    expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
   });
 
   it("create databases after fork", async () => {
@@ -197,7 +197,7 @@ describe("TestDatabasesTest", () => {
     await createAndLoadSchema(1, { envName: "arunit" });
 
     expect(mockReconstructFromSchema).not.toHaveBeenCalled();
-    expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
+    expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
   });
 
   it("throws a clear error when neither database nor URL yields a name", async () => {
@@ -247,7 +247,7 @@ describe("TestDatabasesTest", () => {
 
     try {
       await expect(createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(error);
-      expect(mockEstablishConnection).toHaveBeenCalledWith(Base);
+      expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
       expect(process.env.VERBOSE).toBe("1");
     } finally {
       if (originalVerbose === undefined) {

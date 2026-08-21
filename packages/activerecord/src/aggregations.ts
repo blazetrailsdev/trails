@@ -45,38 +45,36 @@ interface ComposedOfOptions {
  */
 export function composedOf(
   modelClass: typeof Base,
-  name: string,
+  partId: string,
   options: ComposedOfOptions,
 ): void {
   includeAggregations(modelClass);
 
-  // Rails passes its own `options` hash straight to Reflection.create; trails'
-  // ComposedOfOptions carries `className` as the value-object CLASS rather than a
-  // Ruby class-name String, so the reflection options are rebuilt here into the
-  // string-name + anonymousClass shape AggregateReflection reads. Baselined as a
-  // call-argument row on aggregations.json.
-  const reflection = create(
-    "composedOf",
-    name,
-    null,
-    {
-      className: options.className.name,
-      mapping: options.mapping,
-      anonymousClass: options.className,
-    },
-    modelClass,
-  );
-  addAggregateReflection(modelClass, name, reflection);
-
-  readerMethod(modelClass, name, options.mapping, options.className, options.constructorFn);
+  readerMethod(modelClass, partId, options.mapping, options.className, options.constructorFn);
   writerMethod(
     modelClass,
-    name,
+    partId,
     options.className,
     options.mapping,
     options.allowNil,
     options.converter,
   );
+
+  // ComposedOfOptions carries `className` as the value-object CLASS, not Ruby's
+  // class-name String, so those two keys are overlaid onto the hash Rails
+  // forwards whole (aggregations.rb:265).
+  const reflection = create(
+    "composedOf",
+    partId,
+    null,
+    {
+      ...options,
+      className: options.className.name,
+      anonymousClass: options.className,
+    },
+    modelClass,
+  );
+  addAggregateReflection(modelClass, partId, reflection);
 }
 
 /**

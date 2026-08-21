@@ -181,9 +181,10 @@ export class ConnectionHandler {
     const shard = options.shard ?? _base?.currentShard() ?? "default";
     const clobber = options.clobber ?? false;
 
-    const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard, {
-      adapterFactory: options.adapterFactory,
-    });
+    const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard);
+    if (options.adapterFactory) {
+      poolConfig.adapterFactory = options.adapterFactory;
+    }
 
     const poolManager = this.setPoolManager(poolConfig.connectionDescriptor);
 
@@ -406,15 +407,12 @@ export class ConnectionHandler {
     ownerName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
-    options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
     const dbConfig = configurations().resolve(config);
     dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
-    return new PoolConfig(ownerName, dbConfig, role, shard, {
-      adapterFactory: options?.adapterFactory,
-    });
+    return new PoolConfig(ownerName, dbConfig, role, shard);
   }
 }

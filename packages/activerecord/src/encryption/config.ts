@@ -77,7 +77,7 @@ export class Config {
    */
   setSupportSha1ForNonDeterministicEncryption(value: boolean): void {
     if (value && this.hasPrimaryKey()) {
-      const sha1KeyGenerator = new KeyGenerator("SHA1");
+      const sha1KeyGenerator = new KeyGenerator({ hashDigestClass: "SHA1" });
       const sha1KeyProvider = new DerivedSecretKeyProvider(this.primaryKey, {
         keyGenerator: sha1KeyGenerator,
       });

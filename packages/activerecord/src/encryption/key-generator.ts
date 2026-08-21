@@ -12,8 +12,10 @@ import { Configurable } from "./configurable-slot.js";
 export class KeyGenerator {
   private _hashDigestClass: string;
 
-  constructor(hashDigestClass?: string) {
-    this._hashDigestClass = hashDigestClass ?? Configurable.config.hashDigestClass;
+  constructor({
+    hashDigestClass = Configurable.config.hashDigestClass,
+  }: { hashDigestClass?: string } = {}) {
+    this._hashDigestClass = hashDigestClass;
   }
 
   get hashDigestClass(): string {
