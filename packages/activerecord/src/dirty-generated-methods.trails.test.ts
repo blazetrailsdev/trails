@@ -58,7 +58,7 @@ describe("DirtyGeneratedMethods", () => {
 /**
  * The `saved_change_to_*` / `*_before_last_save` / `*_in_database` /
  * `will_save_change_to_*` generics are ActiveRecord's, not ActiveModel's —
- * `activerecord/lib/active_record/attribute_methods/dirty.rb:150-240` defines
+ * `activerecord/lib/active_record/attribute_methods/dirty.rb:86-193` defines
  * them and `activemodel/lib/active_model/dirty.rb` does not. These cases moved
  * here from activemodel/src/dirty.test.ts with the methods.
  */

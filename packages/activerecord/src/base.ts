@@ -1996,8 +1996,8 @@ export class Base extends Model {
    * `EnumType`, both of which need the class, not the record.
    *
    * The NAME is forced: a generated `savedChangeToName` reaches its target
-   * through the derived `${prefix}Attribute${suffix}` join
-   * (attribute_methods.rb:552), and Ruby tells the predicate from the value
+   * through the derived `${prefix}attribute${suffix}` join
+   * (attribute_methods.rb:481), and Ruby tells the predicate from the value
    * reader by a TRAILING `?` where TypeScript's convention is a LEADING `is` —
    * so no pattern can derive `isSavedChangeToAttribute`, the spelling the port
    * carries. Story:
@@ -4405,7 +4405,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   loadHasOne(name: string): Promise<Base | null>;
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
-   * (attribute_methods/dirty.rb:164-166).
+   * (attribute_methods/dirty.rb:108-110).
    *
    * Ported in `attribute-methods/dirty.ts` and mixed onto the prototype, so
    * only the signature lives here. A class-body definition would win over the
@@ -4415,13 +4415,13 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   attributeBeforeLastSave(attr: string): unknown;
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
-   * (attribute_methods/dirty.rb:193-195). Ported and mixed in as
+   * (attribute_methods/dirty.rb:152-154). Ported and mixed in as
    * {@link Base.attributeBeforeLastSave} is.
    */
   attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
-   * (attribute_methods/dirty.rb:200-202). Ported and mixed in as
+   * (attribute_methods/dirty.rb:164-166). Ported and mixed in as
    * {@link Base.attributeBeforeLastSave} is.
    */
   attributeInDatabase(attr: string): unknown;
