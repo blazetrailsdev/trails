@@ -1,27 +1,20 @@
-import { type CodeGenerator, included } from "@blazetrails/activesupport";
+import { include, type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { defaultValue as typeDefaultValue } from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
-  attributeMethodSuffix,
   attributeMissing,
-  isAttributeMethod as _isAttributeMethod,
-  matchedAttributeMethod as _matchedAttributeMethod,
-  missingAttribute as _missingAttribute,
-  _readAttribute as __readAttribute,
-  buildMangledName,
-  defineAttributeMethod as _defineAttributeMethod,
-  isRespondToWithoutAttributes as _isRespondToWithoutAttributes,
   type AttributeMethodHost,
+  type AttributeMethodMatch,
+  buildMangledName,
 } from "./attribute-methods.js";
 import {
-  pendingAttributeModifications,
+  type PendingModification,
   PendingType,
   PendingDefault,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
-import { type InstanceHost } from "./attribute-methods.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -48,6 +41,9 @@ export function attributes(attrs: AttributeSet): Record<string, unknown> {
  *
  * @internal Rails-private helper.
  */
+type AttributeInstanceHost = { _attributes: AttributeSet };
+
+/** @internal */
 export function _writeAttribute(
   this: AttributeInstanceHost,
   attrName: string,
@@ -106,6 +102,9 @@ export function attribute(
     _cachedDefaultAttributes?: AttributeSet | null;
     resolveTypeName(name: string, options?: Record<string, unknown>): Type;
     resolveAttributeName(name: string): string;
+    pendingAttributeModifications(): PendingModification[];
+    attributeTypes(): Record<string, Type>;
+    defineAttributeMethod(attrName: string): void;
   },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
@@ -124,7 +123,7 @@ export function attribute(
     typeName = undefined;
   }
   const typeProvided = typeName !== undefined;
-  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+  if (!Object.hasOwn(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
   const existing = this._attributeDefinitions.get(name);
@@ -171,19 +170,17 @@ export function attribute(
   // default-only call pushes only PendingDefault, preserving the existing type.
   const noDefault = options?.default === undefined;
   if (typeProvided || noDefault) {
-    pendingAttributeModifications
-      .call(this)
-      .push(new PendingType(name, typeProvided ? type : null));
+    this.pendingAttributeModifications().push(new PendingType(name, typeProvided ? type : null));
   }
   if (!noDefault) {
-    pendingAttributeModifications.call(this).push(new PendingDefault(name, defaultValue));
+    this.pendingAttributeModifications().push(new PendingDefault(name, defaultValue));
   }
 
   // Mirrors: Rails reset_default_attributes — invalidate cache on this class
   // and all known subclasses so they recompute on next _defaultAttributes() call.
   resetDefaultAttributes(this);
 
-  _defineAttributeMethod.call(this as unknown as AttributeMethodHost, name);
+  this.defineAttributeMethod(name);
 }
 
 /**
@@ -230,6 +227,12 @@ export function setDefineMethodAttribute(
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
+export interface Attributes {
+  /** Mirrors: attribute_methods.rb:520-522 — `attribute_missing(match, ...)`. */
+  attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
+}
+
 /**
  * Concrete mixin host for `ActiveModel::Attributes`. Rails ships
  * `Attributes` as a module included into a model; in TS this class is
@@ -241,6 +244,12 @@ export function setDefineMethodAttribute(
  *
  * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
  */
+/** A class with `ActiveModel::AttributeMethods` already extended onto it. */
+type AttributeMethodSuffixHost = AttributeMethodHost & {
+  attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attributes {
   /**
    * Mirrors: attributes.rb:35-37
@@ -248,8 +257,8 @@ export class Attributes {
    *     attribute_method_suffix "=", parameters: "value"
    *   end
    */
-  static [included](base: AttributeMethodHost): void {
-    attributeMethodSuffix.call(base, "=", { parameters: "value" });
+  static [included](base: AttributeMethodSuffixHost): void {
+    base.attributeMethodSuffix("=", { parameters: "value" });
   }
 
   _attributes: AttributeSet;
@@ -281,56 +290,9 @@ export class Attributes {
   attributeNames(): string[] {
     return this._attributes.keys();
   }
-
-  /**
-   * Mirrors: attribute_methods.rb:520-522 — `attribute_missing(match, ...)`
-   * surfaces on Attributes via `include AttributeMethods`. Defined as a
-   * prototype method (not a class field) so subclass overrides take
-   * effect — class fields would shadow them.
-   */
-  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
-    return attributeMissing.call(this as unknown as Record<string, unknown>, match, ...args);
-  }
 }
 
-// ---------------------------------------------------------------------------
-// Rails privates surfaced by attributes.rb
-// ---------------------------------------------------------------------------
-
-/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
-export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return _isAttributeMethod.call(this, attrName);
-}
-
-/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
-export function matchedAttributeMethod(
-  this: InstanceHost,
-  methodName: string,
-): { proxyTarget: string; attrName: string } | null {
-  return _matchedAttributeMethod.call(this, methodName);
-}
-
-type AttributeInstanceHost = { _attributes: AttributeSet };
-
-/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
-  return _missingAttribute.call(this, attrName, stack);
-}
-
-/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
-export function _readAttribute(this: InstanceHost, attr: string): unknown {
-  type ReadAttributeThis = InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
-  };
-  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
-}
-
-/** @internal Rails-private helper. Mirrors: #respond_to_without_attributes? (via AttributeMethods include) */
-export function isRespondToWithoutAttributes(
-  this: object,
-  method: string,
-  includePrivateMethods: boolean = false,
-): boolean {
-  return _isRespondToWithoutAttributes.call(this, method, includePrivateMethods);
-}
+// Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8) — the module
+// brings `attribute_missing` with it; the interface merge above is its type
+// side.
+include(Attributes, { attributeMissing });
