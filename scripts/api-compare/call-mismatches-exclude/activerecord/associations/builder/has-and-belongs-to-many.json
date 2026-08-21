@@ -12,12 +12,5 @@
     "rubyName": "through_model",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
-    "rubyName": "through_model",
-    "call": "order:_tableName,computeType",
-    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. has_and_belongs_to_many.rb:23-32 resolves the join table LAZILY ('RHS class might not have been loaded') and defines `compute_type` first; trails computes the table name eagerly on a plain object. Filed as 0106/converge-habtm-through-model-lazy-table-name."
   }
 ]

@@ -4,7 +4,7 @@
     "tsFile": "associations/has-many-association.ts",
     "rubyName": "count_records",
     "call": "select!",
-    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. has_many_association.rb:91 `target.select!(&:new_record?)` filters the target in place; trails routes the whole body through a host-callback object that replaces the target store. Filed as 0106/converge-has-many-count-records-select-bang."
+    "reason": "has_many_association.rb:91 `target.select!(&:new_record?)` filters the target array IN PLACE; trails routes the whole body through a `CountRecordsHost` callback object (shared with CollectionProxy) whose `retainOnlyNewRecords` replaces the target store instead. The host object is the defect — it is decomposition Rails does not have — and deleting it is a collection-association refactor, not a call fix. Surfaced by the leading-underscore candidate (RFC 0106) and filed as 0106/converge-has-many-count-records-select-bang."
   },
   {
     "package": "activerecord",

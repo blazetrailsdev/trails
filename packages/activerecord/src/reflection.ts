@@ -1018,8 +1018,18 @@ export class AssociationReflection extends MacroReflection {
     return this.foreignType;
   }
 
-  get joinPrimaryKey(): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_primary_key
+   * (reflection.rb:606-608) — the klass argument is accepted and unused, as in
+   * Ruby. The zero-arg spelling below is the reader Rails' `join_primary_key`
+   * also answers to.
+   */
+  joinPrimaryKeyFor(_klass?: typeof Base): string | string[] {
     return this.foreignKey;
+  }
+
+  get joinPrimaryKey(): string | string[] {
+    return this.joinPrimaryKeyFor();
   }
 
   get joinPrimaryType(): string | null {
@@ -1922,6 +1932,20 @@ export class PolymorphicReflection extends AbstractReflection {
 
   get type(): string | null {
     return (this._reflection as any).type;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Reflection::PolymorphicReflection#join_primary_key
+   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`.
+   */
+  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    const refl = this._reflection as unknown as {
+      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+      joinPrimaryKey: string | string[];
+    };
+    return typeof refl.joinPrimaryKeyFor === "function"
+      ? refl.joinPrimaryKeyFor(klass ?? this.klass)
+      : refl.joinPrimaryKey;
   }
 
   get joinPrimaryKey(): string | string[] {

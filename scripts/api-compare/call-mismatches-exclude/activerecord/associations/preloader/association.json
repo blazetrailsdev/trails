@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/association.ts",
-    "rubyName": "association_key_name",
-    "call": "klass",
-    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. preloader/association.rb:162 `reflection.join_primary_key(klass)`; the port reads `reflection.joinPrimaryKey` as a property. Converging also has to reconcile the getter's polymorphic arm, so it carries polymorphic-preload risk on three adapters — filed as 0106/converge-preloader-association-key-name-klass-argument."
-  }
-]

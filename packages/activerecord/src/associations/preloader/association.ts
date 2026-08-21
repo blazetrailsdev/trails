@@ -105,7 +105,10 @@ export class Association {
   }
 
   get associationKeyName(): string | string[] {
-    return (this.reflection as any).joinPrimaryKey;
+    // preloader/association.rb:162 `reflection.join_primary_key(klass)` — the
+    // klass matters: a polymorphic reflection resolves its primary key against
+    // the concrete class the preloader is loading (reflection.rb:944-946).
+    return (this.reflection as any).joinPrimaryKeyFor(this.klass);
   }
 
   loaderQuery(): LoaderQuery {

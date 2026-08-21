@@ -47,12 +47,5 @@
     "rubyName": "inverse_name",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "strict_loading_violation_message",
-    "call": "klass",
-    "reason": "Surfaced by the leading-underscore call candidate (RFC 0106): the widened candidate list opened the ported-with-args gate on this pre-existing divergence, which it had kept invisible. reflection.rb:346 interpolates `klass` inside the non-polymorphic arm only; trails splits the method into a module function taking a pre-built `{ className }` object, which is built eagerly and so cannot resolve `klass` lazily. The split is the defect — filed as 0106/converge-strict-loading-violation-message-klass."
   }
 ]
