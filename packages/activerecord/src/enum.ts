@@ -84,6 +84,10 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * class-definition time, before the schema is reflected — a still-default
  * `value` type falls back to inferring the subtype from the mapping's value
  * shapes so pre-reflection casts are not identity no-ops.
+ *
+ * The mapping is a `HashWithIndifferentAccess` because that is what Rails'
+ * `enum_values` is (enum.rb:226) and what `EnumType` reads with `fetch` /
+ * `has_key?` (enum.rb:181,195,199).
  */
 function enumTypeFrom(
   name: string,
@@ -98,8 +102,6 @@ function enumTypeFrom(
     const rv = reflected as ValueType<unknown>;
     subtype = rv.type() == null ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
-  // Rails' `enum_values` is an `ActiveSupport::HashWithIndifferentAccess`
-  // (enum.rb:226) and `EnumType` reads it with `fetch`/`has_key?`.
   return new EnumType(
     name,
     new HashWithIndifferentAccess<EnumValue>(mapping),
@@ -301,11 +303,8 @@ export class EnumType extends ValueType<string> {
   // maps to its stored value, anything else passes through the subtype's cast
   // (so e.g. the string "true" type-casts to boolean `true` for a query).
   serialize(value: unknown): number | string | boolean | null {
-    return this._subtypeType.serialize(this._mapping.fetch(value as string, value as EnumValue)) as
-      | number
-      | string
-      | boolean
-      | null;
+    const mapped = this._mapping.fetch(value as string, value as EnumValue);
+    return this._subtypeType.serialize(mapped) as number | string | boolean | null;
   }
 
   // The in-memory value is the label string; the database value is the mapped
@@ -319,10 +318,8 @@ export class EnumType extends ValueType<string> {
 
   // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
-    return this._subtypeType.isSerializable(
-      this._mapping.fetch(value as string, value as EnumValue),
-      block,
-    );
+    const mapped = this._mapping.fetch(value as string, value as EnumValue);
+    return this._subtypeType.isSerializable(mapped, block);
   }
 
   assertValidValue(value: unknown): void {

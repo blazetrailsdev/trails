@@ -328,6 +328,11 @@ export interface StoreOptions {
  * Does not wire IndifferentCoder — used internally by store() and
  * as the standalone store_accessor() implementation.
  *
+ * Rails defines `#{accessor_key}=` (store.rb:137) before the reader
+ * (store.rb:141); a JS property carries both halves in one descriptor, so the
+ * writer is the first entry inside it (see CLAUDE.md, "Generated attribute
+ * readers are properties").
+ *
  * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
  */
 export function storeAccessor(
@@ -350,9 +355,6 @@ export function storeAccessor(
     const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
     storeAccessorsModule(modelClass).add(accessorKey);
 
-    // Rails defines `#{accessor_key}=` first and `#{accessor_key}` second; a JS
-    // property carries both halves in one descriptor, so the writer comes first
-    // inside it (see CLAUDE.md, "Generated attribute readers are properties").
     Object.defineProperty(storeModuleProto, accessorKey, {
       set: function (this: Base, value: unknown) {
         this.writeStoreAttribute(storeAttribute, key, value);
