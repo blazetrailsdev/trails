@@ -62,9 +62,20 @@ SKIP_PATTERNS = [
 # (assert_queries_count, assert_no_queries, assert_cycle, …) a whitelist kept
 # missing, the `must_*`/`wont_*` spec forms, and `expect`. The `(_|\z)`/`_`
 # anchors keep look-alikes (`asserted`, `assertion`) out.
+#
+# `expects` is mocha's `Mocha::API#expects` — a mock expectation verified at
+# teardown rather than inline, so minitest's own assertion counter never sees it.
+# It is still an assertion of the test's intent, and the trails ports spell it as
+# an explicit `expect(spy).toHaveBeenCalledWith(...)`, so we count it here to keep
+# the two sides' assertion COUNTS in step. Both sides' kind tokens stay unmapped
+# in assertion-kinds.ts (see `expects-canonical-kind-enrollment`): mapping
+# `toHaveBeenCalled*` onto a canonical kind surfaces ~97 pre-existing port
+# divergences across activerecord/activesupport and is its own burndown.
+# `stubs` is NOT an expectation — it only installs a return value — and stays
+# uncounted.
 def assertion_method?(name)
   return false unless name
-  name == "expect" ||
+  name == "expect" || name == "expects" ||
     name.match?(/\A(assert|refute)(_|\z)/) ||
     name.match?(/\A(must|wont)_/)
 end
@@ -1194,7 +1205,7 @@ class TestExtractor
   def collect_assertion_kinds(node)
     kinds = []
     values = []
-    collect_assertion_kinds_expanded(node, kinds, values, [], 0, nil, @class_stack.dup)
+    collect_assertion_kinds_expanded(node, kinds, values, [], 0, nil, @class_stack.dup, false)
     [kinds, values]
   end
 
@@ -1208,7 +1219,10 @@ class TestExtractor
   # expected value without moving the (lockstep-critical) recording site. The
   # `:command` (`assert_equal 5, foo`) and `:command_call` (`foo.must_equal 5`)
   # forms carry their args on the node directly (node[2] / node[4]).
-  def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope)
+  # `pending_never` threads mocha's `.never` modifier down from the chain's outer
+  # `:call` to the inner `expects`, so `foo.expects(:bar).never` records the
+  # negated kind — the twin of the port's `expect(spy).not.toHaveBeenCalled()`.
+  def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope, pending_never = false)
     return unless node.is_a?(Array)
 
     name = self_call_name(node)
@@ -1217,14 +1231,14 @@ class TestExtractor
         # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.
-        results << name
+        results << (pending_never ? "#{name}_never" : name)
         args = node[0] == :command ? node[2] : pending_args
         values << literal_token(expected_arg(args, name))
       elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
         resolved = resolve_helper(name, scope)
         if resolved
           visiting.push(name)
-          collect_assertion_kinds_expanded(resolved[0], results, values, visiting, depth + 1, nil, resolved[1])
+          collect_assertion_kinds_expanded(resolved[0], results, values, visiting, depth + 1, nil, resolved[1], false)
           visiting.pop
         end
       end
@@ -1235,7 +1249,7 @@ class TestExtractor
       # parenthesized `:call` form gets it threaded via `pending_args` from its
       # `:method_add_arg` parent (mirroring the self-call path).
       rname = ident_name(node[3])
-      results << rname
+      results << (pending_never ? "#{rname}_never" : rname)
       args = node[0] == :command_call ? node[4] : pending_args
       values << literal_token(expected_arg(args, rname))
     end
@@ -1244,8 +1258,10 @@ class TestExtractor
     # callee (node[1]) so the value is available at the recording site, then
     # recurse the args normally. Every other node recurses its children unchanged.
     if node[0] == :method_add_arg && node[1].is_a?(Array) && %i[fcall call].include?(node[1][0])
-      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2], scope)
+      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2], scope, pending_never)
       collect_assertion_kinds_expanded(node[2], results, values, visiting, depth, nil, scope)
+    elsif node[0] == :call && ident_name(node[3]) == "never"
+      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, nil, scope, true)
     else
       node.each do |child|
         collect_assertion_kinds_expanded(child, results, values, visiting, depth, nil, scope) if child.is_a?(Array)
