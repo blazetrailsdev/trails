@@ -1791,6 +1791,7 @@ export class Model {
     return this.contextForValidation().context;
   }
 
+  /** @internal */
   set _validationContext(value: string | string[] | null) {
     this.contextForValidation().context = value;
   }

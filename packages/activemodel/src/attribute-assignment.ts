@@ -39,6 +39,16 @@ export function assignAttributes(
   return model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
 }
 
+/** @internal Rails-private helper. */
+export function _assignAttributes(
+  model: AttributeAssignment,
+  attributes: Record<string, unknown>,
+): void {
+  for (const [k, v] of Object.entries(attributes)) {
+    void model._assignAttribute(k, v);
+  }
+}
+
 /**
  * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36) —
  * the alias sits immediately under the method it aliases, as it does in Ruby.
@@ -60,16 +70,6 @@ export function attributeWriterMissing(
   _value: unknown,
 ): void {
   throw new UnknownAttributeError(model, name);
-}
-
-/** @internal Rails-private helper. */
-export function _assignAttributes(
-  model: AttributeAssignment,
-  attributes: Record<string, unknown>,
-): void {
-  for (const [k, v] of Object.entries(attributes)) {
-    void model._assignAttribute(k, v);
-  }
 }
 
 /**

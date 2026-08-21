@@ -1012,6 +1012,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
+  /** @internal */
   declare _maxAllowedPacket?: number;
 
   /**

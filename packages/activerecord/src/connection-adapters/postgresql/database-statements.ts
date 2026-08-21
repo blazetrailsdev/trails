@@ -81,6 +81,7 @@ interface CastResultHost {
 
 /** @internal */
 interface CancelAnyRunningQueryHost {
+  /** @internal */
   _cancelAnyRunningQuery(): void;
 }
 
