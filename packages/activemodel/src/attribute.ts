@@ -225,7 +225,7 @@ export abstract class Attribute {
   /**
    * Force-set the memoized cast value without replacing the Attribute or
    * losing valueBeforeTypeCast. Used for post-cast transformations like
-   * normalization and nullifyBlanks.
+   * normalization.
    */
   overrideCastValue(value: unknown): void {
     this._value = value;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
+import { throwAbort, withOptions } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import {
   _registerCallbackOnProto,
@@ -1033,7 +1033,7 @@ describe("withOptions()", () => {
       }
     }
 
-    User.withOptions({ on: "create" }, (m) => {
+    withOptions(User, { on: "create" }, (m) => {
       m.validates("name", { presence: true });
       m.validates("email", { presence: true });
     });

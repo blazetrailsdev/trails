@@ -381,45 +381,6 @@ describe("typeForAttribute", () => {
   });
 });
 
-describe("nullifyBlanks()", () => {
-  it("converts blank strings to null for specified attributes", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("bio", "string");
-        this.nullifyBlanks("name");
-      }
-    }
-    const u = new User({ name: "  ", bio: "  " });
-    expect(u.readAttribute("name")).toBeNull();
-    expect(u.readAttribute("bio")).toBe("  "); // not nullified
-  });
-
-  it("nullifies all string attrs when called with no arguments", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.nullifyBlanks();
-      }
-    }
-    const u = new User({ name: "", email: "" });
-    expect(u.readAttribute("name")).toBeNull();
-    expect(u.readAttribute("email")).toBeNull();
-  });
-
-  it("nullifies on writeAttribute too", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.nullifyBlanks("name");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    u.writeAttribute("name", "");
-    expect(u.readAttribute("name")).toBeNull();
-  });
-});
 describe("Attributes", () => {
   class User extends Model {
     static {
