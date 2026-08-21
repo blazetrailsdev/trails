@@ -39,6 +39,21 @@ export function assignAttributes(
   return model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
 }
 
+/**
+ * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36) —
+ * the alias sits immediately under the method it aliases, as it does in Ruby.
+ * A TS `set` accessor cannot be awaited and the aliased write path can owe I/O
+ * (`replace`, collection_association.rb:46-48; `ids_writer`, :61-83; has_one's
+ * displacing writer, has_one_association.rb:59-84), so the alias keeps the
+ * Rails name in a `setX()` method (CLAUDE.md § "Fidelity is the job").
+ */
+export function setAttributes(
+  model: AttributeAssignment,
+  newAttributes: unknown,
+): Promise<void> | void {
+  return assignAttributes(model, newAttributes);
+}
+
 export function attributeWriterMissing(
   model: AttributeAssignment,
   name: string,
@@ -53,7 +68,7 @@ export function _assignAttributes(
   attributes: Record<string, unknown>,
 ): void {
   for (const [k, v] of Object.entries(attributes)) {
-    _assignAttribute(model, k, v);
+    void model._assignAttribute(k, v);
   }
 }
 
@@ -92,13 +107,17 @@ export function _assignAttributes(
  *
  * @internal Rails-private helper.
  */
-export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
+export function _assignAttribute(
+  model: AttributeAssignment,
+  k: string,
+  v: unknown,
+): Promise<void> | void {
   const setter = `${k}=`;
   try {
     const method = publicMethod(model, setter);
     if (method) {
-      method.call(model, v);
-      return;
+      const result: unknown = method.call(model, v);
+      return result instanceof Promise ? (result as Promise<void>) : undefined;
     }
     const match = model.matchedAttributeMethod(setter);
     if (match) {
@@ -139,19 +158,19 @@ export function _assignAttribute(model: AttributeAssignment, k: string, v: unkno
 function publicMethod(
   model: AttributeAssignment,
   setter: string,
-): ((this: AttributeAssignment, value: unknown) => void) | null {
+): ((this: AttributeAssignment, value: unknown) => unknown) | null {
   const key = setter.slice(0, -1);
   let obj: object | null = model;
   while (obj && obj !== Object.prototype) {
     const desc = Object.getOwnPropertyDescriptor(obj, key);
     if (desc && typeof desc.set === "function") {
-      return desc.set as (this: AttributeAssignment, value: unknown) => void;
+      return desc.set as (this: AttributeAssignment, value: unknown) => unknown;
     }
     obj = Object.getPrototypeOf(obj);
   }
   const generated = (model as unknown as Record<string, unknown>)[setter];
   if (typeof generated === "function") {
-    return generated as (this: AttributeAssignment, value: unknown) => void;
+    return generated as (this: AttributeAssignment, value: unknown) => unknown;
   }
   return null;
 }
@@ -162,6 +181,8 @@ export interface AttributeAssignment {
   sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
   /** @internal Rails-private helper. */
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  /** @internal Rails-private helper. */
+  _assignAttribute(k: string, v: unknown): Promise<void> | void;
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
 }

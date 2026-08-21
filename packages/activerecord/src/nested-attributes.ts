@@ -584,6 +584,17 @@ export function generateAssociationWriter(
     writable: true,
     configurable: true,
   });
+
+  // Rails' `#{name}_attributes=` (nested_attributes.rb:401-404) — a string key,
+  // not a property setter, so `public_send(setter, v)`
+  // (attribute_assignment.rb:68) reaches it and its promise survives.
+  Object.defineProperty(modelClass.prototype, `${attrName}=`, {
+    value(this: Base, value: any): Promise<void> | void {
+      return assign(this, associationName, value);
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /** @internal */

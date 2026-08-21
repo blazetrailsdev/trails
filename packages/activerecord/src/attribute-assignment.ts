@@ -15,11 +15,12 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
-import { _assignAttribute } from "./persistence.js";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
+  /** @internal */
+  _assignAttribute(k: string, v: unknown): Promise<void> | void;
   readAttribute(name: string): unknown;
   /** @internal */
   assignNestedParameterAttributes(pairs: Record<string, unknown>): Promise<void> | void;
@@ -53,11 +54,11 @@ function isNestedParameterHash(value: unknown): boolean {
  * here answers a promise the rest of the loop is chained behind it to keep that
  * order. Every send that stays in memory keeps running inline.
  *
- * `_assign_attribute` is Ruby's implicit-self send, but trails' AR-side one is
- * a module-private function in `persistence.ts` (where the association-writer
- * resolution it needs lives) rather than a method on the class — publishing it
- * as one would put an `_assign_attribute` override on ActiveRecord that Rails
- * does not have. It is called directly here instead.
+ * `_assign_attribute` is sent to `this` (:17), as in Rails: there is exactly one
+ * of them, ActiveModel's (activemodel/attribute_assignment.rb:67-75), inherited
+ * through `Base`. The association and nested-attribute writers it reaches are
+ * the `#{name}=` methods themselves, installed under those Ruby names by the
+ * association builders and `generate_association_writer`.
  */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
@@ -74,9 +75,9 @@ export function _assignAttributes(
     } else if (isNestedParameterHash(v)) {
       (nestedParameterAttributes ??= {})[key] = v;
     } else if (pending) {
-      pending = pending.then(() => _assignAttribute(this, key, v));
+      pending = pending.then(() => this._assignAttribute(key, v));
     } else {
-      pending = _assignAttribute(this, key, v) as Promise<void> | undefined;
+      pending = this._assignAttribute(key, v) as Promise<void> | undefined;
     }
   }
 
@@ -108,7 +109,7 @@ export function assignNestedParameterAttributes(
   let pending: Promise<void> | undefined;
   for (const [k, v] of Object.entries(pairs)) {
     pending = (
-      pending ? pending.then(() => _assignAttribute(this, k, v)) : _assignAttribute(this, k, v)
+      pending ? pending.then(() => this._assignAttribute(k, v)) : this._assignAttribute(k, v)
     ) as Promise<void> | undefined;
   }
   return pending;

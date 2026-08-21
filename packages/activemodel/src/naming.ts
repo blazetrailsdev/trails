@@ -10,7 +10,7 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "./attribute-assignment.js";
+import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
 /**
  * Naming mixin — provides model_name on classes and naming helpers.
@@ -189,11 +189,17 @@ export class ModelName {
    * Preserves `pattern.lastIndex` so repeated calls with `/g` or `/y`
    * regexes stay stable — `RegExp.prototype.test` advances `lastIndex`
    * on stateful flags, but Ruby `match?` is stateless.
+   *
+   * Anything else raises the `TypeError` Ruby's `get_pat` raises (string.c
+   * `rb_str_match_m_p` -> `get_pat`), not a trails-invented `ArgumentError`.
    */
   match(pattern: unknown): boolean {
     if (typeof pattern === "string") pattern = new RegExp(pattern);
     if (!(pattern instanceof RegExp)) {
-      throw new ArgumentError("ModelName#match requires a RegExp");
+      // Rule keys on the constructor name, so the ported mirror trips it too —
+      // same suppression `calculations.ts` and `cache/store.ts` carry.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`wrong argument type ${builtinClassName(pattern)} (expected Regexp)`);
     }
     const savedLastIndex = pattern.lastIndex;
     try {
@@ -344,3 +350,21 @@ export class ModelName {
 }
 
 include(ModelName, ToJsonWithActiveSupportEncoder);
+
+/**
+ * The JS spelling of MRI's `rb_builtin_class_name`, which is what `get_pat`
+ * (string.c) interpolates into `wrong argument type %s (expected Regexp)`:
+ * `nil` / `true` / `false` for the special constants, the class name
+ * otherwise. JS has one numeric type where Ruby has two, so an integral
+ * `number` reports `Integer` and a fractional one `Float`, as MRI does.
+ *
+ * @noRailsEquivalent Module-private message helper for `ModelName#match`'s
+ *   ported `TypeError`; Ruby gets the class name from the object itself.
+ */
+function builtinClassName(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  if (typeof value === "bigint") return "Integer";
+  return (value as { constructor?: { name?: string } })?.constructor?.name ?? typeof value;
+}

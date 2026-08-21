@@ -88,6 +88,7 @@ import {
 import {
   _assignAttribute as attrAssignOne,
   assignAttributes as attrAssign,
+  setAttributes as attrSetAttributes,
   attributeWriterMissing as defaultAttributeWriterMissing,
   isMassAssignmentEmpty,
   ArgumentError,
@@ -2639,19 +2640,26 @@ export class Model {
   }
 
   /**
+   * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36).
+   */
+  setAttributes(newAttributes: unknown): Promise<void> | void {
+    return attrSetAttributes(this, newAttributes);
+  }
+
+  /**
    * @internal Rails-private helper.
    */
   _assignAttributes(attributes: Record<string, unknown>): void {
     for (const [k, v] of Object.entries(attributes)) {
-      this._assignAttribute(k, v);
+      void this._assignAttribute(k, v);
     }
   }
 
   /**
    * @internal Rails-private helper.
    */
-  _assignAttribute(k: string, v: unknown): void {
-    attrAssignOne(this, k, v);
+  _assignAttribute(k: string, v: unknown): Promise<void> | void {
+    return attrAssignOne(this, k, v);
   }
 
   /**

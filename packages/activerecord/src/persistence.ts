@@ -6,8 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { camelize, singularize } from "@blazetrails/activesupport";
-import { reflectOnAllAssociations } from "./reflection.js";
+import { camelize } from "@blazetrails/activesupport";
 import { parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -882,26 +881,6 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
 }
 
 /**
- * Walk the prototype chain of `instance` to find a setter descriptor for
- * `key`. Returns the setter function, or undefined if none exists.
- *
- * Sole caller: {@link _assignAttribute}'s store-accessor arm. `store_accessor`
- * generates its readers/writers with `define_method` in Rails
- * (store.rb:130-148), so `public_send("#{k}=", v)` reaches them by name; ours
- * are property setters, which `record[k] = v` cannot distinguish from writing a
- * plain attribute slot, hence the descriptor lookup.
- */
-function findPrototypeSetter(instance: object, key: string): ((v: unknown) => void) | undefined {
-  let proto = Object.getPrototypeOf(instance);
-  while (proto !== null && proto !== Object.prototype) {
-    const desc = Object.getOwnPropertyDescriptor(proto, key);
-    if (desc?.set) return desc.set;
-    proto = Object.getPrototypeOf(proto);
-  }
-  return undefined;
-}
-
-/**
  * Re-dispatch any `*Attributes` nested attribute keys that the Base
  * constructor wrote as plain attribute values (via `writeAttribute`) rather
  * than through the generated writer. Called by `create`/`createBang` after
@@ -939,95 +918,6 @@ export function _reapplyNestedAttrSetters(
     }
     cls = Object.getPrototypeOf(cls);
   }
-}
-
-/**
- * Resolves the association arm of Rails' `public_send("#{key}=", value)`
- * (attribute_assignment.rb:67-69) to the writer it would reach. RFC 0087 §1
- * removed the generated `#{name}=` property setter for the writers that do I/O
- * at assignment — `replace`'s diffed deletes+inserts
- * (collection_association.rb:46-48) and `ids_writer`'s resolving query (:61-83)
- * — because a JS property setter cannot await them, so the dispatch finds them
- * by their association-level Rails names here instead.
- *
- * Resolution only: `_assignAttribute` does the sending, so `respond_to?(setter)`
- * and `public_send(setter, v)` (attribute_assignment.rb:67-70) stay the two
- * steps Rails has.
- */
-function associationWriter(
-  self: AttributeIO,
-  key: string,
-): ((value: unknown) => unknown) | undefined {
-  const ctor = (self as any).constructor as typeof Base;
-  for (const ref of reflectOnAllAssociations(ctor)) {
-    const name = String(ref.name);
-    if (ref.isCollection()) {
-      if (key === name) return (value) => (self as any).association(name).writer(value);
-      if (key === `${singularize(name)}Ids`)
-        return (value) => (self as any).association(name).idsWriter(value);
-    } else if (key === name && ref.macro === "hasOne") {
-      // Rails' `#{name}=` removes the displaced record and saves the new one
-      // inline (has_one_association.rb:59-84).
-      return (value) => (self as any).association(name).writer(value);
-    }
-  }
-  return undefined;
-}
-
-/**
- * Mirrors Rails' `_assign_attribute` (ActiveModel
- * attribute_assignment.rb:67-75): dispatch through the public setter when one
- * exists (store accessors write to the store hash, not a standalone attribute
- * slot). A key with no setter is `respond_to?(setter)` false, so it reaches
- * `attribute_writer_missing` (:73) and raises `UnknownAttributeError`.
- *
- * Rails lets setter exceptions propagate raw — the only rescue is the
- * `NoMethodError` arm that reaches `attribute_writer_missing` (:71-74) — so a
- * `ReadonlyAttributeError` out of a writer reaches the caller as itself. The
- * `AttributeAssignmentError` wrap belongs to
- * `execute_callstack_for_multiparameter_attributes`
- * (activerecord/attribute_assignment.rb:47) alone.
- *
- * A `#{name}_attributes=` key dispatches to `set#{Name}Attributes`
- * (nested-attributes.ts), which answers a promise when the assignment displaces
- * a record and so owes Rails' inline `remove_target!`
- * (has_one_association.rb:69) a write; that promise is returned rather than
- * dropped.
- */
-export function _assignAttribute(
-  self: AttributeIO,
-  key: string,
-  value: unknown,
-): Promise<void> | void {
-  const configs = (self as any).constructor?._nestedAttributeConfigs as
-    | { associationName: string }[]
-    | undefined;
-  if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
-    return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
-  }
-  const writer = associationWriter(self, key);
-  if (writer) return writer(value) as Promise<void> | void;
-  const setter = findPrototypeSetter(self, key);
-  if (setter) {
-    const result: unknown = setter.call(self, value);
-    if (result instanceof Promise) return result as Promise<void>;
-  } else {
-    self.attributeWriterMissing(key, value);
-  }
-}
-
-/**
- * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36).
- * A TS `set` accessor cannot be awaited, so the alias keeps the Rails name in a
- * `setX()` method (CLAUDE.md § "Fidelity is the job"). `assign_attributes`
- * itself is not redefined here — as in Rails, it is ActiveModel's
- * (attribute_assignment.rb:28-34), inherited through `Model`.
- */
-export function setAttributes(
-  this: AttributeIO & { assignAttributes(attrs: Record<string, unknown>): Promise<void> | void },
-  attrs: Record<string, unknown>,
-): Promise<void> | void {
-  return this.assignAttributes(attrs);
 }
 
 // ---------------------------------------------------------------------------
