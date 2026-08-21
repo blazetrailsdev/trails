@@ -56,8 +56,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("explain with options as symbol", async () => {
       // Rails: Author.where(id: 1).explain(explain_option)
       const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
-      // Our header appends " for:" where Rails prints a bare clause.
-      expect(result).toContain(`${expectedClause} for:`);
+      expect(result).toContain(expectedClause);
       expect(result).toContain("SELECT `authors`");
     });
 
@@ -66,7 +65,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const result = await Author.where({ id: authors("david").id }).explain(
         explainOpt.toUpperCase(),
       );
-      expect(result).toContain(`${expectedClause} for:`);
+      expect(result).toContain(expectedClause);
       expect(result).toContain("SELECT `authors`");
     });
 
@@ -75,7 +74,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const result = await Author.where({ id: authors("david").id })
         .includes(":posts")
         .explain(explainOpt);
-      expect(result).toContain(`${expectedClause} for:`);
+      expect(result).toContain(expectedClause);
       const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
       expect(blocks.length).toBeGreaterThanOrEqual(2);
     });
@@ -99,7 +98,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const plan = await Author.where({ id: authors("david").id }).explain();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);
-      expect(plan).toMatch(/EXPLAIN.*for:/);
+      expect(plan).toMatch(/EXPLAIN SELECT/);
     });
 
     // trails-only regression: an already-loaded relation must still re-execute
@@ -115,7 +114,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const plan = await relation.explain();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);
-      expect(plan).toMatch(/EXPLAIN.*for:/);
+      expect(plan).toMatch(/EXPLAIN SELECT/);
     });
 
     it("Relation#explain on MySQL captures preload queries", async () => {
@@ -141,7 +140,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("explain helpers (trails-only)", () => {
     it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", async () => {
       const clause = await adapter.buildExplainClause([{ format: "json" }]);
-      expect(clause).toBe("EXPLAIN FORMAT=JSON for:");
+      expect(clause).toBe("EXPLAIN FORMAT=JSON");
     });
 
     it("buildExplainClause combines string flag and format hash space-separated", async () => {
@@ -150,12 +149,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const analyzeWithoutExplain =
         isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
       expect(clause).toBe(
-        analyzeWithoutExplain ? "ANALYZE FORMAT=JSON for:" : "EXPLAIN ANALYZE FORMAT=JSON for:",
+        analyzeWithoutExplain ? "ANALYZE FORMAT=JSON" : "EXPLAIN ANALYZE FORMAT=JSON",
       );
-    });
-
-    it("buildExplainClause rejects unknown format", async () => {
-      await expect(adapter.buildExplainClause([{ format: "bogus" }])).rejects.toThrow();
     });
 
     it("explain executes with { format: 'json' } and returns JSON plan", async () => {

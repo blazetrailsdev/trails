@@ -8,13 +8,13 @@
  * transaction handling, and advisory lock support.
  */
 
-import { inspectExplainOption } from "./abstract/database-statements.js";
-import type { ExplainOption } from "./abstract/database-statements.js";
 import {
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
   returningColumnValues as mysqlReturningColumnValues,
+  buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { rubyInspect } from "../relation/ruby-inspect.js";
@@ -1323,98 +1323,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
 
   /**
-   * Boolean MySQL EXPLAIN flags. MySQL 8.0.18+ supports `EXPLAIN
-   * ANALYZE`; older versions and MariaDB support at least `EXTENDED`
-   * and `PARTITIONS`. Format is handled separately via the
-   * `{ format: ... }` hash since it requires a value.
+   * Mirrors: MySQL::DatabaseStatements#build_explain_clause
+   * (`mysql/database_statements.rb:36-46`), included into the adapter — the
+   * body lives in `mysql/database-statements.ts` like `write_query?` and
+   * `returning_column_values`.
    */
-  protected static readonly EXPLAIN_FLAGS = new Set(["analyze", "extended", "partitions"]);
-
-  /**
-   * Allowed values for the `format` keyword. MySQL 5.6+ supports
-   * `TRADITIONAL` (default) and `JSON`; 8.0.16+ adds `TREE`. Values
-   * come from user code, so the allowlist guards the SQL clause.
-   */
-  protected static readonly EXPLAIN_FORMATS = new Set(["traditional", "json", "tree"]);
-
-  /**
-   * Build the printed header prefix used by `Relation#explain` on MySQL
-   * (`"EXPLAIN ANALYZE FORMAT=JSON for:"`). The clause shape is
-   * driver-independent.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
-   */
-  override async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
-    if (options.length === 0) return "EXPLAIN for:";
-    return `${await this._explainClause(options)} for:`;
-  }
-
-  /**
-   * MariaDB ≥ 10.1.0 runs `ANALYZE <stmt>` rather than `EXPLAIN ANALYZE
-   * <stmt>` — the leading EXPLAIN keyword is dropped. Other servers keep
-   * the `EXPLAIN` prefix. https://mariadb.com/kb/en/analyze-statement/
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#analyze_without_explain?
-   */
-  protected async analyzeWithoutExplain(): Promise<boolean> {
-    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.1.0") >= 0;
-  }
-
-  /**
-   * Compose the `EXPLAIN ...` clause shared by the printed header
-   * (`buildExplainClause`) and the actual statement prefix
-   * (`_explainStatementClause`), applying the MariaDB `ANALYZE`-without-
-   * `EXPLAIN` rewrite. Mirrors MySQL::DatabaseStatements#build_explain_clause.
-   */
-  private async _explainClause(options: ExplainOption[]): Promise<string> {
-    const clause = `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
-    return (await this.analyzeWithoutExplain()) && clause.includes("ANALYZE")
-      ? clause.replace("EXPLAIN ", "")
-      : clause;
-  }
-
-  protected _validateExplainOptions(options: ExplainOption[]): string[] {
-    const ctor = this.constructor as typeof AbstractMysqlAdapter;
-    const flags: string[] = [];
-    let formatClause: string | undefined;
-    for (const o of options) {
-      if (typeof o === "string") {
-        const key = o.toLowerCase();
-        if (!ctor.EXPLAIN_FLAGS.has(key)) {
-          throw new Error(`Unknown MySQL EXPLAIN option: ${o}`);
-        }
-        flags.push(key.toUpperCase());
-        continue;
-      }
-      if (!o || typeof o !== "object" || typeof o.format !== "string") {
-        throw new Error(
-          `Unknown MySQL EXPLAIN option: ${inspectExplainOption(o)} (expected a string flag or an object with a string 'format')`,
-        );
-      }
-      if (formatClause !== undefined) {
-        throw new Error("MySQL EXPLAIN accepts at most one FORMAT option");
-      }
-      const fmt = o.format.toLowerCase();
-      if (!ctor.EXPLAIN_FORMATS.has(fmt)) {
-        throw new Error(
-          `Unknown MySQL EXPLAIN format: ${o.format}. Allowed: traditional, json, tree.`,
-        );
-      }
-      // MySQL uses `FORMAT=X` (no space) rather than PG's `FORMAT X`.
-      // FORMAT must come last in MySQL syntax; flags-first normalization
-      // prevents `EXPLAIN FORMAT=JSON ANALYZE ...` (invalid).
-      formatClause = `FORMAT=${fmt.toUpperCase()}`;
-    }
-    return formatClause === undefined ? flags : [...flags, formatClause];
-  }
-
-  /**
-   * Compose the actual `EXPLAIN ...` SQL clause that prefixes the query —
-   * distinct from `buildExplainClause`, which builds the printed header.
-   */
-  protected async _explainStatementClause(options: ExplainOption[]): Promise<string> {
-    if (options.length === 0) return "EXPLAIN";
-    return this._explainClause(options);
+  buildExplainClause(options: ExplainOption[] = []): Promise<string> {
+    return mysqlBuildExplainClause.call(this, options);
   }
 
   /**

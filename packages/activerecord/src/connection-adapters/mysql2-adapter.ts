@@ -1275,7 +1275,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const clause = await this._explainStatementClause(options);
+    const clause = await this.buildExplainClause(options);
     const start = Date.now();
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const elapsed = (Date.now() - start) / 1000;
@@ -1287,9 +1287,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // which delegates to `mysql/quoting.ts`. No Mysql2-specific override
   // needed — they'd be duplicates.
   //
-  // `buildExplainClause` / `_validateExplainOptions` / `_explainStatementClause`
-  // and the EXPLAIN_FLAGS / EXPLAIN_FORMATS allowlists live on
-  // AbstractMysqlAdapter.
+  // `buildExplainClause` lives on AbstractMysqlAdapter.
 
   /**
    * Execute raw SQL (for DDL and other non-query statements).

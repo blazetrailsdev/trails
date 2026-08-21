@@ -5,6 +5,8 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
+import { toSqlAndBinds } from "./connection-adapters/abstract/database-statements.js";
+import { Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
@@ -66,6 +68,41 @@ describe("InternalMetadata built from a connection pool", () => {
 
     await internalMetadata.createTable();
     expect(await internalMetadata.tableExists()).toBe(true);
+  });
+});
+
+describe("InternalMetadata#selectEntry", () => {
+  // internal_metadata.rb:157
+  it("sends the key as a bind rather than inlining it", async () => {
+    const internalMetadata = new InternalMetadata(Base.connectionPool());
+    await internalMetadata.createTable();
+    const connection = await Base.connectionPool().checkout();
+    const selectAll = vi.spyOn(connection, "selectAll");
+    try {
+      await (
+        internalMetadata as unknown as {
+          selectEntry(c: DatabaseAdapter, key: string): Promise<unknown>;
+        }
+      ).selectEntry(connection, "environment");
+      const sm = selectAll.mock.calls[0][0] as {
+        constraints: { right: unknown }[];
+      };
+      const right = sm.constraints[0].right as Nodes.BindParam;
+      expect(right).toBeInstanceOf(Nodes.BindParam);
+      expect(right.value).toBe("environment");
+
+      // A substituting adapter (prepared statements off — MySQL's default)
+      // renders the same node as a literal, so the placeholder is only
+      // observable where the binds actually travel separately.
+      if ((connection as unknown as { preparedStatements?: boolean }).preparedStatements) {
+        const [sql, binds] = toSqlAndBinds.call(connection as never, sm as never);
+        expect(sql).not.toContain("environment");
+        expect(binds).toEqual(["environment"]);
+      }
+    } finally {
+      selectAll.mockRestore();
+      Base.connectionPool().checkin(connection);
+    }
   });
 });
 

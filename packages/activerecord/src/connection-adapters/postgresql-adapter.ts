@@ -2328,7 +2328,7 @@ export class PostgreSQLAdapter
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_explain_clause
    * (postgresql/database_statements.rb:96-100)
    */
-  override async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
+  async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN";
     const parts = this._validateExplainOptions(options);
     return `EXPLAIN (${parts.join(", ")})`;

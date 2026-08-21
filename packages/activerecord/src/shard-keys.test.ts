@@ -15,7 +15,6 @@ describe("ShardsKeysTest", () => {
 
   let prevConfigs: DatabaseConfigurations;
   let prevDefaultEnv: string;
-  let prevCurrent: unknown;
 
   let baselinePools: Set<unknown>;
 
@@ -23,7 +22,6 @@ describe("ShardsKeysTest", () => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-    prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
     Base.configurations({
@@ -57,7 +55,6 @@ describe("ShardsKeysTest", () => {
     }
     Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
-    (DatabaseConfigurations as any).current = prevCurrent;
     (Base as any)._shardKeys = undefined;
     vi.unstubAllEnvs();
   });

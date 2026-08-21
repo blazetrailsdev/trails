@@ -1323,18 +1323,13 @@ export class CreatePosts extends Migration {
       new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
     const previous = DatabaseTasks.databaseConfiguration;
-    const previousCurrent = DatabaseConfigurations.current;
     DatabaseTasks.databaseConfiguration = configurations;
     try {
       await expect(
         DatabaseTasks.checkProtectedEnvironmentsBang("production"),
       ).rejects.toBeInstanceOf(ProtectedEnvironmentError);
     } finally {
-      // DatabaseConfigurations constructor registers itself as the
-      // module-level current-configurations singleton — restore that too,
-      // not just DatabaseTasks.databaseConfiguration.
       DatabaseTasks.databaseConfiguration = previous;
-      DatabaseConfigurations.current = previousCurrent;
     }
   });
 
@@ -1368,7 +1363,6 @@ export class CreatePosts extends Migration {
       new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
     const previous = DatabaseTasks.databaseConfiguration;
-    const previousCurrent = DatabaseConfigurations.current;
     DatabaseTasks.databaseConfiguration = configurations;
     try {
       await expect(
@@ -1376,7 +1370,6 @@ export class CreatePosts extends Migration {
       ).rejects.toBeInstanceOf(EnvironmentMismatchError);
     } finally {
       DatabaseTasks.databaseConfiguration = previous;
-      DatabaseConfigurations.current = previousCurrent;
     }
   });
 
@@ -1405,7 +1398,6 @@ export class CreatePosts extends Migration {
       new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
     const previous = DatabaseTasks.databaseConfiguration;
-    const previousCurrent = DatabaseConfigurations.current;
     const origEnv = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
     DatabaseTasks.databaseConfiguration = configurations;
     process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
@@ -1415,7 +1407,6 @@ export class CreatePosts extends Migration {
       ).resolves.toBeUndefined();
     } finally {
       DatabaseTasks.databaseConfiguration = previous;
-      DatabaseConfigurations.current = previousCurrent;
       if (origEnv === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
       else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = origEnv;
     }

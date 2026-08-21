@@ -26,7 +26,6 @@ describe("ConnectionSwappingNestedTest", () => {
 
   let prevConfigs: DatabaseConfigurations;
   let prevDefaultEnv: string;
-  let prevCurrent: unknown;
 
   const DB_NAMES = [
     "primary",
@@ -79,7 +78,6 @@ describe("ConnectionSwappingNestedTest", () => {
 
     prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-    prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
   });
@@ -95,7 +93,6 @@ describe("ConnectionSwappingNestedTest", () => {
     }
     Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
-    (DatabaseConfigurations as any).current = prevCurrent;
     (PrimaryBase as any).connectionClass = false;
     (SecondaryBase as any).connectionClass = false;
     (TertiaryBase as any).connectionClass = false;

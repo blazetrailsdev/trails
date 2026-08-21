@@ -1621,9 +1621,6 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     // registration the test bootstrap installs (support/connection.ts:396).
     const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
     const previousConfiguration = DatabaseTasks.databaseConfiguration;
-    // The DatabaseConfigurations constructor installs itself as the module-level
-    // current-configurations singleton, so that needs restoring too.
-    const previousCurrent = DatabaseConfigurations.current;
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
     });
@@ -1634,7 +1631,6 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     } finally {
       createSpy.mockRestore();
       DatabaseTasks.databaseConfiguration = previousConfiguration;
-      DatabaseConfigurations.current = previousCurrent;
     }
   });
 });

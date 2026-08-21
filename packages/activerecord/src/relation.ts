@@ -2681,7 +2681,6 @@ export class Relation<T extends Base> {
     const allQueries =
       typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
 
-    const modelClass = this.model as any;
     const registry = this.model.scopeRegistry();
 
     // Rails: global_scope? && all_queries == false → raise.
@@ -2697,21 +2696,7 @@ export class Relation<T extends Base> {
       return await callback();
     }
 
-    const prev = registry.currentScope(modelClass, true);
-    registry.setCurrentScope(modelClass, this as any);
-    let prevGlobal: any;
-    if (allQueries) {
-      prevGlobal = registry.globalCurrentScope(modelClass, true);
-      registry.setGlobalCurrentScope(modelClass, this as any);
-    }
-    try {
-      return await callback();
-    } finally {
-      registry.setCurrentScope(modelClass, prev);
-      if (allQueries) {
-        registry.setGlobalCurrentScope(modelClass, prevGlobal);
-      }
-    }
+    return await this._scoping(this as any, registry, allQueries, async () => await callback());
   }
 
   /**
@@ -2985,7 +2970,7 @@ export class Relation<T extends Base> {
     this._delegateToModel = true;
     const registry = this.model.scopeRegistry();
     try {
-      return this._scoping(null, registry, () => fn(this, ...args) || this);
+      return this._scoping(null, registry, false, () => fn(this, ...args) || this);
     } finally {
       this._delegateToModel = false;
     }
@@ -3032,14 +3017,54 @@ export class Relation<T extends Base> {
     return (this.model as any).createBang(attributes, block);
   }
 
-  private _scoping<R>(scope: any, registry: any, fn: () => R): R {
-    const previous = registry?.currentScope?.(this.model, true);
-    registry?.setCurrentScope?.(this.model, scope);
-    try {
-      return fn();
-    } finally {
-      registry?.setCurrentScope?.(this.model, previous);
+  /**
+   * Mirrors: ActiveRecord::Relation#_scoping (`relation.rb:1365-1379`).
+   *
+   * Ruby's `ensure` runs once the block has finished, where a JS `finally`
+   * fires the moment an async body yields — so when `fn` answers a promise the
+   * restore rides on it instead of firing under the still-running body. The
+   * check is `instanceof Promise` rather than a thenable test because a
+   * `Relation` is itself thenable, and `_execScope`'s block answers one.
+   *
+   * Rails defaults `all_queries` to `false` and `_exec_scope` omits it; a TS
+   * default cannot sit usefully before the required block parameter, so the
+   * one caller that relies on the default passes `false` outright.
+   */
+  private _scoping<R>(scope: any, registry: any, allQueries: boolean | null, fn: () => R): R {
+    const previous = registry.currentScope(this.model, true);
+    registry.setCurrentScope(this.model, scope);
+    let previousGlobal: any;
+    if (allQueries) {
+      previousGlobal = registry.globalCurrentScope(this.model, true);
+      registry.setGlobalCurrentScope(this.model, scope);
     }
+    const ensure = () => {
+      registry.setCurrentScope(this.model, previous);
+      if (allQueries) {
+        registry.setGlobalCurrentScope(this.model, previousGlobal);
+      }
+    };
+    let result: R;
+    try {
+      result = fn();
+    } catch (error) {
+      ensure();
+      throw error;
+    }
+    if (result instanceof Promise) {
+      return result.then(
+        (value: unknown) => {
+          ensure();
+          return value;
+        },
+        (error: unknown) => {
+          ensure();
+          throw error;
+        },
+      ) as R;
+    }
+    ensure();
+    return result;
   }
 
   // Mirrors relation.rb:1381-1393.
