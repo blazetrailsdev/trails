@@ -883,19 +883,14 @@ describe("useFixtures encryption add-on is opt-in", () => {
     const originalAddOn = entry.addOn;
     const originalModel = entry.model;
     const order: string[] = [];
-    // A minimal class (not a bare object): `resolveFixtureNames` now folds in
-    // `registerModel`, so the stub must look like an AR model class.
-    // `tableName` keeps the resolver happy.
-    class StubModel {
-      static tableName = "encrypted_books";
-    }
-    const stubModel = StubModel as unknown as typeof Base;
     entry.addOn = vi.fn(async () => {
       order.push("addOn");
     });
     entry.model = vi.fn(async () => {
       order.push("model");
-      return stubModel;
+      // `resolveFixtureNames` folds in `registerModel`, which takes a `Base`
+      // subclass only, so the spy forwards to the real thunk.
+      return originalModel.call(entry);
     });
     try {
       await resolveFixtureNames(["encryptedBooks"]);

@@ -292,6 +292,23 @@ function frameworkBase(model: typeof Base): typeof Base | null {
 }
 
 /**
+ * Reject a class that does not descend from `Base`. Rails has no analogue —
+ * everything that reaches `ActiveRecord::Base.descendants` bookkeeping IS a
+ * `Base` subclass, and so always carries the `class_attribute` defaults its
+ * concerns declared (`counter_cache.rb:9-10`, `reflection.rb:11`). Ported
+ * readers rely on that, so the registry enforces it rather than making every
+ * reader re-supply the default.
+ * @internal
+ */
+function assertActiveRecordBase(model: typeof Base): void {
+  if (!frameworkBase(model)) {
+    throw new Error(
+      `registerModel expects an ActiveRecord::Base subclass, got ${String(model?.name ?? model)}`,
+    );
+  }
+}
+
+/**
  * Throw when a bespoke class is registered under a name a canonical model
  * already owns. The registry is global and never torn down between tests, so
  * such a shadow silently poisons every later test that resolves the name as an
@@ -381,13 +398,16 @@ export function registerModel(
   }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
+    assertActiveRecordBase(model);
     modelRegistry.set(nameOrModel, model);
-    // Attach registry key so counter-cache pending-map lookup can match it.
+    // Attach registry key so callers that resolve a class back to the names it
+    // was registered under (reflection's `computeClass`) can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
     model._registryKeys = keys;
-    flushPendingCounterCacheColumns(model);
+    flushPendingCounterCacheColumns(model, nameOrModel);
   } else {
+    assertActiveRecordBase(nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
     // derive the `::`-qualified registry key from it (e.g.
@@ -399,7 +419,7 @@ export function registerModel(
     if (qualified !== nameOrModel.name) {
       registerModel(qualified, nameOrModel);
     }
-    flushPendingCounterCacheColumns(nameOrModel);
+    flushPendingCounterCacheColumns(nameOrModel, nameOrModel.name);
   }
 }
 

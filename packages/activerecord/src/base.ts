@@ -1192,22 +1192,6 @@ export class Base extends Model {
     // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
     // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.
     this._virtualAttributesReconciled = false;
-    // Apply hookAttributeType decorators (TZ conversion, locking) via
-    // `decorate_attributes` (attribute_registration.rb:22-28), which queues the
-    // decorator for the `_default_attributes` replay.
-    // Gated on an explicit type, mirroring Rails' `type = hook_attribute_type(name, type) if type`
-    // (attribute_registration.rb:15). On a no-type call (`attribute("col", { default })`)
-    // the existing type is already hooked from schema reflection — re-hooking would
-    // double-wrap unconditional wrappers like LockingType (`LockingType(LockingType(...))`).
-    const typeWasProvided =
-      typeName !== undefined && (typeof typeName === "string" || typeName instanceof Type);
-    const def = typeWasProvided ? this._attributeDefinitions.get(name) : undefined;
-    if (def) {
-      const hooked = this.hookAttributeType(name, def.type);
-      if (hooked !== def.type) {
-        this.decorateAttributes([name], (_n: string, _t: Type) => hooked);
-      }
-    }
     // If we just defined an "id" accessor on a subclass prototype, remove it
     // so Base.prototype.id (which handles CPK) is used instead.
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
@@ -1951,6 +1935,8 @@ export class Base extends Model {
   }
 
   // --- Reflection::ClassMethods (wired via extend() after class body) ---
+  /** reflection.rb:11 — `class_attribute :_reflections, instance_writer: false, default: {}`. */
+  declare static _reflections: Record<string, _Reflection.AssociationReflection>;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
   declare static reflections: typeof _Reflection.ClassMethods.reflections;
   declare static normalizedReflections: typeof _Reflection.ClassMethods.normalizedReflections;

@@ -109,6 +109,7 @@ import {
   Attributes,
   attribute,
   setDefineMethodAttribute,
+  freeze as attributesFreeze,
 } from "./attributes.js";
 import {
   _defaultAttributes,
@@ -2139,6 +2140,8 @@ export class Model {
     // `context_for_validation` inside `freeze`. Touching
     // `validationContext` alone would not populate the cache.
     void this.contextForValidation();
+    // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
+    attributesFreeze.call(this);
     Object.freeze(this);
     return this;
   }

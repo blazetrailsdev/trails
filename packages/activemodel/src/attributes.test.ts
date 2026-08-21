@@ -166,11 +166,12 @@ describe("AttributesTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    // Freeze the entire model instance
-    const frozen = Object.freeze({ ...m.attributes });
+    m.freeze();
+    expect(Object.isFrozen(m)).toBe(true);
     expect(() => {
-      (frozen as any).name = "changed";
-    }).toThrow();
+      (m as any).name = "changed";
+    }).toThrow(/frozen/i);
+    expect(() => m._attributes.writeFromUser("name", "changed")).toThrow(/frozen/i);
   });
 
   it("attributes can be frozen again", () => {
@@ -180,8 +181,8 @@ describe("AttributesTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    Object.freeze(m._attributes);
-    expect(() => Object.freeze(m._attributes)).not.toThrow();
+    m.freeze();
+    expect(() => m.freeze()).not.toThrow();
   });
 
   it(".type_for_attribute supports attribute aliases", () => {

@@ -33,16 +33,6 @@ export function attributes(attrs: AttributeSet): Record<string, unknown> {
   return attrs.toHash();
 }
 
-/**
- * Mirrors: ActiveModel::Attributes#_write_attribute
- *
- * Writes a value into the attribute store via the user-write path (casts
- * through the type's `cast` method before storing).
- *
- * @internal Rails-private helper.
- */
-type AttributeInstanceHost = { _attributes: AttributeSet };
-
 /** @internal */
 export function _writeAttribute(
   this: AttributeInstanceHost,
@@ -52,32 +42,15 @@ export function _writeAttribute(
   this._attributes.writeFromUser(attrName, value);
 }
 
-// ---------------------------------------------------------------------------
-// Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
-// ---------------------------------------------------------------------------
-
 /**
- * Declare a typed attribute with an optional default.
+ * Mirrors: ActiveModel::Attributes#_write_attribute
  *
- * Mirrors: ActiveModel::Attributes::ClassMethods#attribute
+ * Writes a value into the attribute store via the user-write path (casts
+ * through the type's `cast` method before storing).
  *
- * Model.attribute() delegates here. This is the canonical implementation
- * of the class-level `attribute` declaration.
- *
- * @internal
+ * @internal Rails-private helper.
  */
-export interface AttributeOptions {
-  default?: unknown;
-  virtual?: boolean;
-  limit?: number | null;
-  /**
-   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
-   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
-   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
-   */
-  array?: boolean;
-  range?: boolean;
-}
+type AttributeInstanceHost = { _attributes: AttributeSet };
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
@@ -105,6 +78,7 @@ export function attribute(
     pendingAttributeModifications(): PendingModification[];
     attributeTypes(): Record<string, Type>;
     defineAttributeMethod(attrName: string): void;
+    hookAttributeType(name: string, type: Type): Type;
   },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
@@ -135,7 +109,7 @@ export function attribute(
   // consumed here — `default` and `virtual` — are the ones Rails names
   // explicitly, so only the rest reach the registry.
   const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
-  const type = typeProvided
+  let type = typeProvided
     ? typeName instanceof Type
       ? typeName
       : this.resolveTypeName(
@@ -145,6 +119,8 @@ export function attribute(
             : undefined,
         )
     : (existing?.type ?? typeDefaultValue());
+  // attribute_registration.rb:15 — `type = hook_attribute_type(name, type) if type`.
+  if (typeProvided) type = this.hookAttributeType(name, type);
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
   // leaves the current default/value untouched.
@@ -181,6 +157,33 @@ export function attribute(
   resetDefaultAttributes(this);
 
   this.defineAttributeMethod(name);
+}
+
+// ---------------------------------------------------------------------------
+// Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
+// ---------------------------------------------------------------------------
+
+/**
+ * Declare a typed attribute with an optional default.
+ *
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute
+ *
+ * Model.attribute() delegates here. This is the canonical implementation
+ * of the class-level `attribute` declaration.
+ *
+ * @internal
+ */
+export interface AttributeOptions {
+  default?: unknown;
+  virtual?: boolean;
+  limit?: number | null;
+  /**
+   * PG type modifiers, forwarded to the registry as Rails' `**options` are:
+   * `attribute :tags, :string, array: true` / `:my_range, :string, range: true`
+   * (postgresql_adapter.rb:1166-1167 register them via `add_modifier`).
+   */
+  array?: boolean;
+  range?: boolean;
 }
 
 /**
@@ -225,6 +228,33 @@ export function setDefineMethodAttribute(
       });
     });
   });
+}
+
+/**
+ * Mirrors: ActiveModel::Attributes#freeze (attributes.rb:150-153)
+ *
+ *   def freeze # :nodoc:
+ *     @attributes = @attributes.clone.freeze unless frozen?
+ *     super
+ *   end
+ *
+ * One link of Rails' `freeze` chain; `Model#freeze` runs it where Rails' `super`
+ * from `Validations#freeze` (validations.rb:372-377) reaches it, since TS has no
+ * `super` across mixins. Ruby's `Object#clone` copies the ivars and dispatches
+ * `initialize_clone`, which `AttributeSet` overrides to dup its inner hash
+ * (attribute_set.rb:82-85) — spelled here as the same allocate-and-copy `dup()`
+ * uses.
+ *
+ * @internal Rails-private helper.
+ */
+export function freeze(this: AttributeInstanceHost): void {
+  if (!Object.isFrozen(this)) {
+    const attributes = this._attributes;
+    const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
+    Object.assign(cloned, attributes);
+    cloned.initializeClone(attributes);
+    this._attributes = cloned.freeze();
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
@@ -289,6 +319,14 @@ export class Attributes {
   /** Mirrors: attributes.rb:146-148 — `def attribute_names; @attributes.keys; end` */
   attributeNames(): string[] {
     return this._attributes.keys();
+  }
+
+  /** Mirrors: attributes.rb:150-153 — `@attributes = @attributes.clone.freeze unless frozen?` */
+  freeze(): this {
+    freeze.call(this);
+    // attributes.rb:152 — `super`, which ends at `Object#freeze`.
+    Object.freeze(this);
+    return this;
   }
 }
 
