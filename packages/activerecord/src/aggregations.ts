@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
-import { assertValidKeys, prepend } from "@blazetrails/activesupport";
+import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/activesupport";
 
 /**
  * Aggregation cache and composed-of value-object support.
@@ -32,13 +32,12 @@ export function clearAggregationCache(record: Base): void {
 
 interface ComposedOfOptions {
   /**
-   * Ruby's `:class_name` is the value object's class NAME, constantized at
-   * reader/writer time (aggregations.rb:249-253, 262). TypeScript has no
-   * `constantize` for an arbitrary user class, so the option carries the class
-   * itself and there is no `|| name.camelize` default to derive
-   * (aggregations.rb:227).
+   * Ruby's `:class_name`, constantized at reader/writer time
+   * (aggregations.rb:249-253, 262) and defaulting to `name.camelize`. The class
+   * itself is also accepted, for a value object that is not registered as a
+   * constant.
    */
-  className: new (...args: any[]) => any;
+  className?: (new (...args: any[]) => any) | string;
   mapping?: [string, string][] | [string, string];
   /** Ruby's `:constructor`; a String names a class method, as `send` does. */
   constructorFn?: ((...args: any[]) => any) | string;
@@ -67,7 +66,7 @@ export function composedOf(
   includeAggregations(modelClass);
 
   const name = partId;
-  const className = options.className;
+  const className = options.className ?? camelize(name);
   // `options[:mapping] || [ name, name ]`, then `[ mapping ] unless
   // mapping.first.is_a?(Array)` (aggregations.rb:229-230) — the inferred pair
   // names the attribute after the aggregation itself.
@@ -80,21 +79,35 @@ export function composedOf(
   readerMethod(modelClass, name, className, mapping as [string, string][], allowNil, constructor);
   writerMethod(modelClass, name, className, mapping as [string, string][], allowNil, converter);
 
-  // ComposedOfOptions carries `className` as the value-object CLASS, not Ruby's
-  // class-name String, so those two keys are overlaid onto the hash Rails
-  // forwards whole (aggregations.rb:265).
+  // Rails forwards the options hash whole (aggregations.rb:244). When
+  // `className` was given as the value-object CLASS rather than its name, the
+  // two keys the reflection reads are overlaid onto it.
   const reflection = create(
     "composedOf",
     partId,
     null,
-    {
-      ...options,
-      className: options.className.name,
-      anonymousClass: options.className,
-    },
+    typeof options.className === "function"
+      ? { ...options, className: options.className.name, anonymousClass: options.className }
+      : { ...options },
     modelClass,
   );
   addAggregateReflection(modelClass, partId, reflection);
+}
+
+/**
+ * `class_name.constantize` (aggregations.rb:249-253, 262) — resolved where Ruby
+ * resolves it, inside the generated method, so a value object registered after
+ * the `composedOf` call still binds. A class passed in place of its name is
+ * already the resolved constant.
+ *
+ * @internal
+ */
+function resolveClass(
+  className: (new (...args: any[]) => any) | string,
+): new (...args: any[]) => any {
+  return typeof className === "string"
+    ? (constantize(className) as new (...args: any[]) => any)
+    : className;
 }
 
 /**
@@ -104,7 +117,7 @@ export function composedOf(
 function readerMethod(
   modelClass: typeof Base,
   name: string,
-  className: new (...args: any[]) => any,
+  className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   constructor: ((...args: any[]) => any) | string,
@@ -126,8 +139,8 @@ function readerMethod(
           typeof constructor === "function"
             ? constructor(...attrs)
             : constructor === "new"
-              ? new className(...attrs)
-              : (className as any)[constructor](...attrs);
+              ? new (resolveClass(className))(...attrs)
+              : (resolveClass(className) as any)[constructor](...attrs);
         cache.set(name, object == null ? object : Object.freeze(object));
       }
       return cache.get(name) ?? null;
@@ -167,7 +180,7 @@ function _decompose(
 function writerMethod(
   modelClass: typeof Base,
   name: string,
-  className: new (...args: any[]) => any,
+  className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   converter?: (value: unknown) => unknown,
@@ -177,9 +190,7 @@ function writerMethod(
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: Base, value: unknown): void {
-      // `klass = class_name.constantize` (aggregations.rb:262) — the option
-      // already carries the class, so the local is the class itself.
-      const klass = className;
+      const klass = resolveClass(className);
       const cache = getAggregationCache(this);
       // allow_nil: true → clear all mapped columns when nil and store null in cache.
       // allow_nil: false (default) → fall through so decomposition raises naturally
