@@ -72,17 +72,20 @@ export class BelongsTo extends SingularAssociation {
         ? reflection.counterCacheColumn()
         : null) ?? `${pluralize(underscore(model.name))}_count`;
     const klass = safeConstantize(reflection.className) as any;
-    if (klass && "_counterCacheColumns" in klass) {
-      const column = cacheColumn();
-      if (!klass._counterCacheColumns.includes(column)) {
-        klass._counterCacheColumns = [...klass._counterCacheColumns, column];
-      }
-    } else {
-      // The arm Ruby's autoload reaches and ESM cannot: see counter-cache-state.ts.
+    if (!klass) {
+      // The only arm Ruby's autoload reaches and ESM cannot — an unresolved
+      // constant: see counter-cache-state.ts. A resolved class that does not
+      // answer `_counterCacheColumns` falls through recording nothing, as
+      // Rails' `respond_to?` guard does.
       const pending =
         pendingCounterCacheColumns.get(reflection.className) ?? new Set<() => string>();
       pending.add(cacheColumn);
       pendingCounterCacheColumns.set(reflection.className, pending);
+    } else if ("_counterCacheColumns" in klass) {
+      const column = cacheColumn();
+      if (!klass._counterCacheColumns.includes(column)) {
+        klass._counterCacheColumns = [...klass._counterCacheColumns, column];
+      }
     }
 
     // belongs_to.rb:41 — `model.counter_cached_association_names |= [reflection.name]`
