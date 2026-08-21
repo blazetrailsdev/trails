@@ -4641,7 +4641,6 @@ include(Base, {
   reload: _Persistence.reload,
   slice: _Persistence.slice,
   valuesAt: _Persistence.valuesAt,
-  assignAttributes: _Persistence.assignAttributes,
   setAttributes: _Persistence.setAttributes,
   updateAttribute: _Persistence.updateAttribute,
   updateAttributeBang: _Persistence.updateAttributeBang,

@@ -14,9 +14,21 @@ import { UnknownAttributeError } from "./errors.js";
  *   end
  *
  * Both sends go through the model, as Ruby's implicit `self` receiver does, so
- * a subclass override of either is honoured.
+ * a subclass override of either is honoured — including ActiveRecord's
+ * `_assign_attributes` (activerecord/attribute_assignment.rb:6-23), whose
+ * writers can reach the database at assignment (`replace`,
+ * collection_association.rb:46-48; `ids_writer`, :61-83; has_one's displacing
+ * writer, has_one_association.rb:59-84).
+ *
+ * That is why the return type is `Promise<void> | void` and the body is
+ * deliberately not `async`: an `async` body would push even a plain column
+ * write past the caller's next line, where Ruby's `assign_attributes` has
+ * already done it. It answers a promise only when a send owed I/O.
  */
-export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
+export function assignAttributes(
+  model: AttributeAssignment,
+  newAttributes: unknown,
+): Promise<void> | void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
       `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
@@ -24,7 +36,7 @@ export function assignAttributes(model: AttributeAssignment, newAttributes: unkn
   }
   if (isMassAssignmentEmpty(newAttributes)) return;
 
-  model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
+  return model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
 }
 
 export function attributeWriterMissing(
@@ -149,7 +161,7 @@ export interface AttributeAssignment {
   /** @internal */
   sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
   /** @internal Rails-private helper. */
-  _assignAttributes(attributes: Record<string, unknown>): void;
+  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown;
 }

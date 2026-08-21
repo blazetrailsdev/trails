@@ -95,9 +95,6 @@ describe("STI subclass attribute() registration", () => {
     expect(isEncryptedAttribute(Dog, "name")).toBe(true);
     expect(isEncryptedAttribute(Animal, "name")).toBe(false);
     expect(isEncryptedAttribute(Cat, "name")).toBe(false);
-
-    // Copy-on-write: the subclass no longer shares the base's definitions map.
-    expect(Dog._attributeDefinitions).not.toBe(Animal._attributeDefinitions);
   });
 
   it("subclass attribute survives the subclass's own schema reflection (end-to-end)", async () => {

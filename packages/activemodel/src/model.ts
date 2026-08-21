@@ -2642,8 +2642,8 @@ export class Model {
    *
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
-  assignAttributes(newAttributes: unknown): void {
-    attrAssign(this, newAttributes);
+  assignAttributes(newAttributes: unknown): Promise<void> | void {
+    return attrAssign(this, newAttributes);
   }
 
   /**
