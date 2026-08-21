@@ -55,6 +55,7 @@ export class HasAndBelongsToMany {
       parent = Object.getPrototypeOf(BaseClass);
     }
 
+    let tableName: string | null = null;
     const joinModel: any = class extends BaseClass {
       static leftModel: any;
       static tableNameResolver: () => string;
@@ -65,12 +66,22 @@ export class HasAndBelongsToMany {
       static get tableName(): string {
         // Table name needs to be resolved lazily
         // because RHS class might not have been loaded
-        return (this._tableName ??= this.tableNameResolver());
+        return (tableName ??= this.tableNameResolver());
       }
 
       /** @internal */
       static set tableName(value: string) {
-        this._tableName = value;
+        tableName = value;
+      }
+
+      /** @internal The storage `Base` reads directly; one seat with the getter. */
+      static get _tableName(): string | null {
+        return tableName;
+      }
+
+      /** @internal */
+      static set _tableName(value: string | null) {
+        tableName = value;
       }
 
       static computeType(className: string): any {
@@ -92,7 +103,6 @@ export class HasAndBelongsToMany {
         return this.leftModel.connectionPool();
       }
     };
-    joinModel._tableName = null;
 
     Object.defineProperty(joinModel, "name", {
       value: `HABTM_${camelize(this.associationName)}`,
