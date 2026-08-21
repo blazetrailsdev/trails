@@ -1217,7 +1217,6 @@ export async function internalExecQuery(
     // Thread binds and exec options through so a bound INSERT ... RETURNING
     // reaches the driver and allow_retry / materialize_transactions survive
     // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
-    // Ruby's trailing kwargs become the trailing options object.
     const rawResult = await this.internalExecute(sql, name, binds, {
       prepare: options?.prepare,
       allowRetry: options?.allowRetry,
@@ -1369,16 +1368,11 @@ async function insertStatement(
   let sql: string;
   [sql, binds] = toSqlAndBinds.call(this, arel, binds);
   const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  // Rails: `return returning_column_values(value) unless returning.nil?`
-  // (database_statements.rb:203). `returning_column_values` reads the RETURNING
-  // row, which every adapter now produces because `exec_insert` runs
-  // `sql_for_insert` first.
   if (opts?.returning != null) {
-    return (this.returningColumnValues ?? returningColumnValues).call(this, value);
+    return this.returningColumnValues(value);
   }
-  // Rails: `id_value || last_inserted_id(value)` (database_statements.rb:205).
-  // Ruby `||` falls through only on nil/false, so a caller-supplied id of 0 is
-  // kept.
+  // Ruby's `id_value || last_inserted_id(value)` (database_statements.rb:205)
+  // falls through only on nil/false, so a caller-supplied id of 0 is kept.
   if (idValue != null && idValue !== false) return idValue;
   return this.lastInsertedId(value);
 }
@@ -1515,7 +1509,7 @@ export const DatabaseStatements = {
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result> {
-    [sql, binds] = await this.sqlForInsert(sql, pk ?? null, binds, returning ?? null);
+    [sql, binds] = await this.sqlForInsert(sql, pk, binds, returning);
     return this.internalExecQuery(sql, name, binds);
   },
 
@@ -2024,6 +2018,11 @@ function currentTransactionJoinable(host: DatabaseStatementsHost): boolean {
 /**
  * Appends a RETURNING clause when the adapter supports it, then returns [sql, binds].
  *
+ * Async where Ruby is sync: `supports_insert_returning?` and `primary_key` are
+ * plain predicates in Ruby (a constant and a schema-cache read) but both are
+ * async here, and an un-awaited Promise is always truthy — so a sync body would
+ * append RETURNING on every backend.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert
  * @internal
  */
@@ -2034,10 +2033,6 @@ export async function sqlForInsert(
   binds: unknown[],
   returning: string[] | null | undefined,
 ): Promise<[string, unknown[]]> {
-  // `supports_insert_returning?` and `primary_key` are plain predicates in Ruby;
-  // both are async in trails (a version probe / a schema query), so this body is
-  // async and awaits them. Without the await a Promise is always truthy and the
-  // RETURNING clause would be appended on every backend.
   if (await this.supportsInsertReturning?.()) {
     // Mirrors Rails: `pk == false` is the explicit caller opt-out — skip
     // any pk-derived RETURNING column (caller may still pass `returning:`

@@ -118,8 +118,6 @@ export function buildColumnTypes(
 /** @internal */
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
-  // Ruby reads `@raw_connection.last_id`; node-mysql2's client has no such
-  // accessor, so the value is carried on the adapter instead.
   _lastId?: number;
   _statements?: Map<string, unknown>;
   handleWarnings?(sql: string): void | Promise<void>;

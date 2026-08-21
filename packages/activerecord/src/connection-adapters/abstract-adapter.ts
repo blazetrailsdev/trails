@@ -624,7 +624,7 @@ export interface AbstractAdapter {
     pk?: string | false | null,
     sequenceName?: string | null,
     returning?: string[] | null,
-  ): Promise<Result | number>;
+  ): Promise<Result>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string): boolean;

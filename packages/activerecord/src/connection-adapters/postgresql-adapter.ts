@@ -2486,7 +2486,7 @@ export class PostgreSQLAdapter
     pk?: string | false | null,
     sequenceName?: string | null,
     returning?: string[] | null,
-  ): Promise<Result | number> {
+  ): Promise<Result> {
     // Mirrors Rails' single `if use_insert_returning? || pk == false` arm
     // (postgresql/database_statements.rb:46-47) — `super` is the abstract
     // `sql_for_insert` + `internal_exec_query` pair, which honours the

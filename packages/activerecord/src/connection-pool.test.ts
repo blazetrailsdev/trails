@@ -103,7 +103,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
     return Result.fromRowHashes(await this.execute(sql, b));
   }
   async execInsert(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
+    return Result.fromRowHashes(await this.execute(sql, b));
   }
   async execDelete(sql: string, _n?: string | null, b?: unknown[]) {
     return this.executeMutation(sql, b);
