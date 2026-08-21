@@ -35,14 +35,12 @@ export class PoolConfig {
   readonly dbConfig: DatabaseConfig;
   /**
    * @noRailsEquivalent CONVERGEABLE — story
-   * `0099-call-argument-convergence/remove-pool-config-adapter-factory`.
-   * Ruby resolves the adapter class from `db_config.adapter`
-   * by requiring it at connect time (`connection_handler.rb:279` therefore
-   * passes no factory). ESM has no autoloaded constant lookup, so a caller that
-   * cannot wait for the async `resolveConnectionAdapter` import — test support,
-   * `connectsTo` — hands the pool a ready-made factory instead. Assigned rather
-   * than taken as a fifth `resolve_pool_config`/`PoolConfig.new` argument so
-   * both of those call sites keep Rails' argument list.
+   * `0099-call-argument-convergence/remove-pool-config-adapter-factory`. Ruby
+   * requires the adapter class named by `db_config.adapter` at connect time, so
+   * `connection_handler.rb:279` passes no factory. ESM has no autoloaded
+   * constant lookup, so a caller that cannot await `resolveConnectionAdapter`
+   * hands the pool a ready-made factory. Assigned rather than taken as a fifth
+   * `PoolConfig.new` argument, so that call site keeps Rails' argument list.
    */
   adapterFactory?: () => DatabaseAdapter;
   private _pool: ConnectionPool | null = null;
