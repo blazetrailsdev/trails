@@ -1,7 +1,9 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { include } from "@blazetrails/activesupport";
 import {
   checkValidityBang,
+  type Clusivity,
   delimiter,
   exceptInWithinMergeValue,
   inclusionMethod,
@@ -26,31 +28,26 @@ import {
  * EachValidator's allow_nil dispatch (validator.ts:100) so excluding
  * `nil` works when the excluded set explicitly contains it.
  */
-export class ExclusionValidator extends EachValidator {
-  // Declarations only — actual functions attached to the prototype below.
-  // Prototype attachment (not class fields) so the Clusivity helpers are
-  // available during super() / EachValidator's constructor-time
-  // checkValidityBang() call.
-  declare resolveValue: typeof resolveValue;
-  /** @internal */
-  declare delimiter: typeof delimiter;
-  /** @internal */
-  declare inclusionMethod: typeof inclusionMethod;
-  /** @internal */
-  declare isInclude: typeof isInclude;
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Clusivity` (exclusion.rb:8); the class/interface merge is how `include()` surfaces on the type side, and it adds no members of its own. */
+export interface ExclusionValidator extends Clusivity {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class ExclusionValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (this.isInclude(record, value)) {
       record.errors.add(attribute, ":exclusion", exceptInWithinMergeValue(this.options, value));
     }
   }
-
-  override checkValidityBang(): void {
-    checkValidityBang.call(this);
-  }
 }
 
-ExclusionValidator.prototype.resolveValue = resolveValue;
-ExclusionValidator.prototype.delimiter = delimiter;
-ExclusionValidator.prototype.inclusionMethod = inclusionMethod;
-ExclusionValidator.prototype.isInclude = isInclude;
+// Mirrors: `include Clusivity` (exclusion.rb:8). The module lands on the
+// prototype rather than on class fields because `EachValidator`'s constructor
+// calls `this.checkValidityBang()`, and class fields do not initialize until
+// after `super()` returns.
+include(ExclusionValidator, {
+  checkValidityBang,
+  resolveValue,
+  delimiter,
+  inclusionMethod,
+  isInclude,
+});

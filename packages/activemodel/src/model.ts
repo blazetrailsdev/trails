@@ -1624,9 +1624,10 @@ export class Model {
 
   // -- Naming (Phase 1300) --
 
-  static lookupAncestors(): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
-    return translationLookupAncestors.call(this);
-  }
+  declare static lookupAncestors: () => Array<{
+    new (...args: never[]): unknown;
+    modelName: ModelName;
+  }>;
 
   /**
    * Optional `::`-joined Ruby module path for a namespaced model (e.g.
@@ -1673,13 +1674,19 @@ export class Model {
   _initializingAttributes = false;
 
   /**
-   * Per-instance reset hook. Mirrors the Rails chain
-   * `ActiveModel::{Validations,Dirty}#init_internals`
-   * (validations.rb:467-471, dirty.rb:372-376). The Trails
-   * implementation forwards to the per-module helpers exported
-   * from `validations.ts` and `dirty.ts` so each module owns its
-   * own state-reset surface, mirroring how Ruby's `super` chain
-   * walks the include order.
+   * Mirrors the Rails chain `ActiveModel::{Validations,Dirty}#init_internals`
+   * (validations.rb:467-471, dirty.rb:371-376). Each Ruby module defines the
+   * method and opens with `super`, so the chain is the include order itself;
+   * there is no root definition in ActiveModel (the bottom is
+   * `ActiveRecord::Core#init_internals`, core.rb:834).
+   *
+   * TypeScript has no `super` across mixins — `include()` copies onto one
+   * prototype, so the second module's copy would overwrite the first's with no
+   * way to reach it, and `prepend()`'s explicit `super_` needs a root method to
+   * wrap that Rails does not define here. So the chain is written out, in
+   * include order, calling each module's own exported hook. This is the
+   * language shortcoming, not a preference: neither module's body is inlined or
+   * reordered.
    *
    * @internal Rails-private helper.
    */
@@ -2155,11 +2162,13 @@ export class Model {
   }
 
   /**
-   * Ruby chains one `initialize_dup` per included module through `super`. TS has
-   * no `super` across mixins, so this is the chain: `Validations` replaces
-   * `@errors` (validations.rb:310-313) and `Dirty` resets the mutation tracker
-   * (dirty.rb:248-251) — without the latter the copy shares the source's tracker,
-   * so writing to one marks the other dirty. Both hooks run after `dup()` has
+   * Ruby chains one `initialize_dup` per included module through `super`
+   * (attributes.rb:112-115, validations.rb:310-313, dirty.rb:248-251).
+   * TypeScript has no `super` across mixins — see `initInternals` above for why
+   * neither `include()` nor `prepend()` can express it — so this is the chain,
+   * in include order: `Validations` replaces `@errors` and `Dirty` resets the
+   * mutation tracker (without the latter the copy shares the source's tracker,
+   * so writing to one marks the other dirty). Both run after `dup()` has
    * deep-dup'd `_attributes`, matching the point in Rails' chain where
    * `Attributes#initialize_dup` has already replaced `@attributes`.
    */
@@ -2809,6 +2818,9 @@ classAttribute.call(Model, "attributeMethodPatterns", {
   instanceWriter: false,
   default: [new AttributeMethodPattern()],
 });
+
+// Ruby `extend ActiveModel::Translation` (translation.rb:22, via naming.rb).
+extend(Model, { lookupAncestors: translationLookupAncestors });
 
 // Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
 extend(Model, {
