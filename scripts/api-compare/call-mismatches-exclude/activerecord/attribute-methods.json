@@ -2,29 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "alias_attribute_method_definition",
-    "call": "has_attribute?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "attributes_for_create",
     "call": "id",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deviation (RFC 0106): Rails' `id.nil?` reads the composite-PK reader, which returns an Array for a composite key and so is never nil even when one member is. trails checks the per-column attribute value instead so a composite PK drops each unset member individually. Converging depends on the composite `id` reader story."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "dangerous_attribute_methods",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "generate_alias_attributes",
-    "call": "generate_alias_attribute_methods",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Deviation (RFC 0106): Rails builds the set by reflecting over `Base.instance_methods - Base.superclass.instance_methods` and `map`ping each Symbol to a frozen String. JS has no equivalent of Ruby's owner-scoped `instance_methods`, so trails enumerates the same names as a literal list; the `map` has nothing to map over."
   }
 ]

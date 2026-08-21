@@ -6,6 +6,7 @@
 import { include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
+  ArgumentError,
   MissingAttributeError,
   missingAttribute,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
@@ -208,7 +209,9 @@ interface AttributeMethodsHost {
   abstractClass?: boolean;
   aliasAttribute(newName: string, oldName: string): void;
   _hasAttribute(attrName: string): boolean;
+  hasAttribute(attrName: string): boolean;
   defineAttributeMethods?(): boolean;
+  generateAliasAttributeMethods?(newName: string, oldName: string): void;
   generateAliasAttributes?(): void;
 }
 
@@ -320,20 +323,40 @@ export function eagerlyGenerateAliasAttributeMethods(this: AttributeMethodsHost)
   this._aliasAttributesMassGenerated = true;
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attribute_methods
+ * (attribute_methods.rb:80-85). Rails loops the attribute-method patterns and
+ * defines one alias per pattern; trails' generated readers are accessor
+ * properties (see CLAUDE.md, "Generated attribute readers are properties"), so
+ * the reader/writer pair is one descriptor and the loop collapses to the single
+ * `alias_attribute_method_definition` call the plain pattern produces.
+ */
 export function generateAliasAttributeMethods(
   this: AttributeMethodsHost,
-  _newName: string,
-  _oldName: string,
+  newName: string,
+  oldName: string,
 ): void {
-  // Alias attribute methods are defined eagerly via Object.defineProperty
-  // in activemodel's aliasAttribute. This hook exists for Rails parity.
+  aliasAttributeMethodDefinition.call(this, newName, oldName);
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#alias_attribute_method_definition
+ * (attribute_methods.rb:87-96).
+ */
 export function aliasAttributeMethodDefinition(
   this: AttributeMethodsHost,
   newName: string,
   oldName: string,
 ): void {
+  oldName = String(oldName);
+
+  if (!this.abstractClass && !this.hasAttribute(oldName)) {
+    throw new ArgumentError(
+      `${this.name} model aliases \`${oldName}\`, but \`${oldName}\` is not an attribute. ` +
+        `Use \`alias_method :${newName}, :${oldName}\` or define the method manually.`,
+    );
+  }
+
   // Rails generates pattern-based alias methods for a single pattern.
   // Define a direct getter/setter for the alias name.
   if (this.prototype && !(newName in this.prototype)) {
@@ -447,7 +470,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   }
   if (this.attributeAliases) {
     for (const [newName, oldName] of Object.entries(this.attributeAliases)) {
-      aliasAttributeMethodDefinition.call(this, newName, oldName);
+      generateAliasAttributeMethods.call(this, newName, oldName);
     }
   }
   this._aliasAttributesMassGenerated = true;

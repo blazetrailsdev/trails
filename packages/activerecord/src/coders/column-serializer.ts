@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
@@ -95,10 +96,9 @@ export class ColumnSerializer {
     // for a constructor that will not take zero arguments, so catch everything.
     try {
       this.load(null);
-    } catch (e: unknown) {
-      throw new TypeError(
+    } catch {
+      throw new ArgumentError(
         `Cannot serialize ${this._objectClass.name}. Classes passed to \`serialize\` must have a 0 argument constructor.`,
-        { cause: e },
       );
     }
   }

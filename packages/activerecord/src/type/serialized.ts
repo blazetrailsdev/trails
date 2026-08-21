@@ -3,13 +3,11 @@ import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { IndifferentHashAccessor } from "../store.js";
 
 /**
- * Whether a value is compared against the coder default by structural value
- * rather than identity. Rails' `default_value?` is `value == coder.load(nil)`:
- * built-in collection defaults (`Array`/`Hash`, and our store's
- * `HashWithIndifferentAccess`) have value-based `==`, but an arbitrary coder
+ * Whether a value is a Ruby collection whose `==` compares by structure:
+ * `Array`, `Hash`, and our store's `HashWithIndifferentAccess`. An arbitrary
  * object (e.g. a custom class coder's `object_class` instance) has no `==` and
- * so falls back to identity. We mirror that — only plain arrays/objects and
- * HWIA are value-compared; everything else uses reference equality.
+ * falls back to identity, so only plain arrays/objects and HWIA are
+ * value-compared here.
  *
  * @internal
  */
@@ -61,72 +59,6 @@ function hasValueEquality(value: unknown): boolean {
   return primitive !== value && (primitive === null || typeof primitive !== "object");
 }
 
-/**
- * Structural JSON key used to compare a value against the coder's default.
- * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
- * interface) so their contents — not their Map-backed internal shape — drive
- * the comparison.
- *
- * Object keys are emitted in sorted order so that two content-equal hashes
- * built with keys in a different insertion order canonicalize identically —
- * matching Ruby's order-insensitive `Hash#==` (the semantics `Type::Value#==`
- * relies on for change detection). `JSON.stringify` iterates keys in insertion
- * order, so the normalization has to happen before stringifying rather than in
- * a replacer.
- *
- * @internal
- */
-function canonicalKey(value: unknown): string {
-  return JSON.stringify(normalize(value));
-}
-
-/**
- * Sentinel prefix for values `JSON.stringify` cannot represent and would
- * otherwise collapse to `null` (or drop entirely): `undefined`, `NaN`, and the
- * infinities. Tagging them keeps `canonicalKey` injective across these cases so
- * change detection distinguishes them from an actual `null`, matching Ruby's
- * `Hash#==` (where `nil`, `Float::NAN`, and a missing key are all distinct).
- * This also fixes latent default detection: `{ a: undefined }` used to
- * stringify to `{}` and so falsely matched the empty-hash coder default.
- *
- * The leading NUL keeps the tag from colliding with an ordinary string value —
- * JSON payloads do not carry raw control characters — so a real string can
- * never masquerade as an encoded `undefined`/`NaN`.
- *
- * Note: `canonicalKey` is a _deterministic_ string, so two distinct `NaN`
- * values canonicalize identically. That is fine for default detection (a coder
- * default never contains `NaN`), but change detection needs Ruby's non-reflexive
- * `Float::NAN == Float::NAN == false`; `isChanged` therefore compares Hash
- * values structurally via {@link valuesEqual} rather than by canonical key.
- *
- * @internal
- */
-const NONSERIALIZABLE_SENTINEL = "\u0000serialized:";
-
-/**
- * Recursively unwraps `toHash()`-bearing objects and sorts plain-object keys so
- * the resulting structure has a canonical, insertion-order-independent shape.
- *
- * @internal
- */
-function normalize(value: unknown): unknown {
-  if (value === undefined) return `${NONSERIALIZABLE_SENTINEL}undefined`;
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    return `${NONSERIALIZABLE_SENTINEL}${String(value)}`;
-  }
-  if (value === null || typeof value !== "object") return value;
-  if (typeof (value as { toHash?: unknown }).toHash === "function") {
-    return normalize((value as { toHash(): unknown }).toHash());
-  }
-  if (Array.isArray(value)) return value.map(normalize);
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return value;
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-    sorted[key] = normalize((value as Record<string, unknown>)[key]);
-  }
-  return sorted;
-}
 
 /**
  * Unwraps `toHash()`-bearing objects (HashWithIndifferentAccess) so the wrapped
@@ -180,7 +112,16 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (isValueComparable(a) && isValueComparable(b)) return collectionsEqual(a, b);
   // Rails' `a == b` calls the *left* operand's `==`, so dispatch on `a` only.
-  if (hasEquals(a)) return a.equals(b);
+  // Ruby's `==` never raises on a mismatched operand — `"x" == nil` is false —
+  // so an `equals` that rejects the operand's type (Buffer#equals throws on a
+  // non-Buffer) reports inequality rather than propagating.
+  if (hasEquals(a)) {
+    try {
+      return a.equals(b);
+    } catch {
+      return false;
+    }
+  }
   if (
     hasValueEquality(a) &&
     hasValueEquality(b) &&
@@ -325,7 +266,7 @@ export class Serialized extends ValueType {
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
     if (value === null || value === undefined) return false;
-    const rawNewValue = encoded.call(this, value);
+    const rawNewValue = this.encoded(value);
     const oldNil = rawOldValue === null || rawOldValue === undefined;
     const newNil = rawNewValue === null || rawNewValue === undefined;
     return (
@@ -358,37 +299,24 @@ export class Serialized extends ValueType {
   }
 
   private isDefaultValue(value: unknown): boolean {
-    // Ruby `==` is a value comparison, so a freshly loaded default still equals
-    // an equal object; JS `===` is identity, hence the canonical-key fallback.
-    const defaultValue = this.coder.load(null);
-    if (value === defaultValue) return true;
-    if (value === null || value === undefined)
-      return defaultValue === null || defaultValue === undefined;
-    if (typeof value === "object" && isValueComparable(defaultValue)) {
-      try {
-        return canonicalKey(value) === canonicalKey(defaultValue);
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    // Ruby has one nil; `undefined` and `null` both stand for it here, and
+    // `valuesEqual` (a `===` fallback on leaves) would not equate them.
+    const nilNormalized = value === undefined ? null : value;
+    const coderDefault = this.coder.load(null);
+    return valuesEqual(nilNormalized, coderDefault === undefined ? null : coderDefault);
   }
-}
 
-/**
- * Returns the encoded (serialized) representation of a value, or undefined
- * if the value equals the default. Used for changed_in_place? detection.
- *
- * Mirrors: ActiveRecord::Type::Serialized#encoded (private)
- *
- * @internal
- */
-export function encoded(this: Serialized, value: unknown): unknown {
-  if ((this as any).isDefaultValue(value)) return undefined;
-  const payload = this.coder.dump(value);
-  // Rails: if payload && subtype.binary? → ActiveModel::Type::Binary::Data.new(payload)
-  if (payload && ((this.subtype as any).binary?.() ?? (this.subtype as any).isBinary?.())) {
-    return new BinaryData(payload);
+  /**
+   * Mirrors: ActiveRecord::Type::Serialized#encoded (serialized.rb:66-73,
+   * private) — the coder-dumped payload of a non-default value, used by
+   * `changed_in_place?`.
+   */
+  private encoded(value: unknown): unknown {
+    if (this.isDefaultValue(value)) return undefined;
+    const payload = this.coder.dump(value);
+    if (payload && this.subtype.isBinary()) {
+      return new BinaryData(payload);
+    }
+    return payload;
   }
-  return payload;
 }

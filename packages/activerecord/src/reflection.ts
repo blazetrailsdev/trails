@@ -12,10 +12,11 @@ import {
   constantize,
   safeConstantize,
   foreignKey as deriveForeignKey,
+  except,
 } from "@blazetrails/activesupport";
 import { Table, type TableRef } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
-import { joinTableName } from "./migration/join-table.js";
+import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
 import { modelRegistry, autoloadModel } from "./associations.js";
@@ -624,8 +625,7 @@ export class MacroReflection extends AbstractReflection {
     // Rails: when active_record.name.demodulize == class_name, try ::ClassName
     // (absolute top-level) first, then fall back to namespace-relative lookup.
     const arName = this.activeRecordRegistryName();
-    const lastSegment = arName.includes("::") ? arName.split("::").pop()! : arName;
-    if (lastSegment === className) {
+    if (demodulize(arName) === className) {
       try {
         return this.computeClass(`::${className}`);
       } catch (e) {
@@ -1279,7 +1279,7 @@ export class AssociationReflection extends MacroReflection {
    * collapses a shared `[._]`-terminated prefix across the two table names.
    */
   protected deriveJoinTable(): string {
-    return joinTableName(this.activeRecord.tableName, this.klass.tableName);
+    return deriveJoinTableName(this.activeRecord.tableName, this.klass.tableName);
   }
 }
 
@@ -2172,8 +2172,10 @@ export function addReflection(
   // the new reflection is re-appended at the end, preserving the subclass's
   // declaration order (the has_many :through order check in checkValidityBang
   // depends on it).
-  const reflections: Record<string, unknown> = { ...(ar as any)._reflections };
-  delete reflections[name];
+  const reflections: Record<string, unknown> = except(
+    ((ar as any)._reflections ?? {}) as Record<string, unknown>,
+    name,
+  );
   reflections[name] = reflection;
   (ar as any)._reflections = reflections;
 }
