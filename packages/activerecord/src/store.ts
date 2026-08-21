@@ -434,9 +434,8 @@ function defineStoreAccessorDirtyMethods(
     const [prev] = this.changes[storeAttribute] ?? [undefined];
     return dig(prev, key) ?? null;
   });
-  // Matches Model's `savedChangeToAttribute(name)` predicate shape; the value
-  // form is exposed as `savedChangeTo<X>Values()` (parallel to
-  // `savedChangeToAttributeValues` on Model).
+  // Matches `Base`'s `savedChangeToAttribute(name)` predicate shape; the value
+  // form is exposed as `savedChangeTo<X>Values()`.
   define(`savedChangeTo${cap}`, function (this) {
     if (!this.savedChangeToAttribute?.(storeAttribute)) return false;
     const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];

@@ -1984,16 +1984,46 @@ export class Base extends Model {
     return super.attributeChanged(name, options);
   }
 
-  override savedChangeToAttribute(
-    name: string,
-    options?: { from?: unknown; to?: unknown },
-  ): boolean {
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
+   * (attribute_methods/dirty.rb:86-88), declared alongside its
+   * `attribute_method_affix` in `attributeMethodPatterns` above.
+   *
+   * The body is the port in `attribute-methods/dirty.ts`. What stays here is
+   * what Rails does inside `AttributeMutationTracker#changed?`
+   * (attribute_mutation_tracker.rb:44-48) and trails cannot: alias resolution
+   * and the `type_cast(attr_name, …)` of each option through the attribute's
+   * `EnumType`, both of which need the class, not the record.
+   *
+   * The NAME is forced: a generated `savedChangeToName` reaches its target
+   * through the derived `${prefix}attribute${suffix}` join
+   * (attribute_methods.rb:481), and Ruby tells the predicate from the value
+   * reader by a TRAILING `?` where TypeScript's convention is a LEADING `is` —
+   * so no pattern can derive `isSavedChangeToAttribute`, the spelling the port
+   * carries. Story:
+   * 0096-naming-identifier-burndown/converge-ar-dirty-generic-names-onto-dirty-ts.
+   */
+  savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    const ctor = this.constructor as typeof Base;
     if (options) {
-      const ctor = this.constructor as typeof Base;
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
       options = _castEnumDirtyOpts(ctor, canonical, options);
     }
-    return super.savedChangeToAttribute(name, options);
+    return _isSavedChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
+   * (attribute_methods/dirty.rb:138-140). Same split and the same forced
+   * spelling as {@link Base.savedChangeToAttribute}.
+   */
+  willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    const ctor = this.constructor as typeof Base;
+    if (options) {
+      const canonical = (ctor as any).attributeAliases?.[name] ?? name;
+      options = _castEnumDirtyOpts(ctor, canonical, options);
+    }
+    return _isWillSaveChangeToAttribute.call(this as any, ctor.resolveAttributeName(name), options);
   }
 
   // -- Explain --
@@ -4373,6 +4403,28 @@ export interface Base extends Included<typeof AutosaveAssociation> {
    * the explicit call doubles as the strict-loading bypass.
    */
   loadHasOne(name: string): Promise<Base | null>;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
+   * (attribute_methods/dirty.rb:108-110).
+   *
+   * Ported in `attribute-methods/dirty.ts` and mixed onto the prototype, so
+   * only the signature lives here. A class-body definition would win over the
+   * mixin — `include()` never replaces a class-body method — and displace the
+   * port.
+   */
+  attributeBeforeLastSave(attr: string): unknown;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_change_to_be_saved
+   * (attribute_methods/dirty.rb:152-154). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
+   * (attribute_methods/dirty.rb:164-166). Ported and mixed in as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  attributeInDatabase(attr: string): unknown;
   readAttributeForValidation(attribute: string): unknown;
   validate(context?: ValidationContextArg): Promise<boolean>;
   customValidationContext(): boolean;

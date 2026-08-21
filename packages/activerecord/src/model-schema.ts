@@ -75,10 +75,21 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name
  *
+ * Also folds in `reset_table_name` (model_schema.rb:290-300), whose arms Rails
+ * evaluates eagerly at `inherited` time and trails evaluates lazily here (the
+ * `table_name` reader routes through this function, not through
+ * `resetTableName`): `self == Base` is nil, and an abstract class takes
+ * `superclass.table_name` rather than a name computed from its own class name.
+ *
  * @internal
  */
 export function resolveTableName(this: typeof Base): string {
   if ((this as any)._tableName != null) return (this as any)._tableName;
+  if (this.name === "Base") return "";
+  if ((this as any).abstractClass) {
+    const superclass = Object.getPrototypeOf(this) as typeof Base | null;
+    return superclass ? resolveTableName.call(superclass) : "";
+  }
   // Rails compute_table_name: non-base subclasses always use base_class.table_name.
   // This covers both STI hierarchies and any subclass of a non-abstract AR model.
   if (!isBaseClass(this)) {
@@ -616,13 +627,6 @@ export function resetTableName(this: SchemaHost): string {
   if (this.name === "Base") {
     return "";
   }
-  if ((this as any).abstractClass) {
-    const parent = Object.getPrototypeOf(this) as SchemaHost | null;
-    if (parent?.tableName != null) {
-      this._tableName = parent.tableName;
-      return this._tableName;
-    }
-  }
   const name = resolveTableName.call(this as any);
   this._tableName = name;
   return name;
@@ -1070,15 +1074,14 @@ function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
 
 /**
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#load_schema!
- * (model_schema.rb:587-597) — the base of the chain.
+ * (model_schema.rb:587-597) — the base of the chain. Its guard is
+ * `raise TableNotSpecified unless table_name` (model_schema.rb:587-590): the
+ * table name alone, with no `abstract_class?` term, so an abstract class that
+ * inherits a concrete superclass's table reflects that table's columns.
  */
 function loadSchemaBangAnchor(this: SchemaHost): void {
-  // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
-  // Rails' `table_name` is nil for an abstract class; ours computes an inferred
-  // name even for abstract classes, so mirror the Rails effect by treating an
-  // abstract class (or an explicitly cleared `table_name`) as table-less.
   const klass = this as unknown as typeof Base;
-  if ((this as any).abstractClass || !klass.tableName) {
+  if (!klass.tableName) {
     throw new TableNotSpecified(
       `${klass.name} has no table configured. Set one with ${klass.name}.table_name=`,
     );

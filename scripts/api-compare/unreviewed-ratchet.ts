@@ -364,6 +364,44 @@ export function slackByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
   return out.sort((a, b) => b.mark - b.count - (a.mark - a.count) || compareFiles(a, b));
 }
 
+/**
+ * Split a slack set into the shards this branch's own diff already rewrote and
+ * the rest (RFC 0106).
+ *
+ * A mark only shrinks, so tightening is always safe in the abstract — but the
+ * STALE report is also the SIGNAL that a row retired, and silently swallowing
+ * it for a shard nobody on this branch touched would hide a rebase that
+ * restored someone else's higher copy. So the auto arm is scoped exactly the
+ * way RFC 0083's `api-build-lower-unreviewed-marks-on-drop` scopes its own:
+ * lower only what you know you rewrote. `touched` holds shard paths
+ * (`<package>/<tsFile .ts→.json>`) reached from the diff — a deleted exclude
+ * row is the usual way in — and everything else stays a hard failure.
+ */
+export function partitionSlack(
+  slack: MarkDelta[],
+  touched: ReadonlySet<string>,
+): { auto: MarkDelta[]; blocked: MarkDelta[] } {
+  const auto: MarkDelta[] = [];
+  const blocked: MarkDelta[] = [];
+  for (const d of slack) (touched.has(d.file) ? auto : blocked).push(d);
+  return { auto, blocked };
+}
+
+/**
+ * The auto arm's report. It is printed, not swallowed: the write lands in the
+ * working tree and has to be COMMITTED, or CI re-derives the same slack from
+ * the committed shard and fails on it.
+ */
+export function renderAutoTightened(auto: MarkDelta[], markDir: string): string {
+  return (
+    `\ncall-mismatches unreviewed ratchet: auto-tightened ${auto.length} shard(s) under ` +
+    `${markDir}/ that this branch's own diff already rewrites (a mark only shrinks, so ` +
+    "lowering one you rewrote is safe — this is the `--tighten` you would have run by " +
+    "hand). COMMIT the rewritten shard(s); CI reads the committed value:\n" +
+    auto.map((d) => `  ~ ${d.file}  mark ${d.mark} -> ${d.count}`).join("\n")
+  );
+}
+
 export function renderSlack(slack: MarkDelta[], markDir: string): string {
   const total = slack.reduce((n, d) => n + d.mark - d.count, 0);
   return (

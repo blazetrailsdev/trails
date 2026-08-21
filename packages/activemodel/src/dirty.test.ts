@@ -369,64 +369,7 @@ describe("attributeBeforeTypeCast", () => {
   });
 });
 
-describe("willSaveChangeToAttribute", () => {
-  it("returns true when attribute has been changed", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("size", "integer");
-      }
-    }
-
-    const w = new Widget({ name: "Test", size: 5 });
-    w.changesApplied();
-    w.writeAttribute("name", "Changed");
-    expect(w.willSaveChangeToAttribute("name")).toBe(true);
-    expect(w.willSaveChangeToAttribute("size")).toBe(false);
-  });
-
-  it("willSaveChangeToAttributeValues returns [old, new]", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const w = new Widget({ name: "Test" });
-    w.changesApplied();
-    w.writeAttribute("name", "Changed");
-    expect(w.willSaveChangeToAttributeValues("name")).toEqual(["Test", "Changed"]);
-  });
-});
-
-describe("attributeInDatabase / attributeBeforeLastSave / changedAttributeNamesToSave", () => {
-  it("attributeInDatabase returns the pre-change value", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const w = new Widget({ name: "Test" });
-    w.changesApplied();
-    w.writeAttribute("name", "Changed");
-    expect(w.attributeInDatabase("name")).toBe("Test");
-  });
-
-  it("attributeBeforeLastSave returns old value after save", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const w = new Widget({ name: "Original" });
-    w.changesApplied();
-    w.writeAttribute("name", "Updated");
-    w.changesApplied();
-    expect(w.attributeBeforeLastSave("name")).toBe("Original");
-  });
-
+describe("changedAttributeNamesToSave", () => {
   it("changedAttributeNamesToSave lists pending changes", () => {
     class Widget extends Model {
       static {
@@ -572,34 +515,6 @@ describe("attributeChanged with from/to options", () => {
     u.writeAttribute("name", "Bob");
     expect(u.attributeChanged("name", { to: "Bob" })).toBe(true);
     expect(u.attributeChanged("name", { to: "Wrong" })).toBe(false);
-  });
-
-  it("willSaveChangeToAttribute supports from/to", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    u.changesApplied();
-    u.writeAttribute("name", "Bob");
-    expect(u.willSaveChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(u.willSaveChangeToAttribute("name", { from: "Wrong" })).toBe(false);
-  });
-
-  it("savedChangeToAttribute supports from/to", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    u.changesApplied();
-    u.writeAttribute("name", "Bob");
-    u.changesApplied();
-    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Wrong" })).toBe(false);
-    expect(u.savedChangeToAttribute("name", { from: "Wrong", to: "Bob" })).toBe(false);
   });
 });
 

@@ -7,6 +7,8 @@ import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./call-mismatch-bas
 import {
   excessByPath,
   loadMarks,
+  partitionSlack,
+  renderAutoTightened,
   renderSlack,
   slackByPath,
   tightenCommand,
@@ -35,6 +37,7 @@ import {
   matchesCategory,
   parseSetReason,
   parseTighten,
+  shardsFromDiffPaths,
   REASON_CATEGORIES,
   type ReasonCategory,
 } from "./lint-call-mismatches.js";
@@ -453,6 +456,62 @@ describe("a rebase that restores a higher mark", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// The auto arm (RFC 0106): the manual `--tighten` re-run costs a CI round on
+// this RFC's long-lived, mark-lowering PRs, so a shard the branch's own diff
+// already rewrites tightens itself. Every OTHER stale shard still fails — the
+// STALE report is the signal that a row retired, and a rebase that restored
+// someone else's higher mark must not be swallowed.
+describe("auto-tightening the shards a branch's own diff modifies", () => {
+  const MINE = "activerecord/associations/has-one-association.json";
+  const THEIRS = "activerecord/insert-all.json";
+  const slack = slackByPath(
+    new Map([
+      [MINE, 7],
+      [THEIRS, 3],
+    ]),
+    new Map([
+      [MINE, 8],
+      [THEIRS, 4],
+    ]),
+  );
+
+  it("auto-tightens a stale shard the diff touches and blocks one it does not", () => {
+    const { auto, blocked } = partitionSlack(slack, new Set([MINE]));
+    expect(auto.map((d) => d.file)).toEqual([MINE]);
+    expect(blocked.map((d) => d.file)).toEqual([THEIRS]);
+  });
+
+  it("blocks every shard when the diff touches none of them", () => {
+    const { auto, blocked } = partitionSlack(slack, new Set());
+    expect(auto).toEqual([]);
+    expect(blocked.map((d) => d.file).sort()).toEqual([MINE, THEIRS].sort());
+  });
+
+  it("reaches the shard through the EXCLUDE tree a converged row is deleted from", () => {
+    expect(
+      shardsFromDiffPaths([
+        `scripts/api-compare/call-mismatches-exclude/${MINE}`,
+        `scripts/api-compare/call-mismatches-unreviewed/${THEIRS}`,
+        "packages/activerecord/src/base.ts",
+        "scripts/api-compare/lint-call-mismatches.ts",
+      ]),
+    ).toEqual(new Set([MINE, THEIRS]));
+  });
+
+  it("names the rewritten shards and tells the author to commit them", () => {
+    const { auto } = partitionSlack(slack, new Set([MINE]));
+    const out = renderAutoTightened(auto, "scripts/api-compare/x");
+    expect(out).toContain(`${MINE}  mark 8 -> 7`);
+    expect(out).toContain("COMMIT");
+  });
+
+  it("only ever shrinks: the auto arm routes through tightenMarks", () => {
+    const marks = new Map([[MINE, 8]]);
+    expect(tightenMarks(new Map([[MINE, 9]]), marks, [MINE])).toEqual(marks);
+    expect(tightenMarks(new Map([[MINE, 7]]), marks, [MINE])).toEqual(new Map([[MINE, 7]]));
   });
 });
 
