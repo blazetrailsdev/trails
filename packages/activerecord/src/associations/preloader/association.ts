@@ -104,8 +104,9 @@ export class Association {
     return this._preloadedRecords!;
   }
 
+  /** The name of the key on the associated records */
   get associationKeyName(): string | string[] {
-    return (this.reflection as any).joinPrimaryKey;
+    return this.reflection.joinPrimaryKeyFor(this.klass);
   }
 
   loaderQuery(): LoaderQuery {

@@ -1034,8 +1034,12 @@ export class AssociationReflection extends MacroReflection {
     return this.foreignType;
   }
 
-  get joinPrimaryKey(): string | string[] {
+  joinPrimaryKeyFor(_klass?: typeof Base): string | string[] {
     return this.foreignKey;
+  }
+
+  get joinPrimaryKey(): string | string[] {
+    return this.joinPrimaryKeyFor();
   }
 
   get joinPrimaryType(): string | null {
@@ -1384,13 +1388,6 @@ export class BelongsToReflection extends AssociationReflection {
   }
 
   get joinPrimaryKey(): string | string[] {
-    if (this.isPolymorphic()) {
-      const pk = this.options.primaryKey;
-      if (pk !== undefined) {
-        return Array.isArray(pk) ? pk.map(String) : String(pk);
-      }
-      return "id";
-    }
     return this.joinPrimaryKeyFor();
   }
 
