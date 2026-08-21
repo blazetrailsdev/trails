@@ -3,12 +3,12 @@ import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.j
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { ambientPoolConfiguration } from "./test-adapter.js";
+import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { ConnectionTimeoutError } from "./errors.js";
 
 function establishConnection(poolSize: number, checkoutTimeout: number): ConnectionPool {
   const dbConfig = new HashConfig("test", "primary", {
-    ...ambientPoolConfiguration(),
+    ...rawTestAdapterConfiguration(),
     pool: poolSize,
     checkoutTimeout,
     reapingFrequency: null,

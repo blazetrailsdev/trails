@@ -89,10 +89,25 @@ const _primaryConfiguration: Record<string, unknown> = {
  *
  * @internal
  */
+export function ambientPoolConfiguration(): Record<string, unknown> {
+  return { ..._primaryConfiguration };
+}
+
+// The per-connection driver caps the lane wiring below applies to a raw test
+// adapter (PG `max`, MySQL `connectionLimit`/`flags`). Not part of the primary
+// lane's own configuration hash, which is why they live here and not in
+// `ambientPoolConfiguration`.
 let rawTestAdapterCaps: Record<string, unknown> = {};
 
-export function ambientPoolConfiguration(): Record<string, unknown> {
-  return { ..._primaryConfiguration, ...rawTestAdapterCaps };
+/**
+ * {@link ambientPoolConfiguration} plus those caps: the configuration hash a
+ * pool-under-test builds its connections from, so each of its connections maps
+ * to exactly one server connection the way {@link newRawTestAdapter} does.
+ *
+ * @internal
+ */
+export function rawTestAdapterConfiguration(): Record<string, unknown> {
+  return { ...ambientPoolConfiguration(), ...rawTestAdapterCaps };
 }
 
 /**
@@ -162,8 +177,7 @@ export async function checkoutRawTestAdapter(): Promise<{
   pool: ConnectionPool;
 }> {
   const dbConfig = new HashConfig(_primaryEnvConfig.envName, _primaryEnvConfig.name, {
-    ..._primaryConfiguration,
-    ...rawTestAdapterCaps,
+    ...rawTestAdapterConfiguration(),
     pool: 1,
   });
   const poolConfig = new PoolConfig(

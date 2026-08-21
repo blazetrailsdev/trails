@@ -7,7 +7,7 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { ambientPoolConfiguration } from "./test-adapter.js";
+import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type {
@@ -26,7 +26,7 @@ interface AmbientPoolOptions {
 
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
-    ...ambientPoolConfiguration(),
+    ...rawTestAdapterConfiguration(),
     checkoutTimeout: 0.2,
     reapingFrequency: null,
     ...overrides,
