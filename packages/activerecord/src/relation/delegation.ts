@@ -1122,44 +1122,38 @@ export class DelegationMethods {
    * `Array#to_xml` (activesupport/lib/active_support/core_ext/array/conversions.rb:183-211):
    * serialize the loaded records as an XML collection.
    *
-   * The root element reflects the (pluralized, underscored) class name of the
-   * first record — `<posts type="array">` — but only when every element shares
-   * that class (`all?(first.class)`); a heterogeneous collection (e.g. mixed
-   * STI subclasses) falls back to `"objects"`. Each child is rendered under
-   * `root.singularize` by `XmlMini.to_tag` (conversions.rb:208), which is also
-   * what would dispatch to a per-record `to_xml` — ActiveModel has carried no
-   * such method since Rails 4.2 moved XML serialization out to the external
-   * `activemodel-serializers-xml` gem, so a record falls through `to_tag`'s
-   * generic arm exactly as it does in gem-less Rails.
+   * One `XmlMini` builder is created (`:188`) and threaded through every
+   * `to_tag` call, which is how nesting and indentation compose. The default
+   * root is `pluralize(underscore(first.class.name)).tr("/", "_")` (`:190-193`),
+   * but only when `all?(first.class)` holds — that is `Class#===`, so a subclass
+   * instance still matches and an STI collection whose first element is the base
+   * class roots under the base's plural rather than `<objects>`. An empty
+   * collection's default is the *pre-rename* `underscore(NilClass.name).pluralize`
+   * = `"nil_classes"`, which composes with `dasherize: false` / `camelize:`.
+   *
+   * Rails renames the root first, then singularizes the already-renamed root for
+   * the child name (`:200-202`), and deletes `:children` and `:skip_instruct` so
+   * neither reaches `to_tag`. Each child is rendered by `XmlMini.to_tag` (`:208`),
+   * which is also what would dispatch to a per-record `to_xml` — ActiveModel has
+   * carried no such method since Rails 4.2 moved XML serialization out to the
+   * external `activemodel-serializers-xml` gem, so a record falls through
+   * `to_tag`'s generic arm (xml_mini.rb:132-135) exactly as it does in gem-less
+   * Rails.
    */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
     const records = await this.records();
-    // conversions.rb:188 — the builder is created once and threaded through
-    // every `to_tag` call, which is how nesting and indentation compose.
     const builder = new IndentedXmlStringBuilder();
-    // conversions.rb:202 deletes `:children`, and :199 deletes `:skip_instruct`,
-    // so neither reaches `to_tag`; `:root` is overridden by `to_tag`'s merge.
     const { root: rootOption, children: childrenOption, skipInstruct = false, ...rest } = options;
     const root =
       rootOption ??
-      // conversions.rb:190-195. `all?(first.class)` is `Class#===`, so a
-      // subclass instance still matches — an STI collection whose first element
-      // is the base class roots under the base's plural, not "objects".
       (records.length === 0
-        ? // The empty default is the *pre-rename* value
-          // `underscore(NilClass.name).pluralize` = "nil_classes"; `renameKey`
-          // below dashes it to "nil-classes" under default options and composes
-          // correctly with `dasherize: false` / `camelize:`.
-          "nil_classes"
+        ? "nil_classes"
         : records.every((record) => record instanceof records[0].constructor)
           ? pluralize(underscore(records[0].constructor.name)).replace(/\//g, "_")
           : "objects");
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
 
-    // conversions.rb:200-202: Rails renames the root FIRST, then singularizes
-    // the already-renamed root for the child name — never underscoring the
-    // (already snake_case, or caller-supplied) root string.
     const rootTag = renameKey(root, rest);
     const children = childrenOption ?? singularize(rootTag);
     const attributes: Record<string, string> = rest.skipTypes ? {} : { type: "array" };

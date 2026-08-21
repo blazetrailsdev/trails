@@ -507,9 +507,6 @@ describe("DelegationTest", () => {
       expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
       expect(xml).toContain('<comments type="array">');
       expect(xml).toContain("</comments>");
-      // to_tag's generic arm (xml_mini.rb:132-135) sets `type_name ||=
-      // value.class.name` for a value that is neither a Hash nor a to_xml
-      // responder — gem-less Rails renders each record the same way.
       expect(xml).toContain('<comment type="Comment">');
     });
 
