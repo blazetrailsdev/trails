@@ -840,11 +840,6 @@ export function ensureProperType(this: Base): void {
   if (!isFinderNeedsTypeCondition(klass)) return;
   const inheritCol = klass.inheritanceColumn;
   if (inheritCol === null) return;
-  // Only write when the model actually carries the column — otherwise the value
-  // wouldn't persist or serialize correctly. Rails needs no such guard: its
-  // `attribute_types` loads the schema synchronously on first touch, so
-  // `_write_attribute` always lands on a known attribute (`inheritance.rb:333`).
-  if (!klass._hasAttribute(inheritCol)) return;
   (this as any)._writeAttribute(inheritCol, stiName(klass));
 }
 

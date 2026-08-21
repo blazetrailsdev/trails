@@ -1960,8 +1960,9 @@ function wrapCollectionProxy<T extends Base = Base>(
  *
  * @internal
  */
-function initInternals(record: Base): void {
-  record._resetAssociationCaches();
+export function initInternals(this: Base, super_: () => void): void {
+  super_();
+  this._resetAssociationCaches();
 }
 
 /**

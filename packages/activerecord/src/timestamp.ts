@@ -436,8 +436,25 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export function initInternals(this: TimestampInstanceHost): void {
+export function initInternals(this: TimestampInstanceHost, super_: () => void): void {
+  super_();
   this._touchRecord = null;
+}
+
+/**
+ * Mirrors `ActiveRecord::Timestamp#initialize_dup` (timestamp.rb:50-53): the
+ * clear happens as the `super` stack unwinds, so the initialize callbacks in
+ * `Core#initialize_dup` still see the source's timestamps.
+ *
+ * @internal
+ */
+export function initializeDup(
+  this: TimestampInstanceHost,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  super_(other);
+  clearTimestampAttributes.call(this);
 }
 
 /** @internal */

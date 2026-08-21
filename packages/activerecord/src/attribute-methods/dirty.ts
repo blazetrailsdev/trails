@@ -161,7 +161,8 @@ interface DirtyPrivateHost {
 }
 
 /** @internal */
-export function initInternals(this: DirtyPrivateHost): void {
+export function initInternals(this: DirtyPrivateHost, super_: () => void): void {
+  super_();
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   this._touchAttrNames = null;
