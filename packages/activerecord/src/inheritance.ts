@@ -6,7 +6,8 @@
 
 import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
-import { ActiveRecordError, NameError, SubclassNotFound, TableNotSpecified } from "./errors.js";
+import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
+import { cachedColumnsHash } from "./model-schema.js";
 import {
   camelize,
   constantize,
@@ -146,31 +147,30 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  * paths.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
+ *
+ * @missingRailsCall columns_hash — Language shortcoming: Ruby's `columns_hash`
+ * loads the schema on first touch, and this predicate is reachable from inside
+ * that load (the relation `define_attribute_methods` builds asks it), so
+ * calling `columnsHash()` re-enters `load_schema` — which memoizes only on the
+ * way out (`model_schema.rb:534-545`) and so recurses without bound. The
+ * already-reflected columns are read out of the schema cache instead, which is
+ * the same `@columns_hash` Rails would have answered from.
  */
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  let columnsHash: Record<string, unknown>;
-  try {
-    columnsHash = modelClass.columnsHash();
-  } catch (error) {
-    // Rails always gets a `columns_hash` here: `reset_table_name` gives an
-    // abstract class its superclass's table (`model_schema.rb:290-300`), so
-    // `load_schema!`'s `raise TableNotSpecified unless table_name`
-    // (`model_schema.rb:587-590`) never fires for one. trails infers a table
-    // name for an abstract class instead of nil and keys that raise off
-    // `abstractClass` instead (`model-schema.ts` loadSchemaBangAnchor), so this
-    // one error stands in for the columns Rails would have read off the
-    // inherited table — take them from `attribute_types`, which is seeded from
-    // `columns_hash` and inherited rather than empty. Every other failure is
-    // one Rails would raise too.
-    if (!(error instanceof TableNotSpecified)) throw error;
-    const inheritCol = modelClass.inheritanceColumn;
+  // An unreflected model — and every abstract class, which trails never
+  // reflects — falls back to `attribute_types`, seeded from `columns_hash` and
+  // inherited rather than empty. A cold `columnsHash()` would answer from that
+  // same declared-attribute view anyway.
+  const columnsHash = cachedColumnsHash(modelClass);
+  const inheritCol = modelClass.inheritanceColumn;
+  if (columnsHash === undefined) {
     return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
   }
   // Ruby `columns_hash.include?(inheritance_column)` is false for the nil
   // `inheritance_column` of an STI-disabled model, so no separate arm.
-  return !Object.keys(columnsHash).includes(modelClass.inheritanceColumn as string);
+  return !Object.keys(columnsHash).includes(inheritCol as string);
 }
 
 /**
