@@ -481,6 +481,23 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     }
   });
 
+  it("marks the field accessed when read through readAttribute", () => {
+    // Rails tracks the read inside `fetch_value` (activemodel/attribute.rb:44-47),
+    // which `read_attribute` reaches at read.rb:33, so a public read counts
+    // toward `accessed_fields` (attribute_methods.rb:460). trails keeps the
+    // marker on the record, so `readAttribute` has to set it itself.
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
+    }
+    const t = Topic.new({ title: "access-test", body: "hello" });
+    expect(t.accessedFields()).toEqual([]);
+    t.readAttribute("title");
+    expect(t.accessedFields()).toEqual(["title"]);
+  });
+
   it("keeps attributesBeforeTypeCast a getter rather than a data property", () => {
     // before_type_cast.rb:82 is a zero-arg reader, so it ports as an accessor
     // property; include() copies an object literal by value and would flatten

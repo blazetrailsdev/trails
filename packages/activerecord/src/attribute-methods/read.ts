@@ -26,6 +26,12 @@ interface AttributeHolder {
  * Returns the value of the attribute identified by `attrName` after it has
  * been type cast.
  *
+ * Rails marks the read on the Attribute itself, inside `fetch_value`
+ * (activemodel/attribute.rb:44-47), so `read_attribute` (read.rb:33) feeds
+ * `accessed_fields` (attribute_methods.rb:460) like every other read path.
+ * trails keeps that marker on the record instead — see
+ * {@link readGeneratedAttribute} — so each public read path sets it itself.
+ *
  * Mirrors: ActiveRecord::AttributeMethods::Read#read_attribute (read.rb:29-34)
  */
 export function readAttribute(
@@ -37,10 +43,13 @@ export function readAttribute(
     this.constructor as unknown as { resolveAttributeName(n: string): string }
   ).resolveAttributeName(String(attrName));
 
+  if (this._attributes.has(name)) this._accessedFields.add(name);
   return this._readAttribute(name, block);
 }
 
 interface ReadAttributeHost {
+  _attributes: AttributeSet;
+  _accessedFields: Set<string>;
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
