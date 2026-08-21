@@ -7000,7 +7000,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel([CpkOrder, CpkBook]);
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
     const shopId = (order as any).shop_id;
-    const orderId = (order as any).idValue;
+    const orderId = (order as any).id_value;
     const mk = (authorId: number, id: number) =>
       CpkBook.create({
         id: [authorId, id],

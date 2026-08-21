@@ -97,7 +97,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should resolve aliased attributes", async () => {
-    expect(await Account.sum("availableCredit")).toBe(318);
+    expect(await Account.sum("available_credit")).toBe(318);
   });
 
   it("should return decimal average of integer field", async () => {
@@ -791,7 +791,7 @@ describe("CalculationsTest", () => {
   });
 
   it("count with aliased attribute", async () => {
-    expect(await Account.count("availableCredit")).toBe(6);
+    expect(await Account.count("available_credit")).toBe(6);
   });
 
   it("count with column and options parameter", async () => {

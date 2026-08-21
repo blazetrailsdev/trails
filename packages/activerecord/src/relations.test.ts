@@ -1212,13 +1212,13 @@ describe("RelationTest", () => {
     expect(await postsRel.count("*")).toBe(11);
     expect(await postsRel.count("id")).toBe(11);
     expect(await postsRel.where("legacy_comments_count > 1").count()).toBe(3);
-    expect(await postsRel.where({ commentsCount: 0 }).count()).toBe(6);
+    expect(await postsRel.where({ comments_count: 0 }).count()).toBe(6);
   });
 
   it("count with block", async () => {
     const postsRel = await Post.all();
     const evenCount = postsRel.filter(
-      (p) => ((p as any).commentsCount ?? (p as any).legacy_comments_count ?? 0) % 2 === 0,
+      (p) => ((p as any).comments_count ?? (p as any).legacy_comments_count ?? 0) % 2 === 0,
     ).length;
     expect(evenCount).toBe(8);
   });
@@ -1288,7 +1288,7 @@ describe("RelationTest", () => {
     expect(await postsRel.size()).toBe(11);
     expect(postsRel.isLoaded).toBe(false);
 
-    const bestPosts = postsRel.where({ commentsCount: 0 });
+    const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
     expect((await bestPosts).length).toBe(6);
   });
@@ -1298,7 +1298,7 @@ describe("RelationTest", () => {
     expect(await postsRel.size()).toBe(10);
     expect(postsRel.isLoaded).toBe(false);
 
-    const bestPosts = postsRel.where({ commentsCount: 0 });
+    const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
     expect((await bestPosts).length).toBe(6);
   });
@@ -1318,7 +1318,7 @@ describe("RelationTest", () => {
   });
 
   it("count complex chained relations", async () => {
-    const postsRel = Post.select("commentsCount")
+    const postsRel = Post.select("comments_count")
       .where("id is not null")
       .group("author_id")
       .where("legacy_comments_count > 0");
@@ -1339,13 +1339,13 @@ describe("RelationTest", () => {
     expect(await noPosts.isEmpty()).toBe(true);
     expect(noPosts.isLoaded).toBe(false);
 
-    const bestPosts = postsRel.where({ commentsCount: 0 });
+    const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
     expect(await bestPosts.isEmpty()).toBe(false);
   });
 
   it("empty complex chained relations", async () => {
-    const postsRel = Post.select("commentsCount")
+    const postsRel = Post.select("comments_count")
       .where("id is not null")
       .group("author_id")
       .where("legacy_comments_count > 0");
@@ -1837,7 +1837,7 @@ describe("RelationTest", () => {
     const loadedOrder = await (book as any).loadBelongsTo("order");
     // Rails: assert_equal order2, book.order (AR == compares by class + PK)
     expect(loadedOrder.shop_id).toBe((order2 as any).shop_id);
-    expect(loadedOrder.idValue).toBe((order2 as any).idValue);
+    expect(loadedOrder.id_value).toBe((order2 as any).id_value);
   });
 
   it("explicit create with", () => {
@@ -2414,7 +2414,7 @@ describe("RelationTest", () => {
 
   it("unscope with merge", async () => {
     const p0 = Post.where({ author_id: 0 });
-    const p1 = Post.where({ author_id: 1, commentsCount: 1 });
+    const p1 = Post.where({ author_id: 1, comments_count: 1 });
 
     expect((await p0).map((p) => p.id)).toEqual([posts("authorless").id]);
     expect((await p1).map((p) => p.id)).toEqual([posts("thinking").id]);

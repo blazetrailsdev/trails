@@ -213,7 +213,7 @@ export class CpkOrder extends Base {
 
   static {
     this._primaryKey = ["shop_id", "id"];
-    this.aliasAttribute("idValue", "id");
+    this.aliasAttribute("id_value", "id");
     this.hasMany("orderAgreements", {
       className: "CpkOrderAgreement",
       foreignKey: "order_id",

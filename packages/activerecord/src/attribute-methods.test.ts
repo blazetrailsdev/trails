@@ -123,7 +123,7 @@ describe("AttributeMethodsTest", () => {
     }
     (Post as any).defineAttributeMethods();
     expect(Post.attributeNames()).toContain("id");
-    expect(Object.keys((Post as any).attributeAliases ?? {})).toContain("idValue");
+    expect(Object.keys((Post as any).attributeAliases ?? {})).toContain("id_value");
   });
 
   it("aliasing `id` attribute allows reading the column value", async () => {
@@ -135,7 +135,7 @@ describe("AttributeMethodsTest", () => {
     }
     (Post as any).defineAttributeMethods();
     const p = new Post({ id: 123_456, title: "title" });
-    expect((p as any).idValue).toBe(123_456);
+    expect((p as any).id_value).toBe(123_456);
   });
 
   it("case-sensitive attributes hash", async () => {
@@ -274,7 +274,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     (Keyboard as any).defineAttributeMethods();
-    expect(Object.keys((Keyboard as any).attributeAliases ?? {})).not.toContain("idValue");
+    expect(Object.keys((Keyboard as any).attributeAliases ?? {})).not.toContain("id_value");
   });
   it("#id_value alias returns id column only for composite primary key models", async () => {
     class Order extends Base {
@@ -285,7 +285,7 @@ describe("AttributeMethodsTest", () => {
     }
     (Order as any).defineAttributeMethods();
     const o = new Order({ shop_id: 1, id: 2 });
-    expect((o as any).idValue).toBe(2);
+    expect((o as any).id_value).toBe(2);
   });
   it("attribute_for_inspect with a date", async () => {
     const { Post } = makeModel();
@@ -612,7 +612,7 @@ describe("AttributeMethodsTest", () => {
     class Superclass extends Base {
       static {
         this.abstractClass = true;
-        this.aliasAttribute("idValue", "id");
+        this.aliasAttribute("id_value", "id");
       }
     }
     class Subclass extends Superclass {
@@ -623,7 +623,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const object = (Subclass as any).build({ id: 123_456 });
-    expect(object.idValue).toBe(123_456);
+    expect(object.id_value).toBe(123_456);
   });
   it("#alias_attribute with an _in_database method issues raises an error", async () => {
     const { Post } = makeModel();
@@ -672,10 +672,10 @@ describe("AttributeMethodsTest", () => {
     }
     (Post as any).defineAttributeMethods();
     const fresh = new Post({ title: "id_value_new" });
-    expect((fresh as any).idValue).toBeNull();
+    expect((fresh as any).id_value).toBeNull();
 
     const p = new Post({ id: 1, title: "id_value_test" });
-    expect((p as any).idValue).toBe(1);
+    expect((p as any).id_value).toBe(1);
   });
   it("attribute_for_inspect with a string", () => {
     const { Post } = makeModel();
@@ -1143,8 +1143,8 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {
-    const model = new NumericData({ newBankBalance: "abcd" } as any) as any;
-    expect(model.readAttributeBeforeTypeCast("newBankBalance")).toBe("abcd");
+    const model = new NumericData({ new_bank_balance: "abcd" } as any) as any;
+    expect(model.readAttributeBeforeTypeCast("new_bank_balance")).toBe("abcd");
   });
 
   it("read_attribute_for_database with aliased attribute", async () => {

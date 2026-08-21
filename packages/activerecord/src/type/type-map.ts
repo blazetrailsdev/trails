@@ -22,7 +22,7 @@ export class TypeMap {
   fetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
     const cached = this._cache.get(lookupKey);
     if (cached) return cached;
-    const result = this._performFetch(lookupKey, fallback);
+    const result = this.performFetch(lookupKey, fallback);
     this._cache.set(lookupKey, result);
     return result;
   }
@@ -44,35 +44,27 @@ export class TypeMap {
     });
   }
 
-  protected _performFetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
-    const entries = [...this._mapping.entries()].reverse();
-    for (const [key, factory] of entries) {
-      const matches =
+  /**
+   * @missingRailsCall call — type_map.rb:49 invokes the matched Proc with
+   * `matching_pair.last.call(lookup_key)`. A Proc is a plain function in JS and
+   * a plain function invocation has no `.call`-named form.
+   */
+  protected performFetch(lookupKey: string | null, fallback?: (key: string) => Type): Type {
+    const matchingPair = [...this._mapping.entries()]
+      .reverse()
+      .find(([key]) =>
         typeof key === "string"
           ? key === lookupKey
-          : lookupKey !== null && ((key.lastIndex = 0), key.test(lookupKey));
-      if (matches) return factory(lookupKey as string);
+          : lookupKey !== null && ((key.lastIndex = 0), key.test(lookupKey)),
+      );
+
+    if (matchingPair) {
+      return matchingPair[1](lookupKey as string);
+    } else if (this._parent) {
+      return this._parent.performFetch(lookupKey, fallback);
+    } else if (fallback) {
+      return fallback(lookupKey as string);
     }
-    if (this._parent) {
-      return this._parent._performFetch(lookupKey, fallback);
-    }
-    if (fallback) return fallback(lookupKey as string);
     return new ValueType();
   }
-}
-
-/**
- * Walk the mapping in reverse-registration order looking for a key match.
- * Falls back to parent TypeMap, then to the block/fallback if provided.
- *
- * Mirrors: ActiveRecord::Type::TypeMap#perform_fetch (protected)
- *
- * @internal
- */
-export function performFetch(
-  typeMap: TypeMap,
-  lookupKey: string | null,
-  fallback?: (key: string) => Type,
-): Type {
-  return (typeMap as any)._performFetch(lookupKey, fallback);
 }

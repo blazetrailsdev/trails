@@ -43,10 +43,10 @@ describe("CollectionAssociation#_create_record Array arm", () => {
 
   it("moves the in-memory counter cache by the element count exactly once", async () => {
     const post = await Post.find(posts("welcome").id);
-    const before = post.commentsCount as number;
+    const before = post.comments_count as number;
 
     await commentsOf(post).create([{ body: "one" }, { body: "two" }, { body: "three" }]);
 
-    expect(post.commentsCount).toBe(before + 3);
+    expect(post.comments_count).toBe(before + 3);
   });
 });

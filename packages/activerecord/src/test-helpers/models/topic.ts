@@ -207,7 +207,7 @@ export class BlankTopic extends Topic {
 export class TitlePrimaryKeyTopic extends Topic {
   static {
     this._primaryKey = "title";
-    this.aliasAttribute("idValue", "id");
+    this.aliasAttribute("id_value", "id");
   }
 }
 

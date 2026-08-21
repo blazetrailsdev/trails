@@ -151,24 +151,6 @@ export function belongsToCounterCacheColumn(
 }
 
 /**
- * Resolve a column name through a model's attribute aliases, bridging the
- * snake_case ↔ camelCase key convention: alias keys are stored camelCase
- * (`commentsCount`) while derived names such as counter-cache columns are
- * snake_case (`comments_count`). Rails gets this for free in `Arel::Table#[]`
- * (table.rb:84) because its alias keys are already snake_case; trails
- * normalizes the lookup key instead of the stored alias.
- *
- * @internal
- */
-export function resolveAliasedColumn(
-  modelClass: { attributeAliases?: Record<string, string> } | null | undefined,
-  name: string,
-): string {
-  const aliases = modelClass?.attributeAliases ?? {};
-  return aliases[name] ?? aliases[camelize(name, "lower")] ?? name;
-}
-
-/**
  * Base class shared by all reflection types.
  *
  * Mirrors: ActiveRecord::Reflection::AbstractReflection
