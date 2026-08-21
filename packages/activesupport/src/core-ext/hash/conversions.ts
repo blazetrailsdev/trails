@@ -39,13 +39,16 @@ export class XMLConverter {
   private xml: unknown;
   private disallowedTypes: string[];
 
-  /** Mirrors: ActiveSupport::XMLConverter#initialize (conversions.rb:151-154) */
+  /**
+   * Mirrors: ActiveSupport::XMLConverter#initialize (conversions.rb:151-154).
+   *
+   * Rails' `XmlMini.parse` is synchronous on every backend and so is the
+   * default REXML one here; the Nokogiri backends reach their optional parser
+   * package through a dynamic import, and a TS constructor cannot await one.
+   */
   constructor(xml: string | StringIO | null | undefined, disallowedTypes?: string[] | null) {
     const parsed = XmlMini.parse(xml);
     if (typeof (parsed as PromiseLike<unknown> | null)?.then === "function") {
-      // The Nokogiri backends parse asynchronously (they reach their optional
-      // parser package through a dynamic import); Rails' `XmlMini.parse` is
-      // synchronous on every backend, and a TS constructor cannot await.
       throw new RuntimeError(
         "Hash.fromXml requires a synchronous XmlMini backend; the current backend parses asynchronously",
       );

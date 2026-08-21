@@ -34,6 +34,11 @@ export class HasAndBelongsToMany {
    * Mirrors `Builder::HasAndBelongsToMany#through_model`
    * (has_and_belongs_to_many.rb:13-56).
    *
+   * Rails writes `Class.new(ActiveRecord::Base)`; this builder cannot import
+   * `Base` without closing an import cycle, so the root AR class is reached by
+   * walking up from the left model — the same walk `createHabtmJoinModel`
+   * (associations.ts) does, landing on the same class.
+   *
    * @missingRailsCall call — Language shortcoming: Rails invokes the resolver
    * lambda as `table_name_resolver.call`; JS functions have no `call`-named
    * invocation of their own (`Function.prototype.call` rebinds `this` and is a
@@ -43,10 +48,6 @@ export class HasAndBelongsToMany {
     const builder = this;
     const lhsModel = this.lhsModel;
 
-    // Rails writes `Class.new(ActiveRecord::Base)`; the builder cannot import
-    // `Base` without closing an import cycle, so the root AR class is reached by
-    // walking up from the left model — the same walk `createHabtmJoinModel`
-    // (associations.ts) does, and it lands on the same class.
     let BaseClass: any = lhsModel;
     let parent = Object.getPrototypeOf(BaseClass);
     while (parent && parent !== Function.prototype && typeof parent.create === "function") {
