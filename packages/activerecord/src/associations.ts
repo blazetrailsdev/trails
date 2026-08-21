@@ -1599,7 +1599,7 @@ export function _inlinePolymorphicKeys(
 function createHabtmJoinModel(
   lhsModel: typeof Base,
   joinModelName: string,
-  joinTableName: string,
+  joinTableNameResolver: () => string,
   ownerFk: string,
   targetFk: string,
   targetClassName: string,
@@ -1620,10 +1620,22 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Set table name and composite PK — HABTM join tables typically have no id column,
-  // so the join model uses [ownerFk, targetFk] as its primary key to support
-  // delete/destroy operations that issue PK-based WHERE clauses.
-  JoinModel._tableName = joinTableName;
+  // Mirrors `through_model`'s `@table_name ||= table_name_resolver.call`
+  // (has_and_belongs_to_many.rb:24-27): the name resolves on first read, not at
+  // declaration time, because the RHS class might not have been loaded yet.
+  // The composite PK is trails': HABTM join tables typically have no id column,
+  // so the join model uses [ownerFk, targetFk] to support delete/destroy
+  // operations that issue PK-based WHERE clauses.
+  let joinTableName: string | null = null;
+  Object.defineProperty(JoinModel, "_tableName", {
+    get(): string {
+      return (joinTableName ??= joinTableNameResolver());
+    },
+    set(value: string | null) {
+      joinTableName = value;
+    },
+    configurable: true,
+  });
   JoinModel.primaryKey = [ownerFk, targetFk];
 
   // Carry the declaring model's Ruby module path onto the anonymous join model

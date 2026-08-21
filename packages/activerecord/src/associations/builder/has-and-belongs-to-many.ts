@@ -195,11 +195,13 @@ export class HasAndBelongsToMany {
     const options = this.options;
 
     const targetClassName = (options.className as string) ?? camelize(singularize(name));
-    const joinTableName =
-      (options.joinTable as string) ??
-      deps.defaultJoinTableName(model, name, {
-        className: options.className as string | undefined,
-      });
+    let memoizedJoinTableName: string | undefined;
+    const joinTableNameResolver = (): string =>
+      (memoizedJoinTableName ??=
+        (options.joinTable as string) ??
+        deps.defaultJoinTableName(model, name, {
+          className: options.className as string | undefined,
+        }));
     // Rails derives the owner join key from the demodulized class name, so a
     // namespaced owner like `Publisher::Article` yields `article_id`, not
     // `publisher_article_id`. `_demodulizedName` carries the Ruby leaf name for
@@ -224,7 +226,7 @@ export class HasAndBelongsToMany {
     const JoinModel = deps.createHabtmJoinModel(
       model,
       joinModelName,
-      joinTableName,
+      joinTableNameResolver,
       ownerFk,
       targetFk,
       targetClassName,
@@ -340,20 +342,26 @@ export class HasAndBelongsToMany {
       "indexErrors",
       "associationForeignKey",
     ] as const;
-    // Note: `joinTable` is intentionally NOT forwarded — `joinTableName`
-    // (set above) already resolves `options.joinTable ?? default`, so the
-    // value is captured. Re-forwarding would also overwrite it with
-    // `undefined` when callers pass `joinTable: undefined` explicitly.
+    // Note: a DERIVED join-table name is deliberately not written here.
+    // Rails' `hm_options` allowlist forwards `:join_table` only when the
+    // declaration supplied one (associations.rb:1899); with the key absent,
+    // `HasAndBelongsToManyReflection#join_table` falls through to
+    // `derive_join_table`, which reads `klass.table_name` when the reflection
+    // is USED. Writing a derived name here instead resolved the RHS table at
+    // declaration time — the eager resolution Rails' join model documents
+    // against ("Table name needs to be resolved lazily because RHS class might
+    // not have been loaded", has_and_belongs_to_many.rb:25-26), and with the
+    // RHS unregistered it latched the name-derived fallback for good.
     // `associationForeignKey` is retained on the reflection options to
     // mirror Rails' `habtm_reflection` (which keeps the full options
     // hash); note however that `_build` and `_resolveHabtmJoin` currently
     // hard-code the target FK as `${singular(name)}_id` — full plumbing into
     // the generated join model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
-      joinTable: joinTableName,
       through: middleName,
       source: (options.source as string) ?? sourceName,
     };
+    if (options.joinTable != null) habtmOptions.joinTable = options.joinTable;
     for (const k of HABTM_FORWARDED_KEYS) {
       if (Object.prototype.hasOwnProperty.call(options, k)) {
         habtmOptions[k] = options[k];

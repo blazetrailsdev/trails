@@ -1482,6 +1482,9 @@ interface CallArgsResult {
    *  that shrinks the comparable set is countable rather than silent. */
   skipped: Record<CallArgSkipReason, number>;
   mismatches: CallArgMismatch[];
+  /** `@missingRailsArgs` tags on a COMPARED pair that suppressed nothing —
+   *  the tag's only-shrink half, read by lint-call-args.ts. */
+  staleTags: StaleCallTag[];
 }
 
 function emptySkipTally(): Record<CallArgSkipReason, number> {
@@ -2992,6 +2995,9 @@ export function main() {
     let callsCompared = 0;
     const callMismatches: CallMismatch[] = [];
     const callTagsUsed = new Map<string, Set<string>>();
+    // The same, for the call-ARGUMENT tags: a tag that never suppressed a
+    // mismatch is STALE, the only-shrink half `@missingRailsCall` already has.
+    const argTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
     const callSkeletons: CallSkeleton[] = [];
     let callArgsCompared = 0;
@@ -3388,7 +3394,13 @@ export function main() {
           // this deviation off the baseline: the reason is reviewed in the diff
           // where the code is, exactly as `@missingRailsCall` does for the
           // call-SET gate.
-          if (argTags?.has(ruby.name)) continue;
+          if (argTags?.has(ruby.name)) {
+            const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
+            (argTagsUsed.get(tagKey) ?? argTagsUsed.set(tagKey, new Set()).get(tagKey)!).add(
+              ruby.name,
+            );
+            continue;
+          }
           callArgMismatches.push({
             rubyFile,
             tsFile,
@@ -3928,6 +3940,7 @@ export function main() {
         mismatched: callArgMismatches.length,
         skipped: callArgsSkipped,
         mismatches: callArgMismatches,
+        staleTags: staleCallTags(tsMissingArgTagsByFileName, argTagsUsed),
       },
       bodyHashes: bodyHashRecords,
     });
@@ -4074,6 +4087,9 @@ export function main() {
     const callArgsFlat = results.flatMap((r) =>
       r.callArgs.mismatches.map((m) => ({ package: r.package, ...m })),
     );
+    const staleArgTagsFlat = results.flatMap((r) =>
+      r.callArgs.staleTags.map((t) => ({ package: r.package, ...t })),
+    );
     fs.writeFileSync(
       callArgsPath,
       JSON.stringify(
@@ -4090,6 +4106,7 @@ export function main() {
             ]),
           ),
           mismatches: callArgsFlat,
+          staleTags: staleArgTagsFlat,
         },
         null,
         2,

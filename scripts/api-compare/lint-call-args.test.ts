@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import type { CallArgExcludeEntry } from "./call-args-baseline.js";
-import { loadBaseline, renderKey } from "./lint-call-args.js";
+import { loadBaseline, renderKey, renderStaleTags } from "./lint-call-args.js";
 import { writeSplitBaseline } from "./lint-call-mismatches.js";
 import { rowsOfKind } from "./call-mismatch-baseline.js";
 
@@ -85,4 +85,20 @@ describe("the split call-argument baseline", () => {
 
 it("prints the argument list that makes a row its own key", () => {
   expect(renderKey(entry())).toContain("visit(ref:o, ref:collector)");
+});
+
+describe("renderStaleTags", () => {
+  it("names each tag whose call site no longer flags", () => {
+    const out = renderStaleTags([
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/abstract/connection-pool.ts",
+        tsName: "buildAsyncExecutor",
+        call: "new",
+      },
+    ]);
+    expect(out).toContain("1 STALE @missingRailsArgs tag(s)");
+    expect(out).toContain("connection-adapters/abstract/connection-pool.ts");
+    expect(out).toContain("buildAsyncExecutor");
+  });
 });

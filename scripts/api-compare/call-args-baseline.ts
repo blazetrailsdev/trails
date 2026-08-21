@@ -42,6 +42,9 @@ export interface CallArgArtifact {
     class: string;
     tsArgs: string[];
   })[];
+  /** `@missingRailsArgs` tags (RFC 0099) on a COMPARED pair that suppressed no
+   *  mismatch. Absent on an artifact predating the field. */
+  staleTags?: { package: string; tsFile: string; tsName: string; call: string }[];
 }
 
 /** The rows the gate ratchets: `shape` only. */
