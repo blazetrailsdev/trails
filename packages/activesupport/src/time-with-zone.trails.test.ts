@@ -127,7 +127,6 @@ describe("TimeWithZone method_missing", () => {
     const twz = new AllDayTime(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
     const range = (twz as unknown as { allDay(): Range<TimeWithZone> }).allDay();
     expect(range).toBeInstanceOf(Range);
-    // `..`, not `...`: the rebuilt range is inclusive whatever the source was.
     expect(range.excludeEnd).toBe(false);
     expect(range.begin).toBeInstanceOf(TimeWithZone);
     expect(range.end).toBeInstanceOf(TimeWithZone);

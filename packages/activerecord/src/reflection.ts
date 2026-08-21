@@ -1005,6 +1005,10 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
+  /**
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#association_primary_key
+   * (reflection.rb:583-585).
+   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     return this.primaryKeyForModel(klass || this.klass);
   }
@@ -1338,6 +1342,11 @@ export class BelongsToReflection extends AssociationReflection {
     return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
+  /**
+   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#association_primary_key
+   * (reflection.rb:925-936). The klass option is necessary to support loading
+   * polymorphic associations.
+   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     const pk = this.options.primaryKey;
     if (pk !== undefined) {
@@ -1643,6 +1652,19 @@ export class ThroughReflection extends AbstractReflection {
     );
   }
 
+  /**
+   * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
+   * (reflection.rb:1083-1090) at its name, argument and default.
+   *
+   * The body deviates: Rails reads `actual_source_reflection.options[:primary_key]`
+   * and otherwise falls to `primary_key(klass || self.klass)`, which for a
+   * query-constraints source answers the target's own single `primary_key`.
+   * trails asks the source reflection instead, so a composite source edge
+   * answers the composite key its foreign key has the arity of — the resolution
+   * `CollectionAssociation`'s delete/find comparison paths are built on. Story
+   * `converge-through-reflection-association-primary-key-body` tracks converging
+   * that cluster; converging here alone breaks the comparison paths.
+   */
   associationPrimaryKey(klass?: typeof Base): string | string[] {
     return (
       this.sourceReflection?.associationPrimaryKey(klass) ??
