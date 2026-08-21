@@ -91,30 +91,6 @@ function arrayLen(value: string | string[]): number {
 }
 
 /**
- * Build the strict-loading violation message for an association. `owner` is the
- * violating record's class (Rails passes `owner.class` and interpolates it via
- * `#{owner}`, yielding the class name); a bare string is accepted too. `name`
- * is the association name. Polymorphic associations get the "polymorphic
- * association" variant, others name their klass.
- *
- * Mirrors: ActiveRecord::Reflection::AbstractReflection#strict_loading_violation_message
- */
-export function strictLoadingViolationMessage(
-  owner: unknown,
-  reflection: { name: string; polymorphic: boolean; className?: string },
-): string {
-  const ownerName =
-    typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
-  const assocDesc = reflection.polymorphic
-    ? "polymorphic association"
-    : `${reflection.className} association`;
-  return (
-    `\`${ownerName}\` is marked for strict_loading. ` +
-    `The ${assocDesc} named \`:${reflection.name}\` cannot be lazily loaded.`
-  );
-}
-
-/**
  * Extract the explicit counter-cache column from the `counterCache` option,
  * accepting its raw (`true` | `"<column>"`) or normalized (`{ column }`) form.
  * Returns null when no explicit column is configured.
@@ -482,12 +458,20 @@ export class AbstractReflection {
     return `${underscore(this._concrete().pluralName)}_${name}`;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Reflection::AbstractReflection#strict_loading_violation_message
+   * (reflection.rb:344-348). `owner` is the violating record's class, which
+   * Rails interpolates through `#{owner}` for its name; a bare string is
+   * accepted too. `klass` is read only on the non-polymorphic arm, as in Ruby —
+   * a polymorphic reflection has no klass to resolve.
+   */
   strictLoadingViolationMessage(owner: unknown): string {
-    return strictLoadingViolationMessage(owner, {
-      name: this._concrete().name,
-      polymorphic: this.isPolymorphic(),
-      className: this.className,
-    });
+    const ownerName =
+      typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
+    let message = `\`${ownerName}\` is marked for strict_loading.`;
+    message += ` The ${this.isPolymorphic() ? "polymorphic association" : `${this.klass.name} association`}`;
+    message += ` named \`:${this._concrete().name}\` cannot be lazily loaded.`;
+    return message;
   }
 
   hasInverse(): boolean {
