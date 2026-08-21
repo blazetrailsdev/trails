@@ -29,15 +29,19 @@ tester.run("no-freeform-comments", rule, {
     { code: `// eslint-disable-next-line no-unused-vars\nconst x = 1;\n` },
     { code: `// @ts-expect-error deliberate\nconst x = 1;\n` },
     { code: `// prettier-ignore\nconst x = 1;\n` },
-    // The escape hatch, and it is case-insensitive.
-    { code: `// keep: the ordering here is load-bearing for the pool.\nconst x = 1;\n` },
-    { code: `// KEEP: shouted, still kept.\nconst x = 1;\n` },
     // One line of a wrapped block carrying the citation keeps the whole block.
     {
       code: `// The visitor dispatches on node class, not on arity, because\n// visitors.rb:41 does the same.\nconst x = 1;\n`,
     },
   ],
   invalid: [
+    // There is no opt-out marker. `keep:` was the rule's escape hatch and was
+    // removed unused — a comment now earns JSDoc or a citation, or it goes.
+    {
+      code: `// keep: the ordering here is load-bearing for the pool.\nconst x = 1;\n`,
+      output: `const x = 1;\n`,
+      errors: [{ messageId: "freeform" }],
+    },
     // A standalone comment takes its whole line with it.
     {
       code: `// this adds two numbers\nconst x = 1 + 1;\n`,

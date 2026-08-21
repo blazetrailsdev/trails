@@ -7,7 +7,7 @@
  * sides. The comments worth having are the ones that point at Rails, the ones
  * the port's own conventions live in (JSDoc), and the ones a tool reads.
  *
- * So this rule deletes free-form comments and KEEPS four kinds:
+ * So this rule deletes free-form comments and KEEPS three kinds:
  *
  *   1. JSDoc block comments (`/** ... *\/`). Every port convention lives here —
  *      `Mirrors:`, `@internal`, `@noRailsEquivalent`, `@missingRailsCall` — and
@@ -17,7 +17,10 @@
  *   3. Tool directives — `eslint-*`, `@ts-*`, `prettier-ignore`, coverage
  *      pragmas, and this repo's own `boundary:` / `@boundary-file:` (read by
  *      `no-native-date`). Deleting these changes what the toolchain does.
- *   4. Anything explicitly kept with the escape hatch (see KEEP_MARKER).
+ *
+ * There is no opt-out marker. The rule shipped with a `keep:` escape hatch and
+ * the sweep across arel and activemodel used it zero times, so it was removed:
+ * a comment earns one of the three forms above or it goes.
  *
  * Rails' OWN comments are NOT kept, and that is deliberate. The Ruby is
  * vendored at `vendor/rails/` and every ported file carries a `Mirrors:` line
@@ -46,15 +49,6 @@
  * `--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'` to
  * audit without deleting.
  */
-
-/**
- * Escape hatch. A comment whose first line carries this marker is kept, and
- * the marker itself stays in the source as the record of the decision.
- *
- * Prefer promoting the comment to JSDoc or citing the Rails file instead —
- * both are kept automatically and both say more than the marker does.
- */
-const KEEP_MARKER = "keep:";
 
 /**
  * Directives the toolchain reads. Deleting one silently changes behaviour.
@@ -133,7 +127,6 @@ function isKept(group) {
     const text = comment.value;
     if (isJsDoc(comment)) return true;
     if (DIRECTIVE_RE.test(text)) return true;
-    if (text.toLowerCase().includes(KEEP_MARKER)) return true;
     return RAILS_REF_RE.test(text);
   });
 }
@@ -179,7 +172,7 @@ const rule = {
     ],
     messages: {
       freeform:
-        "Free-form comment. trails is a line-by-line Rails port: cite the Rails file, promote it to JSDoc, or delete it. To keep it as-is, prefix it with `{{marker}}`.",
+        "Free-form comment. trails is a line-by-line Rails port: cite the Rails file, promote it to JSDoc, or delete it.",
     },
   },
   create(context) {
@@ -193,7 +186,6 @@ const rule = {
           context.report({
             loc: { start: group[0].loc.start, end: group[group.length - 1].loc.end },
             messageId: "freeform",
-            data: { marker: KEEP_MARKER },
             fix: reportOnly ? undefined : (fixer) => fixer.removeRange(range),
           });
         }
@@ -203,4 +195,4 @@ const rule = {
 };
 
 export default rule;
-export { KEEP_MARKER, RAILS_REF_RE, DIRECTIVE_RE };
+export { RAILS_REF_RE, DIRECTIVE_RE };
