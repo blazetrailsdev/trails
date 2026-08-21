@@ -653,16 +653,11 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private nullifyOwnerAttributes(record: Base): void {
-    // Source the column list from the Rails-named helper so custom
-    // foreignKey/foreignType (incl. composite PKs and polymorphic `as`)
-    // honor the same derivation rules used by reflection itself.
-    const attrs = nullifiedOwnerAttributes(this);
-    for (const col of Object.keys(attrs)) {
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(col, null);
-      } else {
-        (record as any)[col] = null;
-      }
+    const primaryKey = (record.constructor as typeof Base).primaryKey;
+    const primaryKeys =
+      primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    for (const foreignKeyColumn of this.foreignKeyColumns()) {
+      if (!primaryKeys.includes(foreignKeyColumn)) record.writeAttribute(foreignKeyColumn, null);
     }
   }
 }
