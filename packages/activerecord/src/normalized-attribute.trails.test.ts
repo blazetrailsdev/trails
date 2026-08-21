@@ -17,6 +17,8 @@
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
 import { fixtures } from "./test-fixtures.js";
+import { StringType, Type } from "@blazetrails/activemodel";
+import { NormalizedValueType } from "./normalization.js";
 
 class NormalizedCompany extends Company {}
 class OtherCompany extends Company {}
@@ -37,9 +39,9 @@ describe("STI subclass normalizes", () => {
     await NormalizedCompany.loadSchema();
     await Company.loadSchema();
 
-    NormalizedCompany.normalizes("name", (name: unknown) =>
-      typeof name === "string" ? name.trim().toUpperCase() : name,
-    );
+    NormalizedCompany.normalizes("name", {
+      with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
+    });
 
     expect(NormalizedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
     expect(Company.typeForAttribute("name").cast("  acme  ")).toBe("  acme  ");
@@ -53,9 +55,9 @@ describe("STI subclass normalizes", () => {
     await ReloadedCompany.loadSchema();
     await Company.loadSchema();
 
-    ReloadedCompany.normalizes("name", (name: unknown) =>
-      typeof name === "string" ? name.trim().toUpperCase() : name,
-    );
+    ReloadedCompany.normalizes("name", {
+      with: (name: unknown) => (typeof name === "string" ? name.trim().toUpperCase() : name),
+    });
     expect(ReloadedCompany.typeForAttribute("name").cast("  acme  ")).toBe("ACME");
 
     // Rails re-seeds `_default_attributes` from `columns_hash` and replays the
@@ -73,7 +75,7 @@ describe("STI subclass normalizes", () => {
     await RefreshedCompany.loadSchema();
     await Company.loadSchema();
 
-    RefreshedCompany.normalizes("description", (value: unknown) => value);
+    RefreshedCompany.normalizes("description", { with: (value: unknown) => value });
     const defsOf = (klass: typeof Company) =>
       (klass as unknown as { _attributeDefinitions: Map<string, object> })._attributeDefinitions;
     expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
@@ -89,5 +91,40 @@ describe("STI subclass normalizes", () => {
     expect(defsOf(RefreshedCompany).get("name")).not.toBe(defsOf(Company).get("name"));
     expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
     expect(defTypeFor(RefreshedCompany, "description").cast("x")).toBe("x");
+  });
+});
+
+/**
+ * trails-only: `NormalizedValueType` is a `methodMissingProxy` standing in for
+ * Ruby's `DelegateClass`, so every method it does not define binds to the
+ * wrapped type. `==` (normalization.rb:143-148, spelled `equals` here per
+ * `type/value.ts:221`) is one Rails defines precisely so the decorator answers
+ * for itself — without the override the forwarding reports a decorated type as
+ * equal to the undecorated one it wraps.
+ */
+describe("NormalizedValueType equality", () => {
+  const build = (castType: Type, normalizer: (value: unknown) => unknown, normalizeNil = false) =>
+    new NormalizedValueType({ castType, normalizer, normalizeNil });
+
+  it("does not answer equality from the wrapped cast type", () => {
+    const castType = new StringType();
+    const normalizer = (value: unknown) => value;
+
+    expect(build(castType, normalizer).equals(castType)).toBe(false);
+    expect(build(castType, normalizer).equals(build(castType, normalizer) as unknown as Type)).toBe(
+      true,
+    );
+  });
+
+  it("distinguishes normalizer and apply_to_nil", () => {
+    const castType = new StringType();
+    const normalizer = (value: unknown) => value;
+
+    expect(
+      build(castType, normalizer).equals(build(castType, (value) => value) as unknown as Type),
+    ).toBe(false);
+    expect(
+      build(castType, normalizer).equals(build(castType, normalizer, true) as unknown as Type),
+    ).toBe(false);
   });
 });

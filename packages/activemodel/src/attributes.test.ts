@@ -276,51 +276,6 @@ describe("AttributesTest", () => {
     }).toThrow();
   });
 });
-describe("normalizes", () => {
-  it("applies normalization on write", () => {
-    class User extends Model {
-      static {
-        this.attribute("email", "string");
-        this.normalizes("email", (v: unknown) =>
-          typeof v === "string" ? v.trim().toLowerCase() : v,
-        );
-      }
-    }
-
-    const u = new User({ email: "  Alice@Example.COM  " });
-    expect(u.readAttribute("email")).toBe("alice@example.com");
-  });
-
-  it("applies normalization on subsequent writeAttribute", () => {
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.normalizes("name", (v: unknown) => (typeof v === "string" ? v.trim() : v));
-      }
-    }
-
-    const u = new User({ name: "Alice" });
-    u.writeAttribute("name", "  Bob  ");
-    expect(u.readAttribute("name")).toBe("Bob");
-  });
-
-  it("supports multiple attributes", () => {
-    class User extends Model {
-      static {
-        this.attribute("first_name", "string");
-        this.attribute("last_name", "string");
-        this.normalizes("first_name", "last_name", (v: unknown) =>
-          typeof v === "string" ? v.toUpperCase() : v,
-        );
-      }
-    }
-
-    const u = new User({ first_name: "alice", last_name: "smith" });
-    expect(u.readAttribute("first_name")).toBe("ALICE");
-    expect(u.readAttribute("last_name")).toBe("SMITH");
-  });
-});
-
 describe("attributesBeforeTypeCast", () => {
   it("returns all raw attribute values", () => {
     class User extends Model {

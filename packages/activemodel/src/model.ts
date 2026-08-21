@@ -35,12 +35,6 @@ import {
   lookupAncestors as translationLookupAncestors,
 } from "./translation.js";
 import { Type } from "./type/value.js";
-import {
-  normalizedValueType,
-  isNormalizedValueType,
-  normalizedValueToken,
-  unwrapNormalization,
-} from "./type/normalized-value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import {
@@ -130,11 +124,6 @@ import { _toPartialPath } from "./conversion.js";
  * outrank the module's, `extend()` would overwrite it.
  */
 const AttributesClassMethods = { attribute, setDefineMethodAttribute };
-
-/** Args accepted by `Model.normalizes` — attributes, transform fn, and optional options. */
-export type NormalizesArgs =
-  | [...string[], (value: unknown) => unknown]
-  | [...string[], (value: unknown) => unknown, { applyToNil?: boolean }];
 
 /**
  * Anything `validates_with` accepts: a full `Validator`/`EachValidator`
@@ -312,144 +301,6 @@ export class Model {
   /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-75). */
   static attributeNames(): string[] {
     return Object.keys(this.attributeTypes());
-  }
-
-  static _normalizations: Map<
-    string,
-    { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }
-  > = new Map();
-
-  /** Guards one-time `before_validation` registration per class (see `normalizes`). */
-  static _normalizeChangedInPlaceRegistered?: boolean;
-
-  /**
-   * Register a normalization function for one or more attributes.
-   * The function is called before validation on every write.
-   *
-   * Mirrors: ActiveRecord::Base.normalizes (Rails 7.1+)
-   *
-   * Example:
-   *   User.normalizes("email", (v) => typeof v === "string" ? v.trim().toLowerCase() : v);
-   */
-  static normalizes(...args: NormalizesArgs): void {
-    if (!Object.hasOwn(this, "_normalizations")) {
-      this._normalizations = new Map();
-      const parent = Object.getPrototypeOf(this) as typeof Model;
-      if (parent._normalizations) {
-        for (const [k, v] of parent._normalizations) {
-          this._normalizations.set(k, { fns: [...v.fns], applyToNil: v.applyToNil });
-        }
-      }
-    }
-
-    let options: { applyToNil?: boolean } = {};
-    let fn: (value: unknown) => unknown;
-    const lastArg = args[args.length - 1];
-    let attributes: string[];
-    if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
-      options = lastArg as { applyToNil?: boolean };
-      fn = args[args.length - 2] as (value: unknown) => unknown;
-      attributes = args.slice(0, -2) as string[];
-    } else {
-      fn = lastArg as (value: unknown) => unknown;
-      attributes = args.slice(0, -1) as string[];
-    }
-    const applyToNil = !!options.applyToNil;
-
-    for (const attr of attributes) {
-      const existing = this._normalizations.get(attr);
-      if (existing) {
-        existing.fns.push(fn);
-        if (applyToNil) existing.applyToNil = true;
-      } else {
-        this._normalizations.set(attr, { fns: [fn], applyToNil });
-      }
-      // Rails `normalizes` is one call to `decorate_attributes`, wrapping the
-      // attribute's cast type in a NormalizedValueType so a SINGLE type governs
-      // the write path (assignment/cast) and the query path
-      // (`type_for_attribute(name).cast/serialize`). The decorator is idempotent
-      // (see `_normalizationDecorator`) so the immediate apply + pending replay
-      // never double-wrap a non-idempotent normalizer.
-      this.decorateAttributes([attr], this._normalizationDecorator(attr));
-    }
-
-    // Rails' ActiveRecord::Normalization registers
-    // `before_validation :normalize_changed_in_place_attributes` at include
-    // time. We register it lazily on the first class in a hierarchy to call
-    // `normalizes` (subclasses inherit the callback via the copy-on-write
-    // chain, so the inherited-truthy guard keeps exactly one registration).
-    if (!this._normalizeChangedInPlaceRegistered) {
-      Object.defineProperty(this, "_normalizeChangedInPlaceRegistered", {
-        value: true,
-        writable: true,
-        configurable: true,
-      });
-      this.beforeValidation((record) => {
-        record.normalizeChangedInPlaceAttributes();
-      });
-    }
-  }
-
-  /**
-   * Re-normalize every normalized attribute that has changed in place, so a
-   * mutated value is normalized before validation and persistence.
-   *
-   * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes
-   */
-  normalizeChangedInPlaceAttributes(): void {
-    const ctor = this.constructor as typeof Model;
-    if (!ctor._normalizations) return;
-    for (const name of ctor._normalizations.keys()) {
-      if (this.attributeChangedInPlace(name)) this.normalizeAttribute(name);
-    }
-  }
-
-  /**
-   * Apply the normalization for a single attribute (re-normalize in place).
-   * Mirrors: ActiveRecord::Base#normalize_attribute
-   */
-  normalizeAttribute(name: string): void {
-    // Rails: `self[name] = self[name]` — re-assign so the decorated cast type
-    // re-normalizes the current (possibly changed-in-place) value.
-    this.writeAttribute(name, this.readAttribute(name));
-  }
-
-  /**
-   * Normalize a value for a given attribute without a record.
-   * Mirrors: ActiveRecord::Base.normalize_value_for — `type_for_attribute(name).cast(value)`.
-   * The attribute's cast type already carries the NormalizedValueType decoration,
-   * so a single `cast` casts then normalizes.
-   */
-  static normalizeValueFor(name: string, value: unknown): unknown {
-    return this.typeForAttribute(name).cast(value);
-  }
-
-  /**
-   * Build the idempotent NormalizedValueType decorator for `name`, used by
-   * `normalizes` (immediate apply + durable pending replay via `decorateAttributes`).
-   * The `_normalizations` entry object is the identity token:
-   * a decorator returns `null` (no change) when the cast type is already wrapped
-   * with the SAME entry, and unwraps+rewraps when a different/older one is found
-   * (so subclass stacking replaces the parent's wrap with the fuller combined set).
-   *
-   * @internal
-   */
-  static _normalizationDecorator(name: string): (n: string, castType: Type) => Type {
-    return (_n: string, castType: Type): Type => {
-      const entry = this._normalizations.get(name);
-      if (!entry) return castType;
-      if (normalizedValueToken(castType) === entry) {
-        return null as unknown as Type;
-      }
-      const base = isNormalizedValueType(castType) ? unwrapNormalization(castType) : castType;
-      const fns = entry.fns;
-      const normalizer = (value: unknown): unknown => {
-        let result = value;
-        for (const fn of fns) result = fn(result);
-        return result;
-      };
-      return normalizedValueType(base, normalizer, entry.applyToNil, entry);
-    };
   }
 
   /**

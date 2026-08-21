@@ -1,116 +1,246 @@
+import { classAttribute, included, methodMissingProxy } from "@blazetrails/activesupport";
+import { SerializeCastValue } from "@blazetrails/activemodel";
+import type { Type } from "@blazetrails/activemodel";
+
 /**
- * Attribute normalization support for ActiveRecord.
- *
- * The class methods `normalizes`, `normalizeValueFor`, and instance method
- * `normalizeAttribute` are defined on ActiveModel::Model and inherited by
- * ActiveRecord::Base. This file provides the NormalizedValueType wrapper
- * that Rails defines in ActiveRecord::Normalization, and re-exports the
- * methods from Model for parity:api discoverability.
- *
- * Mirrors: ActiveRecord::Normalization
+ * Args accepted by `normalizes` — Ruby's `*names, with:, apply_to_nil: false`
+ * (normalization.rb:88) in the trails kwargs idiom: the names, then one trailing
+ * options object.
  */
-
-import { Model, NormalizesArgs, SerializeCastValue } from "@blazetrails/activemodel";
+export type NormalizesArgs = [
+  ...names: string[],
+  options: { with: (value: unknown) => unknown; applyToNil?: boolean },
+];
 
 /**
- * NormalizedValueType — decorates an underlying cast type with a normalizer.
- * When cast() is called, the value is first cast by the underlying type,
- * then the normalizer is applied.
+ * The class-side surface `Normalization` needs from its host.
  *
- * This is the parity:api mirror of Rails' `ActiveRecord::Normalization::NormalizedValueType`
- * and preserves its method call structure (`serialize` → `cast` + `serialize_cast_value`).
- * The SINGLE live implementation is ActiveModel's `normalizedValueType`
- * (`activemodel/src/type/normalized-value.ts`), which `Model.normalizes` wires onto
- * the attribute's cast type via `decorate_attributes` so one type governs both the
- * write and query paths; this class carries the same semantics but is not on that
- * runtime path.
+ * @internal
+ */
+interface NormalizationClass {
+  normalizedAttributes: Set<string>;
+  decorateAttributes(names: string[], decorator: (name: string, castType: Type) => Type): void;
+  typeForAttribute(name: string): Type;
+}
+
+/**
+ * The instance-side surface `Normalization` needs from its host.
  *
- * Mirrors: ActiveRecord::Normalization::NormalizedValueType
+ * @internal
+ */
+interface NormalizationRecord {
+  attributeChangedInPlace(name: string): boolean;
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+}
+
+/**
+ * Normalizes a specified attribute using its declared normalizations.
+ *
+ * Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26)
+ */
+export function normalizeAttribute(this: NormalizationRecord, name: string): void {
+  // Treat the value as a new, unnormalized value.
+  // Rails: `self[name] = self[name]`.
+  this.writeAttribute(name, this.readAttribute(name));
+}
+
+export const ClassMethods = {
+  /**
+   * Declares a normalization for one or more attributes. The normalization is
+   * applied when the attribute is assigned or updated, and the normalized value
+   * will be persisted to the database. The normalization is also applied to the
+   * corresponding keyword argument of query methods.
+   *
+   * Mirrors: ActiveRecord::Normalization::ClassMethods#normalizes (normalization.rb:88)
+   *
+   * @missingRailsArgs new — PERMANENT: `NormalizedValueType.new` gets every
+   *   Rails kwarg with the same key and value. Rails passes the local `with`;
+   *   `with` is a reserved word in JavaScript and cannot be an identifier, so
+   *   the kwarg is read off the options object.
+   */
+  normalizes(this: NormalizationClass, ...args: NormalizesArgs): void {
+    const options = args[args.length - 1] as {
+      with: (value: unknown) => unknown;
+      applyToNil?: boolean;
+    };
+    const names = args.slice(0, -1) as string[];
+    const applyToNil = options.applyToNil ?? false;
+
+    this.decorateAttributes(
+      names,
+      (name: string, castType: Type) =>
+        new NormalizedValueType({
+          castType,
+          normalizer: options.with,
+          normalizeNil: applyToNil,
+        }) as unknown as Type,
+    );
+
+    this.normalizedAttributes = new Set([...this.normalizedAttributes, ...names]);
+  },
+
+  /**
+   * Normalizes a given +value+ using normalizations declared for +name+.
+   *
+   * Mirrors: ActiveRecord::Normalization::ClassMethods#normalize_value_for
+   * (normalization.rb:106)
+   */
+  normalizeValueFor(this: NormalizationClass, name: string, value: unknown): unknown {
+    return this.typeForAttribute(name).cast(value);
+  },
+};
+
+/**
+ * Re-normalize every normalized attribute that has changed in place, so a
+ * mutated value is normalized before validation and persistence.
+ *
+ * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes
+ * (normalization.rb:112, private)
+ *
+ * @internal
+ */
+export function normalizeChangedInPlaceAttributes(
+  this: NormalizationRecord & { normalizeAttribute(name: string): void },
+): void {
+  for (const name of (this.constructor as unknown as NormalizationClass).normalizedAttributes) {
+    if (this.attributeChangedInPlace(name)) this.normalizeAttribute(name);
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::Normalization's `included do ... end`
+ * (normalization.rb:7-11) — the `class_attribute` and the `before_validation`
+ * that arrive with the module itself, not with a `normalizes` declaration.
+ */
+export const InstanceMethods = {
+  normalizeAttribute,
+  normalizeChangedInPlaceAttributes,
+
+  [included](base: any): void {
+    classAttribute.call(base, "normalizedAttributes", { default: new Set<string>() });
+    base.beforeValidation((record: { normalizeChangedInPlaceAttributes(): void }) => {
+      record.normalizeChangedInPlaceAttributes();
+    });
+  },
+};
+
+/**
+ * Decorates an underlying cast type with a normalizer. When `cast` is called,
+ * the value is first cast by the underlying type, then the normalizer is
+ * applied — this is the single point where normalization happens.
+ *
+ * `serialize` normalizes (casts then serializes) — matching Rails'
+ * `serialize(value) = serialize_cast_value(cast(value))` — because a query bind
+ * built from a raw value (`StatementCache` substitution binds an un-cast value
+ * via `withCastValue`) reaches the database through `serialize`.
+ * `serializeCastValue` does NOT re-normalize (its input is already a cast
+ * value): the instance write path serializes `this.value` (already
+ * cast+normalized) through the cast-value fast path, so persistence never
+ * double-applies a non-idempotent normalizer (the "minimizes number of times
+ * normalization is applied" contract). Every other method (deserialize,
+ * isChanged, type metadata, …) delegates to the underlying type unchanged —
+ * notably `deserialize` does NOT normalize, so values read from the database are
+ * left as-is (Rails: normalization is applied on assignment and query, not on
+ * load).
+ *
+ * Mirrors: ActiveRecord::Normalization::NormalizedValueType (normalization.rb:117),
+ * a `DelegateClass(ActiveModel::Type::Value)` overriding `cast`, `serialize`, and
+ * `serialize_cast_value`. We model the DelegateClass with `methodMissingProxy`
+ * over the instance, whose delegate is the wrapped type — so every method this
+ * class does not define binds to the wrapped type, and `deserialize` (which
+ * internally calls `cast`) uses that type's un-normalized cast rather than this
+ * decorator's normalizing one.
  */
 export class NormalizedValueType {
-  readonly castType: { cast(value: unknown): unknown; serialize?(value: unknown): unknown };
+  readonly castType: Type;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
   constructor(options: {
-    castType: { cast(value: unknown): unknown; serialize?(value: unknown): unknown };
+    castType: Type;
     normalizer: (value: unknown) => unknown;
-    normalizeNil?: boolean;
+    normalizeNil: boolean;
   }) {
     this.castType = options.castType;
     this.normalizer = options.normalizer;
-    this.normalizeNil = options.normalizeNil ?? false;
+    this.normalizeNil = options.normalizeNil;
+    // Ruby's `super(cast_type)` — DelegateClass forwarding for every method
+    // this class does not define.
+    return methodMissingProxy(this, {
+      delegate: (target) => target.castType,
+    });
   }
 
   cast(value: unknown): unknown {
-    const castValue = this.castType.cast(value);
-    return normalize(this, castValue);
+    return normalize(this, this.castType.cast(value));
   }
 
   serialize(value: unknown): unknown {
+    // Rails: serialize_cast_value(cast(value)). Normalizes a raw value fed
+    // straight to serialize (e.g. a StatementCache query bind).
     return this.serializeCastValue(this.cast(value));
   }
 
+  /**
+   * Mirrors Rails' `ActiveModel::Type::SerializeCastValue.serialize(cast_type, value)`:
+   * route an already-cast value through the underlying type's cast-value fast
+   * path when compatible, else its full `serialize`. Never re-normalizes.
+   */
   serializeCastValue(value: unknown): unknown {
-    // Rails: `serialize_cast_value(cast_type, value)` →
-    // `ActiveModel::Type::SerializeCastValue.serialize(cast_type, value)`, which
-    // dispatches on the cast type's own serialize-cast-value compatibility
-    // (`itself_if_serialize_cast_value_compatible`) rather than mere method
-    // presence. Route through the shared helper so this mirror and the live
-    // `normalizedValueType` share one dispatch rule.
     return SerializeCastValue.serialize(
       this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
       value,
     );
   }
+
+  /**
+   * Rails' NormalizedValueType `include`s SerializeCastValue and defines
+   * `serialize`/`serialize_cast_value` at the same level, so it is ALWAYS
+   * serialize-cast-value-compatible (independent of the wrapped type). Return
+   * the decorator itself so the persisted-value path dispatches through this
+   * type's non-normalizing `serializeCastValue` rather than the normalizing
+   * `serialize` — otherwise a non-idempotent normalizer double-applies on save.
+   */
+  itselfIfSerializeCastValueCompatible(): Type {
+    return this as unknown as Type;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Normalization::NormalizedValueType#== (normalization.rb:143-148),
+   * whose `eql?` alias is the same method — one TS method serves both.
+   * `equals` is the settled trails spelling of `Type#==`
+   * (activemodel/src/type/value.ts:221), and this override is load-bearing:
+   * without it the DelegateClass forwarding answers `equals` from the WRAPPED
+   * type, so a decorated type would compare equal to an undecorated one.
+   *
+   * `cast_type == other.cast_type` reaches whatever `==` the wrapped type
+   * defines, falling back to Ruby's identity default — hence the `equals?.()`
+   * with an identity fallback, since `equals` is defined on `ValueType` rather
+   * than on the abstract `Type`.
+   */
+  equals(other: Type): boolean {
+    return (
+      this.constructor === (other as object)?.constructor &&
+      this.normalizeNil === (other as unknown as NormalizedValueType).normalizeNil &&
+      this.normalizer === (other as unknown as NormalizedValueType).normalizer &&
+      castTypesEqual(this.castType, (other as unknown as NormalizedValueType).castType)
+    );
+  }
 }
 
-// Wrapper functions that delegate to Model's normalization methods.
-// These exist for parity:api discoverability — the actual implementations
-// are on ActiveModel::Model, inherited by ActiveRecord::Base.
-
-export function normalizes(modelClass: typeof Model, ...args: NormalizesArgs): void {
-  return modelClass.normalizes(...args);
+function castTypesEqual(a: Type, b: Type): boolean {
+  const equals = (a as { equals?(other: Type): boolean }).equals;
+  return equals ? equals.call(a, b) : a === b;
 }
 
 /**
- * Rails: `class_attribute :normalized_attributes, default: Set.new` — the set of
- * attribute names with a registered normalizer. Trails stores the normalizers
- * in ActiveModel's `Model._normalizations` map; expose the Rails-shaped Set
- * reader (the `=`/`?` forms map to the same accessor).
- *
- * Mirrors: ActiveRecord::Normalization#normalized_attributes
- */
-export function normalizedAttributes(modelClass: typeof Model): Set<string> {
-  const normalizations: Map<string, unknown> | undefined = (modelClass as any)._normalizations;
-  return new Set(normalizations ? normalizations.keys() : []);
-}
-
-export function normalizeValueFor(
-  modelClass: typeof Model,
-  ...args: Parameters<typeof Model.normalizeValueFor>
-): unknown {
-  return modelClass.normalizeValueFor(...args);
-}
-
-export function normalizeAttribute(record: InstanceType<typeof Model>, name: string): void {
-  return record.normalizeAttribute(name);
-}
-
-/**
- * Apply the normalizer proc to a value, skipping nil unless normalize_nil is set.
- *
- * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize (private).
- * The live normalization lives in ActiveModel's `normalizedValueType`; this stays
- * for parity:api discoverability and shares its nil-skip semantics.
+ * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize
+ * (normalization.rb:154, private) — `normalizer.call(value) unless value.nil? && !normalize_nil?`.
  *
  * @internal
  */
-export function normalize(normalizedType: NormalizedValueType, value: unknown): unknown {
-  if ((value === null || value === undefined) && !normalizedType.normalizeNil) return value;
-  return normalizedType.normalizer(value);
+function normalize(type: NormalizedValueType, value: unknown): unknown {
+  if ((value === null || value === undefined) && !type.normalizeNil) return value;
+  return type.normalizer(value);
 }
-
-// `normalize_changed_in_place_attributes` lives on ActiveModel::Model
-// (`Model.prototype.normalizeChangedInPlaceAttributes`) and is wired onto Base
-// there; base.ts references that single implementation directly.

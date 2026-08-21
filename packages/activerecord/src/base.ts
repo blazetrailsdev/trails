@@ -218,7 +218,8 @@ import {
   get as _get,
   set as _set,
 } from "./attribute-methods.js";
-import { normalizedAttributes as _normalizedAttributes } from "./normalization.js";
+import * as Normalization from "./normalization.js";
+import type { NormalizesArgs } from "./normalization.js";
 import {
   toKey as _toKey,
   PrimaryKey as _PrimaryKey,
@@ -848,6 +849,16 @@ interface _ConstructorAssociationWriter {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
+  // Normalization
+  declare static normalizes: (...args: NormalizesArgs) => void;
+  declare static normalizeValueFor: (name: string, value: unknown) => unknown;
+  /**
+   * Mirrors: ActiveRecord::Normalization's `class_attribute
+   * :normalized_attributes, default: Set.new` (normalization.rb:8), installed
+   * by the module's `included` hook.
+   */
+  declare static normalizedAttributes: Set<string>;
+
   declare static lookupAncestors: typeof Translation.lookupAncestors;
 
   // --- Sanitization mixin (wired via extend() after class) ---
@@ -1813,15 +1824,6 @@ export class Base extends Model {
 
   static set verboseQueryLogs(value: boolean) {
     _setVerboseQueryLogs(value);
-  }
-
-  /**
-   * Set of attribute names with a registered normalizer.
-   *
-   * Mirrors: ActiveRecord::Base.normalized_attributes
-   */
-  static get normalizedAttributes(): Set<string> {
-    return _normalizedAttributes(this);
   }
 
   /**
@@ -4363,6 +4365,16 @@ export class Base extends Model {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation> {
+  /** Mirrors: ActiveRecord::Normalization#normalize_attribute (normalization.rb:26). */
+  normalizeAttribute(name: string): void;
+  /**
+   * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes
+   * (normalization.rb:112, private).
+   *
+   * @internal
+   */
+  normalizeChangedInPlaceAttributes(): void;
+
   /**
    * Assigned by `init_internals` (core.rb:834-849) during `super()`. Declared
    * here rather than as a class field because a field initializer runs after
@@ -4598,6 +4610,8 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
+extend(Base, Normalization.ClassMethods);
+include(Base, Normalization.InstanceMethods);
 extend(Base, {
   enum: _EnumModule.enumMethod,
   _enum: _EnumModule._enum,
@@ -4875,15 +4889,6 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // normalizeChangedInPlaceAttributes now lives on Model.prototype (this PR wires
-  // the before_validation there). Reference it directly so parity:api credits
-  // base.ts without a wrapper that would shadow — and diverge from — the single
-  // Model implementation.
-  normalizeChangedInPlaceAttributes: Model.prototype.normalizeChangedInPlaceAttributes,
-  // normalizeAttribute lives on Model.prototype (inherited). Wire via direct
-  // prototype reference so parity:api credits it to base.ts without shadowing
-  // Model's implementation via a wrapper that would create a circular call.
-  normalizeAttribute: Model.prototype.normalizeAttribute,
   // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
   // (readAttributeBeforeTypeCast is a method, attributesBeforeTypeCast is a getter).
   // The re-exports in before-type-cast.ts call record.<methodName>(), so wiring

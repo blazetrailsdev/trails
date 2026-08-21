@@ -57,9 +57,9 @@ export class EncryptedBookNormalizedFirst extends Base {
   static _tableName = "encrypted_books";
 
   static {
-    this.normalizes("name", _downcaseLikeRails);
+    this.normalizes("name", { with: _downcaseLikeRails });
     this.encrypts("name");
-    this.normalizes("logo", _downcaseLikeRails);
+    this.normalizes("logo", { with: _downcaseLikeRails });
     this.encrypts("logo");
   }
 }
@@ -69,9 +69,9 @@ export class EncryptedBookNormalizedSecond extends Base {
 
   static {
     this.encrypts("name");
-    this.normalizes("name", _downcaseLikeRails);
+    this.normalizes("name", { with: _downcaseLikeRails });
     this.encrypts("logo");
-    this.normalizes("logo", _downcaseLikeRails);
+    this.normalizes("logo", { with: _downcaseLikeRails });
   }
 }
 
