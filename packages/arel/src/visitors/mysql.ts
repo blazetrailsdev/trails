@@ -67,11 +67,6 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  /**
-   * MySQL's null-safe equality is `<=>`. The standard `IS [NOT] DISTINCT
-   * FROM` is supported only on MySQL 8.0.14+; the operator form works
-   * on every MySQL version.
-   */
   protected override visitArelNodesIsNotDistinctFrom(
     o: Nodes.IsNotDistinctFrom,
     collector: SQLString,

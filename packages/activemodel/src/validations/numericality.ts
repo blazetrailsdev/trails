@@ -28,6 +28,8 @@ export class NumericalityValidator extends EachValidator {
    * below so they're available during EachValidator's super-time
    * checkValidityBang() call (same bootstrapping pattern as PRs #994 / #1002 /
    * #1009). Class fields don't initialize until after super() returns.
+   *
+   * @internal Rails-private helpers.
    */
   /** @internal Rails-private helper. */
   declare optionAsNumber: typeof optionAsNumber;

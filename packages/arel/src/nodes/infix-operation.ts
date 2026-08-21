@@ -142,6 +142,8 @@ export class Overlaps extends InfixOperation {
  * static import graph (math.ts imports InfixOperation for its class
  * references; a static reverse import would cycle).
  * See node-expression.ts for why these use the explicit module interfaces.
+ *
+ * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
  */
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;

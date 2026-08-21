@@ -30,6 +30,8 @@ export type NodeCtor = abstract new (...args: never[]) => object;
  * `ArelConnection` constructor argument (RFC 0007 deleted the defaults), so
  * their constructor signatures are not assignable to the abstract base's.
  * Only the static dispatch surface matters here, never construction.
+ *
+ * @noRailsEquivalent TypeScript-only ctor type; Ruby dispatches on the class object directly.
  */
 type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
   Pick<typeof Visitor, "dispatchCache">;

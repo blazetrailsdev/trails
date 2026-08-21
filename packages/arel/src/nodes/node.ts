@@ -117,10 +117,6 @@ interface NodeRegistry {
   And?: new (children: Node[]) => Node;
 }
 
-/**
- * Registry for breaking circular dependencies.
- * Populated by the index module after all classes are loaded.
- */
 const _registry: NodeRegistry = {};
 
 function assertRegistered(name: keyof NodeRegistry): void {
@@ -200,6 +196,8 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
  * interface (vs. `Included<typeof FactoryMethods>`) is required: under
  * composite/declaration emit, the cycle Node ↔ FactoryMethods would force
  * tsc to fall back to a structural shape with a string index signature.
+ *
+ * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
  */
 type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModule;
 

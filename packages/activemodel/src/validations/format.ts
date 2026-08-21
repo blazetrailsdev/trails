@@ -28,6 +28,8 @@ export class FormatValidator extends EachValidator {
    * during EachValidator's constructor-time checkValidityBang() call. JS class
    * fields don't initialize until AFTER super() returns. (Same bootstrapping
    * lesson as PR #994.)
+   *
+   * @internal Rails-private helpers.
    */
   declare resolveValue: typeof resolveValue;
   /** @internal Rails-private helper. */

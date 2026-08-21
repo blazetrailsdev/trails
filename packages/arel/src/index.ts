@@ -36,6 +36,8 @@ _registerCteFactory((name, relation) => new Cte(name, relation));
  * init rather than inside node-expression.ts / infix-operation.ts because
  * the mixin modules transitively import those files via their target-node
  * imports, creating a module-load cycle.
+ *
+ * @noRailsEquivalent ESM load order forces the mixin wiring here; Ruby `include`s in each class body.
  */
 import { include } from "@blazetrails/activesupport";
 import { Node } from "./nodes/node.js";
