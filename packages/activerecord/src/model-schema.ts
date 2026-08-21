@@ -579,6 +579,8 @@ export interface SchemaHost {
  * the classes only the tracker knows about, so the push-down sites can cover
  * both.
  *
+ * @noRailsEquivalent Rails has one registry because `inherited` fills it; this
+ * exists only to bridge trails' two partial ones, and goes when they converge.
  * @internal
  */
 function withTracked(known: SchemaHost[], tracked: SchemaHost[], host: SchemaHost): SchemaHost[] {
