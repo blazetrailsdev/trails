@@ -3,7 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
-import { reflectOnAllAssociations } from "../reflection.js";
+import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
   foreignKeyPresentFor,
@@ -653,10 +653,19 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private nullifyOwnerAttributes(record: Base): void {
+    const reflection = _reflectOnAssociation(
+      this.owner.constructor as typeof Base,
+      this.reflection.name,
+    );
+    const foreignKey = reflection?.foreignKey;
     const primaryKey = (record.constructor as typeof Base).primaryKey;
     const primaryKeys =
       primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-    for (const foreignKeyColumn of this.foreignKeyColumns()) {
+    for (const foreignKeyColumn of foreignKey == null
+      ? []
+      : Array.isArray(foreignKey)
+        ? foreignKey
+        : [foreignKey]) {
       if (!primaryKeys.includes(foreignKeyColumn)) record.writeAttribute(foreignKeyColumn, null);
     }
   }
