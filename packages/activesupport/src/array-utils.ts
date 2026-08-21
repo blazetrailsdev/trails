@@ -210,6 +210,30 @@ export function selectBang<T>(array: T[], predicate: (item: T) => boolean): T[] 
 }
 
 /**
+ * The smallest element of `collection`, or `undefined` when it is empty —
+ * Ruby's `Enumerable#min` in its no-argument RECEIVER form, which
+ * `HasManyAssociation#count_records` (`has_many_association.rb:95`) calls as
+ * `[association_scope.limit_value, count].compact.min`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Enumerable`, not Rails, exactly as
+ * `selectBang` above is Ruby core `Array`. JS spells the same operation
+ * `Math.min(...values)`, which is a different shape (the values are arguments,
+ * not a receiver) and is numbers-only, so the receiver form is spelled here for
+ * the ports that consume it.
+ */
+export function min<T>(collection: readonly T[]): T | undefined {
+  let result: T | undefined;
+  let seen = false;
+  for (const item of collection) {
+    if (!seen || item < (result as T)) {
+      result = item;
+      seen = true;
+    }
+  }
+  return result;
+}
+
+/**
  * Remove elements from `array` that match `predicate`, returning the removed elements.
  *
  * Mirrors: `Array#extract!` (core_ext/array/extract.rb:10-20). Ruby's no-block

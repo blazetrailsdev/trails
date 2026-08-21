@@ -68,8 +68,16 @@ import {
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
-import { TAG as MISSING_RAILS_CALL_TAG, suppressedCallsIn } from "./missing-rails-call-tags.js";
-import { TAG as MISSING_RAILS_ARGS_TAG, suppressedArgCallsIn } from "./missing-rails-args-tags.js";
+import {
+  TAG as MISSING_RAILS_CALL_TAG,
+  suppressedCallReasonsIn,
+  suppressedCallsIn,
+} from "./missing-rails-call-tags.js";
+import {
+  TAG as MISSING_RAILS_ARGS_TAG,
+  suppressedArgCallsIn,
+  suppressedArgReasonsIn,
+} from "./missing-rails-args-tags.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -711,6 +719,8 @@ export function extractFromProgram(
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
         const fnMissingRailsArgs = missingRailsArgsTags(node);
+        const fnMissingRailsCallReasons = missingRailsCallTagReasons(node);
+        const fnMissingRailsArgsReasons = missingRailsArgsTagReasons(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -727,6 +737,12 @@ export function extractFromProgram(
           ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
           ...(fnMissingRailsArgs !== undefined ? { missingRailsArgs: fnMissingRailsArgs } : {}),
+          ...(fnMissingRailsCallReasons !== undefined
+            ? { missingRailsCallReasons: fnMissingRailsCallReasons }
+            : {}),
+          ...(fnMissingRailsArgsReasons !== undefined
+            ? { missingRailsArgsReasons: fnMissingRailsArgsReasons }
+            : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
@@ -1625,6 +1641,31 @@ export function missingRailsArgsTags(node: ts.Node): string[] | undefined {
   );
 }
 
+/**
+ * The reasons behind {@link missingRailsCallTags}' suppressions, keyed by Ruby
+ * call — the artifact half of the permanence report (RFC 0099): a receipt's
+ * `PERMANENT` / `CONVERGEABLE` claim is only separable downstream if the reason
+ * that makes it travels with the suppression.
+ */
+export function missingRailsCallTagReasons(node: ts.Node): Record<string, string> | undefined {
+  return taggedReasonsOn(
+    node,
+    MISSING_RAILS_CALL_TAG,
+    fileHasMissingRailsCallTag,
+    suppressedCallReasonsIn,
+  );
+}
+
+/** The call-ARGUMENT twin of {@link missingRailsCallTagReasons}. */
+export function missingRailsArgsTagReasons(node: ts.Node): Record<string, string> | undefined {
+  return taggedReasonsOn(
+    node,
+    MISSING_RAILS_ARGS_TAG,
+    fileHasMissingRailsArgsTag,
+    suppressedArgReasonsIn,
+  );
+}
+
 /** The shared read: the last leading `/** ... *\/` comment, parsed by the
  *  family's parser, with a per-file fast path off the tag's raw text. */
 function taggedCallsOn(
@@ -1633,6 +1674,31 @@ function taggedCallsOn(
   seen: WeakMap<ts.SourceFile, boolean>,
   parse: (comment: string, origin: { fileName: string; startLine: number }) => string[],
 ): string[] | undefined {
+  const calls = taggedCommentOf(node, tag, seen, parse);
+  return calls !== undefined && calls.length > 0 ? calls : undefined;
+}
+
+/** {@link taggedCallsOn} for the call → reason map; empty means untagged. */
+function taggedReasonsOn(
+  node: ts.Node,
+  tag: string,
+  seen: WeakMap<ts.SourceFile, boolean>,
+  parse: (
+    comment: string,
+    origin: { fileName: string; startLine: number },
+  ) => Record<string, string>,
+): Record<string, string> | undefined {
+  const reasons = taggedCommentOf(node, tag, seen, parse);
+  return reasons !== undefined && Object.keys(reasons).length > 0 ? reasons : undefined;
+}
+
+/** Find the declaration's tag-bearing JSDoc and hand it to `parse`. */
+function taggedCommentOf<T>(
+  node: ts.Node,
+  tag: string,
+  seen: WeakMap<ts.SourceFile, boolean>,
+  parse: (comment: string, origin: { fileName: string; startLine: number }) => T,
+): T | undefined {
   const sf = node.getSourceFile();
   let present = seen.get(sf);
   if (present === undefined) {
@@ -1645,11 +1711,10 @@ function taggedCallsOn(
   if (!range) return undefined;
   const comment = sf.text.slice(range.pos, range.end);
   if (!comment.includes(tag)) return undefined;
-  const calls = parse(comment, {
+  return parse(comment, {
     fileName: sf.fileName,
     startLine: sf.getLineAndCharacterOfPosition(range.pos).line + 1,
   });
-  return calls.length > 0 ? calls : undefined;
 }
 
 /**
@@ -1899,6 +1964,8 @@ export function harvestObjectLiteralMethods(
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
+    const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
+    const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
@@ -1965,6 +2032,12 @@ export function harvestObjectLiteralMethods(
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
       ...(propMissingRailsArgs !== undefined ? { missingRailsArgs: propMissingRailsArgs } : {}),
+      ...(propMissingRailsCallReasons !== undefined
+        ? { missingRailsCallReasons: propMissingRailsCallReasons }
+        : {}),
+      ...(propMissingRailsArgsReasons !== undefined
+        ? { missingRailsArgsReasons: propMissingRailsArgsReasons }
+        : {}),
       ...(writer ? { writer: true } : {}),
     });
   }
@@ -2100,12 +2173,20 @@ export function extractClass(
     const noRailsEquivalent = noRailsEquivalentReason(member);
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const memberMissingRailsArgs = missingRailsArgsTags(member);
+    const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
+    const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(memberMissingRailsCalls !== undefined
         ? { missingRailsCalls: memberMissingRailsCalls }
         : {}),
       ...(memberMissingRailsArgs !== undefined ? { missingRailsArgs: memberMissingRailsArgs } : {}),
+      ...(memberMissingRailsCallReasons !== undefined
+        ? { missingRailsCallReasons: memberMissingRailsCallReasons }
+        : {}),
+      ...(memberMissingRailsArgsReasons !== undefined
+        ? { missingRailsArgsReasons: memberMissingRailsArgsReasons }
+        : {}),
     };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;

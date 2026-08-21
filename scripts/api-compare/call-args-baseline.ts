@@ -14,7 +14,12 @@
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
 
-import { type CallMismatchKey, compareShardKeys, shardKeyOf } from "./call-mismatch-baseline.js";
+import {
+  type CallMismatchKey,
+  type TagReceipt,
+  compareShardKeys,
+  shardKeyOf,
+} from "./call-mismatch-baseline.js";
 
 /** One flagged call site at the grain the baseline records. `rubyArgs` is part
  *  of the key: one call in one method can be wrong two ways at two sites. */
@@ -45,6 +50,10 @@ export interface CallArgArtifact {
   /** `@missingRailsArgs` tags (RFC 0099) on a COMPARED pair that suppressed no
    *  mismatch. Absent on an artifact predating the field. */
   staleTags?: { package: string; tsFile: string; tsName: string; call: string }[];
+  /** The mismatches `@missingRailsArgs` tags DID suppress, each with its reason
+   *  (RFC 0099) — grouped by permanence claim in the report. Absent on an
+   *  artifact predating the field. */
+  suppressed?: TagReceipt[];
 }
 
 /** The rows the gate ratchets: `shape` only. */

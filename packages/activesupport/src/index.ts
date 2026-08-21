@@ -287,6 +287,7 @@ export {
   inGroups,
   split,
   extractBang,
+  min,
   selectBang,
   toSentence,
   // `toXml` is Hash#to_xml above; one ESM namespace cannot hold both, the same

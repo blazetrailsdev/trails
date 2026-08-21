@@ -1825,7 +1825,20 @@ describe("staleCallTags", () => {
   const tags = new Map([
     [
       "relation.ts",
-      new Map([["load", new Map([["Relation", new Set(["synchronize", "reload"])]])]]),
+      new Map([
+        [
+          "load",
+          new Map([
+            [
+              "Relation",
+              new Map([
+                ["synchronize", "PERMANENT — receipt."],
+                ["reload", "PERMANENT — receipt."],
+              ]),
+            ],
+          ]),
+        ],
+      ]),
     ],
   ]);
 
@@ -1851,8 +1864,18 @@ describe("staleCallTags", () => {
 
   it("keys tags to their own file, so a same-named method elsewhere is untouched", () => {
     const twoFiles = new Map([
-      ["relation.ts", new Map([["load", new Map([["Relation", new Set(["synchronize"])]])]])],
-      ["core.ts", new Map([["load", new Map([["Core", new Set(["synchronize"])]])]])],
+      [
+        "relation.ts",
+        new Map([
+          ["load", new Map([["Relation", new Map([["synchronize", "PERMANENT — receipt."]])]])],
+        ]),
+      ],
+      [
+        "core.ts",
+        new Map([
+          ["load", new Map([["Core", new Map([["synchronize", "PERMANENT — receipt."]])]])],
+        ]),
+      ],
     ]);
     const used = new Map([[callTagKey("core.ts", "Core", "load"), new Set<string>()]]);
     expect(staleCallTags(twoFiles, used)).toEqual([
@@ -1868,8 +1891,8 @@ describe("staleCallTags", () => {
           [
             "checkout",
             new Map([
-              ["ConnectionPool", new Set(["synchronize"])],
-              ["NullPool", new Set(["synchronize"])],
+              ["ConnectionPool", new Map([["synchronize", "PERMANENT — receipt."]])],
+              ["NullPool", new Map([["synchronize", "PERMANENT — receipt."]])],
             ]),
           ],
         ]),
@@ -2221,22 +2244,29 @@ describe("writerPairedWithReader", () => {
 
 describe("tagsForOwner", () => {
   const byClass = new Map([
-    ["ConnectionPool", new Set(["synchronize"])],
-    ["NullPool", new Set(["reload"])],
+    ["ConnectionPool", new Map([["synchronize", "PERMANENT — no monitor in JS."]])],
+    ["NullPool", new Map([["reload", "CONVERGEABLE — see story."]])],
   ]);
 
   it("reads only the resolved owner's tags", () => {
-    expect([...tagsForOwner(byClass, "ConnectionPool")!]).toEqual(["synchronize"]);
+    expect([...tagsForOwner(byClass, "ConnectionPool")!.keys()]).toEqual(["synchronize"]);
   });
 
   it("gives an owner with no tags of its own nothing from its siblings", () => {
-    expect(tagsForOwner(new Map([["NullPool", new Set(["synchronize"])]]), "ConnectionPool")).toBe(
-      undefined,
-    );
+    expect(
+      tagsForOwner(
+        new Map([["NullPool", new Map([["synchronize", "PERMANENT — x."]])]]),
+        "ConnectionPool",
+      ),
+    ).toBe(undefined);
   });
 
   it("falls back to the union when the owner is unresolved", () => {
-    expect([...tagsForOwner(byClass, undefined)!].sort()).toEqual(["reload", "synchronize"]);
+    expect([...tagsForOwner(byClass, undefined)!.keys()].sort()).toEqual(["reload", "synchronize"]);
+  });
+
+  it("carries each tag's reason, so the report can read its permanence claim", () => {
+    expect(tagsForOwner(byClass, "NullPool")!.get("reload")).toBe("CONVERGEABLE — see story.");
   });
 });
 

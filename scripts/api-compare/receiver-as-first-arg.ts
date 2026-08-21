@@ -115,4 +115,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // call, so activerecord's `ruby-first.ts` exports it as `first(collection)`
   // and the Ruby receiver is TS argument 1.
   "first",
+  // Ruby core `Enumerable#min` in its no-argument receiver form —
+  // `[limit_value, count].compact.min`. JS's `Math.min(...values)` takes the
+  // values as ARGUMENTS and is numbers-only, so @blazetrails/activesupport
+  // exports `min(collection)` and the Ruby receiver is TS argument 1.
+  "min",
 ]);

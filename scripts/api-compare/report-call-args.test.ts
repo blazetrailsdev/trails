@@ -56,6 +56,35 @@ describe("renderReport", () => {
     expect(out).toMatch(/opaqueRubyArg\s+7/);
   });
 
+  it("groups the call-site receipts by permanence claim", () => {
+    const out = renderReport(
+      {
+        ...artifact,
+        suppressed: [
+          {
+            package: "arel",
+            tsFile: "visitors/to-sql.ts",
+            tsName: "visit",
+            call: "new",
+            reason: "PERMANENT: a JS Map takes no capacity.",
+          },
+          {
+            package: "activerecord",
+            tsFile: "relation.ts",
+            tsName: "where",
+            call: "where",
+            reason: "CONVERGEABLE: pending the scope port.",
+          },
+        ],
+      },
+      20,
+    );
+    expect(out).toContain("Call-site receipts by permanence claim (2)");
+    expect(out).toMatch(/permanent\s+1/);
+    expect(out).toMatch(/convergeable\s+1/);
+    expect(out).toContain("activerecord/relation.ts where where");
+  });
+
   it("truncates a grouping to --top", () => {
     expect(renderReport(artifact, 1)).toContain("By file (top 1 of 2)");
   });

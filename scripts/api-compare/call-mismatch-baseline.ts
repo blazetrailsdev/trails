@@ -119,6 +119,21 @@ export interface Artifact {
    *  (RFC 0083). Optional so an artifact predating the field still loads; the
    *  gate fails on a non-empty list, the tag's only-shrink half. */
   staleTags?: StaleTag[];
+  /** The flags `@missingRailsCall` tags DID suppress, each with the reason that
+   *  justified it (RFC 0099). Optional so an artifact predating the field still
+   *  loads; the report groups them by permanence claim. */
+  suppressed?: TagReceipt[];
+}
+
+/** One suppression a call-site receipt bought: the tagged declaration, the Ruby
+ *  call it justifies, and the tag's reason — whose leading `PERMANENT` /
+ *  `CONVERGEABLE` token is the population split the report prints. */
+export interface TagReceipt {
+  package: string;
+  tsFile: string;
+  tsName: string;
+  call: string;
+  reason?: string;
 }
 
 export interface StaleTag {

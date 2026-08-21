@@ -22,7 +22,6 @@ import { qualifiedName } from "./inheritance.js";
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
-import { ConfigurationError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
@@ -33,14 +32,9 @@ import {
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
-import { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import {
   underscore,
-  singularize,
-  pluralize,
-  camelize,
-  foreignKey as deriveForeignKey,
   constantize,
   registerConstant,
   unregisterConstant,
@@ -824,12 +818,7 @@ export class Associations {
       name,
       scope as ((...args: any[]) => any) | null,
       options as Record<string, unknown>,
-      {
-        defaultJoinTableName,
-        singleFk,
-        createHabtmJoinModel,
-        modelRegistry,
-      },
+      { modelRegistry },
     );
     // Rails registers the autosave-association callbacks for every HABTM
     // (the underlying has_many :through is built via the standard
@@ -1577,178 +1566,6 @@ export function _inlinePolymorphicKeys(
   // here rather than delegating.
   const scalarOwnerKey = Array.isArray(primaryKey) ? "id" : primaryKey;
   return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
-}
-
-/**
- * Compute the default join table name for HABTM.
- * Uses the two table names in alphabetical order, joined by underscore.
- */
-/** Coerce a foreignKey option to a single string. HABTM doesn't support composite keys. */
-/**
- * Create an anonymous join model class for HABTM associations.
- * The join model has two belongsTo associations (left side and target),
- * delegates its adapter to the declaring model, and uses the specified
- * join table name.
- *
- * Mirrors: ActiveRecord::Associations::Builder::HasAndBelongsToMany#through_model
- */
-function createHabtmJoinModel(
-  lhsModel: typeof Base,
-  joinModelName: string,
-  joinTableNameResolver: () => string,
-  ownerFk: string,
-  targetFk: string,
-  targetClassName: string,
-  sourceName: string,
-): typeof Base {
-  // Walk up to the root AR Base class to avoid inheriting domain callbacks/validations.
-  // Stop at the last class that still has `create` (i.e., the AR Base class).
-  let BaseClass: typeof Base = lhsModel;
-  let parent = Object.getPrototypeOf(BaseClass);
-  while (parent && parent !== Function.prototype && typeof parent.create === "function") {
-    BaseClass = parent;
-    parent = Object.getPrototypeOf(BaseClass);
-  }
-  const JoinModel = class extends BaseClass {} as typeof Base;
-  Object.defineProperty(JoinModel, "name", {
-    value: joinModelName,
-    writable: false,
-    configurable: true,
-  });
-
-  // Mirrors `through_model`'s `@table_name ||= table_name_resolver.call`
-  // (has_and_belongs_to_many.rb:24-27): the name resolves on first read, not at
-  // declaration time, because the RHS class might not have been loaded yet.
-  // The composite PK is trails': HABTM join tables typically have no id column,
-  // so the join model uses [ownerFk, targetFk] to support delete/destroy
-  // operations that issue PK-based WHERE clauses.
-  let joinTableName: string | null = null;
-  Object.defineProperty(JoinModel, "_tableName", {
-    get(): string {
-      return (joinTableName ??= joinTableNameResolver());
-    },
-    set(value: string | null) {
-      joinTableName = value;
-    },
-    configurable: true,
-  });
-  JoinModel.primaryKey = [ownerFk, targetFk];
-
-  // Carry the declaring model's Ruby module path onto the anonymous join model
-  // so its source `belongsTo` resolves an unqualified target class name
-  // (e.g. "Article") namespace-relative to the owner (→ "Publisher::Article").
-  // Without this, the join model's `activeRecord` is the bare `HABTM_*` class
-  // and the compute_type walk has no nesting to try.
-  if ((lhsModel as { moduleName?: string }).moduleName) {
-    (JoinModel as { moduleName?: string }).moduleName = (
-      lhsModel as { moduleName?: string }
-    ).moduleName;
-  }
-
-  // Delegate connection to the left (declaring) model. The join model is rooted
-  // at the AR Base class (to shed domain callbacks), so it would otherwise
-  // resolve to the primary pool. Delegating the connection-spec name keeps writes
-  // (and the threaded-connection check in `threadedConnectionFor`) on the owner's
-  // pool — required when the owner lives in an alternate database.
-  Object.defineProperty(JoinModel, "connection", {
-    get() {
-      return lhsModel.connection;
-    },
-    configurable: true,
-  });
-  // `connectionPool` resolves via `connectionSpecificationName`, which reads the
-  // `_connectionSpecificationName` backing field (own-property check + accessor).
-  // Delegating that field — not just the public static accessor — is what routes
-  // the pool lookup to the owner's database.
-  Object.defineProperty(JoinModel, "_connectionSpecificationName", {
-    get() {
-      return lhsModel.connectionSpecificationName;
-    },
-    set(_v: unknown) {
-      /* no-op: always delegates to lhs */
-    },
-    configurable: true,
-  });
-  Object.defineProperty(JoinModel, "adapter", {
-    get() {
-      return lhsModel.connection;
-    },
-    set(_v: unknown) {
-      /* no-op: always delegates to lhs */
-    },
-    configurable: true,
-  });
-
-  // Mirrors `Builder::HasAndBelongsToMany#add_left_association` /
-  // `#add_right_association` (has_and_belongs_to_many.rb:53-63).
-  (JoinModel as any).belongsTo("leftSide", {
-    required: false,
-    className: lhsModel.name,
-    foreignKey: ownerFk,
-  });
-  (JoinModel as any).belongsTo(sourceName, {
-    required: false,
-    className: targetClassName,
-    foreignKey: targetFk,
-  });
-
-  // `required: false` is hardcoded on both sides in Rails, so
-  // `belongs_to_required_by_default` never reaches the implicit join model
-  // (see project.rb:21-26 and the "usable with belongs to required by default"
-  // test).
-
-  return JoinModel;
-}
-
-function singleFk(fk: string | string[] | undefined, fallback: string): string {
-  if (Array.isArray(fk)) {
-    throw new ConfigurationError("HABTM associations do not support composite foreign keys");
-  }
-  return fk ?? fallback;
-}
-
-/**
- * Compute the default HABTM join-table name.
- *
- * Mirrors ActiveRecord::Associations::Builder::HasAndBelongsToMany#table_name:
- * sort both side table names, then collapse a shared `[._]`-terminated prefix
- * so `b30_posts` + `b30_tags` → `b30_posts_tags` (not `b30_posts_b30_tags`).
- */
-function defaultJoinTableName(
-  model1: typeof Base,
-  assocName: string,
-  options?: { className?: string },
-): string {
-  const lhsTable = (model1 as any).tableName ?? fallbackTableName(model1.name);
-  const className = options?.className ?? camelize(singularize(assocName));
-  const targetModel = modelRegistry.get(className);
-  const rhsTable = (targetModel as any)?.tableName ?? fallbackTableName(className);
-  return joinHabtmTableNames(lhsTable, rhsTable);
-}
-
-// Mirrors builder/has-and-belongs-to-many.ts#_fallbackTableName: namespaced
-// class names (`Admin::Tag`) underscore to `admin/tag`, which would leak a
-// `/` into the join-table name. Rails' `klass.table_name` normalizes to
-// underscores, so do the same when the target model isn't registered yet.
-function fallbackTableName(name: string): string {
-  return underscore(pluralize(name)).replace(/\//g, "_");
-}
-
-/**
- * Compute the target-side FK for a HABTM. Mirrors Rails
- * Builder::HasAndBelongsToMany#belongs_to_options:
- *   1. explicit `associationForeignKey` override
- *   2. `class_name.foreign_key` (demodulize+underscore+"_id")
- *   3. default belongs_to: singularized association name + "_id"
- * @internal
- */
-export function habtmTargetFk(
-  assocName: string,
-  options: { className?: unknown; associationForeignKey?: unknown },
-): string {
-  if (options.associationForeignKey) return String(options.associationForeignKey);
-  if (options.className) return deriveForeignKey(String(options.className));
-  return `${underscore(singularize(assocName))}_id`;
 }
 
 /**

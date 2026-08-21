@@ -34,6 +34,7 @@ import { compositeQueryConstraintsList, queryConstraintsList } from "../persiste
 import {
   camelize,
   eachSlice,
+  min,
   selectBang,
   singularize,
   underscore,
@@ -398,7 +399,7 @@ export class HasManyAssociation extends CollectionAssociation {
         limitValue?: number | null;
       } | null
     )?.limitValue;
-    return limitValue == null ? count : Math.min(limitValue, count);
+    return min([limitValue, count].filter((value) => value != null))!;
   }
 }
 

@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { CallArgArtifact } from "./call-args-baseline.js";
 
-import { parseTop, section, tally } from "./lint-call-mismatches.js";
+import { parseTop, receiptsSection, section, tally } from "./lint-call-mismatches.js";
 import { classifyRow, NAMING_CLASSES } from "./naming-taxonomy.js";
 
 export { parseTop };
@@ -97,6 +97,7 @@ export function renderReport(
       "Naming residue by class",
       tally(naming, (r) => namingLabel(r)),
     ),
+    receiptsSection("Call-site receipts by permanence claim", artifact.suppressed ?? []),
     section(
       "Naming residue by package",
       tally(naming, (r) => `${r.package}  ${namingLabel(r).replace(/^.*\(|\)$/g, "")}`),

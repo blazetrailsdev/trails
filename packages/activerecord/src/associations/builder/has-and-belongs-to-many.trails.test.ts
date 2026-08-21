@@ -38,5 +38,6 @@ describe("Builder::HasAndBelongsToMany#throughModel", () => {
     expect(joinModel.leftModel).toBe(Developer);
     expect(joinModel.leftReflection.name).toBe("leftSide");
     expect(joinModel.rightReflection.name).toBe("project");
+    expect(joinModel.primaryKey).toEqual(["developer_id", "project_id"]);
   });
 });
