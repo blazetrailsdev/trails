@@ -34,6 +34,7 @@ import { compositeQueryConstraintsList, queryConstraintsList } from "../persiste
 import {
   camelize,
   eachSlice,
+  min,
   selectBang,
   singularize,
   underscore,
@@ -398,7 +399,10 @@ export class HasManyAssociation extends CollectionAssociation {
         limitValue?: number | null;
       } | null
     )?.limitValue;
-    return limitValue == null ? count : Math.min(limitValue, count);
+    // `[association_scope.limit_value, count].compact.min`
+    // (has_many_association.rb:95) — `compact` drops the nil limit, so `count`
+    // is always present and the receiver is never empty.
+    return min([limitValue, count].filter((value) => value != null))!;
   }
 }
 
