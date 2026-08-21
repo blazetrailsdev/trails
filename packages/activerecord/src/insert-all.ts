@@ -9,6 +9,8 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import { except, isPresent, many, reverseMerge } from "@blazetrails/activesupport";
+import { first } from "./ruby-first.js";
 import { withConnection } from "./connection-handling.js";
 import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
 
@@ -37,7 +39,7 @@ export interface InsertAllOptions {
 export class InsertAll {
   readonly model: ModelClass;
   readonly connection: ModelClass["connection"];
-  readonly inserts: Record<string, unknown>[];
+  inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
   /**
    * Initially the user's `:unique_by` input (column name, column list, or
@@ -76,6 +78,18 @@ export class InsertAll {
     ) as Promise<Result>;
   }
 
+  /**
+   * @missingRailsCall find_unique_index_for — Language shortcoming: Rails
+   * resolves `@unique_by` here (insert_all.rb:42) off a synchronous
+   * `schema_cache.indexes`; that read is async in trails, so the call rides
+   * the deferral in `_populateUpdatableColumns()`, which every path awaits
+   * before anything reads `uniqueBy`.
+   *
+   * @missingRailsArgs except — PERMANENT: Ruby's `scope_for_create.except(col)`
+   * is a receiver-form call; JS objects have no `except`, so the activesupport
+   * port takes the receiver as its first argument and the argument list is one
+   * longer than Rails'. The Ruby arguments are passed unchanged after it.
+   */
   constructor(
     relation: Relation<any>,
     connection: ModelClass["connection"],
@@ -103,19 +117,20 @@ export class InsertAll {
           : options.returning;
     }
 
-    if (this.inserts.length === 0) {
+    if (isEmpty(this.inserts)) {
       this.keys = new Set();
     } else {
       this.resolveSti();
       this.resolveAttributeAliases();
-      this.keys = new Set(Object.keys(this.inserts[0]));
+      this.keys = new Set(Object.keys(first(this.inserts) as Record<string, unknown>));
     }
 
     // Rails: scope_for_create.except(model.inheritance_column) — STI type is
     // handled by resolveSti (reverse_merge) so it must not be re-injected here.
-    const rawScopeAttrs: Record<string, unknown> = (relation as any).scopeForCreate();
-    delete rawScopeAttrs[this.model.inheritanceColumn as string];
-    this.scopeAttributes = rawScopeAttrs;
+    this.scopeAttributes = except(
+      (relation as any).scopeForCreate() as Record<string, unknown>,
+      this.model.inheritanceColumn as string,
+    );
     for (const key of Object.keys(this.scopeAttributes)) {
       this.keys.add(key);
     }
@@ -135,7 +150,7 @@ export class InsertAll {
     // so the RETURNING rows are captured into an ActiveRecord::Result rather
     // than discarded (executeMutation only reports the affected-row count).
     let message = `${this.model.name} `;
-    if (this.inserts.length > 1) message += "Bulk ";
+    if (many(this.inserts)) message += "Bulk ";
     message += this.onDuplicate === "update" ? "Upsert" : "Insert";
     return this.connection.execInsertAll(await this.toSql(), message);
   }
@@ -203,13 +218,20 @@ export class InsertAll {
     if (
       this.onDuplicate === "update" &&
       !this.updateSql &&
-      !this.updateOnly &&
-      this._updatableColumns.length === 0
+      !isPresent(this.updateOnly) &&
+      isEmpty(this._updatableColumns)
     ) {
       this.onDuplicate = "skip";
     }
   }
 
+  /**
+   * @missingRailsCall table_name — Language shortcoming: Rails reads
+   * `schema_cache.primary_keys(model.table_name)` here (insert_all.rb:61);
+   * that schema-cache read is async in trails, so the table name is passed
+   * at the deferred read in `dbPrimaryKeys()` and this reader returns the
+   * value it resolved.
+   */
   primaryKeys(): string[] {
     // Rails: `Array(@model.schema_cache.primary_keys(model.table_name))`
     // (insert_all.rb:61) — the *database* primary keys from the schema cache,
@@ -303,10 +325,19 @@ export class InsertAll {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall empty? — Language shortcoming: Rails' last branch is
+   * `@on_duplicate == :update && updatable_columns.empty?`
+   * (insert_all.rb:140), but `updatable_columns` subtracts
+   * `unique_by_columns`, which trails can only resolve off an async
+   * schema-cache read; that branch therefore runs at the end of
+   * `_populateUpdatableColumns()`, which every path awaits before
+   * `onDuplicate` is read.
+   */
   private configureOnDuplicateUpdateLogic(): void {
     const onDuplicate = this.onDuplicate;
-    if (this.isCustomUpdateSqlProvided() && this.updateOnly !== undefined) {
+    if (this.isCustomUpdateSqlProvided() && isPresent(this.updateOnly)) {
       // Rails: raise ArgumentError (insert_all.rb).
       throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
@@ -316,14 +347,16 @@ export class InsertAll {
       onDuplicate !== undefined &&
       onDuplicate !== "update" &&
       !this.isCustomUpdateSqlProvided() &&
-      this.updateOnly !== undefined
+      isPresent(this.updateOnly)
     ) {
       throw new Error("Cannot use both onDuplicate and updateOnly");
     }
 
-    if (this.updateOnly !== undefined) {
-      this._updatableColumns = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
-      this.onDuplicate = this._updatableColumns.length === 0 ? "skip" : "update";
+    if (isPresent(this.updateOnly)) {
+      this._updatableColumns = Array.isArray(this.updateOnly)
+        ? this.updateOnly
+        : [this.updateOnly as string];
+      this.onDuplicate = "update";
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = "update";
@@ -378,27 +411,25 @@ export class InsertAll {
     // with no `type` column (e.g. a readonly-attribute subclass) from inserting a
     // value into a non-existent column.
     if (!isFinderNeedsTypeCondition(this.model)) return;
+    const stiType = this.model.stiName();
     // STI is active on this path, so the column resolves to a name; `?? "type"`
     // only satisfies the now-nullable getter's type.
-    const inheritanceCol = this.model.inheritanceColumn ?? "type";
-    const type = this.model.stiName();
-    for (const insert of this.inserts) {
-      if (!(inheritanceCol in insert)) {
-        insert[inheritanceCol] = type;
-      }
-    }
+    this.inserts = this.inserts.map((insert) =>
+      reverseMerge(insert, { [String(this.model.inheritanceColumn ?? "type")]: stiType }),
+    );
   }
 
   /** @internal */
   private resolveAttributeAliases(): void {
-    if (!this.inserts[0] || !this.hasAttributeAliases(this.inserts[0])) return;
-    for (let i = 0; i < this.inserts.length; i++) {
+    const firstInsert = first(this.inserts);
+    if (!firstInsert || !this.hasAttributeAliases(firstInsert)) return;
+    this.inserts = this.inserts.map((insert) => {
       const resolved: Record<string, unknown> = {};
-      for (const [attribute, val] of Object.entries(this.inserts[i])) {
+      for (const [attribute, val] of Object.entries(insert)) {
         resolved[this.resolveAttributeAlias(attribute)] = val;
       }
-      this.inserts[i] = resolved;
-    }
+      return resolved;
+    });
     // Mirrors insert_all.rb:121-122: update_only and unique_by are alias-resolved
     // alongside the insert keys so the ON CONFLICT update list and conflict
     // target reference physical column names.

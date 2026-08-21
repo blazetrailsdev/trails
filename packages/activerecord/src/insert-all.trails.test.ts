@@ -5,9 +5,11 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
+import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { adapterType } from "./test-adapter.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
+import { itIfSupports } from "./support/supports.js";
 import type { Base } from "./base.js";
 
 async function withRecordTimestamps(
@@ -81,4 +83,26 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
       });
     });
   });
+});
+
+describe("InsertAll configure_on_duplicate_update_logic", () => {
+  fixtures([]);
+
+  // insert_all.rb:134 branches on `update_only.present?`, and `[].present?` is
+  // false, so an empty :update_only falls through to the auto-generated
+  // updatable-columns path (rb:140) rather than pinning the update list to []
+  // and coercing :update into :skip.
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "upsert all with an empty update only still updates the auto-generated columns",
+    async () => {
+      await Book.upsertAll([{ id: 101, name: "Perelandra", author_id: 7, isbn: "1974522598" }]);
+      await Book.upsertAll([{ id: 101, name: "Perelandra 2", author_id: 7, isbn: "111111" }], {
+        updateOnly: [],
+      });
+      const book = (await Book.find(101)) as unknown as { name: string; isbn: string };
+      expect(book.name).toBe("Perelandra 2");
+      expect(book.isbn).toBe("111111");
+    },
+  );
 });
