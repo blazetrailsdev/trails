@@ -30,56 +30,90 @@ export class HasAndBelongsToMany {
     this.options = options;
   }
 
+  /**
+   * Mirrors `Builder::HasAndBelongsToMany#through_model`
+   * (has_and_belongs_to_many.rb:13-56).
+   *
+   * Rails writes `Class.new(ActiveRecord::Base)`; this builder cannot import
+   * `Base` without closing an import cycle, so the root AR class is reached by
+   * walking up from the left model — the same walk `createHabtmJoinModel`
+   * (associations.ts) does, landing on the same class.
+   *
+   * @missingRailsCall call — Language shortcoming: Rails invokes the resolver
+   * lambda as `table_name_resolver.call`; JS functions have no `call`-named
+   * invocation of their own (`Function.prototype.call` rebinds `this` and is a
+   * different method), so `this.tableNameResolver()` IS the same call.
+   */
   throughModel(): any {
+    const builder = this;
     const lhsModel = this.lhsModel;
-    const associationName = this.associationName;
-    const options = this.options;
 
-    const joinModelName = `HABTM_${camelize(associationName)}`;
-    const tableNameResolver = () => this._tableName();
-    const rightName = singularize(associationName);
+    let BaseClass: any = lhsModel;
+    let parent = Object.getPrototypeOf(BaseClass);
+    while (parent && parent !== Function.prototype && typeof parent.create === "function") {
+      BaseClass = parent;
+      parent = Object.getPrototypeOf(BaseClass);
+    }
 
-    const joinModel: any = {
-      name: joinModelName,
-      leftModel: lhsModel,
-      tableNameResolver,
-      _tableName: null as string | null,
-      _associations: [],
-      _reflections: {},
-      leftReflection: null as any,
-      rightReflection: null as any,
+    let tableName: string | null = null;
+    const joinModel: any = class extends BaseClass {
+      static leftModel: any;
+      static tableNameResolver: () => string;
+      static leftReflection: any;
+      static rightReflection: any;
 
-      get tableName() {
+      /** @internal */
+      static get tableName(): string {
         // Table name needs to be resolved lazily
         // because RHS class might not have been loaded
-        return (this._tableName ??= this.tableNameResolver());
-      },
+        return (tableName ??= this.tableNameResolver());
+      }
 
-      computeType(className: string) {
-        return lhsModel.computeType?.(className) ?? null;
-      },
+      /** @internal */
+      static set tableName(value: string) {
+        tableName = value;
+      }
 
-      connectionPool() {
-        return lhsModel.connectionPool?.() ?? null;
-      },
+      /** @internal The storage `Base` reads directly; one seat with the getter. */
+      static get _tableName(): string | null {
+        return tableName;
+      }
+
+      /** @internal */
+      static set _tableName(value: string | null) {
+        tableName = value;
+      }
+
+      static computeType(className: string): any {
+        return this.leftModel.computeType(className);
+      }
+
+      static addLeftAssociation(name: string, options: Record<string, unknown>): void {
+        this.belongsTo(name, { required: false, ...options });
+        this.leftReflection = this._reflectOnAssociation(name);
+      }
+
+      static addRightAssociation(name: string, options: Record<string, unknown>): void {
+        const rhsName = singularize(name);
+        this.belongsTo(rhsName, { required: false, ...options });
+        this.rightReflection = this._reflectOnAssociation(rhsName);
+      }
+
+      static connectionPool(): any {
+        return this.leftModel.connectionPool();
+      }
     };
 
-    joinModel.leftReflection = {
-      name: "leftSide",
-      type: "belongsTo",
-      options: { anonymousClass: lhsModel },
-    };
-    joinModel._associations.push(joinModel.leftReflection);
+    Object.defineProperty(joinModel, "name", {
+      value: `HABTM_${camelize(this.associationName)}`,
+      writable: true,
+      configurable: true,
+    });
+    joinModel.tableNameResolver = () => builder._tableName();
+    joinModel.leftModel = lhsModel;
 
-    const rhsOptions = this.belongsToOptions(options);
-
-    joinModel.rightReflection = {
-      name: rightName,
-      type: "belongsTo",
-      options: { ...rhsOptions },
-    };
-    joinModel._associations.push(joinModel.rightReflection);
-
+    joinModel.addLeftAssociation("leftSide", { anonymousClass: lhsModel });
+    joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
     return joinModel;
   }
 
@@ -171,11 +205,13 @@ export class HasAndBelongsToMany {
     const options = this.options;
 
     const targetClassName = (options.className as string) ?? camelize(singularize(name));
-    const joinTableName =
-      (options.joinTable as string) ??
-      deps.defaultJoinTableName(model, name, {
-        className: options.className as string | undefined,
-      });
+    let memoizedJoinTableName: string | undefined;
+    const joinTableNameResolver = (): string =>
+      (memoizedJoinTableName ??=
+        (options.joinTable as string) ??
+        deps.defaultJoinTableName(model, name, {
+          className: options.className as string | undefined,
+        }));
     // Rails derives the owner join key from the demodulized class name, so a
     // namespaced owner like `Publisher::Article` yields `article_id`, not
     // `publisher_article_id`. `_demodulizedName` carries the Ruby leaf name for
@@ -200,7 +236,7 @@ export class HasAndBelongsToMany {
     const JoinModel = deps.createHabtmJoinModel(
       model,
       joinModelName,
-      joinTableName,
+      joinTableNameResolver,
       ownerFk,
       targetFk,
       targetClassName,
@@ -316,20 +352,26 @@ export class HasAndBelongsToMany {
       "indexErrors",
       "associationForeignKey",
     ] as const;
-    // Note: `joinTable` is intentionally NOT forwarded — `joinTableName`
-    // (set above) already resolves `options.joinTable ?? default`, so the
-    // value is captured. Re-forwarding would also overwrite it with
-    // `undefined` when callers pass `joinTable: undefined` explicitly.
+    // Note: a DERIVED join-table name is deliberately not written here.
+    // Rails' `hm_options` allowlist forwards `:join_table` only when the
+    // declaration supplied one (associations.rb:1899); with the key absent,
+    // `HasAndBelongsToManyReflection#join_table` falls through to
+    // `derive_join_table`, which reads `klass.table_name` when the reflection
+    // is USED. Writing a derived name here instead resolved the RHS table at
+    // declaration time — the eager resolution Rails' join model documents
+    // against ("Table name needs to be resolved lazily because RHS class might
+    // not have been loaded", has_and_belongs_to_many.rb:25-26), and with the
+    // RHS unregistered it latched the name-derived fallback for good.
     // `associationForeignKey` is retained on the reflection options to
     // mirror Rails' `habtm_reflection` (which keeps the full options
     // hash); note however that `_build` and `_resolveHabtmJoin` currently
     // hard-code the target FK as `${singular(name)}_id` — full plumbing into
     // the generated join model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
-      joinTable: joinTableName,
       through: middleName,
       source: (options.source as string) ?? sourceName,
     };
+    if (options.joinTable != null) habtmOptions.joinTable = options.joinTable;
     for (const k of HABTM_FORWARDED_KEYS) {
       if (Object.prototype.hasOwnProperty.call(options, k)) {
         habtmOptions[k] = options[k];

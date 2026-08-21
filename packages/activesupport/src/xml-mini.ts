@@ -47,12 +47,18 @@ export const FileLike = {
  * `ActiveSupport`; here the module namespace object of
  * `./xml-mini/<name>.js` *is* that module.
  *
- * Rails' backends return the parsed Hash synchronously; ours are async because
- * each loads its optional parser package (`@blazetrails/nokogiri`) through a
- * dynamic import — see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99`.
+ * Rails' backends all return the parsed Hash synchronously, and so does the
+ * default REXML one here. The Nokogiri backends are the residue: each loads its
+ * optional parser package (`@blazetrails/nokogiri`) through a dynamic import —
+ * see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99` — so their
+ * `parse` returns a Promise, and only the `await XmlMini.parse(...)` path
+ * reaches them. `Hash.fromXml`, which Rails calls straight through
+ * (conversions.rb:128-130), needs a synchronous backend.
  */
 export interface XmlMiniBackend {
-  parse(data: string | StringIO | null | undefined): Promise<Record<string, unknown>>;
+  parse(
+    data: string | StringIO | null | undefined,
+  ): Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
 /** The name of a backend, or the backend module itself. */
@@ -286,13 +292,14 @@ let _backend: XmlMiniBackend | null | undefined;
 /**
  * Parse an XML document into a hash through the current backend.
  *
- * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99) — awaitable because
- * every backend's `parse` is (see {@link XmlMiniBackend}); the delegation itself
- * still forwards straight to the selected backend.
+ * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99) — the delegation
+ * forwards straight to the selected backend, whose result is the Hash itself
+ * for a synchronous backend and a Promise for an asynchronous one (see
+ * {@link XmlMiniBackend}).
  */
 export function parse(
   data: string | StringIO | null | undefined,
-): Promise<Record<string, unknown>> {
+): Record<string, unknown> | Promise<Record<string, unknown>> {
   return backend()!.parse(data);
 }
 

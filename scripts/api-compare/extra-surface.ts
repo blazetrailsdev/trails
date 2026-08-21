@@ -557,39 +557,9 @@ function staleMovedDeclarations(extras: readonly ExtraName[], reason: string): s
   return [...declaredCoincidentalMovedNames(reason)].filter((n) => !moved.has(n));
 }
 
-/**
- * The permanence claim a tag's reason makes about itself.
- *
- * `permanent` — a language-level or runtime-level fact no port can remove.
- * `convergeable` — unfinished porting, a fixable collision, a comparator gap:
- * the tag is a placeholder for work, and the reason should name its story.
- * `unclassified` — the reason makes no claim either way.
- */
-export type Permanence = "permanent" | "convergeable" | "unclassified";
+import { classifyReason, type Permanence } from "./missing-rails-call-tags.js";
 
-const PERMANENCE_TOKENS: Record<string, Permanence> = {
-  PERMANENT: "permanent",
-  CONVERGEABLE: "convergeable",
-};
-
-/**
- * Read the leading classification token off a `@noRailsEquivalent` reason.
- *
- * The tag audit (RFC 0080) found 42 of 79 tags describing convergeable
- * surface: each reason was factually accurate about its mechanism and merely
- * drew "therefore permanent" from it, so nothing in the report could tell the
- * two populations apart. Requiring the claim to be stated as a token makes an
- * unstated one countable — a tag that says neither word is `unclassified`
- * rather than assumed permanent.
- *
- * The token must be the reason's first word (uppercase, on a word boundary, so
- * prose like "PERMANENTLY" does not qualify); any punctuation may follow it.
- */
-export function classifyReason(reason: string): Permanence {
-  const first = /^\s*([A-Z]+)\b/.exec(reason);
-  if (!first) return "unclassified";
-  return PERMANENCE_TOKENS[first[1]] ?? "unclassified";
-}
+export { classifyReason, type Permanence };
 
 export function allowKeyOf(e: { package: string; tsFile: string; name: string }): string {
   return `${e.package} ${e.tsFile} ${e.name}`;

@@ -651,19 +651,19 @@ export function toXml(
 /**
  * Returns a Hash containing a collection of pairs when the key is the node name
  * and the value is its content. Mirrors: `Hash.from_xml`
- * (`core_ext/hash/conversions.rb:128-130`) — awaitable because `XmlMini.parse` is.
+ * (`core_ext/hash/conversions.rb:128-130`).
  */
 export function fromXml(
   xml: string | StringIO | null | undefined,
   disallowedTypes?: string[] | null,
-): Promise<unknown> {
-  return XMLConverter.create(xml, disallowedTypes).then((converter) => converter.toH());
+): unknown {
+  return new XMLConverter(xml, disallowedTypes).toH();
 }
 
 /**
  * Builds a Hash from XML just like `Hash.from_xml`, but also allows Symbol and
  * YAML. Mirrors: `Hash.from_trusted_xml` (conversions.rb:133-135).
  */
-export function fromTrustedXml(xml: string | StringIO | null | undefined): Promise<unknown> {
+export function fromTrustedXml(xml: string | StringIO | null | undefined): unknown {
   return fromXml(xml, []);
 }

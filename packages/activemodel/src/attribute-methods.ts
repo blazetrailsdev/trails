@@ -536,7 +536,13 @@ export function isInstanceMethodAlreadyImplemented(
   return this.generatedAttributeMethods().isMethodDefined(methodName);
 }
 
-/** @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_cache */
+/**
+ * @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_cache
+ *
+ * @missingRailsArgs new — PERMANENT: attribute_methods.rb:418 writes
+ * `Concurrent::Map.new(initial_capacity: 4)`; a JS `Map` has no capacity hint,
+ * so the kwarg has no counterpart to pass.
+ */
 export function attributeMethodPatternsCache(
   this: ClassMethods,
 ): Map<string, Array<{ proxyTarget: string; attrName: string }>> {

@@ -111,6 +111,15 @@ export interface MethodInfo {
    */
   missingRailsCalls?: string[];
   /**
+   * TS-side only (RFC 0099): the Ruby call names this declaration's JSDoc tags
+   * as deliberately called with a DIFFERENT argument list, via
+   * `@missingRailsArgs <call> — <reason>`. compare.ts's `checkCallArgs` drops
+   * these from the call-argument mismatch population, so the deviation is
+   * reviewed at the call site instead of as a baseline row — see
+   * missing-rails-args-tags.ts.
+   */
+  missingRailsArgs?: string[];
+  /**
    * Normalized digest of the Ruby method BODY (source-hash pinning, RFC 0025).
    * Whitespace/comment-insensitive, body-only; changes when the ported code
    * changes upstream. Ruby-side only (the TS extractor does not emit it); used

@@ -351,7 +351,13 @@ write.
    `shape` rows — count, order, literal values, kwarg keys; `naming` rows (a
    `ref:` identifier spelled differently) are report-only via
    `pnpm parity:api:calls:args:report`. New row? Pass what Rails passes;
-   baselining is the fallback and costs a reviewed one-line `reason`.
+   baselining is the fallback and costs a reviewed one-line `reason`. A single
+   argument-shape deviation can instead carry a `@missingRailsArgs <ruby_call>
+— <reason>` JSDoc tag at the call site — the call-ARGUMENT twin of
+   `@missingRailsCall` — which suppresses the flag with no baseline row. Its
+   reason must open with `PERMANENT` or `CONVERGEABLE`, the same permanence
+   discipline `parity:api:extra` enforces on `@noRailsEquivalent`; a reason
+   claiming neither is an error, not an assumed PERMANENT.
 
 3. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a

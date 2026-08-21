@@ -23,7 +23,7 @@ export const CONTENT_KEY = "__content__";
  * string here (see {@link XmlMini.XmlMiniBackend}), so Rails' wrap in a
  * `StringIO` and its `eof?` check are the empty-string check.
  */
-export async function parse(data: string | null | undefined): Promise<Record<string, unknown>> {
+export function parse(data: string | null | undefined): Record<string, unknown> {
   const io = data ?? "";
 
   if (io === "") {

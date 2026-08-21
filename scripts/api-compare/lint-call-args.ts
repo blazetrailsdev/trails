@@ -43,6 +43,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import {
   type CallArgArtifact,
   type CallArgExcludeEntry,
@@ -160,7 +161,9 @@ export async function main(write: boolean): Promise<number> {
   if (await reportEmptyBaselines(files, "call-args ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
-  if (added.length === 0 && stale.length === 0) {
+  const staleTags = artifact.staleTags ?? [];
+  if (staleTags.length > 0) console.error(renderStaleTags(staleTags));
+  if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
     console.log(`call-args ratchet: OK (${baseline.length} baselined shape row(s))`);
     return 0;
   }
@@ -189,6 +192,18 @@ export async function main(write: boolean): Promise<number> {
   }
 
   return 1;
+}
+
+/** The STALE-tag half of the only-shrink contract: a call-site
+ *  `@missingRailsArgs` receipt that suppresses nothing any more. A
+ *  justification only shrinks, exactly like a baseline row. */
+export function renderStaleTags(staleTags: NonNullable<CallArgArtifact["staleTags"]>): string {
+  return [
+    `\ncall-args ratchet: ${staleTags.length} STALE ${ARGS_TAG} tag(s) whose call site no ` +
+      "longer flags.",
+    "The TS call site now passes what Rails passes, so delete the tag from its JSDoc block.\n",
+    ...staleTags.map((t) => `  - ${t.package}  ${t.tsFile}  ${t.tsName}  ${t.call}`),
+  ].join("\n");
 }
 
 /** `--report`: the whole artifact, `naming` included — the excluded class is

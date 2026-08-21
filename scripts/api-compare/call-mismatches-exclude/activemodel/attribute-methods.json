@@ -9,17 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_method_patterns_cache",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{initialCapacity=num:4}"
-    ],
-    "reason": "attribute_methods.rb:418 `Concurrent::Map.new(initial_capacity: 4)` — a JS `Map` has no capacity hint, so the kwarg has no counterpart to pass. Same language shortcoming as the `initial_capacity: 2` row on connection-handler.ts."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "define_call",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

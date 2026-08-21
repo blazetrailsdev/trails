@@ -69,6 +69,7 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
 import { TAG as MISSING_RAILS_CALL_TAG, suppressedCallsIn } from "./missing-rails-call-tags.js";
+import { TAG as MISSING_RAILS_ARGS_TAG, suppressedArgCallsIn } from "./missing-rails-args-tags.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
@@ -153,6 +154,8 @@ interface WorkerOutput {
   inputs: string[];
 }
 const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
+/** Same role for `@missingRailsArgs`; see the note on the one above. */
+const fileHasMissingRailsArgsTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
  * Tags a deliberate JSDoc block may legitimately carry *after*
@@ -707,6 +710,7 @@ export function extractFromProgram(
         const internal = hasInternalJsDocTag(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
+        const fnMissingRailsArgs = missingRailsArgsTags(node);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -722,6 +726,7 @@ export function extractFromProgram(
           ...(fnCallArgs !== undefined ? { callArgs: fnCallArgs } : {}),
           ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
+          ...(fnMissingRailsArgs !== undefined ? { missingRailsArgs: fnMissingRailsArgs } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
@@ -1601,19 +1606,46 @@ export function paramsOfCallableRef(
  * further down the file is still in its temporal dead zone when this runs.
  */
 export function missingRailsCallTags(node: ts.Node): string[] | undefined {
+  return taggedCallsOn(node, MISSING_RAILS_CALL_TAG, fileHasMissingRailsCallTag, suppressedCallsIn);
+}
+
+/**
+ * The Ruby calls a declaration's JSDoc tags as deliberately made with a
+ * different argument list (`@missingRailsArgs <call> — <reason>`, RFC 0099), or
+ * undefined when it carries none. The call-ARGUMENT twin of
+ * {@link missingRailsCallTags}, read the same way and recorded at the same
+ * extraction sites; compare.ts's `checkCallArgs` is what makes it load-bearing.
+ */
+export function missingRailsArgsTags(node: ts.Node): string[] | undefined {
+  return taggedCallsOn(
+    node,
+    MISSING_RAILS_ARGS_TAG,
+    fileHasMissingRailsArgsTag,
+    suppressedArgCallsIn,
+  );
+}
+
+/** The shared read: the last leading `/** ... *\/` comment, parsed by the
+ *  family's parser, with a per-file fast path off the tag's raw text. */
+function taggedCallsOn(
+  node: ts.Node,
+  tag: string,
+  seen: WeakMap<ts.SourceFile, boolean>,
+  parse: (comment: string, origin: { fileName: string; startLine: number }) => string[],
+): string[] | undefined {
   const sf = node.getSourceFile();
-  let present = fileHasMissingRailsCallTag.get(sf);
+  let present = seen.get(sf);
   if (present === undefined) {
-    present = sf.text.includes(MISSING_RAILS_CALL_TAG);
-    fileHasMissingRailsCallTag.set(sf, present);
+    present = sf.text.includes(tag);
+    seen.set(sf, present);
   }
   if (!present) return undefined;
   const ranges = ts.getLeadingCommentRanges(sf.text, node.getFullStart()) ?? [];
   const range = ranges.filter((r) => sf.text.slice(r.pos, r.pos + 3) === "/**").at(-1);
   if (!range) return undefined;
   const comment = sf.text.slice(range.pos, range.end);
-  if (!comment.includes(MISSING_RAILS_CALL_TAG)) return undefined;
-  const calls = suppressedCallsIn(comment, {
+  if (!comment.includes(tag)) return undefined;
+  const calls = parse(comment, {
     fileName: sf.fileName,
     startLine: sf.getLineAndCharacterOfPosition(range.pos).line + 1,
   });
@@ -1866,6 +1898,7 @@ export function harvestObjectLiteralMethods(
     let internal = hasInternalJsDocTag(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
+    const propMissingRailsArgs = missingRailsArgsTags(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
@@ -1931,6 +1964,7 @@ export function harvestObjectLiteralMethods(
       ...(callSeq !== undefined ? { callSeq } : {}),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
+      ...(propMissingRailsArgs !== undefined ? { missingRailsArgs: propMissingRailsArgs } : {}),
       ...(writer ? { writer: true } : {}),
     });
   }
@@ -2065,11 +2099,13 @@ export function extractClass(
     const internal = visibility !== "public" || hasInternalJsDocTag(member);
     const noRailsEquivalent = noRailsEquivalentReason(member);
     const memberMissingRailsCalls = missingRailsCallTags(member);
+    const memberMissingRailsArgs = missingRailsArgsTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(memberMissingRailsCalls !== undefined
         ? { missingRailsCalls: memberMissingRailsCalls }
         : {}),
+      ...(memberMissingRailsArgs !== undefined ? { missingRailsArgs: memberMissingRailsArgs } : {}),
     };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;

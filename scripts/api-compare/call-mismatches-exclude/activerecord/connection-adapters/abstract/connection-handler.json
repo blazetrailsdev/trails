@@ -5,16 +5,5 @@
     "rubyName": "connection_pool_list",
     "call": "map",
     "reason": "Per-site verified (RFC 0106 wave 4b): the inner `map` of connection_handler.rb:75-79 is the same Ruby-Enumerable idiom, spelled as the body of trails' explicit `for..of` accumulation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{initialCapacity=num:2}"
-    ],
-    "reason": "connection_handler.rb:78 `Concurrent::Map.new(initial_capacity: 2)` — a JS `Map` has no capacity hint, so the kwarg has no counterpart to pass. Language shortcoming, not deferred work."
   }
 ]
