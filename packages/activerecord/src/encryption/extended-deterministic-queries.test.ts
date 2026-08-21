@@ -293,7 +293,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
     });
     return {
       _encryptedAttributes: new Set(["email"]),
-      _attributeDefinitions: new Map([["email", { type }]]),
+      typeForAttribute: () => type,
     };
   }
 
@@ -302,7 +302,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
     // Prevents a chained `.where()` on the same relation from re-expanding
     // an already-expanded condition into AV-of-AV.
     const model = modelWithDeterministicEmail();
-    const type = (model._attributeDefinitions.get("email") as any).type as EncryptedAttributeType;
+    const type = model.typeForAttribute();
     const already = [new AdditionalValue("x", type)];
     const out = EncryptedQuery.processArguments(model, [{ email: already }], true) as [
       Record<string, unknown>,
@@ -312,7 +312,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
 
   it("does not short-circuit when checkForAdditionalValues=false (findBy path always expands)", () => {
     const model = modelWithDeterministicEmail();
-    const type = (model._attributeDefinitions.get("email") as any).type as EncryptedAttributeType;
+    const type = model.typeForAttribute();
     const already = [new AdditionalValue("x", type)];
     const [out] = EncryptedQuery.processArguments(model, [{ email: already }], false) as [
       Record<string, unknown[]>,
@@ -325,7 +325,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
     // Rails: within flat_map, `each_value` that is already an AV passes
     // through untouched instead of running through additional_values_for.
     const model = modelWithDeterministicEmail();
-    const type = (model._attributeDefinitions.get("email") as any).type as EncryptedAttributeType;
+    const type = model.typeForAttribute();
     const av = new AdditionalValue("x", type);
     // Mix: a plaintext AND an AV that isn't last — so the whole-array
     // short-circuit doesn't apply, but the per-element check should.
@@ -359,7 +359,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
 
     const model = {
       _encryptedAttributes: new Set(["email"]),
-      _attributeDefinitions: new Map([["email", { type }]]),
+      typeForAttribute: () => type,
     };
     const relation = {
       model,
@@ -377,7 +377,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const type = makeType(true);
     const model = {
       _encryptedAttributes: new Set(["email"]),
-      _attributeDefinitions: new Map([["email", { type }]]),
+      typeForAttribute: () => type,
     };
     const relation = { model, whereValuesHash: () => ({}) };
 
@@ -392,7 +392,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const av = new AdditionalValue("enc", type);
     const model = {
       _encryptedAttributes: new Set(["body"]),
-      _attributeDefinitions: new Map([["body", { type }]]),
+      typeForAttribute: () => type,
     };
     const relation = { model, whereValuesHash: () => ({ body: [av] }) };
 
@@ -404,7 +404,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const type = makeType(true);
     const model = {
       _encryptedAttributes: new Set(["email"]),
-      _attributeDefinitions: new Map([["email", { type }]]),
+      typeForAttribute: () => type,
     };
     const relation = {
       model,
@@ -518,7 +518,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       });
       const model = {
         _encryptedAttributes: new Set(["email"]),
-        _attributeDefinitions: new Map([["email", { type }]]),
+        typeForAttribute: () => type,
       };
       const rel = new (targets.Relation as any)(model);
       rel.where({ email: "a@x" });
@@ -542,7 +542,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       const av = new AdditionalValue("plain@x", type);
       const model = {
         _encryptedAttributes: new Set(["email"]),
-        _attributeDefinitions: new Map([["email", { type }]]),
+        typeForAttribute: () => type,
       };
       const rel = new (targets.Relation as any)(model);
       rel._wheres = { email: [av] };
@@ -565,7 +565,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       });
       class Contact extends (targets.Base as any) {
         static _encryptedAttributes = new Set(["email"]);
-        static _attributeDefinitions = new Map([["email", { type }]]);
+        static typeForAttribute = () => type;
       }
       (Contact as any).findBy({ email: "x" });
       const captured = (Contact as any)._lastFindBy.email as unknown[];

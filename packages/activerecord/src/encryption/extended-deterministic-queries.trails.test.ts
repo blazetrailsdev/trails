@@ -11,7 +11,7 @@ import {
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
-import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
+import { encryptedTypeOf } from "./encryptable-record.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import { Base } from "../base.js";
@@ -142,10 +142,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     // The mechanism, pinned directly: Serialized#serialize(AV) raises inside
     // coder.dump before any payload exists — the dumped-AV JSON (which would
     // embed previous-scheme internals) is never produced.
-    const fullType = getAttributeType(PreviousSchemeSerializedBook, "name") as {
+    const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
-    const prevType = encryptedTypeOf(getAttributeType(PreviousSchemeSerializedBook, "name"))!
+    const prevType = encryptedTypeOf(PreviousSchemeSerializedBook.typeForAttribute("name"))!
       .previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(NoMethodError);
@@ -164,10 +164,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       DisallowedClass,
     );
 
-    const fullType = getAttributeType(PreviousSchemeYamlBook, "name") as {
+    const fullType = PreviousSchemeYamlBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
-    const prevType = encryptedTypeOf(getAttributeType(PreviousSchemeYamlBook, "name"))!
+    const prevType = encryptedTypeOf(PreviousSchemeYamlBook.typeForAttribute("name"))!
       .previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(DisallowedClass);
@@ -175,7 +175,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
   });
 
   it("uniqueness ciphertext generation serializes through the full resolved type", () => {
-    const fullType = getAttributeType(PreviousSchemeSerializedBook, "name") as {
+    const fullType = PreviousSchemeSerializedBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
     };
     // The resolved type is the outer Serialized wrapper, not the bare

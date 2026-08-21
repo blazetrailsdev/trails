@@ -113,7 +113,7 @@ export class EncryptableRecord {
    * post-reflection rebuild, as before) keeps the decorator's queue position —
    * and therefore the resolved nesting relative to `serialize` — in declaration
    * order, and bounds the queue: repeated `_defaultAttributes` rebuilds never
-   * re-push (`registerEncryptedType` no longer touches the queue).
+   * re-push.
    *
    * The column default is resolved inside the decorator at replay time
    * (mirrors Rails' `default: columns_hash[name.to_s]&.default`, evaluated in
@@ -123,11 +123,6 @@ export class EncryptableRecord {
    */
   static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
     modelClass.decorateAttributes([name], (attrName: string, castType: Type) => {
-      // Idempotence guard: a fresh-seed replay applies each queued decorator
-      // once, but the seeded cast type can itself already be encrypted (the
-      // `registerEncryptedType` path writes one into `_attributeDefinitions`,
-      // which AR's column seeding reads back).
-      if (castType instanceof EncryptedAttributeType) return null as unknown as Type;
       return new EncryptedAttributeType({
         scheme: pending.scheme,
         castType,
@@ -142,41 +137,6 @@ export class EncryptableRecord {
         ),
       });
     });
-  }
-
-  /**
-   * Register the EncryptedAttributeType for a plain mock model (the immediate
-   * path in `encryptAttribute` — callers without `decorateAttributes`). Real
-   * Base subclasses never come through here: their wrapping is the durable
-   * decorator pushed by `pushEncryptionDecorator`, resolved via
-   * `typeForAttribute`.
-   * @internal
-   */
-  static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
-    // Get existing cast type from attribute definitions if available.
-    // If already encrypted, unwrap to avoid double-encryption.
-    const existingDef = modelClass._attributeDefinitions?.get?.(name);
-    let castType = existingDef?.type;
-    if (castType instanceof EncryptedAttributeType) {
-      castType = castType.castType;
-    }
-
-    const encryptedType = new EncryptedAttributeType({
-      scheme,
-      castType,
-      default: this.columnDefaultFor(modelClass, name, existingDef),
-    });
-
-    // Register directly into _attributeDefinitions (not via attribute()
-    // which expects a string type name).
-    if (modelClass._attributeDefinitions?.set) {
-      modelClass._attributeDefinitions.set(name, {
-        name,
-        type: encryptedType,
-        defaultValue: existingDef?.defaultValue ?? null,
-        ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
-      });
-    }
   }
 
   /**
@@ -441,7 +401,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
   }
   const result = new Set<string>();
   for (const attributeName of encryptedAttributes.call(this)) {
-    const type = encryptedTypeOf(getAttributeType(this, attributeName));
+    const type = encryptedTypeOf(this.typeForAttribute(attributeName));
     if (type?.deterministic) {
       result.add(attributeName);
     }
@@ -572,7 +532,7 @@ export function buildEncryptAttributeAssignments(this: any): Record<string, unkn
 export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const attributeName of encryptedAttributes.call(this.constructor)) {
-    const type = getAttributeType(this.constructor, attributeName) as {
+    const type = this.constructor.typeForAttribute(attributeName) as {
       deserialize: (v: unknown) => unknown;
     };
     const encryptedValue = ciphertextFor.call(this, attributeName);
@@ -609,25 +569,17 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
     },
   };
 
-  if (typeof modelClass.decorateAttributes === "function") {
-    // Durable path (real model classes): push the durable PendingDecorator NOW,
-    // at declaration time, so its position in the pending queue tracks
-    // declaration order relative to `serialize` / `normalizes` — mirroring
-    // Rails, where `encrypts` calls `decorate_attributes` inline
-    // (encryptable_record.rb:87-92) and AttributeRegistration replays in
-    // declaration order. The decorator resolves the column default at replay
-    // time, so it needs no re-push after schema reflection. The
-    // `_pendingEncryptions` buffer remains only for validator re-runs +
-    // frozen-validator install on rebuild (applyPendingEncryptions).
-    EncryptableRecord.registerPendingEncryption(this, pending);
-    EncryptableRecord.pushEncryptionDecorator(this, name, pending);
-    encryptionHooks.applyPendingEncryptions(modelClass);
-  } else {
-    // Immediate path (plain-object callers without decoration machinery, e.g.
-    // direct `EncryptableRecord.encrypts` tests): register the encrypted type
-    // synchronously so it's readable right after the call.
-    EncryptableRecord.registerEncryptedType(this, name, pending.scheme);
-  }
+  // Push the durable PendingDecorator NOW, at declaration time, so its position
+  // in the pending queue tracks declaration order relative to `serialize` /
+  // `normalizes` — mirroring Rails, where `encrypts` calls `decorate_attributes`
+  // inline (encryptable_record.rb:87-92) and AttributeRegistration replays in
+  // declaration order. The decorator resolves the column default at replay time,
+  // so it needs no re-push after schema reflection. The `_pendingEncryptions`
+  // buffer remains only for validator re-runs + frozen-validator install on
+  // rebuild (applyPendingEncryptions).
+  EncryptableRecord.registerPendingEncryption(this, pending);
+  EncryptableRecord.pushEncryptionDecorator(this, name, pending);
+  encryptionHooks.applyPendingEncryptions(modelClass);
 
   if (Configurable.config.validateColumnSize) {
     validateColumnSize.call(this, name);
@@ -679,17 +631,6 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // the original column rides the same replay-safe machinery as its source.
   encrypts.call(this, originalAttributeName);
   EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
-}
-
-/**
- * Resolve an attribute's type through `typeForAttribute` (Rails' single lookup
- * surface); falls back to `_attributeDefinitions` for plain mock models.
- */
-export function getAttributeType(klass: any, name: string): unknown {
-  if (typeof klass?.typeForAttribute === "function") {
-    return klass.typeForAttribute(name);
-  }
-  return klass._attributeDefinitions?.get?.(name)?.type;
 }
 
 /**

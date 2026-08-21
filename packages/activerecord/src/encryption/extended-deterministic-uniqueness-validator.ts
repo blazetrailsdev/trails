@@ -1,8 +1,4 @@
-import {
-  deterministicEncryptedAttributes,
-  getAttributeType,
-  encryptedTypeOf,
-} from "./encryptable-record.js";
+import { deterministicEncryptedAttributes, encryptedTypeOf } from "./encryptable-record.js";
 import {
   AdditionalValue,
   ExtendedDeterministicQueries,
@@ -102,7 +98,7 @@ export class EncryptedUniquenessValidator {
     const deterministicAttrs = deterministicEncryptedAttributes.call(klass);
     if (!deterministicAttrs.has(attribute)) return;
 
-    const encryptedType = encryptedTypeOf(getAttributeType(klass, attribute));
+    const encryptedType = encryptedTypeOf(klass.typeForAttribute(attribute));
     if (!encryptedType) return;
 
     // When ExtendedDeterministicQueries is installed it already expands the
@@ -132,7 +128,7 @@ export class EncryptedUniquenessValidator {
     // only previous-scheme candidates are AdditionalValue-wrapped. Gating
     // reaches the inner type via encryptedTypeOf (Rails' DelegateClass
     // delegation).
-    const fullType = getAttributeType(klass, attribute) as SerializableType | undefined;
+    const fullType = klass.typeForAttribute(attribute) as SerializableType | undefined;
     const type = encryptedTypeOf(fullType);
     if (!fullType || !type?.deterministic) {
       return [value];
