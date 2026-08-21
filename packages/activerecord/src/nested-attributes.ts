@@ -371,7 +371,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
               ? (optionFk as unknown[]).map(String)
               : [foreignKey];
           const assocPk =
-            reflection?.associationPrimaryKey ?? (targetModel as any).primaryKey ?? "id";
+            reflection?.associationPrimaryKey?.() ?? (targetModel as any).primaryKey ?? "id";
           const assocPkColumns = Array.isArray(assocPk) ? assocPk : [assocPk];
           const arelTable = (ctor as any).arelTable as Table;
           // Use _writeAttribute + direct persistence to avoid re-triggering

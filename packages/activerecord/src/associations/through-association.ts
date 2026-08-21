@@ -134,12 +134,7 @@ export function constructJoinAttributes(
   const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const reflKlass = refl.klass;
-  const assocPk =
-    (typeof sourceRefl.associationPrimaryKeyFor === "function"
-      ? sourceRefl.associationPrimaryKeyFor(reflKlass)
-      : sourceRefl.associationPrimaryKey) ??
-    sourceRefl.primaryKey ??
-    "id";
+  const assocPk = sourceRefl.associationPrimaryKey?.(reflKlass) ?? sourceRefl.primaryKey ?? "id";
   const pkArr: string[] = Array.isArray(assocPk) ? assocPk : [assocPk];
   // Mirrors Rails' `Array(association_primary_key) == reflection.klass.composite_query_constraints_list`.
   // For a single-PK join model this is `["id"] == ["id"]` → true, so the join

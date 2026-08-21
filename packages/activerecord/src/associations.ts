@@ -191,7 +191,7 @@ export interface AssociationDefinition {
   /** Rails' `AssociationReflection#foreign_key`. See {@link macro}. */
   foreignKey?: string | string[];
   /** Rails' `AssociationReflection#association_primary_key`. See {@link macro}. */
-  associationPrimaryKey?: string | string[];
+  associationPrimaryKey?: (klass?: typeof Base) => string | string[];
   /** Rails' `AssociationReflection#counter_cache_column`. See {@link macro}. */
   counterCacheColumn?: () => string | null;
   /** Rails' `AssociationReflection#has_cached_counter?`. See {@link macro}. */

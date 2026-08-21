@@ -104,7 +104,7 @@ export class WhereChain<R = any> {
       }
 
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
       );
       // query_methods.rb:96-99 — the `class_name:` branch keys the hash with the
       // association Symbol, the `else` branch with the table-name String.
@@ -129,7 +129,7 @@ export class WhereChain<R = any> {
       const reflection = this.scopeAssociationReflection(association);
       leftOuterJoinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
+        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
       );
       // query_methods.rb:130-133 — Symbol key for the `class_name:` branch, the
       // table-name String otherwise.
@@ -162,7 +162,7 @@ interface WhereChainReflection {
   name: string;
   tableName: string;
   options: Record<string, unknown>;
-  associationPrimaryKey: string | string[];
+  associationPrimaryKey(): string | string[];
 }
 
 /**

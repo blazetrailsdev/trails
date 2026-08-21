@@ -304,7 +304,7 @@ export interface CompositePrimaryKeyMismatchReflection {
   isCollection?: () => boolean;
   belongsTo?: () => boolean;
   activeRecordPrimaryKey?: string | string[];
-  associationPrimaryKey?: string | string[];
+  associationPrimaryKey?: () => string | string[];
   /** Pre-resolved key for trails-only guard sites that hold no reflection. */
   primaryKey?: string | string[];
 }
@@ -333,7 +333,7 @@ function reflectionPrimaryKey(
     if (reflection.hasOne?.() || reflection.isCollection?.()) {
       return reflection.activeRecordPrimaryKey;
     }
-    return reflection.associationPrimaryKey;
+    return reflection.associationPrimaryKey?.();
   }
   return reflection.primaryKey;
 }

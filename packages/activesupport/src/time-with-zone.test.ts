@@ -977,6 +977,20 @@ describe("TimeWithZoneTest", () => {
     expect(result.sec).toBe(1);
     expect(result.zone).toBe("EDT");
   });
+
+  it("method missing with time return value", () => {
+    const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+    const result = (twz as unknown as { add(d: object): unknown }).add({ months: 1 });
+    expect(result).toBeInstanceOf(TimeWithZone);
+    expect((result as TimeWithZone).time.toString()).toBe("2000-01-31T19:00:00");
+  });
+
+  it("method missing with non time return value", () => {
+    const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+    const result = (twz as unknown as { toPlainDate(): unknown }).toPlainDate();
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect(String(result)).toBe("1999-12-31");
+  });
 });
 
 describe("TimeWithZoneMethodsForString", () => {

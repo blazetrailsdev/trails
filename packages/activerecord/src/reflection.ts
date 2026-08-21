@@ -158,6 +158,12 @@ export class AbstractReflection {
     return false;
   }
 
+  protected primaryKeyForModel(klass: typeof Base): string | string[] {
+    const pk = klass.primaryKey;
+    if (!pk) throw new UnknownPrimaryKey(klass);
+    return pk;
+  }
+
   get tableName(): string {
     return this.klass.tableName;
   }
@@ -999,12 +1005,12 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
-  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#association_primary_key
+   * (reflection.rb:583-585).
+   */
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
     return this.primaryKeyForModel(klass || this.klass);
-  }
-
-  get associationPrimaryKey(): string | string[] {
-    return this.associationPrimaryKeyFor();
   }
 
   get associationForeignKey(): string {
@@ -1059,12 +1065,6 @@ export class AssociationReflection extends MacroReflection {
     return this._activeRecordPrimaryKeyCache;
   }
 
-  protected primaryKeyForModel(klass: typeof Base): string | string[] {
-    const pk = klass.primaryKey;
-    if (!pk) throw new UnknownPrimaryKey(klass);
-    return pk;
-  }
-
   associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
     // Rails (`reflection.rb` AssociationReflection#association_scope_cache):
     //   key = self
@@ -1092,7 +1092,7 @@ export class AssociationReflection extends MacroReflection {
           throw new CompositePrimaryKeyMismatchError(this);
         }
       } else if (this.belongsTo()) {
-        if (arrayLen(this.associationPrimaryKey) !== arrayLen(fk)) {
+        if (arrayLen(this.associationPrimaryKey()) !== arrayLen(fk)) {
           throw new CompositePrimaryKeyMismatchError(this);
         }
       }
@@ -1342,7 +1342,12 @@ export class BelongsToReflection extends AssociationReflection {
     return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
-  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#association_primary_key
+   * (reflection.rb:925-936). The klass option is necessary to support loading
+   * polymorphic associations.
+   */
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
     const pk = this.options.primaryKey;
     if (pk !== undefined) {
       return Array.isArray(pk) ? pk.map(String) : String(pk);
@@ -1362,18 +1367,12 @@ export class BelongsToReflection extends AssociationReflection {
     return this.primaryKeyForModel(targetKlass);
   }
 
-  get associationPrimaryKey(): string | string[] {
-    return this.associationPrimaryKeyFor();
-  }
-
   /**
    * Mirrors: ActiveRecord::Reflection::BelongsToReflection#join_primary_key
    * (reflection.rb:944-946).
    */
   joinPrimaryKey(klass?: typeof Base): string | string[] {
-    return this.isPolymorphic()
-      ? this.associationPrimaryKeyFor(klass)
-      : this.associationPrimaryKeyFor();
+    return this.isPolymorphic() ? this.associationPrimaryKey(klass) : this.associationPrimaryKey();
   }
 
   get joinForeignKey(): string | string[] {
@@ -1409,6 +1408,8 @@ export class HasAndBelongsToManyReflection extends AssociationReflection {
  */
 export class ThroughReflection extends AbstractReflection {
   private _delegate: AssociationReflection;
+  /** `@association_primary_key` — memoized by {@link associationPrimaryKey}. */
+  private _associationPrimaryKey?: string;
 
   /** @internal */
   get delegateReflection(): AssociationReflection {
@@ -1653,8 +1654,29 @@ export class ThroughReflection extends AbstractReflection {
     );
   }
 
-  get associationPrimaryKey(): string | string[] {
-    return this.sourceReflection?.associationPrimaryKey ?? this._delegate.associationPrimaryKey;
+  /**
+   * We want to use the klass from this reflection, rather than just delegate
+   * straight to the source_reflection, because the source_reflection may be
+   * polymorphic. We still need to respect the source_reflection's :primary_key
+   * option, though.
+   *
+   * Mirrors: ActiveRecord::Reflection::ThroughReflection#association_primary_key
+   * (reflection.rb:1083-1090). Unlike BelongsToReflection's (:928), this branch
+   * has no Array arm — it is `-primary_key.to_s` whatever the option holds, and
+   * Ruby's `Array#to_s` is an alias of `inspect`.
+   */
+  associationPrimaryKey(klass?: typeof Base): string | string[] {
+    // Get the "actual" source reflection if the immediate source reflection has a
+    // source reflection itself
+    const primaryKey = (this.actualSourceReflection() as unknown as ConcreteReflection).options
+      ?.primaryKey;
+    if (primaryKey != null && primaryKey !== false) {
+      return (this._associationPrimaryKey ??= Array.isArray(primaryKey)
+        ? rubyInspectArray(primaryKey)
+        : String(primaryKey));
+    } else {
+      return this.primaryKeyForModel(klass || this.klass);
+    }
   }
 
   /**
