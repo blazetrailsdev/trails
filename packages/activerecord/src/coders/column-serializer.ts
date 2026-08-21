@@ -42,7 +42,6 @@ export class ColumnSerializer {
     this._attrName = coder.attrName;
     this._objectClass = coder.objectClass;
     this._coder = coder.coder;
-    this.checkArityOfConstructor();
   }
 
   /**
