@@ -11,13 +11,13 @@
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "instantiate",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106 wave 4g): `/\\At\\d+_r\\d+\\z/.match?(name)` (join_dependency.rb:121) is Rails' heuristic for \"is this column one of the join aliases\". trails already holds the exact alias set the aliases object emitted, so `instantiate` tests `aliasSet.has(key)` (join-dependency.ts:738) instead of re-deriving it from the alias spelling. Same partition of the result columns, no regex to match against."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "walk",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106 wave 4g): `right.children.map { [left.children.find {...}, node1] }.partition(&:first)` (join_dependency.rb:215-217). JS has no `Enumerable#partition`, so the `map` that only exists to feed it is fused into the partitioning `for..of` that fills `intersection`/`missing` directly (join-dependency.ts:455-458) — the pair array Ruby materializes has no reader other than `partition`."
   }
 ]
