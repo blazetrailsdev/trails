@@ -315,9 +315,9 @@ export class PredicateBuilder {
    * `type_for_attribute(name).cast(value)`.
    */
   private normalizeQueryValue(columnName: string, value: unknown): unknown {
-    const klass = this.table.klass as { _normalizations?: Map<string, unknown> } | null;
-    const normalizations = klass?._normalizations;
-    if (!normalizations || !normalizations.has(columnName)) return value;
+    const klass = this.table.klass as { normalizedAttributes?: Set<string> } | null;
+    const normalizedAttributes = klass?.normalizedAttributes;
+    if (!normalizedAttributes || !normalizedAttributes.has(columnName)) return value;
     return this.table.type(columnName).cast(value);
   }
 

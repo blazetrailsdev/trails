@@ -1,4 +1,4 @@
-import { methodMissingProxy } from "@blazetrails/activesupport";
+import { classAttribute, included, methodMissingProxy } from "@blazetrails/activesupport";
 import { SerializeCastValue } from "@blazetrails/activemodel";
 import type { Type } from "@blazetrails/activemodel";
 
@@ -13,29 +13,13 @@ export type NormalizesArgs = [
 ];
 
 /**
- * One attribute's accumulated normalizers. Rails keeps only the attribute
- * NAMES (`class_attribute :normalized_attributes`) because the normalizer
- * itself lives in the decorated cast type; trails also keeps the functions so a
- * decorator can be rebuilt when the attribute set is re-reflected from the
- * schema.
- *
- * @internal
- */
-interface NormalizationEntry {
-  fns: Array<(value: unknown) => unknown>;
-  applyToNil: boolean;
-}
-
-/**
  * The class-side surface `Normalization` needs from its host.
  *
  * @internal
  */
 interface NormalizationClass {
-  _normalizations: Map<string, NormalizationEntry>;
-  _normalizeChangedInPlaceRegistered?: boolean;
+  normalizedAttributes: Set<string>;
   decorateAttributes(names: string[], decorator: (name: string, castType: Type) => Type): void;
-  beforeValidation(callback: (record: any) => void): void;
   typeForAttribute(name: string): Type;
 }
 
@@ -72,21 +56,10 @@ export const ClassMethods = {
    *
    * @missingRailsArgs new — PERMANENT: `NormalizedValueType.new` gets every
    *   Rails kwarg with the same key and value. Rails passes the local `with`;
-   *   `with` is a reserved word in JavaScript and cannot be an identifier, and
-   *   the value passed here is the composed normalizer over every `with` the
-   *   class has declared for the attribute, so it is spelled `normalizer`.
+   *   `with` is a reserved word in JavaScript and cannot be an identifier, so
+   *   the kwarg is read off the options object.
    */
   normalizes(this: NormalizationClass, ...args: NormalizesArgs): void {
-    if (!Object.hasOwn(this, "_normalizations")) {
-      const inherited = this._normalizations;
-      this._normalizations = new Map();
-      if (inherited) {
-        for (const [k, v] of inherited) {
-          this._normalizations.set(k, { fns: [...v.fns], applyToNil: v.applyToNil });
-        }
-      }
-    }
-
     const options = args[args.length - 1] as {
       with: (value: unknown) => unknown;
       applyToNil?: boolean;
@@ -94,66 +67,17 @@ export const ClassMethods = {
     const names = args.slice(0, -1) as string[];
     const applyToNil = options.applyToNil ?? false;
 
-    // trails' analogue of `self.normalized_attributes += names.map(&:to_sym)`
-    // (normalization.rb:94), hoisted above `decorate_attributes` because — unlike
-    // Rails, whose block closes over `with`/`apply_to_nil` directly — the block
-    // below reads the accumulated entry so a pending-decorator replay after a
-    // schema re-reflection rebuilds the SAME normalizer.
-    for (const name of names) {
-      const existing = this._normalizations.get(name);
-      if (existing) {
-        existing.fns.push(options.with);
-        if (applyToNil) existing.applyToNil = true;
-      } else {
-        this._normalizations.set(name, { fns: [options.with], applyToNil });
-      }
-    }
+    this.decorateAttributes(
+      names,
+      (name: string, castType: Type) =>
+        new NormalizedValueType({
+          castType,
+          normalizer: options.with,
+          normalizeNil: applyToNil,
+        }) as unknown as Type,
+    );
 
-    this.decorateAttributes(names, (name: string, castType: Type): Type => {
-      const entry = this._normalizations.get(name);
-      if (!entry) return castType;
-      // The entry is the decorator's identity token: skip when this cast type is
-      // already wrapped with the SAME entry (the immediate apply and the durable
-      // pending replay both run this block), and unwrap+rewrap when a
-      // different/older one is found, so subclass stacking replaces the parent's
-      // wrap with the fuller combined set and a non-idempotent normalizer is
-      // never applied twice.
-      if (castType instanceof NormalizedValueType && castType.token === entry) {
-        return null as unknown as Type;
-      }
-      while (castType instanceof NormalizedValueType) castType = castType.castType;
-      const fns = entry.fns;
-      const normalizer = (value: unknown): unknown => {
-        let result = value;
-        for (const fn of fns) result = fn(result);
-        return result;
-      };
-      const type = new NormalizedValueType({
-        castType,
-        normalizer,
-        normalizeNil: entry.applyToNil,
-      });
-      type.token = entry;
-      return type as unknown as Type;
-    });
-
-    // Rails registers `before_validation :normalize_changed_in_place_attributes`
-    // in the Concern's `included` block (normalization.rb:10). trails registers
-    // it lazily on the first class in a hierarchy to call `normalizes`
-    // (subclasses inherit the callback via the copy-on-write chain, so the
-    // inherited-truthy guard keeps exactly one registration).
-    if (!this._normalizeChangedInPlaceRegistered) {
-      Object.defineProperty(this, "_normalizeChangedInPlaceRegistered", {
-        value: true,
-        writable: true,
-        configurable: true,
-      });
-      this.beforeValidation(
-        (record: NormalizationRecord & { normalizeChangedInPlaceAttributes(): void }) => {
-          record.normalizeChangedInPlaceAttributes();
-        },
-      );
-    }
+    this.normalizedAttributes = new Set([...this.normalizedAttributes, ...names]);
   },
 
   /**
@@ -179,24 +103,27 @@ export const ClassMethods = {
 export function normalizeChangedInPlaceAttributes(
   this: NormalizationRecord & { normalizeAttribute(name: string): void },
 ): void {
-  for (const name of (this.constructor as unknown as { normalizedAttributes: Set<string> })
-    .normalizedAttributes) {
+  for (const name of (this.constructor as unknown as NormalizationClass).normalizedAttributes) {
     if (this.attributeChangedInPlace(name)) this.normalizeAttribute(name);
   }
 }
 
 /**
- * Set of attribute names with a registered normalizer.
- *
- * Mirrors: ActiveRecord::Normalization's `class_attribute :normalized_attributes`
- * (normalization.rb:8). trails stores the normalizer functions alongside the
- * names in `_normalizations`; this reader is the Rails-shaped Set view.
+ * Mirrors: ActiveRecord::Normalization's `included do ... end`
+ * (normalization.rb:7-11) — the `class_attribute` and the `before_validation`
+ * that arrive with the module itself, not with a `normalizes` declaration.
  */
-export function normalizedAttributes(klass: {
-  _normalizations?: Map<string, unknown>;
-}): Set<string> {
-  return new Set(klass._normalizations ? klass._normalizations.keys() : []);
-}
+export const InstanceMethods = {
+  normalizeAttribute,
+  normalizeChangedInPlaceAttributes,
+
+  [included](base: any): void {
+    classAttribute.call(base, "normalizedAttributes", { default: new Set<string>() });
+    base.beforeValidation((record: { normalizeChangedInPlaceAttributes(): void }) => {
+      record.normalizeChangedInPlaceAttributes();
+    });
+  },
+};
 
 /**
  * Decorates an underlying cast type with a normalizer. When `cast` is called,
@@ -229,15 +156,6 @@ export class NormalizedValueType {
   readonly castType: Type;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
-
-  /**
-   * Identity used by the attribute-decoration pipeline to recognize "already
-   * decorated by this normalization" during seed + pending replay, so a
-   * normalizer applies exactly once per attribute.
-   *
-   * @internal
-   */
-  token: unknown = undefined;
 
   constructor(options: {
     castType: Type;

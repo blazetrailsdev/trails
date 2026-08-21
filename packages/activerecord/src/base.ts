@@ -852,13 +852,12 @@ export class Base extends Model {
   // Normalization
   declare static normalizes: (...args: NormalizesArgs) => void;
   declare static normalizeValueFor: (name: string, value: unknown) => unknown;
-  /** @internal */
-  static _normalizations: Map<
-    string,
-    { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }
-  > = new Map();
-  /** Guards one-time `before_validation` registration per class (see `normalizes`). */
-  declare static _normalizeChangedInPlaceRegistered?: boolean;
+  /**
+   * Mirrors: ActiveRecord::Normalization's `class_attribute
+   * :normalized_attributes, default: Set.new` (normalization.rb:8), installed
+   * by the module's `included` hook.
+   */
+  declare static normalizedAttributes: Set<string>;
 
   declare static lookupAncestors: typeof Translation.lookupAncestors;
 
@@ -1825,15 +1824,6 @@ export class Base extends Model {
 
   static set verboseQueryLogs(value: boolean) {
     _setVerboseQueryLogs(value);
-  }
-
-  /**
-   * Set of attribute names with a registered normalizer.
-   *
-   * Mirrors: ActiveRecord::Base.normalized_attributes
-   */
-  static get normalizedAttributes(): Set<string> {
-    return Normalization.normalizedAttributes(this);
   }
 
   /**
@@ -4617,10 +4607,11 @@ extend(Base, CounterCache.ClassMethods);
     },
   });
 }
-extend(Base, Normalization.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
+extend(Base, Normalization.ClassMethods);
+include(Base, Normalization.InstanceMethods);
 extend(Base, {
   enum: _EnumModule.enumMethod,
   _enum: _EnumModule._enum,
@@ -4898,9 +4889,6 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // Normalization
-  normalizeChangedInPlaceAttributes: Normalization.normalizeChangedInPlaceAttributes,
-  normalizeAttribute: Normalization.normalizeAttribute,
   // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
   // (readAttributeBeforeTypeCast is a method, attributesBeforeTypeCast is a getter).
   // The re-exports in before-type-cast.ts call record.<methodName>(), so wiring
