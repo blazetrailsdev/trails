@@ -1123,29 +1123,21 @@ export class DelegationMethods {
    * serialize the loaded records as an XML collection.
    *
    * One `XmlMini` builder is created (`:188`) and threaded through every
-   * `to_tag` call, which is how nesting and indentation compose. The default
-   * root is `pluralize(underscore(first.class.name)).tr("/", "_")` (`:190-193`)
-   * when `first.class != Hash && all?(first.class)`, else `"objects"`:
+   * `to_tag` call (`:208`), which is how nesting and indentation compose. The
+   * default root is `pluralize(underscore(first.class.name)).tr("/", "_")`
+   * (`:190-193`) when `first.class != Hash && all?(first.class)`, else
+   * `"objects"`. `all?` is `Class#===`, so a subclass still matches and an STI
+   * collection roots under its base's plural; the Hash guard is live in
+   * Rails' suite (conversions_test.rb `test_to_xml_with_options` roots an array
+   * of hashes under `<objects>`), and Ruby's Hash is a JS plain object. On an
+   * empty array `first` is nil and `all?` is vacuously true, so the same branch
+   * yields the *pre-rename* `"nil_classes"`, which `renameKey` then dasherizes.
    *
-   * - `all?` is `Class#===`, so a subclass instance still matches — an STI
-   *   collection whose first element is the base class roots under the base's
-   *   plural rather than `<objects>`.
-   * - The Hash guard is live in Rails' own suite: an array of hashes roots under
-   *   `<objects>` (conversions_test.rb `test_to_xml_with_options`). Ruby's Hash
-   *   is a JS plain object, whose constructor is `Object`.
-   * - Ruby's `first` on an empty array is `nil`, so this same branch yields
-   *   `underscore(NilClass.name).pluralize` = `"nil_classes"` — the *pre-rename*
-   *   value, which is what composes with `dasherize: false` / `camelize:`. An
-   *   empty `all?` is vacuously true, matching `Array#every`.
-   *
-   * Rails renames the root first, then singularizes the already-renamed root for
-   * the child name (`:200-202`), and deletes `:children` and `:skip_instruct` so
-   * neither reaches `to_tag`. Each child is rendered by `XmlMini.to_tag` (`:208`),
-   * which is also what would dispatch to a per-record `to_xml` — ActiveModel has
-   * carried no such method since Rails 4.2 moved XML serialization out to the
-   * external `activemodel-serializers-xml` gem, so a record falls through
-   * `to_tag`'s generic arm (xml_mini.rb:132-135) exactly as it does in gem-less
-   * Rails.
+   * Rails renames the root first, then singularizes it for the child name, and
+   * deletes `:children` / `:skip_instruct` so neither reaches `to_tag`
+   * (`:199-202`). ActiveModel has carried no per-record `to_xml` since Rails 4.2
+   * moved XML out to the `activemodel-serializers-xml` gem, so records fall
+   * through `to_tag`'s generic arm (xml_mini.rb:132-135) as in gem-less Rails.
    */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
     const records = await this.records();
