@@ -958,10 +958,12 @@ describe("TimeWithZoneTest", () => {
 
   it("freeze preloads instance variables", () => {
     const twz = maketwz();
-    Object.freeze(twz);
+    twz.freeze();
     expect(() => {
+      twz.period;
       twz.time;
-      twz.utc();
+      twz.toDatetime();
+      twz.toTime();
     }).not.toThrow();
   });
 
@@ -1085,7 +1087,9 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 month into spring dst gap", () => {
-    const twz = eastern.local(2006, 3, 2, 2);
+    // `TimeWithZone.new(nil, @time_zone, Time.utc(2006, 3, 2, 2))`
+    // (time_with_zone_test.rb:918) — the LOCAL-time constructor arm.
+    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-03-02T02:00:00"));
     const result = twz.advance({ months: 1 });
     expect(result.hour).toBe(3);
     expect(result.dst()).toBe(true);
@@ -1093,7 +1097,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 second into spring dst gap", () => {
-    const twz = eastern.local(2006, 4, 2, 1, 59, 59);
+    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-04-02T01:59:59"));
     const result = twz.advance({ seconds: 1 });
     expect(result.hour).toBe(3);
     expect(result.min).toBe(0);

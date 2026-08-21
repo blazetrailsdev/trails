@@ -64,3 +64,37 @@ describe("TimeWithZone to_fs over Time::DATE_FORMATS", () => {
     }
   });
 });
+
+// `initialize`'s local-time arm (time_with_zone.rb:51-56): with no `utc_time`,
+// `get_period_and_ensure_valid_local_time` (:570-581) resolves the period from
+// the LOCAL time, and rescues `TZInfo::PeriodNotFound` by moving the time
+// forward an hour and retrying — the only place the class raises on, or
+// repairs, a local time that does not exist.
+describe("TimeWithZone local-time construction", () => {
+  const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+
+  it("resolves the period from the local time", () => {
+    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-01-02T03:00:00"));
+    expect(twz.zone).toBe("EST");
+    expect(twz.utcOffset).toBe(-5 * 3600);
+    expect(twz.inspect()).toBe("2006-01-02 03:00:00.000000000 EST -05:00");
+  });
+
+  it("moves a local time in the spring-forward gap ahead one hour", () => {
+    // 2006-04-02 02:30 EST does not exist: the clocks went 02:00 → 03:00.
+    const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-04-02T02:30:00"));
+    expect(twz.zone).toBe("EDT");
+    expect(twz.inspect()).toBe("2006-04-02 03:30:00.000000000 EDT -04:00");
+  });
+
+  it("keeps a period handed to it rather than looking one up", () => {
+    const period = eastern.periodForUtc(Temporal.Instant.from("2006-07-01T00:00:00Z"));
+    const twz = new TimeWithZone(
+      null,
+      eastern,
+      Temporal.PlainDateTime.from("2006-01-02T03:00:00"),
+      period,
+    );
+    expect(twz.zone).toBe("EDT");
+  });
+});
