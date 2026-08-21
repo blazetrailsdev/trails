@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
-    "call": "instantiate",
-    "reason": "querying.rb:89 — the STI arm of the branch the `inheritance_column` row above describes; with no result-set column check, trails takes one `_instantiate` path for both arms. Converges with that row."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
-    "rubyName": "_load_from_sql",
     "call": "instantiate_instance_of",
     "reason": "querying.rb:92 — the homogeneous arm of the same branch. Routing it through `instantiateInstanceOf` would also change which of `_instantiate`'s two type maps the column types land in (see the `persistence.ts instantiate -> instantiate_instance_of` row). Converges with the `inheritance_column` row."
   }

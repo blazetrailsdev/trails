@@ -2249,20 +2249,20 @@ export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unk
   // run later, at render time. (Array/Set only, matching `quoteBoundValue` in
   // sanitization.ts rather than every `respond_to?(:map)` iterable.)
   if (Array.isArray(value) || value instanceof Set) {
-    const mapped = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase() : v));
+    const mapped = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
     return mapped.length === 0 ? null : mapped;
   }
-  if (hasIdForDatabase(value)) return value.idForDatabase();
+  if (hasIdForDatabase(value)) return value.idForDatabase;
   return value;
 }
 
-function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {
+function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
   return (
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
     !(value instanceof Set) &&
-    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
+    "idForDatabase" in value
   );
 }
 

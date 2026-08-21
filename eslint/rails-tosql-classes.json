@@ -4,7 +4,7 @@
     "activerecord": [
       {
         "name": "DatabaseStatements",
-        "methods": ["toSql", "toSqlAndBinds"],
+        "methods": ["toSql", "toSqlAndBinds", "_toSqlAndBinds"],
         "rubyFile": "connection_adapters/abstract/database_statements.rb",
         "tsFile": "connection-adapters/abstract/database-statements.ts"
       },

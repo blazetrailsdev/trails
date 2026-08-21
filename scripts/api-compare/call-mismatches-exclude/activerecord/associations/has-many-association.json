@@ -2,6 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-many-association.ts",
+    "rubyName": "count_records",
+    "call": "min",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "has_many_association.rb:95 `[association_scope.limit_value, count].compact.min` — Ruby's Enumerable#min is a RECEIVER method taking no arguments; JS's is `Math.min(...values)`, which takes the values as arguments. Same values, same result, and the only spellings that would report zero args (an Array.prototype extension, or a receiver-shaped helper named `min`) are surface trails does not add. Language shortcoming."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-many-association.ts",
     "rubyName": "handle_dependency",
     "call": "fetch",
     "reason": "Ruby `options.fetch(:ensuring_owner_was, nil)` (has_many_association.rb:52); a JS object has no `fetch`, so the stored-nil semantics are spelled as an own-key check at the call site."

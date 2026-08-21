@@ -437,7 +437,7 @@ function replaceNamedBindVariables(
  */
 function quoteBoundValue(connection: Quoter, value: unknown): string {
   if (hasIdForDatabase(value)) {
-    const cast = connection.castBoundValue(value.idForDatabase());
+    const cast = connection.castBoundValue(value.idForDatabase);
     return connection.quote(cast);
   }
 
@@ -453,7 +453,7 @@ function quoteBoundValue(connection: Quoter, value: unknown): string {
     }
     return values
       .map((v) => {
-        const idVal = hasIdForDatabase(v) ? v.idForDatabase() : v;
+        const idVal = hasIdForDatabase(v) ? v.idForDatabase : v;
         const cast = connection.castBoundValue(idVal);
         return connection.quote(cast);
       })
@@ -464,13 +464,13 @@ function quoteBoundValue(connection: Quoter, value: unknown): string {
   return connection.quote(cast);
 }
 
-function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {
+function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
   return (
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
     !(value instanceof Set) &&
-    typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
+    "idForDatabase" in value
   );
 }
 

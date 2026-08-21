@@ -30,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "query_constraints_list",
-    "call": "base_class?",
-    "reason": "persistence.rb:223 `base_class? || primary_key != base_class.primary_key`. trails walks the prototype chain instead (persistence.ts:199-215) because `baseClass` is itself derived from that walk. Note Ruby's `!=` on the primary-key ARRAY is value equality, so the converged port needs an element-wise compare, not `!==`; tracked."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "reload",
     "call": "merge",
     "reason": "persistence.rb:746 `(options || {}).merge(all_queries: true)` — Ruby Hash#merge returning a new hash is JS object spread (`{ ...findOptions, allQueries: true }`, persistence.ts:1422); there is no Hash object to call `merge` on. Language shortcoming."

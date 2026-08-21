@@ -13,7 +13,7 @@ describe("AssociationQueryValue", () => {
     it("extracts the id from a record-like value", () => {
       const value = { id: 7, title: "x" };
       const av = new AssociationQueryValue(
-        { joinForeignKey: "author_id", joinPrimaryKey: "id" },
+        { joinForeignKey: "author_id", joinPrimaryKey: () => "id" },
         value,
       );
       expect(av.queries()).toEqual([{ author_id: [7] }]);
@@ -21,7 +21,7 @@ describe("AssociationQueryValue", () => {
 
     it("wraps a scalar value in a single-element array", () => {
       const av = new AssociationQueryValue(
-        { joinForeignKey: "author_id", joinPrimaryKey: "id" },
+        { joinForeignKey: "author_id", joinPrimaryKey: () => "id" },
         42,
       );
       expect(av.queries()).toEqual([{ author_id: [42] }]);
@@ -30,10 +30,10 @@ describe("AssociationQueryValue", () => {
     it("maps an array of records to an id list", () => {
       const v1 = { id: 1 };
       const v2 = { id: 2 };
-      const av = new AssociationQueryValue({ joinForeignKey: "author_id", joinPrimaryKey: "id" }, [
-        v1,
-        v2,
-      ]);
+      const av = new AssociationQueryValue(
+        { joinForeignKey: "author_id", joinPrimaryKey: () => "id" },
+        [v1, v2],
+      );
       expect(av.queries()).toEqual([{ author_id: [1, 2] }]);
     });
   });
@@ -44,7 +44,7 @@ describe("AssociationQueryValue", () => {
       const av = new AssociationQueryValue(
         {
           joinForeignKey: ["blog_id", "id"],
-          joinPrimaryKey: ["blog_id", "blog_post_id"],
+          joinPrimaryKey: () => ["blog_id", "blog_post_id"],
         },
         comment,
       );
@@ -58,7 +58,7 @@ describe("AssociationQueryValue", () => {
       const av = new AssociationQueryValue(
         {
           joinForeignKey: ["blog_id", "id"],
-          joinPrimaryKey: ["blog_id", "blog_post_id"],
+          joinPrimaryKey: () => ["blog_id", "blog_post_id"],
         },
         [c1, c2],
       );
@@ -83,7 +83,7 @@ describe("AssociationQueryValue", () => {
       const av = new AssociationQueryValue(
         {
           joinForeignKey: ["blog_id", "blog_post_id"],
-          joinPrimaryKey: ["blog_id", "id"],
+          joinPrimaryKey: () => ["blog_id", "id"],
         },
         record,
       );
@@ -111,7 +111,7 @@ describe("AssociationQueryValue", () => {
       const av = new AssociationQueryValue(
         {
           joinForeignKey: ["blog_id", "id"],
-          joinPrimaryKey: ["blog_id", "blog_post_id"],
+          joinPrimaryKey: () => ["blog_id", "blog_post_id"],
         },
         fakeRelation,
       );
@@ -126,7 +126,7 @@ describe("AssociationQueryValue", () => {
       const av = new AssociationQueryValue(
         {
           joinForeignKey: ["blog_id", "id"],
-          joinPrimaryKey: ["blog_id", "blog_post_id"],
+          joinPrimaryKey: () => ["blog_id", "blog_post_id"],
         },
         [null],
       );

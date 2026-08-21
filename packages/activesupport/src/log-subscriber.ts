@@ -2,6 +2,7 @@ import { Subscriber, getClassState } from "./subscriber.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
 import { trailsLogger } from "./trails-logger-slot.js";
+import { transformKeys } from "./hash-utils.js";
 
 /**
  * ActiveSupport::LogSubscriber — a Subscriber that dispatches events
@@ -159,16 +160,11 @@ export class LogSubscriber extends Subscriber {
   }
 
   private static _setEventLevels(): void {
-    // Rails: `subscriber.event_levels = log_levels.transform_keys { |k| "#{k}.#{namespace}" }`
     // Only updates the subscriber from the most recent attachTo call.
     const state = getClassState(this);
     const sub = state.subscriber as LogSubscriber | undefined;
     if (!sub) return;
-    const levels = new Map<string, (logger: Logger) => boolean>();
-    for (const [k, v] of this.logLevels) {
-      levels.set(`${k}.${state.namespace}`, v);
-    }
-    sub.eventLevels = levels;
+    sub.eventLevels = transformKeys(this.logLevels, (k) => `${k}.${state.namespace}`);
   }
 
   // -- Instance state ------------------------------------------------------

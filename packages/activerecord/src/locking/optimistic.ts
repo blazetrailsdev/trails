@@ -68,7 +68,7 @@ function buildBaseConstraints(
   const constraintsList = queryConstraintsList.call(ctor as any);
   if (!constraintsList) {
     const pk = ctor.primaryKey as string;
-    return { [pk]: (instance as any).idInDatabase?.() ?? (instance as any).id };
+    return { [pk]: (instance as any).idInDatabase ?? (instance as any).id };
   }
   return Object.fromEntries(
     constraintsList.map((col: string) => [

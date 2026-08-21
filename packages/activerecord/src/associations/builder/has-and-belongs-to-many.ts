@@ -36,20 +36,23 @@ export class HasAndBelongsToMany {
     const options = this.options;
 
     const joinModelName = `HABTM_${camelize(associationName)}`;
-    const tableName = this._tableName();
+    const tableNameResolver = () => this._tableName();
     const rightName = singularize(associationName);
 
     const joinModel: any = {
       name: joinModelName,
       leftModel: lhsModel,
-      _tableName: tableName,
+      tableNameResolver,
+      _tableName: null as string | null,
       _associations: [],
       _reflections: {},
       leftReflection: null as any,
       rightReflection: null as any,
 
       get tableName() {
-        return this._tableName;
+        // Table name needs to be resolved lazily
+        // because RHS class might not have been loaded
+        return (this._tableName ??= this.tableNameResolver());
       },
 
       computeType(className: string) {

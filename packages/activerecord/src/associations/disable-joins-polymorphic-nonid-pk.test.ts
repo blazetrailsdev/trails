@@ -4,7 +4,7 @@
  * The non-DJAS path has a regression test at
  * `association-scope.test.ts` ("findTarget through with sourceType +
  * non-id target PK uses correct join column"). The DJAS walk routes
- * through the same reflection infrastructure (`joinPrimaryKeyFor`
+ * through the same reflection infrastructure (`joinPrimaryKey`
  * resolves the source target's actual PK column for a polymorphic
  * belongsTo at runtime), but no direct DJAS coverage existed for
  * that intersection. This file pins the DJAS shape end-to-end.

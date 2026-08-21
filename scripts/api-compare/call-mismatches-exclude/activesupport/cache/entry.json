@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "cache/entry.ts",
-    "rubyName": "compressed",
-    "call": "compressed?",
-    "reason": "Rails' Entry#compressed short-circuits on its own `compressed?` predicate (activesupport/lib/active_support/cache/entry.rb:77); trails' port tests the `_compressed` field inline instead of calling the ported predicate. Unmasked by the RFC 0025 same-file-closure fix, not introduced by it."
-  }
-]

@@ -351,6 +351,7 @@ interface TimeZoneConversionHost {
   timeZoneAwareAttributes: boolean;
   skipTimeZoneConversionForAttributes: string[];
   timeZoneAwareTypes: string[];
+  /** @internal */
   _hookAttributeType?(name: string, castType: unknown): unknown;
 }
 

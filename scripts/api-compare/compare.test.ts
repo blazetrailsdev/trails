@@ -627,7 +627,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["match? → isMatch|match|matchQ"]);
+      expect(missing).toEqual(["match? → isMatch|match|matchQ|_isMatch|_match|_matchQ"]);
     });
 
     it("still flags an enumerable call the TS body makes in no form", () => {
@@ -639,7 +639,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["any? → isAny|any|anyQ"]);
+      expect(missing).toEqual(["any? → isAny|any|anyQ|_isAny|_any|_anyQ"]);
     });
 
     it("does not flag exclude?/none? when the TS body negates the analogue", () => {
@@ -670,8 +670,8 @@ describe("significantMissingCalls", () => {
         wide,
       );
       expect(missing).toEqual([
-        "exclude? → isExclude|exclude|excludes|excludeQ",
-        "none? → isNone|none|noneQ",
+        "exclude? → isExclude|exclude|excludes|excludeQ|_isExclude|_exclude|_excludes|_excludeQ",
+        "none? → isNone|none|noneQ|_isNone|_none|_noneQ",
       ]);
     });
 
@@ -2483,7 +2483,10 @@ describe("ambiguousTsNames", () => {
   const map = (c: string) => rubyMethodToTs(c);
 
   it("names the TS spelling a predicate and its plain sibling share", () => {
-    expect([...ambiguousTsNames(["validate?", "validate", "name"], map)]).toEqual(["validate"]);
+    expect([...ambiguousTsNames(["validate?", "validate", "name"], map)]).toEqual([
+      "validate",
+      "_validate",
+    ]);
   });
 
   it("is empty when every Ruby call maps to its own TS names", () => {
@@ -2520,7 +2523,7 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
     expect(reorderedCalls("create", ["build", "save"], ["build"], ported, map, wide)).toEqual([]);
     expect(
       significantMissingCalls("create", ["build", "save"], new Set(["build"]), ported, map, wide),
-    ).toEqual(["save → save"]);
+    ).toEqual(["save → save|_save"]);
   });
 
   it("reports one flag per body, naming the first inversion", () => {

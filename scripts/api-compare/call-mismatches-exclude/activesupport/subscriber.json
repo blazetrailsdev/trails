@@ -1,0 +1,14 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "subscriber.ts",
+    "rubyName": "add_event_subscriber",
+    "call": "subscribe",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:pattern",
+      "ref:subscriber"
+    ],
+    "reason": "subscriber.rb:94 `notifier.subscribe(pattern, subscriber)` passes the Subscriber OBJECT, which Notifications then invokes through Ruby's `#call` protocol; a JS notifier takes a callable, so trails passes `(e) => sub.call(e)`. Language shortcoming: JS has no object-answers-to-call protocol. Same substitution already ratified one file over for `log-subscriber.ts silenced? -> call`, and the wrapper's whole body is the `#call` Ruby would have made. Surfaced by the leading-underscore candidate (RFC 0106)."
+  }
+]

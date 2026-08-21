@@ -31,7 +31,13 @@ import {
 import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { camelize, eachSlice, singularize, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  eachSlice,
+  selectBang,
+  singularize,
+  underscore,
+} from "@blazetrails/activesupport";
 
 /**
  * Proxy that handles a has_many association.
@@ -358,79 +364,42 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /**
-   * Counts the collection's records, applying the counter cache, the
-   * `limit_value` clamp, and the empty-DB loaded side-effect.
-   *
    * Mirrors: ActiveRecord::Associations::HasManyAssociation#count_records
+   * (has_many_association.rb:80-95).
    * @internal
    */
   async countRecords(): Promise<number> {
-    const refl = this.reflection;
-    return countRecords({
-      hasActiveCachedCounter: () => refl.hasActiveCachedCounter?.() ?? false,
-      counterCacheColumn: () => refl.counterCacheColumn?.() ?? null,
-      readCounterAttribute: (col) => (this.owner as any).readAttribute(col),
-      countViaScope: async () => {
-        const rel = (this as any).scope?.();
-        // has_many_association.rb:84 `scope.count(:all)`: `:all` keeps a
-        // `select` declared on the association off the COUNT.
-        return rel && typeof rel.count === "function"
-          ? await rel.count("all")
-          : (this as CollectionAssociation).target.length;
-      },
-      limitValue: () =>
-        ((this as CollectionAssociation).scope() as { limitValue?: number | null })?.limitValue ??
-        null,
-      retainOnlyNewRecords: () => {
-        const self = this as CollectionAssociation;
-        self._writeTargetStore(self.target.filter((r) => r.isNewRecord()));
-      },
-      markLoaded: () => (this as CollectionAssociation).loadedBang(),
-    });
+    const reflection = this.reflection as unknown as {
+      hasActiveCachedCounter(): boolean;
+      counterCacheColumn(): string | null;
+    };
+    let count: number;
+    if (reflection.hasActiveCachedCounter()) {
+      // has_active_cached_counter? guarantees a counter column, but guard
+      // against a null column anyway — `nil.to_i == 0` in Rails.
+      const column = reflection.counterCacheColumn();
+      count = column == null ? 0 : toI((this.owner as any).readAttribute(column));
+    } else {
+      count = await (this as unknown as CollectionAssociation).scope().count("all");
+    }
+
+    // If there's nothing in the database, @target should only contain new
+    // records or be an empty array. This is a documented side-effect of
+    // the method that may avoid an extra SELECT.
+    if (count === 0) {
+      selectBang((this as unknown as CollectionAssociation).target, (record) =>
+        record.isNewRecord(),
+      );
+      (this as unknown as CollectionAssociation).loadedBang();
+    }
+
+    const limitValue = (
+      (this as unknown as CollectionAssociation).associationScope() as {
+        limitValue?: number | null;
+      } | null
+    )?.limitValue;
+    return limitValue == null ? count : Math.min(limitValue, count);
   }
-}
-
-/**
- * Host surface `countRecords` needs, abstracting the OO association and the
- * CollectionProxy (which keep their cardinality in different fields).
- * @internal
- */
-export interface CountRecordsHost {
-  hasActiveCachedCounter(): boolean;
-  counterCacheColumn(): string | null;
-  readCounterAttribute(column: string): unknown;
-  countViaScope(): Promise<number>;
-  limitValue(): number | null;
-  retainOnlyNewRecords(): void;
-  markLoaded(): void;
-}
-
-/**
- * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
- * (has_many_association.rb): read the counter cache when active, otherwise
- * `scope.count(:all)`; when the DB is empty purge non-new records and mark the
- * target loaded — a documented side-effect that may avoid an extra SELECT —
- * then clamp to `[association_scope.limit_value, count].compact.min`.
- * @internal
- */
-export async function countRecords(host: CountRecordsHost): Promise<number> {
-  let count: number;
-  if (host.hasActiveCachedCounter()) {
-    // has_active_cached_counter? guarantees a counter column, but guard against
-    // a null column anyway — `nil.to_i == 0` in Rails.
-    const column = host.counterCacheColumn();
-    count = column == null ? 0 : toI(host.readCounterAttribute(column));
-  } else {
-    count = await host.countViaScope();
-  }
-
-  if (count === 0) {
-    host.retainOnlyNewRecords();
-    host.markLoaded();
-  }
-
-  const limitValue = host.limitValue();
-  return limitValue == null ? count : Math.min(limitValue, count);
 }
 
 /** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */

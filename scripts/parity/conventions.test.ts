@@ -149,12 +149,24 @@ describe("snakeToCamel", () => {
   });
 });
 
+/**
+ * The candidate list minus the trailing `_`-prefixed private-helper spellings,
+ * which every Ruby name now also offers and which are asserted on their own
+ * below — so the pairing tests here keep reading as the ordering contract they
+ * were written as.
+ */
+const bareCandidates = (name: string, siblings?: ReadonlySet<string>): string[] | null =>
+  rubyMethodToTs(name, siblings)?.filter((c) => !c.startsWith("_")) ?? null;
+
+const bareCandidatesIgnoringSkip = (name: string): string[] | null =>
+  rubyMethodToTsIgnoringSkip(name)?.filter((c) => !c.startsWith("_")) ?? null;
+
 describe("rubyMethodToTsIgnoringSkip", () => {
   it("maps SKIP names that rubyMethodToTs refuses", () => {
     expect(rubyMethodToTs("freeze")).toBeNull();
-    expect(rubyMethodToTsIgnoringSkip("freeze")).toEqual(["freeze"]);
-    expect(rubyMethodToTsIgnoringSkip("lookup_cast_type")).toEqual(["lookupCastType"]);
-    expect(rubyMethodToTsIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
+    expect(bareCandidatesIgnoringSkip("freeze")).toEqual(["freeze"]);
+    expect(bareCandidatesIgnoringSkip("lookup_cast_type")).toEqual(["lookupCastType"]);
+    expect(bareCandidatesIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
   });
 
   it("still refuses operators", () => {
@@ -188,33 +200,33 @@ describe("rubyMethodToTs", () => {
   });
 
   it("transforms bang methods to *Bang", () => {
-    expect(rubyMethodToTs("save!")).toEqual(["saveBang"]);
+    expect(bareCandidates("save!")).toEqual(["saveBang"]);
   });
 
   it("strips the trailing `=` from setter methods", () => {
-    expect(rubyMethodToTs("name=")).toEqual(["name", "setName"]);
+    expect(bareCandidates("name=")).toEqual(["name", "setName"]);
   });
 
   it("orders the setX candidate after the bare accessor for setter methods", () => {
-    expect(rubyMethodToTs("table_name=")).toEqual(["tableName", "setTableName"]);
+    expect(bareCandidates("table_name=")).toEqual(["tableName", "setTableName"]);
     // Underscore-prefixed storage slots get no `setX` candidate at all.
     expect(rubyMethodToTs("_load_from=")).toEqual(["_loadFrom"]);
   });
 
   it("offers setX first when the Ruby reader of the same base also exists", () => {
     const siblings = new Set(["beginning_of_week", "beginning_of_week="]);
-    expect(rubyMethodToTs("beginning_of_week=", siblings)).toEqual([
+    expect(bareCandidates("beginning_of_week=", siblings)).toEqual([
       "setBeginningOfWeek",
       "beginningOfWeek",
     ]);
     // No paired reader: the bare accessor still comes first.
-    expect(rubyMethodToTs("table_name=", new Set(["table_name="]))).toEqual([
+    expect(bareCandidates("table_name=", new Set(["table_name="]))).toEqual([
       "tableName",
       "setTableName",
     ]);
     // A Ruby `set_#{base}` of its own already owns the `setX` spelling.
     expect(
-      rubyMethodToTs(
+      bareCandidates(
         "content_type=",
         new Set(["content_type", "content_type=", "set_content_type"]),
       ),
@@ -226,10 +238,47 @@ describe("rubyMethodToTs", () => {
   });
 
   it("camelCases capitalized snake-case visit method names", () => {
-    expect(rubyMethodToTs("visit_Arel_Nodes_SelectStatement")).toEqual([
+    expect(bareCandidates("visit_Arel_Nodes_SelectStatement")).toEqual([
       "visitArelNodesSelectStatement",
     ]);
-    expect(rubyMethodToTs("visit__no_edges")).toEqual(["visitNoEdges"]);
+    expect(bareCandidates("visit__no_edges")).toEqual(["visitNoEdges"]);
+  });
+});
+
+describe("rubyMethodToTs private helpers", () => {
+  it("offers the _-prefixed spelling last for every candidate", () => {
+    // trails prefixes a private helper with `_` to keep it off the public
+    // surface, so `ActionController::Parameters#convert_value_to_parameters`
+    // (actionpack/lib/action_controller/metal/strong_parameters.rb:1157)
+    // legitimately ports as `_convertValueToParameters`.
+    expect(rubyMethodToTs("convert_value_to_parameters")).toEqual([
+      "convertValueToParameters",
+      "_convertValueToParameters",
+    ]);
+    expect(rubyMethodToTs("save!")).toEqual(["saveBang", "_saveBang"]);
+    expect(rubyMethodToTs("blank?")).toEqual([
+      "isBlank",
+      "blank",
+      "blankQ",
+      "_isBlank",
+      "_blank",
+      "_blankQ",
+    ]);
+  });
+
+  it("leaves the fixed JS spellings alone", () => {
+    // `constructor` / `toString` / `toJSON` / `toSql` / `negate` are
+    // language-mandated names, never private-helper names.
+    expect(rubyMethodToTs("initialize")).toEqual(["constructor"]);
+    expect(rubyMethodToTs("to_s")).toEqual(["toString"]);
+    expect(rubyMethodToTs("to_json")).toEqual(["toJSON"]);
+    expect(rubyMethodToTs("to_sql")).toEqual(["toSql"]);
+    expect(rubyMethodToTs("-@")).toEqual(["negate"]);
+  });
+
+  it("does not double an underscore a Ruby name already carries", () => {
+    expect(rubyMethodToTs("_load_from")).toEqual(["_loadFrom"]);
+    expect(rubyMethodToTs("_load_from=")).toEqual(["_loadFrom"]);
   });
 });
 
@@ -237,18 +286,18 @@ describe("rubyMethodToTs predicates", () => {
   it("strips the redundant is-prefix when the Ruby name already starts with is_", () => {
     // No `isPrefixed` fallback — that would let trails authors land
     // isIsNumber and still get parity:api credit, defeating the rule.
-    expect(rubyMethodToTs("is_number?")).toEqual(["isNumber", "isNumberQ"]);
-    expect(rubyMethodToTs("is_integer?")).toEqual(["isInteger", "isIntegerQ"]);
-    expect(rubyMethodToTs("is_hexadecimal_literal?")).toEqual([
+    expect(bareCandidates("is_number?")).toEqual(["isNumber", "isNumberQ"]);
+    expect(bareCandidates("is_integer?")).toEqual(["isInteger", "isIntegerQ"]);
+    expect(bareCandidates("is_hexadecimal_literal?")).toEqual([
       "isHexadecimalLiteral",
       "isHexadecimalLiteralQ",
     ]);
   });
 
   it("keeps prepending is for predicates that don't already start with one of the allowlisted prefixes", () => {
-    expect(rubyMethodToTs("number?")).toEqual(["isNumber", "number", "numberQ"]);
-    expect(rubyMethodToTs("blank?")).toEqual(["isBlank", "blank", "blankQ"]);
-    expect(rubyMethodToTs("present?")).toEqual(["isPresent", "present", "presentQ"]);
+    expect(bareCandidates("number?")).toEqual(["isNumber", "number", "numberQ"]);
+    expect(bareCandidates("blank?")).toEqual(["isBlank", "blank", "blankQ"]);
+    expect(bareCandidates("present?")).toEqual(["isPresent", "present", "presentQ"]);
   });
 
   it("does NOT treat names that merely camelize to start with 'is' as the is_*? family", () => {
@@ -256,12 +305,12 @@ describe("rubyMethodToTs predicates", () => {
     // `isolation_level?` camelizes to `isolationLevel` (starts with
     // 'is'), but the Ruby base doesn't start with `is_` — keep both
     // candidates so trails methods named either way still match.
-    expect(rubyMethodToTs("isolation_level?")).toEqual([
+    expect(bareCandidates("isolation_level?")).toEqual([
       "isIsolationLevel",
       "isolationLevel",
       "isolationLevelQ",
     ]);
-    expect(rubyMethodToTs("island?")).toEqual(["isIsland", "island", "islandQ"]);
+    expect(bareCandidates("island?")).toEqual(["isIsland", "island", "islandQ"]);
   });
 
   it("keeps the existing has/supports/can/etc allowlist behavior intact (camel preferred, isPrefixed available as fallback)", () => {
@@ -270,18 +319,18 @@ describe("rubyMethodToTs predicates", () => {
     // sometimes needs the disambiguating alias — Reflection exposes
     // `isHasOne()` alongside the `Model.hasOne` association
     // declaration, for example.
-    expect(rubyMethodToTs("has_attribute?")).toEqual([
+    expect(bareCandidates("has_attribute?")).toEqual([
       "hasAttribute",
       "isHasAttribute",
       "hasAttributeQ",
     ]);
-    expect(rubyMethodToTs("supports_savepoints?")).toEqual([
+    expect(bareCandidates("supports_savepoints?")).toEqual([
       "supportsSavepoints",
       "isSupportsSavepoints",
       "supportsSavepointsQ",
     ]);
-    expect(rubyMethodToTs("can_load?")).toEqual(["canLoad", "isCanLoad", "canLoadQ"]);
-    expect(rubyMethodToTs("should_retry?")).toEqual([
+    expect(bareCandidates("can_load?")).toEqual(["canLoad", "isCanLoad", "canLoadQ"]);
+    expect(bareCandidates("should_retry?")).toEqual([
       "shouldRetry",
       "isShouldRetry",
       "shouldRetryQ",
@@ -291,9 +340,9 @@ describe("rubyMethodToTs predicates", () => {
   it("offers the native JS containment spelling for include?/member?/exclude?", () => {
     // A faithful `.includes()` port has neither camel candidate, so without
     // the third candidate every such port needs a bespoke ratchet exclude.
-    expect(rubyMethodToTs("include?")).toEqual(["isInclude", "include", "includes", "includeQ"]);
-    expect(rubyMethodToTs("member?")).toEqual(["isMember", "member", "includes", "memberQ"]);
-    expect(rubyMethodToTs("exclude?")).toEqual(["isExclude", "exclude", "excludes", "excludeQ"]);
+    expect(bareCandidates("include?")).toEqual(["isInclude", "include", "includes", "includeQ"]);
+    expect(bareCandidates("member?")).toEqual(["isMember", "member", "includes", "memberQ"]);
+    expect(bareCandidates("exclude?")).toEqual(["isExclude", "exclude", "excludes", "excludeQ"]);
   });
 
   it("offers the quoted literal first when the Ruby file also defines the bare name", () => {
@@ -301,14 +350,14 @@ describe("rubyMethodToTs predicates", () => {
     // so the camel candidate `debug` names the LOGGING method — the pairing
     // that reported BroadcastLogger's predicate bodies as call mismatches.
     // trails spells the predicate `get "debug?"`, which is what should win.
-    expect(rubyMethodToTs("debug?", new Set(["debug"]))).toEqual([
+    expect(bareCandidates("debug?", new Set(["debug"]))).toEqual([
       "debug?",
       "isDebug",
       "debug",
       "debugQ",
     ]);
     // No bare sibling — the candidate list is untouched.
-    expect(rubyMethodToTs("debug?", new Set())).toEqual(["isDebug", "debug", "debugQ"]);
+    expect(bareCandidates("debug?", new Set())).toEqual(["isDebug", "debug", "debugQ"]);
   });
 
   it("offers the Q suffix last for every predicate", () => {
@@ -320,11 +369,11 @@ describe("rubyMethodToTs predicates", () => {
     // (core.rb:121) — and where the quoted literal is unreachable because the
     // member is a `static` called by name (`Base.primaryClassQ()`,
     // connection_handler.rb:67) or a named `export`.
-    expect(rubyMethodToTs("active_connections?")?.at(-1)).toBe("activeConnectionsQ");
-    expect(rubyMethodToTs("primary_class?")?.at(-1)).toBe("primaryClassQ");
-    expect(rubyMethodToTs("connected_to?")?.at(-1)).toBe("connectedToQ");
-    expect(rubyMethodToTs("readonly_attribute?")?.at(-1)).toBe("readonlyAttributeQ");
-    expect(rubyMethodToTs("strict_locals?")?.at(-1)).toBe("strictLocalsQ");
+    expect(bareCandidates("active_connections?")?.at(-1)).toBe("activeConnectionsQ");
+    expect(bareCandidates("primary_class?")?.at(-1)).toBe("primaryClassQ");
+    expect(bareCandidates("connected_to?")?.at(-1)).toBe("connectedToQ");
+    expect(bareCandidates("readonly_attribute?")?.at(-1)).toBe("readonlyAttributeQ");
+    expect(bareCandidates("strict_locals?")?.at(-1)).toBe("strictLocalsQ");
   });
 
   it("keeps the Q spelling last so existing is-prefixed ports still match first", () => {
@@ -580,7 +629,7 @@ describe("ALREADY_PREDICATE_PREFIXES", () => {
       // `<prefix>_thing?` → [camel, isPrefixed], camel first.
       const camel = snakeToCamel(`${prefix}_thing`);
       const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
-      expect(rubyMethodToTs(`${prefix}_thing?`)).toEqual([camel, isPrefixed, `${camel}Q`]);
+      expect(bareCandidates(`${prefix}_thing?`)).toEqual([camel, isPrefixed, `${camel}Q`]);
     }
   });
 

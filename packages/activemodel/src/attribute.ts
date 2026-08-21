@@ -130,6 +130,11 @@ export abstract class Attribute {
     return this._cachedValueForDatabase;
   }
 
+  /** @internal */
+  protected _valueForDatabase(): unknown {
+    return this.type.serialize(this.value);
+  }
+
   isSerializable(block?: (castValue: unknown) => void): boolean {
     return this.type.isSerializable(this.value, block);
   }
@@ -174,11 +179,11 @@ export abstract class Attribute {
     return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
   }
 
+  abstract typeCast(value: unknown): unknown;
+
   isInitialized(): boolean {
     return true;
   }
-
-  abstract typeCast(value: unknown): unknown;
 
   cameFromUser(): boolean {
     return false;
@@ -205,6 +210,11 @@ export abstract class Attribute {
     return this._originalValueForDatabase();
   }
 
+  /** @internal */
+  protected _originalValueForDatabase(): unknown {
+    return this.type.serialize(this.originalValue);
+  }
+
   private isAssigned(): boolean {
     return this.originalAttribute !== null;
   }
@@ -212,16 +222,6 @@ export abstract class Attribute {
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
-  }
-
-  /** @internal */
-  protected _valueForDatabase(): unknown {
-    return this.type.serialize(this.value);
-  }
-
-  /** @internal */
-  protected _originalValueForDatabase(): unknown {
-    return this.type.serialize(this.originalValue);
   }
 
   /**

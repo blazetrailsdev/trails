@@ -351,10 +351,26 @@ export function _deepTransformKeysInObjectBang(
  * is no Rails method for the port to converge on; JS objects have no such
  * primitive, so it is spelled here in the file that consumes it.
  */
+export function transformKeys<V>(
+  hash: Map<string, V>,
+  block: (key: string) => string,
+): Map<string, V>;
 export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
-): Record<string, unknown> {
+): Record<string, unknown>;
+export function transformKeys(
+  hash: AnyObject | Map<string, unknown>,
+  block: (key: string) => string,
+): Record<string, unknown> | Map<string, unknown> {
+  // A Ruby Hash is spelled either way in trails — a plain object where the keys
+  // are known, a `Map` where they are not — and the primitive has to reach both
+  // or a body holding the Map spelling cannot make the call Ruby makes.
+  if (hash instanceof Map) {
+    const result = new Map<string, unknown>();
+    for (const [key, value] of hash) result.set(block(key), value);
+    return result;
+  }
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(hash)) {
     result[block(key)] = hash[key];

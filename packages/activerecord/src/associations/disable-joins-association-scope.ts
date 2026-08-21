@@ -59,18 +59,13 @@ function readTuple(owner: Base, cols: string[]): unknown[] {
  * hard-codes `"id"` for polymorphic sources since the target class
  * isn't known at definition time, but the resolved sourceType class
  * may use a custom PK (`uuid`, a composite, ...). Routing through
- * `joinPrimaryKeyFor(klass)` mirrors the AssociationScope walk
+ * `joinPrimaryKey(klass)` mirrors the AssociationScope walk
  * (association-scope.ts:nextChainScope) and Rails'
- * `join_primary_key_for(klass)` (reflection.rb:968). Falls back to
- * the static `joinPrimaryKey` when the method isn't exposed (e.g.
- * chain entries that aren't Through / BelongsTo shapes).
+ * `join_primary_key(klass)` (reflection.rb:606, :944, :1093).
  */
 function resolveJoinPrimaryKey(reflection: unknown, klass?: typeof Base): string | string[] {
-  const r = reflection as {
-    joinPrimaryKey: string | string[];
-    joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-  };
-  return typeof r.joinPrimaryKeyFor === "function" ? r.joinPrimaryKeyFor(klass) : r.joinPrimaryKey;
+  const r = reflection as { joinPrimaryKey(klass?: typeof Base): string | string[] };
+  return r.joinPrimaryKey(klass);
 }
 
 /**
@@ -136,7 +131,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // hard-codes `"id"` for polymorphic sources, but a sourceType
       // target may use a different PK (e.g. `uuid`). Mirrors the
       // AssociationScope chain walk which also routes through
-      // joinPrimaryKeyFor (reflection.rb:968).
+      // joinPrimaryKey(klass) (reflection.rb:944).
       const keyCols = keyColumns(
         resolveJoinPrimaryKey(lastReflection, (lastReflection as { klass?: typeof Base }).klass),
         "joinPrimaryKey",

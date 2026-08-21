@@ -151,10 +151,9 @@ export class PredicateBuilder {
       const ft = associatedTable.joinForeignType as string;
       const refl = associatedTable.reflection;
       const pkFor = (klass?: unknown): string | string[] => {
-        const pk =
-          refl && typeof refl.joinPrimaryKeyFor === "function"
-            ? refl.joinPrimaryKeyFor(klass)
-            : (associatedTable.joinPrimaryKey ?? "id");
+        // predicate_builder/polymorphic_array_value.rb:33
+        // `associated_table.join_primary_key(klass(value))`.
+        const pk = associatedTable.joinPrimaryKey(klass as typeof Base | undefined) ?? "id";
         return Array.isArray(pk) ? pk : String(pk);
       };
       const values = Array.isArray(value) ? value : [value];

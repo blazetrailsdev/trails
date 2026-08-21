@@ -805,16 +805,20 @@ export class JoinDependency {
       // marks "no primary key" with a falsy primaryKey ("" / null), matching
       // Rails' nil `node.primary_key`.
       const nodePk = (node.baseKlass as any).primaryKey;
-      let keyCols: string[];
+      let keys: string[];
       if (nodePk) {
-        keyCols = Array.isArray(nodePk) ? nodePk : [nodePk];
+        keys = (Array.isArray(nodePk) ? nodePk : [nodePk]).map(
+          (column) => aliases.columnAlias(node, String(column))!,
+        );
       } else {
-        const jpk = ((node as JoinAssociation).reflection as any).joinPrimaryKey as
+        const jpk = ((node as JoinAssociation).reflection as any).joinPrimaryKey() as
           | string
           | string[];
-        keyCols = Array.isArray(jpk) ? jpk : [jpk];
+        keys = (Array.isArray(jpk) ? jpk : [jpk]).map(
+          (column) => aliases.columnAlias(node, String(column))!,
+        );
       }
-      const keyVals = keyCols.map((c) => row[aliases.columnAlias(node, String(c))!]);
+      const keyVals = keys.map((key) => row[key]);
       if (keyVals.some((v) => v === null || v === undefined)) {
         this._markAssociationLoaded(arParent, node);
         continue;

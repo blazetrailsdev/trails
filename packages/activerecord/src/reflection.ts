@@ -68,7 +68,7 @@ export interface ConcreteReflection {
   readonly type?: string;
   readonly foreignKey?: string | string[];
   readonly scope?: ((...args: any[]) => any) | null;
-  readonly joinPrimaryKey?: string | string[];
+  joinPrimaryKey?(klass?: typeof Base): string | string[];
   readonly joinForeignKey?: string | string[];
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
   scopeFor(relation: any, owner?: any): any;
@@ -88,30 +88,6 @@ function asConcrete(reflection: AbstractReflection): ConcreteReflection {
 
 function arrayLen(value: string | string[]): number {
   return Array.isArray(value) ? value.length : 1;
-}
-
-/**
- * Build the strict-loading violation message for an association. `owner` is the
- * violating record's class (Rails passes `owner.class` and interpolates it via
- * `#{owner}`, yielding the class name); a bare string is accepted too. `name`
- * is the association name. Polymorphic associations get the "polymorphic
- * association" variant, others name their klass.
- *
- * Mirrors: ActiveRecord::Reflection::AbstractReflection#strict_loading_violation_message
- */
-export function strictLoadingViolationMessage(
-  owner: unknown,
-  reflection: { name: string; polymorphic: boolean; className?: string },
-): string {
-  const ownerName =
-    typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
-  const assocDesc = reflection.polymorphic
-    ? "polymorphic association"
-    : `${reflection.className} association`;
-  return (
-    `\`${ownerName}\` is marked for strict_loading. ` +
-    `The ${assocDesc} named \`:${reflection.name}\` cannot be lazily loaded.`
-  );
 }
 
 /**
@@ -278,7 +254,7 @@ export class AbstractReflection {
       scope = scope.merge(chainScope);
     }
 
-    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey);
+    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey!());
     const foreignKeys = this._arrayWrap(this._concrete().joinForeignKey);
 
     if (primaryKeys.length !== foreignKeys.length) {
@@ -315,8 +291,8 @@ export class AbstractReflection {
     // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
-    const klass = this.klass as any;
     const relation = this.buildScope(table, predicateBuilder);
+    const klass = this.klass as any;
     return klass.scopeForAssociation ? klass.scopeForAssociation(relation) : relation;
   }
 
@@ -482,12 +458,20 @@ export class AbstractReflection {
     return `${underscore(this._concrete().pluralName)}_${name}`;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Reflection::AbstractReflection#strict_loading_violation_message
+   * (reflection.rb:344-348). `owner` is the violating record's class, which
+   * Rails interpolates through `#{owner}` for its name; a bare string is
+   * accepted too. `klass` is read only on the non-polymorphic arm, as in Ruby —
+   * a polymorphic reflection has no klass to resolve.
+   */
   strictLoadingViolationMessage(owner: unknown): string {
-    return strictLoadingViolationMessage(owner, {
-      name: this._concrete().name,
-      polymorphic: this.isPolymorphic(),
-      className: this.className,
-    });
+    const ownerName =
+      typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
+    let message = `\`${ownerName}\` is marked for strict_loading.`;
+    message += ` The ${this.isPolymorphic() ? "polymorphic association" : `${this.klass.name} association`}`;
+    message += ` named \`:${this._concrete().name}\` cannot be lazily loaded.`;
+    return message;
   }
 
   hasInverse(): boolean {
@@ -1034,7 +1018,12 @@ export class AssociationReflection extends MacroReflection {
     return this.foreignType;
   }
 
-  get joinPrimaryKey(): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::AssociationReflection#join_primary_key
+   * (reflection.rb:606-608) — the klass argument is accepted and unused, as in
+   * Ruby.
+   */
+  joinPrimaryKey(_klass?: typeof Base): string | string[] {
     return this.foreignKey;
   }
 
@@ -1377,21 +1366,14 @@ export class BelongsToReflection extends AssociationReflection {
     return this.associationPrimaryKeyFor();
   }
 
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::BelongsToReflection#join_primary_key
+   * (reflection.rb:944-946).
+   */
+  joinPrimaryKey(klass?: typeof Base): string | string[] {
     return this.isPolymorphic()
       ? this.associationPrimaryKeyFor(klass)
       : this.associationPrimaryKeyFor();
-  }
-
-  get joinPrimaryKey(): string | string[] {
-    if (this.isPolymorphic()) {
-      const pk = this.options.primaryKey;
-      if (pk !== undefined) {
-        return Array.isArray(pk) ? pk.map(String) : String(pk);
-      }
-      return "id";
-    }
-    return this.joinPrimaryKeyFor();
   }
 
   get joinForeignKey(): string | string[] {
@@ -1612,31 +1594,16 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.joinTable;
   }
 
-  get joinPrimaryKey(): string | string[] {
+  /**
+   * Mirrors: ActiveRecord::Reflection::ThroughReflection#join_primary_key
+   * (reflection.rb:1093-1095) — `source_reflection.join_primary_key(klass)`.
+   * The klass matters when the source is a polymorphic belongsTo with a
+   * sourceType: the resolved class may use a different PK column (e.g. `uuid`).
+   */
+  joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
     const src = this.sourceReflection;
     if (!src) this.checkValidityBang();
-    return src!.joinPrimaryKey;
-  }
-
-  /**
-   * Resolve the join primary key against a runtime klass, mirroring
-   * BelongsToReflection#joinPrimaryKeyFor. Needed when the source is
-   * a polymorphic belongsTo with sourceType: the static joinPrimaryKey
-   * hardcodes "id", but the resolved sourceType class may use a
-   * different PK column (e.g. `uuid`).
-   */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const src = this.sourceReflection as unknown as {
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey: string | string[];
-    } | null;
-    if (!src) {
-      this.checkValidityBang();
-    }
-    if (src && typeof src.joinPrimaryKeyFor === "function") {
-      return src.joinPrimaryKeyFor(klass);
-    }
-    return src!.joinPrimaryKey;
+    return src!.joinPrimaryKey(klass);
   }
 
   get joinForeignKey(): string | string[] {
@@ -1940,8 +1907,13 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).type;
   }
 
-  get joinPrimaryKey(): string | string[] {
-    return (this._reflection as any).joinPrimaryKey;
+  /**
+   * Mirrors: ActiveRecord::Reflection::PolymorphicReflection#join_primary_key
+   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`, whose
+   * default is `self.klass`.
+   */
+  joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
+    return (this._reflection as AssociationReflection).joinPrimaryKey(klass);
   }
 
   get joinForeignKey(): string | string[] {
@@ -2039,8 +2011,15 @@ export class RuntimeReflection extends AbstractReflection {
     return (this.klass as any).arelTable;
   }
 
-  get joinPrimaryKey(): string | string[] {
-    return this.joinPrimaryKeyFor();
+  /**
+   * Mirrors: ActiveRecord::Reflection::RuntimeReflection#join_primary_key
+   * (reflection.rb:1275-1277) — `@reflection.join_primary_key(klass)`. The
+   * head's klass is the RUNTIME one (`association.klass`), which is the whole
+   * point of RuntimeReflection: a polymorphic belongs_to cannot compute its
+   * target class from the reflection alone.
+   */
+  joinPrimaryKey(klass: typeof Base = this.klass): string | string[] {
+    return (this._reflection as AssociationReflection).joinPrimaryKey(klass);
   }
 
   allIncludes(callback: () => any): any {
@@ -2076,20 +2055,6 @@ export class RuntimeReflection extends AbstractReflection {
   /** @internal */
   scopeFor(relation: unknown, owner?: unknown): unknown {
     return asConcrete(this._reflection).scopeFor?.(relation, owner) ?? relation;
-  }
-
-  /** @internal */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    const refl = this._reflection as unknown as {
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey: string | string[];
-    };
-    // The head's klass is the runtime one (`association.klass`), which is the
-    // whole point of RuntimeReflection: a polymorphic belongs_to can't compute
-    // its target class from the reflection alone.
-    return typeof refl.joinPrimaryKeyFor === "function"
-      ? refl.joinPrimaryKeyFor(klass ?? this.klass)
-      : refl.joinPrimaryKey;
   }
 
   /** @internal */

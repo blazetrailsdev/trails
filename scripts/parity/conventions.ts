@@ -1438,7 +1438,40 @@ export function rubyMethodToTs(
  * entry point answers it; the SKIP gate stays in place for compare.ts, so a
  * skipped method still never counts as a missing port.
  */
+/** Ruby names whose TS counterpart is a fixed JS spelling, not a portable identifier. */
+const FIXED_TS_SPELLINGS = new Set([
+  "initialize",
+  "new",
+  "to_s",
+  "to_str",
+  "to_json",
+  "to_sql",
+  "-@",
+]);
+
 export function rubyMethodToTsIgnoringSkip(
+  name: string,
+  siblingRubyNames?: ReadonlySet<string>,
+): string[] | null {
+  const candidates = rubyMethodToTsWithoutUnderscore(name, siblingRubyNames);
+  if (candidates === null) return null;
+  // trails prefixes a private helper with `_` to keep it off the public
+  // surface — the convention `eslint/rails-private-methods.json` is generated
+  // from — so Ruby's `convert_value_to_parameters` legitimately ports as
+  // `_convertValueToParameters`. The underscored spelling is offered LAST, the
+  // way `Q` is for predicates, so it only ever widens what counts and can never
+  // move an existing pairing.
+  // The fixed JS spellings (`constructor`, `toString`, `toJSON`, `toSql`,
+  // `negate`) are language-mandated names, never private-helper names, so they
+  // are left alone.
+  if (FIXED_TS_SPELLINGS.has(name)) return candidates;
+  const underscored = candidates
+    .filter((c) => /^[a-zA-Z][A-Za-z0-9]*$/.test(c))
+    .map((c) => "_" + c);
+  return [...new Set([...candidates, ...underscored])];
+}
+
+function rubyMethodToTsWithoutUnderscore(
   name: string,
   siblingRubyNames?: ReadonlySet<string>,
 ): string[] | null {
@@ -1654,6 +1687,15 @@ name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
 declaration). Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
+
+Private-helper details: every candidate above additionally offers its
+\`_\`-prefixed spelling as a LAST candidate (\`convert_value_to_parameters\` →
+\`_convertValueToParameters\`). trails prefixes a private helper with \`_\` to keep
+it off the public surface — the convention \`eslint/rails-private-methods.json\`
+is generated from — so a Ruby private method legitimately ports underscored.
+Being last, it never moves an existing pairing. The fixed JS spellings
+(\`constructor\`, \`toString\`, \`toJSON\`, \`toSql\`, \`negate\`) are excluded: those
+are language-mandated names, not helper names.
 
 Setter-form details: a Ruby \`name=\` writer matches the bare camel accessor
 first, and \`set#{Name}\` second. The \`set*\` fallback covers writers whose Rails

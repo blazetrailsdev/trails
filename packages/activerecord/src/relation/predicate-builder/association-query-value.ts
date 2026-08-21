@@ -15,7 +15,7 @@
 /** Metadata about the associated table needed to build the FK predicate. */
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
-  joinPrimaryKey: string | string[] | null;
+  joinPrimaryKey(klass?: unknown): string | string[] | null;
   joinPrimaryType?: string | null;
   polymorphicNameAssociation?: string | null;
 }
@@ -118,7 +118,7 @@ export class AssociationQueryValue {
 
   /** @internal */
   private primaryKey(): string | string[] {
-    return this.associatedTable.joinPrimaryKey ?? "id";
+    return this.associatedTable.joinPrimaryKey() ?? "id";
   }
 
   /** @internal */

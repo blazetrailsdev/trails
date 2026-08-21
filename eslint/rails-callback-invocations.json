@@ -1,13 +1,21 @@
 {
   "methods": {
+    "packages/activerecord/src/callbacks.ts#_createOrUpdate": ["save"],
     "packages/activerecord/src/callbacks.ts#_createRecord": ["create"],
+    "packages/activerecord/src/callbacks.ts#_destroy": ["destroy"],
+    "packages/activerecord/src/callbacks.ts#_incrementBang": ["touch"],
+    "packages/activerecord/src/callbacks.ts#_touch": ["touch"],
     "packages/activerecord/src/callbacks.ts#_updateRecord": ["update"],
     "packages/activerecord/src/callbacks.ts#createOrUpdate": ["save"],
     "packages/activerecord/src/callbacks.ts#destroy": ["destroy"],
     "packages/activerecord/src/callbacks.ts#incrementBang": ["touch"],
     "packages/activerecord/src/callbacks.ts#touch": ["touch"],
+    "packages/activerecord/src/core.ts#_initWithAttributes": ["find", "initialize"],
     "packages/activerecord/src/core.ts#initWithAttributes": ["find", "initialize"],
     "packages/activerecord/src/core.ts#initializeDup": ["initialize"],
+    "packages/activerecord/src/transactions.ts#_beforeCommittedBang": ["before_commit"],
+    "packages/activerecord/src/transactions.ts#_committedBang": ["commit"],
+    "packages/activerecord/src/transactions.ts#_rolledbackBang": ["rollback"],
     "packages/activerecord/src/transactions.ts#beforeCommittedBang": ["before_commit"],
     "packages/activerecord/src/transactions.ts#committedBang": ["commit"],
     "packages/activerecord/src/transactions.ts#rolledbackBang": ["rollback"]

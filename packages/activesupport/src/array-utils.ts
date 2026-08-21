@@ -194,6 +194,22 @@ export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[]
 }
 
 /**
+ * Keep only the elements matching `predicate`, IN PLACE — Ruby's
+ * `Array#select!`. The mutation is the point: every holder of the array sees
+ * it, which is what `HasManyAssociation#count_records`
+ * (`has_many_association.rb:91`) relies on when it prunes the loaded target.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array`, not Rails, exactly as
+ * `transformKeys` (hash-utils.ts) is Ruby core `Hash`. Rails bodies call it and
+ * JS arrays have no in-place filter, so it is spelled here for the ports that
+ * consume it.
+ */
+export function selectBang<T>(array: T[], predicate: (item: T) => boolean): T[] {
+  array.splice(0, array.length, ...array.filter(predicate));
+  return array;
+}
+
+/**
  * Remove elements from `array` that match `predicate`, returning the removed elements.
  *
  * Mirrors: `Array#extract!` (core_ext/array/extract.rb:10-20). Ruby's no-block
