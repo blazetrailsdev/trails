@@ -495,7 +495,7 @@ jobs:
           # The pulls/{n}/commits endpoint caps at 250 commits even with
           # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
           # closed in that case rather than passing on a partial scan — this repo
-          # squashes and has a 500-LOC ceiling, so 250 commits never happens
+          # squashes and PRs are size-capped, so 250 commits never happens
           # legitimately; if it does, squash/rebase before re-running.
           count=$(scripts/ci/gh-api-retry.sh "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
           if [ "$count" -gt 250 ]; then
