@@ -80,12 +80,20 @@ describe("XmlMini", () => {
 // synchronously — the Nokogiri ones load their parser from the file-top
 // `require` seat (nokogiri.rb:3-8), which `with_backend` reaches.
 describe("Hash.from_xml under each XmlMini backend", () => {
+  const XML = '<product><name>Book</name><price type="integer">10</price></product>';
+  const HASH = { product: { name: "Book", price: 10 } };
+
   for (const name of ["REXML", "Nokogiri", "NokogiriSAX"]) {
     it(`parses synchronously under ${name}`, async () => {
-      const hash = await withBackend(name, () =>
-        fromXml('<product><name>Book</name><price type="integer">10</price></product>'),
-      );
-      expect(hash).toEqual({ product: { name: "Book", price: 10 } });
+      expect(await withBackend(name, () => fromXml(XML))).toEqual(HASH);
     });
   }
+
+  // Ruby cannot name `ActiveSupport::XmlMini_Nokogiri` without having required
+  // its file, which is where `require "nokogiri"` (nokogiri.rb:3) runs, so the
+  // module-object arm of `cast_backend_name_to_module` (xml_mini.rb:200-201) is
+  // as loaded as the name arm.
+  it("parses synchronously when the backend is selected as a module", async () => {
+    expect(await withBackend(XmlMini_Nokogiri, () => fromXml(XML))).toEqual(HASH);
+  });
 });

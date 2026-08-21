@@ -55,6 +55,16 @@ export const FileLike = {
  */
 export interface XmlMiniBackend {
   parse(data: string | StringIO | null | undefined): Record<string, unknown>;
+
+  /**
+   * The backend file's own file-top `require` of its parser library, which
+   * Ruby runs as part of requiring the file (nokogiri.rb:3, nokogirisax.rb:3)
+   * and {@link castBackendNameToModule} awaits here. Backends whose parser
+   * needs no loading (REXML) do not declare it.
+   *
+   * @internal
+   */
+  _require?(): Promise<void>;
 }
 
 /** The name of a backend, or the backend module itself. */
@@ -722,19 +732,8 @@ const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
   jdom: "JRuby is required to use the JDOM backend for XmlMini",
   libxml: "cannot load such file -- libxml",
   libxmlsax: "cannot load such file -- libxml",
-  // Ruby's `require "active_support/xml_mini/nokogiri"` also runs that file's
-  // own file-top `require "nokogiri"` (nokogiri.rb:3-8); ESM's `import()` only
-  // evaluates the module body, so the `_require` hook is awaited at the same seat.
-  nokogiri: async () => {
-    const backend = await import("./xml-mini/nokogiri.js");
-    await backend._require();
-    return backend;
-  },
-  nokogirisax: async () => {
-    const backend = await import("./xml-mini/nokogirisax.js");
-    await backend._require();
-    return backend;
-  },
+  nokogiri: () => import("./xml-mini/nokogiri.js"),
+  nokogirisax: () => import("./xml-mini/nokogirisax.js"),
   rexml: () => import("./xml-mini/rexml.js"),
 };
 
@@ -747,14 +746,26 @@ const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
  * is a dynamic import here, since the module namespace object of
  * `xml-mini/<name>.js` is the backend module.
  *
+ * Requiring that file also runs its own file-top `require` of the parser
+ * library (nokogiri.rb:3, nokogirisax.rb:3), so in Ruby a backend module cannot
+ * be named at all — by `name` or as the module object this method returns
+ * unchanged — without its parser already being loaded. An ESM `import` only
+ * evaluates the module body and cannot await, so both arms await the backend's
+ * {@link XmlMiniBackend._require} hook to reach the same state.
+ *
  * @internal
  */
 export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
   if (typeof name !== "string") {
+    await name._require?.();
     return name;
   } else {
     const backend = XML_MINI_BACKENDS[name.toLowerCase()];
-    if (typeof backend === "function") return (await backend()) as XmlMiniBackend;
+    if (typeof backend === "function") {
+      const module = (await backend()) as XmlMiniBackend;
+      await module._require?.();
+      return module;
+    }
     // Ruby's counterpart is the core `LoadError` / `RuntimeError` the file's own
     // `require` or guard raises; there is no Rails error class to port here, the
     // same reason `yaml.ts:16` gives for its own LoadError stand-in.
