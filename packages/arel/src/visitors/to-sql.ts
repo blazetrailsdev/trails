@@ -1843,10 +1843,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /**
-   * Overridable hook for date bind insertion so PostgreSQLWithBinds can
-   * emit $N placeholders instead of ?.
-   */
   protected addDateBind(value: unknown, collector: SQLString): void {
     collector.addBind(value, this.bindBlock());
   }

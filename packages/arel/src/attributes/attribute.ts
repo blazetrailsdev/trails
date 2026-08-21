@@ -28,10 +28,6 @@ import { Predications } from "../predications.js";
  * Mirrors: Arel::Attributes::Attribute
  */
 export interface RelationLike {
-  /**
-   * A `SqlLiteral` name (e.g. a `SelectManager#as` / set-op `from()` derived
-   * table) renders bare; `quoteTableName` returns its value unchanged.
-   */
   name: string | SqlLiteral;
   // `TableAlias#table_alias` aliases `:name`, which may be a `SqlLiteral`
   // (Arel::Nodes::TableAlias `alias :table_alias :name`, table_alias.rb); a

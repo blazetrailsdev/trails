@@ -57,11 +57,6 @@ const _NodeExpression = NodeExpression as unknown as new (...args: unknown[]) =>
 const _TreeManager = TreeManager as unknown as new (...args: unknown[]) => TreeManager;
 const _SqlLiteral = SqlLiteral as unknown as new (...args: unknown[]) => SqlLiteral;
 
-/**
- * Modules typed as explicit module interfaces (no string index sig) need
- * a cast to satisfy include()'s runtime constraint. The cast is type-only
- * and runtime semantics are unchanged — include() iterates Object.keys.
- */
 type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
 const asRuntime = <T>(m: T): RuntimeModule => m as unknown as RuntimeModule;
 include(_Node, asRuntime(FactoryMethods));

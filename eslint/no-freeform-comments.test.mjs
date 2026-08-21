@@ -14,7 +14,10 @@ tester.run("no-freeform-comments", rule, {
     // JSDoc is where every port convention lives.
     { code: `/** Mirrors: ActiveRecord::Relation#where. */\nexport function where() {}\n` },
     { code: `/**\n * @internal\n */\nconst x = 1;\n` },
-    { code: `/** No tags, still JSDoc. */\nconst x = 1;\n` },
+    // A tagless JSDoc documenting a declaration is still JSDoc. This is also
+    // the rule's known limitation: it cannot tell this from narration that was
+    // reformatted to `/** */` to dodge the fix. See the rule's own doc.
+    { code: `/** The engine every manager compiles against. */\nexport const engine = 1;\n` },
     // Rails citations, in every spelling the packages actually use.
     { code: `// query_methods.rb:1604\nconst x = 1;\n` },
     {

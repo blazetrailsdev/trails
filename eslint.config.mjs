@@ -726,9 +726,11 @@ export default defineConfig(
 
   // ── no-freeform-comments: trails is a line-by-line Rails port, so a comment
   //    that restates the TS competes with the Ruby for authority and rots
-  //    independently of both. The autofix DELETES; it keeps JSDoc, Rails
-  //    references, tool directives, Rails' own ported comments, and anything
-  //    marked `keep:`. Scoped to the packages whose backlog has been swept —
+  //    independently of both. The autofix DELETES; it keeps JSDoc, references
+  //    that point AT the Ruby, tool directives, and anything marked `keep:`.
+  //    Rails' OWN comments are NOT kept — the Ruby is vendored and cited, so
+  //    copying its annotations across just duplicates them somewhere that goes
+  //    stale on its own. Scoped to the packages whose backlog has been swept —
   //    widen it a package at a time, after auditing that package's comments,
   //    never ahead of the audit. ──
   {

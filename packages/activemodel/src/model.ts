@@ -236,10 +236,6 @@ export interface Model {
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
-  /**
-   * Allow dynamic attribute access (e.g., record.title) for properties
-   * defined at runtime via Model.attribute().
-   */
   [key: string]: unknown;
 
   static includeRootInJson: boolean | string = false;

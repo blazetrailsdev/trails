@@ -26,6 +26,15 @@
  * rots on its own the moment Rails edits it — the same failure this rule
  * exists to prevent. Reference the Ruby; do not restate it.
  *
+ * KNOWN LIMITATION: keep-rule 1 is unconditional, so reformatting a doomed
+ * `//` comment as `/** ... *\/` bypasses the fix. That is deliberate and not
+ * closable statically — JSDoc on a declaration is exactly where this repo puts
+ * `Mirrors:`, `@internal` and `@noRailsEquivalent`, and no static check can
+ * separate a real contract note from narration wearing the same syntax. The
+ * check is review, not lint: a JSDoc block that documents nothing about the
+ * declaration it sits on is the same drift this rule deletes, and should be
+ * deleted in review.
+ *
  * The fix is destructive by design: the point is to run it, then read the diff
  * and rescue whatever turns out to be load-bearing. Run it with
  * `--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'` to
