@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { pluralize, underscore, DescendantsTracker } from "@blazetrails/activesupport";
+import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
@@ -570,28 +570,6 @@ export interface SchemaHost {
 }
 
 /**
- * Rails' `subclasses` / `descendants` are `DescendantsTracker`-backed, so
- * `inherited` lists every subclass the moment it is defined and
- * `reload_schema_from_cache`'s recursive push (model_schema.rb:553-568) reaches
- * all of them. trails has two partial registries instead: `Inheritance`'s
- * `_subclasses`, filled only by an explicit `registerSubclass`, and the
- * `DescendantsTracker` that `_default_attributes` registers into. This returns
- * the classes only the tracker knows about, so the push-down sites can cover
- * both.
- *
- * @noRailsEquivalent Rails has one registry because `inherited` fills it; this
- * exists only to bridge trails' two partial ones, and goes when they converge.
- * @internal
- */
-function withTracked(known: SchemaHost[], tracked: SchemaHost[], host: SchemaHost): SchemaHost[] {
-  const result = [...known];
-  for (const klass of tracked) {
-    if (klass !== host && !result.includes(klass)) result.push(klass);
-  }
-  return result;
-}
-
-/**
  * Drop the memoized class-level `attributeNames` and `columnNames` on `host`
  * and its descendants — Rails' `reload_schema_from_cache` nils
  * `@attribute_names` and `@column_names` recursively (model_schema.rb:553-568).
@@ -602,12 +580,7 @@ function withTracked(known: SchemaHost[], tracked: SchemaHost[], host: SchemaHos
  */
 export function clearAttributeNamesMemo(host: SchemaHost): void {
   const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
-  const all = withTracked(
-    descendants,
-    DescendantsTracker.descendants(host as never) as unknown as SchemaHost[],
-    host,
-  );
-  for (const klass of [host, ...all]) {
+  for (const klass of [host, ...descendants]) {
     for (const memo of ["_attributeNamesMemo", "_columnNamesMemo"] as const) {
       if (Object.prototype.hasOwnProperty.call(klass, memo)) {
         Reflect.deleteProperty(klass, memo);
@@ -1047,12 +1020,7 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(this);
   }
-  const subclasses = (this as { subclasses?: SchemaHost[] }).subclasses ?? [];
-  for (const sub of withTracked(
-    subclasses,
-    DescendantsTracker.subclasses(this as never) as unknown as SchemaHost[],
-    this,
-  )) {
+  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
     reloadSchemaFromCache.call(sub);
   }
 }
@@ -1476,25 +1444,11 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // columnsHash while the cache was cold (loadSchema's fallback set
           // `_schemaLoaded` with only the declared attrs) would otherwise keep
           // that stale view forever — leaving `columnNames()` reading the warm
-          // cache's real columns while `attributeNames()` stays minimal. Drop
-          // the flag so the next `loadSchema` re-reflects from the warm cache
-          // and merges the real columns into `_attributeDefinitions`, and drop
-          // the name memos stamped against the synthesized view — otherwise
-          // `columnNames()` keeps serving the pre-warm list.
+          // cache's real columns while `attributeNames()` stays minimal, so
+          // reload it the way Rails does (model_schema.rb:553-568) and let the
+          // next `loadSchema` re-reflect from the warm cache.
           if (ownSchemaMemo(host, "_schemaLoaded")) {
-            // Rails nils these recursively (model_schema.rb:553-568), so a
-            // subclass memo built off the pre-warm synthesized view goes too.
-            const stale = withTracked(
-              (host as { descendants?: SchemaHost[] }).descendants ?? [],
-              DescendantsTracker.descendants(host as never) as unknown as SchemaHost[],
-              host,
-            );
-            for (const klass of [host, ...stale]) {
-              klass._schemaLoaded = false;
-              klass._columnsHash = undefined;
-              klass._columns = undefined;
-            }
-            clearAttributeNamesMemo(host);
+            reloadSchemaFromCache.call(host);
           }
           return new Set(names);
         }
