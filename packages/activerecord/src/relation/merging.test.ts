@@ -338,7 +338,7 @@ describe("RelationMergingTest", () => {
   });
 
   it("merge collapses wheres from the LHS only", () => {
-    const left = Post.where({ title: "omg" }).where({ commentsCount: 1 });
+    const left = Post.where({ title: "omg" }).where({ comments_count: 1 });
     const right = Post.where({ title: "wtf" }).where({ title: "bbq" });
 
     const merged = left.merge(right);

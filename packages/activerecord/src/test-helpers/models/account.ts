@@ -32,7 +32,7 @@ export class Account extends Base {
       autosave: false,
     });
 
-    this.aliasAttribute("availableCredit", "credit_limit");
+    this.aliasAttribute("available_credit", "credit_limit");
 
     this.scope("open", (q: any) => q.where("firm_name = ?", "37signals"));
     this.scope("available", (q: any) => q.open());

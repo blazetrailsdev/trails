@@ -28,8 +28,8 @@ export class Reply extends Topic {
     // association scope (e.g. approved_replies' parent_id constraint).
     this.scope("ordered", () => Reply.order("id"));
 
-    this.aliasAttribute("newContent", "content");
-    this.aliasAttribute("newParentId", "parent_id");
+    this.aliasAttribute("new_content", "content");
+    this.aliasAttribute("new_parent_id", "parent_id");
   }
 
   static open() {

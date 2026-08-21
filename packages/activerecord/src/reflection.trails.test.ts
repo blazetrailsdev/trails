@@ -20,7 +20,6 @@ import {
   ThroughReflection,
   belongsToCounterCacheColumn,
   counterCacheColumnOption,
-  resolveAliasedColumn,
   create,
 } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
@@ -152,13 +151,6 @@ describe("ReflectionTest", () => {
       "legacy_comments_count",
     );
     expect(belongsToCounterCacheColumn(false, "Comment")).toBeNull();
-  });
-
-  it("resolves a snake_case counter column through a camelCase attribute alias", () => {
-    const model = { attributeAliases: { commentsCount: "legacy_comments_count" } };
-    expect(resolveAliasedColumn(model, "comments_count")).toBe("legacy_comments_count");
-    expect(resolveAliasedColumn(model, "replies_count")).toBe("replies_count");
-    expect(resolveAliasedColumn(undefined, "comments_count")).toBe("comments_count");
   });
 
   it("create accepts a nil name without a cast", () => {

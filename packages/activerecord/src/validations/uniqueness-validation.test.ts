@@ -259,7 +259,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with aliases", async () => {
     // Rails validates :new_content scope :new_parent_id (aliases of content /
     // parent_id, already declared on Reply).
-    Reply.validatesUniqueness("newContent", { scope: "newParentId" });
+    Reply.validatesUniqueness("new_content", { scope: "new_parent_id" });
 
     const t = await Topic.create({ title: "I'm unique!" });
 

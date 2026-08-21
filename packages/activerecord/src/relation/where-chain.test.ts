@@ -477,39 +477,39 @@ describe("WhereChainTest", () => {
   });
 
   it("rewhere with range", async () => {
-    const relation = Post.where({ commentsCount: new Range(1, 3) }).rewhere({
-      commentsCount: new Range(3, 5),
+    const relation = Post.where({ comments_count: new Range(1, 3) }).rewhere({
+      comments_count: new Range(3, 5),
     });
-    const expected = Post.where({ commentsCount: new Range(3, 5) });
+    const expected = Post.where({ comments_count: new Range(3, 5) });
     expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite upper bound range", async () => {
-    const relation = Post.where({ commentsCount: new Range(1, Infinity) }).rewhere({
-      commentsCount: new Range(3, 5),
+    const relation = Post.where({ comments_count: new Range(1, Infinity) }).rewhere({
+      comments_count: new Range(3, 5),
     });
-    const expected = Post.where({ commentsCount: new Range(3, 5) });
+    const expected = Post.where({ comments_count: new Range(3, 5) });
     expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite lower bound range", async () => {
-    const relation = Post.where({ commentsCount: new Range(-Infinity, 1) }).rewhere({
-      commentsCount: new Range(3, 5),
+    const relation = Post.where({ comments_count: new Range(-Infinity, 1) }).rewhere({
+      comments_count: new Range(3, 5),
     });
-    const expected = Post.where({ commentsCount: new Range(3, 5) });
+    const expected = Post.where({ comments_count: new Range(3, 5) });
     expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with infinite range", async () => {
-    const relation = Post.where({ commentsCount: new Range(-Infinity, Infinity) }).rewhere({
-      commentsCount: new Range(3, 5),
+    const relation = Post.where({ comments_count: new Range(-Infinity, Infinity) }).rewhere({
+      comments_count: new Range(3, 5),
     });
-    const expected = Post.where({ commentsCount: new Range(3, 5) });
+    const expected = Post.where({ comments_count: new Range(3, 5) });
     expect(ids(await relation)).toEqual(ids(await expected));
   });
 
   it("rewhere with nil", async () => {
-    const relation = Post.where({ commentsCount: 16 }).rewhere(null);
+    const relation = Post.where({ comments_count: 16 }).rewhere(null);
     const expected = Post.all();
     expect(ids(await relation)).toEqual(ids(await expected));
   });

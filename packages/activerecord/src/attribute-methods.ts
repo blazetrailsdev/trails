@@ -392,7 +392,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
       this._attributeMethodsGenerated;
     if (!generatedByNestedLoad) {
       amDefineAttributeMethods.call(this as never, ...this.attributeNames());
-      if (this._hasAttribute("id")) this.aliasAttribute("idValue", "id");
+      if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
     }
   }
   generateAliasAttributes.call(this);

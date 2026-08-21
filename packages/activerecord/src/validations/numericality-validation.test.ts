@@ -177,9 +177,9 @@ describe("NumericalityValidationTest", () => {
 
   it("aliased attribute", async () => {
     const modelClassVar = modelClass();
-    modelClassVar.validatesNumericalityOf("newBankBalance", { greaterOrEqualThan: 0 });
+    modelClassVar.validatesNumericalityOf("new_bank_balance", { greaterOrEqualThan: 0 });
 
-    const subject = modelClassVar.new({ newBankBalance: "abcd" });
+    const subject = modelClassVar.new({ new_bank_balance: "abcd" });
 
     expect(await subject.isValid()).toBe(false);
   });

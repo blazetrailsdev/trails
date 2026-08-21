@@ -815,12 +815,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
     const tag = cpkTags("cpk_tag_loyal_customer");
     const orderTag = await CpkOrderTag.create({
-      order_id: (order as any).idValue,
+      order_id: (order as any).id_value,
       tag_id: (tag as any).id,
       attached_by: "Nikita",
     });
     const loadedOrder = await (orderTag as any).association("order").loadTarget();
-    expect(loadedOrder?.idValue).toBe((order as any).idValue);
+    expect(loadedOrder?.id_value).toBe((order as any).id_value);
     const loadedTag = await (orderTag as any).association("tag").loadTarget();
     expect(loadedTag?.id).toBe((tag as any).id);
     await (orderTag as any).update({ attached_reason: "This is our loyal customer" });
@@ -840,12 +840,12 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = cpkTags("cpk_tag_loyal_customer");
     await (tag as any).orders.push(order);
     const joinRow = await CpkOrderTag.findBy({
-      order_id: (order as any).idValue,
+      order_id: (order as any).id_value,
       tag_id: (tag as any).id,
     });
     expect(joinRow).not.toBeNull();
     const orders = await (tag as any).orders.reload();
-    expect(orders.map((o: any) => Number(o.idValue))).toContain(Number((order as any).idValue));
+    expect(orders.map((o: any) => Number(o.id_value))).toContain(Number((order as any).id_value));
   });
 
   // TS-only: guard the JOIN routing for the remaining composite through
@@ -866,7 +866,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const book = await CpkBookWithOrderAgreements.create({ id: [1, 2] });
     (book as any).order = order;
     await book.save();
-    const agreement = await CpkOrderAgreement.create({ order_id: (order as any).idValue });
+    const agreement = await CpkOrderAgreement.create({ order_id: (order as any).id_value });
 
     const sql = await (book as any).orderAgreements.toSql();
     const orderAgreementsFk = quoteTableName("cpk_order_agreements.order_id");
@@ -2498,7 +2498,7 @@ describe("HasManyThroughAssociationsTest", () => {
     (book as any).order = order;
     const agreement = await (
       await import("../test-helpers/models/cpk.js").then((m) => m.CpkOrderAgreement)
-    ).create({ order_id: (order as any).idValue });
+    ).create({ order_id: (order as any).id_value });
     const agreements = await (book as any).orderAgreements.toArray();
     expect(agreements.map((a: any) => a.id)).toEqual([agreement.id]);
   });
@@ -2509,11 +2509,11 @@ describe("HasManyThroughAssociationsTest", () => {
       await import("../test-helpers/models/cpk.js").then((m) => m.CpkBookWithOrderAgreements)
     ).create({
       id: [1, 2],
-      order_id: (order as any).idValue,
+      order_id: (order as any).id_value,
     });
     await (
       await import("../test-helpers/models/cpk.js").then((m) => m.CpkOrderAgreement)
-    ).create({ order_id: (order as any).idValue });
+    ).create({ order_id: (order as any).id_value });
 
     await (book as any).orderAgreements.load();
     (book as any).order = new CpkOrder();

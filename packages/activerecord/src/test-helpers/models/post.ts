@@ -186,14 +186,12 @@ export class Post extends Base {
 
   static {
     this.aliasAttribute("text", "body");
-    this.aliasAttribute("commentsCount", "legacy_comments_count");
-    // Rails: `alias_attribute :comments_count, :legacy_comments_count` (post.rb).
     this.aliasAttribute("comments_count", "legacy_comments_count");
 
     this.scope("containingTheLetterA", (q: any) => q.where("body LIKE '%a%'"));
     this.scope("titledWithAnApostrophe", (q: any) => q.where("title LIKE '%''%'"));
     this.scope("rankedByComments", (q: any) =>
-      q.order(q.model.arelTable.get("commentsCount").desc()),
+      q.order(q.model.arelTable.get("comments_count").desc()),
     );
     this.scope("orderedByPostId", (q: any) => q.order("posts.post_id ASC"));
     this.scope("limitBy", (q: any, l: number) => q.limit(l));
