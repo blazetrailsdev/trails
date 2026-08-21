@@ -160,10 +160,6 @@ export class Subscriber {
 
     if (sub.patterns.has(pattern)) return;
 
-    // subscriber.rb:94 passes the Subscriber OBJECT itself; the notifier invokes
-    // it through Ruby's `#call` protocol. `Fanout::Subscribers.new` accepts a
-    // callable object the same way (fanout.rb:325-331), so the object goes
-    // through here too rather than a wrapper lambda.
     const handle = notifier.subscribe(pattern, sub);
     sub.patterns.set(pattern, handle);
   }
