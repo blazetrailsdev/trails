@@ -704,7 +704,10 @@ export class JoinDependency {
    * Hydrate models from a flat result row set, mirroring Rails'
    * JoinDependency#instantiate body. `seen` is the identity-keyed
    * parent → node → id → model map (Rails' `compare_by_identity` hash); a JS
-   * `Map` keys by object identity, matching it. `modelCache` caches each node's
+   * `Map` keys by object identity, matching it. The settled default-block-Hash
+   * spelling (an inline Proxy `get` trap) cannot express either hash: a trap
+   * only ever sees string and symbol keys, while these are keyed on record and
+   * `JoinPart` objects, so the default block is open-coded on the `Map`. `modelCache` caches each node's
    * instances by id, with the join-root's entry doubling as the parent dedup
    * map (`parents = model_cache[join_root]`).
    *

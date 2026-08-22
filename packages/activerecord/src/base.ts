@@ -179,7 +179,6 @@ import {
   singularize as _singularize,
   type Included,
   type ParameterFilter,
-  type BenchmarkLogger,
 } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
@@ -1671,15 +1670,10 @@ export class Base extends Model {
 
   /**
    * Times the given block and logs the result.
-   * Mirrors: ActiveRecord::Base.benchmark (via ActiveSupport::Benchmarkable)
+   * Mirrors: `extend ActiveSupport::Benchmarkable` (base.rb:285) — the mixin
+   * reads this class's own `logger` reader (benchmarkable.rb:38).
    */
-  static benchmark<T>(
-    message: string,
-    options: { level?: "debug" | "info" | "warn" | "error"; silence?: boolean } = {},
-    fn: () => T | Promise<T>,
-  ): T | Promise<Awaited<T>> {
-    return benchmarkable(this.logger as BenchmarkLogger | null, message, options, fn);
-  }
+  static benchmark = benchmarkable;
 
   // -- Timestamp control --
   static _recordTimestamps = true;

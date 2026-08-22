@@ -2,42 +2,44 @@
  * Pool manager — manages pool configs per role and shard.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PoolManager
+ *
+ * `@role_to_shard_mapping` is `Hash.new { |h, k| h[k] = {} }`
+ * (pool_manager.rb:7); JS has no Hash default block, so the auto-vivification
+ * is a Proxy `get` trap.
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {
-  private _roleToShardMapping: Map<string, Map<string, PoolConfig>>;
+  private _roleToShardMapping: Record<string, Record<string, PoolConfig>>;
 
   constructor() {
-    this._roleToShardMapping = new Map();
+    this._roleToShardMapping = new Proxy({} as Record<string, Record<string, PoolConfig>>, {
+      get(h, k) {
+        if (typeof k !== "string") return Reflect.get(h, k);
+        return (h[k] ??= {});
+      },
+    });
   }
 
   get shardNames(): string[] {
     return [
       ...new Set(
-        [...this._roleToShardMapping.values()].flatMap((shardMap) => [...shardMap.keys()]),
+        Object.values(this._roleToShardMapping).flatMap((shardMap) => Object.keys(shardMap)),
       ),
     ];
   }
 
   get roleNames(): string[] {
-    return [...this._roleToShardMapping.keys()];
+    return Object.keys(this._roleToShardMapping);
   }
 
   poolConfigs(role?: string): PoolConfig[] {
     if (role != null) {
-      const shardMap = this._roleToShardMapping.get(role);
-      return shardMap ? [...shardMap.values()] : [];
+      return Object.values(this._roleToShardMapping[role]);
     }
-    const result: PoolConfig[] = [];
-    for (const shardMap of this._roleToShardMapping.values()) {
-      for (const poolConfig of shardMap.values()) {
-        result.push(poolConfig);
-      }
-    }
-    return result;
+    return Object.values(this._roleToShardMapping).flatMap((shardMap) => Object.values(shardMap));
   }
 
   eachPoolConfig(role: string | undefined, callback: (poolConfig: PoolConfig) => void): void;
@@ -60,36 +62,44 @@ export class PoolManager {
     }
 
     if (role != null) {
-      const shardMap = this._roleToShardMapping.get(role);
-      if (shardMap) {
-        for (const poolConfig of shardMap.values()) {
-          cb(poolConfig);
-        }
+      for (const poolConfig of Object.values(this._roleToShardMapping[role])) {
+        cb(poolConfig);
       }
     } else {
-      for (const shardMap of this._roleToShardMapping.values()) {
-        for (const poolConfig of shardMap.values()) {
+      for (const shardMap of Object.values(this._roleToShardMapping)) {
+        for (const poolConfig of Object.values(shardMap)) {
           cb(poolConfig);
         }
       }
     }
   }
 
-  removeRole(role: string): boolean {
-    return this._roleToShardMapping.delete(role);
+  /**
+   * @missingRailsCall delete — PERMANENT: `@role_to_shard_mapping.delete(role)`
+   * (pool_manager.rb:37) is Ruby `Hash#delete`; over a plain object the JS
+   * spelling is the `delete` operator, which is not a call.
+   */
+  removeRole(role: string): Record<string, PoolConfig> | undefined {
+    if (!Object.hasOwn(this._roleToShardMapping, role)) return undefined;
+    const shardMap = this._roleToShardMapping[role];
+    delete this._roleToShardMapping[role];
+    return shardMap;
   }
 
+  /**
+   * @missingRailsCall delete — PERMANENT: `@role_to_shard_mapping[role].delete(shard)`
+   * (pool_manager.rb:41) is Ruby `Hash#delete`; over a plain object the JS
+   * spelling is the `delete` operator, which is not a call.
+   */
   removePoolConfig(role: string, shard: string): PoolConfig | undefined {
-    const shardMap = this._roleToShardMapping.get(role);
-    if (!shardMap) return undefined;
-    const poolConfig = shardMap.get(shard);
-    shardMap.delete(shard);
-    if (shardMap.size === 0) this._roleToShardMapping.delete(role);
+    const shardMap = this._roleToShardMapping[role];
+    const poolConfig = shardMap[shard];
+    delete shardMap[shard];
     return poolConfig;
   }
 
   getPoolConfig(role: string, shard: string): PoolConfig | undefined {
-    return this._roleToShardMapping.get(role)?.get(shard);
+    return this._roleToShardMapping[role][shard];
   }
 
   setPoolConfig(role: string, shard: string, poolConfig: PoolConfig): void {
@@ -100,11 +110,6 @@ export class PoolManager {
           `pool configuration is provided.`,
       );
     }
-    let shardMap = this._roleToShardMapping.get(role);
-    if (!shardMap) {
-      shardMap = new Map();
-      this._roleToShardMapping.set(role, shardMap);
-    }
-    shardMap.set(shard, poolConfig);
+    this._roleToShardMapping[role][shard] = poolConfig;
   }
 }

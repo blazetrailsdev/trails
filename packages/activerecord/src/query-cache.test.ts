@@ -83,7 +83,7 @@ function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
 // Mirrors ActiveRecord::TestCase#clean_up_connection_handler: drop every
 // non-default (e.g. :reading) role a test established, leaving the writing pool.
 function cleanUpConnectionHandler(): void {
-  const managers: Map<string, { roleNames: string[]; removeRole(role: string): boolean }> = (
+  const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
     Base.connectionHandler as unknown as {
       _connectionNameToPoolManager: Map<string, never>;
     }

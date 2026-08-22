@@ -25,7 +25,7 @@ describe("PrimaryClassTest", () => {
   // drop every non-default (e.g. :reading) role the connects_to tests
   // established, leaving the writing pool.
   function cleanUpConnectionHandler(): void {
-    const managers: Map<string, { roleNames: string[]; removeRole(role: string): boolean }> = (
+    const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
       Base.connectionHandler as unknown as {
         _connectionNameToPoolManager: Map<string, never>;
       }

@@ -1,8 +1,11 @@
 /**
- * Shared benchmark helper, mirroring `ActiveSupport::Benchmarkable#benchmark`.
- * Used by both `ActionController::Logger`/`AbstractController` and
- * `ActiveRecord::Base.benchmark` so the two stay in lock-step.
+ * `ActiveSupport::Benchmarkable` — mixed into `AbstractController::Logger`
+ * (logger.rb:13) and `ActiveRecord::Base` (base.rb:285) the way Rails'
+ * `include`/`extend` mixes it in. `benchmark` reads the host's own `logger`
+ * reader (benchmarkable.rb:38,44,46) rather than taking it as a parameter.
  */
+
+import { assertValidKeys } from "./hash-utils.js";
 
 export interface BenchmarkLogger {
   debug?(message: string): void;
@@ -16,30 +19,21 @@ export interface BenchmarkLogger {
 export interface BenchmarkOptions {
   level?: "debug" | "info" | "warn" | "error";
   silence?: boolean;
-  /**
-   * If true, log the elapsed time even when the block raises/rejects.
-   * Rails' `ActiveSupport::Benchmarkable` does NOT do this — exceptions
-   * propagate without a trailing log line — so this is opt-in. The
-   * actionpack `benchmark()` wrapper enables it for partial-failure
-   * visibility; `ActiveRecord::Base.benchmark` keeps Rails-strict
-   * behavior.
-   */
-  logOnError?: boolean;
 }
 
-// Matches `ActiveSupport::Logger::ERROR` — the level raised by `silence` so
-// in-block info/debug calls are suppressed.
-const ERROR_LEVEL = 3;
+/** The host of `include ActiveSupport::Benchmarkable` — supplies `logger`. */
+export interface Benchmarkable {
+  logger?: BenchmarkLogger | null;
+}
 
 const monotonicNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
-  message: string,
+  this: Benchmarkable,
   block: () => T | Promise<T>,
 ): T | Promise<Awaited<T>>;
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
+  this: Benchmarkable,
   message: string,
   options: BenchmarkOptions,
   block: () => T | Promise<T>,
@@ -52,66 +46,62 @@ export function benchmark<T>(
  *   there is no `logger` reader to call.
  */
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
+  this: Benchmarkable,
   message: string,
-  optionsOrBlock: BenchmarkOptions | (() => T | Promise<T>),
+  block: () => T | Promise<T>,
+): T | Promise<Awaited<T>>;
+export function benchmark<T>(
+  this: Benchmarkable,
+  messageOrBlock: string | (() => T | Promise<T>) = "Benchmarking",
+  optionsOrBlock?: BenchmarkOptions | (() => T | Promise<T>),
   maybeBlock?: () => T | Promise<T>,
 ): T | Promise<Awaited<T>> {
-  const block = (typeof optionsOrBlock === "function" ? optionsOrBlock : maybeBlock!) as () =>
-    | T
-    | Promise<T>;
+  const message = typeof messageOrBlock === "function" ? "Benchmarking" : messageOrBlock;
+  const block = (
+    typeof messageOrBlock === "function"
+      ? messageOrBlock
+      : typeof optionsOrBlock === "function"
+        ? optionsOrBlock
+        : maybeBlock!
+  ) as () => T | Promise<T>;
   const options: BenchmarkOptions =
-    typeof optionsOrBlock === "function" ? {} : (optionsOrBlock ?? {});
-  const level = options.level ?? "info";
+    typeof optionsOrBlock === "function" || typeof optionsOrBlock === "undefined"
+      ? {}
+      : optionsOrBlock;
 
-  if (!logger) return block() as T | Promise<Awaited<T>>;
+  const logger = this?.logger;
+  if (logger) {
+    assertValidKeys(options as Record<string, unknown>, ["level", "silence"]);
+    options.level ||= "info";
 
-  const start = monotonicNow();
-  const log = (): void => {
-    const fn = (logger as Record<string, unknown>)[level];
-    if (typeof fn !== "function") return;
-    const ms = monotonicNow() - start;
-    (fn as (msg: string) => void).call(logger, `${message} (${ms.toFixed(1)}ms)`);
-  };
+    let result: T | Promise<T>;
+    const start = monotonicNow();
+    const finish = (): T | Promise<Awaited<T>> => {
+      const ms = monotonicNow() - start;
+      const write = (logger as Record<string, unknown>)[options.level!];
+      if (typeof write === "function") {
+        (write as (msg: string) => void).call(logger, `${message} (${ms.toFixed(1)}ms)`);
+      }
+      return result as Awaited<T>;
+    };
 
-  const runBlock = (): T | Promise<T> => {
     if (options.silence && typeof logger.silence === "function") {
-      // `Logger#silence` is synchronous; raising the level only suppresses
-      // log calls dispatched before the block returns. Async continuations
-      // inside `block` log normally — matches Rails' Ruby behavior.
-      let inner: T | Promise<T>;
-      logger.silence(ERROR_LEVEL, () => {
-        inner = block();
+      logger.silence(undefined, () => {
+        result = block();
       });
-      return inner!;
+    } else {
+      result = block();
     }
-    return block();
-  };
 
-  // Rails' Benchmarkable does not log on raise — exceptions propagate
-  // without a trailing log line. `logOnError: true` opts back into the
-  // log-on-throw contract that the actionpack helper has historically
-  // promised so callers can see partial timings of failing operations.
-  let result: T | Promise<T>;
-  try {
-    result = runBlock();
-  } catch (err) {
-    if (options.logOnError) log();
-    throw err;
-  }
-
-  if (result! instanceof Promise) {
-    return (result as Promise<Awaited<T>>).then(
-      (val) => {
-        log();
+    if (result! instanceof Promise) {
+      return (result as Promise<Awaited<T>>).then((val) => {
+        result = val as T;
+        finish();
         return val;
-      },
-      (err) => {
-        if (options.logOnError) log();
-        throw err;
-      },
-    );
+      });
+    }
+    return finish();
+  } else {
+    return block() as T | Promise<Awaited<T>>;
   }
-  log();
-  return result as Awaited<T>;
 }

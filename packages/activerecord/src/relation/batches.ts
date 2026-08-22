@@ -157,7 +157,7 @@ export class Batches {
     const ensureValidOptions = () =>
       ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
 
-    if (this.orderValues.length > 0) {
+    if (this.arel().orders.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
