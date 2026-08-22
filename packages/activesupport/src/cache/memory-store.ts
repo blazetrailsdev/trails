@@ -38,6 +38,12 @@ export class MemoryStore extends Store implements CacheStore {
   private cacheSize: number;
   private _pruning = false;
 
+  /**
+   * @missingRailsCall new — PERMANENT: memory_store.rb:83 `@monitor = Monitor.new` — Ruby's
+   *   Monitor is a reentrant mutex guarding the store against other THREADS. JS
+   *   has one thread and the store's mutations are synchronous, so there is
+   *   nothing to construct and nothing to lock. Language shortcoming.
+   */
   constructor(options?: {
     size?: number;
     maxPruneTime?: number;

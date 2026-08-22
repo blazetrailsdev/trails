@@ -31,6 +31,12 @@ export class BroadcastLogger extends Logger {
     return this;
   }
 
+  /**
+   * @missingRailsCall delete — PERMANENT: Ruby Array#delete removes by value:
+   *   `@broadcasts.delete(logger)` (broadcast_logger.rb:105) ports to the
+   *   `filter`ed reassignment in stopBroadcastingTo — JS arrays have no
+   *   delete-by-value.
+   */
   stopBroadcastingTo(logger: Logger): this {
     this.broadcasts = this.broadcasts.filter((l) => l !== logger);
     return this;

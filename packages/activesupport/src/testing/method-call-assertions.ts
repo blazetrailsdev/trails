@@ -66,6 +66,9 @@ export function assertCalled<T extends object>(
  * runs.
  *
  * @internal
+ *
+ * @missingRailsCall new — PERMANENT: `Minitest::Mock.new`; minitest is not ported, so the
+ *   mock is the recorded-call list `assertMock` compares against `args`.
  */
 export function assertCalledWith<T extends object>(
   object: T,

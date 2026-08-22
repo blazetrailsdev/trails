@@ -60,6 +60,14 @@ export class ActionableError extends Error {
     return {};
   }
 
+  /**
+   * @missingRailsCall fetch — PERMANENT: actionable_error.rb:30
+   *   `actions(error).fetch(name).call` — Ruby Hash#fetch raises KeyError, which
+   *   the method's own `rescue KeyError` turns into NonActionable; JS object
+   *   indexing cannot raise, so the port spells the same pair as an explicit
+   *   `name in actions` guard (key presence, exactly as fetch tests it) plus the
+   *   NonActionable throw. Language shortcoming.
+   */
   static dispatch(error: any, name: string): void {
     const actions = this.actions(error);
     if (!(name in actions)) {

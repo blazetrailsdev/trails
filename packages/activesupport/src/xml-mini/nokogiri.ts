@@ -116,6 +116,9 @@ function nodeToHash(node: XmlNode): XmlHash {
  * Mirrors: ActiveSupport::XmlMini_Nokogiri#parse (nokogiri.rb:19-31) —
  * `StringIO` is the shim for Ruby's stdlib `StringIO`, and `instanceof
  * StringIO` stands in for `respond_to?(:read)`.
+ *
+ * @missingRailsCall first — PERMANENT: Ruby core Enumerable#first on the parsed document
+ *   (xml_mini/nokogiri.rb:19-30), not a ported trails method.
  */
 export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (!(data instanceof StringIO)) {

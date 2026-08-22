@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "broadcast-logger.ts",
-    "rubyName": "stop_broadcasting_to",
-    "call": "delete",
-    "reason": "Ruby Array#delete removes by value: `@broadcasts.delete(logger)` (broadcast_logger.rb:105) ports to the `filter`ed reassignment in stopBroadcastingTo — JS arrays have no delete-by-value."
-  }
-]

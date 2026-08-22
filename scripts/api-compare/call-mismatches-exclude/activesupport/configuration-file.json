@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "configuration-file.ts",
-    "rubyName": "parse",
-    "call": "load",
-    "reason": "configuration_file.rb:26-28 `YAML.unsafe_load_file` / `YAML.load_file` — Ruby's YAML/Psych is stdlib with no port; trails reads the file through the async fs adapter and hands the source to its own YAML parser, so no `load` call exists to make."
-  }
-]

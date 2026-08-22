@@ -509,6 +509,13 @@ export interface ToXmlOptions extends Omit<ToTagOptions, "builder"> {
   skipInstruct?: boolean;
 }
 
+/**
+ * @missingRailsCall call — PERMANENT: to_tag ports XmlMini.to_tag: Rails'
+ *   Hash#delete(:type)/#merge/#call/#to_s are satisfied by different TS idioms
+ *   (immutable `{ ...options }` spread instead of merge, destructured
+ *   `options.type` instead of delete, direct function invocation, and
+ *   String()/keyToString()) — no behavioral omission.
+ */
 export function toTag(key: unknown, value: unknown, options: ToTagOptions): void {
   const { builder } = options;
   const explicitType = options.type;

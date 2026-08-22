@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "report",
-    "call": "merge",
-    "reason": "error_reporter.rb:263 `ActiveSupport::ExecutionContext.to_h.merge(context)` — Ruby Hash#merge returning a new hash is JS object spread (`{ ...ExecutionContext.toH(), ...context }`); there is no Hash object to call `merge` on. Same substitution as the `cache.ts merged_options -> merge` row."
-  }
-]

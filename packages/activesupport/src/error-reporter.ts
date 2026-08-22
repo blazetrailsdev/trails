@@ -235,6 +235,12 @@ export class ErrorReporter {
   /**
    * Report an error directly to subscribers. You can use this method when the
    * block-based #handle and #record methods are not suitable.
+   *
+   * @missingRailsCall merge — PERMANENT: error_reporter.rb:263
+   *   `ActiveSupport::ExecutionContext.to_h.merge(context)` — Ruby Hash#merge
+   *   returning a new hash is JS object spread (`{ ...ExecutionContext.toH(),
+   *   ...context }`); there is no Hash object to call `merge` on. Same
+   *   substitution as the `cache.ts merged_options -> merge` row.
    */
   report(
     error: Error,

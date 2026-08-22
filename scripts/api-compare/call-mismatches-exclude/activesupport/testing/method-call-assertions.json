@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "testing/method-call-assertions.ts",
-    "rubyName": "assert_called_with",
-    "call": "new",
-    "reason": "`Minitest::Mock.new`; minitest is not ported, so the mock is the recorded-call list `assertMock` compares against `args`."
-  }
-]
