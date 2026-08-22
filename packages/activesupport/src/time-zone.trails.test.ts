@@ -183,9 +183,6 @@ describe("TimeZoneLocalPeriodsTest", () => {
   });
 
   it("strptime %Q keeps digits below the millisecond", () => {
-    // `Date._strptime("946684800123456", "%Q")` is `{seconds: (118335600015432/125)}`
-    // — 946684800123.456 seconds — so the instant carries 456 microseconds past
-    // the millisecond that a Float epoch in milliseconds would drop.
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = eastern.strptime("946684800123456", "%Q")!;
     expect(twz.toI()).toBe(946684800123);
@@ -195,8 +192,6 @@ describe("TimeZoneLocalPeriodsTest", () => {
   it("at keeps digits below the millisecond", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     expect(eastern.at(946684800, 123456.789).nsec).toBe(123456789);
-    // A Rational is exact, as `Time.at(Rational(946684800123456789, 10**9))`
-    // is in MRI.
     expect(eastern.at(new Rational(946684800123456789n, 1_000_000_000n)).nsec).toBe(123456789);
   });
 });

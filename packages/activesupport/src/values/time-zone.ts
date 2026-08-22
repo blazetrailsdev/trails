@@ -749,9 +749,10 @@ export class Timezone {
  * microseconds one. A Float is truncated at the nanosecond, as MRI's
  * `Time.at(946684800.123456789).nsec` is `123456835` rather than `...836`.
  *
- * @noRailsEquivalent Ruby's Numeric tower does this arithmetic exactly at any
- * width; JS needs the accumulation moved onto `bigint` to keep the digits
- * below the millisecond that a Float epoch cannot hold.
+ * @noRailsEquivalent CONVERGEABLE — Ruby's Numeric tower does this arithmetic
+ * exactly at any width, so `Time.at` needs no such scaling; this goes away with
+ * a `Time.at` in `@blazetrails/date` for `at` to delegate to, the gap
+ * `time-helpers-stub-date-and-datetime-clock` records.
  */
 function toNanoseconds(value: number | bigint | Rational, scale: bigint): bigint {
   if (value instanceof Rational) return (value.numerator * scale) / value.denominator;
@@ -984,11 +985,11 @@ export class TimeZone {
    */
   at(
     seconds: number | bigint | Rational,
-    subsecondMicros: number | bigint | Rational = 0,
+    microsecondsWithFrac: number | bigint | Rational = 0,
   ): TimeWithZone {
     return new TimeWithZone(
       Temporal.Instant.fromEpochNanoseconds(
-        toNanoseconds(seconds, 1_000_000_000n) + toNanoseconds(subsecondMicros, 1_000n),
+        toNanoseconds(seconds, 1_000_000_000n) + toNanoseconds(microsecondsWithFrac, 1_000n),
       ),
       this,
     );
