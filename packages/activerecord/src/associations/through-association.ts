@@ -283,6 +283,13 @@ export const ThroughAssociation = {
   //
   // Mirrors: ActiveRecord::Associations::ThroughAssociation#target_scope
   // (through_association.rb:34-42).
+  /**
+   * @missingRailsCall drop — CONVERGEABLE (story
+   *   port-ruby-array-drop-for-chain-call-sites): Ruby's `Enumerable#drop(1)` over
+   *   `reflection.chain` (through_association.rb:36) is spelled `chain.slice(1)`
+   *   here because trails ports no `Array#drop` yet — the sibling of
+   *   `ruby-empty.ts` / `ruby-first.ts` that story adds.
+   */
   targetScope(this: ThroughAssociationHost): any {
     let scope = super.targetScope();
     if (!scope) return scope;

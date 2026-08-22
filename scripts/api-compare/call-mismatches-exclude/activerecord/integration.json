@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "integration.ts",
-    "rubyName": "can_use_fast_cache_version?",
-    "call": "with_connection",
-    "reason": "integration.rb:180-183 reads `self.class.with_connection(&:default_timezone)`; `withConnection` is async in trails and `canUseFastCacheVersion` is a synchronous predicate on the cacheKey/cacheVersion path, so the port reads the global `ActiveRecord.defaultTimezone` instead — which is what Rails own FIXME on that line asks for (do not check out a connection here)."
-  }
-]

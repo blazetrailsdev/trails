@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/through-association.ts",
-    "rubyName": "target_scope",
-    "call": "drop",
-    "reason": "Ruby's Enumerable#drop(1) over `reflection.chain` (through_association.rb:36) is `chain.slice(1)`: a JS array has no `drop` and ActiveSupport ports no Array#drop."
-  }
-]

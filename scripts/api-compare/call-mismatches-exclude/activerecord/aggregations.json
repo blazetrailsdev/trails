@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "aggregations.ts",
-    "rubyName": "composed_of",
-    "call": "include",
-    "reason": "aggregations.rb `include Aggregations` — Ruby `include` has no TS equivalent; the settled trails idiom names the mixin helper after the module, so the call is `includeAggregations(modelClass)` (aggregations.ts:50, :262) and the `unless self < Aggregations` guard lives inside it. Language shortcoming."
-  }
-]

@@ -224,6 +224,13 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
  * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
  *
  * @internal
+ *
+ * @missingRailsCall with_connection — PERMANENT: integration.rb:181-184 reads
+ *   `self.class.with_connection(&:default_timezone)`. `withConnection` returns a
+ *   Promise in trails and `canUseFastCacheVersion` is a synchronous predicate on
+ *   the `cacheKey` / `cacheVersion` path, so it cannot await one; the port reads
+ *   the global `ActiveRecord.defaultTimezone` instead — which is what Rails' own
+ *   FIXME on that line asks for (do not check out a connection here).
  */
 export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown): boolean {
   if (typeof timestamp !== "string") return false;
