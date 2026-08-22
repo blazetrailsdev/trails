@@ -96,6 +96,21 @@ describe("Delegation.generate", () => {
 });
 
 describe("Delegation.generateMethodMissing", () => {
+  it("does not answer marshal_dump or _dump but still forwards an explicit call", () => {
+    const delegate = {
+      marshal_dump() {
+        return "dumped";
+      },
+    };
+    const obj = Delegation.generateMethodMissing({ delegate } as object, "delegate") as Record<
+      string,
+      () => string
+    >;
+
+    expect("marshal_dump" in obj).toBe(false);
+    expect(obj["marshal_dump"]()).toBe("dumped");
+  });
+
   it("proxies method calls to delegate", () => {
     const delegate = {
       greet() {

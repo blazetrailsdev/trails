@@ -107,11 +107,13 @@ export namespace Delegation {
 
   /**
    * Mirrors: `ActiveSupport::Delegation.generate_method_missing`
-   * (`delegation.rb:160-198`). Ruby defines `method_missing` /
+   * (`delegation.rb:160-198`). Ruby defines `method_missing` and
    * `respond_to_missing?` on `owner`; the trails idiom for both is a `Proxy`,
-   * so this returns the wrapped object instead of mutating `owner`.
-   * `marshal_dump` and `_dump` are exempt from delegation, as in Rails
-   * (`:167`, `:186`).
+   * whose `get` trap is the former and whose `has` trap is the latter — so this
+   * returns the wrapped object instead of mutating `owner`. The
+   * `marshal_dump` / `_dump` exemption is Rails' and belongs to
+   * `respond_to_missing?` alone (`:167`, `:186`): an explicit call still
+   * forwards, because `method_missing` does not repeat the check.
    */
   export function generateMethodMissing<T extends object>(
     owner: T,
@@ -119,11 +121,16 @@ export namespace Delegation {
     { allowNil }: { allowNil?: boolean } = {},
   ): T {
     return new Proxy(owner, {
+      has(obj, prop) {
+        if (prop === "marshal_dump" || prop === "_dump") return false;
+        if (Reflect.has(obj, prop)) return true;
+        const __target = (obj as Record<string, unknown>)[target];
+        return __target != null && prop in Object(__target);
+      },
       get(obj, prop, receiver) {
         if (prop in obj || typeof prop === "symbol") {
           return Reflect.get(obj, prop, receiver);
         }
-        if (prop === "marshal_dump" || prop === "_dump") return undefined;
         const __target = (obj as Record<string, unknown>)[target];
         if (__target == null) {
           if (allowNil) return undefined;
