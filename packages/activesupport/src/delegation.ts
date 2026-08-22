@@ -3,6 +3,20 @@
  * Mirrors ActiveSupport::Delegation and ActiveSupport::DelegationError.
  */
 
+import { NameError } from "./core-ext/name-error.js";
+
+/**
+ * Ruby's `NoMethodError`, raised when the delegator calls a method the target
+ * does not answer. Rails re-raises MRI's from the generated body's
+ * `rescue NoMethodError => e ... else raise` (delegation.rb:130-141).
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
 export class DelegationError extends Error {
   constructor(message: string) {
     super(message);
@@ -32,7 +46,15 @@ export namespace Delegation {
    * The generated delegator calls a callable member and reads one that is not:
    * Ruby's `_.#{method}(...)` (`:130`) is a call either way, because a Ruby
    * attr_reader IS a method, while a trails reader is a property (CLAUDE.md,
-   * "Generated attribute readers are properties").
+   * "Generated attribute readers are properties"). A member the target does not
+   * answer at all still raises: Rails converts the generated body's
+   * `NoMethodError` to a `DelegationError` only when `_` is nil, and otherwise
+   * re-raises it (`:132-140`).
+   *
+   * `to:` accepts only a method name. Rails also takes a `Module`, and prefixes
+   * a `RESERVED_METHOD_NAMES` receiver with `self.` (`:36-58`) — neither is
+   * ported; see story `0106-wide-call-set-direct-burndown/
+   * port-delegation-generate-module-and-reserved-receivers`.
    */
   export function generate<T extends object>(
     owner: T,
@@ -70,6 +92,9 @@ export namespace Delegation {
           if (_ == null) {
             if (allowNil) return undefined;
             throw DelegationError.nilTarget(methodName, to);
+          }
+          if (!(method in Object(_))) {
+            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
           }
           const member = (_ as Record<string, unknown>)[method];
           return typeof member === "function" ? member.apply(_, args) : member;

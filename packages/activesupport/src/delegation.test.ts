@@ -77,6 +77,17 @@ describe("Delegation.generate", () => {
     expect(p.my_greet()).toBe("hello");
   });
 
+  it("raises NoMethodError when the target does not answer the method", () => {
+    class Greeter {}
+    class Person {
+      greeter = new Greeter();
+    }
+    Delegation.generate(Person.prototype, ["greet"], { to: "greeter" });
+    const p = new Person() as Person & { greet: () => string };
+    expect(() => p.greet()).toThrow(/undefined method 'greet'/);
+    expect(() => p.greet()).not.toThrow(DelegationError);
+  });
+
   it("throws when no target specified", () => {
     expect(() => {
       Delegation.generate({}, ["greet"], { to: "" });

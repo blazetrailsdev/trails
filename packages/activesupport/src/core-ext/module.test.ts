@@ -380,12 +380,23 @@ describe("ModuleTest", () => {
   });
 
   it("delegation doesnt mask nested no method error on nil receiver", () => {
-    class Container {
-      val: null = null;
+    class Product {
+      constructor(public name: string) {}
+      get manufacturer(): { name: string } {
+        return (null as unknown as { unknownMethod(): { name: string } }).unknownMethod();
+      }
+      get type(): { name: string } {
+        return (null as unknown as { typeName(): { name: string } }).typeName();
+      }
     }
-    delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something(): unknown };
-    expect(() => c.something()).toThrow();
+    delegate(Product.prototype, "name", { to: "manufacturer", prefix: true });
+    delegate(Product.prototype, "name", { to: "type", prefix: true });
+    const product = new Product("Widget") as Product & {
+      manufacturer_name(): string;
+      type_name(): string;
+    };
+    expect(() => product.manufacturer_name()).toThrow(TypeError);
+    expect(() => product.type_name()).toThrow(TypeError);
   });
 
   it("delegation with method arguments", () => {
