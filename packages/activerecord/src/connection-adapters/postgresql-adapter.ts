@@ -860,13 +860,10 @@ export class PostgreSQLAdapter
     this._mappedDefaultTimezone = null;
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
     await client.query("SET standard_conforming_strings = on");
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
     await client.query("SET intervalstyle = iso_8601");
     await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
-    // postgresql_adapter.rb:977 — `variables = @config.fetch(:variables, {})
-    // .stringify_keys`, re-read per configure so a config change takes effect
-    // on the next connection.
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
     // SET statements from :variables config hash
     // https://www.postgresql.org/docs/current/static/sql-set.html
     for (const [key, val] of Object.entries(variables)) {
