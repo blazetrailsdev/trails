@@ -3295,6 +3295,12 @@ export class PostgreSQLAdapter
    * (XmlData, BitData, Range, ArrayData) fall through to the base dispatch.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
+   *
+   * @missingRailsCall check_int_in_range — PERMANENT: Equivalent (RFC 0072
+   *   activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is
+   *   a bare alias — `export const checkIntInRange = checkIntegerRange` — so the
+   *   routed call is the alias target and the extractor never sees the alias
+   *   name. Nothing to converge.
    */
   override quote(value: unknown): string {
     // `.call(this)` so the inherited date/time dispatch resolves to this
@@ -3306,6 +3312,15 @@ export class PostgreSQLAdapter
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_string
    * (postgresql/quoting.rb:127-131) — escape-only, so the inherited `quote`
    * dispatches here instead of the abstract backslash-doubling escape.
+   *
+   * @missingRailsCall with_raw_connection — PERMANENT: Language shortcoming: Rails'
+   *   quote_string escapes through the live connection (`with_raw_connection {
+   *   |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres
+   *   exposes no escape entry point at all — sync or async — and `quote_string`
+   *   is a sync method every `quote` call site depends on. The override
+   *   reproduces libpq's standard_conforming_strings escaping inline in
+   *   postgresql/quoting.ts (same divergence already baselined for that module's
+   *   quote_string).
    */
   override quoteString(s: string): string {
     return pgQuoteString(s);
