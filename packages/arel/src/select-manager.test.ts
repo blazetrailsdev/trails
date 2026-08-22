@@ -323,7 +323,7 @@ describe("SelectManagerTest", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
       const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(q1.unionAll(q2))).toContain("UNION ALL");
+      expect(visitor.compile(q1.union(":all", q2))).toContain("UNION ALL");
     });
   });
 
@@ -1176,7 +1176,7 @@ describe("SelectManagerTest", () => {
   it("rightOuterJoin generates RIGHT OUTER JOIN", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
-    mgr.rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+    mgr.join(posts, Nodes.RightOuterJoin).on(users.get("id").eq(posts.get("user_id")));
     expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
     expect(mgr.toSql()).toContain('"posts"');
   });
@@ -1184,14 +1184,14 @@ describe("SelectManagerTest", () => {
   it("fullOuterJoin generates FULL OUTER JOIN", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
-    mgr.fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+    mgr.join(posts, Nodes.FullOuterJoin).on(users.get("id").eq(posts.get("user_id")));
     expect(mgr.toSql()).toContain("FULL OUTER JOIN");
   });
 
   it("crossJoin generates CROSS JOIN", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
-    mgr.crossJoin(posts);
+    mgr.join(posts, Nodes.CrossJoin);
     expect(mgr.toSql()).toContain("CROSS JOIN");
     expect(mgr.toSql()).toContain('"posts"');
   });
@@ -1202,27 +1202,6 @@ describe("SelectManagerTest", () => {
     const win = mgr.window("w");
     win.order(users.get("created_at").asc());
     expect(mgr.toSql()).toContain("WINDOW");
-  });
-
-  it("rightOuterJoin with string table name", () => {
-    const mgr = new SelectManager(users);
-    mgr.project(star);
-    mgr.rightOuterJoin("posts", users.get("id").eq(new Nodes.SqlLiteral("posts.user_id")));
-    expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
-  });
-
-  it("fullOuterJoin with string table name", () => {
-    const mgr = new SelectManager(users);
-    mgr.project(star);
-    mgr.fullOuterJoin("posts", users.get("id").eq(new Nodes.SqlLiteral("posts.user_id")));
-    expect(mgr.toSql()).toContain("FULL OUTER JOIN");
-  });
-
-  it("crossJoin with string table name", () => {
-    const mgr = new SelectManager(users);
-    mgr.project(star);
-    mgr.crossJoin("posts");
-    expect(mgr.toSql()).toContain("CROSS JOIN");
   });
 
   describe("projections", () => {
@@ -1353,7 +1332,8 @@ describe("SelectManagerTest", () => {
     it("takes the full outer join class", () => {
       const mgr = users
         .project(star)
-        .fullOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+        .join(posts, Nodes.FullOuterJoin)
+        .on(users.get("id").eq(posts.get("user_id")));
       expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.FullOuterJoin);
       expect(mgr.toSql()).toContain("FULL OUTER JOIN");
     });
@@ -1361,7 +1341,8 @@ describe("SelectManagerTest", () => {
     it("takes the right outer join class", () => {
       const mgr = users
         .project(star)
-        .rightOuterJoin(posts, users.get("id").eq(posts.get("user_id")));
+        .join(posts, Nodes.RightOuterJoin)
+        .on(users.get("id").eq(posts.get("user_id")));
       expect(mgr.joinSources()[0]).toBeInstanceOf(Nodes.RightOuterJoin);
       expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
     });

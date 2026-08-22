@@ -3426,7 +3426,7 @@ export interface JoinEmissionPlan {
  * @internal
  */
 export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmissionPlan): void {
-  if (plan.leadingJoins.length > 0) manager.prependJoinNodes(...plan.leadingJoins);
+  if (plan.leadingJoins.length > 0) manager.joinSources().push(...plan.leadingJoins);
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
   // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
@@ -3463,8 +3463,9 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   const joinType = plan.joinType;
   if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, joinType);
-    for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker(), references))
-      manager.appendJoinNode(node);
+    manager
+      .joinSources()
+      .push(...jd.joinConstraints(plan.stashedJoins, sharedTracker(), references));
   }
 
   // `build_joins` concats `buckets[:join_node]` once (query_methods.rb:1899);
@@ -3472,7 +3473,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // the `while joins.first.is_a?(Arel::Nodes::Join)` loop
   // (query_methods.rb:1856-1863) before the CTE nodes the select_named_joins
   // block appends (query_methods.rb:1865-1873).
-  for (const node of plan.joinNodes) manager.appendJoinNode(node);
+  if (plan.joinNodes.length > 0) manager.joinSources().push(...plan.joinNodes);
 
   // When a tracker was threaded in (Rails passes the alias HASH itself to
   // `join_scope.arel(alias_tracker.aliases)`, so claims made while building this
