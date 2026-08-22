@@ -705,7 +705,6 @@ export class AssociationScope {
       for (const scopeChainItem of constraints) {
         if (typeof scopeChainItem !== "function") continue;
         const item = this.evalScope(reflection, scopeChainItem, owner);
-        if (!item) continue;
 
         if (scopeChainItem === (chainHead as { scope?: unknown } | undefined)?.scope) {
           // Rails: `scope.merge! item.except(:where, :includes, :unscope, :order)`
@@ -909,7 +908,11 @@ export class AssociationScope {
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
       (reflection as ReflectionProxy).aliasedTable,
     );
-    return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner) ?? relation;
+    // Ruby `||` falls back on `false` as well as `nil`, and a scope lambda
+    // ending in a predicate returns one — `?? relation` would hand `false`
+    // back to add_constraints where Rails hands back the relation.
+    const evaluated = invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
+    return evaluated != null && evaluated !== false ? evaluated : relation;
   }
 
   /**

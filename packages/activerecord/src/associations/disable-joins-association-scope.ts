@@ -318,9 +318,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       ).constraints?.() ?? [];
     for (const scopeChainItem of constraints) {
       if (typeof scopeChainItem !== "function") continue;
-      const item = this.evalScope(reflection, scopeChainItem, owner);
-      if (!item) continue;
-      // Rails: `scope.unscope!(*item.unscope_values)`,
+      const item = this.evalScope(reflection, scopeChainItem, owner); // Rails: `scope.unscope!(*item.unscope_values)`,
       // `scope.where_clause += item.where_clause`,
       // `scope.order_values = item.order_values | scope.order_values`
       // (disable_joins_association_scope.rb:41-47). The join-less variant
