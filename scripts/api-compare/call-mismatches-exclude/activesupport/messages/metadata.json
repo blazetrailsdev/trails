@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "extract_from_metadata_envelope",
+    "call": "utc",
+    "reason": "`Time.now.utc >= parse_expiry(...)` (messages/metadata.rb:81). trails reads the clock as a JS `Date`, which is already an absolute instant, so the `.utc` hop is a no-op on this seat. Pre-existing: surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was ported and `utc` entered the population."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "pick_expiry",
+    "call": "utc",
+    "reason": "`expires_at.utc` / `Time.now.utc.advance(...)` (messages/metadata.rb:100-105). Same seat as `extract_from_metadata_envelope` above: the expiry is a JS `Date`, already absolute, so there is no offset for `.utc` to drop. Pre-existing: surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was ported and `utc` entered the population."
+  }
+]

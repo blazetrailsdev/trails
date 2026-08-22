@@ -625,22 +625,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "DateTime's offset-shifting conversions (date_time/calculations.rb:169-" +
-      "193): `localtime`/`getlocal` and `utc`/`getgm`/`getutc`/`gmtime`. Each " +
-      "answers a `Time` for the same instant at a different offset, and trails " +
-      "represents a time as a `Date`/`Temporal.Instant` — an absolute instant " +
-      "carrying no offset — so there is nothing for them to convert; the " +
-      "offset-carrying surface is TimeWithZone (`utc`, `utcOffset`, `isUtc` in " +
-      "time-with-zone.ts). Scoped to date_time/calculations.rb so it cannot " +
-      "silence the genuine Time/TimeWithZone members of the same names. " +
-      "`utc?` and `utc_offset` came off this list once the DateTime receiver " +
-      "existed to read an offset off: both are ported in " +
-      "core-ext/date-time/calculations.ts.",
-    names: ["localtime", "getlocal", "utc", "getgm", "getutc", "gmtime"],
-    rubyFiles: ["core_ext/date_time/calculations.rb"],
-  },
-  {
-    reason:
       "Ruby method-(re)definition machinery: `silence_redefinition_of_method` " +
       "exists to suppress MRI's method-redefined warning, `redefine_singleton_method` " +
       "wraps `define_singleton_method` in that suppression, and `method_visibility` " +

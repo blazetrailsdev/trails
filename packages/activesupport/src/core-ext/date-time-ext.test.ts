@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { DateTime, Rational, Temporal } from "@blazetrails/date";
+import { DateTime, Rational, Temporal, Time } from "@blazetrails/date";
 import {
   advance,
   ago,
@@ -7,16 +7,21 @@ import {
   beginningOfHour,
   beginningOfMinute,
   change,
+  compare,
   current,
   endOfDay,
   endOfHour,
   endOfMinute,
+  getlocal,
+  getutc,
   isUtc,
+  localtime,
   middleOfDay,
   secondsSinceMidnight,
   secondsUntilEndOfDay,
   since,
   subsec,
+  utc,
   utcOffset,
 } from "./date-time/calculations.js";
 import {
@@ -31,6 +36,8 @@ import {
   usec,
 } from "./date-time/conversions.js";
 import { setFrozenTime } from "../time-travel.js";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
 import { setZone } from "../time-zone-config.js";
 import { ArgumentError } from "../hash-utils.js";
 import {
@@ -57,6 +64,25 @@ afterEach(() => {
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
+}
+
+function withEnvTz<T>(tz: string, fn: () => T): T {
+  const orig = process.env.TZ;
+  process.env.TZ = tz;
+  try {
+    return fn();
+  } finally {
+    if (orig === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = orig;
+    }
+  }
+}
+
+/** Ruby's `Time#==`, which compares the instant the two receivers name. */
+function sameTime(actual: Time, expected: Time): void {
+  expect(actual.toTime().epochNanoseconds).toBe(expected.toTime().epochNanoseconds);
 }
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -126,14 +152,39 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("localtime", () => {
-    const dt = new Date("2005-02-22T10:10:10Z");
-    expect(dt instanceof Date).toBe(true);
-    expect(dt.getTime()).toBeGreaterThan(0);
+    withEnvTz("US/Eastern", () => {
+      expect(localtime(DateTime.civil(2016, 3, 11, 15, 11, 12, 0))).toBeInstanceOf(Time);
+      sameTime(
+        localtime(DateTime.civil(2016, 3, 11, 15, 11, 12, 0)),
+        Time.local(2016, 3, 11, 10, 11, 12),
+      );
+      sameTime(
+        localtime(DateTime.civil(2016, 3, 21, 15, 11, 12, 0)),
+        Time.local(2016, 3, 21, 11, 11, 12),
+      );
+      sameTime(
+        localtime(DateTime.civil(2016, 4, 1, 16, 11, 12, new Rational(1, 24))),
+        Time.local(2016, 4, 1, 11, 11, 12),
+      );
+    });
   });
 
   it("getlocal", () => {
-    const dt = new Date("2005-02-22T10:10:10Z");
-    expect(dt.getFullYear()).toBeGreaterThan(2004);
+    withEnvTz("US/Eastern", () => {
+      expect(getlocal(DateTime.civil(2016, 3, 11, 15, 11, 12, 0))).toBeInstanceOf(Time);
+      sameTime(
+        getlocal(DateTime.civil(2016, 3, 11, 15, 11, 12, 0)),
+        Time.local(2016, 3, 11, 10, 11, 12),
+      );
+      sameTime(
+        getlocal(DateTime.civil(2016, 3, 21, 15, 11, 12, 0)),
+        Time.local(2016, 3, 21, 11, 11, 12),
+      );
+      sameTime(
+        getlocal(DateTime.civil(2016, 4, 1, 16, 11, 12, new Rational(1, 24))),
+        Time.local(2016, 4, 1, 11, 11, 12),
+      );
+    });
   });
 
   it("to date", () => {
@@ -419,8 +470,24 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("utc", () => {
-    const dt = new Date("2005-02-22T10:10:10Z");
-    expect(dt.getUTCHours()).toBe(10);
+    expect(utc(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-6, 24)))).toBeInstanceOf(Time);
+    sameTime(
+      utc(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-6, 24))),
+      Time.utc(2005, 2, 21, 16, 11, 12),
+    );
+    sameTime(
+      utc(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-5, 24))),
+      Time.utc(2005, 2, 21, 15, 11, 12),
+    );
+    sameTime(utc(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)), Time.utc(2005, 2, 21, 10, 11, 12));
+    sameTime(
+      utc(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(1, 24))),
+      Time.utc(2005, 2, 21, 9, 11, 12),
+    );
+    sameTime(
+      getutc(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(1, 24))),
+      Time.utc(2005, 2, 21, 9, 11, 12),
+    );
   });
 
   it("formatted offset with utc", () => {
@@ -436,39 +503,49 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("compare with time", () => {
-    const dt1 = d(2005, 2, 22, 10, 10, 10);
-    const dt2 = d(2005, 2, 22, 10, 10, 11);
-    expect(dt1 < dt2).toBe(true);
+    expect(compare(dt(2000), Time.utc(1999, 12, 31, 23, 59, 59))).toBe(1);
+    expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 0))).toBe(0);
+    expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 1))).toBe(-1);
   });
 
   it("compare with datetime", () => {
-    const dt1 = d(2005, 2, 22, 10, 10, 10);
-    const dt2 = d(2005, 2, 22, 10, 10, 10);
-    expect(dt1.getTime()).toBe(dt2.getTime());
+    expect(compare(dt(2000), DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(1);
+    expect(compare(dt(2000), DateTime.civil(2000, 1, 1, 0, 0, 0))).toBe(0);
+    expect(compare(dt(2000), DateTime.civil(2000, 1, 1, 0, 0, 1))).toBe(-1);
   });
 
-  it.skip("compare with time with zone");
+  it("compare with time with zone", () => {
+    const utcZone = TimeZone.find("UTC")!;
+    const twz = (t: Time): TimeWithZone => new TimeWithZone(t.toTime().toInstant(), utcZone);
+    expect(compare(dt(2000), twz(Time.utc(1999, 12, 31, 23, 59, 59)))).toBe(1);
+    expect(compare(dt(2000), twz(Time.utc(2000, 1, 1, 0, 0, 0)))).toBe(0);
+    expect(compare(dt(2000), twz(Time.utc(2000, 1, 1, 0, 0, 1)))).toBe(-1);
+  });
 
   it("compare with string", () => {
-    const dt = d(2005, 2, 22);
-    const str = dt.toISOString();
-    expect(new Date(str).getFullYear()).toBe(2005);
+    expect(compare(dt(2000), Time.utc(1999, 12, 31, 23, 59, 59).toS())).toBe(1);
+    expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 0).toS())).toBe(0);
+    expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 1).toS())).toBe(-1);
+    expect(compare(dt(2000), "Invalid as Time")).toBeNull();
   });
 
   it("compare with integer", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const timestamp = dt.getTime();
-    expect(typeof timestamp).toBe("number");
-    expect(timestamp > 0).toBe(true);
+    expect(compare(dt(1970, 1, 1, 12, 0, 0), 2440587)).toBe(1);
+    expect(compare(dt(1970, 1, 1, 12, 0, 0), 2440588)).toBe(0);
+    expect(compare(dt(1970, 1, 1, 12, 0, 0), 2440589)).toBe(-1);
   });
 
   it("compare with float", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const asFloat = dt.getTime() / 1000;
-    expect(typeof asFloat).toBe("number");
+    expect(compare(dt(1970), 2440586.5)).toBe(1);
+    expect(compare(dt(1970), 2440587.5)).toBe(0);
+    expect(compare(dt(1970), 2440588.5)).toBe(-1);
   });
 
-  it.skip("compare with rational");
+  it("compare with rational", () => {
+    expect(compare(dt(1970), new Rational(4881173, 2))).toBe(1);
+    expect(compare(dt(1970), new Rational(4881175, 2))).toBe(0);
+    expect(compare(dt(1970), new Rational(4881177, 2))).toBe(-1);
+  });
 
   it("to f", () => {
     expect(toF(dt(2000))).toBe(946684800.0);

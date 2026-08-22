@@ -17,7 +17,13 @@
  * Mirrors: `class DateTime` (`core_ext/date_time/calculations.rb`)
  */
 
-import { DateTime as RubyDateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import {
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Rational,
+  Temporal,
+  Time,
+} from "@blazetrails/date";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -25,6 +31,7 @@ import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
 import { secFraction } from "../../time-ext.js";
 import * as date from "../date/calculations.js";
+import { toDatetime as stringToDatetime } from "../string/conversions.js";
 import { nsec, toI } from "./conversions.js";
 
 /**
@@ -302,6 +309,57 @@ export function endOfMinute(datetime: DateTime): DateTime {
 export const atEndOfMinute = endOfMinute;
 
 /**
+ * Returns a `Time` instance of the simultaneous time in the system timezone.
+ *
+ * Mirrors: `DateTime#localtime(utc_offset = nil)`
+ * (`date_time/calculations.rb:170-178`). `new_offset(0)` re-reads the receiver
+ * at a zero offset, so the components handed to `Time.utc` are the UTC ones,
+ * and `getlocal` moves that instant to the local zone (or to `utcOffset`).
+ */
+export function localtime(datetime: DateTime, utcOffset: number | string | null = null): Time {
+  const utc = new RubyDateTime(datetime).newOffset(0);
+
+  return Time.utc(
+    Number(utc.year),
+    utc.month,
+    utc.day,
+    utc.hour,
+    utc.min,
+    new Rational(utc.sec, 1).add(utc.secFraction),
+  ).getlocal(utcOffset);
+}
+
+/** Mirrors: `alias_method :getlocal, :localtime` (`date_time/calculations.rb:179`) */
+export const getlocal = localtime;
+
+/**
+ * Returns a `Time` instance of the simultaneous time in the UTC timezone.
+ *
+ * Mirrors: `DateTime#utc` (`date_time/calculations.rb:184-191`).
+ */
+export function utc(datetime: DateTime): Time {
+  const utc = new RubyDateTime(datetime).newOffset(0);
+
+  return Time.utc(
+    Number(utc.year),
+    utc.month,
+    utc.day,
+    utc.hour,
+    utc.min,
+    new Rational(utc.sec, 1).add(utc.secFraction),
+  );
+}
+
+/** Mirrors: `alias_method :getgm, :utc` (`date_time/calculations.rb:192`) */
+export const getgm = utc;
+
+/** Mirrors: `alias_method :getutc, :utc` (`date_time/calculations.rb:193`) */
+export const getutc = utc;
+
+/** Mirrors: `alias_method :gmtime, :utc` (`date_time/calculations.rb:194`) */
+export const gmtime = utc;
+
+/**
  * Mirrors: `DateTime#utc?` (`date_time/calculations.rb:196-198`) —
  * `offset == 0`.
  */
@@ -317,4 +375,69 @@ export function isUtc(datetime: DateTime): boolean {
  */
 export function utcOffset(datetime: DateTime): number {
   return new RubyDateTime(datetime).offset.mul(86400).toI();
+}
+
+/**
+ * Layers additional behavior on `DateTime#<=>` so that `Time` and
+ * `ActiveSupport::TimeWithZone` instances can be compared with a `DateTime`.
+ *
+ * Mirrors: `DateTime#<=>(other)` (`date_time/calculations.rb:208-214`), whose
+ * `super` is ruby/date's own `Date#<=>` (`date_core.c` `d_lite_cmp`) — the
+ * arm that takes the Integer, Float and Rational astronomical Julian days
+ * Rails' own tests compare against.
+ *
+ * `rescue nil` covers `other.to_datetime` as well as the `super` call, so a
+ * String that does not parse answers `null` rather than raising.
+ */
+export function compare(datetime: DateTime, other: unknown): number | null {
+  // boundary: Ruby dispatches on `respond_to? :to_datetime`; the trails values
+  // that answer it are the ruby/date receivers, TimeWithZone, a String, and
+  // the `Temporal` seats a DateTime, a Date and a Time are carried as.
+  if (respondsToToDatetime(other)) {
+    try {
+      return new RubyDateTime(datetime).cmp(new RubyDateTime(toDatetime(other)));
+    } catch {
+      return null;
+    }
+  } else {
+    return new RubyDateTime(datetime).cmp(other);
+  }
+}
+
+/**
+ * `other.respond_to? :to_datetime` (`date_time/calculations.rb:209`).
+ * @internal
+ */
+function respondsToToDatetime(other: unknown): boolean {
+  return (
+    typeof other === "string" ||
+    other instanceof Time ||
+    other instanceof TimeWithZone ||
+    other instanceof RubyDate ||
+    other instanceof Temporal.PlainDate ||
+    other instanceof Temporal.PlainDateTime ||
+    other instanceof Temporal.ZonedDateTime ||
+    other instanceof Temporal.Instant
+  );
+}
+
+/**
+ * `other.to_datetime` (`date_time/calculations.rb:210`), one arm per receiver
+ * {@link respondsToToDatetime} admits.
+ * @internal
+ */
+function toDatetime(other: unknown): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  if (typeof other === "string") {
+    const parsed = stringToDatetime(other);
+    if (parsed === undefined) throw new ArgumentError("invalid date");
+    return parsed;
+  }
+  if (other instanceof Time) return other.toDatetime();
+  if (other instanceof TimeWithZone) return other.toDatetime();
+  if (other instanceof RubyDate) return other.toDatetime();
+  if (other instanceof Temporal.PlainDate) return new RubyDate(other).toDatetime();
+  if (other instanceof Temporal.Instant) {
+    return Time.at(new Rational(other.epochNanoseconds, 1_000_000_000n)).toDatetime();
+  }
+  return other as Temporal.PlainDateTime | Temporal.ZonedDateTime;
 }
