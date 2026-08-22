@@ -20,19 +20,6 @@ export { UnsupportedVisitError };
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
-/**
- * Resolve a bind's database value. QueryAttribute exposes
- * `valueForDatabase` as a method; ActiveModel::Attribute (TS port)
- * exposes it as a getter. A normal property read handles both shapes —
- * the getter evaluates to its value, a method reference yields a
- * function that we then invoke.
- */
-export function resolveValueForDatabase(value: unknown): unknown {
-  if (!value || typeof value !== "object" || !("valueForDatabase" in value)) return value;
-  const v = (value as Record<string, unknown>).valueForDatabase;
-  return typeof v === "function" ? (v as () => unknown).call(value) : v;
-}
-
 // -- Raw-value dispatch helpers --
 //
 // Rails dispatches a raw value on its Ruby class (visitor.rb:29-30). These map
@@ -75,27 +62,6 @@ function constructorName(v: unknown): string {
 
 /** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
 const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
-
-/**
- * True when a CTE body node renders its own surrounding parentheses (a
- * `Grouping`, a set-operation node, or a `SelectManager`), so
- * `visit_Arel_Nodes_Cte` must not add another pair. A bare `SelectStatement` /
- * `SqlLiteral` returns false — those need the explicit `AS (...)` wrap.
- */
-export function cteRelationSelfWraps(relation: Node): boolean {
-  return (
-    // `Arel::Nodes::As.new(cte_table, select_manager)` is Rails' own CTE idiom
-    // and `visit_Arel_SelectManager` (to_sql.rb:358-361) already emits the
-    // parens. A SelectManager is not a Node, so it reaches a CTE body slot as
-    // `NodeOrValue` rather than through the node hierarchy above.
-    (relation as unknown) instanceof SelectManager ||
-    relation instanceof Nodes.Grouping ||
-    relation instanceof Nodes.Union ||
-    relation instanceof Nodes.UnionAll ||
-    relation instanceof Nodes.Intersect ||
-    relation instanceof Nodes.Except
-  );
-}
 
 /**
  * Ruby `Object#to_s`, as applied by every adapter's `quote_column_name` /
@@ -294,7 +260,22 @@ export class ToSql extends Visitor {
     // collector << quote(o.value_for_database).to_s — the quoted literal is
     // appended directly (visit_Arel_Nodes_Quoted is an alias). Only BindParam
     // uses add_bind. Inlines exactly like visitQuoted.
-    const valueForDatabase = resolveValueForDatabase(o.valueForDatabase());
+    //
+    // Ruby's `value_for_database` is one zero-arg method however the receiver
+    // defines it, so Rails just calls it. In TS the ported readers split: a
+    // QueryAttribute answers with a method, an ActiveModel::Attribute with a
+    // getter, so a `Casted` wrapping either hands back a value or a function
+    // and the second half has to be applied here.
+    let valueForDatabase = o.valueForDatabase();
+    if (
+      valueForDatabase &&
+      typeof valueForDatabase === "object" &&
+      "valueForDatabase" in valueForDatabase
+    ) {
+      const held = valueForDatabase;
+      const inner = (held as Record<string, unknown>).valueForDatabase;
+      valueForDatabase = typeof inner === "function" ? (inner as () => unknown).call(held) : inner;
+    }
     collector.append(this.quote(valueForDatabase));
     return collector;
   }
@@ -1259,7 +1240,17 @@ export class ToSql extends Visitor {
     // bare SelectStatement / SqlLiteral relations, which don't self-wrap, so add
     // the parens explicitly only for those — otherwise an array CTE
     // (UnionAll) or a SqlLiteral CTE (Grouping) double-wraps to `AS ((…))`.
-    if (cteRelationSelfWraps(o.relation)) {
+    // A `Grouping`, a set-operation node or a `SelectManager` emits its own
+    // parens (`visit_Arel_SelectManager`, to_sql.rb:358-361), so wrapping again
+    // would render `AS ((…))`.
+    if (
+      (o.relation as unknown) instanceof SelectManager ||
+      o.relation instanceof Nodes.Grouping ||
+      o.relation instanceof Nodes.Union ||
+      o.relation instanceof Nodes.UnionAll ||
+      o.relation instanceof Nodes.Intersect ||
+      o.relation instanceof Nodes.Except
+    ) {
       this.visit(o.relation, collector);
     } else {
       collector.append("(");
