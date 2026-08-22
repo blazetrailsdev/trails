@@ -51,6 +51,7 @@ import {
   applyCallTags,
   suppressTaggedCalls,
   tagsForOwner,
+  recordTaggedCalls,
 } from "./compare.js";
 import { rubyMethodToTs } from "@blazetrails/parity/conventions";
 import type {
@@ -1819,6 +1820,40 @@ describe("suppressTaggedCalls", () => {
       "reload → reload",
     ]);
     expect([...used]).toEqual([]);
+  });
+});
+
+describe("recordTaggedCalls", () => {
+  it("records a tag on the package under comparison", () => {
+    const byFileName = new Map<string, Map<string, Map<string, Map<string, string>>>>();
+    recordTaggedCalls(byFileName, "gem-version.ts", "gemVersion", "", ["new"], {
+      new: "PERMANENT",
+    });
+    expect(byFileName.get("gem-version.ts")?.get("gemVersion")?.get("")?.get("new")).toBe(
+      "PERMANENT",
+    );
+  });
+
+  it("ignores a dep package's tag on a file whose basename collides with ours", () => {
+    const byFileName = new Map<string, Map<string, Map<string, Map<string, string>>>>();
+    // Every package ships a `gem-version.ts`; activesupport's tag must not
+    // land under actionpack's same-named file and read as stale there.
+    recordTaggedCalls(
+      byFileName,
+      "gem-version.ts",
+      "gemVersion",
+      "",
+      ["new"],
+      { new: "PERMANENT" },
+      "dep",
+    );
+    expect(byFileName.size).toBe(0);
+    expect(
+      staleCallTags(
+        byFileName,
+        new Map([[callTagKey("gem-version.ts", "*", "gemVersion"), new Set<string>()]]),
+      ),
+    ).toEqual([]);
   });
 });
 
