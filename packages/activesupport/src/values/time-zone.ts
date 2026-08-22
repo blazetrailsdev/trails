@@ -1191,7 +1191,7 @@ export class TimeZone {
       throw new ArgumentError("argument out of range");
     }
 
-    return new TimeWithZone(utcInstantOf(time, parts.offset ?? 0), this);
+    return new TimeWithZone(utcInstantOf(time, parts.offset!), this);
   }
 
   /**

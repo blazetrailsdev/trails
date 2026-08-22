@@ -74,10 +74,6 @@ export abstract class Node {
     return false;
   }
 
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-
   /**
    * Ruby-ish equality helper.
    *
