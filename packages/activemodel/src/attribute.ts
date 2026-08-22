@@ -234,7 +234,8 @@ export abstract class Attribute {
    * and that pass must stay invisible to `accessed_fields`
    * (attribute_methods.rb:460-462 → `AttributeSet#accessed`), which Rails leaves
    * empty on a freshly built record. Dropping the memo with the flag costs one
-   * recomputation on the first real read.
+   * recomputation on the first real read. Story compute-record-dirtiness-lazily
+   * deletes this along with the eager pass.
    *
    * @internal
    */

@@ -110,11 +110,8 @@ describe("AttributeMethodsTest (trails)", () => {
   });
 
   it("attribute_present? is empty?, not blank?", () => {
-    // attribute_methods.rb:387-392 is `!value.nil? && !(value.respond_to?(:empty?)
-    // && value.empty?)`. Ruby's `" ".empty?` is FALSE, so a whitespace-only
-    // string IS present — where ActiveSupport's `blank?` (which trails read
-    // through before) calls it blank. The alias arm and the `_read_attribute`
-    // read are the same two lines of that body.
+    // attribute_methods.rb:387-392 asks `empty?`, not `blank?`: Ruby's
+    // `" ".empty?` is FALSE, so a whitespace-only string is present.
     class Topic extends Base {
       static {
         this.attribute("title", "string");

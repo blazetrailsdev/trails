@@ -15,9 +15,7 @@ import { pp } from "./pretty-print.js";
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
-  // Rails renders these three through `PP.pp(user, StringIO.new(actual))`
-  // (filter_attributes_test.rb:120-145); trails' port of `PP.pp` is `pp` over
-  // `Core#pretty_print`.
+  /** `PP.pp(user, StringIO.new(actual))` (filter_attributes_test.rb:120-145). */
   async function ppString(obj: unknown): Promise<string> {
     let out = "";
     await pp(obj, { write: (s: string) => (out += s) });

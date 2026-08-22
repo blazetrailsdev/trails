@@ -494,9 +494,6 @@ export class DirtyTracker {
       // Attribute#changed? already compares value against original_value — for a
       // UserProvidedDefault that original_value is the column default — so defer
       // to it instead of comparing against the model-default snapshot.
-      // This whole pass is eager where Rails is lazy, so it asks through
-      // `withoutMarkingRead`: `changed?` and `value` both mark the attribute
-      // read, and a constructed record reports no accessed fields in Rails.
       attr.withoutMarkingRead(() => {
         if (attr.isChanged()) {
           const wasValue = attr.originalValue ?? null;

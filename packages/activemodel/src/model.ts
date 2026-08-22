@@ -1483,16 +1483,21 @@ export class Model {
     this._writeAttribute(name, value);
   }
 
-  /** @internal */
+  /**
+   * Rails computes nothing here: `write_from_user` builds a `FromUser` whose
+   * `@value` stays uncomputed, so `has_been_read?` is false after a write and
+   * `accessed_fields` is empty on a freshly built record
+   * (attribute_methods_test.rb:1308). trails' dirty tracker is eager, so it
+   * needs the cast value now; it comes from `type_cast` (attribute.rb:100-103,
+   * what `value` memoizes) rather than through `fetchValue`, whose memo is what
+   * marks the attribute read. Story compute-record-dirtiness-lazily retires the
+   * eagerness.
+   *
+   * @internal
+   */
   _writeAttribute(name: string, value: unknown): void {
     this._attributes.writeFromUser(name, value);
     const attribute = this._attributes.getAttribute(name);
-    // Rails computes nothing here: `write_from_user` builds a FromUser whose
-    // `@value` stays uncomputed, so `has_been_read?` is false after a write and
-    // `accessed_fields` is empty on a fresh record (attribute_methods_test.rb:1308).
-    // trails' dirty tracker is eager, so it needs the cast value now — take it
-    // from `type_cast` (attribute.rb:100-103, what `value` memoizes) rather than
-    // through `fetchValue`, whose memo is what marks the attribute read.
     const newValue = attribute.typeCast(attribute.valueBeforeTypeCast);
     // Route through type.isChanged so numeric semantics (equal_nan?,
     // number_to_non_number?) are respected — mirrors the Rails path where dirty

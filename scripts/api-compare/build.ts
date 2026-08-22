@@ -281,7 +281,9 @@ function firstCuratedReason(
  * `composedOf` under `Aggregations` and `secure-password.ts` records
  * `authenticateBy` under `SecurePassword`. compare.ts keys its expectation
  * under that owner, so the migrator has to look there for a declaration the
- * AST reports at the top level.
+ * AST reports at the top level. The fallback yields to any owner a declaration
+ * in the file names for itself — `relation.ts` declares `class Relation`, whose
+ * members keep their own key.
  */
 export function fileModuleName(fileName: string): string {
   const base = (fileName.split("/").at(-1) ?? fileName).replace(/\.ts$/, "");
@@ -390,9 +392,9 @@ export function reconcileFileText(
    *  0083). A tag still carrying the seeded placeholder justifies nothing and
    *  keeps its row: it does not suppress either (see `justifies`). */
   tagged: { rubyName: string; call: string }[];
-  /** Expectation names never seen on a body-bearing declaration (mixin
-   *  host-class duplicates, prototype-patched methods, …) — reported, never
-   *  silently dropped. */
+  /** Expectation names never seen on a declaration this file can tag
+   *  (prototype-patched methods, a name declared only in another file, …) —
+   *  reported, never silently dropped. */
   unmatched: string[];
   /** Every missing call left untagged for want of a curated reason (see
    *  `reconcile`), so a zero-edit run still says how much is waiting on human
@@ -407,76 +409,68 @@ export function reconcileFileText(
   const skipped: string[] = [];
 
   const decls = collectDeclarations(sf);
-  // Every owner a declaration in this file names for itself, so the
-  // synthesized-file-module fallback below never steals a key some class or
-  // mixin object already declares under its own name.
   const declaredKeys = new Set(decls.map((d) => expectationKey(d.owner, d.name)));
   const moduleName = fileModuleName(fileName);
 
   for (const { name, owner, node } of decls) {
-    {
-      const key = expectationKey(owner, name);
-      // A top-level function is recorded by extract-ts-api.ts under the module
-      // it synthesizes from the FILE NAME (`aggregations.ts` → `Aggregations`),
-      // so compare.ts keys its expectation there while the AST says `""`.
-      const moduleKey =
-        owner === "" ? expectationKey(moduleName, name) : expectationKey(owner, name);
-      const anyKey = expectationKey(ANY_CLASS, name);
-      seen.add(key);
-      const useModuleKey = moduleKey !== key && !declaredKeys.has(moduleKey);
-      if (useModuleKey && expectations.has(moduleKey)) seen.add(moduleKey);
-      if (expectations.has(anyKey)) seen.add(anyKey);
-      const exp =
-        expectations.get(key) ??
-        (useModuleKey ? expectations.get(moduleKey) : undefined) ??
-        expectations.get(anyKey);
-      const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
-      const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
-      const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
-      if (exp || (comment && comment.includes(TAG))) {
-        const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
-        const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
-        const { rest, entries } = parseJsdoc(
-          comment ?? "",
-          jsdocRange
-            ? {
-                fileName,
-                startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
-              }
-            : undefined,
-        );
-        const expected = exp?.calls ?? new Set<string>();
-        const r = reconcile(
-          entries,
-          expected,
-          (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
-          onlyCall,
-        );
-        skipped.push(...r.skipped);
-        if (exp) {
-          for (const e of [...r.kept, ...r.added]) {
-            if (!justifies(e.reason)) continue;
-            for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
-          }
+    const key = expectationKey(owner, name);
+    const fileModuleKey = expectationKey(moduleName, name);
+    const anyKey = expectationKey(ANY_CLASS, name);
+    const useFileModuleKey =
+      owner === "" && fileModuleKey !== key && !declaredKeys.has(fileModuleKey);
+    seen.add(key);
+    if (useFileModuleKey && expectations.has(fileModuleKey)) seen.add(fileModuleKey);
+    if (expectations.has(anyKey)) seen.add(anyKey);
+    const exp =
+      expectations.get(key) ??
+      (useFileModuleKey ? expectations.get(fileModuleKey) : undefined) ??
+      expectations.get(anyKey);
+    const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
+    const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
+    const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
+    if (exp || (comment && comment.includes(TAG))) {
+      const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
+      const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
+      const { rest, entries } = parseJsdoc(
+        comment ?? "",
+        jsdocRange
+          ? {
+              fileName,
+              startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
+            }
+          : undefined,
+      );
+      const expected = exp?.calls ?? new Set<string>();
+      const r = reconcile(
+        entries,
+        expected,
+        (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
+        onlyCall,
+      );
+      skipped.push(...r.skipped);
+      if (exp) {
+        for (const e of [...r.kept, ...r.added]) {
+          if (!justifies(e.reason)) continue;
+          for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
         }
-        for (const d of r.dropped) {
-          if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
+      }
+      for (const d of r.dropped) {
+        if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
+      }
+      const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent);
+      if (comment && jsdocRange) {
+        if (next === null) {
+          // Remove the comment plus its trailing newline + indent.
+          let end = jsdocRange.end;
+          if (text[end] === "\n") end += 1 + indent.length;
+          edits.push({ start: jsdocRange.pos, end, text: "" });
+        } else if (next !== comment) {
+          edits.push({ start: jsdocRange.pos, end: jsdocRange.end, text: next });
         }
-        const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent);
-        if (comment && jsdocRange) {
-          if (next === null) {
-            // Remove the comment plus its trailing newline + indent.
-            let end = jsdocRange.end;
-            if (text[end] === "\n") end += 1 + indent.length;
-            edits.push({ start: jsdocRange.pos, end, text: "" });
-          } else if (next !== comment) {
-            edits.push({ start: jsdocRange.pos, end: jsdocRange.end, text: next });
-          }
-        } else if (next !== null) {
-          // Rendered lines already carry the indent; the original declaration
-          // line (starting at lineStart) keeps its own.
-          edits.push({ start: lineStart, end: lineStart, text: next + "\n" });
-        }
+      } else if (next !== null) {
+        // Rendered lines already carry the indent; the original declaration
+        // line (starting at lineStart) keeps its own.
+        edits.push({ start: lineStart, end: lineStart, text: next + "\n" });
       }
     }
   }
