@@ -1780,6 +1780,14 @@ export class ToSql extends Visitor {
     return collector;
   }
 
+  /**
+   * @noRailsEquivalent CONVERGEABLE (story:
+   * arel-to-sql-compile-unification). This is Rails' `Visitor#accept(object,
+   * collector)` (`visitor.rb:8-10`) under a second name — `ToSql` has one
+   * `compile(node, collector = SQLString.new)` (`to_sql.rb:17`) and nothing
+   * else. Retiring it onto `accept` touches ~15 call sites across
+   * `packages/activerecord` and the suites, which is the filed story.
+   */
   compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
     return this.visit(node, (externalCollector ?? new SQLString()) as SQLString);
   }
@@ -1788,7 +1796,13 @@ export class ToSql extends Visitor {
    * Compile an AST node and extract bind values separately.
    * Returns [sql_with_placeholders, bind_values, retryable].
    *
-   * Mirrors: Rails' compilation with Arel::Collectors::Composite
+   * @noRailsEquivalent CONVERGEABLE (story:
+   * arel-to-sql-compile-unification). Rails builds the
+   * `Collectors::Composite(SQLString, Bind)` in AR's
+   * `DatabaseStatements#to_sql_and_binds` and compiles through the one
+   * `compile(node, collector)` (`to_sql.rb:17`); trails builds it here instead,
+   * so the collector construction sits on the arel side of the boundary.
+   * Moving it back touches ~40 call sites, which is the filed story.
    */
   compileWithBinds(node: Node): [string, unknown[], boolean, boolean] {
     const sqlCollector = new SQLString();
