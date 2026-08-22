@@ -572,7 +572,17 @@ export async function findNthWithLimit(
   return relation.limit(limit).toArray();
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+ *   `relation.order_values.empty?` (finder_methods.rb:628) — `empty?` on a Ruby
+ *   Array, whose faithful JS spelling is `xs.length === 0`. That emits no
+ *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
+ *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which
+ *   takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+ *   nothing in the TS body was dropped.
+ */
 export async function findNthFromLast(this: FinderRelation, index: number): Promise<any | null> {
   if (this.isLoaded) {
     const records: any[] = await this.records();
@@ -710,6 +720,13 @@ export async function performCreateOrFindByBang(
  * `skip_query_cache_if_necessary { with_connection { |c|
  * c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
  * (finder_methods.rb:377-381), the cached read path.
+ *
+ * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): Ruby `Array#size` on
+ *   the plain Array `select_rows` returns (finder_methods.rb:379 —
+ *   `c.select_rows(relation.arel, "#{model.name} Exists?").size == 1`, ported as
+ *   `(await c.selectRows(...)).length === 1`), whose faithful JS spelling emits
+ *   no callee, so no TS call can ever credit the Ruby one — nothing in the TS
+ *   body was dropped.
  */
 export async function exists(
   this: FinderRelation,
@@ -798,6 +815,13 @@ export const member = include;
 // passes, so the resulting RecordNotFound message, model, primary_key, and id
 // fields match — including the `conditions` clause derived from the relation's
 // where clause (` [#{arel.where_sql(model)}]" unless where_clause.empty?`).
+/**
+ * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): Ruby `Array#size` on a
+ *   plain Array local (finder_methods.rb:428 — `Array.wrap(ids).size == 1`,
+ *   ported as `wrap(ids).length === 1`), whose faithful JS spelling emits no
+ *   callee, so no TS call can ever credit the Ruby one — nothing in the TS body
+ *   was dropped.
+ */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,
@@ -977,7 +1001,14 @@ export function usingLimitableReflections(
   return reflections.every((r) => !r.isCollection());
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106): Ruby `Array#first` on
+ *   a plain Array local (finder_methods.rb:505-517 — `ids.first`, ported as
+ *   `ids[0]`), whose faithful JS spelling emits no callee, so no TS call can
+ *   ever credit the Ruby one — nothing in the TS body was dropped.
+ */
 export async function findWithIds(this: FinderRelation, ids: unknown[]): Promise<any> {
   const normalized = normalizeFindArgs(this.model.name, this.primaryKey, ids);
   if (normalized.emptyArray) return [];
@@ -1077,7 +1108,12 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106): `records.first`
+ *   (finder_methods.rb:584, :586) — Ruby `Array#first`, spelled `[0]` in TS.
+ */
 export async function findTake(this: FinderRelation): Promise<any | null> {
   if (this.isLoaded) return (await this.records())[0] ?? null;
   // `@take ||=` (finder_methods.rb:586): a nil result is not memoized, so the
@@ -1086,13 +1122,26 @@ export async function findTake(this: FinderRelation): Promise<any | null> {
   return (this as any)._take;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall take — PERMANENT: Verified per-site (RFC 0106): `records.take(limit)`
+ *   (finder_methods.rb:592) — Ruby `Array#take`, spelled `.slice(0, limit)` in
+ *   TS. The homonymous `Relation#take` is a different method and is not what
+ *   this line calls.
+ */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
   if (this.isLoaded) return (await this.records()).slice(0, limit);
   return (this as any).limit(limit).toArray();
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106):
+ *   `find_nth_with_limit(index, 1).first` (finder_methods.rb:600) — Ruby
+ *   `Array#first` on the returned Array, spelled `[0]` in TS.
+ */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
   // `@offsets[index] ||=` (finder_methods.rb:600): as with `@take`, a nil hit
   // is not memoized and re-queries.
@@ -1105,7 +1154,13 @@ export async function findNth(this: FinderRelation, index: number): Promise<any 
   return record;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `records.last(limit)` /
+ *   `records.last` (finder_methods.rb:637) — Ruby `Array#last`, whose TS
+ *   spelling is a tail slice / final-index read, not a call.
+ */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
   // `limit ? records.last(limit) : records.last` (finder_methods.rb:636-638).
   const records: any[] = await this.records();
@@ -1114,7 +1169,17 @@ export async function findLast(this: FinderRelation, limit?: number): Promise<an
   return limit === 0 ? [] : records.slice(-limit);
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `order_values.empty?`
+ *   (finder_methods.rb:641) — `empty?` on a Ruby Array, whose faithful JS
+ *   spelling is `xs.length === 0`. That emits no callee, so no TS call can ever
+ *   credit the Ruby one. The gate flags it only because `empty?` maps onto the
+ *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ */
 export function orderedRelation(this: FinderRelation): any {
   const mc = this.model as any;
   const pk = this.primaryKey;

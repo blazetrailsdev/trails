@@ -14,13 +14,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "cast_result",
-    "call": "order:freeRawResult,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
     "rubyName": "execute_batch",
     "call": "raw_execute",
     "reason": "Per-site verified (RFC 0106 wave 4b): mysql2/database_statements.rb's `execute_batch` calls `raw_execute(combine_multi_statements(statements), name, batch: true)`; trails routes the batch through `internalExecute` so the multi-statement flag and the retry/materialize kwargs travel with it — see project note `_inQueryTransformers leaks off preprocessQuery` for why the batch path must not re-enter rawExecute directly."

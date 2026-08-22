@@ -244,6 +244,12 @@ export class PostgreSQLAdapter
   // before exec'ing psql. We can't mutate the process environment (no
   // process.* access), so we return the env map the PTY exec would set;
   // PGPASSWORD is included only when `includePassword` is set, matching Rails.
+  /**
+   * @missingRailsCall find_cmd_and_exec — PERMANENT: Rails' dbconsole execs `psql` through
+   *   find_cmd_and_exec; process spawning is forbidden in this package (no
+   *   node:* imports, no process.*), so trails' dbconsole only builds the PG*
+   *   environment the console command needs.
+   */
   static override dbconsole(
     config: Record<string, unknown> = {},
     options: { includePassword?: boolean } = {},
@@ -2436,6 +2442,12 @@ export class PostgreSQLAdapter
   // server value is 63 on every stock build, the fallback matches what the
   // query would return, so the synchronous alias/index/table-name-length callers
   // stay correct without an eager per-connection round-trip Rails never pays.
+  /**
+   * @missingRailsCall query_value — PERMANENT: Rails runs the query inside the sync reader
+   *   via `||=`; trails queries are Promises, so the `queryValue` call lives in
+   *   the async `warmMaxIdentifierLength` and this reader returns the warmed
+   *   memo.
+   */
   maxIdentifierLength(): number {
     return this._maxIdentifierLength ?? 63;
   }
@@ -2816,6 +2828,34 @@ export class PostgreSQLAdapter
    * configure-on-next-acquire.
    *
    * @internal
+   *
+   * @missingRailsCall fetch — CONVERGEABLE (0106-wide-call-set-direct-burndown/converge-pg-configure-connection-variables-fetch): The whole configure body lives in
+   *   `_maybeConfigureConnection`, which reads the already-parsed frozen
+   *   `_sessionVariables` instead of re-fetching `@config[:variables]` per call.
+   * @missingRailsCall internal_execute — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): configure runs while the acquire
+   *   machinery still holds the connection, so the SET statements go straight to
+   *   the pg.Client — routing them through internalExecute would re-enter
+   *   connectBang/verify and deadlock. Root cause (RFC 0106 re-confirmation):
+   *   Rails' `with_raw_connection` wraps its body in `@lock.synchronize`
+   *   (abstract_adapter.rb:983-984) and `@lock` is a `Monitor`
+   *   (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`),
+   *   which is RE-ENTRANT for the owning thread — so Rails nests this call
+   *   inside the acquire that is already holding the connection. A JS
+   *   promise-based mutex has no thread/fiber identity to key re-entrancy on, so
+   *   the nested call deadlocks instead of re-entering. Language shortcoming,
+   *   tracked by RFC 0073.
+   * @missingRailsCall quote — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): The SET SESSION values are rendered by
+   *   `quoteLiteral` on the raw client in `_maybeConfigureConnection`; `quote`
+   *   would route back through the type-cast stack the connection is still
+   *   mid-configure for. Root cause (RFC 0106 re-confirmation): Rails'
+   *   `with_raw_connection` wraps its body in `@lock.synchronize`
+   *   (abstract_adapter.rb:983-984) and `@lock` is a `Monitor`
+   *   (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`),
+   *   which is RE-ENTRANT for the owning thread — so Rails nests this call
+   *   inside the acquire that is already holding the connection. A JS
+   *   promise-based mutex has no thread/fiber identity to key re-entrancy on, so
+   *   the nested call deadlocks instead of re-entering. Language shortcoming,
+   *   tracked by RFC 0073.
    */
   async configureConnection(): Promise<void> {
     const conn = this._rawConnection;
@@ -3060,6 +3100,19 @@ export class PostgreSQLAdapter
    * takes the published `_rawConnection` when there is one for the same reason
    * — `_acquireFreshClient()` would await the very acquire this call is nested
    * inside.
+   *
+   * @missingRailsCall with_raw_connection — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): Rails' with_raw_connection is
+   *   re-entrant on @raw_connection; ours is not, and this runs inside the very
+   *   acquire configureConnection is warming, so it takes the published
+   *   `_rawConnection` directly. Root cause (RFC 0106 re-confirmation): Rails'
+   *   `with_raw_connection` wraps its body in `@lock.synchronize`
+   *   (abstract_adapter.rb:983-984) and `@lock` is a `Monitor`
+   *   (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`),
+   *   which is RE-ENTRANT for the owning thread — so Rails nests this call
+   *   inside the acquire that is already holding the connection. A JS
+   *   promise-based mutex has no thread/fiber identity to key re-entrancy on, so
+   *   the nested call deadlocks instead of re-entering. Language shortcoming,
+   *   tracked by RFC 0073.
    */
   async getDatabaseVersion(): Promise<number> {
     const conn = this._rawConnection ?? (await this._acquireFreshClient());
@@ -4242,6 +4295,11 @@ export class PostgreSQLAdapter
    * while node-pg Parses under the name on first Execute. It stays in the
    * signature because Rails' `prepare_statement(sql, binds, conn)` has it.
    * @internal
+   *
+   * @missingRailsCall translate_exception_class — PERMANENT: Rails rescues around
+   *   `conn.prepare`; node-pg has no parse-only call (it Parses under the name
+   *   on first Execute), so there is no prepare site here and the Parse error is
+   *   translated by `_performQuery` instead.
    */
   async prepareStatement(sql: string, _binds: unknown[], _conn: pg.Client): Promise<string> {
     const pool = this._statements;
@@ -4263,6 +4321,22 @@ export class PostgreSQLAdapter
    * Sync the session timezone variable after `default_timezone` changes.
    * Mirrors: PostgreSQLAdapter#reconfigure_connection_timezone
    * @internal
+   *
+   * @missingRailsCall fetch — CONVERGEABLE (0106-wide-call-set-direct-burndown/converge-pg-configure-connection-variables-fetch): Reads the already-parsed frozen
+   *   `_sessionVariables` rather than re-fetching `@config[:variables]`, which
+   *   the config parse resolved once at construction.
+   * @missingRailsCall raw_execute — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): Runs as the first step of `_performQuery`,
+   *   itself the block already executing inside withRawConnection, so the SET
+   *   goes to the acquired client directly rather than re-entering rawExecute's
+   *   leaf loop. Root cause (RFC 0106 re-confirmation): Rails'
+   *   `with_raw_connection` wraps its body in `@lock.synchronize`
+   *   (abstract_adapter.rb:983-984) and `@lock` is a `Monitor`
+   *   (abstract_adapter.rb:180-189, `LoadInterlockAwareMonitor < Monitor`),
+   *   which is RE-ENTRANT for the owning thread — so Rails nests this call
+   *   inside the acquire that is already holding the connection. A JS
+   *   promise-based mutex has no thread/fiber identity to key re-entrancy on, so
+   *   the nested call deadlocks instead of re-entering. Language shortcoming,
+   *   tracked by RFC 0073.
    */
   async reconfigureConnectionTimezone(): Promise<void> {
     // Rails returns early when `variables["timezone"]` was set by the user

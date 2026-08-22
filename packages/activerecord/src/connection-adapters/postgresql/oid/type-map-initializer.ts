@@ -170,12 +170,6 @@ export class TypeMapInitializer {
     targetOid: number,
     block: (subtype: OidSubtype) => unknown,
   ): void {
-    // Divergence: Rails assumes @store responds to lookup. If a TS TypeMap
-    // store omits it, the lazy builder below would silently receive
-    // undefined subtypes and produce confusing downstream errors. Fail fast.
-    if (!this.store.lookup) {
-      throw new Error(`TypeMap store must implement lookup() to register subtype-based OID ${oid}`);
-    }
     if (this.storeHas(targetOid)) {
       this.register(oid, (_oid: number | string, ...args: unknown[]) =>
         block(this.storeLookup(targetOid, ...args) as OidSubtype),

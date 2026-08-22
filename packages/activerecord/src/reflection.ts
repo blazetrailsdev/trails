@@ -904,7 +904,15 @@ export class AssociationReflection extends MacroReflection {
   private _inverseNameCache: string | null | undefined = undefined;
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
-  /** @internal Mirrors `inverse_name` (reflection.rb:749-755). */
+  /**
+   * @internal Mirrors `inverse_name` (reflection.rb:749-755).
+   *
+   * @missingRailsCall fetch — PERMANENT: Equivalent (RFC 0106): `options.fetch(:inverse_of)
+   *   { automatic_inverse_of }` returns the STORED value whenever the key exists
+   *   (including `false`), and falls back to the block otherwise.
+   *   `options.inverseOf !== undefined` is exactly that key-presence test — not
+   *   a `??` nullish default — so the two arms match Ruby.
+   */
   override inverseName(): string | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
     const explicit = this.options.inverseOf;
@@ -2178,6 +2186,11 @@ export function create(
 
 /**
  * Mirrors: ActiveRecord::Reflection.add_reflection
+ *
+ * @missingRailsCall merge! — PERMANENT: Equivalent (RFC 0106): the `.merge!(name =>
+ *   reflection)` half of `_reflections.except(name).merge!(...)` is a
+ *   single-pair in-place merge; `except` is now the Rails call and the pair is
+ *   assigned onto the returned hash, which is what `Hash#merge!` does here.
  */
 export function addReflection(
   ar: typeof Base,
