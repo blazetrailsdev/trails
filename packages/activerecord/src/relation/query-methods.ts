@@ -3354,13 +3354,6 @@ export function selectInnerNamedJoins(
  *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
  *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
  *   dropped.
- * @missingRailsCall order:selectNamedJoins,constructor — CONVERGEABLE: Re-keyed by the
- *   accessor-pair fix to the ported-with-args gate (compare.ts `tsWriterSigs`):
- *   the SAME pre-existing order-only divergence this body already carried,
- *   reported at a different first inversion now that a `set` accessor's
- *   signature no longer opens the gate for its reader. The row it replaces was
- *   deleted from this file in the same commit. Tracked by story
- *   query-methods-order-only-call-inversions (RFC 0106).
  */
 export function buildJoinBuckets(
   this: QueryMethodsHost,
