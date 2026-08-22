@@ -821,8 +821,8 @@ export class AssociationScope {
         reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
       ).constraints?.() ?? [];
     if (constraints.length === 0) return scope;
-    // Rails' `source_type:` chain entry is a PolymorphicReflection whose own
-    // `klass` resolves (reflection.rb:1265) and is read by `build_scope`'s
+    // Rails' `source_type:` chain entry is a PolymorphicReflection, whose `klass`
+    // delegates to `@reflection` (reflection.rb:1229-1230) and is read by `build_scope`'s
     // `klass = self.klass` default (reflection.rb:336); trails' entry is the raw
     // polymorphic belongsTo, whose `klass` raises, so resolve it here instead of
     // threading a fourth argument past `eval_scope` (association_scope.rb:169).
