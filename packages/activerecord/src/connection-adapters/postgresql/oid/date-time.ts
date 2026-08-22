@@ -38,6 +38,11 @@ export class DateTime extends DateTimeType {
    * handles the nil short-circuit and dispatches here, so we fall
    * through to the parent's `castValue` (NOT `cast`) to avoid the
    * virtual-dispatch loop that would re-enter this method.
+   *
+   * @missingRailsCall format — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   postgresql/oid/date_time.rb's `value.format` is Ruby's DateTime
+   *   formatting; trails' cast returns a Temporal value formatted through
+   *   Temporal's own API, which has no `format` method.
    */
   override castValue(value: unknown): PgDateTimeResult | null {
     if (value === null || value === undefined) return null;

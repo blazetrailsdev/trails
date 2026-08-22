@@ -124,7 +124,13 @@ export class Contexts {
     return this.currentCustomContext ?? this.defaultContext;
   }
 
-  /** Mirrors: ActiveRecord::Encryption::Contexts#current_custom_context (contexts.rb:66-68) */
+  /**
+   * Mirrors: ActiveRecord::Encryption::Contexts#current_custom_context (contexts.rb:66-68)
+   *
+   * @missingRailsCall last — PERMANENT: `custom_contexts&.last` (contexts.rb:67) on a plain
+   *   Array — the faithful port is index access, which emits no call name
+   *   (compare.ts's `first`/`last` note).
+   */
   static get currentCustomContext(): Context | null {
     return customContexts.length > 0 ? customContexts[customContexts.length - 1] : null;
   }

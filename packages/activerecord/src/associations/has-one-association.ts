@@ -147,6 +147,10 @@ export class HasOneAssociation extends SingularAssociation {
   /**
    * Delete the associated record using the given method.
    * Supports: delete, destroy, nullify.
+   *
+   * @missingRailsCall fetch — PERMANENT: Ruby `options.fetch(:ensuring_owner_was, nil)`
+   *   (has_one_association.rb:51); a JS object has no `fetch`, so the stored-nil
+   *   semantics are spelled as an own-key check at the call site.
    */
   async delete(
     method: string | undefined = this.reflection.options.dependent as string | undefined,

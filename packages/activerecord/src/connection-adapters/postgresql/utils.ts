@@ -6,6 +6,8 @@
  */
 
 export class Name {
+  static readonly SEPARATOR = ".";
+
   readonly schema: string | null;
   readonly identifier: string;
 
@@ -15,10 +17,7 @@ export class Name {
   }
 
   toString(): string {
-    if (this.schema) {
-      return `${this.schema}.${this.identifier}`;
-    }
-    return this.identifier;
+    return this.parts().join(Name.SEPARATOR);
   }
 
   quoted(): string {

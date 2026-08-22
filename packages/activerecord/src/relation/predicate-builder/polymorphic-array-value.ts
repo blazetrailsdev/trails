@@ -42,6 +42,15 @@ export class PolymorphicArrayValue {
     return this._values;
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `values.empty?`
+   *   (polymorphic_array_value.rb:12) — `empty?` on a Ruby Array, whose faithful
+   *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
+   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
+   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
+   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
+   *   TS body was dropped.
+   */
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
     if (this.values.length === 0) {

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/oid/date.ts",
-    "rubyName": "cast_value",
-    "call": "format",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/date.rb's `value.format` is Ruby's Date formatting; trails' cast returns a Temporal.PlainDate and formats through Temporal's own API, which has no `format` method."
-  }
-]

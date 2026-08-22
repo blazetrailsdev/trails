@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql/database-statements.ts",
-    "rubyName": "returning_column_values",
-    "call": "first",
-    "reason": "Per-site verified (RFC 0106 wave 4b): mysql/database_statements.rb's `result.rows.first` is `result.rows[0]` on a JS array; `Array#first` is not a ported method name."
-  }
-]

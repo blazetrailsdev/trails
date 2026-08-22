@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/oid/cidr.ts",
-    "rubyName": "cast_value",
-    "call": "new",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/cidr.rb builds an `IPAddr.new(...)`; Ruby's IPAddr has no port in trails, so the cast returns the normalized CIDR string. Tracked as the PG address-type gap, not a dropped delegation."
-  }
-]

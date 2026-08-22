@@ -260,6 +260,12 @@ export class Queue {
     return undefined;
   }
 
+  /**
+   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool/queue.rb `@queue.size > @num_waiting`; trails' queue holds
+   *   its entries in a JS array whose `.length` is the same quantity —
+   *   `Array#size` is not a ported method name.
+   */
   private canRemoveNoWait(): boolean {
     return this._queue.length > this._numWaiting;
   }

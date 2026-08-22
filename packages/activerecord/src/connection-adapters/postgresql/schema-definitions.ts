@@ -128,6 +128,15 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
+  /**
+   * @missingRailsCall match? — PERMANENT: Rails
+   *   postgresql/schema_definitions.rb:209-211 is
+   *   `!ActiveRecord::SchemaDumper.excl_ignore_pattern.match?(name) if name`,
+   *   which this body mirrors — the pattern IS applied. `Regexp#match?` has no
+   *   JS call spelling: a JS RegExp answers `test`, and `test` is stateful on a
+   *   `/g` pattern, so the port routes through `statelessTest`
+   *   (schema-dumper.ts:349) to get Ruby's stateless semantics.
+   */
   exportNameOnSchemaDump(): boolean {
     return this.name != null && !statelessTest(SchemaDumper.exclIgnorePattern, this.name);
   }

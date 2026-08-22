@@ -254,6 +254,15 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * returns, matching Rails' assignment-time `create_through_record`. Only the
    * new-owner / `save: false` build arms leave it for the owner's next save,
    * which is Rails' own shape (has_one_through_association.rb:33-37).
+   *
+   * @missingRailsCall create_through_record — PERMANENT: Verified per-site (RFC 0106):
+   *   `create_through_record(record, save)`
+   *   (has_one_through_association.rb:10-12) writes the join row, so it is async
+   *   in trails. `replace` cannot be — it is reached from the synchronous
+   *   `writer`/`setNewRecord` path that RFC 0087 requires to stay sync — so the
+   *   body queues `_pendingReplace` and `persistReplace`/`autosaveHasOne` awaits
+   *   `createThroughRecord` one frame later. Same sync-setter shortcoming as the
+   *   `setX()` idiom.
    */
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);

@@ -20,6 +20,11 @@ export class ExplainPrettyPrinter {
    *      ->  Seq Scan on posts  (cost=0.00..28.88 rows=8 width=4)
    *            Filter: (posts.user_id = 1)
    *   (6 rows)
+   *
+   * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   postgresql/explain_pretty_printer.rb's `result.rows.map(&:first)` /
+   *   `.first` is index-0 access on a JS array; `Array#first` is not a ported
+   *   method name.
    */
   pp(result: Result): string {
     const header = result.columns[0];

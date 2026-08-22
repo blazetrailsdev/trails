@@ -125,6 +125,11 @@ export class UniquenessValidator extends EachValidator {
    *
    * Validates options: :conditions must be callable, :scope must be
    * strings. Extracts :class option for finder resolution.
+   *
+   * @missingRailsCall all? — PERMANENT: Verified per-site (RFC 0106):
+   *   `Array(options[:scope]).all? { |s| s.respond_to?(:to_sym) }`
+   *   (`uniqueness.rb:11`) — `Array#all?` is `Array#every` in JS. The gate flags
+   *   it only because `all?` maps onto the unrelated `Relation#all`.
    */
   constructor(options: Record<string, unknown> = {}) {
     if (options.conditions != null && typeof options.conditions !== "function") {

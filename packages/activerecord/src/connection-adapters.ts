@@ -95,6 +95,11 @@ export function validateAdapterName(adapterName: string): void {
  * Mirrors: ActiveRecord::ConnectionAdapters.resolve
  *
  * Resolves an adapter name to its class.
+ *
+ * @missingRailsCall join — CONVERGEABLE (story adapter-not-found-message-should-be-built-inline): Rails builds the AdapterNotFound message inline
+ *   (connection_adapters.rb:34-39); the port extracts it into the private
+ *   `adapterNotFoundError`, whose `[...adapters.keys()].sort().join(", ")`
+ *   (connection-adapters.ts:75) is outside the published call-set.
  */
 export async function resolve(adapterName: string): Promise<AdapterClass> {
   const cached = resolved.get(adapterName);

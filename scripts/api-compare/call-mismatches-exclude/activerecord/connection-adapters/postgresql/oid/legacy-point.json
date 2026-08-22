@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/oid/legacy-point.ts",
-    "rubyName": "serialize",
-    "call": "number_for_point",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/legacy_point.rb's `number_for_point` strips a trailing `.0` from each coordinate; trails' serialize formats the pair with the same rule inline. The helper is private and one-line in Rails; extracting it here would be surface with a single caller."
-  }
-]

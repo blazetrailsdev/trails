@@ -45,6 +45,13 @@ export class Reaper {
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static _timers = new Map<number, ReturnType<typeof setInterval>>();
 
+  /**
+   * @missingRailsCall spawn_thread — CONVERGEABLE (RFC 0073, the threadless-pool surface): Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool/reaper.rb `spawn_thread` starts a background Thread;
+   *   trails' Reaper drives the same period from a timer, so there is no thread
+   *   to spawn. Tracked with the rest of the threadless pool surface by RFC
+   *   0073.
+   */
   static registerPool(pool: ReapablePool, frequency: number): void {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;

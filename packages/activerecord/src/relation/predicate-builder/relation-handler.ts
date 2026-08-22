@@ -17,6 +17,15 @@ import { DeferredDistinctPkIn } from "./deferred-distinct-pk-in.js";
  *     → author_id IN (SELECT authors.id FROM authors WHERE active = true)
  */
 export class RelationHandler {
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `value.select_values.empty?` (relation_handler.rb:11) — `empty?` on a Ruby
+   *   Array, whose faithful JS spelling is `xs.length === 0`. That emits no
+   *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
+   *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`,
+   *   which takes arguments since it gained Rails' `async:` kwarg
+   *   (result.rb:94-100) — nothing in the TS body was dropped.
+   */
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;

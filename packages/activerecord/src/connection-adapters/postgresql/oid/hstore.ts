@@ -48,6 +48,11 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return this.deserialize(serialized);
   }
 
+  /**
+   * @missingRailsCall new — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   postgresql/oid/hstore.rb's scanner allocates a `Hash.new`; trails
+   *   accumulates into an object literal, which is not a `new` expression.
+   */
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (value == null) return null;
     if (typeof value !== "string") {

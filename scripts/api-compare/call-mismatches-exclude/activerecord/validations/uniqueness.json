@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "validations/uniqueness.ts",
-    "rubyName": "initialize",
-    "call": "all?",
-    "reason": "Verified per-site (RFC 0106): `Array(options[:scope]).all? { |s| s.respond_to?(:to_sym) }` (`uniqueness.rb:11`) — `Array#all?` is `Array#every` in JS. The gate flags it only because `all?` maps onto the unrelated `Relation#all`."
-  }
-]
