@@ -47,13 +47,13 @@ export function writeAttribute(this: Model, attrName: string, value: unknown): v
   //   table has a real `id` column (e.g. cpk_books). Mirror that raise here
   //   rather than writing the scalar `id`. (Composite `id=` assignment flows
   //   through the per-column `_writeAttribute` path, not this one.)
+  // The `_initializingAttributes` guard on that arm has no Rails counterpart:
+  // during `new X(…)` it must stay quiet, because Ruby builds the attribute set
+  // before any writer runs.
   const pk = (this.constructor as unknown as { primaryKey: string | string[] | null }).primaryKey;
   if (name === "id" && pk != null) {
     if (typeof pk === "string") {
       name = pk;
-      // `_initializingAttributes` has no Rails counterpart: during `new X(…)`
-      // this arm must stay quiet, because Ruby builds the attribute set before
-      // any writer runs.
     } else if (!this._initializingAttributes) {
       // Rails calls `write_from_user(@primary_key, …)` with the PK array, so the
       // Null attribute's name — and the interpolated message (attribute.rb:236) —
@@ -64,12 +64,9 @@ export function writeAttribute(this: Model, attrName: string, value: unknown): v
   }
 
   // write.rb:36 — `@attributes.write_from_user(name, value)`. `Model`'s
-  // `_writeAttribute` is that call plus trails' dirty bookkeeping; going
-  // through `this._writeAttribute` would instead re-enter
+  // `_writeAttribute` is that call plus trails' dirty bookkeeping; going through
+  // `this._writeAttribute` would instead re-enter
   // `HasReadonlyAttributes#_write_attribute`, a guard Rails does not run twice.
-  // Writing an unknown attribute raises `MissingAttributeError` from
-  // `AttributeSet#writeFromUser`; mass assignment routes through here too but
-  // rescues it (attribute-assignment.ts), so `new X({unknown: 1})` stays lenient.
   Model.prototype._writeAttribute.call(this, name, value);
 }
 
