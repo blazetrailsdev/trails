@@ -1056,16 +1056,6 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * @missingRailsCall column_definitions — RFC 0106: the TS `columns` switches
-   *   on `adapterName` instead of Rails' per-adapter overrides, so
-   *   `column_definitions`/`new_column_from_field` have no seam yet — the
-   *   adapter-layout deviation tracked by RFC 0023
-   *   (schema_statements.rb:107-113).
-   * @missingRailsCall new_column_from_field — RFC 0106: see the
-   *   column_definitions row — the `adapterName` switch in TS `columns` has no
-   *   per-adapter hook to call (schema_statements.rb:107-113).
-   */
   async columns(tableName: string): Promise<Column[]> {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
@@ -1297,12 +1287,6 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * @missingRailsCall primary_keys — RFC 0106: the TS `primaryKey` switches on
-   *   `adapterName` instead of delegating to a per-adapter `primaryKeys` — the
-   *   adapter-layout deviation tracked by RFC 0023
-   *   (schema_statements.rb:145-149).
-   */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
@@ -1888,11 +1872,6 @@ export class SchemaStatements {
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
-  /**
-   * @missingRailsCall fetch — RFC 0106: Ruby Hash#fetch with a raising block —
-   *   the port throws inline off a Map lookup; converging needs the Hash#fetch
-   *   idiom class of RFC 0082 (schema_statements.rb:1504-1508).
-   */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (!algorithm) return undefined;
     const normalized = algorithm.toLowerCase();
@@ -2034,9 +2013,6 @@ export class SchemaStatements {
    *
    * @missingRailsCall first — RFC 0106: Ruby String#first(10) on a hexdigest —
    *   the port slices (schema_statements.rb:1603).
-   * @missingRailsCall limit — RFC 0106: Ruby String#limit (byte-truncation) —
-   *   the port truncates by JS UTF-16 length; the byte-aware convergence is RFC
-   *   0082 idiom work (schema_statements.rb:1606-1609).
    */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = Array.isArray(column) ? column : [column];

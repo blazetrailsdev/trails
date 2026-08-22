@@ -2,9 +2,30 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "configure_connection",
+    "call": "fetch",
+    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:837: `@config.fetch(:pragmas, {}).stringify_keys`. `Hash#fetch` with a default has no JS analogue that preserves a stored `nil`; the port reads the pragmas option directly. Tracked by RFC 0094."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "connect",
+    "call": "new_client",
+    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:807: `@raw_connection = self.class.new_client(@connection_parameters)` hands the sqlite3 gem the whole config hash. trails has no `@connection_parameters` hash and its `newClient` returns an adapter rather than a raw driver handle, so `connect()` opens the driver directly from the expanded filename. Tracked by RFC 0094 (sqlite3-adapter-construction-fidelity)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "copy_table",
     "call": "order:columns,createTable",
-    "reason": "Per-entry verified (RFC 0106 sqlite3 table-rebuild cluster), sqlite3_adapter.rb:602-639: Rails calls `columns(from)` INSIDE the `create_table` block; trails' TableDefinition block is synchronous and `columns()` is async, so the reflection is hoisted above `createTable`. ORDER-only — every call Rails makes is made, once, with the same arguments. Stays a baseline row rather than a `@missingRailsCall` tag: an `order:` flag is keyed on the Ruby name (`copy_table`) while the tag migrator keys it on the camelCased declaration (`copyTable`), so the tag reads back as stale."
+    "reason": "Per-entry verified (RFC 0106 sqlite3 table-rebuild cluster), sqlite3_adapter.rb:602-639: Rails calls `columns(from)` INSIDE the `create_table` block. `createTable`'s TableDefinition block is synchronous in trails (the definition is built, then rendered, with no await point), and `columns()` is async, so the reflection is hoisted above the `createTable` call. Everything Rails calls is called, once, with the same arguments — only the sequence differs, and it is forced by the block being unable to await. Stays a baseline row rather than a `@missingRailsCall` tag: an `order:` flag is keyed on the Ruby name (`copy_table`) while `parity:api:build` writes the tag keyed on the camelCased declaration (`copyTable`), so a migrated `order:` row reads back as both a STALE tag and a NEW mismatch."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "initialize",
+    "call": "merge",
+    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:128-132: Rails merges `@config` into `@connection_parameters` because the sqlite3 gem takes the whole config hash as driver options. trails' constructor takes `(filename, options)` — the driver (node:sqlite / better-sqlite3) accepts no config hash — so there is no parameters hash to merge into. Tracked for construction convergence by RFC 0094 (sqlite3-adapter-construction-fidelity)."
   },
   {
     "package": "activerecord",
@@ -16,5 +37,19 @@
       "kwargs{connectionPool=ref:pool}"
     ],
     "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/sqlite3_adapter.rb:120 `raise ActiveRecord::NoDatabaseError.new(connection_pool: @pool)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "new_client",
+    "call": "include?",
+    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:36-41: Rails rescues `Errno::ENOENT` and re-raises `NoDatabaseError` only when `error.message.include?(\"No such file or directory\")`. trails' `newClient` constructs an adapter rather than opening a file, so there is no open-time errno to classify; the missing-database mapping happens in `translateException`. Tracked by RFC 0094."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "shared_cache?",
+    "call": "fetch",
+    "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:473: Rails reads `@config.fetch(:flags, 0).anybits?(SHAREDCACHE)`. There is no `flags` bitmask in trails' config — no JS sqlite driver exposes SQLITE_OPEN_SHAREDCACHE — so `isSharedCache` inspects the `cache=shared` query parameter of the database URI instead, which is the only way shared cache can be requested here. Tracked by RFC 0094."
   }
 ]

@@ -384,15 +384,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * `database` key.
    */
   constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
-  /**
-   * @missingRailsCall merge — Per-entry verified (RFC 0106 sqlite3 construction
-   *   cluster), sqlite3_adapter.rb:128-132: Rails merges `@config` into
-   *   `@connection_parameters` because the sqlite3 gem takes the whole config
-   *   hash as driver options. trails' constructor takes `(filename, options)` —
-   *   the driver (node:sqlite / better-sqlite3) accepts no config hash — so
-   *   there is no parameters hash to merge into. Tracked for construction
-   *   convergence by RFC 0094 (sqlite3-adapter-construction-fidelity).
-   */
   constructor(
     filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
     options: SQLite3AdapterOptions = {},
@@ -1516,15 +1507,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows?.[0]?.encoding ?? "UTF-8";
   }
 
-  /**
-   * @missingRailsCall fetch — Per-entry verified (RFC 0106 sqlite3 construction
-   *   cluster), sqlite3_adapter.rb:473: Rails reads `@config.fetch(:flags,
-   *   0).anybits?(SHAREDCACHE)`. There is no `flags` bitmask in trails' config —
-   *   no JS sqlite driver exposes SQLITE_OPEN_SHAREDCACHE — so `isSharedCache`
-   *   inspects the `cache=shared` query parameter of the database URI instead,
-   *   which is the only way shared cache can be requested here. Tracked by RFC
-   *   0094.
-   */
   isSharedCache(): boolean {
     const qIdx = this._filename.indexOf("?");
     if (qIdx === -1) return false;
@@ -1603,15 +1585,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
-  /**
-   * @missingRailsCall include? — Per-entry verified (RFC 0106 sqlite3
-   *   construction cluster), sqlite3_adapter.rb:36-41: Rails rescues
-   *   `Errno::ENOENT` and re-raises `NoDatabaseError` only when
-   *   `error.message.include?("No such file or directory")`. trails' `newClient`
-   *   constructs an adapter rather than opening a file, so there is no open-time
-   *   errno to classify; the missing-database mapping happens in
-   *   `translateException`. Tracked by RFC 0094.
-   */
   static newClient(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },
@@ -2654,9 +2627,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /**
-   * @internal
-   */
+  /** @internal */
   private async copyTable(
     from: string,
     to: string,
@@ -2833,17 +2804,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return def;
   }
 
-  /**
-   * @internal
-   *
-   * @missingRailsCall new_client — Per-entry verified (RFC 0106 sqlite3
-   *   construction cluster), sqlite3_adapter.rb:807: `@raw_connection =
-   *   self.class.new_client(@connection_parameters)` hands the sqlite3 gem the
-   *   whole config hash. trails has no `@connection_parameters` hash and its
-   *   `newClient` returns an adapter rather than a raw driver handle, so
-   *   `connect()` opens the driver directly from the expanded filename. Tracked
-   *   by RFC 0094 (sqlite3-adapter-construction-fidelity).
-   */
+  /** @internal */
   private connect(): void {
     const openConfig = this.openConfig();
     try {
@@ -3061,12 +3022,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
    * awaits it, so both the initial-open and reconnect paths apply pragmas.
    * @internal
-   *
-   * @missingRailsCall fetch — Per-entry verified (RFC 0106 sqlite3 construction
-   *   cluster), sqlite3_adapter.rb:837: `@config.fetch(:pragmas,
-   *   {}).stringify_keys`. `Hash#fetch` with a default has no JS analogue that
-   *   preserves a stored `nil`; the port reads the pragmas option directly.
-   *   Tracked by RFC 0094.
    */
   override configureConnection(): void | Promise<void> {
     this.castTimeout();
