@@ -1554,8 +1554,8 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     ]);
     const init = m["Arel::Attribute"].find((x) => x.name === "initialize")!;
     expect(init.params).toEqual([
-      { name: "relation", kind: "optional" },
-      { name: "name", kind: "optional" },
+      { name: "relation", kind: "optional", default: "..." },
+      { name: "name", kind: "optional", default: "..." },
     ]);
     const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
     expect(reader.params).toEqual([]);
@@ -1570,8 +1570,8 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     `);
     const init = m["ActiveSupport::Report"].find((x) => x.name === "initialize")!;
     expect(init.params).toEqual([
-      { name: "error", kind: "keyword" },
-      { name: "severity", kind: "keyword" },
+      { name: "error", kind: "keyword", default: "..." },
+      { name: "severity", kind: "keyword", default: "..." },
     ]);
   });
 

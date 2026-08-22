@@ -663,11 +663,13 @@ class ApiExtractor
         line: @current_line,
       }
     end
+    # Both arms are optional: `Struct.new(:a, :b).new` and its keyword_init
+    # twin both accept zero arguments, leaving the members nil.
     kind = keyword_init?(struct_new_node) ? "keyword" : "optional"
     target[:instanceMethods] << {
       name: "initialize",
       visibility: "public",
-      params: names.map { |name| { name: name, kind: kind } },
+      params: names.map { |name| { name: name, kind: kind, default: "..." } },
       file: @current_file,
       line: @current_line,
     }
