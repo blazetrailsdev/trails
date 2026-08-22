@@ -12,13 +12,6 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes, Table, relationName } from "@blazetrails/arel";
 
-/** Rails' uniform SQL-name read for a table reference — `relation.table_alias ||
- *  relation.name`, which both `Arel::Table` (table.rb:11-12) and
- *  `Arel::Nodes::TableAlias` (table_alias.rb:6-8) answer. */
-function sqlName(rel: Table | Nodes.TableAlias): string {
-  return relationName(rel.tableAlias ?? rel.name);
-}
-
 describe("JoinDependency walk() deduplication", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
@@ -189,12 +182,13 @@ describe("JoinDependency walk() deduplication", () => {
     const jd1ReviewsJoin = joins.find((j) => {
       const table = (j as Nodes.OuterJoin).left as Table | Nodes.TableAlias;
       const realName = table instanceof Nodes.TableAlias ? table.tableName : table.name;
-      const alias = sqlName(table);
+      const alias = relationName(table.tableAlias ?? table.name);
       return realName === "comments" && alias !== "comments";
     }) as Nodes.OuterJoin | undefined;
     expect(jd1ReviewsJoin).toBeDefined();
 
-    const jd1ReviewsAlias = sqlName(jd1ReviewsJoin!.left as Table | Nodes.TableAlias);
+    const jd1ReviewsTable = jd1ReviewsJoin!.left as Table | Nodes.TableAlias;
+    const jd1ReviewsAlias = relationName(jd1ReviewsTable.tableAlias ?? jd1ReviewsTable.name);
     expect(referencedTables).toContain(jd1ReviewsAlias);
     expect(referencedTables).toContain("likes");
     expect(referencedTables).not.toContain("comments");
