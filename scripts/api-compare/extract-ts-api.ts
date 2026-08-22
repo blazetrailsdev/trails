@@ -2260,6 +2260,20 @@ export function extractClass(
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
       });
+      for (const param of member.parameters) {
+        if (!ts.isIdentifier(param.name)) continue;
+        const paramVisibility = parameterPropertyVisibility(param);
+        if (paramVisibility === undefined) continue;
+        instanceMethods.push({
+          name: param.name.text,
+          visibility: paramVisibility,
+          params: [],
+          line: param.getSourceFile().getLineAndCharacterOfPosition(param.getStart()).line + 1,
+          file,
+          isStatic: false,
+          ...(paramVisibility !== "public" || hasInternalJsDocTag(param) ? { internal: true } : {}),
+        });
+      }
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
       const calls = extractCalls(member.body);
       const callSeq = extractCallSeq(member.body);
@@ -3672,6 +3686,25 @@ function memberVisibility(member: ts.ClassElement): "public" | "private" | "prot
   if (hasModifier(member, ts.SyntaxKind.ProtectedKeyword)) return "protected";
   if (member.name && ts.isPrivateIdentifier(member.name)) return "private";
   return "public";
+}
+
+/**
+ * The visibility of a constructor parameter property — a parameter carrying an
+ * accessibility modifier or `readonly`, which TypeScript turns into a field of
+ * the class. `undefined` for an ordinary parameter, which declares nothing.
+ */
+function parameterPropertyVisibility(
+  param: ts.ParameterDeclaration,
+): "public" | "private" | "protected" | undefined {
+  if (hasModifier(param, ts.SyntaxKind.PrivateKeyword)) return "private";
+  if (hasModifier(param, ts.SyntaxKind.ProtectedKeyword)) return "protected";
+  if (
+    hasModifier(param, ts.SyntaxKind.PublicKeyword) ||
+    hasModifier(param, ts.SyntaxKind.ReadonlyKeyword)
+  ) {
+    return "public";
+  }
+  return undefined;
 }
 
 function isExported(node: ts.Node): boolean {
