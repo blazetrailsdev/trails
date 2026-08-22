@@ -220,6 +220,14 @@ export interface DatabaseStatementsHost {
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements (initialize)
  */
 export class DatabaseStatementsBase {
+  /**
+   * @missingRailsCall reset_transaction — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   abstract/database_statements.rb:12 is `reset_transaction` inside
+   *   `initialize`; trails' DatabaseStatements is a mixin with no constructor of
+   *   its own — the adapter's own constructor calls `resetTransaction()`
+   *   (abstract-adapter.ts), so the call happens, just not from a body matched
+   *   to this Ruby method.
+   */
   constructor() {
     (this as any)._transactionManager = new TransactionManager(this as any);
   }

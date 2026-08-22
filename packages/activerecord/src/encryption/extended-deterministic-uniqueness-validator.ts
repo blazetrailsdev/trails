@@ -24,6 +24,13 @@ export class ExtendedDeterministicUniquenessValidator {
    *
    * Mirrors: Rails' ExtendedDeterministicUniquenessValidator.install_support which
    * prepends EncryptedUniquenessValidator into ActiveRecord::Validations::UniquenessValidator.
+   *
+   * @missingRailsCall prepend — PERMANENT: Rails prepends `EncryptedUniquenessValidator`
+   *   into the validator class
+   *   (extended_deterministic_uniqueness_validator.rb:7); trails swaps
+   *   `validateEach` on the prototype directly because `resetSupport` has to
+   *   hand the original method back for test teardown, which the `prepend()`
+   *   shim's wrapper cannot expose.
    */
   static installSupport({
     UniquenessValidator,

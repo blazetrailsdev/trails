@@ -98,6 +98,13 @@ export class LogSubscriber extends BaseLogSubscriber {
     });
   }
 
+  /**
+   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106):
+   *   `payload[:binds]&.any?` (`log_subscriber.rb:120`) — a blockless
+   *   `Array#any?` is the emptiness test, whose faithful JS spelling is `length
+   *   > 0`. The gate flags it only because `any?` maps onto the unrelated
+   *   `Relation#any?`.
+   */
   sql(event: Event): void {
     const payload = event.payload;
 

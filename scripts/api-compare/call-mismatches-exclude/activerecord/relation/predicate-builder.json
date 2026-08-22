@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "handler_for",
-    "call": "last",
-    "reason": "Verified per-site (RFC 0106): `@handlers.detect { ... }.last` (predicate_builder.rb:186) — Ruby `Array#last` on the matched `[klass, handler]` pair, spelled `[1]` in TS (predicate-builder.ts:543)."
-  }
-]

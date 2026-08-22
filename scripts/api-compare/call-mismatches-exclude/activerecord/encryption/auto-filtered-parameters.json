@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/auto-filtered-parameters.ts",
-    "rubyName": "collect_for_later",
-    "call": "new",
-    "reason": "`Concurrent::Array.new` (auto_filtered_parameters.rb:48): the per-class attribute list is an array literal in TS, which emits no constructor call, and Concurrent:: thread-safe collections have no analogue on a single-threaded event loop."
-  }
-]

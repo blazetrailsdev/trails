@@ -153,6 +153,14 @@ export class RangeType extends ValueType<Range> {
     return isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
+  /**
+   * @missingRailsCall split — PERMANENT: Name-collision false positive (story
+   *   relation-delegation-rails-named-methods): exposing the `delegate ... to:
+   *   :records` set under Rails names made `split`/`reverse`/`rindex` recognized
+   *   ported method names, so this unrelated call to String#split /
+   *   Array#reverse / String#rindex on a non-Relation receiver is flagged by the
+   *   name-based wide call-set check.
+   */
   private extractBounds(value: string): {
     from: unknown;
     to: unknown;

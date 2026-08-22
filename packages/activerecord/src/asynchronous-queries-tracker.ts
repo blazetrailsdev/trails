@@ -52,6 +52,16 @@ export class AsynchronousQueriesTracker {
     asynchronousQueriesTracker.finalizeSession();
   }
 
+  /**
+   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@stack.last or raise
+   *   ActiveRecordError` (`asynchronous_queries_tracker.rb:50`) — the TS body
+   *   reads `this.#stack[this.#stack.length - 1]` and raises the same error with
+   *   the same message. `first`/`last`/`size` are positional/property idioms
+   *   with no JS call form, deliberately left uncredited by RFC 0092
+   *   (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment)
+   *   so the reason-text route is the sanctioned one; nothing was dropped from
+   *   the TS body.
+   */
   get currentSession(): Session {
     const session = this.#stack[this.#stack.length - 1];
     if (!session)

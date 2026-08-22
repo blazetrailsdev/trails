@@ -234,7 +234,13 @@ export class EncryptedAttributeType extends ValueType {
       this.isFixed() && this.previousTypesWithoutCleanText().length > 0);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall first — PERMANENT: `previous_types.first`
+   *   (encrypted_attribute_type.rb:127) on a plain Array — the faithful port is
+   *   index access, which emits no call name (compare.ts's `first`/`last` note).
+   */
   private serializeWithOldest(value: unknown): unknown {
     // Mirrors Rails' previous_types.first — the first of the previous types (which are
     // built from previousSchemesIncludingCleanText, so the clean-text entry, if any, is

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters.ts",
-    "rubyName": "resolve",
-    "call": "join",
-    "reason": "Rails builds the AdapterNotFound message inline (connection_adapters.rb:34-39); the port extracts it into the private `adapterNotFoundError`, whose `[...adapters.keys()].sort().join(\", \")` (connection-adapters.ts:75) is outside the published call-set."
-  }
-]

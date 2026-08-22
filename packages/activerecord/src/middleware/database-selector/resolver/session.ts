@@ -34,6 +34,12 @@ export class Session {
     return time.epochMilliseconds;
   }
 
+  /**
+   * @missingRailsCall at — PERMANENT: Verified per-site (RFC 0106): `Time.at(timestamp /
+   *   1000, (timestamp % 1000) * 1000)` (`resolver/session.rb:25`) — trails'
+   *   time type is `Temporal.Instant`, whose epoch constructor is
+   *   `fromEpochMilliseconds`; there is no `at` to call.
+   */
   static convertTimestampToTime(timestamp: number | undefined): Temporal.Instant {
     return Temporal.Instant.fromEpochMilliseconds(timestamp ?? 0);
   }

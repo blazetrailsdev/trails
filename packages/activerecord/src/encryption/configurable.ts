@@ -139,6 +139,12 @@ export class Configurable {
     }
   }
 
+  /**
+   * @missingRailsCall new — PERMANENT: `Concurrent::Array.new` (configurable.rb:48): the
+   *   lazily-allocated listener list is `_listeners ??= []` in TS, an array
+   *   literal with no constructor call, and Concurrent:: collections have no
+   *   analogue on a single-threaded event loop.
+   */
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
     // Mirrors Rails' `self.encrypted_attribute_declaration_listeners ||= ...`
     // (configurable.rb:48) — lazily allocate on first registration.

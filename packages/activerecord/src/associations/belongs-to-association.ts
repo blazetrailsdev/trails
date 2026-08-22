@@ -23,6 +23,10 @@ export class BelongsToAssociation extends SingularAssociation {
   /**
    * Handle dependent destruction/deletion of the target record.
    * Called by the owner's before_destroy callback.
+   *
+   * @missingRailsCall fetch — PERMANENT: Ruby `options.fetch(:ensuring_owner_was, nil)`
+   *   (belongs_to_association.rb:34); a JS object has no `fetch`, so the
+   *   stored-nil semantics are spelled as an own-key check at the call site.
    */
   async handleDependency(): Promise<void> {
     const target = await this.loadTarget();

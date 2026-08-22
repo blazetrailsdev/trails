@@ -855,7 +855,15 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
   if (typeof this.errors?.uniqBang === "function") this.errors.uniqBang();
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall define_method — PERMANENT: autosave_association.rb:162
+ *   `define_method(name) do |*args| ... end` — Ruby's `define_method` is a
+ *   prototype assignment in JS (`klass.prototype[name] = function ...`,
+ *   autosave-association.ts:863); there is no `define_method` to call. Language
+ *   shortcoming.
+ */
 export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) => any): void {
   const klass = this;
   // Rails passes a Symbol here and `define_method` names the method after it;

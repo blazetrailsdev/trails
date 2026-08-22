@@ -2513,6 +2513,13 @@ export class Base extends Model {
    *   `composite_primary_key? ? id.first.is_a?(Array) : id.is_a?(Array)`
    * so a plain tuple on a composite-PK model is treated as ONE record,
    * not N.
+   *
+   * @missingRailsCall with_transaction_returning_status — PERMANENT: File-mapping artifact:
+   *   `base.ts`'s `destroy` is the instance-method table entry `destroy:
+   *   _Persistence.destroy` (base.ts:4609), not a body. Rails'
+   *   `Transactions#destroy` (transactions.rb:356-358) maps to persistence.ts
+   *   `destroy`, which does call `withTransactionReturningStatus`
+   *   (persistence.ts:855).
    */
   static async destroy<T extends typeof Base>(
     this: T,

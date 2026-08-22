@@ -144,6 +144,15 @@ export class AssociationQueryValue {
     return !(type in hash);
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `value.select_values.empty?` (association_query_value.rb:52) — `empty?` on
+   *   a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits
+   *   no callee, so no TS call can ever credit the Ruby one. The gate flags it
+   *   only because `empty?` maps onto the unrelated
+   *   `ActiveRecord::Result.empty`, which takes arguments since it gained Rails'
+   *   `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped.
+   */
   private isSelectClause(): boolean {
     const sv = (this.value as any).selectValues;
     if (typeof sv === "function") return sv.call(this.value).length === 0;

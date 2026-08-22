@@ -120,6 +120,11 @@ export class ConnectionHandler {
     return [...this._connectionNameToPoolManager.keys()];
   }
 
+  /**
+   * @missingRailsCall map — PERMANENT: Per-site verified (RFC 0106 wave 4b): the inner
+   *   `map` of connection_handler.rb:75-79 is the same Ruby-Enumerable idiom,
+   *   spelled as the body of trails' explicit `for..of` accumulation.
+   */
   connectionPoolList(role?: string | null): ConnectionPool[] {
     const effectiveRole = role === "all" ? null : role;
     const pools: ConnectionPool[] = [];

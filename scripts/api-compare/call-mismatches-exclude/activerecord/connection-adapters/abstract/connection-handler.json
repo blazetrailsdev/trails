@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "connection_pool_list",
-    "call": "map",
-    "reason": "Per-site verified (RFC 0106 wave 4b): the inner `map` of connection_handler.rb:75-79 is the same Ruby-Enumerable idiom, spelled as the body of trails' explicit `for..of` accumulation."
-  }
-]

@@ -56,6 +56,12 @@ export class Schema extends Current {
     info: SchemaDefineInfo,
     fn: (schema: Schema) => void | Promise<void>,
   ): Promise<void>;
+  /**
+   * @missingRailsCall with_connection — CONVERGEABLE (RFC 0059, the one-schema convergence): `connection_pool.with_connection`
+   *   (schema.rb:54) checks a connection out for the block; the port's
+   *   `Schema.define` is handed the adapter explicitly (schema.ts:51-64), the
+   *   one-schema convergence RFC 0059 tracks.
+   */
   static async define(
     adapter: DatabaseAdapter,
     infoOrFn: SchemaDefineInfo | ((schema: Schema) => void | Promise<void>),

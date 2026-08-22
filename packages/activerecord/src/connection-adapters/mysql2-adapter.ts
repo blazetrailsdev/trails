@@ -396,6 +396,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * is stashed for promotion. Prefer the config-hash / URI-string form.
    */
   constructor(rawConnection: mysql.Connection, deprecatedConfig?: Record<string, unknown> | null);
+  /**
+   * @missingRailsCall push — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   mysql2_adapter.rb:61-66 pushes onto `@config[:flags]` (a Ruby Array) while
+   *   building the client flags; trails composes the mysql2 driver options
+   *   object instead — the node driver takes named booleans, not a FLAGS array,
+   *   so there is no array to push onto.
+   */
   constructor(
     config: string | (mysql.PoolOptions & MysqlAdapterOptions) | mysql.Connection,
     deprecatedConfig?: Record<string, unknown> | null,

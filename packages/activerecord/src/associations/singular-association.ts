@@ -291,6 +291,14 @@ export class SingularAssociation extends Association {
    * `setTarget` refusing a replacement that lands mid-query rather than losing
    * it silently. `Association#_findTarget` handles the complementary case the
    * raise cannot see — a bare FK change that never touches the holder.
+   *
+   * @missingRailsCall first — PERMANENT: Rails' `super.then(&:first)` is Array#first over
+   *   the array Association#find_target already loaded, not Relation#first;
+   *   take() (unordered LIMIT 1) is the SQL-level equivalent — Relation#first
+   *   would route through ordered_relation and add the ORDER BY that
+   *   has_one_associations_test `test_has_one_does_not_use_order_by` forbids.
+   *   The statement-cache branch's literal .first() lives in the extracted
+   *   _loadSingularViaStatementCache helper (associations.ts).
    */
   protected override async findTarget(): Promise<Base | null> {
     this._loaderWritebackSuppressed++;

@@ -530,6 +530,11 @@ export class PredicateBuilder {
     return converted;
   }
 
+  /**
+   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@handlers.detect {
+   *   ... }.last` (predicate_builder.rb:186) — Ruby `Array#last` on the matched
+   *   `[klass, handler]` pair, spelled `[1]` in TS (predicate-builder.ts:543).
+   */
   private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
     // Rails: `@handlers.detect { |klass, _| klass === object }.last` — BasicObject
     // matches every value, so the detect never comes back nil.

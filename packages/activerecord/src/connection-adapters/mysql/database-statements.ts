@@ -106,7 +106,13 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
   return abstractDefaultInsertValue(column);
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+ *   mysql/database_statements.rb's `result.rows.first` is `result.rows[0]` on a
+ *   JS array; `Array#first` is not a ported method name.
+ */
 export async function returningColumnValues(
   this: SupportsInsertReturningHost | void,
   result: Result,

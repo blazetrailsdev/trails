@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/oid/hstore.ts",
-    "rubyName": "deserialize",
-    "call": "new",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/oid/hstore.rb's scanner allocates a `Hash.new`; trails accumulates into an object literal, which is not a `new` expression."
-  }
-]

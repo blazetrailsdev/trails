@@ -128,6 +128,15 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
+  /**
+   * @missingRailsCall match? — CONVERGEABLE (story pg-export-name-ignores-dumper-patterns): Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails postgresql/schema_definitions.rb:209-211/231-233
+   *   filter via SchemaDumper.excl_ignore_pattern/unique_ignore_pattern.match?;
+   *   trails schema-definitions.ts:98-100/134-136 return `this.name != null`
+   *   only — the ignore-pattern filtering (patterns exist at
+   *   schema-dumper.ts:346-348) is unported. Omission tracked in story
+   *   pg-export-name-ignores-dumper-patterns.
+   */
   exportNameOnSchemaDump(): boolean {
     return this.name != null && !statelessTest(SchemaDumper.exclIgnorePattern, this.name);
   }

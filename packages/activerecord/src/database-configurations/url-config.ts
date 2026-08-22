@@ -12,6 +12,11 @@ import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js"
 export class UrlConfig extends HashConfig {
   readonly url: string;
 
+  /**
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `@configuration_hash.merge(build_url_hash)` (`url_config.rb:43`) — a
+   *   non-mutating Hash merge is an object spread in TS.
+   */
   constructor(
     envName: string,
     name: string,

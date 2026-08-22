@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/extended-deterministic-uniqueness-validator.ts",
-    "rubyName": "install_support",
-    "call": "prepend",
-    "reason": "Rails prepends `EncryptedUniquenessValidator` into the validator class (extended_deterministic_uniqueness_validator.rb:7); trails swaps `validateEach` on the prototype directly because `resetSupport` has to hand the original method back for test teardown, which the `prepend()` shim's wrapper cannot expose."
-  }
-]
