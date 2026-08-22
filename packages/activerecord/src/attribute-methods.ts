@@ -322,12 +322,43 @@ export function eagerlyGenerateAliasAttributeMethods(this: AttributeMethodsHost)
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attribute_methods
- * (attribute_methods.rb:80-85). Rails loops the attribute-method patterns and
- * defines one alias per pattern; trails' generated readers are accessor
- * properties (see CLAUDE.md, "Generated attribute readers are properties"), so
- * the reader/writer pair is one descriptor and the loop collapses to the single
- * `alias_attribute_method_definition` call the plain pattern produces.
+ * DIVERGES from ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attribute_methods
+ * (attribute_methods.rb:80-85), which is
+ *
+ *     attribute_method_patterns.each do |pattern|
+ *       alias_attribute_method_definition(code_generator, pattern, new_name, old_name)
+ *     end
+ *     attribute_method_patterns_cache.clear
+ *
+ * This body defines the alias once, through the descriptor helper below,
+ * instead of once per pattern, and never clears the pattern cache. It is NOT
+ * converged, and the shape is not defensible on its own — it is blocked on the
+ * eager/lazy split, not chosen.
+ *
+ * Porting the loop means routing each pattern through
+ * `defineAttributeMethodPattern(pattern, oldName, { owner, as: newName,
+ * override: true })`, which is what ActiveModel's own
+ * `aliasAttributeMethodDefinition` already does
+ * (activemodel/attribute-methods.ts:354-366). Doing that here generates every
+ * alias TWICE: Rails reaches this method as an alias' only generator because
+ * its `eagerly_generate_alias_attribute_methods` is a no-op
+ * (attribute_methods.rb:76-78, "alias attributes in Active Record are lazily
+ * generated"), but trails never assigns that override (below, :309) onto
+ * `Base`, so `alias_attribute` still runs ActiveModel's EAGER arm. Measured:
+ * `id|id_value` is emitted by both activemodel/attribute-methods.ts:340 and
+ * this pass.
+ *
+ * Wiring the override — making AR aliases lazy as Rails has them — is the fix,
+ * and it also moves when `DangerousAttributeError` surfaces (Rails raises it
+ * from `instance_method_already_implemented?` during `define_attribute_methods`,
+ * attribute_methods.rb:165-179). Tracked by story
+ * `converge-lazy-alias-attribute-method-generation`, which carries this
+ * method's acceptance criteria.
+ *
+ * The call-set gate cannot hold this: it never pairs this function with
+ * `attribute_methods.rb:80`, so those calls are outside the measured
+ * population and a `@missingRailsCall` receipt for them reads as a STALE tag.
+ * The story is the register.
  */
 export function generateAliasAttributeMethods(
   this: AttributeMethodsHost,
