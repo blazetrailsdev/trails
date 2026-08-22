@@ -2076,9 +2076,6 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  *   relation.ts with the member (RFC 0107 fan-out).
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
-  // `@arel ||= with_connection { |c| build_arel(c, aliases) }`
-  // (query_methods.rb:1595) — see the `@missingRailsCall` note above for the
-  // synchronous `_conn()` lease standing in for the `with_connection` block.
   return ((this as any)._arel ??= this.buildArel((this as any)._conn(), aliases));
 }
 
