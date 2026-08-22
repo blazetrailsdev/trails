@@ -215,7 +215,8 @@ export class DisableJoinsAssociationScope extends AssociationScope {
   }
 
   /**
-   * Build a per-step scope: `klass.unscoped.where(key IN ids)` merged with
+   * Build a per-step scope: `reflection.build_scope(reflection.aliased_table)
+   * .where(key IN ids)` merged with
    * `scope_for_association` (minus the joined/eager-load options that
    * would conflict with the disabled-joins shape) and any reflection
    * `constraints()` (where_clause += / order_values |=).
@@ -241,7 +242,17 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     ordered: boolean,
   ): unknown {
     const klass = (reflection as { klass: typeof Base }).klass;
-    let scope: unknown = (klass as unknown as { unscoped: () => unknown }).unscoped();
+    // Rails: `reflection.build_scope(reflection.aliased_table)`
+    // (disable_joins_association_scope.rb:34) — a bare
+    // `Relation.create(klass, table:, predicate_builder:)`
+    // (reflection.rb:336-338): no default scope, no STI predicate, bound to
+    // the reflection's aliased table.
+    let scope: unknown = (
+      reflection as unknown as {
+        buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): unknown;
+        aliasedTable?: unknown;
+      }
+    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable, undefined, klass);
     if (keyCols.length === 1) {
       // Single-column key: hash WHERE typically compiles to
       // `key IN (?, ?, ...)`. The PredicateBuilder array handler
@@ -310,16 +321,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       ).constraints?.() ?? [];
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      const entryScope = (
-        reflection as unknown as {
-          buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): unknown;
-          aliasedTable?: unknown;
-        }
-      ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable, undefined, klass);
-      const evaluated =
-        c.length === 0
-          ? (c as () => unknown).call(entryScope)
-          : c.call(entryScope, entryScope, owner);
+      // Rails: `item = eval_scope(reflection, scope_chain_item, owner)`
+      // (disable_joins_association_scope.rb:42).
+      const evaluated = this.evalScope(reflection, c, owner, klass);
       scope = this._pushScopeIntoRelation(scope, evaluated);
     }
 

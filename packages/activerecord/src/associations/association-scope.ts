@@ -838,14 +838,11 @@ export class AssociationScope {
    * arity / `this` semantics: 0-arg → `call(relation)`; 1+-arg → `call(relation, relation,
    * owner)`. The common 0-arg form Rails uses for scope_for_association /
    * source_type_scope (`function () { return this.where(...) }`) relies on
-   * `this` being the relation. Unlike Rails we omit the `|| relation`
-   * truthy-fallback — callers push only the evaluated WHERE/ORDER
-   * predicates, and falling back to the bare relation would re-push its
-   * STI predicate.
+   * `this` being the relation.
    *
    * @internal
    */
-  private evalScope(
+  protected evalScope(
     reflection: AbstractReflection | ReflectionProxy,
     scopeFn: (...args: unknown[]) => unknown,
     owner: Base,
@@ -866,7 +863,11 @@ export class AssociationScope {
       undefined,
       entryKlass,
     );
-    return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
+    // Rails: `relation.instance_exec(owner, &scope) || relation`
+    // (association_scope.rb:171) — a scope lambda that returns a falsy value
+    // yields the bare `build_scope` relation, which contributes no WHERE or
+    // ORDER to the caller.
+    return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner) ?? relation;
   }
 
   /**

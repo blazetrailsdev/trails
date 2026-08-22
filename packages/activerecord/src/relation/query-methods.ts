@@ -1058,7 +1058,18 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
   return this;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall order:constructor,sql — CONVERGEABLE: Verified per-site (RFC 0106): ORDER
+ *   only. Rails reaches `Arel.sql(opts)` in the String arm
+ *   (query_methods.rb:1623) before the `WhereClause.new` at the bottom, and
+ *   handles a bare Arel node in the same trailing `else`; the port early-returns
+ *   the node arm as `new WhereClause([opts])` (query-methods.ts:1143) above the
+ *   String arm, so the constructor is first in TS evaluation order. Same calls,
+ *   same results. Tracked by story query-methods-order-only-call-inversions
+ *   (RFC 0106).
+ */
 export function buildWhereClause(
   this: QueryMethodsHost,
   opts: unknown,
@@ -2040,6 +2051,19 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  *
  * Mirrors: ActiveRecord::QueryMethods#arel (query_methods.rb:1594-1596)
  * @internal
+ *
+ * @missingRailsCall build_arel — CONVERGEABLE: Surfaced by the relation.ts →
+ *   relation/query-methods.ts split (RFC 0107): `arel` and `toArel` are now
+ *   cross-file, so the call-set comparer can no longer see through the
+ *   delegation to the `build_arel` call inside `toArel`. Folding the memo,
+ *   connection acquisition and build_arel call back into `arel` itself is
+ *   tracked by story converge-toarel-onto-with-connection-acquisition (RFC
+ *   0107).
+ * @missingRailsCall with_connection — CONVERGEABLE: Relation#arel's memo, connection
+ *   acquisition and build_arel call all live in `toArel`, which this body
+ *   delegates to verbatim; folding them back into `arel` is tracked by story
+ *   converge-toarel-onto-with-connection-acquisition (RFC 0107). Row moved
+ *   verbatim from relation.ts with the member (RFC 0107 fan-out).
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
   return this.toArel(aliases);
@@ -2285,7 +2309,23 @@ export function buildBoundSqlLiteral(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall arel — CONVERGEABLE: Confirmed equivalent (RFC 0047): the TS body builds
+ *   the Arel manager via _buildArel/toArel (the build_arel port that arel()
+ *   delegates to) rather than the memoized arel reader; surfaced when arel()
+ *   gained its Rails-faithful aliases param (query_methods.rb:1594). See PR
+ *   #4518. Tracked by story query-methods-order-only-call-inversions (RFC
+ *   0106).
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+ *   `optimizer_hints_values.empty?` (query_methods.rb:1609) — `empty?` on a Ruby
+ *   Array, whose faithful JS spelling is `xs.length === 0`. That emits no
+ *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
+ *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which
+ *   takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+ *   nothing in the TS body was dropped.
+ */
 export function buildSubquery(
   this: QueryMethodsHost,
   subqueryAlias: string,
@@ -2307,7 +2347,15 @@ export function buildSubquery(
   return sm;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall new — PERMANENT: Verified per-site (RFC 0106): `String.new(order)
+ *   unless order.instance_of?(String)` (query_methods.rb:2047) exists only to
+ *   shed a String SUBCLASS's method overrides (Arel::Nodes::SqlLiteral#count).
+ *   JS has no String subclassing to shed, so the port is the plain
+ *   `String(order)` coercion (query-methods.ts:2395).
+ */
 export function isDoesNotSupportReverse(order: string): boolean {
   const plain = String(order);
   if (
@@ -2857,7 +2905,17 @@ export function arelColumnsFromHash(
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `group_values.empty?`
+ *   (query_methods.rb:2155) — `empty?` on a Ruby Array, whose faithful JS
+ *   spelling is `xs.length === 0`. That emits no callee, so no TS call can ever
+ *   credit the Ruby one. The gate flags it only because `empty?` maps onto the
+ *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
     if (attrName === "count" && ((this as any).groupValues ?? []).length > 0) {
@@ -3085,7 +3143,18 @@ export function eachJoinDependencies(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+ *   `eager_load_values.empty?` / `includes_values.empty?`
+ *   (query_methods.rb:1737,1738) — `empty?` on a Ruby Array, whose faithful JS
+ *   spelling is `xs.length === 0`. That emits no callee, so no TS call can ever
+ *   credit the Ruby one. The gate flags it only because `empty?` maps onto the
+ *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   // Mirror Rails build_join_dependencies (query_methods.rb):
   //   joins = joins_values | left_outer_joins_values | eager_load | includes
@@ -3275,7 +3344,25 @@ export function selectInnerNamedJoins(
   }) as AssociationSpec[];
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+ *   `left_outer_joins_values.empty?` / `joins_values.empty?`
+ *   (query_methods.rb:1828,1838) — `empty?` on a Ruby Array, whose faithful JS
+ *   spelling is `xs.length === 0`. That emits no callee, so no TS call can ever
+ *   credit the Ruby one. The gate flags it only because `empty?` maps onto the
+ *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ * @missingRailsCall order:selectNamedJoins,constructor — CONVERGEABLE: Re-keyed by the
+ *   accessor-pair fix to the ported-with-args gate (compare.ts `tsWriterSigs`):
+ *   the SAME pre-existing order-only divergence this body already carried,
+ *   reported at a different first inversion now that a `set` accessor's
+ *   signature no longer opens the gate for its reader. The row it replaces was
+ *   deleted from this file in the same commit. Tracked by story
+ *   query-methods-order-only-call-inversions (RFC 0106).
+ */
 export function buildJoinBuckets(
   this: QueryMethodsHost,
 ): [Record<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
@@ -3496,7 +3583,18 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `joins_values.empty?`
+ *   / `left_outer_joins_values.empty?` / `leading_joins.empty?`
+ *   (query_methods.rb:1882,1891,1893) — `empty?` on a Ruby Array, whose faithful
+ *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
+ *   ever credit the Ruby one. The gate flags it only because `empty?` maps onto
+ *   the unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ */
 export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
   // query_methods.rb:1882 — `return if joins_values.empty? && left_outer_joins_values.empty?`.
   if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return;
@@ -3524,7 +3622,17 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `with_values.empty?`
+ *   (query_methods.rb:1914) — `empty?` on a Ruby Array, whose faithful JS
+ *   spelling is `xs.length === 0`. That emits no callee, so no TS call can ever
+ *   credit the Ruby one. The gate flags it only because `empty?` maps onto the
+ *   unrelated `ActiveRecord::Result.empty`, which takes arguments since it
+ *   gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was
+ *   dropped.
+ */
 export function buildWith(this: QueryMethodsHost, arel: any): void {
   if (this.withValues.length === 0) return;
 
@@ -3542,7 +3650,19 @@ export function buildWith(this: QueryMethodsHost, arel: any): void {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106): `.join_sources.first`
+ *   (query_methods.rb:1959) — Ruby `Array#first` on the join-sources Array,
+ *   spelled `.joinSources()[0]` in TS.
+ * @missingRailsCall order:table,constructor — CONVERGEABLE: Verified per-site (RFC 0106):
+ *   ORDER only. Rails constructs `Arel::Table.new(name)` before touching `table`
+ *   (query_methods.rb:1955-1957); the port hoists `this.table` into a local
+ *   first so it can raise its no-arel-table guard before allocating
+ *   (query-methods.ts:3658-3660). Same calls, same results. Tracked by story
+ *   query-methods-order-only-call-inversions (RFC 0106).
+ */
 export function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,

@@ -397,7 +397,6 @@ export class ToSql extends Visitor {
     reg(Nodes.OuterJoin, "visitArelNodesOuterJoin");
     reg(Nodes.RightOuterJoin, "visitArelNodesRightOuterJoin");
     reg(Nodes.FullOuterJoin, "visitArelNodesFullOuterJoin");
-    reg(Nodes.CrossJoin, "visitCrossJoin");
     reg(Nodes.StringJoin, "visitArelNodesStringJoin");
     reg(Nodes.On, "visitArelNodesOn");
     reg(Nodes.Equality, "visitArelNodesEquality");
@@ -1758,12 +1757,6 @@ export class ToSql extends Visitor {
       return key.left as Node;
     }
     return key;
-  }
-
-  private visitCrossJoin(o: Nodes.CrossJoin, collector: SQLString): SQLString {
-    collector.append("CROSS JOIN ");
-    this.visit(o.left, collector);
-    return collector;
   }
 
   protected visitBinaryOp(o: Nodes.Binary, op: string, collector: SQLString): SQLString {
