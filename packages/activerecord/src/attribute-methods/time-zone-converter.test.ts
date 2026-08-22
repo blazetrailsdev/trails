@@ -4,12 +4,13 @@ import { DateTime } from "../type/date-time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, resetLocalTimeZoneId } from "@blazetrails/date";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {
     setZone(null);
     vi.restoreAllMocks();
+    resetLocalTimeZoneId();
   });
 
   it("comparison with date time type", () => {
@@ -152,6 +153,7 @@ describe("TimeZoneConverterTest", () => {
   it("falls back to ActiveRecord.default_timezone when the subtype has no is_utc?", () => {
     const previous = ActiveRecord.defaultTimezone;
     vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    resetLocalTimeZoneId();
     setZone("UTC");
     ActiveRecord.defaultTimezone = "local";
     try {
