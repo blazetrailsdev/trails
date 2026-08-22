@@ -195,6 +195,7 @@ import {
   initializeGeneratedModules as _initializeGeneratedModules,
   GeneratedAttributeMethods,
   generateAliasAttributes as _generateAliasAttributes,
+  eagerlyGenerateAliasAttributeMethods as _eagerlyGenerateAliasAttributeMethods,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
   pkAttribute as _pkAttribute,
@@ -1547,6 +1548,7 @@ export class Base extends Model {
   // (attribute_methods.rb:139-159): no attr-name splat, and it answers whether
   // the class's methods were generated.
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
+  declare static generateAliasAttributes: typeof _generateAliasAttributes;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
   /** @internal */
   declare static resolveTypeName: typeof _resolveTypeName;
@@ -4649,6 +4651,7 @@ extend(Base, {
   defineAttributeMethods: _defineAttributeMethods,
   initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
+  eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
   _defaultAttributes: _arDefaultAttributes,
   resolveTypeName: _resolveTypeName,
 });

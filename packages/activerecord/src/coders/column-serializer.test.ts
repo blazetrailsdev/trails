@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { ColumnSerializer } from "./column-serializer.js";
 import { JSON as JsonCoder } from "./json.js";
 import { SerializationTypeMismatch } from "../errors.js";
@@ -49,13 +50,26 @@ describe("ColumnSerializerTest", () => {
   });
 
   it("check_arity_of_constructor raises for classes that throw during construction", () => {
-    // Rails catches ArgumentError from `ObjectClass.new` with no args.
-    // In JS, we detect constructors that throw when called with no arguments.
+    // Rails rescues ArgumentError alone (column_serializer.rb:56) and re-raises
+    // it as the "0 argument constructor" ArgumentError; anything else the
+    // constructor raises propagates unchanged.
     class ThrowsOnConstruct {
       constructor() {
         throw new Error("cannot construct without args");
       }
     }
-    expect(() => new ColumnSerializer("attr", JsonCoder, ThrowsOnConstruct)).toThrow(TypeError);
+    expect(() => new ColumnSerializer("attr", JsonCoder, ThrowsOnConstruct)).toThrow(
+      "cannot construct without args",
+    );
+
+    class ThrowsArgumentErrorOnConstruct {
+      constructor() {
+        throw new ArgumentError("wrong number of arguments");
+      }
+    }
+    expect(() => new ColumnSerializer("attr", JsonCoder, ThrowsArgumentErrorOnConstruct)).toThrow(
+      "Cannot serialize ThrowsArgumentErrorOnConstruct. Classes passed to `serialize` must have" +
+        " a 0 argument constructor.",
+    );
   });
 });

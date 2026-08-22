@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
@@ -91,14 +92,17 @@ export class ColumnSerializer {
 
   /** @internal */
   checkArityOfConstructor(): void {
-    // Ruby narrows this to `rescue ArgumentError`; JS throws a bare TypeError
-    // for a constructor that will not take zero arguments, so catch everything.
     try {
       this.load(null);
     } catch (e: unknown) {
-      throw new TypeError(
+      // Rails rescues ArgumentError alone (column_serializer.rb:56) — the error
+      // `Class.new` raises when the constructor demands arguments. Anything
+      // else the constructor raises propagates unchanged. A JS constructor
+      // never signals a missing argument (it receives `undefined`), so only a
+      // body that raises ArgumentError itself reaches the re-raise.
+      if (!(e instanceof ArgumentError)) throw e;
+      throw new ArgumentError(
         `Cannot serialize ${this._objectClass.name}. Classes passed to \`serialize\` must have a 0 argument constructor.`,
-        { cause: e },
       );
     }
   }

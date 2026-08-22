@@ -302,13 +302,21 @@ describe("AttributeMethodsTest (trails)", () => {
     // through the class, and ActiveRecord's override raises before the
     // `override: true` arm alias_attribute relies on is consulted
     // (activerecord/attribute_methods.rb:165-168, 324-331).
+    //
+    // The raise lands when the alias is GENERATED, not when it is declared:
+    // ActiveRecord's `eagerly_generate_alias_attribute_methods` is a no-op
+    // because "alias attributes in Active Record are lazily generated"
+    // (attribute_methods.rb:76-78), so `define_attribute_methods` ->
+    // `generate_alias_attributes` is what reaches the guard.
     class Employee extends Base {
       static {
         this.attribute("name", "string");
       }
     }
 
-    expect(() => Employee.aliasAttribute("save", "name")).toThrow(DangerousAttributeError);
+    Employee.aliasAttribute("save", "name");
+
+    expect(() => Employee.generateAliasAttributes()).toThrow(DangerousAttributeError);
   });
 
   it("an ordinary class-body method is not overridden by a generated attribute method", () => {
@@ -342,6 +350,11 @@ describe("AttributeMethodsTest (trails)", () => {
       }
     }
     class Leaf extends Middle {}
+
+    // Aliases are generated lazily in Active Record (attribute_methods.rb:76-78),
+    // so the sweep `define_attribute_methods` runs is what puts `nickname` on
+    // the prototype.
+    Middle.generateAliasAttributes();
 
     const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
     expect("nickname" in (Leaf.prototype as object)).toBe(true);
