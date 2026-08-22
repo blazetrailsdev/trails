@@ -1,6 +1,6 @@
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
-import { _engine, ArelEngine, Node, NodeVisitor } from "./nodes/node.js";
+import { _engine, ArelEngine, Node } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
@@ -251,10 +251,6 @@ export class Table extends Node {
   ): Join {
     const JoinClass = klass ?? InnerJoin;
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 

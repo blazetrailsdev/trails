@@ -12,7 +12,7 @@
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Temporal, Date as RubyDate, Rational } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Rational, Time } from "@blazetrails/date";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -743,25 +743,6 @@ export class Timezone {
 }
 
 /**
- * The `Integer`, `Float` or `Rational` a Ruby `Time.at` argument can be, scaled
- * to a whole number of nanoseconds. `scale` is the nanoseconds one unit of the
- * argument is worth — `1_000_000_000` for the seconds argument, `1_000` for the
- * microseconds one. A Float is truncated at the nanosecond, as MRI's
- * `Time.at(946684800.123456789).nsec` is `123456835` rather than `...836`.
- *
- * @noRailsEquivalent CONVERGEABLE — Ruby's Numeric tower does this arithmetic
- * exactly at any width, so `Time.at` needs no such scaling; this goes away with
- * a `Time.at` in `@blazetrails/date` for `at` to delegate to, the gap
- * `time-helpers-stub-date-and-datetime-clock` records.
- */
-function toNanoseconds(value: number | bigint | Rational, scale: bigint): bigint {
-  if (value instanceof Rational) return (value.numerator * scale) / value.denominator;
-  if (typeof value === "bigint") return value * scale;
-  const whole = Math.trunc(value);
-  return BigInt(whole) * scale + BigInt(Math.trunc((value - whole) * Number(scale)));
-}
-
-/**
  * Ruby `Time.new`'s fractional-seconds argument (`parts.fetch(:sec, 0) +
  * parts.fetch(:sec_fraction, 0)`), which Temporal cannot take as a Rational —
  * it wants the sub-second remainder split across its millisecond / microsecond
@@ -976,21 +957,16 @@ export class TimeZone {
    *   Time.zone.at(946684800.0)           # => Fri, 31 Dec 1999 14:00:00 HST -10:00
    *   Time.at(946684800, 123456.789).nsec # => 123456789
    *
-   * Ruby's `Time.at` takes the seconds as an Integer, Float or Rational and an
-   * optional second argument giving the sub-second part in microseconds, and
-   * carries the result to the nanosecond. `Temporal.Instant` is that same
-   * nanosecond seat, so the total is accumulated as a `bigint` count of
-   * nanoseconds rather than through a Float millisecond, which would drop
-   * every digit below the millisecond.
+   * `getutc` is Ruby's `Time#utc` on an immutable receiver (trails' `::Time`
+   * has no in-place conversion), and `toTime().toInstant()` is the instant a
+   * `TimeWithZone` holds where Ruby's `in_time_zone` takes the `::Time` itself.
    */
   at(
     seconds: number | bigint | Rational,
     microsecondsWithFrac: number | bigint | Rational = 0,
   ): TimeWithZone {
     return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(
-        toNanoseconds(seconds, 1_000_000_000n) + toNanoseconds(microsecondsWithFrac, 1_000n),
-      ),
+      Time.at(seconds, microsecondsWithFrac).getutc().toTime().toInstant(),
       this,
     );
   }

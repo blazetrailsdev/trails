@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Function } from "./function.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Over } from "./over.js";
@@ -35,8 +35,4 @@ export class NamedFunction extends Function {
     }
     return new Over(this, window);
   };
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
 }

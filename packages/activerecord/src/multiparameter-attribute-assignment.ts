@@ -12,11 +12,11 @@
 
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
 
-// Read _aggregateReflections directly to avoid a circular dependency:
+// Read aggregateReflections directly to avoid a circular dependency:
 // persistence.ts → multiparameter-attribute-assignment.ts → reflection.ts → persistence.ts
 function getAggregation(modelClass: any, name: string): { klass: any } | null {
-  const aggs: Map<string, { klass: any }> | undefined = modelClass._aggregateReflections;
-  return aggs?.get(name) ?? null;
+  const aggs: Record<string, { klass: any }> | undefined = modelClass.aggregateReflections;
+  return aggs?.[name] ?? null;
 }
 
 // Maximum allowed position index — guards against DoS via huge allocations

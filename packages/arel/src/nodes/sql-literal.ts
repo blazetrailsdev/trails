@@ -1,5 +1,5 @@
 import { isBlank, type Included } from "@blazetrails/activesupport";
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
 import { buildQuoted } from "./casted.js";
 
@@ -72,10 +72,6 @@ export class SqlLiteral extends Node {
   toYAML(): string {
     const escaped = this.value.replace(/\n/g, "\\n");
     return `---\n!sql_literal\nvalue: ${JSON.stringify(escaped)}`;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 

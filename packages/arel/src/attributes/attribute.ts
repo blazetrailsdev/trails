@@ -1,5 +1,5 @@
 import { include, type Included } from "@blazetrails/activesupport";
-import { Node, NodeVisitor } from "../nodes/node.js";
+import { Node } from "../nodes/node.js";
 import { As, ATTRIBUTE_BRAND } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Count } from "../nodes/count.js";
@@ -183,10 +183,6 @@ export class Attribute extends Node {
   extract(field: string): Extract {
     // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
     return new Extract([this], field);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 

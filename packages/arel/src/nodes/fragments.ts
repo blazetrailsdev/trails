@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * Fragments — a list of nodes to be emitted in sequence.
@@ -15,9 +15,5 @@ export class Fragments extends Node {
 
   join(node: Node): Fragments {
     return new Fragments([...this.values, node]);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

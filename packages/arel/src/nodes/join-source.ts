@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 
 /**
@@ -20,9 +20,5 @@ export class JoinSource extends Binary {
 
   isEmpty(): boolean {
     return !this.left && this.right.length === 0;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

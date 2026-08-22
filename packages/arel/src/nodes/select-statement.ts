@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
 
@@ -27,10 +27,6 @@ export class SelectStatement extends NodeExpression {
     this.offset = null;
     this.lock = null;
     this.with = null;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 
   clone(): SelectStatement {
@@ -64,9 +60,5 @@ export class SelectOptions extends Node {
     this.limit = limit;
     this.offset = offset;
     this.lock = lock;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -69,9 +69,5 @@ export class TableAlias extends Binary {
     return this.relation instanceof Table
       ? this.relation.get(name, this)
       : new Attribute(this, name);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

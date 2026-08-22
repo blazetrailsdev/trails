@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "reflection.ts",
-    "rubyName": "add_aggregate_reflection",
-    "call": "merge",
-    "reason": "Equivalent (RFC 0106): `aggregate_reflections` is a Ruby Hash upstream and a JS `Map` in trails, so the single-pair `merge` is `Map#set` on a copy. Converging the call means porting the container to a plain hash first."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
     "rubyName": "add_reflection",
     "call": "except",
     "kind": "args",

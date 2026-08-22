@@ -1,20 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { Node, NodeVisitor } from "../nodes/node.js";
+import { Node } from "../nodes/node.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "../errors.js";
 
-class A extends Node {
-  accept<T>(v: NodeVisitor<T>): T {
-    return v.visit(this);
-  }
-}
+class A extends Node {}
 class B extends A {}
 class B2 extends B {}
-class C extends Node {
-  accept<T>(v: NodeVisitor<T>): T {
-    return v.visit(this);
-  }
-}
+class C extends Node {}
 
 class TestVisitor extends Visitor {
   visited: Array<{ node: string; collector: unknown }> = [];

@@ -13,6 +13,7 @@ import {
   safeConstantize,
   foreignKey as deriveForeignKey,
   except,
+  merge,
 } from "@blazetrails/activesupport";
 import { Table, type TableRef } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
@@ -2182,20 +2183,16 @@ export function addReflection(
 
 /**
  * Mirrors: ActiveRecord::Reflection.add_aggregate_reflection
+ * (reflection.rb:29-31). `aggregate_reflections` is a `class_attribute`
+ * (reflection.rb:12), so the reassignment is the whole per-class mechanism:
+ * the read walks the constructor chain, the write lands on `ar`.
  */
 export function addAggregateReflection(
   ar: typeof Base,
   name: string,
   reflection: AggregateReflection,
 ): void {
-  const hasOwn = Object.prototype.hasOwnProperty.call(ar, "_aggregateReflections");
-  const existing = (ar as any)._aggregateReflections;
-  const aggs: Map<string, AggregateReflection> =
-    hasOwn && existing instanceof Map
-      ? existing
-      : new Map<string, AggregateReflection>(existing instanceof Map ? existing : undefined);
-  aggs.set(name, reflection);
-  (ar as any)._aggregateReflections = aggs;
+  ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
 }
 
 // ---------------------------------------------------------------------------
@@ -2307,20 +2304,14 @@ export function reflectOnAllAssociations(
 }
 
 export function reflectOnAllAggregations(modelClass: typeof Base): AggregateReflection[] {
-  const aggregations: Map<string, AggregateReflection> | undefined = (modelClass as any)
-    ._aggregateReflections;
-  if (!aggregations) return [];
-  return Array.from(aggregations.values());
+  return Object.values(modelClass.aggregateReflections);
 }
 
 export function reflectOnAggregation(
   modelClass: typeof Base,
   name: string,
 ): AggregateReflection | null {
-  const aggregations: Map<string, AggregateReflection> | undefined = (modelClass as any)
-    ._aggregateReflections;
-  if (!aggregations) return null;
-  return aggregations.get(name) ?? null;
+  return modelClass.aggregateReflections[name] ?? null;
 }
 
 export function reflectOnAllAutosaveAssociations(
@@ -2376,14 +2367,6 @@ export const ClassMethods = {
   },
   reflectOnAllAutosaveAssociations(this: typeof Base): AssociationLikeReflection[] {
     return reflectOnAllAutosaveAssociations(this);
-  },
-  // Rails: `class_attribute :aggregate_reflections, default: {}` — the
-  // composed-of registry keyed by aggregation name. Trails stores it in the
-  // dynamically-assigned `_aggregateReflections` Map; expose the Rails-shaped
-  // hash reader (the `=`/`?` forms map to the same accessor).
-  aggregateReflections(this: typeof Base): Readonly<Record<string, AggregateReflection>> {
-    const aggs: Map<string, AggregateReflection> | undefined = (this as any)._aggregateReflections;
-    return aggs ? Object.fromEntries(aggs) : {};
   },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
