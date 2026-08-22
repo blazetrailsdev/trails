@@ -1,5 +1,4 @@
 export { Node } from "./node.js";
-export type { NodeVisitor } from "./node.js";
 export { And } from "./and.js";
 export { Or } from "./or.js";
 export { Grouping } from "./grouping.js";

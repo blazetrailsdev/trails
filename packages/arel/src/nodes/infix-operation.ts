@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -45,10 +45,6 @@ export class InfixOperation extends Binary {
 
   desc(): Descending {
     return new Descending(this);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 

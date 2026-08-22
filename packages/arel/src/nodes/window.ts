@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { SqlLiteral } from "./sql-literal.js";
 
@@ -49,10 +49,6 @@ export class Window extends Node {
     this.frame(new Range(expr));
     return this;
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
 }
 
 /**
@@ -84,11 +80,7 @@ export class Following extends Unary {
   }
 }
 
-export class CurrentRow extends Node {
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
+export class CurrentRow extends Node {}
 
 export class Rows extends Unary {
   declare readonly expr: Node | null;

@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
 export class Unary extends NodeExpression {
@@ -12,10 +12,6 @@ export class Unary extends NodeExpression {
   constructor(expr: unknown) {
     super();
     this.expr = expr;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 

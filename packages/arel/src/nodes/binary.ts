@@ -1,6 +1,6 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { And } from "./and.js";
@@ -133,10 +133,6 @@ export class Binary extends NodeExpression {
   not(): Not {
     return new Not(this);
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
 }
 
 export class Assignment extends Binary {}
@@ -232,10 +228,6 @@ export class IsDistinctFrom extends Binary {
   fetchAttribute(block: (attr: Node) => unknown): unknown {
     return fetchAttributeFromBinary(this.left, this.right, block);
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
 }
 
 export class IsNotDistinctFrom extends Binary {
@@ -245,10 +237,6 @@ export class IsNotDistinctFrom extends Binary {
 
   fetchAttribute(block: (attr: Node) => unknown): unknown {
     return fetchAttributeFromBinary(this.left, this.right, block);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 
@@ -277,11 +265,7 @@ export abstract class Join extends Binary {
   }
 }
 
-export class CrossJoin extends Join {
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
+export class CrossJoin extends Join {}
 
 /** Set operations — Rails defines via const_set in binary.rb */
 export class Union extends Binary {

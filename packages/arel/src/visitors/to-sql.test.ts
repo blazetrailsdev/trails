@@ -221,14 +221,19 @@ describe("the to_sql visitor", () => {
   });
 
   it("can define a dispatch method", () => {
-    const visitor: Nodes.NodeVisitor<string> = {
-      visit(node: Nodes.Node): string {
-        if (node instanceof Nodes.SqlLiteral) return node.value;
-        return "unknown";
-      },
-    };
-    const node = new Nodes.SqlLiteral("NOW()");
-    expect(node.accept(visitor)).toBe("NOW()");
+    let visited = false;
+    class HelloVisitor extends Visitors.Visitor {
+      hello(_node: Table, _c: unknown): string {
+        visited = true;
+        return "";
+      }
+      static {
+        this.dispatchCache().set(Table, "hello");
+      }
+    }
+    const viz = new HelloVisitor();
+    viz.accept(users, new Collectors.SQLString());
+    expect(visited).toBe(true);
   });
 
   it("should visit built-in functions", () => {
