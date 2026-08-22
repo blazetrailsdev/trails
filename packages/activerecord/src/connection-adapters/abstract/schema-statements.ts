@@ -1605,6 +1605,10 @@ export class SchemaStatements {
     return `${singularize(name)}_${columnName}`;
   }
 
+  /**
+   * @missingRailsCall size — PERMANENT: RFC 0106: Ruby Array#size — JS spells it `.length`,
+   *   no call to converge (schema_statements.rb:1259-1260).
+   */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -2004,7 +2008,12 @@ export class SchemaStatements {
     return 62;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
+   *   the port slices (schema_statements.rb:1603).
+   */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = Array.isArray(column) ? column : [column];
     const name = `index_${tableName}_on_${cols.join("_and_")}`;
@@ -2261,7 +2270,15 @@ export class SchemaStatements {
     return m ? m[1] : str;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
+   *   the port slices (schema_statements.rb:1755-1762).
+   * @missingRailsCall map — PERMANENT: RFC 0106: Ruby Array#map(&:to_s) over already-string
+   *   column names — the port has no to_s hop to map
+   *   (schema_statements.rb:1757).
+   */
   foreignKeyName(
     tableName: string,
     options: { name?: string; column?: string | string[] },
@@ -2324,6 +2341,13 @@ export class SchemaStatements {
    * that stored null, which is the one input the two expressions disagree on.
    * The stored value is then read for Ruby truthiness, not as a boolean.
    * @internal
+   *
+   * @missingRailsCall fetch — PERMANENT: RFC 0106: schema_statements.rb:1783-1785 is
+   *   `@config.fetch(:foreign_keys, true)`. The port already matches its
+   *   SEMANTICS — schema-statements.ts:2328-2331 spells the key-present test as
+   *   `"foreignKeys" in this._config ? ... : true`, so a stored null stays falsy
+   *   — but `in` emits no callee, so no TS call can credit Ruby's `fetch`.
+   *   Language shortcoming: JS has no Hash#fetch.
    */
   isForeignKeysEnabled(): boolean {
     const foreignKeys = "foreignKeys" in this._config ? this._config.foreignKeys : true;
@@ -2343,6 +2367,9 @@ export class SchemaStatements {
    * where a stored nil interpolates as the empty string ("users__chk"). Rails
    * raises Ruby's core `KeyError` there, with `key not found: :expression`.
    * @internal
+   *
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
+   *   the port slices; no call to converge (schema_statements.rb:1787-1795).
    */
   checkConstraintName(
     tableName: string,
@@ -2434,7 +2461,18 @@ export class SchemaStatements {
     return this.extractNewDefaultValue(defaultOrChanges) as string | null;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `options.except(:name, :algorithm).empty?` (schema_statements.rb:1830) —
+   *   `empty?` on a Ruby Hash, whose faithful JS spelling is
+   *   `Object.keys(h).length === 0`. That emits no callee, so no TS call can
+   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
+   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
+   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
+   *   TS body was dropped.
+   */
   canRemoveIndexByName(
     columnName: string | string[] | undefined | null,
     options: Record<string, unknown>,

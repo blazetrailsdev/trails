@@ -30,43 +30,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "flush",
-    "call": "select",
-    "reason": "Per-site verified (RFC 0106 wave 4b): connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`; trails' _flush partitions in one `for..of` over `_available.clear()` because eviction and re-add must happen under the same synchronous pass. Same predicate (`!in_use?` and idle >= minimum_idle)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "pin_connection!",
     "call": "checkout",
     "reason": "pinConnectionBang acquires the pinned connection via the sync `_acquireConnection` helper (the trails pinned-checkout path); `checkout` is now async (converge-connection-pool-checkout-lease-async) and cannot be awaited from this path."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "reap",
-    "call": "checkin",
-    "reason": "Per-site verified (RFC 0106 wave 4b): reap recovers connections whose OWNER THREAD died (connection_pool.rb:628-642). JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no stale set to steal, reset and check back in; the guard is the discarded? early return Rails also has."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "reap",
-    "call": "remove",
-    "reason": "Per-site verified (RFC 0106 wave 4b): see `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640 cannot arise in a single-threaded runtime."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "reap",
-    "call": "select",
-    "reason": "Per-site verified (RFC 0106 wave 4b): see `reap`/`checkin` above — connection_pool.rb:628-633 selects on `conn.owner.alive?`, which has no JS analogue."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "stat",
-    "call": "count",
-    "reason": "Per-site verified (RFC 0106 wave 4b): connection_pool.rb:687-689 derives busy/dead/idle with three `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps the same numbers as maintained sets (`_checkedOut.size`, `_available.length`) and has no `dead` bucket because there are no dead owner threads."
   }
 ]

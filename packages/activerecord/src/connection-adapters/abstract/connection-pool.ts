@@ -1047,6 +1047,14 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
+  /**
+   * @missingRailsCall count — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool.rb:687-689 derives busy/dead/idle with three
+   *   `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps
+   *   the same numbers as maintained sets (`_checkedOut.size`,
+   *   `_available.length`) and has no `dead` bucket because there are no dead
+   *   owner threads.
+   */
   stat(): {
     size: number;
     connections: number;
@@ -1234,6 +1242,19 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
+  /**
+   * @missingRailsCall checkin — PERMANENT: Per-site verified (RFC 0106 wave 4b): reap
+   *   recovers connections whose OWNER THREAD died (connection_pool.rb:628-642).
+   *   JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no
+   *   stale set to steal, reset and check back in; the guard is the discarded?
+   *   early return Rails also has.
+   * @missingRailsCall remove — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
+   *   `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640
+   *   cannot arise in a single-threaded runtime.
+   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
+   *   `reap`/`checkin` above — connection_pool.rb:628-633 selects on
+   *   `conn.owner.alive?`, which has no JS analogue.
+   */
   reap(): void {
     if (this.isDiscarded()) return;
     // In Rails, reap recovers connections whose owner thread has died.
@@ -1248,6 +1269,12 @@ export class ConnectionPool implements ReapablePool {
    * drivers. The `Promise` return is an intentional, documented divergence from
    * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
+   *
+   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`;
+   *   trails' _flush partitions in one `for..of` over `_available.clear()`
+   *   because eviction and re-add must happen under the same synchronous pass.
+   *   Same predicate (`!in_use?` and idle >= minimum_idle).
    */
   async flush(minimumIdle?: number | null): Promise<void> {
     await Promise.all(this._flush(minimumIdle));

@@ -354,6 +354,13 @@ export class ForeignKeyDefinition {
     return "id";
   }
 
+  /**
+   * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
+   *   `options.fetch(:validate, true)`
+   *   (`connection_adapters/schema_definitions.rb:153`) — `options` is a plain
+   *   TS object, not a Hash, so the default-substituting read has no `fetch`
+   *   call spelling; the body is `this.options.validate ?? true`.
+   */
   get isValidate(): boolean | null {
     return this.validate;
   }
@@ -364,6 +371,17 @@ export class ForeignKeyDefinition {
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
+  /**
+   * @missingRailsCall match? — PERMANENT: Verified per-site (RFC 0106):
+   *   `!ActiveRecord::SchemaDumper.fk_ignore_pattern.match?(name) if name`
+   *   (`connection_adapters/schema_definitions.rb:158`). Ruby's `Regexp#match?`
+   *   is stateless; JS `RegExp#test` advances `lastIndex` on a `/g` pattern, and
+   *   `fk_ignore_pattern` is user-assignable
+   *   (`schema-definitions.trails.test.ts` pins a `/g` pattern giving two
+   *   different answers on consecutive reads). The `statelessTest` wrapper is
+   *   that language shortcoming, and `test` is the only JS analogue the gate
+   *   credits for `match?`.
+   */
   get isExportNameOnSchemaDump(): boolean {
     return this.name != null ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
   }
@@ -863,7 +881,14 @@ export class ReferenceDefinition {
       : {};
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall slice — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails schema_definitions.rb:254-256 is
+   *   `options.slice(:if_exists, :if_not_exists)`; trails
+   *   schema-definitions.ts:675-680 picks the two keys explicitly.
+   */
   private conditionalOptions(): Pick<ColumnOptions, "ifExists" | "ifNotExists"> {
     const result: Pick<ColumnOptions, "ifExists" | "ifNotExists"> = {};
     if (this.options.ifExists !== undefined) result.ifExists = this.options.ifExists;
@@ -871,7 +896,19 @@ export class ReferenceDefinition {
     return result;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:259 chains two `merge`s, spelled as one object
+   *   spread in trails (schema-definitions.ts:870-878). Same keys, same
+   *   precedence.
+   * @missingRailsCall slice — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:259's `options.slice(:null, :first, :after)` is
+   *   spelled as three presence-guarded spreads in trails
+   *   (schema-definitions.ts:874-876) — `Hash#slice` has no ported analogue for
+   *   a plain object, and a bare spread would introduce the keys as `undefined`.
+   */
   private polymorphicOptions(): ColumnOptions {
     return {
       ...this.asOptions(this.polymorphic),
@@ -887,7 +924,15 @@ export class ReferenceDefinition {
     return `index_${tableName}_on_${this.name}`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:267 is
+   *   `as_options(index).merge(conditional_options)`, spelled as an object
+   *   spread in trails (schema-definitions.ts:884-895). Same keys, same
+   *   precedence.
+   */
   private indexOptions(tableName: string): AddIndexOptions {
     const opts: AddIndexOptions = {
       ...this.asOptions(this.index),
@@ -899,7 +944,15 @@ export class ReferenceDefinition {
     return opts;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:277 is `as_options(foreign_key).merge(column:
+   *   column_name, **conditional_options)`; trails spells the same merge as an
+   *   object spread (schema-definitions.ts:896-902). `Hash#merge` has no ported
+   *   analogue for a plain object.
+   */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
     return {
       ...this.asOptions(this.foreignKey),
@@ -918,7 +971,16 @@ export class ReferenceDefinition {
     return this.columns().map(([n]) => n);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall fetch — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:297-299 is `foreign_key_options.fetch(:to_table) {
+   *   ... }`; `to_table` is a declared optional property on trails'
+   *   ReferenceForeignKeyOptions, so the block default is spelled `?? (...)`
+   *   (schema-definitions.ts:922-925). The Ruby fetch/`??` difference (a STORED
+   *   nil) cannot arise: the key is only ever written with a table name.
+   */
   private foreignTableName(): string {
     const fkOpts = this.foreignKeyOptions();
     return fkOpts.toTable ?? (globalPluralizeTableNames() ? pluralize(this.name) : this.name);
@@ -1045,6 +1107,14 @@ export class TableDefinition {
     this.comment = tdOptions.comment;
   }
 
+  /**
+   * @missingRailsCall get_primary_key — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_definitions.rb:397 is `Base.get_primary_key(...)`; importing `Base`
+   *   from the connection-adapter layer is a module cycle, so trails reads it
+   *   through the `table-name-options.ts` registration slot as
+   *   `globalGetPrimaryKey` (schema-definitions.ts:1058). Same value, same
+   *   fallback.
+   */
   setPrimaryKey(
     tableName: string,
     id: boolean | ColumnType | IdHashOptions,
@@ -1147,6 +1217,11 @@ export class TableDefinition {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#remove_column
    * (Rails deletes from `@columns_hash`; this port keeps an array.)
+   *
+   * @missingRailsCall delete — PERMANENT: Newly comparable (RFC 0072 arity sweep): Rails
+   *   deletes from the `@columns_hash` Hash; TableDefinition here stores
+   *   `columns` as an ordered array, so the same removal is a findIndex/splice.
+   *   Equivalent — no Hash to delete from.
    */
   removeColumn(name: string): void {
     const index = this.columns.findIndex((c) => c.name === String(name));
