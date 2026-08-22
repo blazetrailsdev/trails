@@ -1,7 +1,7 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
-import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { BigDecimal, kernelFloat } from "../core-ext/big-decimal/conversions.js";
 import { I18n } from "../i18n.js";
 import type { NumberToHumanOptions } from "../number-helper.js";
 
@@ -40,7 +40,7 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
     // (number_to_human_converter.rb:12-14); BigDecimal division is unported,
     // so the value drops to a float for the exponent scaling.
     this.number = new RoundingHelper(this.options).round(this.number) as BigDecimal;
-    this.number = this.numberAsFloat();
+    this.number = kernelFloat(this.number)!;
 
     // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;

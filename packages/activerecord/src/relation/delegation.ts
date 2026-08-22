@@ -112,6 +112,12 @@ export class GeneratedRelationMethods {
    * Install `fn` as this module's `name` method — Rails'
    * `GeneratedRelationMethods#generate_method` (delegation.rb:74-90).
    *
+   * @missingRailsCall define_method — PERMANENT: Verified per-site (RFC 0106):
+   *   delegation.rb:85 `define_method(method) { ... }` installs the delegator
+   *   into the module. trails' `GeneratedRelationMethods` is not a Ruby Module,
+   *   so the equivalent installation is the plain property write
+   *   `installOnCarrier` performs onto every registered prototype carrier
+   *   (delegation.ts:91-101).
    * @missingRailsCall include? — PERMANENT: Verified per-site (RFC 0106): Rails'
    * `RESERVED_METHOD_NAMES.include?(method.to_s)` guard (delegation.rb:78, over
    * `ActiveSupport::Delegation::RESERVED_METHOD_NAMES`, delegation.rb:18)
@@ -123,6 +129,18 @@ export class GeneratedRelationMethods {
    * below, so there is nothing for the name test to select. Porting the Ruby
    * keyword list (`begin`, `elsif`, …) would guard against names that are
    * harmless in JS while missing the ones that are not.
+   * @missingRailsCall match? — PERMANENT: Verified per-site (RFC 0106): the
+   *   `/\A[a-zA-Z_]\w*[!?]?\z/.match?(method)` test (delegation.rb:78) only
+   *   chooses between Ruby's two INSTALLATION spellings — `module_eval` codegen
+   *   vs `define_method` — which produce the same delegator. TS has one
+   *   installation spelling, so there is nothing for the test to select and the
+   *   `define_method` arm is what the port implements.
+   * @missingRailsCall scoping — PERMANENT: Verified per-site (RFC 0106): both
+   *   delegation.rb:81/86 arms wrap the call in `scoping { ... }`. trails builds
+   *   that wrapper in `classMethodDelegator` (delegation.ts) and PASSES it in as
+   *   `generate_method`'s `fn`, because a TS delegator must also defer scope
+   *   restoration across a Promise result; `generateMethod` therefore only
+   *   installs it.
    */
   generateMethod(name: string, fn: AnyCallable): void {
     // Rails: `return if method_defined?(method)` (delegation.rb:76).
@@ -331,6 +349,17 @@ export function relationDelegateClass(klass: typeof Base): typeof Base {
   return klass;
 }
 
+/**
+ * @missingRailsCall include — CONVERGEABLE (story delegation-relation-delegate-cache-builds-lazily): Verified per-site (RFC 0106): delegation.rb:36-37
+ *   `Class.new(klass) { include ClassSpecificRelation }`. trails builds the
+ *   per-model delegate subclass lazily on first use (`buildDelegateClass`,
+ *   delegation.ts:416) rather than eagerly per model at `inherited` time, so no
+ *   class is constructed — and nothing is included into one — in this body.
+ * @missingRailsCall include_relation_methods — CONVERGEABLE (story delegation-relation-delegate-cache-builds-lazily): Verified per-site (RFC 0106):
+ *   delegation.rb:38 — same lazy-subclass divergence as the `include` row above;
+ *   `includeRelationMethods` runs from `buildDelegateClass` (delegation.ts:416)
+ *   when the subclass is first needed.
+ */
 export function initializeRelationDelegateCache(): void {
   for (const klass of _delegatedClasses) {
     _delegateCache.initialize(klass);
@@ -369,6 +398,13 @@ export function generatedRelationMethods(this: typeof Base): GeneratedRelationMe
  * generated methods as real methods on a delegate prototype carrier.
  *
  * @internal
+ *
+ * @missingRailsCall base_class? — PERMANENT: Mechanism divergence (story
+ *   delegation-generated-methods-per-model-prototype-carrier): trails' per-model
+ *   prototype-carrier port installs generated methods onto per-model Relation
+ *   subclass prototypes (relationClassFor /
+ *   GeneratedRelationMethods.includeInto) rather than replicating Rails'
+ *   anonymous-module include, so the call-set differs by construction.
  */
 export function includeRelationMethods(modelClass: typeof Base, delegate: object): void {
   // Deviation: Ruby's recursion + include-order MRO is reproduced structurally

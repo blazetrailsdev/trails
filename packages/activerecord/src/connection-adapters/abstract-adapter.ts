@@ -864,6 +864,21 @@ export class AbstractAdapter implements Quoting {
    */
   static dbWarningsIgnore: (string | RegExp)[] = [];
 
+  /**
+   * @missingRailsCall build_statement_pool — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: the base ctor takes no
+   *   config (concrete adapters assign `_config`), so Rails' config-derived
+   *   initialize tail has nowhere to run here; converging it is the constructor
+   *   reshape owned by RFC 0094 (abstract_adapter.rb:155-172).
+   * @missingRailsCall fetch — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived initialize tail — see the
+   *   build_statement_pool row; blocked on the RFC 0094 constructor reshape
+   *   (abstract_adapter.rb:159-166).
+   * @missingRailsCall type_cast_config_to_boolean — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived
+   *   initialize tail — see the build_statement_pool row; blocked on the RFC
+   *   0094 constructor reshape (abstract_adapter.rb:159-166).
+   * @missingRailsCall validate_default_timezone — CONVERGEABLE (story abstract-adapter-constructor-drops-rails-config-arg): RFC 0106: config-derived
+   *   initialize tail — see the build_statement_pool row; blocked on the RFC
+   *   0094 constructor reshape (abstract_adapter.rb:167).
+   */
   constructor() {
     // The module-level `include(...)` / callback / query-cache wiring is applied
     // lazily on first construction rather than at module-evaluation time. This
@@ -2559,7 +2574,13 @@ export class AbstractAdapter implements Quoting {
     return exception instanceof Deadlocked || exception instanceof LockWaitTimeout;
   }
 
-  /** @internal Mirrors: AbstractAdapter#backoff (100ms × counter) */
+  /**
+   * @internal Mirrors: AbstractAdapter#backoff (100ms × counter)
+   *
+   * @missingRailsCall sleep — PERMANENT: RFC 0106: Ruby's Kernel#sleep has no TS
+   *   counterpart — the body is the setTimeout promise that is the only way to
+   *   suspend an async chain (abstract_adapter.rb:1078-1080).
+   */
   backoff(counter: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 100 * counter));
   }
@@ -2586,7 +2607,17 @@ export class AbstractAdapter implements Quoting {
     return typeof tz === "string" ? { defaultTimezone: tz } : null;
   }
 
-  /** @internal Mirrors: AbstractAdapter#type_map */
+  /**
+   * @internal Mirrors: AbstractAdapter#type_map
+   *
+   * @missingRailsCall compute_if_absent — PERMANENT: Verified per-site (RFC 0106):
+   *   `EXTENDED_TYPE_MAPS.compute_if_absent(key) { ... }`
+   *   (`connection_adapters/abstract_adapter.rb:1114`) —
+   *   `Concurrent::Map#compute_if_absent` is an atomic memoize with no JS
+   *   analogue; the body spells the same memoize as a `get`/`set` pair on a
+   *   plain `Map`, keyed on the serialized option hash because JS Maps key on
+   *   reference identity.
+   */
   get typeMap(): unknown {
     const ctor = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
@@ -2641,6 +2672,11 @@ export class AbstractAdapter implements Quoting {
    * literal themselves. Rails' one other producer is the *cached* payload,
    * `QueryCache#cache_notification_info` (query_cache.rb:308), which stays
    * separate here too.
+   *
+   * @missingRailsCall instrument — PERMANENT: RFC 0106: the receiver now converges to
+   *   `this.instrumenter`; the method is `instrumentAsync` because Rails' sync
+   *   `Instrumenter#instrument` cannot await the query block
+   *   (abstract_adapter.rb:1134-1146).
    */
   async log<T>(
     sql: string,

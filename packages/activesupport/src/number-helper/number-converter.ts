@@ -3,6 +3,9 @@ import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 
+/** `BigDecimal.double_fig * 2`, the default precision `Rational#to_d(0)` uses. */
+const RATIONAL_DEFAULT_PRECISION = 32;
+
 /** What `BigDecimal(str, exception: false)` accepts (number_converter.rb:183). */
 export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 
@@ -83,7 +86,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   execute(): string {
     if (this.number === null || this.number === undefined) return String(this.number);
-    if (this.validateFloat && !this.isValidFloat()) return String(this.number);
+    if (this.validateFloat && !this.validBigdecimal()) return String(this.number);
     return this.convert();
   }
 
@@ -91,24 +94,6 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected get validateFloat(): boolean {
     return false;
-  }
-
-  protected isValidFloat(): boolean {
-    if (this.number instanceof BigDecimal) return true;
-    // Ruby's `Float(Rational(9775, 100))` is `97.75` — a Rational converts,
-    // where `Number(rational)` is `NaN` (number_helper_test.rb:225-230).
-    if (this.number instanceof Rational) return Number.isFinite(this.number.toF());
-    // Ruby's `Float("")` / `Float(" ")` raise, where `Number("")` is 0.
-    if (typeof this.number === "string" && this.number.trim() === "") return false;
-    const n = Number(this.number);
-    return !isNaN(n) && isFinite(n);
-  }
-
-  protected numberAsFloat(): number {
-    if (this.number instanceof Rational) return this.number.toF();
-    return this.number instanceof BigDecimal
-      ? Number(this.number.toString("F"))
-      : Number(this.number);
   }
 
   /**
@@ -120,9 +105,17 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
    * surrounding whitespace and an exponent are accepted. The final arm is
    * Ruby's `number.to_d rescue nil`: a `BigDecimal` is already converted, and
    * anything else answering `to_d` is converted through it.
+   *
+   * The `when Float, Rational` arm is `number.to_d(0)`; `to_d(0)` on a
+   * Rational is BigDecimal's default precision — `BigDecimal.double_fig * 2`,
+   * so `Rational(1, 3).to_d(0)` carries 32 significant digits on MRI 3.3.11 —
+   * which has to be supplied here because this port raises without a
+   * precision for a Rational, exactly as `Kernel#BigDecimal` does. A Float
+   * needs no explicit precision: its decimal expansion is already finite.
    */
   protected validBigdecimal(): BigDecimal | null {
     const number = this.number;
+    if (number instanceof Rational) return new BigDecimal(number, RATIONAL_DEFAULT_PRECISION);
     if (typeof number === "number" && !Number.isFinite(number)) return null;
     if (typeof number === "number" || typeof number === "bigint") {
       return new BigDecimal(number);

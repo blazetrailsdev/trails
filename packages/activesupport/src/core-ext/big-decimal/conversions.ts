@@ -131,6 +131,18 @@ export class BigDecimal {
   }
 
   /**
+   * Ruby `BigDecimal#to_f`, which the number helpers reach through
+   * `Kernel.Float` (`number_to_human_size_converter.rb:12`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  toF(): number {
+    return Number(this.toString("F"));
+  }
+
+  /**
    * Ruby `BigDecimal#zero?`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.

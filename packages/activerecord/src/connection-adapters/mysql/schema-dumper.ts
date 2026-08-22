@@ -115,7 +115,14 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return "bigint";
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   mysql/schema_dumper.rb:13-15 reads the `size` NAMED CAPTURE of the
+   *   tiny/medium/long regexp, not a method; trails reads the same capture as
+   *   `sizeMatch.groups.size` (mysql/schema-dumper.ts:124-132).
+   */
   protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column);
     if (column.unsigned) spec["unsigned"] = "true";
@@ -262,7 +269,24 @@ export class SchemaDumper extends AbstractSchemaDumper {
     this.virtualExpressionCache[tableName] = byColumn;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b): the
+   *   `.first["Collation"]` of mysql/schema_dumper.rb:69 is
+   *   `rows[0]?.["Collation"]` in the prefetch (mysql/schema-dumper.ts:108);
+   *   `Array#first` is not a ported method name.
+   * @missingRailsCall internal_exec_query — PERMANENT: Per-site verified (RFC 0106 wave
+   *   4b): mysql/schema_dumper.rb:68-69 issues `SHOW TABLE STATUS` inline from a
+   *   SYNCHRONOUS dumper method; trails' query layer is promise-returning, so
+   *   the same query is issued by `populateTableCollationFromStatus` before the
+   *   column loop and `schemaCollation` reads the prefilled cache
+   *   (mysql/schema-dumper.ts:101-110, 266-274).
+   * @missingRailsCall quote — PERMANENT: Per-site verified (RFC 0106 wave 4b): the
+   *   `@connection.quote(table_name)` of mysql/schema_dumper.rb:69 moved with
+   *   that query into `populateTableCollationFromStatus`
+   *   (mysql/schema-dumper.ts:106) — see the internal_exec_query entry.
+   */
   protected override schemaCollation(column: MysqlColumn): string | undefined {
     if (!column.collation) return undefined;
     const tableName = this.tableName;
@@ -277,6 +301,25 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * Returns the generation expression for a virtual column from `virtualExpressionCache`.
    * The adapter populates the cache before iterating columns (queries `information_schema`).
    * @internal
+   *
+   * @missingRailsCall query_value — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails mysql/schema_dumper.rb:74-93 queries
+   *   information_schema (query_value/quote/quote_column_name) per column;
+   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
+   *   adapter pre-populates with the same information_schema query before column
+   *   iteration.
+   * @missingRailsCall quote — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails mysql/schema_dumper.rb:74-93 queries
+   *   information_schema (query_value/quote/quote_column_name) per column;
+   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
+   *   adapter pre-populates with the same information_schema query before column
+   *   iteration.
+   * @missingRailsCall quote_column_name — PERMANENT: Per-entry verified (RFC 0032
+   *   wide-entry verification): Rails mysql/schema_dumper.rb:74-93 queries
+   *   information_schema (query_value/quote/quote_column_name) per column;
+   *   trails schema-dumper.ts:275-280 reads `virtualExpressionCache` which the
+   *   adapter pre-populates with the same information_schema query before column
+   *   iteration.
    */
   protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
     const tableName = this.tableName;

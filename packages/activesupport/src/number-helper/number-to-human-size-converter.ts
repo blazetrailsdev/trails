@@ -1,3 +1,4 @@
+import { kernelFloat } from "../core-ext/big-decimal/conversions.js";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import type { NumberToHumanSizeOptions } from "../number-helper.js";
@@ -12,7 +13,7 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   }
 
   protected convert(): string {
-    this.number = this.numberAsFloat();
+    this.number = kernelFloat(this.number)!;
 
     // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;
