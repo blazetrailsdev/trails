@@ -28,8 +28,6 @@ describe("ActiveRecord::Encryption::MessageTest", () => {
     // an array stands in for the non-string payload.
     expect(() => new Message({ payload: [] as any })).toThrow(ForbiddenClass);
 
-    // Rails constructs these three bare — a raise would fail the test on its own,
-    // so they carry no assertion of their own.
     new Message();
     new Message({ payload: "" });
     new Message({ payload: "Some payload" });

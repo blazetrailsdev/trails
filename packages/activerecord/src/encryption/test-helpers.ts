@@ -5,6 +5,7 @@
  *          ActiveRecord::Encryption::EncryptionHelpers (assertions).
  */
 
+import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
@@ -696,10 +697,7 @@ export function assertEncryptorWorksWith(keyProvider: unknown): void {
   const encryptor = new EncryptorImpl();
 
   const encryptedMessage = encryptor.encrypt("some text", { keyProvider } as never);
-  const decrypted = encryptor.decrypt(encryptedMessage, { keyProvider } as never);
-  if (decrypted !== "some text") {
-    throw new Error(`assertEncryptorWorksWith: expected "some text", got ${String(decrypted)}`);
-  }
+  expect(encryptor.decrypt(encryptedMessage, { keyProvider } as never)).toEqual("some text");
 }
 
 /**

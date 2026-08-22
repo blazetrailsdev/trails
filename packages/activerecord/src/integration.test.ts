@@ -47,10 +47,8 @@ describe("IntegrationTest", () => {
   const { owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
-    // Rails `assert_kind_of String, ...`. A JS string primitive is not an
-    // `instanceof String`, so box it — `Object("x")` is a String wrapper and
-    // `Object(1)` is not, which is exactly the discrimination Ruby's kind check
-    // makes.
+    // `assert_kind_of String`: a JS string primitive is not an `instanceof
+    // String`, so box it — `Object("x")` is a String wrapper, `Object(1)` is not.
     expect(Object((await Client.first())!.toParam())).toBeInstanceOf(String);
   });
 

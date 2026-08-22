@@ -158,9 +158,8 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
 
     await Contexts.protectingEncryptedData(async () => {
       const found = await (EncryptedBook as any).findBy({ name: "Dune" });
-      // Rails' `assert_equal book, find_by(...)` leans on AR record equality
-      // (`Core#==`, class + id); vitest's toEqual is a structural deep compare,
-      // which the two records' differing dirty/transaction state fails.
+      // `assert_equal book, find_by(...)` leans on AR record equality (`Core#==`,
+      // class + id); vitest's toEqual is a structural deep compare instead.
       expect(found?.id).toEqual(book.id);
     });
   });
