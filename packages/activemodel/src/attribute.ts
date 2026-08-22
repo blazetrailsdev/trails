@@ -225,6 +225,32 @@ export abstract class Attribute {
   }
 
   /**
+   * Run `fn` and leave `has_been_read?` exactly as it was.
+   *
+   * `Attribute#value` memoizes and flips `@has_been_read` (attribute.rb:41-44),
+   * so Ruby's `changed?` marks the attribute read too — harmlessly, because
+   * Rails only computes dirtiness when someone asks for it. trails computes a
+   * new record's dirtiness EAGERLY, in `DirtyTracker#reinstateNewRecordChanges`,
+   * and that pass must stay invisible to `accessed_fields`
+   * (attribute_methods.rb:460-462 → `AttributeSet#accessed`), which Rails leaves
+   * empty on a freshly built record. Dropping the memo with the flag costs one
+   * recomputation on the first real read.
+   *
+   * @internal
+   */
+  withoutMarkingRead<T>(fn: () => T): T {
+    const hadValue = this._hasValue;
+    try {
+      return fn();
+    } finally {
+      if (!hadValue) {
+        this._hasValue = false;
+        this._value = undefined;
+      }
+    }
+  }
+
+  /**
    * Force-set the memoized cast value without replacing the Attribute or
    * losing valueBeforeTypeCast. Used for post-cast transformations like
    * normalization.

@@ -43,8 +43,12 @@ export interface AttributeMethods {
 }
 
 interface AttributeRecord {
-  _attributes: { has(name: string): boolean; keys(): Iterable<string>; get(name: string): unknown };
-  _accessedFields: Set<string>;
+  _attributes: {
+    has(name: string): boolean;
+    keys(): Iterable<string>;
+    get(name: string): unknown;
+    accessed(): string[];
+  };
   readAttribute(name: string): unknown;
   /** @internal */
   _readAttribute(name: string): unknown;
@@ -160,7 +164,7 @@ export function attributes(this: AttributeRecord): Record<string, unknown> {
  * Mirrors: ActiveRecord::AttributeMethods#accessed_fields
  */
 export function accessedFields(this: AttributeRecord): string[] {
-  return [...this._accessedFields];
+  return this._attributes.accessed();
 }
 
 /**

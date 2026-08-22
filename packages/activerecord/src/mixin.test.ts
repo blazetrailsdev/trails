@@ -34,9 +34,8 @@ describe("TouchTest", () => {
 
     travel(Duration.minutes(5));
 
-    // Mirror lft_will_change! — force-marks lft dirty without changing its value.
-    // Use _attributes.fetchValue (not readAttribute) to match attributeWillChangeBang semantics:
-    // fetchValue doesn't add to _accessedFields.
+    // Mirror lft_will_change! — force-marks lft dirty without changing its value,
+    // the way attributeWillChangeBang does.
     (stamped as any)._dirty.forceChange("lft", (stamped as any)._attributes.fetchValue("lft"));
     await stamped.save();
 
