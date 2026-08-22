@@ -122,6 +122,16 @@ export function isInclude(hash: AnyObject, key: string): boolean {
 }
 
 /**
+ * Ruby's `Hash#merge` — a non-destructive copy of the receiver with
+ * `otherHash`'s pairs written over it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link except} is.
+ */
+export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
+  return { ...hash, ...otherHash } as T;
+}
+
+/**
  * Return a copy of the object without the specified keys.
  */
 export function except<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {

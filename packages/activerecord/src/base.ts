@@ -1917,6 +1917,8 @@ export class Base extends Model {
   // --- Reflection::ClassMethods (wired via extend() after class body) ---
   /** reflection.rb:11 — `class_attribute :_reflections, instance_writer: false, default: {}`. */
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
+  /** reflection.rb:12 — `class_attribute :aggregate_reflections, instance_writer: false, default: {}`. */
+  declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
   declare static reflections: typeof _Reflection.ClassMethods.reflections;
   declare static normalizedReflections: typeof _Reflection.ClassMethods.normalizedReflections;
@@ -1925,7 +1927,6 @@ export class Base extends Model {
   declare static reflectOnAllAggregations: typeof _Reflection.ClassMethods.reflectOnAllAggregations;
   declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
-  declare static aggregateReflections: typeof _Reflection.ClassMethods.aggregateReflections;
 
   // --- Validations::ClassMethods (wired via extend() after class body) ---
   declare static validates: typeof _Validations.validates;
@@ -4635,6 +4636,7 @@ extend(Base, _Reflection.ClassMethods);
 // it is trails-only registry bookkeeping carried on the same mechanism as the
 // `_reflections` it shadows, so the two cannot drift apart.
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
+classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "counterCachedAssociationNames", {
