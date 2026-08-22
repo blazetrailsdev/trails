@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
+    "rubyName": "discriminate_class_for_record",
+    "call": "find_sti_class",
+    "reason": "inheritance.rb:301 `find_sti_class(record[inheritance_column])` — trails routes through `findStiClassForRow` (inheritance.ts:867), the registry-safe variant that matches only within `baseClass`'s tracked subtree; the bare `findStiClass` is Rails' autoloader analog and is reached from there when STI is explicitly enabled. Tracked by story discriminate-class-for-record-should-call-find-sti-class; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
     "rubyName": "subclass_from_attributes",
     "call": "find_sti_class",
     "kind": "args",

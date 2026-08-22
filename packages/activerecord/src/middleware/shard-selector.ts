@@ -32,11 +32,6 @@ export class ShardSelector {
     this.options = options;
   }
 
-  /**
-   * @missingRailsCall new — CONVERGEABLE: shard_selector.rb:41 wraps env in
-   * ActionDispatch::Request.new(env); trails has no ActionDispatch, so call()
-   * receives the request itself and constructs nothing.
-   */
   async call(request: ShardRequest): Promise<unknown> {
     const shard = this.selectedShard(request);
     return this.setShard(shard, () => this.app(request));

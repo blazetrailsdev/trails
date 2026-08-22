@@ -2627,7 +2627,18 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall order:columns,createTable — PERMANENT: Per-entry verified
+   *   (RFC 0106 sqlite3 table-rebuild cluster), sqlite3_adapter.rb:602-639:
+   *   Rails calls `columns(from)` INSIDE the `create_table` block.
+   *   `createTable`'s TableDefinition block is synchronous in trails (the
+   *   definition is built, then rendered, with no await point), and `columns()`
+   *   is async, so the reflection is hoisted above the `createTable` call.
+   *   Everything Rails calls is called, once, with the same arguments — only the
+   *   sequence differs, and it is forced by the block being unable to await.
+   */
   private async copyTable(
     from: string,
     to: string,

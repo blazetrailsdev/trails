@@ -48,6 +48,7 @@ import {
   tsOwnerSeat,
   writerPairedWithReader,
   staleCallTags,
+  applyCallTags,
   suppressTaggedCalls,
   tagsForOwner,
 } from "./compare.js";
@@ -1818,6 +1819,33 @@ describe("suppressTaggedCalls", () => {
       "reload → reload",
     ]);
     expect([...used]).toEqual([]);
+  });
+});
+
+describe("applyCallTags", () => {
+  it("suppresses an order-only flag the declaration tags", () => {
+    const used = new Set<string>();
+    const applied = applyCallTags(
+      ["order:columns,createTable → createTable,columns"],
+      new Map([["order:columns,createTable", "PERMANENT: the block cannot await."]]),
+      used,
+    );
+    expect(applied.kept).toEqual([]);
+    expect(applied.suppressed).toEqual([
+      { call: "order:columns,createTable", reason: "PERMANENT: the block cannot await." },
+    ]);
+    expect([...used]).toEqual(["order:columns,createTable"]);
+  });
+
+  it("suppresses a dropped-call flag and leaves an untagged order flag standing", () => {
+    const used = new Set<string>();
+    const applied = applyCallTags(
+      ["synchronize → synchronize", "order:a,b → b,a"],
+      new Map([["synchronize", "PERMANENT: no threads."]]),
+      used,
+    );
+    expect(applied.kept).toEqual(["order:a,b → b,a"]);
+    expect(applied.suppressed.map((s) => s.call)).toEqual(["synchronize"]);
   });
 });
 

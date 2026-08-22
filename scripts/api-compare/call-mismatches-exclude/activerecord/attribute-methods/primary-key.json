@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/primary-key.ts",
+    "rubyName": "get_primary_key",
+    "call": "primary_keys",
+    "reason": "`schema_cache.primary_keys` (attribute_methods/primary_key.rb:104) is async in trails; `getCachedPrimaryKeys` is its lease-free cache-only view. Returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit: the async/sync split is convergeable work, so the row is what tracks it."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/primary-key.ts",
+    "rubyName": "get_primary_key",
+    "call": "table_exists?",
+    "reason": "`table_exists?` (attribute_methods/primary_key.rb:103) is async in trails, and its sync cache-only view (`cachedTableExists`) leases a connection to reach the cache, which `primaryKey` must not do — see `cachedSchemaCacheFor`. A table absent from the schema cache has no cached primary keys either, so the guard is subsumed by the `primaryKeys !== undefined` check. Returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
+  }
+]

@@ -1383,6 +1383,29 @@ export function suppressTaggedCalls(
   });
 }
 
+/**
+ * Apply one declaration's `@missingRailsCall` tags to EVERY flag its pair
+ * raised — the dropped-call ones and the ORDER-only ones alike — returning what
+ * survives plus the suppressions bought, each with the reason that justified it.
+ *
+ * The order flags used to be appended AFTER suppression ran, so a tag migrated
+ * from an `order:` baseline row suppressed nothing: `parity:api:calls` reported
+ * that one row's call twice at once, as a STALE tag (it never suppressed) and as
+ * a NEW mismatch (the flag came back), and the row could not leave the baseline
+ * (RFC 0106). An order-only divergence is a divergence like any other, so it
+ * takes a receipt like any other.
+ */
+export function applyCallTags(
+  flagged: readonly string[],
+  tags: ReadonlyMap<string, string>,
+  used: Set<string>,
+): { kept: string[]; suppressed: { call: string; reason: string }[] } {
+  const suppressed = flagged
+    .filter((m) => tags.has(callOf(m)))
+    .map((m) => ({ call: callOf(m), reason: tags.get(callOf(m)) ?? "" }));
+  return { kept: suppressTaggedCalls([...flagged], tags, used), suppressed };
+}
+
 /** Every tagged call on a COMPARED (tsFile, tsClass, tsName) that never
  *  suppressed a flag — the tag's stale half. Sorted for a deterministic
  *  artifact. A pair whose owning class stayed unresolved recorded its
@@ -3308,25 +3331,6 @@ export function main() {
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
-        let kept = missing;
-        if (tags !== undefined && tags.size > 0) {
-          const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
-          const used = callTagsUsed.get(tagKey) ?? callTagsUsed.set(tagKey, new Set()).get(tagKey)!;
-          kept = suppressTaggedCalls(missing, tags, used);
-          for (const m of missing) {
-            const call = callOf(m);
-            if (tags.has(call))
-              suppressedCalls.push({
-                tsFile,
-                rubyName,
-                tsName,
-                tsClass,
-                call,
-                reason: tags.get(call) ?? "",
-              });
-          }
-        }
         const rubySkeleton = rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
@@ -3354,7 +3358,17 @@ export function main() {
             ),
           );
         }
-        const flagged = [...kept, ...ordered];
+        const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
+        let flagged = [...missing, ...ordered];
+        if (tags !== undefined && tags.size > 0) {
+          const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
+          const used = callTagsUsed.get(tagKey) ?? callTagsUsed.set(tagKey, new Set()).get(tagKey)!;
+          const applied = applyCallTags(flagged, tags, used);
+          flagged = applied.kept;
+          for (const s of applied.suppressed) {
+            suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, ...s });
+          }
+        }
         if (flagged.length === 0) return;
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, tsClass, missing: flagged });
       };

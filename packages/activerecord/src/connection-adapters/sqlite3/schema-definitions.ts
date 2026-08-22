@@ -27,14 +27,6 @@ export class TableDefinition extends AbstractTableDefinition {
     return this.references(name, options);
   }
 
-  /**
-   * @missingRailsCall column — CONVERGEABLE (story sqlite3-table-change-column-should-redeclare-the-column): Per-site verified (RFC 0106 wave 4b):
-   *   sqlite3/schema_definitions.rb's `change_column` re-enters
-   *   `column(column_name, type, **options)` on the table definition; trails'
-   *   SQLite Table#changeColumn forwards to the adapter's `changeColumn`, which
-   *   rebuilds the table (copy_table) — the definition-level column
-   *   re-declaration happens inside that rebuild.
-   */
   changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): void {
     const col = this.newColumnDefinition(columnName, type, options);
     const idx = this.columns.findIndex((c) => c.name === columnName);

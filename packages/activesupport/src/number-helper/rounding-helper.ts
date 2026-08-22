@@ -41,9 +41,6 @@ export class RoundingHelper {
    * The literal-shape guard is what `BigDecimal(number.to_s)` does by raising:
    * a string that is not a decimal literal is an `ArgumentError`, not a
    * silently coerced zero.
-   *
-   * @missingRailsCall digit_count — CONVERGEABLE: only the `Rational` arm calls it, to size
-   * the `BigDecimal(number, ndigits)` precision; there is no trails Rational.
    */
   private convertToDecimal(number: unknown): BigDecimal {
     if (number instanceof BigDecimal) return number;

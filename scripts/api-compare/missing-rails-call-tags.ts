@@ -289,3 +289,34 @@ export function classifyReason(reason: string): Permanence {
   if (!first) return "unclassified";
   return PERMANENCE_TOKENS[first[1]] ?? "unclassified";
 }
+
+/**
+ * Prose that hands the deviation to a future owner: an RFC, a story, a
+ * follow-up, a burndown wave. A reason resting on such a phrase is describing
+ * work someone will do, which is `CONVERGEABLE` — and, per RFC 0106's rule, a
+ * deviation whose work is still owned belongs in `call-mismatches-exclude/` as
+ * a row rather than at the call site as a receipt, because the row is the thing
+ * tracking it.
+ *
+ * Deliberately NOT a bare `RFC ####` / `story <slug>` match. Most reasons cite
+ * an RFC as the AUDIT that verified them ("Per-site verified (RFC 0106 wave
+ * 4b)"), and one cites the story whose rename CAUSED a name-collision false
+ * positive — neither is a convergence owner, and matching them would drown the
+ * signal in the provenance every reviewed reason carries.
+ */
+const CONVERGENCE_OWNER =
+  /\b(?:tracked (?:by|with|as)|convergence tracked|pending (?:per-cluster|burndown|review)|TODO|follow-?up|will be (?:converged|ported))\b/i;
+
+/**
+ * A tag whose reason claims `PERMANENT` while its prose hands the deviation to
+ * a future owner — the failure the RFC 0080 audit found in 42 of 79
+ * `@noRailsEquivalent` tags, where each reason was factually accurate about its
+ * mechanism and merely drew "therefore permanent" from it. {@link classifyReason}
+ * cannot see it: an unstated claim is countable, a WRONG one is not.
+ *
+ * Reported, never gated: the phrase list is a review prompt, so a false
+ * positive must cost a reviewer a glance rather than a red build.
+ */
+export function claimsPermanenceButNamesOwner(reason: string): boolean {
+  return classifyReason(reason) === "permanent" && CONVERGENCE_OWNER.test(reason);
+}
