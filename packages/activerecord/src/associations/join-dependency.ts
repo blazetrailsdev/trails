@@ -13,7 +13,7 @@
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
-import { Nodes, Table, relationName } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { JoinBase } from "./join-dependency/join-base.js";
@@ -469,8 +469,7 @@ export class JoinDependency {
       if (r instanceof JoinAssociation) {
         const lt = l.table;
         r.table =
-          l.effectiveSqlName ||
-          (typeof lt === "string" ? lt : relationName(lt.tableAlias ?? lt.name));
+          l.effectiveSqlName || (typeof lt === "string" ? lt : String(lt.tableAlias ?? lt.name));
       }
       return this.walk(l, r, joinType);
     });
@@ -540,7 +539,7 @@ export class JoinDependency {
               return root ? name : `${name}_join`;
             },
           );
-          const effectiveName = relationName(table.tableAlias ?? table.name);
+          const effectiveName = String(table.tableAlias ?? table.name);
           const aliased = aliasedArelTableForReflection(
             reflection,
             (reflection as any).tableName,

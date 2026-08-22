@@ -6,7 +6,7 @@
 
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
-import { type Nodes, Visitors, Collectors, relationName } from "@blazetrails/arel";
+import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -2720,7 +2720,7 @@ export class AbstractAdapter implements Quoting {
   }): Promise<import("./column.js").Column | undefined> {
     // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
-    const tableName = relationName(attribute.relation.name);
+    const tableName = String(attribute.relation.name);
     // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the
     // pool's BoundSchemaReflection, or one bound to this connection when the
     // adapter stands alone on a NullPool.

@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Nodes, fetchAttribute, relationName } from "@blazetrails/arel";
+import { Nodes, fetchAttribute } from "@blazetrails/arel";
 
 export class WhereClause {
   private _predicates: Nodes.Node[];
@@ -154,7 +154,7 @@ export class WhereClause {
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
       const attr = extractAttribute(node);
       if (attr === null) continue;
-      if (tableName !== undefined && relationName(attr.relation.name) !== tableName) continue;
+      if (tableName !== undefined && String(attr.relation.name) !== tableName) continue;
       result[attr.name] = extractNodeValue((node as any).right);
     }
     return result;
@@ -171,7 +171,7 @@ export class WhereClause {
       if (typeof c === "string") colStrings.add(c);
       else if (c instanceof Nodes.Attribute) {
         attrNodes.push(c);
-        colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
+        colStrings.add(`${String(c.relation.name)}.${c.name}`);
       } else if (c instanceof Nodes.Node) {
         // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
         exprNodes.push(c);
@@ -188,7 +188,7 @@ export class WhereClause {
       }
       if (attrNodes.some((a) => a.eql(attr))) return false;
       if (colStrings.has(attr.name)) return false;
-      const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
+      const qualified = `${String(attr.relation.name)}.${attr.name}`;
       if (colStrings.has(qualified)) return false;
       return true;
     });
@@ -229,7 +229,7 @@ export class WhereClause {
     this.eachAttributes((attr, node) => {
       const key =
         attr instanceof Nodes.Attribute
-          ? `${relationName(attr.relation.name)}.${attr.name}`
+          ? `${String(attr.relation.name)}.${attr.name}`
           : String(attr);
       hash[key] = node;
     });

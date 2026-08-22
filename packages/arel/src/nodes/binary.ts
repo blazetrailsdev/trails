@@ -1,7 +1,7 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { _Equality, _In } from "../node-slots.js";
+import { _Attribute, _Equality, _In } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -92,21 +92,14 @@ export type NodeOrValue =
   // whose Rails counterpart has exactly one.
   | null;
 
-export const ATTRIBUTE_BRAND = Symbol.for("arel.Attribute");
-
-function isAttribute(node: unknown): boolean {
-  if (!node || typeof node !== "object") return false;
-  return (node as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true;
-}
-
 /**
  * Mirrors: `module Arel::Nodes::FetchAttribute` (binary.rb:32-40) — mixed
  * into the Binary subclasses whose left or right operand may be an Attribute.
  */
 export const FetchAttribute = {
   fetchAttribute(this: Binary, block: (attr: Node) => unknown): unknown {
-    if (isAttribute(this.left)) return block(this.left as Node);
-    if (isAttribute(this.right)) return block(this.right as Node);
+    if (_Attribute && this.left instanceof _Attribute) return block(this.left as Node);
+    if (_Attribute && this.right instanceof _Attribute) return block(this.right as Node);
     return undefined;
   },
 };

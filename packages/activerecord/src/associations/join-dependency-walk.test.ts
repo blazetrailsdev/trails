@@ -10,7 +10,7 @@ import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
-import { Nodes, Table, relationName } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 
 describe("JoinDependency walk() deduplication", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
@@ -182,13 +182,13 @@ describe("JoinDependency walk() deduplication", () => {
     const jd1ReviewsJoin = joins.find((j) => {
       const table = (j as Nodes.OuterJoin).left as Table | Nodes.TableAlias;
       const realName = table instanceof Nodes.TableAlias ? table.tableName : table.name;
-      const alias = relationName(table.tableAlias ?? table.name);
+      const alias = String(table.tableAlias ?? table.name);
       return realName === "comments" && alias !== "comments";
     }) as Nodes.OuterJoin | undefined;
     expect(jd1ReviewsJoin).toBeDefined();
 
     const jd1ReviewsTable = jd1ReviewsJoin!.left as Table | Nodes.TableAlias;
-    const jd1ReviewsAlias = relationName(jd1ReviewsTable.tableAlias ?? jd1ReviewsTable.name);
+    const jd1ReviewsAlias = String(jd1ReviewsTable.tableAlias ?? jd1ReviewsTable.name);
     expect(referencedTables).toContain(jd1ReviewsAlias);
     expect(referencedTables).toContain("likes");
     expect(referencedTables).not.toContain("comments");

@@ -5,7 +5,7 @@
  * Mirrors: ActiveRecord::QueryMethods
  */
 import * as Arel from "@blazetrails/arel";
-import { Nodes, SelectManager, Table as ArelTable, relationName } from "@blazetrails/arel";
+import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
@@ -802,7 +802,7 @@ function orderClauseKey(clause: unknown): string {
   if (typeof clause === "string") return `s:${clause}`;
   if (clause instanceof Nodes.SqlLiteral) return `s:${String((clause as any).value ?? "")}`;
   if (clause instanceof Nodes.Attribute) {
-    return `a:${relationName((clause as any).relation?.name)}.${(clause as any).name}`;
+    return `a:${String((clause as any).relation?.name)}.${(clause as any).name}`;
   }
   if (clause instanceof Nodes.Node && "expr" in (clause as any)) {
     return `${clause.constructor.name}(${orderClauseKey((clause as any).expr)})`;
@@ -2443,11 +2443,11 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);
     } else if (arg instanceof Nodes.Attribute) {
-      refs.push(relationName(arg.relation.name));
+      refs.push(String(arg.relation.name));
     } else if (arg instanceof Nodes.Ordering) {
       const expr = (arg as any).expr;
       if (expr instanceof Nodes.Attribute) {
-        refs.push(relationName(expr.relation.name));
+        refs.push(String(expr.relation.name));
       }
     } else if (arg instanceof Map) {
       // Rails' Hash arm extracts a table only from String/Symbol keys; an Arel

@@ -1,6 +1,7 @@
 import { include, type Included } from "@blazetrails/activesupport";
+import { _setAttribute } from "../node-slots.js";
 import { Node } from "../nodes/node.js";
-import { As, ATTRIBUTE_BRAND } from "../nodes/binary.js";
+import { As } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Count } from "../nodes/count.js";
 import { Sum, Max, Min, Avg } from "../nodes/function.js";
@@ -40,20 +41,8 @@ export interface RelationLike {
   lower: (column: unknown) => NamedFunction;
 }
 
-/**
- * Coerce a relation / table-alias `name` to a plain string, unwrapping a
- * `SqlLiteral`. In Rails `Arel::Nodes::SqlLiteral < String`, so a SqlLiteral
- * name is already a usable string; here `SqlLiteral` is a standalone `Node`, so
- * every string consumer of `RelationLike.name` / `TableAlias.name` must unwrap
- * via this helper rather than letting the object flow into a `String` slot.
- */
-export function relationName(name: string | SqlLiteral): string {
-  return name instanceof SqlLiteral ? name.value : name;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attribute extends Node {
-  readonly [ATTRIBUTE_BRAND] = true;
   readonly relation: RelationLike;
   readonly name: string;
 
@@ -219,3 +208,5 @@ export interface Attribute extends Omit<
 }
 
 include(Attribute, Predications);
+
+_setAttribute(Attribute);

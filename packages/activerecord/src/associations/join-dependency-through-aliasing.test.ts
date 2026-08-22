@@ -12,7 +12,7 @@ import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
-import { Nodes, Table, relationName } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
@@ -28,7 +28,7 @@ function nodeAt(jd: JoinDependency, path: string): JoinPart {
 function joinedTableNames(joins: Nodes.Join[]): string[] {
   return joins.map((join) => {
     const rel = join.left as Table | Nodes.TableAlias;
-    return relationName(rel.tableAlias ?? rel.name);
+    return String(rel.tableAlias ?? rel.name);
   });
 }
 
@@ -40,7 +40,7 @@ function joinedTableNames(joins: Nodes.Join[]): string[] {
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
   return joins.find((join) => {
     const rel = join.left as Table | Nodes.TableAlias;
-    return relationName(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
+    return String(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
   })!;
 }
 
@@ -66,7 +66,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
 
     expect(joinedTableNames(joins)).toContain("posts");
     const throughJoin = joins.find(
-      (j) => relationName((j.left as Table).tableAlias ?? (j.left as Table).name) === "posts",
+      (j) => String((j.left as Table).tableAlias ?? (j.left as Table).name) === "posts",
     )!;
     expect(throughJoin).toBeInstanceOf(Nodes.OuterJoin);
     expect((throughJoin.left as Table).tableAlias).toBeNull();
@@ -94,13 +94,13 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     // Target aliased — Rails encodes this as a `TableAlias` over the real table.
     const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Nodes.TableAlias;
     expect(targetTable.tableName).toBe("comments");
-    expect(relationName(targetTable.tableAlias ?? targetTable.name)).toBe(
+    expect(String(targetTable.tableAlias ?? targetTable.name)).toBe(
       "comments_with_foreign_keys_authors",
     );
 
     // Through still uses real name
     const throughJoin = joins.find(
-      (j) => relationName((j.left as Table).tableAlias ?? (j.left as Table).name) === "posts",
+      (j) => String((j.left as Table).tableAlias ?? (j.left as Table).name) === "posts",
     )!;
     expect(throughJoin).toBeDefined();
     expect((throughJoin.left as Table).tableAlias).toBeNull();
@@ -179,7 +179,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(target.effectiveSqlName).toBe("commentsWithForeignKey");
     const targetTable = target.arelTable as Nodes.TableAlias;
     expect(targetTable.tableName).toBe("comments");
-    expect(relationName(targetTable.tableAlias ?? targetTable.name)).toBe("commentsWithForeignKey");
+    expect(String(targetTable.tableAlias ?? targetTable.name)).toBe("commentsWithForeignKey");
 
     // The intermediate chain link is internal and never reference-aliased.
     expect(joinedTableNames(jd.joinConstraints([]))).toContain("posts");
