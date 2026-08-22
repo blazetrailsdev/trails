@@ -48,7 +48,7 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
     await seedPosts();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await Post.eagerLoad("comments")
+      count = (await Post.eagerLoad(":comments")
         .order("title")
         .limit(2)
         .count("posts.tags_count")) as number;
@@ -65,7 +65,7 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
 
   it("eager_load(:comments).order(:title).offset(n).count(column) counts over the ordered rows after the offset", async () => {
     await seedPosts();
-    const count = await Post.eagerLoad("comments")
+    const count = await Post.eagerLoad(":comments")
       .order("title")
       .offset(1)
       .count("posts.tags_count");

@@ -135,7 +135,7 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all with includes", async () => {
-    const petsScope = Pet.includes("toys").where({ toys: { name: "Bone" } });
+    const petsScope = Pet.includes(":toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.exists()).toBe(true);
     const countBefore = await petsScope.count();

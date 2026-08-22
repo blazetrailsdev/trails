@@ -13,7 +13,7 @@ import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
-import { Rational, cCivilToJd, strftime } from "@blazetrails/date";
+import { Rational, Time, cCivilToJd, strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import {
@@ -551,16 +551,12 @@ export class TimeWithZone {
   }
 
   /**
-   * Returns the UTC instant.
-   *
-   * @missingRailsCall getlocal — PERMANENT: Rails' `to_time` returns a `::Time` re-seated
-   *   by `getlocal` per `preserve_timezone` (time_with_zone.rb:493-501); trails'
-   *   `toTime()` answers the UTC `Temporal.Instant`, which carries its own
-   *   offset and has no `getlocal`. The `preserve_timezone` three-arm split is a
-   *   separate unported behaviour, not a dropped call.
+   * Mirrors: `ActiveSupport::TimeWithZone#to_time` (time_with_zone.rb:493-501),
+   * which answers a `::Time` — `getlocal`, the same instant in the system zone,
+   * for the default `preserve_timezone`.
    */
-  toTime(): Temporal.Instant {
-    return this.utc();
+  toTime(): Time {
+    return Time.at(new Rational(this.utc().epochNanoseconds, 1_000_000_000n));
   }
 
   /** Unix timestamp in seconds */

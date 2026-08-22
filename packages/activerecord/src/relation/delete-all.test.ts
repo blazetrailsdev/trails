@@ -129,7 +129,7 @@ describe("DeleteAllTest", () => {
   });
 
   it("delete all with includes", async () => {
-    const pets = Pet.includes("toys").where({ toys: { name: "Bone" } });
+    const pets = Pet.includes(":toys").where({ toys: { name: "Bone" } });
 
     expect(await pets.exists()).toBe(true);
     const countBefore = await pets.count();

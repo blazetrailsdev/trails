@@ -51,7 +51,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksWithChapters();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad("chapters").count()) as number;
+      count = (await CpkBook.eagerLoad(":chapters").count()) as number;
     });
     // Rails folds the eager JD into a LEFT OUTER JOIN and de-duplicates via a
     // DISTINCT-pk-columns subquery; 2 chapters on book 1 fan to 3 joined rows,
@@ -65,12 +65,12 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   it("eager_load(:assoc).count matches the un-joined count", async () => {
     await seedBooksWithChapters();
     // Rails: Cpk::Book.count == Cpk::Book.includes(:chapters).references(:chapters).count
-    expect(await CpkBook.eagerLoad("chapters").count()).toBe(await CpkBook.count());
+    expect(await CpkBook.eagerLoad(":chapters").count()).toBe(await CpkBook.count());
   });
 
   it("eager_load(:assoc).count(column) counts distinct non-null values of the column", async () => {
     await seedBooksWithChapters();
-    expect(await CpkBook.eagerLoad("chapters").count("cpk_books.revision")).toBe(2);
+    expect(await CpkBook.eagerLoad(":chapters").count("cpk_books.revision")).toBe(2);
   });
 
   async function seedBooksDuplicateRevisions(): Promise<void> {
@@ -90,7 +90,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad("chapters")
+      count = (await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.author_id", "cpk_books.id")
         .limit(2)
         .count("cpk_books.revision")) as number;
@@ -118,7 +118,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad("chapters")
+      count = (await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.title")
         .limit(2)
         .count("cpk_books.revision")) as number;
@@ -131,7 +131,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:assoc).offset(n).count(column) bounds ROWS via the id fetch", async () => {
     await seedBooksDuplicateRevisions();
-    const count = await CpkBook.eagerLoad("chapters")
+    const count = await CpkBook.eagerLoad(":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .offset(1)
       .count("cpk_books.revision");
@@ -168,7 +168,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
       // grouped calculation has no count-subquery arm, so the composite key
       // would reach Arel as the multi-column `COUNT(DISTINCT author_id, id)`
       // SQLite and PostgreSQL reject.
-      result = (await CpkBook.eagerLoad("order").group("order").count("cpk_books.id")) as Map<
+      result = (await CpkBook.eagerLoad(":order").group("order").count("cpk_books.id")) as Map<
         unknown,
         unknown
       >;
@@ -182,7 +182,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:x).group(:composite_fk_belongs_to).sum folds the eager JD", async () => {
     await seedBooksWithOrders();
-    const result = (await CpkBook.eagerLoad("order").group("order").sum("id")) as Map<
+    const result = (await CpkBook.eagerLoad(":order").group("order").sum("id")) as Map<
       unknown,
       unknown
     >;

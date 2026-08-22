@@ -20,7 +20,7 @@ describe("OrderTest", () => {
 
   const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((b: any) => b.id);
   const incOrder = (...args: any[]): Promise<unknown[]> =>
-    ids(Book.includes("author").order(...args));
+    ids(Book.includes(":author").order(...args));
 
   it("order asc", async () => {
     const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;

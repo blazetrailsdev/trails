@@ -9,6 +9,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { toTime } from "./core-ext/time/compatibility.js";
+import { change } from "./time-ext.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "./core-ext/date-time/conversions.js";
 import { setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 
@@ -75,5 +76,23 @@ describe("DateTime's private conversion helpers", () => {
         Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00"),
       ),
     ).toBe(Date.UTC(2005, 1, 21, 5, 11, 12) / 1000);
+  });
+});
+
+describe("change over a ::Time receiver", () => {
+  it("returns a ::Time, cascading the reset from the largest option given", () => {
+    const t = RubyTime.utc(2012, 8, 29, 22, 35, 30);
+    const changed = change(t, { hour: 0 });
+    expect(changed).toBeInstanceOf(RubyTime);
+    expect([changed.year, changed.mon, changed.day]).toEqual([2012, 8, 29]);
+    expect([changed.hour, changed.min, changed.sec]).toEqual([0, 0, 0]);
+    expect(changed.isUtc()).toBe(true);
+  });
+
+  it("usec: 0 drops the sub-second and leaves the rest alone", () => {
+    const t = RubyTime.utc(2012, 8, 29, 22, 35, 30, 123456);
+    const changed = change(t, { usec: 0 });
+    expect(changed.nsec).toBe(0);
+    expect([changed.hour, changed.min, changed.sec]).toEqual([22, 35, 30]);
   });
 });

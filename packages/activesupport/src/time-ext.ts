@@ -9,7 +9,7 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
@@ -444,10 +444,37 @@ export function change(
   options: ChangeOptions,
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
+export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
-  date: Date | Temporal.ZonedDateTime,
+  date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
-): Temporal.Instant | Temporal.ZonedDateTime {
+): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
+  // A `::Time` receiver answers a `::Time`, as `change` does in Ruby; the
+  // components it reads are the ones its `to_time` carries, so the change runs
+  // through the shared arm below and is reseated. `Time`'s constructor takes an
+  // offset rather than a zone id, so a zoned receiver comes back carrying its
+  // offset — Rails' own `elsif zone` arm rebuilds through `::Time.local`, which
+  // reseats in the system zone rather than the receiver's, so neither keeps a
+  // foreign zone's abbreviation.
+  if (date instanceof RubyTime) {
+    const changed = change(date.toTime(), options);
+    return new RubyTime(
+      changed.year,
+      changed.month,
+      changed.day,
+      changed.hour,
+      changed.minute,
+      new Rational(
+        BigInt(changed.second) * 1_000_000_000n +
+          BigInt(
+            changed.millisecond * 1_000_000 + changed.microsecond * 1_000 + changed.nanosecond,
+          ),
+        1_000_000_000n,
+      ),
+      date.isUtc() ? "UTC" : changed.offset,
+    );
+  }
+
   // Ruby reads the components off the receiver; a JS `Date` spells those readers
   // differently, and reads them in the system's local zone, so widen it to the
   // one shape both arms below share.

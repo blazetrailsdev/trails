@@ -293,4 +293,25 @@ describe("Time", () => {
       );
     });
   });
+
+  describe("Time#getlocal", () => {
+    it("answers the same instant in the local system zone", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      const local = t.getlocal();
+      expect(local.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+      expect(local.utcOffset).toBe(
+        Number(
+          Temporal.Instant.fromEpochMilliseconds(946728000000).toZonedDateTimeISO(
+            Temporal.Now.timeZoneId(),
+          ).offsetNanoseconds,
+        ) / 1_000_000_000,
+      );
+    });
+
+    it("seats the instant at an explicit utc_offset", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      expect(t.getlocal("+05:00").utcOffset).toBe(18000);
+      expect(t.getlocal("+05:00").hour).toBe(17);
+    });
+  });
 });

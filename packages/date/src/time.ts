@@ -832,6 +832,17 @@ export class Time {
   }
 
   /**
+   * Ruby `Time#getlocal(utc_offset = nil)` (`ruby/time.c` `time_getlocaltime`),
+   * the same instant seated in the local system zone — or, with an argument, at
+   * that offset. MRI's `localtime` mutates the receiver and `getlocal` answers a
+   * converted copy; trails' `Time` is immutable, so the copy is the answer here
+   * the way `getutc` already is.
+   */
+  getlocal(utcOffset: string | number | null = null): Time {
+    return Time.#atInstant(this.#instant, utcOffset);
+  }
+
+  /**
    * Ruby `Time#getutc` (`ruby/time.c` `time_getutc`), the same instant in UTC.
    * `lib/time.rb`'s `httpdate` reaches it as `dup.utc`, an in-place conversion
    * of a copy; trails' `Time` is immutable, so the copy is the answer here.

@@ -7,6 +7,7 @@ import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
+import { change } from "../time-ext.js";
 import { isEmpty } from "../ruby-empty.js";
 
 /** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
@@ -171,30 +172,36 @@ export function travelTo(
     throw new RuntimeError(travelToNestedBlockCall);
   }
 
-  let instant: Temporal.Instant;
+  let now: Time;
   if (dateOrTime instanceof Temporal.PlainDate) {
-    instant = midnight(dateOrTime).toTime();
+    now = midnight(dateOrTime).toTime();
   } else if (typeof dateOrTime === "string") {
     // Without a `Time.zone` set there is no zone to parse through.
     const zone = timeZone();
-    instant = zone ? zone.parse(dateOrTime)!.toTime() : Temporal.Instant.from(dateOrTime);
-  } else if (dateOrTime instanceof globalThis.Date) {
-    instant = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());
-  } else if (dateOrTime instanceof Time) {
-    instant = dateOrTime.toTime().toInstant();
+    now = zone
+      ? zone.parse(dateOrTime)!.toTime()
+      : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
-    instant = dateOrTime;
+    // `now.to_time unless now.is_a?(Time)` — a JS `Date` and a
+    // `Temporal.Instant` are both the instant a Ruby `to_time` seats.
+    now =
+      dateOrTime instanceof Time
+        ? dateOrTime
+        : Time.at(
+            new Rational(
+              dateOrTime instanceof globalThis.Date
+                ? BigInt(dateOrTime.getTime()) * 1_000_000n
+                : dateOrTime.epochNanoseconds,
+              1_000_000_000n,
+            ),
+          );
   }
 
-  if (!withUsec) {
-    instant = Temporal.Instant.fromEpochMilliseconds(
-      Math.floor(instant.epochMilliseconds / 1000) * 1000,
-    );
-  }
+  if (!withUsec) now = change(now, { usec: 0 });
 
   // `now` must be in local system timezone, because `Time.at(now)`
   // and `now.to_date` (see stubs below) will use `now`'s timezone too!
-  const now = Time.at(new Rational(instant.epochNanoseconds, 1_000_000_000n));
+  now = now.getlocal();
 
   const stubs = simpleStubs();
   const stubbedTime = stubs.stubbing(Time, "now") ? Time.now() : undefined;
@@ -223,7 +230,7 @@ export function travelTo(
   // Ruby has no fifth receiver: production code reads the clock through
   // `currentTimeInstant()` because `Time.now()` costs ~70x a bare
   // `Temporal.Now.instant()` and sits on every `TimeWithZone` construction.
-  stubs.stubObject(clock, "now", () => instant);
+  stubs.stubObject(clock, "now", () => now.toTime().toInstant());
 
   if (block) {
     try {

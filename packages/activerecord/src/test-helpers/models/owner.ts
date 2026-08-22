@@ -41,7 +41,7 @@ export class Owner extends Base {
           ) as last_pet_id
         `,
         )
-        .includes("lastPet"),
+        .includes(":lastPet"),
     );
     this.afterCommit(async (owner: Owner) => {
       await owner.executeBlocks();

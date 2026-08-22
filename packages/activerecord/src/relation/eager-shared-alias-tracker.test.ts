@@ -25,8 +25,8 @@ describe("eager build_joins shared AliasTracker", () => {
   fixtures([]);
 
   it("aliases the eager OUTER JOIN when an explicit joins already claims the table", () => {
-    const rel = Post.includes("author")
-      .references("author")
+    const rel = Post.includes(":author")
+      .references(":author")
       .joins("INNER JOIN authors ON authors.id = posts.author_id");
     const sql = (rel as unknown as { toSql(): string }).toSql().replace(/["`]/g, "");
 
