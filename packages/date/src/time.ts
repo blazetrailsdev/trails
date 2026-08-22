@@ -294,6 +294,24 @@ export class Time {
   }
 
   /**
+   * Ruby `Time.new(year = nil, month = nil, day = nil, hour = nil, min = nil,
+   * sec = nil)` (`time.c` `time_s_init`): with no arguments it answers the
+   * current time in the local zone, and with them it lands on the same seat
+   * `Time.local` does. MRI's `in:` zone keyword is not carried.
+   */
+  static new(
+    year?: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
+  ): Time {
+    if (year === undefined) return Time.now();
+    return Time.mktime(year, month, day, hour, min, sec);
+  }
+
+  /**
    * The instant-taking construction path MRI's `time_new_timew` is: the
    * receiver's seat is the epoch, and the wall clock and the `utc_offset` are
    * read OFF it. Building through the public constructor instead would hand
@@ -327,11 +345,18 @@ export class Time {
    * `num_exact` takes, and the sum is carried exactly and then floored at the
    * nanosecond, MRI's own seat: `Time.at(946684800, 123456.789).nsec` is
    * `123456789`, and `Time.at(-0.5).to_i` is `-1`.
+   *
+   * A `Time` is taken too — MRI's `time_s_at` reads its `timespec` and answers
+   * a Time naming the same instant — and then `microseconds_with_frac` is not
+   * part of the seat.
    */
   static at(
-    seconds: number | bigint | Rational,
+    seconds: number | bigint | Rational | Time,
     microsecondsWithFrac: number | bigint | Rational = 0,
   ): Time {
+    if (seconds instanceof Time) {
+      return Time.#atInstant(seconds.#instant);
+    }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
       .add(numExact(microsecondsWithFrac).mul(1_000));
