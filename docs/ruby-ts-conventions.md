@@ -79,6 +79,14 @@ methods like `get()`/`set()` as the surrounding code does):
 
 `[]`, `[]=`, `==`, `===`, `!=`, `<=>`, `+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `~`, `!`, `!~`, `=~`, `>>`, `<<`, `~@`
 
+The named spelling a given class picked is pinned per Ruby fqn in
+`OPERATOR_SPELLING_BY_FQN` (`scripts/api-compare/operator-order-spelling.ts`) —
+`Arel::Math#*` is `multiply`, `Arel::Table#[]` is `get`. Both the method-ORDER
+manifest and `parity:api:extra` resolve operators through that table, so a
+ported operator sorts into its Rails slot and does not read as extra surface.
+The pin is per-class on purpose: `<<` is `bitwiseShiftLeft` on `Arel::Math` and
+means _append_ on the collectors, so a global entry would mis-credit them.
+
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to

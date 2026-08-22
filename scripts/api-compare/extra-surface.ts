@@ -99,6 +99,7 @@ import {
   snakeToCamel,
 } from "@blazetrails/parity/conventions";
 import { resolveModuleName } from "./compare.js";
+import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
 
@@ -1102,9 +1103,18 @@ function collectAllowedNames(
   // `scopedSkipMirrorName`: a scoped skip that names its TS spelling means the
   // port exists but not at the mapped site (a `prepend`ed module's `initialize`,
   // which has no TS constructor to wrap), so the declaration is the port.
-  const addMethods = (methods: MethodInfo[], methodFile?: string): void => {
+  const addMethods = (methods: MethodInfo[], ownerFqn: string, methodFile?: string): void => {
     for (const m of methods) {
       if (methodFile !== undefined && m.file !== methodFile) continue;
+      // A Ruby OPERATOR (`*`, `<<`, `~@`) carries no canonical camelCase
+      // spelling, so `rubyMethodCandidates` refuses it and the TS port of
+      // `Arel::Math#*` reads as novel surface. The port is real and its
+      // spelling is already pinned per-class in `OPERATOR_SPELLING_BY_FQN`
+      // (the method-ORDER manifest resolves operators through the same table),
+      // so consult it here rather than mint a second table: keyed by the
+      // DECLARING class, `<<` is `bitwiseShiftLeft` on `Arel::Math` and stays
+      // unmapped on `SelectManager`, where it means append.
+      for (const c of operatorSpelling(ownerFqn, m.name) ?? []) allowed.add(c);
       // Private/protected Ruby methods (internal) still count: a TS method
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
@@ -1154,7 +1164,7 @@ function collectAllowedNames(
     // Only the module's instance methods cross into the host. Class
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
-    addMethods(mod.instanceMethods);
+    addMethods(mod.instanceMethods, fqn);
     // Chain `include`s only — a module's own `extend` doesn't propagate
     // (Ruby singleton-class semantics).
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
@@ -1171,8 +1181,8 @@ function collectAllowedNames(
     const short = fqn.split("::").pop();
     if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     if (nameOnly) continue;
-    addMethods(info.instanceMethods, methodFile);
-    addMethods(info.classMethods, methodFile);
+    addMethods(info.instanceMethods, fqn, methodFile);
+    addMethods(info.classMethods, fqn, methodFile);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
     for (const ext of info.extends ?? []) walkMixin(ext, fqn);
 

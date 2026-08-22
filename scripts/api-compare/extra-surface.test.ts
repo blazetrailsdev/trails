@@ -2864,3 +2864,86 @@ describe("gateStale", () => {
     expect(gateStale(summary([entry("arel", "aa")]))).toContain("Delete the tag");
   });
 });
+
+describe("buildReport — Ruby operator methods", () => {
+  // `rubyMethodToTs` refuses every OPERATOR, so without the per-class
+  // `OPERATOR_SPELLING_BY_FQN` lookup the TS port of `Arel::Math#*` reads as
+  // novel surface. The table is keyed by the DECLARING class, so `<<` resolves
+  // only where it means a bitwise shift.
+  function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        arel: {
+          classes: {
+            "Arel::Collectors::PlainString": rubyClass({
+              name: "PlainString",
+              file: "collectors/plain_string.rb",
+              instance: [method("<<")],
+            }),
+          },
+          modules: {
+            "Arel::Math": rubyClass({
+              name: "Math",
+              file: "math.rb",
+              instance: [method("*"), method("<<")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        arel: {
+          classes: {
+            Math: {
+              name: "Math",
+              file: "math.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("multiply"), method("bitwiseShiftLeft")],
+              classMethods: [],
+            },
+            PlainString: {
+              name: "PlainString",
+              file: "collectors/plain-string.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("append")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  it("allows the pinned TS spelling of an operator its class declares", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const files = report.packages[0].extraFiles.map((f) => f.tsFile);
+    expect(files).not.toContain("math.ts");
+  });
+
+  it("leaves an operator unmapped on a class with no pinned spelling", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/plain-string.ts");
+    expect(f?.extras.map((e) => e.name)).toEqual(["append"]);
+  });
+});
