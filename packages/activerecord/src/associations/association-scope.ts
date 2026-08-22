@@ -719,7 +719,8 @@ export class AssociationScope {
     // scope. So detect through explicitly and invoke `.scope` directly with
     // the same arity / `this` semantics. The source reflection's scope is a
     // SEPARATE concern, merged below.
-    const head = chain[0] as {
+    const chainHead = chain[0];
+    const head = chainHead as {
       scopeFor?: (rel: unknown, owner: unknown) => unknown;
       scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
       isThroughReflection?: () => boolean;
@@ -733,34 +734,25 @@ export class AssociationScope {
     }
     // Rails' `chain.reverse_each` folds the CHAIN HEAD too
     // (association_scope.rb:132), and a through head's `constraints` is
-    // `source_reflection.constraints << scope` (reflection.rb:1180-1184), so a
-    // scope declared on the SOURCE reflection — e.g.
-    // `Post.has_many :nonexistent_comments, -> { where("comments.id < 0") }`
-    // for `Author.has_many :nonexistent_comments, through: :posts` — merges as
-    // part of the head entry, evaluated against the head's own `klass`. That
-    // klass is the RUNTIME one (`RuntimeReflection#klass` → `@association.klass`,
-    // reflection.rb:1265), which is what makes a `source_type:` through work:
-    // its source is a polymorphic belongsTo whose `klass` is uncomputable, and
-    // Rails never reads it here.
-    //
-    // The head's OWN scope is `chain_head.scope`, which Rails singles out at
-    // :137 and trails applied above, so skip it here rather than applying it
-    // twice.
-    if (isThrough) {
-      scope = this._mergeReflectionScopeChain(scope, chain[0], owner, head.scope ?? undefined);
-    }
+    // `source_reflection.constraints << scope` (reflection.rb:1180-1184) — that
+    // is how a scope on the SOURCE reflection merges, evaluated against the
+    // head's own `klass`. For a `source_type:` through that klass is the runtime
+    // `@association.klass` (`RuntimeReflection#klass`, reflection.rb:1265), so
+    // the polymorphic belongsTo's uncomputable `klass` is never read.
+    scope = this._mergeReflectionScopeChain(scope, chainHead, owner, chainHead);
     return scope;
   }
 
   /**
-   * Apply a non-head chain entry's scope lambda. Rails' add_constraints
+   * Apply one chain entry's scope lambdas — Rails' `chain.reverse_each` loop
+   * body. Rails' add_constraints
    * does this via `eval_scope` + `scope.where_clause += item.where_clause`
    * + `scope.order_values = item.order_values | scope.order_values` —
    * granular per-attribute merging that pushes ONLY where and order
    * predicates onto the main relation. A through-reflection scope's
    * limit / select / joins / etc must NOT override the main scope.
    *
-   * For non-head entries we evaluate the lambda against a fresh
+   * The lambda is evaluated against a fresh
    * `entry.klass.unscoped` (with STI type_condition re-applied for
    * subclasses, matching the head-scope path in `scope()`) so its
    * `where(...)` calls bind to the correct table. We then push the
@@ -774,7 +766,7 @@ export class AssociationScope {
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
-    chainHeadScope?: (rel: unknown, owner?: unknown) => unknown,
+    chainHead?: AbstractReflection | ReflectionProxy,
   ): unknown {
     // Iterate `reflection.constraints()` rather than special-casing
     // PolymorphicReflection via instanceof. For ordinary
@@ -794,9 +786,9 @@ export class AssociationScope {
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      // Rails: `if scope_chain_item == chain_head.scope` (:137) — the head's
-      // own scope takes the merge-except path, applied above.
-      if (chainHeadScope !== undefined && c === chainHeadScope) continue;
+      // Rails: `if scope_chain_item == chain_head.scope` (association_scope.rb:137)
+      // takes the merge-except path, which trails applies in `addConstraints`.
+      if (c === (chainHead as { scope?: unknown } | undefined)?.scope) continue;
       const evaluated = this.evalScope(reflection, c, owner);
       merged = this._pushScopeIntoRelation(merged, evaluated);
     }
