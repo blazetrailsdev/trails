@@ -1,7 +1,8 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ToSql, cteRelationSelfWraps } from "./to-sql.js";
+import { SelectManager } from "../select-manager.js";
+import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";
 
 /**
@@ -125,7 +126,14 @@ export class MySQL extends ToSql {
     // Grouping (SqlLiteral path) or a set-operation node (array CTE → UnionAll)
     // visits with its own parens — skip the explicit wrap in that case.
     collector.append(`${this.quoteTableName(o.name)} AS `);
-    if (cteRelationSelfWraps(o.relation)) {
+    if (
+      (o.relation as unknown) instanceof SelectManager ||
+      o.relation instanceof Nodes.Grouping ||
+      o.relation instanceof Nodes.Union ||
+      o.relation instanceof Nodes.UnionAll ||
+      o.relation instanceof Nodes.Intersect ||
+      o.relation instanceof Nodes.Except
+    ) {
       this.visit(o.relation, collector);
     } else {
       collector.append("(");

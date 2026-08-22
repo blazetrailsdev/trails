@@ -7,7 +7,7 @@ import { Predications } from "./predications.js";
 // infinity?, unboundable?, open_ended?). Trails surfaces them on the
 // mixin object for Rails-fidelity / parity:api privates coverage;
 // these tests pin their behavior. The three predicate helpers delegate to
-// the single implementation in predications-range.ts.
+// the single implementation on the mixin in predications.ts.
 
 const users = new Table("users");
 

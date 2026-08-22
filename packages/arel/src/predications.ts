@@ -8,6 +8,7 @@ import {
   NotIn,
   IsDistinctFrom,
   IsNotDistinctFrom,
+  Between,
 } from "./nodes/binary.js";
 import { Equality } from "./nodes/equality.js";
 import { Matches, DoesNotMatch } from "./nodes/matches.js";
@@ -19,16 +20,6 @@ import { Or } from "./nodes/or.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
-import {
-  parseRange,
-  betweenFromRange,
-  notBetweenFromRange,
-  infinitySign,
-  unboundableSign,
-  isNilBound,
-  type RangeHost,
-  type RangePredicates,
-} from "./predications-range.js";
 
 /**
  * Stands in for Rails' `when Arel::SelectManager` arm (predications.rb:65-74
@@ -112,6 +103,77 @@ export interface GroupingFolders {
     others: unknown[],
     ...extras: unknown[]
   ): Grouping;
+}
+
+/**
+ * The `self` half of Rails' `between` contract. `between` / `not_between`
+ * (predications.rb:36-61, 84-110) and `open_ended?` (:255-257) dispatch these
+ * on implicit self, so an including class overriding one is honored — declared
+ * structurally for the same reason {@link GroupingFolders} is: the bodies below
+ * cannot name `Predications` while it is still being defined.
+ */
+interface RangePredicates {
+  /** @internal */
+  isInfinity(value: unknown): 1 | -1 | 0;
+  /** @internal */
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  /** @internal */
+  isOpenEnded(value: unknown): boolean;
+  /** @internal */
+  in(values: unknown[]): Node;
+  /** @internal */
+  notIn(values: unknown[]): Node;
+  /** @internal */
+  eq(other: unknown): Node;
+  /** @internal */
+  gt(right: unknown): Node;
+  /** @internal */
+  gteq(right: unknown): Node;
+  /** @internal */
+  lt(right: unknown): Node;
+  /** @internal */
+  lteq(right: unknown): Node;
+}
+
+interface InfiniteLike {
+  isInfinite?: () => 1 | -1 | false;
+}
+
+interface UnboundableLike {
+  isUnboundable?: () => 1 | -1 | false;
+}
+
+/** The receiver `between` / `notBetween` dispatch their whole tree through. */
+type BetweenHost = Node & PredicationHost & RangePredicates;
+
+/** The `begin` / `end` / `exclude_end?` trio Ruby's Range answers. */
+interface RangeLike {
+  begin: unknown;
+  end: unknown;
+  excludeEnd: boolean;
+}
+
+// Ruby's `between(other)` takes one Range and reads `other.begin` /
+// `other.end` / `other.exclude_end?` off it — a language protocol with no JS
+// equivalent, so the three call shapes trails accepts (`[begin, end]`,
+// `{ begin, end, excludeEnd? }`, `(begin, end, excludeEnd?)`) are normalized
+// to that trio here before the Rails decision tree runs on it.
+function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boolean): RangeLike {
+  if (Array.isArray(beginOrRange) && end === undefined) {
+    return { begin: beginOrRange[0], end: beginOrRange[1], excludeEnd: false };
+  }
+  if (
+    typeof beginOrRange === "object" &&
+    beginOrRange !== null &&
+    !(beginOrRange instanceof Node) &&
+    end === undefined &&
+    "begin" in (beginOrRange as Record<string, unknown>) &&
+    "end" in (beginOrRange as Record<string, unknown>)
+  ) {
+    const r = beginOrRange as { begin: unknown; end: unknown; excludeEnd?: boolean };
+    return { begin: r.begin, end: r.end, excludeEnd: r.excludeEnd === true };
+  }
+  return { begin: beginOrRange, end, excludeEnd: excludeEnd === true };
 }
 
 // Build the `expr → Node` callback used by groupingAny / groupingAll.
@@ -210,61 +272,81 @@ export const Predications = {
     return new NotIn(this, this.quotedNode(other));
   },
 
-  // `between` / `notBetween` accept three forms — `[begin, end]`,
-  // `{ begin, end, excludeEnd? }`, or `(begin, end, excludeEnd?)` — same
-  // as Attribute#between. The decision tree (in predications-range.ts)
-  // mirrors Rails' Predications#between (predications.rb): unboundable
-  // bounds collapse to In([])/NotIn([]), open-ended bounds reduce to
-  // half-comparisons, exclusive end uses `<` / `>=`, and degenerate
-  // `b == e` collapses to eq.
+  // Mirrors Arel::Predications#between (predications.rb:36-61). `other` is a
+  // Ruby Range there; here it is the trio `parseRange` normalizes the three
+  // accepted call shapes onto, and the decision tree below is Rails' own,
+  // branch for branch.
   between: function (
-    this: Node & PredicationHost & RangeHost & RangePredicates,
+    this: BetweenHost,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
   ): Node {
-    const range = parseRange(beginOrRange, end, excludeEnd);
-    return betweenFromRange(this, range);
+    const other = parseRange(beginOrRange, end, excludeEnd);
+    if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
+      return this.in([]);
+    } else if (this.isOpenEnded(other.begin)) {
+      if (this.isOpenEnded(other.end)) {
+        if (this.isInfinity(other.begin) === 1 || this.isInfinity(other.end) === -1) {
+          return this.in([]);
+        } else {
+          return this.notIn([]);
+        }
+      } else if (other.excludeEnd) {
+        return this.lt(other.end);
+      } else {
+        return this.lteq(other.end);
+      }
+    } else if (this.isOpenEnded(other.end)) {
+      return this.gteq(other.begin);
+    } else if (other.excludeEnd) {
+      return this.gteq(other.begin).and(this.lt(other.end));
+    } else if (other.begin === other.end) {
+      return this.eq(other.begin);
+    } else {
+      const left = this.quotedNode(other.begin);
+      const right = this.quotedNode(other.end);
+      return new Between(this, new And([left, right]));
+    }
   } as {
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      range: readonly [unknown, unknown],
-    ): Node;
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      range: { begin: unknown; end: unknown; excludeEnd?: boolean },
-    ): Node;
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      begin: unknown,
-      end: unknown,
-      excludeEnd?: boolean,
-    ): Node;
+    (this: BetweenHost, range: readonly [unknown, unknown]): Node;
+    (this: BetweenHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+    (this: BetweenHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
+  // Mirrors Arel::Predications#not_between (predications.rb:84-110).
   notBetween: function (
-    this: Node & PredicationHost & RangeHost & RangePredicates,
+    this: BetweenHost,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
   ): Node {
-    const range = parseRange(beginOrRange, end, excludeEnd);
-    return notBetweenFromRange(this, range);
+    const other = parseRange(beginOrRange, end, excludeEnd);
+    if (this.isUnboundable(other.begin) === 1 || this.isUnboundable(other.end) === -1) {
+      return this.notIn([]);
+    } else if (this.isOpenEnded(other.begin)) {
+      if (this.isOpenEnded(other.end)) {
+        if (this.isInfinity(other.begin) === 1 || this.isInfinity(other.end) === -1) {
+          return this.notIn([]);
+        } else {
+          return this.in([]);
+        }
+      } else if (other.excludeEnd) {
+        return this.gteq(other.end);
+      } else {
+        return this.gt(other.end);
+      }
+    } else if (this.isOpenEnded(other.end)) {
+      return this.lt(other.begin);
+    } else {
+      const left = this.lt(other.begin);
+      const right = other.excludeEnd ? this.gteq(other.end) : this.gt(other.end);
+      return left.or(right);
+    }
   } as {
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      range: readonly [unknown, unknown],
-    ): Node;
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      range: { begin: unknown; end: unknown; excludeEnd?: boolean },
-    ): Node;
-    (
-      this: Node & PredicationHost & RangeHost & RangePredicates,
-      begin: unknown,
-      end: unknown,
-      excludeEnd?: boolean,
-    ): Node;
+    (this: BetweenHost, range: readonly [unknown, unknown]): Node;
+    (this: BetweenHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+    (this: BetweenHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
   eqAny(
@@ -455,34 +537,69 @@ export const Predications = {
   },
 
   // Mirrors Arel::Predications#infinity? (predications.rb:248-250) —
-  // `value.respond_to?(:infinite?) && value.infinite?`, which yields the sign
-  // because Ruby's `Float#infinite?` returns `1 | -1 | nil`. The decision tree
-  // in predications-range.ts reads the sign, so these three expose the same
-  // single implementation `between` / `notBetween` above already use rather
-  // than a second copy — Rails has exactly one per Ruby file.
+  // `value.respond_to?(:infinite?) && value.infinite?`, which yields the SIGN
+  // because Ruby's `Float#infinite?` returns `1 | -1 | nil`. The duck-type
+  // dispatch is Rails': bare ±Infinity (Ruby's `Float` responds to `infinite?`)
+  // or anything exposing `isInfinite()` — which is how a `Quoted` answers
+  // (casted.rb:43-45). `Casted` defines no `infinite?` (casted.rb:5-35), so it
+  // never answers and `open_ended?(Casted(INFINITY))` stays false.
+  //
+  // `0` stands in for Ruby's `nil` miss: Ruby's `0` is truthy and so could not
+  // double as "absent", and a `0` sign is unreachable anyway. The producers
+  // (`Quoted#isInfinite`, `BindParam#isInfinite`, `QueryAttribute#isInfinite`)
+  // return `1 | -1 | false`, mirroring `respond_to?(:x) && value.x` — `false`
+  // is the `&&` short-circuit. Do not add a `true` arm back: a boolean producer
+  // would report `+1` for a -Infinity bound.
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
-    return infinitySign(value);
+    if (value === Infinity) return 1;
+    if (value === -Infinity) return -1;
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof (value as InfiniteLike).isInfinite === "function"
+    ) {
+      const r = (value as InfiniteLike).isInfinite!();
+      if (r === 1 || r === -1) return r;
+    }
+    return 0;
   },
 
   // Mirrors Arel::Predications#unboundable? (predications.rb:252-253) —
-  // `value.respond_to?(:unboundable?) && value.unboundable?`. Duck-typed: a
-  // bound answers it by exposing `isUnboundable()` (a QueryAttribute bind, or
-  // the RangeHandler's out-of-range sentinel). A bare ±Infinity is open-ended,
-  // NOT unboundable — Float has no `unboundable?` in Ruby.
+  // `value.respond_to?(:unboundable?) && value.unboundable?`, the same
+  // duck-typed predicate the visitor uses (to_sql.rb:905-907). A bound is
+  // unboundable when it serializes out of range for its column type; trails
+  // threads that through a bound exposing `isUnboundable()` (a QueryAttribute
+  // bind, or the RangeHandler's out-of-range sentinel).
+  //
+  // A bare ±Infinity is NOT unboundable — Float has no `unboundable?`, so Rails
+  // answers false and the bound falls through to the `open_ended?` / `infinity?`
+  // arms of the between tree. `Float::INFINITY..` still collapses to `in([])`,
+  // but via the nested `infinity?` check at predications.rb:42.
   isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
-    return unboundableSign(value);
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof (value as UnboundableLike).isUnboundable === "function"
+    ) {
+      const r = (value as UnboundableLike).isUnboundable!();
+      if (r === 1) return 1;
+      if (r === -1) return -1;
+    }
+    return 0;
   },
 
   // Mirrors Arel::Predications#open_ended? (predications.rb:255-257) —
-  // `value.nil? || infinity?(value) || unboundable?(value)`, composed here in
-  // Rails' own shape rather than delegating: Ruby dispatches `infinity?` /
-  // `unboundable?` through implicit self, so a host overriding either is
-  // honored. The protocol logic itself still lives in exactly one place —
-  // these call `isInfinity` / `isUnboundable` above, which delegate to
-  // predications-range.ts. `betweenFromRange` composes the same three helpers
-  // for the extracted `between` body.
+  // `value.nil? || infinity?(value) || unboundable?(value)`. `infinity?` and
+  // `unboundable?` dispatch through implicit self in Ruby, so a host overriding
+  // either is honored here too.
+  //
+  // The leading `value.nil?` is a real dispatch, not a null check: the node
+  // classes override `nil?` to report on the *wrapped* value (`BindParam#nil?`
+  // bind_param.rb:23-25, `Casted#nil?` / `Quoted#nil?` casted.rb:16,41). So
+  // `between(BindParam(nil), 3)` is `lteq(3)` in Rails, not a Between over a nil
+  // bind — reading only `=== null` skips that.
   isOpenEnded(
     this: PredicationHost & {
       isInfinity(value: unknown): 1 | -1 | 0;
@@ -490,7 +607,12 @@ export const Predications = {
     },
     value: unknown,
   ): boolean {
-    return isNilBound(value) || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
+    const isNil =
+      value === null ||
+      value === undefined ||
+      (typeof (value as { isNil?: () => boolean }).isNil === "function" &&
+        (value as { isNil: () => boolean }).isNil());
+    return isNil || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
   },
 };
 
