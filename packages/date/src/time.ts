@@ -284,13 +284,31 @@ export class Time {
    */
   #instant: Temporal.Instant;
   /** @internal The receiver's zone, or `null` when it was built from an offset. */
-  readonly #timeZoneId: string | null;
+  #timeZoneId: string | null;
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   #utcOffset: number;
 
   /** Ruby `Time.now`, the current time in the local zone. */
   static now(): Time {
     return Time.#atInstant(Temporal.Now.instant());
+  }
+
+  /**
+   * Ruby `Time.new(year = nil, month = nil, day = nil, hour = nil, min = nil,
+   * sec = nil)` (`time.c` `time_s_init`): with no arguments it answers the
+   * current time in the local zone, and with them it lands on the same seat
+   * `Time.local` does. MRI's `in:` zone keyword is not carried.
+   */
+  static new(
+    year?: number | string,
+    month: number | string | null = 1,
+    day: number | string | null = 1,
+    hour: number | string | null = 0,
+    min: number | string | null = 0,
+    sec: number | string | Rational | null = 0,
+  ): Time {
+    if (year === undefined) return Time.now();
+    return Time.mktime(year, month, day, hour, min, sec);
   }
 
   /**
@@ -301,8 +319,10 @@ export class Time {
    * disambiguation picks the earlier offset for the repeated hour after a DST
    * fall-back — so `Time.at(t)` could answer an instant an hour from `t`.
    */
-  static #atInstant(instant: Temporal.Instant): Time {
-    const zoned = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+  static #atInstant(instant: Temporal.Instant, zone: string | number | null = null): Time {
+    const timeZoneId =
+      zone == null ? Temporal.Now.timeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
+    const zoned = instant.toZonedDateTimeISO(timeZoneId);
     const time = new Time(
       zoned.year,
       zoned.month,
@@ -316,6 +336,7 @@ export class Time {
       ),
     );
     time.#instant = instant;
+    time.#timeZoneId = typeof zone === "number" ? null : timeZoneId;
     time.#utcOffset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
     return time;
   }
@@ -327,11 +348,24 @@ export class Time {
    * `num_exact` takes, and the sum is carried exactly and then floored at the
    * nanosecond, MRI's own seat: `Time.at(946684800, 123456.789).nsec` is
    * `123456789`, and `Time.at(-0.5).to_i` is `-1`.
+   *
+   * A `Time` is taken too — MRI's `time_s_at` reads its `timespec` and answers
+   * a Time naming the same instant, in the argument's OWN zone rather than the
+   * local one: `Time.at(Time.new(2020, 1, 1, 0, 0, 0, "+05:00")).utc_offset` is
+   * `18000` under any `TZ`, and `Time.at(Time.utc(2020, 1, 1)).utc?` is true.
+   * A second argument alongside it is a `TypeError` (`num_exact`), not a
+   * microsecond, because `time_s_at` reaches `Time` before `num_exact` runs.
    */
   static at(
-    seconds: number | bigint | Rational,
+    seconds: number | bigint | Rational | Time,
     microsecondsWithFrac: number | bigint | Rational = 0,
   ): Time {
+    if (seconds instanceof Time) {
+      if (microsecondsWithFrac !== 0) {
+        throw new TypeError("can't convert Time into an exact number");
+      }
+      return Time.#atInstant(seconds.#instant, seconds.#timeZoneId ?? seconds.#utcOffset);
+    }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
       .add(numExact(microsecondsWithFrac).mul(1_000));

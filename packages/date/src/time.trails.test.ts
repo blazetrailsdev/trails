@@ -270,4 +270,19 @@ describe("Time", () => {
       expect(est.getutc().strftime("%Y-%m-%d %H:%M:%S")).toBe("2008-11-02 06:30:00");
     });
   });
+  describe("Time.at given a Time", () => {
+    it("keeps the argument's own zone rather than converting to the local one", () => {
+      const t = new Time(2020, 1, 1, 0, 0, 0, "+05:00");
+
+      expect(Time.at(t).utcOffset).toBe(18000);
+      expect(Time.at(t).toS()).toBe(t.toS());
+      expect(Time.at(Time.utc(2020, 1, 1)).isUtc()).toBe(true);
+    });
+
+    it("raises TypeError when a second argument comes with it", () => {
+      expect(() => Time.at(Time.utc(2020, 1, 1), 5)).toThrow(
+        new TypeError("can't convert Time into an exact number"),
+      );
+    });
+  });
 });

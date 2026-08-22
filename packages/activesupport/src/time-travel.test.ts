@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 
-import { Temporal } from "@blazetrails/date";
+import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { travelTo, travelBack, travel, freezeTime } from "./testing/time-helpers.js";
 import {
   currentTime,
@@ -32,16 +32,33 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel to", () => {
-    travelTo(new Date("2030-01-01T00:00:00Z"));
-    expect(currentTime().getUTCFullYear()).toBe(2030);
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    travelTo(expectedTime);
+
+    expect(Time.now().toS()).toEqual(expectedTime.toS());
+    expect(Time.new().toS()).toEqual(expectedTime.toS());
+    expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+    expect(currentTime().getUTCFullYear()).toBe(2004);
   });
 
   it("time helper travel to with block", () => {
-    let inside: Date | null = null;
-    travelTo(new Date("2032-06-15T12:00:00Z"), {}, () => {
-      inside = currentTime();
+    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+    travelTo(expectedTime, {}, () => {
+      expect(Time.now().toS()).toEqual(expectedTime.toS());
+      expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(currentTime().getUTCFullYear()).toBe(2004);
     });
-    expect(inside!.getUTCFullYear()).toBe(2032);
+
+    expect(Time.now().toS()).not.toEqual(expectedTime.toS());
+    expect(Time.new().toS()).not.toEqual(expectedTime.toS());
+    expect(RubyDate.today().toString()).not.toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+    expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
   });
 
   it.skip("time helper travel to with time zone");

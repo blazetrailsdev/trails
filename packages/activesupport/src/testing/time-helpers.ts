@@ -1,7 +1,7 @@
 /**
  * Mirrors: active_support/testing/time_helpers.rb
  */
-import { Temporal } from "@blazetrails/date";
+import { Date, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -125,7 +125,7 @@ export function travel(
   block?: () => void,
 ): void {
   const ms = duration instanceof Duration ? duration.inSeconds() * 1000 : duration;
-  travelTo(new Date(currentTime().getTime() + ms), { withUsec }, block);
+  travelTo(new globalThis.Date(currentTime().getTime() + ms), { withUsec }, block);
 }
 
 /**
@@ -138,14 +138,9 @@ export function travel(
  * errors with external services, like MySQL (which will round instead of floor,
  * leading to off-by-one-second errors), unless the `withUsec` argument is set
  * to `true`.
- *
- * @missingRailsCall at — CONVERGEABLE (story
- *   `travel-to-should-stub-rails-time-receivers`): `Time.at(now)` builds the
- *   stubbed Time; the trails clock method takes a `Temporal.Instant` directly,
- *   so there is no `at` constructor to call.
  */
 export function travelTo(
-  dateOrTime: Temporal.PlainDate | Date | Temporal.Instant | string,
+  dateOrTime: Temporal.PlainDate | globalThis.Date | Temporal.Instant | Time | string,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
@@ -176,26 +171,59 @@ export function travelTo(
     throw new RuntimeError(travelToNestedBlockCall);
   }
 
-  let now: Temporal.Instant;
+  let instant: Temporal.Instant;
   if (dateOrTime instanceof Temporal.PlainDate) {
-    now = midnight(dateOrTime).toTime();
+    instant = midnight(dateOrTime).toTime();
   } else if (typeof dateOrTime === "string") {
     // Without a `Time.zone` set there is no zone to parse through.
     const zone = timeZone();
-    now = zone ? zone.parse(dateOrTime)!.toTime() : Temporal.Instant.from(dateOrTime);
-  } else if (dateOrTime instanceof Date) {
-    now = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());
+    instant = zone ? zone.parse(dateOrTime)!.toTime() : Temporal.Instant.from(dateOrTime);
+  } else if (dateOrTime instanceof globalThis.Date) {
+    instant = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());
+  } else if (dateOrTime instanceof Time) {
+    instant = dateOrTime.toTime().toInstant();
   } else {
-    now = dateOrTime;
+    instant = dateOrTime;
   }
 
   if (!withUsec) {
-    now = Temporal.Instant.fromEpochMilliseconds(Math.floor(now.epochMilliseconds / 1000) * 1000);
+    instant = Temporal.Instant.fromEpochMilliseconds(
+      Math.floor(instant.epochMilliseconds / 1000) * 1000,
+    );
   }
 
+  // `now` must be in local system timezone, because `Time.at(now)`
+  // and `now.to_date` (see stubs below) will use `now`'s timezone too!
+  const now = Time.at(new Rational(instant.epochNanoseconds, 1_000_000_000n));
+
   const stubs = simpleStubs();
-  const stubbedTime = stubs.stubbing(clock, "now") ? currentTimeInstant() : undefined;
-  stubs.stubObject(clock, "now", () => now);
+  const stubbedTime = stubs.stubbing(Time, "now") ? Time.now() : undefined;
+  stubs.stubObject(Time, "now", () => Time.at(now));
+
+  stubs.stubObject(Time, "new", (...args: unknown[]) => {
+    if (isEmpty(args)) {
+      return Time.at(now);
+    } else {
+      const stub = stubs.stubbing(Time, "new")!;
+      return (stub.originalMethod as (...a: unknown[]) => Time).apply(Time, args);
+    }
+  });
+
+  stubs.stubObject(Date, "today", () => Date.jd(new Date(now.toDate()).jd));
+  stubs.stubObject(DateTime, "now", () =>
+    DateTime.jd(
+      new Date(now.toDate()).jd,
+      now.hour,
+      now.min,
+      now.sec,
+      new Rational(now.utcOffset, 86400),
+    ),
+  );
+
+  // Ruby has no fifth receiver: production code reads the clock through
+  // `currentTimeInstant()` because `Time.now()` costs ~70x a bare
+  // `Temporal.Now.instant()` and sits on every `TimeWithZone` construction.
+  stubs.stubObject(clock, "now", () => instant);
 
   if (block) {
     try {
@@ -266,6 +294,6 @@ function setInBlock(value: boolean): void {
  * Returns the current time, honouring any active travel. Rails reads
  * `Time.now`; the trails clock method is `time-travel.ts`'s `clock.now`.
  */
-function currentTime(): Date {
-  return new Date(clock.now().epochMilliseconds);
+function currentTime(): globalThis.Date {
+  return new globalThis.Date(clock.now().epochMilliseconds);
 }
