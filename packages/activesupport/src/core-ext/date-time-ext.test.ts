@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { DateTime, Rational, Temporal, Time } from "@blazetrails/date";
 import {
   advance,
@@ -67,16 +67,11 @@ function asDate(instant: Temporal.Instant): Date {
 }
 
 function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
+  vi.stubEnv("TZ", tz);
   try {
     return fn();
   } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
+    vi.unstubAllEnvs();
   }
 }
 

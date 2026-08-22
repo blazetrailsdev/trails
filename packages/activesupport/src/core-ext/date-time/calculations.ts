@@ -382,62 +382,53 @@ export function utcOffset(datetime: DateTime): number {
  * `ActiveSupport::TimeWithZone` instances can be compared with a `DateTime`.
  *
  * Mirrors: `DateTime#<=>(other)` (`date_time/calculations.rb:208-214`), whose
- * `super` is ruby/date's own `Date#<=>` (`date_core.c` `d_lite_cmp`) — the
- * arm that takes the Integer, Float and Rational astronomical Julian days
- * Rails' own tests compare against.
+ * `super` is ruby/date's own `Date#<=>` ({@link RubyDateTime#cmp},
+ * `date_core.c` `d_lite_cmp`) — the arm that takes the Integer, Float and
+ * Rational astronomical Julian days Rails' own tests compare against.
  *
- * `rescue nil` covers `other.to_datetime` as well as the `super` call, so a
- * String that does not parse answers `null` rather than raising.
+ * Ruby dispatches the first arm on `respond_to? :to_datetime`, which TS has no
+ * equivalent for: the guard below is the closed list of trails values that
+ * answer `to_datetime` — the ruby/date receivers, a `TimeWithZone`, a String,
+ * and the `Temporal` seats a DateTime, a Date and a Time are carried as — and
+ * the conditional inside the `try` is the `to_datetime` dispatch itself, one
+ * arm per receiver. A blank or unparsable String is `nil` from
+ * `String#to_datetime` (`core_ext/string/conversions.rb:56-58`), which Ruby
+ * hands to `super` and `rescue nil` then swallows; `rescue nil` covers
+ * `other.to_datetime` as well as the `super` call.
  */
 export function compare(datetime: DateTime, other: unknown): number | null {
-  // boundary: Ruby dispatches on `respond_to? :to_datetime`; the trails values
-  // that answer it are the ruby/date receivers, TimeWithZone, a String, and
-  // the `Temporal` seats a DateTime, a Date and a Time are carried as.
-  if (respondsToToDatetime(other)) {
+  if (
+    typeof other === "string" ||
+    other instanceof Time ||
+    other instanceof TimeWithZone ||
+    other instanceof RubyDate ||
+    // boundary: a JS `Date` is trails' `Time` seat, and Ruby's `Time` answers `to_datetime`.
+    other instanceof globalThis.Date ||
+    other instanceof Temporal.PlainDate ||
+    other instanceof Temporal.PlainDateTime ||
+    other instanceof Temporal.ZonedDateTime ||
+    other instanceof Temporal.Instant
+  ) {
     try {
-      return new RubyDateTime(datetime).cmp(new RubyDateTime(toDatetime(other)));
+      const asDatetime: Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined =
+        typeof other === "string"
+          ? stringToDatetime(other)
+          : other instanceof Time || other instanceof TimeWithZone || other instanceof RubyDate
+            ? other.toDatetime()
+            : other instanceof Temporal.PlainDate
+              ? new RubyDate(other).toDatetime()
+              : other instanceof Temporal.Instant
+                ? Time.at(new Rational(other.epochNanoseconds, 1_000_000_000n)).toDatetime()
+                : // boundary: the `Time` seat again, on the `to_datetime` arm.
+                  other instanceof globalThis.Date
+                  ? Time.at(new Rational(BigInt(other.getTime()), 1000n)).toDatetime()
+                  : other;
+      if (asDatetime === undefined) return null;
+      return new RubyDateTime(datetime).cmp(new RubyDateTime(asDatetime));
     } catch {
       return null;
     }
   } else {
     return new RubyDateTime(datetime).cmp(other);
   }
-}
-
-/**
- * `other.respond_to? :to_datetime` (`date_time/calculations.rb:209`).
- * @internal
- */
-function respondsToToDatetime(other: unknown): boolean {
-  return (
-    typeof other === "string" ||
-    other instanceof Time ||
-    other instanceof TimeWithZone ||
-    other instanceof RubyDate ||
-    other instanceof Temporal.PlainDate ||
-    other instanceof Temporal.PlainDateTime ||
-    other instanceof Temporal.ZonedDateTime ||
-    other instanceof Temporal.Instant
-  );
-}
-
-/**
- * `other.to_datetime` (`date_time/calculations.rb:210`), one arm per receiver
- * {@link respondsToToDatetime} admits.
- * @internal
- */
-function toDatetime(other: unknown): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-  if (typeof other === "string") {
-    const parsed = stringToDatetime(other);
-    if (parsed === undefined) throw new ArgumentError("invalid date");
-    return parsed;
-  }
-  if (other instanceof Time) return other.toDatetime();
-  if (other instanceof TimeWithZone) return other.toDatetime();
-  if (other instanceof RubyDate) return other.toDatetime();
-  if (other instanceof Temporal.PlainDate) return new RubyDate(other).toDatetime();
-  if (other instanceof Temporal.Instant) {
-    return Time.at(new Rational(other.epochNanoseconds, 1_000_000_000n)).toDatetime();
-  }
-  return other as Temporal.PlainDateTime | Temporal.ZonedDateTime;
 }

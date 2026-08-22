@@ -794,11 +794,11 @@ export class Time {
   }
 
   /**
-   * Ruby `Time#getlocal(utc_offset = nil)` (`ruby/time.c` `time_getlocaltime`
-   * on a duplicate — `time_getlocaltime` is what `Time#getlocal` binds to),
+   * Ruby `Time#getlocal(utc_offset = nil)` (`ruby/time.c` `time_getlocaltime`),
    * the same instant read in the local zone, or at `utc_offset` when one is
-   * given. Like {@link Time#getutc} it answers a copy, because trails' `Time`
-   * is immutable.
+   * given — `Time.utc(...).getlocal(0).utc_offset` is `0` and
+   * `.getlocal("+05:00")` moves the wall clock five hours east. Like
+   * {@link Time#getutc} it answers a copy, because trails' `Time` is immutable.
    */
   getlocal(utcOffset: number | string | null = null): Time {
     return Time.#atInstant(this.#instant, utcOffset);
