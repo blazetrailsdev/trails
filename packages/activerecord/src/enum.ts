@@ -412,7 +412,7 @@ export class EnumMethods {
    * the predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
    * scope `{name}`, and the auto negative scope `not{Name}`.
    *
-   * @missingRailsCall define_method — enum.rb:306,310 emit the predicate and
+   * @missingRailsCall define_method — PERMANENT. enum.rb:306,310 emit the predicate and
    * bang with `define_method`. A generated member has to be installed with
    * `Object.defineProperty` in trails: it carries a descriptor, and the reader
    * half of the enum surface is a property, not a callable (see CLAUDE.md,
@@ -522,7 +522,7 @@ export { enumMethod as enum };
  *
  * Mirrors: ActiveRecord::Enum#_enum (private)
  *
- * @missingRailsCall define_method — enum.rb:232
+ * @missingRailsCall define_method — PERMANENT. enum.rb:232
  * `singleton_class.define_method(name.pluralize) { enum_values }` defines the
  * class-level values reader. trails installs it with `Object.defineProperty` on
  * the class object, the JS spelling of `singleton_class.define_method` (see
@@ -846,7 +846,7 @@ const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, 
  *
  * Mirrors: ActiveRecord::Enum#_enum_methods_module (private)
  *
- * @missingRailsCall include — enum.rb:329 `include mod` splices the freshly
+ * @missingRailsCall include — PERMANENT. enum.rb:329 `include mod` splices the freshly
  * built module into the class's ancestors. trails does that splice with
  * `getOrCreateModuleCarrier` (from `EnumMethods.carrier()`), which interposes a
  * prototype between the model prototype and its parent — the JS spelling of the
@@ -870,7 +870,7 @@ export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumM
  *
  * Mirrors: ActiveRecord::Enum#detect_enum_conflict! (private)
  *
- * @missingRailsCall method_defined_within? — enum.rb:377 and enum.rb:383 both
+ * @missingRailsCall method_defined_within? — PERMANENT. enum.rb:377 and enum.rb:383 both
  * spell their check as `method_defined_within?`. Neither arm can route through
  * the port of it: `isMethodDefinedWithin` resolves a method's owner by walking
  * the CONSTRUCTOR chain (`instanceMethodOwner`), which never reaches
