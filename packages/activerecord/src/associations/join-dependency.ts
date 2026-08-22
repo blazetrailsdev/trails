@@ -13,7 +13,7 @@
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
-import { Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
+import { Nodes, Table, relationName } from "@blazetrails/arel";
 import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { JoinBase } from "./join-dependency/join-base.js";
@@ -101,9 +101,15 @@ function getModelColumns(modelClass: any): string[] {
 export class Aliases {
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
   private _allColumns: AliasMap[];
-  private _tables: Array<{ node: JoinPart | null; table: TableRef; columns: AliasMap[] }>;
+  private _tables: Array<{
+    node: JoinPart | null;
+    table: Table | Nodes.TableAlias;
+    columns: AliasMap[];
+  }>;
 
-  constructor(tables: Array<{ node: JoinPart | null; table: TableRef; columns: AliasMap[] }>) {
+  constructor(
+    tables: Array<{ node: JoinPart | null; table: Table | Nodes.TableAlias; columns: AliasMap[] }>,
+  ) {
     this._aliasCache = new Map();
     this._allColumns = [];
     this._tables = tables;
@@ -176,7 +182,7 @@ export class JoinDependency {
    */
   private _joinedTables: Map<
     string,
-    { aliased: TableRef; effectiveName: string; terminated: boolean }
+    { aliased: Table | Nodes.TableAlias; effectiveName: string; terminated: boolean }
   > = new Map();
   /**
    * Mirrors: ActiveRecord::Associations::JoinDependency#initialize
@@ -184,7 +190,7 @@ export class JoinDependency {
    */
   constructor(
     baseModel: typeof Base,
-    table: TableRef | null,
+    table: Table | Nodes.TableAlias | null,
     associations: AssociationSpec | AssociationSpec[] | null,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
   ) {
@@ -462,7 +468,9 @@ export class JoinDependency {
       // Rails: `r.table = l.table`.
       if (r instanceof JoinAssociation) {
         const lt = l.table;
-        r.table = l.effectiveSqlName || (typeof lt === "string" ? lt : tableSqlName(lt));
+        r.table =
+          l.effectiveSqlName ||
+          (typeof lt === "string" ? lt : relationName(lt.tableAlias ?? lt.name));
       }
       return this.walk(l, r, joinType);
     });
@@ -496,7 +504,7 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
 
     if (child instanceof JoinAssociation) {
-      let resolvedRoot: { aliased: TableRef; effectiveName: string } | undefined;
+      let resolvedRoot: { aliased: Table | Nodes.TableAlias; effectiveName: string } | undefined;
       const built = child.joinConstraints(
         foreignTable,
         foreignKlass,
@@ -532,7 +540,7 @@ export class JoinDependency {
               return root ? name : `${name}_join`;
             },
           );
-          const effectiveName = tableSqlName(table);
+          const effectiveName = relationName(table.tableAlias ?? table.name);
           const aliased = aliasedArelTableForReflection(
             reflection,
             (reflection as any).tableName,
@@ -950,7 +958,7 @@ export class JoinDependency {
           column: columnName,
           alias: `t${i}_r${j}`,
         }));
-        return { node: joinPart, table: joinPart.arelTable as TableRef, columns };
+        return { node: joinPart, table: joinPart.arelTable as Table | Nodes.TableAlias, columns };
       }),
     ));
   }

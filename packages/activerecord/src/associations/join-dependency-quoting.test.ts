@@ -14,7 +14,7 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
-import { Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
+import { Nodes, Table, relationName } from "@blazetrails/arel";
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
@@ -27,7 +27,10 @@ function nodeAt(jd: JoinDependency, path: string): JoinPart {
  * it (join_dependency.rb:189-211 concatenates the joins into the arel).
  */
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
-  return joins.find((join) => tableSqlName(join.left as TableRef) === node.effectiveSqlName)!;
+  return joins.find((join) => {
+    const rel = join.left as Table | Nodes.TableAlias;
+    return relationName(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
+  })!;
 }
 
 describe("JoinDependency Arel node construction", () => {

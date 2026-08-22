@@ -8,7 +8,7 @@
  */
 
 import type { Base } from "../../base.js";
-import type { TableRef } from "@blazetrails/arel";
+import type { Table, Nodes } from "@blazetrails/arel";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
@@ -22,7 +22,7 @@ export abstract class JoinPart {
    * the way Rails' JoinPart#table does — no separate index-keyed table map.
    * @internal
    */
-  arelTable: TableRef | null = null;
+  arelTable: Table | Nodes.TableAlias | null = null;
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
@@ -37,7 +37,7 @@ export abstract class JoinPart {
     if (children) this.children.push(...children);
   }
 
-  abstract get table(): TableRef | string;
+  abstract get table(): Table | Nodes.TableAlias | string;
 
   /**
    * Mirrors Rails' `delegate :table_name, :column_names, :primary_key,

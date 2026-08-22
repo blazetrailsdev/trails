@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::Associations::AliasTracker
  */
-import { Table, Nodes, type TableRef } from "@blazetrails/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
 
@@ -30,7 +30,7 @@ export function aliasedArelTableFor(
   klass: { arelTable?: Table; tableName?: string } | null | undefined,
   tableName: string,
   effectiveName?: string,
-): TableRef {
+): Table | Nodes.TableAlias {
   const sqlName = effectiveName ?? tableName;
   // No klass (polymorphic): nothing to source a caster from, so build a bare
   // table on the real name and alias it exactly as Rails' `arel_table.alias`.
@@ -52,7 +52,7 @@ export function aliasedArelTableForReflection(
   reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,
   tableName: string,
   effectiveName?: string,
-): TableRef {
+): Table | Nodes.TableAlias {
   const klass = reflection?.isPolymorphic?.() ? null : (reflection?.klass as never);
   return aliasedArelTableFor(klass, tableName, effectiveName);
 }
