@@ -182,8 +182,6 @@ export function travelTo(
       ? zone.parse(dateOrTime)!.toTime()
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
-    // `now.to_time unless now.is_a?(Time)` — a JS `Date` and a
-    // `Temporal.Instant` are both the instant a Ruby `to_time` seats.
     now =
       dateOrTime instanceof Time
         ? dateOrTime

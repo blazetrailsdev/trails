@@ -444,18 +444,20 @@ export function change(
   options: ChangeOptions,
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
+/**
+ * A `::Time` receiver answers a `::Time`, as `change` does in Ruby. The
+ * components it reads are the ones its `to_time` carries, so the change runs
+ * through the shared `ZonedDateTime` arm and is reseated. `Time`'s constructor
+ * takes an offset rather than a zone id, so a zoned receiver comes back
+ * carrying its offset — Rails' own `elsif zone` arm rebuilds through
+ * `::Time.local`, which reseats in the system zone rather than the receiver's,
+ * so neither keeps a foreign zone's abbreviation.
+ */
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
-  // A `::Time` receiver answers a `::Time`, as `change` does in Ruby; the
-  // components it reads are the ones its `to_time` carries, so the change runs
-  // through the shared arm below and is reseated. `Time`'s constructor takes an
-  // offset rather than a zone id, so a zoned receiver comes back carrying its
-  // offset — Rails' own `elsif zone` arm rebuilds through `::Time.local`, which
-  // reseats in the system zone rather than the receiver's, so neither keeps a
-  // foreign zone's abbreviation.
   if (date instanceof RubyTime) {
     const changed = change(date.toTime(), options);
     return new RubyTime(
