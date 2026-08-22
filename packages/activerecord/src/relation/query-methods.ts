@@ -2057,13 +2057,12 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  *   cross-file, so the call-set comparer can no longer see through the
  *   delegation to the `build_arel` call inside `toArel`. Folding the memo,
  *   connection acquisition and build_arel call back into `arel` itself is
- *   tracked by story converge-toarel-onto-with-connection-acquisition (RFC
- *   0107).
+ *   tracked by story fold-to-arel-into-the-arel-reader (RFC 0107).
  * @missingRailsCall with_connection — CONVERGEABLE: Relation#arel's memo, connection
  *   acquisition and build_arel call all live in `toArel`, which this body
  *   delegates to verbatim; folding them back into `arel` is tracked by story
- *   converge-toarel-onto-with-connection-acquisition (RFC 0107). Row moved
- *   verbatim from relation.ts with the member (RFC 0107 fan-out).
+ *   fold-to-arel-into-the-arel-reader (RFC 0107). Row moved verbatim from
+ *   relation.ts with the member (RFC 0107 fan-out).
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
   return this.toArel(aliases);
