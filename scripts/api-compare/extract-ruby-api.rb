@@ -572,6 +572,7 @@ class ApiExtractor
           fqn = current_fqn
           @classes[fqn] ||= new_class_info(const_name_str, fqn)
           @classes[fqn][:superclass] = "Struct"
+          synthesize_struct_members(fqn, struct_call)
           walk_body(body)
           @visibility_stack.pop
           @namespace_stack.pop
@@ -623,6 +624,7 @@ class ApiExtractor
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
+    synthesize_struct_members(fqn, node[2]) if superclass == "Struct"
 
     body = node[3] || node[2]
     @attr_names_stack.push(collect_attr_declarations(body))
@@ -632,6 +634,43 @@ class ApiExtractor
     @module_function_stack.pop
     @visibility_stack.pop
     @namespace_stack.pop
+  end
+
+  # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)
+  # generates a reader and a writer per member plus an `initialize` taking the
+  # members positionally, none of which appear in the source as `def`s. Without
+  # them the ported TS fields have no Ruby counterpart in the same file and score
+  # as extra/moved surface.
+  def synthesize_struct_members(fqn, struct_new_node)
+    target = @classes[fqn]
+    return unless target
+    names = extract_symbol_args(struct_new_node)
+    return if names.empty?
+
+    names.each do |name|
+      target[:instanceMethods] << {
+        name: name,
+        visibility: "public",
+        params: [],
+        file: @current_file,
+        line: @current_line,
+        reader: true,
+      }
+      target[:instanceMethods] << {
+        name: "#{name}=",
+        visibility: "public",
+        params: [{ name: "value", kind: "required" }],
+        file: @current_file,
+        line: @current_line,
+      }
+    end
+    target[:instanceMethods] << {
+      name: "initialize",
+      visibility: "public",
+      params: names.map { |name| { name: name, kind: "optional" } },
+      file: @current_file,
+      line: @current_line,
+    }
   end
 
   def process_sclass(node)

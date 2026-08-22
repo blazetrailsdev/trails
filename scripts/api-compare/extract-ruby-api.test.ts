@@ -1534,6 +1534,56 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
   });
 
+  // `class Attribute < Struct.new :relation, :name`
+  // (activerecord/lib/arel/attributes/attribute.rb:5) generates the member
+  // accessors and an `initialize`; none of them appear in the source as `def`s.
+  it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
+    const m = metaMethods(`
+      module Arel
+        class Attribute < Struct.new :relation, :name
+          def type_caster
+            relation.type_for_attribute(name)
+          end
+        end
+      end
+    `);
+    expect(m["Arel::Attribute"].map((x) => x.name).sort()).toEqual([
+      "initialize",
+      "name",
+      "name=",
+      "relation",
+      "relation=",
+      "type_caster",
+    ]);
+    const init = m["Arel::Attribute"].find((x) => x.name === "initialize")!;
+    expect(init.params).toEqual([
+      { name: "relation", kind: "optional" },
+      { name: "name", kind: "optional" },
+    ]);
+    const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
+    expect(reader.params).toEqual([]);
+  });
+
+  it("synthesizes the accessors a `CONST = Struct.new(...) do ... end` generates", () => {
+    const m = metaMethods(`
+      module Arel
+        Edge = Struct.new(:name, :from) do
+          def to_s
+            name
+          end
+        end
+      end
+    `);
+    expect(m["Arel::Edge"].map((x) => x.name).sort()).toEqual([
+      "from",
+      "from=",
+      "initialize",
+      "name",
+      "name=",
+      "to_s",
+    ]);
+  });
+
   it("unrolls a literal-array each loop that interpolates the loop variable", () => {
     const m = metaMethods(`
       module ClassMethods
