@@ -968,11 +968,6 @@ function walkTsFileSurface(
         interfaceMemberOf: null,
       });
     }
-    // `interfaceMembers` is what tells the two halves of a declaration-merged
-    // `interface`+`namespace` apart: only the names it lists came from the
-    // interface body, so a namespace member is not covered by the interface's
-    // exemption — the same split `collectTaggedEntries` applies to a tagged
-    // interface's members.
     const interfaceMembers = c.interfaceMembers;
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
       if (skipForeign && m.declaredIn !== undefined) continue;
@@ -1063,11 +1058,20 @@ export function collectInterfaceOnlyNames(
  * shape, so its members stay scored and stay tag-able — the drift case a
  * blanket member exemption would hide.
  *
+ * The exemption is deliberately NOT restricted to novel names, as the
+ * declaration one is: a structural stand-in's member routinely names a method
+ * some OTHER Rails class defines (`Arel::Table#table_alias`), which is exactly
+ * the moved row the wrong `.rb` was being charged for.
+ *
  * A name anything else in the file also contributes — a class member, a
  * top-level function, any declaration name — is excluded, on the same
  * reasoning as `collectInterfaceOnlyNames`: the extra set is a flat Set of
  * bare names, so one name carries one verdict and exempting on the
  * interface's behalf would silently absolve the other contributor.
+ * `interfaceMembers` is what tells the two halves of a declaration-merged
+ * `interface`+`namespace` apart — only the names it lists came from the
+ * interface body — the same split `collectTaggedEntries` applies to a tagged
+ * interface's members.
  */
 export function collectInterfaceMemberOnlyNames(
   file: string,
@@ -1648,12 +1652,6 @@ function buildPackageReport(
         interfaceExemptCount++;
         continue;
       }
-      // A member of an exempt-by-kind interface inherits its declaration's
-      // verdict — see `collectInterfaceMemberOnlyNames`. Unlike the
-      // declaration exemption this one is not restricted to novel names: a
-      // structural stand-in's member routinely names a method some OTHER Rails
-      // class defines (`Arel::Table#table_alias`), which is exactly the moved
-      // row the wrong `.rb` was being charged for.
       const memberOwners = interfaceMemberOnly.get(name);
       if (
         memberOwners !== undefined &&
