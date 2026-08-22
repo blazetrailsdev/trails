@@ -907,18 +907,6 @@ export function queryCastAttribute(
   return _queryCastAttribute.call(this as any, attrName, value);
 }
 /** @internal */
-export function isPrimaryKeyValuesPresent(this: InstanceMethodHost): boolean {
-  const pk = (this.constructor as any).primaryKey;
-  if (Array.isArray(pk)) {
-    return pk.every((col: string) => {
-      const v = this._readAttribute(col);
-      return v !== null && v !== undefined;
-    });
-  }
-  return this.id != null;
-}
-
-/** @internal */
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
   attr: string,

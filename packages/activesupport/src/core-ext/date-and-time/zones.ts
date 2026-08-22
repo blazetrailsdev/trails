@@ -18,6 +18,7 @@ import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
 import { instantFrom } from "../../temporal.js";
 import { toTime } from "../date/conversions.js";
+import { Object } from "../object/acts-like.js";
 
 /** A receiver of the mixin: the `Date` arm or the `Time` arm. */
 export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant;
@@ -43,6 +44,11 @@ export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant;
  * (`core-ext/date/conversions.ts`, `date/conversions.rb:83-86`), so both arms
  * of this receiver return one — `Temporal.Instant` is reachable only from the
  * `Time` arm's `time`.
+ *
+ * @missingRailsArgs acts_like? — PERMANENT: Ruby's `acts_like?(:time)` is a
+ * method ON the receiver; TypeScript cannot reopen `Date` or the `Temporal`
+ * types, so `core-ext/object/acts-like.ts` is the receiver-form reopening of
+ * `Object` and takes the receiver as its first argument.
  */
 export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
 export function inTimeZone(
@@ -54,7 +60,7 @@ export function inTimeZone(
   zone: unknown = currentZone(),
 ): TimeWithZone | Temporal.Instant {
   const timeZone = findZoneBang(zone);
-  const time = actsLikeTime(dateOrTime) ? dateOrTime : null;
+  const time = Object.actsLike(dateOrTime, "time") ? (dateOrTime as Date | Temporal.Instant) : null;
 
   if (timeZone) {
     return timeWithZone(dateOrTime, time, timeZone);
@@ -93,12 +99,4 @@ function timeWithZone(
  */
 function asInstant(time: Date | Temporal.Instant): Temporal.Instant {
   return time instanceof Temporal.Instant ? time : instantFrom(time);
-}
-
-/**
- * `acts_like?(:time)` for the two receivers this mixin sees: a
- * `Temporal.PlainDate` is the `Date` arm and never acts like a time.
- */
-function actsLikeTime(dateOrTime: DateOrTime): dateOrTime is Date | Temporal.Instant {
-  return !(dateOrTime instanceof Temporal.PlainDate);
 }

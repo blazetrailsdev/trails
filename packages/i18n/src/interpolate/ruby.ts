@@ -42,7 +42,7 @@ export function interpolate(string: string, values: unknown): string {
 }
 
 /**
- * @missingRailsCall call — Ruby's `value.call(values)` on a `respond_to?(:call)`
+ * @missingRailsCall call — PERMANENT: Ruby's `value.call(values)` on a `respond_to?(:call)`
  * value is plain invocation in JS; `Function#call` there takes a receiver, not
  * the argument list.
  */

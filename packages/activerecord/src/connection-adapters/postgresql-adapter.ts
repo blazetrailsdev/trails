@@ -3243,7 +3243,7 @@ export class PostgreSQLAdapter
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
    *
-   * @missingRailsCall check_int_in_range — Equivalent (RFC 0072
+   * @missingRailsCall check_int_in_range — PERMANENT: Equivalent (RFC 0072
    *   activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is
    *   a bare alias — `export const checkIntInRange = checkIntegerRange` — so the
    *   routed call is the alias target and the extractor never sees the alias
@@ -3260,7 +3260,7 @@ export class PostgreSQLAdapter
    * (postgresql/quoting.rb:127-131) — escape-only, so the inherited `quote`
    * dispatches here instead of the abstract backslash-doubling escape.
    *
-   * @missingRailsCall with_raw_connection — Language shortcoming: Rails'
+   * @missingRailsCall with_raw_connection — PERMANENT: Language shortcoming: Rails'
    *   quote_string escapes through the live connection (`with_raw_connection {
    *   |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres
    *   exposes no escape entry point at all — sync or async — and `quote_string`
@@ -3419,7 +3419,7 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * @missingRailsCall values_at — Per-entry verified (RFC 0072
+   * @missingRailsCall values_at — PERMANENT: Per-entry verified (RFC 0072
    *   converge-pg-extension-cluster-onto-internal-exec-query): Ruby's
    *   `split(".").values_at(-2, -1)` has no JS analogue;
    *   postgresql-adapter.ts#enableExtension expresses the identical
@@ -3436,7 +3436,7 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * @missingRailsCall values_at — Per-entry verified (RFC 0072
+   * @missingRailsCall values_at — PERMANENT: Per-entry verified (RFC 0072
    *   converge-pg-extension-cluster-onto-internal-exec-query): Ruby's
    *   `split(".").values_at(-2, -1)` discards the schema half;
    *   postgresql-adapter.ts#disableExtension takes `parts.at(-1)` directly,
@@ -3468,7 +3468,7 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * @missingRailsCall any? — Ruby-ism: `query_values(...).any?` is `names.length
+   * @missingRailsCall any? — PERMANENT: Ruby-ism: `query_values(...).any?` is `names.length
    *   > 0` in TS; `length` is a property access, not a call.
    */
   async foreignTableExists(tableName: string): Promise<boolean> {

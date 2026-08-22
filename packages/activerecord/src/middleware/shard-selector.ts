@@ -33,7 +33,7 @@ export class ShardSelector {
   }
 
   /**
-   * @missingRailsCall new — shard_selector.rb:41 wraps env in
+   * @missingRailsCall new — CONVERGEABLE: shard_selector.rb:41 wraps env in
    * ActionDispatch::Request.new(env); trails has no ActionDispatch, so call()
    * receives the request itself and constructs nothing.
    */

@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "create",
-    "call": "relation_class_for",
-    "reason": "Verified per-site (RFC 0106): homonym. `relation_class_for` is called by `Relation::ClassMethods.create(model, ...)` (delegation.rb:139-141), the relation-class constructor; relation.ts's `create` ports the unrelated `Relation#create(attributes, &block)` (relation.rb:154-161), which makes no such call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."

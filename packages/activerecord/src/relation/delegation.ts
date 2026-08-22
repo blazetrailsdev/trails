@@ -33,7 +33,7 @@ import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods
 type AnyCallable = (...args: any[]) => any;
 
 /** Constructor shape of the shared `Relation` class and its per-model subclasses. */
-type RelationCtor = new (modelClass: typeof Base, table?: any) => any;
+type RelationCtor = new (modelClass: typeof Base, table?: any, predicateBuilder?: any) => any;
 
 /**
  * The Delegation module interface.
@@ -112,7 +112,7 @@ export class GeneratedRelationMethods {
    * Install `fn` as this module's `name` method — Rails'
    * `GeneratedRelationMethods#generate_method` (delegation.rb:74-90).
    *
-   * @missingRailsCall include? — Verified per-site (RFC 0106): Rails'
+   * @missingRailsCall include? — PERMANENT: Verified per-site (RFC 0106): Rails'
    * `RESERVED_METHOD_NAMES.include?(method.to_s)` guard (delegation.rb:78, over
    * `ActiveSupport::Delegation::RESERVED_METHOD_NAMES`, delegation.rb:18)
    * selects between Ruby's two INSTALLATION spellings — `module_eval` string
@@ -476,6 +476,24 @@ export function relationClassFor(modelClass: typeof Base): RelationCtor {
     modelClass,
     _relationFamilySlot.relation,
   ) as RelationCtor;
+}
+
+/**
+ * Build a relation of `model`'s own relation class.
+ *
+ * Mirrors: ActiveRecord::Delegation::ClassMethods#create
+ * (relation/delegation.rb:139-141) — `relation_class_for(model).new(model, ...)`,
+ * whose remaining arguments are `Relation#initialize`'s keywords (`table:`,
+ * `predicate_builder:`) and are forwarded unchanged. The scope proxy is the
+ * trails half of what Ruby's per-model delegate class does for named scopes, so
+ * it is applied here rather than at each construction site.
+ */
+export function create(
+  model: typeof Base,
+  kwargs: { table?: any; predicateBuilder?: any } = {},
+): any {
+  const { table, predicateBuilder } = kwargs;
+  return wrapWithScopeProxy(new (relationClassFor(model))(model, table, predicateBuilder));
 }
 
 /**

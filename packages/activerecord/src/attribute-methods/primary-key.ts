@@ -12,13 +12,15 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
 
-interface PrimaryKeyRecord {
+/** @internal */
+export interface PrimaryKeyRecord {
   id: unknown;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  attributeBeforeTypeCast(attrName: string): unknown;
-  attributeWas(attrName: string): unknown;
-  attributeInDatabase(attrName: string): unknown;
+  _queryAttribute(name: string): boolean;
+  attributeBeforeTypeCast(name: string): unknown;
+  attributeWas(name: string): unknown;
+  attributeInDatabase(name: string): unknown;
 }
 
 /**
@@ -35,56 +37,25 @@ export function toKey(this: PrimaryKeyRecord): unknown[] | null {
 }
 
 /**
- * Check whether all primary key values are present.
- *
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#primary_key_values_present?
+ * One primary key column's `value_for_database`. Ruby indexes the attribute set
+ * and reads the value off it; `valueForDatabase` is a getter property here, and
+ * an unreflected column has no attribute to read it from.
  */
-export function isPrimaryKeyValuesPresent(this: PrimaryKeyRecord): boolean {
-  const pk = (this.constructor as any).primaryKey;
-  if (Array.isArray(pk)) {
-    return pk.every((col: string) => {
-      const v = this._readAttribute(col);
-      return v !== null && v !== undefined;
-    });
-  }
-  return this.id != null;
-}
-
-function readIdForDatabase(this: PrimaryKeyRecord): unknown {
-  const pk = (this.constructor as any).primaryKey;
-  const attrs = (this as any)._attributes;
+function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
+  const attrs = (record as any)._attributes;
   if (attrs?.getAttribute) {
-    if (Array.isArray(pk)) {
-      return pk.map((k: string) => {
-        const attr = attrs.getAttribute(k);
-        // valueForDatabase is a getter property, not a method
-        return attr != null && "valueForDatabase" in attr
-          ? attr.valueForDatabase
-          : this._readAttribute(k);
-      });
-    }
-    const attr = attrs.getAttribute(pk);
+    const attr = attrs.getAttribute(key);
     if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
   }
-  if (Array.isArray(pk)) return pk.map((k: string) => this._readAttribute(k));
-  return this._readAttribute(pk);
+  return record._readAttribute(key);
 }
 
 // ---------------------------------------------------------------------------
 // Instance accessor methods
 // ---------------------------------------------------------------------------
 
-/**
- * Ruby `Object#inspect`-style rendering for the `id=` TypeError message, mirroring
- * `CompositePrimaryKey#id=`'s `#{value.inspect}`.
- */
-function inspectValue(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return JSON.stringify(value);
-  return String(value);
-}
-
-interface PrimaryKeyInstance {
+/** @internal */
+export interface PrimaryKeyInstance {
   constructor: unknown;
   _queryAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
@@ -95,7 +66,6 @@ interface PrimaryKeyInstance {
 function readId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
   // Rails: `_read_attribute(@primary_key)`. A nil primary key reads through the
   // AttributeSet's Null attribute, returning nil without raising.
   return this._readAttribute(pk as string);
@@ -104,22 +74,7 @@ function readId(this: PrimaryKeyInstance): unknown {
 function writeId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  if (Array.isArray(pk)) {
-    // Rails: `raise TypeError unless value.is_a?(Enumerable)` then
-    // `@primary_key.zip(value)`. Mirror Ruby's Enumerable with the codebase's
-    // Array-or-Set analogue (see sanitization.ts `isEnumerable`) — deliberately
-    // not arbitrary iterables, so a String is a scalar that raises like Ruby.
-    if (!Array.isArray(value) && !(value instanceof Set)) {
-      throw new TypeError(
-        `Expected value matching [${pk.map((col) => JSON.stringify(col)).join(", ")}], got ${inspectValue(value)}.`,
-      );
-    }
-    // Rails' `@primary_key.zip(value)` pads short values with nil, so
-    // `id = [1]` writes nil to the trailing key part rather than leaving it
-    // untouched. Coerce past-the-end elements to null (not undefined) to match.
-    const values = Array.isArray(value) ? value : [...value];
-    pk.forEach((col, i) => this._writeAttribute(col, i < values.length ? values[i] : null));
-  } else if (pk == null) {
+  if (pk == null) {
     // Key-less model: Rails does NOT install the PrimaryKey `id=` override
     // without a primary key (`instance_method_already_implemented?` gates the
     // ID_ATTRIBUTE_METHODS on `primary_key`), so `id=` is the regular writer for
@@ -130,30 +85,28 @@ function writeId(this: PrimaryKeyInstance, value: unknown): void {
     // unreflected column and would swallow the dashboards raise).
     this.writeAttribute("id", value);
   } else {
-    this._writeAttribute(pk, value);
+    this._writeAttribute(pk as string, value);
   }
-}
-
-/**
- * Rails' `CompositePrimaryKey#id?` (composite_primary_key.rb:36-42) branches on
- * `composite_primary_key?` and answers `@primary_key.all? { |col| ... }`;
- * trails folds both arms here the way `readId` folds `CompositePrimaryKey#id`.
- */
-function readIdQuery(this: PrimaryKeyInstance): boolean {
-  const ctor = this.constructor as any;
-  const pk = ctor.primaryKey as string | string[] | null;
-  if (Array.isArray(pk)) return pk.every((col) => this._queryAttribute(col));
-  return this._queryAttribute(pk as string);
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
 export class PrimaryKey {
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id (primary_key.rb:18-20). */
   get id(): unknown {
     return readId.call(this as unknown as PrimaryKeyInstance);
   }
 
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#primary_key_values_present?
+   * (primary_key.rb:22-24) — `!!id`.
+   */
+  isPrimaryKeyValuesPresent(): boolean {
+    return (this as unknown as PrimaryKeyRecord).id != null;
+  }
+
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id= (primary_key.rb:28-30). */
   set id(value: unknown) {
     writeId.call(this as unknown as PrimaryKeyInstance, value);
   }
@@ -167,41 +120,45 @@ export class PrimaryKey {
    * "Generated attribute readers are properties".
    */
   get isId(): boolean {
-    return readIdQuery.call(this as unknown as PrimaryKeyInstance);
+    const record = this as unknown as PrimaryKeyRecord;
+    return record._queryAttribute(primaryKeyOf(record) as string);
   }
 
   /**
    * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_before_type_cast
-   * (primary_key.rb:49-51). A zero-arg Ruby reader, so an accessor property
+   * (primary_key.rb:39-41). A zero-arg Ruby reader, so an accessor property
    * here — see CLAUDE.md, "Generated attribute readers are properties".
    */
   get idBeforeTypeCast(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    const pk = (record.constructor as any).primaryKey;
-    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeBeforeTypeCast(col));
-    return record.attributeBeforeTypeCast(pk);
+    return record.attributeBeforeTypeCast(primaryKeyOf(record) as string);
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_was (primary_key.rb:54-56). */
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_was (primary_key.rb:44-46). */
   get idWas(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    const pk = (record.constructor as any).primaryKey;
-    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeWas(col));
-    return record.attributeWas(pk);
+    return record.attributeWas(primaryKeyOf(record) as string);
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_in_database (primary_key.rb:59-61). */
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_in_database (primary_key.rb:49-51). */
   get idInDatabase(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    const pk = (record.constructor as any).primaryKey;
-    if (Array.isArray(pk)) return pk.map((col: string) => record.attributeInDatabase(col));
-    return record.attributeInDatabase(pk);
+    return record.attributeInDatabase(primaryKeyOf(record) as string);
   }
 
-  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_for_database (primary_key.rb:64-66). */
+  /** Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id_for_database (primary_key.rb:54-56). */
   get idForDatabase(): unknown {
-    return readIdForDatabase.call(this as unknown as PrimaryKeyRecord);
+    const record = this as unknown as PrimaryKeyRecord;
+    return columnForDatabase(record, primaryKeyOf(record) as string);
   }
+}
+
+/**
+ * Ruby reads the record's `@primary_key` ivar, seeded from the class at
+ * `init_internals`; trails reads it off the class the record was built from.
+ */
+function primaryKeyOf(record: object): string | string[] {
+  return (record.constructor as any).primaryKey;
 }
 
 // ---------------------------------------------------------------------------

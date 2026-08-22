@@ -33,7 +33,7 @@ export class JSONGemEncoder {
    * has no `Hash#fetch`, so the presence check is an `in` guard and the branch
    * follows Ruby truthiness (nil and false only).
    *
-   * @missingRailsCall fetch — Ruby Hash#fetch has no JS call analogue; encode
+   * @missingRailsCall fetch — PERMANENT: Ruby Hash#fetch has no JS call analogue; encode
    *   reproduces its stored-value-wins semantics with an `in` guard rather than
    *   `??`.
    */
@@ -109,7 +109,7 @@ export class JSONGemEncoder {
    * nesting limit to lift. `JSON.stringify` returns `undefined` for `undefined`,
    * which has no Ruby analogue, so it becomes `null` as Ruby's `nil` would.
    *
-   * @missingRailsCall generate — ::JSON.generate is the Ruby JSON gem entry
+   * @missingRailsCall generate — PERMANENT: ::JSON.generate is the Ruby JSON gem entry
    *   point; JSON.stringify is its only JS analogue and already implements
    *   quirks_mode with no nesting limit.
    */

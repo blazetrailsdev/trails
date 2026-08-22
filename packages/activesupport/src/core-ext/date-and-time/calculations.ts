@@ -198,18 +198,6 @@ function fetch(hash: Record<string, number>, key: string): number {
 }
 
 /**
- * `self.acts_like?(:time)`. `Object.actsLike` asks the receiver for the marker
- * method, and neither of trails' two receivers carries one, so for `:time` the
- * arm itself is the answer — a JS `Date` and the `Temporal.Instant` its members
- * answer are moments, a `Temporal.PlainDate` is a calendar day.
- */
-function actsLike(dateOrTime: DateOrTime | DateOrInstant, duck: string): boolean {
-  if (duck !== "time") return Object.actsLike(dateOrTime, duck);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this arm is keyed on being one.
-  return dateOrTime instanceof Date || dateOrTime instanceof Temporal.Instant;
-}
-
-/**
  * Returns a new date/time representing yesterday.
  *
  * Mirrors: `DateAndTime::Calculations#yesterday` (`:20-22`)
@@ -562,7 +550,7 @@ export function beginningOfWeek(
   startDay: string = date.beginningOfWeek(),
 ): DateOrInstant {
   const result = daysAgo(dateOrTime as Date, daysToWeekStart(dateOrTime, startDay));
-  return actsLike(dateOrTime, "time") ? time.midnight(receiver(result) as Date) : result;
+  return Object.actsLike(dateOrTime, "time") ? time.midnight(receiver(result) as Date) : result;
 }
 
 /** Mirrors: `alias :at_beginning_of_week :beginning_of_week` (`:271`) */
@@ -673,14 +661,16 @@ export function prevOccurring(dateOrTime: DateOrTime, dayOfWeek: string): DateOr
 
 /** Mirrors: `DateAndTime::Calculations#first_hour` (`:358-360`) @internal */
 function firstHour(dateOrTime: DateOrInstant): DateOrInstant {
-  return actsLike(dateOrTime, "time")
+  return Object.actsLike(dateOrTime, "time")
     ? time.beginningOfDay(receiver(dateOrTime) as Date)
     : dateOrTime;
 }
 
 /** Mirrors: `DateAndTime::Calculations#last_hour` (`:362-364`) @internal */
 function lastHour(dateOrTime: DateOrInstant): DateOrInstant {
-  return actsLike(dateOrTime, "time") ? time.endOfDay(receiver(dateOrTime) as Date) : dateOrTime;
+  return Object.actsLike(dateOrTime, "time")
+    ? time.endOfDay(receiver(dateOrTime) as Date)
+    : dateOrTime;
 }
 
 /** Mirrors: `DateAndTime::Calculations#days_span` (`:366-368`) @internal */

@@ -13,8 +13,8 @@ describe("suppressedCallsIn", () => {
   it("returns the tagged calls, sorted and deduplicated", () => {
     const comment = block(
       "Prose.",
-      "@missingRailsCall synchronize — Ruby guards with Mutex#synchronize; trails is single-threaded.",
-      "@missingRailsCall reload — satisfied by the caller.",
+      "@missingRailsCall synchronize — PERMANENT: Ruby guards with Mutex#synchronize; trails is single-threaded.",
+      "@missingRailsCall reload — PERMANENT: satisfied by the caller.",
     );
     expect(suppressedCallsIn(comment)).toEqual(["reload", "synchronize"]);
   });
@@ -80,7 +80,7 @@ describe("suppressedCallsIn", () => {
     // generator writes keeps it a continuation, not a second tag.
     const comment = [
       "/**",
-      " * @missingRailsCall reset — the reader memoizes through",
+      " * @missingRailsCall reset — PERMANENT: the reader memoizes through",
       " *   @primary_key instead, so Rails' reset has no counterpart.",
       " */",
     ].join("\n");
@@ -89,7 +89,7 @@ describe("suppressedCallsIn", () => {
 
   it("never mints a suppression from a line-leading prose tag in a reason", () => {
     const comment = block(
-      "@missingRailsCall reset — see below.",
+      "@missingRailsCall reset — PERMANENT: see below.",
       "@primary_key is what the reader memoizes through.",
     );
     expect(suppressedCallsIn(comment)).toEqual(["reset"]);
@@ -97,12 +97,13 @@ describe("suppressedCallsIn", () => {
 
   it("parses a one-line comment carrying a tag", () => {
     expect(
-      suppressedCallsIn("/** @missingRailsCall first — the caller already ordered. */"),
+      suppressedCallsIn("/** @missingRailsCall first — PERMANENT: the caller already ordered. */"),
     ).toEqual(["first"]);
   });
 
   it("keeps the prose of a one-line comment out of the call set", () => {
-    const comment = "  /** Prose. @missingRailsCall first — the caller already ordered. */";
+    const comment =
+      "  /** Prose. @missingRailsCall first — PERMANENT: the caller already ordered. */";
     expect(suppressedCallsIn(comment)).toEqual(["first"]);
   });
 
@@ -115,6 +116,18 @@ describe("suppressedCallsIn", () => {
     expect(() => suppressedCallsIn(comment, { fileName: "a/b.ts", startLine: 10 })).toThrow(
       /a\/b\.ts:11/,
     );
+  });
+
+  it("throws on a reason making no permanence claim", () => {
+    expect(() => suppressedCallsIn(block("@missingRailsCall first — the caller ordered."))).toThrow(
+      /needs a permanence claim/,
+    );
+  });
+
+  it("accepts a CONVERGEABLE reason", () => {
+    expect(
+      suppressedCallsIn(block("@missingRailsCall first — CONVERGEABLE: pending RFC 0107.")),
+    ).toEqual(["first"]);
   });
 
   it("does not treat the seeded placeholder as a justification", () => {

@@ -292,7 +292,7 @@ export class ErrorReporter {
   }
 
   /**
-   * @missingRailsCall first — Ruby walks `error.backtrace_locations.first&.path`
+   * @missingRailsCall first — PERMANENT: Ruby walks `error.backtrace_locations.first&.path`
    * to shift this file's frames off the backtrace its `raise` just manufactured.
    * JS' `throw`/`catch` manufactures nothing, so there is no list to walk;
    * `Error.captureStackTrace`'s `constructorOpt` elides the same frames at
