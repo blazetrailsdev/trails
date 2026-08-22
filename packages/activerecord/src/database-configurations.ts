@@ -404,7 +404,14 @@ export class DatabaseConfigurations {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall parse — PERMANENT: Verified per-site (RFC 0106): `URI.parse(url)`
+   *   (`database_configurations.rb:255`) — the body only needs the scheme, and
+   *   Ruby's `URI.parse` raises on what `new URL()` accepts (and vice versa), so
+   *   the scheme test is a regex. `parse` has no TS call spelling here.
+   */
   private buildDbConfigFromString(envName: string, name: string, config: string): DatabaseConfig {
     const url = config;
     if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {

@@ -144,6 +144,11 @@ export class MySQLDatabaseTasks {
     DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
   }
 
+  /**
+   * @missingRailsCall new — PERMANENT: Verified per-site (RFC 0106): `Hash.new.tap {
+   *   |options| ... }` (`mysql_database_tasks.rb:84`) — a fresh Hash is an
+   *   object literal in TS; `Hash.new` has no TS call spelling.
+   */
   private creationOptions(): { charset?: string; collation?: string } {
     // `Hash#include?` is key presence, not a defined value, so a key stored
     // with an explicit nil still emits its option.
@@ -243,7 +248,14 @@ export class MySQLDatabaseTasks {
     await Base.establishConnection(config as { adapter?: string; [key: string]: unknown });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `configuration_hash.merge(database: nil)` (`mysql_database_tasks.rb:80`) —
+   *   a non-mutating Hash merge is an object spread in TS, which is not a
+   *   `merge` call the comparator can credit.
+   */
   private configurationHashWithoutDatabase(): ConfigHash {
     return { ...this.configurationHash, database: null };
   }

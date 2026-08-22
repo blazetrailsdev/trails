@@ -265,6 +265,16 @@ export class FileStore extends Store implements CacheStore {
   }
 
   // Translate a file path into a key (file_store.rb:184-187).
+  /**
+   * @missingRailsCall delete — PERMANENT: JS String#split's limit truncates the remainder
+   *   where Ruby's keeps it joined, so `split(SEPARATOR,
+   *   4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand
+   *   TS form; the slice(3).join('') chain computes the same string.
+   * @missingRailsCall last — PERMANENT: JS String#split's limit truncates the remainder
+   *   where Ruby's keeps it joined, so `split(SEPARATOR,
+   *   4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand
+   *   TS form; the slice(3).join('') chain computes the same string.
+   */
   protected filePathKey(path: string): string {
     const sep = getPath().sep;
     // Ruby `split(File::SEPARATOR, 4).last.delete(File::SEPARATOR)`: the limit

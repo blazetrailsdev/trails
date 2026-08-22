@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations.ts",
-    "rubyName": "build_db_config_from_string",
-    "call": "parse",
-    "reason": "Verified per-site (RFC 0106): `URI.parse(url)` (`database_configurations.rb:255`) — the body only needs the scheme, and Ruby's `URI.parse` raises on what `new URL()` accepts (and vice versa), so the scheme test is a regex. `parse` has no TS call spelling here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
     "rubyName": "default_env",
     "call": "call",
     "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s` (`database_configurations.rb:189`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; porting it is filed as `port-connection-handling-default-env-proc`."

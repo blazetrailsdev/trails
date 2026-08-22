@@ -41,7 +41,14 @@ export class MessageEncryptor extends Codec {
     return this.useAuthenticatedMessageEncryption ? "aes-256-gcm" : "aes-256-cbc";
   }
 
-  /** Given a cipher, returns the key length of the cipher in bytes. */
+  /**
+   * Given a cipher, returns the key length of the cipher in bytes.
+   *
+   * @missingRailsCall new — PERMANENT: Rails' key_len is
+   *   `OpenSSL::Cipher.new(cipher).key_len`; trails has no OpenSSL::Cipher
+   *   binding, so keyLen derives the byte length from the cipher name instead of
+   *   instantiating a cipher.
+   */
   static keyLen(cipher: string = this.defaultCipher()): number {
     const match = cipher.match(/(\d+)/);
     return match ? parseInt(match[1], 10) / 8 : 32;
@@ -212,6 +219,11 @@ export class MessageEncryptor extends Codec {
   /**
    * Stands in for Ruby's `OpenSSL::Cipher.new(@cipher)`, which trails has no
    * analogue for. Reports only the three properties Rails reads off it.
+   *
+   * @missingRailsCall new — PERMANENT: Same gap as `key_len` above: Rails' new_cipher is
+   *   `OpenSSL::Cipher.new(@cipher)` (message_encryptor.rb:367-369) and trails
+   *   has no OpenSSL::Cipher binding, so newCipher returns a spec derived from
+   *   the cipher name instead of instantiating a cipher.
    */
   private newCipher(): { keyLen: number; ivLen: number; authenticated: boolean } {
     const ctor = this.constructor as typeof MessageEncryptor;

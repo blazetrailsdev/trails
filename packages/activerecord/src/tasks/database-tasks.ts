@@ -621,6 +621,15 @@ export class DatabaseTasks {
     return this.collation(dbConfig[0]);
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `ENV["VERSION"].empty?` (database_tasks.rb:324) — `empty?` on a Ruby
+   *   String, whose faithful JS spelling is `s === ""`. That emits no callee, so
+   *   no TS call can ever credit the Ruby one. The gate flags it only because
+   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
+   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+   *   nothing in the TS body was dropped.
+   */
   static targetVersion(): number | null {
     // TRAILS_MIGRATION_VERSION is canonical; VERSION is the legacy fallback (one-release window).
     const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
@@ -1034,6 +1043,12 @@ export class DatabaseTasks {
     }
   }
 
+  /**
+   * @missingRailsCall load — PERMANENT: Verified per-site (RFC 0106): Ruby's `load(file)`
+   *   (`database_tasks.rb:386`) evaluates a Ruby schema file; a TS/JS schema
+   *   file is an ES module, so the port awaits a dynamic `import()` of its file
+   *   URL. `load` has no TS call spelling.
+   */
   static async loadSchema(
     dbConfig: DatabaseConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
@@ -1490,6 +1505,13 @@ export class DatabaseTasks {
     return {};
   }
 
+  /**
+   * @missingRailsCall new — PERMANENT: Verified per-site (RFC 0106):
+   *   `ActiveRecord::DatabaseConfigurations.new(databases)`
+   *   (`database_tasks.rb:144`) — the TS signature takes the already-built
+   *   `DatabaseConfigurations`, because the Rails caller is the railtie hash and
+   *   trails has no `Rails` constant to branch on at `:142`.
+   */
   static forEach(databases: DatabaseConfigurations, fn: (name: string) => void): void {
     const env = this.env;
     const configs = databases.configsFor({ envName: env });

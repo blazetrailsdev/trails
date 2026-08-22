@@ -86,6 +86,12 @@ export class HashBuilder {
   hash: XmlHash = {};
   private _hashStack: XmlHash[] = [];
 
+  /**
+   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@hash_stack.last`
+   *   (nokogirisax.rb:25) is the positional read
+   *   `this._hashStack[this._hashStack.length - 1]`; `Array#last` has no JS call
+   *   form (RFC 0092 positional-idiom-analogues).
+   */
   get currentHash(): XmlHash {
     return this._hashStack[this._hashStack.length - 1];
   }
@@ -123,6 +129,12 @@ export class HashBuilder {
     this._hashStack.push(newHash);
   }
 
+  /**
+   * @missingRailsCall delete — PERMANENT: Per-entry verified: Rails nokogirisax.rb:57-59
+   *   calls `current_hash.delete(HASH_SIZE_KEY)` / `.delete(CONTENT_KEY)`; TS
+   *   spells both with the `delete` operator on the plain object, which is not a
+   *   call node.
+   */
   endElement(_name: string): void {
     const currentHash = this.currentHash;
     const length = Object.keys(currentHash).length;

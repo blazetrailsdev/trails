@@ -143,6 +143,12 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     }
   }
 
+  /**
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `format_options.merge(opts)` (number_converter.rb:142) is object spread `{
+   *   ...this.formatOptions(), ...this.opts }`; `Hash#merge` has no JS call
+   *   form.
+   */
   protected get options(): Record<string, unknown> {
     if (!this._options) {
       this._options = { ...this.formatOptions(), ...this.opts };
