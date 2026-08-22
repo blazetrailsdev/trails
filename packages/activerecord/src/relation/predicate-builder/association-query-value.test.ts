@@ -93,7 +93,7 @@ describe("AssociationQueryValue", () => {
       const reselected: string[] = [];
       const fakeRelation = {
         _model: {},
-        toArel() {
+        arel() {
           return null;
         },
         selectValues: [],

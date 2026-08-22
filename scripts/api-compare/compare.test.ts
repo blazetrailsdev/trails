@@ -431,11 +431,11 @@ describe("significantMissingCalls", () => {
       // RFC 0107 — then reddened `to_sql`, `create_or_find_by` and
       // `apply_join_dependency` with no edit to any of their bodies.
       const sameFile = new Map<string, string[]>([
-        ["_buildEagerOperandManager", ["length", "toArel"]],
+        ["_buildEagerOperandManager", ["length", "arel"]],
         ["length", ["toArray"]],
         ["toArray", ["withConnection", "execQueries"]],
       ]);
-      const own = new Set(["_buildEagerOperandManager", "_conn", "toArel"]);
+      const own = new Set(["_buildEagerOperandManager", "_conn", "arel"]);
       const calls = (n: string) => sameFile.get(n);
       // `xs` is a local, so the extractor marks the read foreign for the owner
       // that made it — which is what stops the walk, no name-list needed.

@@ -404,7 +404,7 @@ describe("RelationTest", () => {
     }
     // SelectManager#as produces a Nodes.TableAlias — mirrors Rails'
     // `relation.arel.as("ranked")` as the from() argument.
-    const ranked = Book.select("title").toArel().as("ranked");
+    const ranked = Book.select("title").arel().as("ranked");
     const result = Book.from(ranked).where("ranked.title IS NOT NULL").toSql();
     expect(result).toContain("FROM (SELECT");
     expect(result).toContain(") ranked");
@@ -1113,10 +1113,10 @@ describe("lock_value stores the argument", () => {
   // The SQLite visitor drops the LOCK node entirely (arel/visitors/sqlite.rb),
   // so assert against the AST rather than the rendered SQL.
   it("builds the Arel default clause for a bare lock", () => {
-    expect((CanonPost.all().toArel() as any).ast.lock).toBe(null);
-    expect(String((CanonPost.all().lock().toArel() as any).ast.lock.expr)).toBe("FOR UPDATE");
-    expect((CanonPost.all().lock(false).toArel() as any).ast.lock).toBe(null);
-    expect(String((CanonPost.all().lock("FOR SHARE").toArel() as any).ast.lock.expr)).toBe(
+    expect((CanonPost.all().arel() as any).ast.lock).toBe(null);
+    expect(String((CanonPost.all().lock().arel() as any).ast.lock.expr)).toBe("FOR UPDATE");
+    expect((CanonPost.all().lock(false).arel() as any).ast.lock).toBe(null);
+    expect(String((CanonPost.all().lock("FOR SHARE").arel() as any).ast.lock.expr)).toBe(
       "FOR SHARE",
     );
   });

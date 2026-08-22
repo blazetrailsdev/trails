@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
-    "call": "arel",
-    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_main_query",
     "call": "wrap",
     "reason": "Verified per-site (RFC 0106): relation.rb:1426 is `FutureResult.wrap([])`, the async arm of the `@none` short-circuit. trails has no FutureResult — `loadAsync` memoizes the load PROMISE itself (relation.ts:753-765) because instantiation/eager-loading/preloading are all awaited inside `execQueries` — so the async arm returns the same `Result.empty()` the sync arm does."
   },
@@ -33,13 +26,6 @@
     "rubyName": "to_sql",
     "call": "apply_join_dependency",
     "reason": "Verified per-site (RFC 0106): relation.rb:1211-1215 renders the eager arm inside an `apply_join_dependency` block. trails' `toSql` is synchronous (relation.ts:1935) while `applyJoinDependency` is async, so the eager arm renders the aliased manager `_buildEagerOperandManager()` returns instead. Retires with the build_arel/apply_join_dependency routing convergence (story relation-arel-build-arel-routing), not here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "to_sql",
-    "call": "arel",
-    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
   },
   {
     "package": "activerecord",

@@ -5,6 +5,7 @@ import {
   RecordNotFound,
   RecordInvalid,
   IrreversibleOrderError,
+  UnmodifiableRelation,
   registerModel,
   registerSubclass,
   Base,
@@ -2241,10 +2242,11 @@ describe("RelationTest", () => {
   });
 
   it("relations with cached arel can't be mutated [internal API]", () => {
-    const rel = Post.all();
-    const withWhere = rel.where({ title: "foo" });
-    expect(withWhere).not.toBe(rel);
-    expect(rel.toSql()).not.toContain("foo");
+    const rel = Post.all() as any;
+    rel.arel();
+
+    expect(() => rel.limitBang(5)).toThrow(UnmodifiableRelation);
+    expect(() => rel.whereBang("1 = 2")).toThrow(UnmodifiableRelation);
   });
 
   it("relations show the records in #inspect", async () => {
