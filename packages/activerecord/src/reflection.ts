@@ -2173,7 +2173,7 @@ export function addReflection(
   // declaration order (the has_many :through order check in checkValidityBang
   // depends on it).
   const reflections: Record<string, unknown> = except(
-    ((ar as any)._reflections ?? {}) as Record<string, unknown>,
+    (ar as any)._reflections as Record<string, unknown>,
     name,
   );
   reflections[name] = reflection;

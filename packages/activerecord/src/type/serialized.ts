@@ -299,10 +299,9 @@ export class Serialized extends ValueType {
 
   private isDefaultValue(value: unknown): boolean {
     // Ruby has one nil; `undefined` and `null` both stand for it here, and
-    // `valuesEqual` (a `===` fallback on leaves) would not equate them.
-    const nilNormalized = value === undefined ? null : value;
-    const coderDefault = this.coder.load(null);
-    return valuesEqual(nilNormalized, coderDefault === undefined ? null : coderDefault);
+    // `valuesEqual`'s `===` fallback on leaves would not equate them, so both
+    // operands are normalized onto `null` first.
+    return valuesEqual(value ?? null, this.coder.load(null) ?? null);
   }
 
   /**
