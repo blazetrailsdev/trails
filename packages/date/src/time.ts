@@ -284,7 +284,7 @@ export class Time {
    */
   #instant: Temporal.Instant;
   /** @internal The receiver's zone, or `null` when it was built from an offset. */
-  readonly #timeZoneId: string | null;
+  #timeZoneId: string | null;
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   #utcOffset: number;
 
@@ -319,8 +319,10 @@ export class Time {
    * disambiguation picks the earlier offset for the repeated hour after a DST
    * fall-back — so `Time.at(t)` could answer an instant an hour from `t`.
    */
-  static #atInstant(instant: Temporal.Instant): Time {
-    const zoned = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+  static #atInstant(instant: Temporal.Instant, zone: string | number | null = null): Time {
+    const timeZoneId =
+      zone == null ? Temporal.Now.timeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
+    const zoned = instant.toZonedDateTimeISO(timeZoneId);
     const time = new Time(
       zoned.year,
       zoned.month,
@@ -334,6 +336,7 @@ export class Time {
       ),
     );
     time.#instant = instant;
+    time.#timeZoneId = typeof zone === "number" ? null : timeZoneId;
     time.#utcOffset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
     return time;
   }
@@ -347,15 +350,21 @@ export class Time {
    * `123456789`, and `Time.at(-0.5).to_i` is `-1`.
    *
    * A `Time` is taken too — MRI's `time_s_at` reads its `timespec` and answers
-   * a Time naming the same instant — and then `microseconds_with_frac` is not
-   * part of the seat.
+   * a Time naming the same instant, in the argument's OWN zone rather than the
+   * local one: `Time.at(Time.new(2020, 1, 1, 0, 0, 0, "+05:00")).utc_offset` is
+   * `18000` under any `TZ`, and `Time.at(Time.utc(2020, 1, 1)).utc?` is true.
+   * A second argument alongside it is a `TypeError` (`num_exact`), not a
+   * microsecond, because `time_s_at` reaches `Time` before `num_exact` runs.
    */
   static at(
     seconds: number | bigint | Rational | Time,
     microsecondsWithFrac: number | bigint | Rational = 0,
   ): Time {
     if (seconds instanceof Time) {
-      return Time.#atInstant(seconds.#instant);
+      if (microsecondsWithFrac !== 0) {
+        throw new TypeError("can't convert Time into an exact number");
+      }
+      return Time.#atInstant(seconds.#instant, seconds.#timeZoneId ?? seconds.#utcOffset);
     }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
