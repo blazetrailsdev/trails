@@ -11,8 +11,6 @@
 import { camelize, CodeGenerator, include, Module } from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
-  hasAttribute(name: string): boolean;
-  attributePresent(name: string): boolean;
   attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
   respondTo(method: string): boolean;
 }
@@ -126,8 +124,10 @@ export class AttributeMethodPattern {
 
 /** Minimum shape required of an instance accessed through a generated attribute method closure. */
 interface ReadWriteHost {
-  readAttribute(name: string): unknown;
-  writeAttribute(name: string, value: unknown): void;
+  /** @internal */
+  _readAttribute(name: string): unknown;
+  /** @internal */
+  _writeAttribute(name: string, value: unknown): void;
   [key: string]: unknown;
 }
 
@@ -801,10 +801,10 @@ export function defineMethodAttribute(
               `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
             );
           }
-          return this.readAttribute(canonicalName);
+          return this._readAttribute(canonicalName);
         },
         set(this: ReadWriteHost, value: unknown) {
-          this.writeAttribute(canonicalName, value);
+          this._writeAttribute(canonicalName, value);
         },
         configurable: true,
       });

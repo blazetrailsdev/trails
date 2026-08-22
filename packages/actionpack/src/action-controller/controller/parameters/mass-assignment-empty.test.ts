@@ -21,7 +21,7 @@ describe("MassAssignmentEmptyParametersTest", () => {
     expect(() => {
       record = new Account(params as unknown as Record<string, unknown>);
     }).not.toThrow();
-    expect(record!.readAttribute("name")).toBeNull();
+    expect(record!._readAttribute("name")).toBeNull();
   });
 
   it("non-empty Parameters proceeds past the empty-bag guard at construction", () => {
@@ -55,6 +55,6 @@ describe("ParametersForbiddenAttributesTest", () => {
     const params = new Parameters({ name: "Bob" }).permitAll();
     expect(params.permitted).toBe(true);
     const record = new Account(params as unknown as Record<string, unknown>);
-    expect(record.readAttribute("name")).toBe("Bob");
+    expect(record._readAttribute("name")).toBe("Bob");
   });
 });

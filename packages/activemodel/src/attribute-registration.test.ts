@@ -61,7 +61,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const m = new MyModel({ count: "5" });
-    expect(m.readAttribute("count")).toBe(5);
+    expect(m._readAttribute("count")).toBe(5);
   });
 
   it("default value can be specified", () => {
@@ -71,7 +71,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("status")).toBe("pending");
+    expect(m._readAttribute("status")).toBe("pending");
   });
 
   it("default value can be nil", () => {
@@ -81,7 +81,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("name")).toBeNull();
+    expect(m._readAttribute("name")).toBeNull();
   });
 
   it(".type_for_attribute returns the default type when an unregistered attribute is specified", () => {
@@ -183,7 +183,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const c = new Child({ name: "5" });
-    expect(c.readAttribute("name")).toBe(5);
+    expect(c._readAttribute("name")).toBe(5);
   });
 
   it("superclass attributes can be overridden", () => {
@@ -198,7 +198,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const c = new Child({});
-    expect(c.readAttribute("name")).toBe("child");
+    expect(c._readAttribute("name")).toBe("child");
   });
 
   it("superclass default values can be overridden", () => {
@@ -213,7 +213,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const c = new Child({});
-    expect(c.readAttribute("status")).toBe("inactive");
+    expect(c._readAttribute("status")).toBe("inactive");
   });
 
   it(".decorate_attributes decorates specified attributes", () => {
@@ -327,7 +327,7 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const p = new Person({ age: "25" });
-    expect(p.readAttribute("age")).toBe(25);
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it(".attribute_types reflects registered attribute types", () => {

@@ -432,8 +432,8 @@ export function prepareValueForValidation(
   if (cameFromUser in r) {
     if (r[cameFromUser]) {
       rawValue = r[`${attrName}BeforeTypeCast`];
-    } else if (typeof r.readAttribute === "function") {
-      rawValue = r.readAttribute(attrName);
+    } else if (typeof r._readAttribute === "function") {
+      rawValue = r._readAttribute(attrName);
     }
   } else {
     const beforeTypeCast = `${attrName}BeforeTypeCast`;
@@ -449,7 +449,7 @@ export function prepareValueForValidation(
 
 interface RecordWithRawAttribute {
   attributeChangedInPlace?: (name: string) => boolean;
-  readAttribute?: (name: string) => unknown;
+  _readAttribute?: (name: string) => unknown;
   [key: string]: unknown;
 }
 

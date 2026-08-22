@@ -51,7 +51,7 @@ class Topic extends Model {
   // suffix, reading the ivar directly.
   attributeBeforeTypeCast(attr: string): unknown {
     if (attr === "price") return this._price;
-    return this.readAttributeBeforeTypeCast(attr);
+    return this._attributes.getAttribute(attr).valueBeforeTypeCast;
   }
 }
 

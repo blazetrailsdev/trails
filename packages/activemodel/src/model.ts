@@ -1467,16 +1467,6 @@ export class Model {
     }
   }
 
-  readAttribute(name: string, block?: (name: string) => unknown): unknown {
-    // Rails resolves alias_attribute names in `read_attribute`
-    // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
-    // skips it. Resolved against the loaded attribute set so the trails
-    // camelCase-key bridge cannot displace a name the record already owns.
-    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
-    if (this._attributes.has(resolved)) this._accessedFields.add(resolved);
-    return this._attributes.fetchValue(resolved, block) ?? null;
-  }
-
   /**
    * @internal
    * Mirrors AR `_read_attribute(attr_name, &block)` — reads directly from the
@@ -1494,15 +1484,6 @@ export class Model {
     this._writeAttribute(name, value);
   }
 
-  writeAttribute(name: string, value: unknown): void {
-    // Alias-resolve on the public write path; aliased writes land on the
-    // canonical attribute's dirty state (Rails `write_attribute`,
-    // write.rb:31-34). Resolved against the loaded attribute set to stay
-    // coherent with `readAttribute` / `hasAttribute`.
-    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
-    this._writeAttribute(resolved, value);
-  }
-
   /** @internal */
   _writeAttribute(name: string, value: unknown): void {
     this._attributes.writeFromUser(name, value);
@@ -1513,52 +1494,9 @@ export class Model {
     this._dirty.attributeWritten(name, newValue, value, this._attributes.getAttribute(name).type);
   }
 
-  /**
-   * Read the raw (uncast) value of an attribute.
-   *
-   * Mirrors: ActiveModel::Dirty#attribute_before_type_cast
-   */
-  readAttributeBeforeTypeCast(name: string): unknown {
-    const resolved = (this.constructor as typeof Model).resolveAttributeName(name);
-    return this._attributes.getAttribute(resolved).valueBeforeTypeCast ?? null;
-  }
-
   /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
   get includeRootInJson(): boolean | string {
     return (this.constructor as typeof Model).includeRootInJson;
-  }
-
-  /**
-   * Get all attributes before type cast as a plain object.
-   *
-   * Mirrors: ActiveModel::Attributes#attributes_before_type_cast
-   */
-  get attributesBeforeTypeCast(): Record<string, unknown> {
-    return this._attributes.valuesBeforeTypeCast();
-  }
-
-  /**
-   * Get the type/metadata for an attribute.
-   *
-   * Mirrors: ActiveRecord::Base.column_for_attribute
-   */
-  columnForAttribute(name: string): { name: string; type: Type } | null {
-    const klass = this.constructor as typeof Model;
-    if (!Object.hasOwn(klass.attributeTypes(), name)) return null;
-    return { name, type: klass.typeForAttribute(name) };
-  }
-
-  /**
-   * Check if this model has the given attribute defined.
-   *
-   * Mirrors: ActiveRecord::AttributeMethods#has_attribute? — `attr_name =
-   * self.class.attribute_aliases[attr_name] || attr_name` then
-   * `@attributes.key?(attr_name)` (activerecord/attribute_methods.rb:316-320).
-   */
-  hasAttribute(name: string): boolean {
-    let attrName = String(name);
-    attrName = (this.constructor as typeof Model).attributeAliases[attrName] ?? attrName;
-    return this._attributes.isKey(attrName);
   }
 
   /**
@@ -1568,13 +1506,6 @@ export class Model {
    * methods and cannot carry an accessor's type across the mixin.
    */
   declare attributes: Record<string, unknown>;
-
-  attributePresent(name: string): boolean {
-    const value = this.readAttribute(name);
-    if (value === null || value === undefined) return false;
-    if (typeof value === "string" && value.trim() === "") return false;
-    return true;
-  }
 
   // Rails `validation_context` holds either a single Symbol or an
   // Array<Symbol> (or nil). `valid?([:create, :publish])` round-trips
@@ -1892,7 +1823,7 @@ export class Model {
   get attributesInDatabase(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this._dirty.changedAttributeNames) {
-      result[name] = this._dirty.attributeWas(name) ?? this.readAttribute(name);
+      result[name] = this._dirty.attributeWas(name) ?? this._readAttribute(name);
     }
     return result;
   }
@@ -1923,7 +1854,7 @@ export class Model {
   attributePreviouslyWas(name: string): unknown {
     name = (this.constructor as typeof Model).resolveAttributeName(name);
     const change = this._dirty.previousChanges[name];
-    return change ? change[0] : this.readAttribute(name);
+    return change ? change[0] : this._readAttribute(name);
   }
 
   restoreAttributes(): void {
@@ -2098,7 +2029,7 @@ export class Model {
       }
     }
     for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
+      this._writeAttribute(key, value);
     }
     return this;
   }
@@ -2236,7 +2167,9 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place?
    */
   attributeChangedInPlace(name: string): boolean {
-    const current = this.readAttribute(name);
+    const current = this._readAttribute(
+      (this.constructor as typeof Model).resolveAttributeName(name),
+    );
     const recorded = this._dirty.mutationsFromDatabase[name];
     if (recorded) return current !== recorded[1];
     const original = this._dirty.attributeWas(name);
@@ -2253,7 +2186,7 @@ export class Model {
   toKey(): unknown[] | null {
     // conversion.rb:67-70 — `key = respond_to?(:id) && id; key ? Array(key) : nil`.
     // `Array(key)` is what keeps a composite `id` from being double-wrapped.
-    const key = this.respondTo("id") ? this.readAttribute("id") : false;
+    const key = this.respondTo("id") ? this._readAttribute("id") : false;
     return key != null && key !== false ? wrap(key) : null;
   }
 
@@ -2290,7 +2223,7 @@ export class Model {
   slice(...methods: (string | string[])[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const m of methods.flat()) {
-      result[m] = this.readAttribute(m);
+      result[m] = this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m));
     }
     return result;
   }
@@ -2301,7 +2234,9 @@ export class Model {
    * Mirrors: ActiveModel::Access#values_at
    */
   valuesAt(...methods: (string | string[])[]): unknown[] {
-    return methods.flat().map((m) => this.readAttribute(m));
+    return methods
+      .flat()
+      .map((m) => this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m)));
   }
 
   runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown {

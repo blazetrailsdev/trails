@@ -277,7 +277,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
           (_r: any) => {
             log.push("before");
           },
-          { if: (r: any) => r.readAttribute("name") === "trigger" },
+          { if: (r: any) => r._readAttribute("name") === "trigger" },
         );
       }
     }

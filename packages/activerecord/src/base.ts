@@ -201,6 +201,7 @@ import {
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
   pkAttribute as _pkAttribute,
+  readAttributeBeforeTypeCast as _readAttributeBeforeTypeCast,
   readAttributeForDatabase as _readAttributeForDatabase,
   attributesForDatabase as _attributesForDatabase,
   attributeBeforeTypeCast as _attributeBeforeTypeCast,
@@ -232,11 +233,15 @@ import {
 } from "./attribute-methods/primary-key.js";
 import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
 import {
+  readAttribute as _readAttribute,
   _readAttribute as _readAttributeFn,
   defineMethodAttribute as _defineMethodAttribute,
 } from "./attribute-methods/read.js";
 import { setDefineMethodAttribute as _setDefineMethodAttribute } from "./attribute-methods/write.js";
-import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
+import {
+  attributeCameFromUser as _attributeCameFromUser,
+  attributesBeforeTypeCast as _attributesBeforeTypeCastFn,
+} from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -3832,6 +3837,9 @@ export class Base extends Model {
 
   declare hasAttribute: (name: string) => boolean;
   declare attributePresent: (name: string) => boolean;
+  declare readAttributeBeforeTypeCast: (name: string) => unknown;
+  declare readonly attributesBeforeTypeCast: Record<string, unknown>;
+  declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
   declare queryAttribute: (name: string) => boolean;
@@ -4734,6 +4742,8 @@ include(Base, {
   // Serialization
   serializableHash: Serialization.serializableHash,
   // AttributeMethods
+  readAttribute: _readAttribute,
+  readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
@@ -4750,6 +4760,17 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
+// before_type_cast.rb:82 — a Ruby zero-arg reader ports as an accessor property
+// (CLAUDE.md, "Generated attribute readers are properties"), and include()
+// copies the object literal by value, which would flatten the getter into a
+// data property. Install the descriptor directly instead.
+Object.defineProperty(Base.prototype, "attributesBeforeTypeCast", {
+  get(this: Base) {
+    return _attributesBeforeTypeCastFn(this as never);
+  },
+  configurable: true,
+});
+include(Base, ModelSchema.InstanceMethods);
 include(Base, _PrimaryKey);
 // Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
 // Array (primary_key.rb:132); each of its bodies opens with the
@@ -4888,10 +4909,6 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
-  // (readAttributeBeforeTypeCast is a method, attributesBeforeTypeCast is a getter).
-  // The re-exports in before-type-cast.ts call record.<methodName>(), so wiring
-  // them would create cycles. Category A: inherited, extractor limitation.
   // savedChanges/hasChangesToSave/changesToSave/changedAttributeNamesToSave/
   // attributesInDatabase — getters on Model.prototype; wiring via include() replaces
   // the getter descriptor with a data property and breaks behavior. Category A.

@@ -9,8 +9,8 @@ describe("FloatType (trails)", () => {
       }
     }
     const m = new MyModel({ value: 1.5 });
-    m.writeAttribute("value", 2.5);
-    expect(m.readAttribute("value")).toBe(2.5);
+    m._writeAttribute("value", 2.5);
+    expect(m._readAttribute("value")).toBe(2.5);
     expect(m.attributeChanged("value")).toBe(true);
   });
 

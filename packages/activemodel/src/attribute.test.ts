@@ -13,8 +13,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("count")).toBe(0);
-    expect(m.readAttribute("count")).toBe(0);
+    expect(m._readAttribute("count")).toBe(0);
+    expect(m._readAttribute("count")).toBe(0);
   });
 
   it("from_user + value_for_database type casts from the user to the database", () => {
@@ -24,7 +24,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ age: "25" });
-    expect(m.readAttribute("age")).toBe(25);
+    expect(m._readAttribute("age")).toBe(25);
   });
 
   it("from_user + value_for_database uses serialize_cast_value when possible", () => {
@@ -34,7 +34,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ age: "25" });
-    expect(m.readAttribute("age")).toBe(25);
+    expect(m._readAttribute("age")).toBe(25);
   });
 
   it("value_for_database is memoized", () => {
@@ -44,8 +44,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    expect(m.readAttribute("name")).toBe("test");
-    expect(m.readAttribute("name")).toBe("test");
+    expect(m._readAttribute("name")).toBe("test");
+    expect(m._readAttribute("name")).toBe("test");
   });
 
   it("value_for_database is recomputed when value changes in place", () => {
@@ -55,8 +55,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.writeAttribute("name", "changed");
-    expect(m.readAttribute("name")).toBe("changed");
+    m._writeAttribute("name", "changed");
+    expect(m._readAttribute("name")).toBe("changed");
   });
 
   it("duping does not dup the value if it is not dupable", () => {
@@ -66,7 +66,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ count: 5 });
-    expect(m.readAttribute("count")).toBe(5);
+    expect(m._readAttribute("count")).toBe(5);
   });
 
   it("duping does not eagerly type cast if we have not yet type cast", () => {
@@ -76,7 +76,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("name")).toBeNull();
+    expect(m._readAttribute("name")).toBeNull();
   });
 
   it("uninitialized attributes yield their name if a block is given to value", () => {
@@ -86,7 +86,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.readAttribute("name")).toBeNull();
+    expect(m._readAttribute("name")).toBeNull();
   });
 
   it("attributes do not equal attributes with different names", () => {
@@ -97,8 +97,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test", title: "test" });
-    expect(m.readAttribute("name")).toBe("test");
-    expect(m.readAttribute("title")).toBe("test");
+    expect(m._readAttribute("name")).toBe("test");
+    expect(m._readAttribute("title")).toBe("test");
   });
 
   it("attributes do not equal attributes with different types", () => {
@@ -109,8 +109,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ age: 25, name: "25" });
-    expect(m.readAttribute("age")).toBe(25);
-    expect(m.readAttribute("name")).toBe("25");
+    expect(m._readAttribute("age")).toBe(25);
+    expect(m._readAttribute("name")).toBe("25");
   });
 
   it("attributes do not equal attributes with different values", () => {
@@ -121,7 +121,7 @@ describe("AttributeTest", () => {
     }
     const m1 = new MyModel({ name: "Alice" });
     const m2 = new MyModel({ name: "Bob" });
-    expect(m1.readAttribute("name")).not.toBe(m2.readAttribute("name"));
+    expect(m1._readAttribute("name")).not.toBe(m2._readAttribute("name"));
   });
 
   it("attributes do not equal attributes of other classes", () => {
@@ -147,7 +147,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    expect(m.readAttribute("name")).toBe("test");
+    expect(m._readAttribute("name")).toBe("test");
   });
 
   it("an attribute is not changed if it hasn't been assigned or mutated", () => {
@@ -167,7 +167,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.writeAttribute("name", "changed");
+    m._writeAttribute("name", "changed");
     expect(m.attributeChanged("name")).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.writeAttribute("name", "test");
+    m._writeAttribute("name", "test");
     expect(m.attributeChanged("name")).toBe(false);
   });
 
@@ -199,7 +199,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.writeAttribute("name", "mutated");
+    m._writeAttribute("name", "mutated");
     expect(m.attributeChanged("name")).toBe(true);
   });
 
@@ -210,7 +210,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.writeAttribute("name", "changed");
+    m._writeAttribute("name", "changed");
     expect(m.attributeChanged("name")).toBe(true);
     m.clearChangesInformation();
     expect(m.attributeChanged("name")).toBe(false);
@@ -224,7 +224,7 @@ describe("AttributeTest", () => {
     }
     const m = new MyModel({ name: "test" });
     m.clearChangesInformation();
-    expect(m.readAttribute("name")).toBe("test");
+    expect(m._readAttribute("name")).toBe("test");
   });
 
   it("with_value_from_user validates the value", () => {
@@ -234,8 +234,8 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({});
-    m.writeAttribute("age", "25");
-    expect(m.readAttribute("age")).toBe(25);
+    m._writeAttribute("age", "25");
+    expect(m._readAttribute("age")).toBe(25);
   });
 
   it("from_database + read type casts from database", () => {
@@ -271,7 +271,7 @@ describe("AttributeTest", () => {
     const p = new Person({ name: "Alice" });
     const attrs = { ...p.attributes };
     attrs.name = "Bob";
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("with_value_from_user returns a new attribute with the value from the user", () => {
@@ -293,7 +293,7 @@ describe("AttributeTest", () => {
       }
     }
     const p = new Person();
-    expect(p.readAttribute("name")).toBe(null);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("attributes equal other attributes with the same constructor arguments", () => {
@@ -314,8 +314,8 @@ describe("AttributeTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.hasAttribute("name")).toBe(true);
-    expect(p.hasAttribute("nonexistent")).toBe(false);
+    expect(p._attributes.isKey("name")).toBe(true);
+    expect(p._attributes.isKey("nonexistent")).toBe(false);
   });
 
   it("with_type preserves mutations", () => {
@@ -326,9 +326,9 @@ describe("AttributeTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 25 });
-    p.writeAttribute("name", "Bob");
-    expect(p.readAttribute("name")).toBe("Bob");
-    expect(p.readAttribute("age")).toBe(25);
+    p._writeAttribute("name", "Bob");
+    expect(p._readAttribute("name")).toBe("Bob");
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it("value_before_type_cast returns the given value", () => {
@@ -338,8 +338,8 @@ describe("AttributeTest", () => {
       }
     }
     const p = new Person({ age: "42" });
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("42");
-    expect(p.readAttribute("age")).toBe(42);
+    expect(p._attributes.getAttribute("age").valueBeforeTypeCast).toBe("42");
+    expect(p._readAttribute("age")).toBe(42);
   });
 
   it("#serializable? delegates to the type", () => {

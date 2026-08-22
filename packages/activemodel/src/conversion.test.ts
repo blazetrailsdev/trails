@@ -8,7 +8,7 @@ class Contact extends Model {
     this.attribute("id");
   }
   override isPersisted(): boolean {
-    return this.readAttribute("id") != null;
+    return this._readAttribute("id") != null;
   }
 }
 

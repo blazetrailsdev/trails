@@ -13,8 +13,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: "25" });
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(25);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it("building with custom types", () => {
@@ -24,7 +24,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ active: "true" });
-    expect(p.readAttribute("active")).toBe(true);
+    expect(p._readAttribute("active")).toBe(true);
   });
 
   it("[] returns a null object", () => {
@@ -34,7 +34,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.readAttribute("name")).toBe(null);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("duping creates a new hash, but does not dup the attributes", () => {
@@ -46,7 +46,7 @@ describe("AttributeSetTest", () => {
     const p = new Person({ name: "Alice" });
     const attrs = p.attributes;
     attrs.name = "Bob";
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("deep_duping creates a new hash and dups each attribute", () => {
@@ -58,7 +58,7 @@ describe("AttributeSetTest", () => {
     const p = new Person({ name: "Alice" });
     const attrs = { ...p.attributes };
     attrs.name = "Bob";
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("freezing cloned set does not freeze original", () => {
@@ -69,8 +69,8 @@ describe("AttributeSetTest", () => {
     }
     const p = new Person({ name: "Alice" });
     const attrs = Object.freeze({ ...p.attributes });
-    p.writeAttribute("name", "Bob");
-    expect(p.readAttribute("name")).toBe("Bob");
+    p._writeAttribute("name", "Bob");
+    expect(p._readAttribute("name")).toBe("Bob");
     expect(attrs.name).toBe("Alice");
   });
 
@@ -107,8 +107,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ age: "25" });
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("25");
-    expect(p.readAttribute("age")).toBe(25);
+    expect(p._attributes.getAttribute("age").valueBeforeTypeCast).toBe("25");
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it("known columns are built with uninitialized attributes", () => {
@@ -118,8 +118,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.hasAttribute("name")).toBe(true);
-    expect(p.readAttribute("name")).toBe(null);
+    expect(p._attributes.isKey("name")).toBe(true);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("uninitialized attributes are not included in the attributes hash", () => {
@@ -129,8 +129,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.attributePresent("name")).toBe(false);
-    expect(p.readAttribute("name")).toBe(null);
+    expect(p._readAttribute("name")).toBe(null);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("uninitialized attributes are not included in keys", () => {
@@ -141,7 +141,7 @@ describe("AttributeSetTest", () => {
     }
     const p = new Person({});
     expect(p.attributeNames()).toContain("name");
-    expect(p.attributePresent("name")).toBe(false);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("uninitialized attributes return false for key?", () => {
@@ -151,8 +151,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.hasAttribute("name")).toBe(true);
-    expect(p.attributePresent("name")).toBe(false);
+    expect(p._attributes.isKey("name")).toBe(true);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("unknown attributes return false for key?", () => {
@@ -162,7 +162,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.hasAttribute("unknown")).toBe(false);
+    expect(p._attributes.isKey("unknown")).toBe(false);
   });
 
   it("fetch_value returns the value for the given initialized attribute", () => {
@@ -172,7 +172,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("fetch_value returns nil for unknown attributes", () => {
@@ -182,7 +182,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("unknown")).toBe(null);
+    expect(p._readAttribute("unknown")).toBe(null);
   });
 
   it("fetch_value returns nil for unknown attributes when types has a default", () => {
@@ -192,7 +192,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.readAttribute("missing")).toBe(null);
+    expect(p._readAttribute("missing")).toBe(null);
   });
 
   it("fetch_value uses the given block for uninitialized attributes", () => {
@@ -202,7 +202,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    const value = p.readAttribute("name") ?? "default";
+    const value = p._readAttribute("name") ?? "default";
     expect(value).toBe("default");
   });
 
@@ -213,7 +213,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.readAttribute("name")).toBe(null);
+    expect(p._readAttribute("name")).toBe(null);
   });
 
   it("the primary_key is always initialized", () => {
@@ -234,8 +234,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    p.writeAttribute("age", "42");
-    expect(p.readAttribute("age")).toBe(42);
+    p._writeAttribute("age", "42");
+    expect(p._readAttribute("age")).toBe(42);
   });
 
   it("write_from_user sets the attribute with user typecasting", () => {
@@ -245,8 +245,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    p.writeAttribute("age", "25");
-    expect(p.readAttribute("age")).toBe(25);
+    p._writeAttribute("age", "25");
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it("values_for_database", () => {
@@ -257,8 +257,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: "25" });
-    expect(p.readAttribute("name")).toBe("Alice");
-    expect(p.readAttribute("age")).toBe(25);
+    expect(p._readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("age")).toBe(25);
   });
 
   it("freezing doesn't prevent the set from materializing", () => {
@@ -293,9 +293,9 @@ describe("AttributeSetTest", () => {
     }
     const p = new Person({ name: "Alice", age: 25 });
     const accessed = p._attributes.accessed();
-    p.readAttribute("name");
+    p._readAttribute("name");
     expect(p._attributes.accessed().length).toBeGreaterThanOrEqual(accessed.length);
-    expect(p.hasAttribute("name")).toBe(true);
+    expect(p._attributes.isKey("name")).toBe(true);
   });
 
   it("#map returns a new attribute set with the changes applied", () => {
@@ -307,7 +307,7 @@ describe("AttributeSetTest", () => {
     const p = new Person({ name: "Alice" });
     const mapped = p._attributes.map((attr) => attr.withCastValue("Bob"));
     expect(mapped.fetchValue("name")).toBe("Bob");
-    expect(p.readAttribute("name")).toBe("Alice");
+    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("comparison for equality is correctly implemented", () => {

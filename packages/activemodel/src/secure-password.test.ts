@@ -108,9 +108,9 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.readAttribute("password_digest")).not.toBe(null);
+    expect(u._readAttribute("password_digest")).not.toBe(null);
     (u as any).password = null;
-    expect(u.readAttribute("password_digest")).toBe(null);
+    expect(u._readAttribute("password_digest")).toBe(null);
   });
 
   it("update an existing user with validation and no change in password", async () => {
@@ -118,7 +118,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     expect(await u.isValid()).toBe(true);
-    expect(u.readAttribute("password_digest")).not.toBe(null);
+    expect(u._readAttribute("password_digest")).not.toBe(null);
   });
 
   it("update an existing user with validations and valid password/confirmation", async () => {
@@ -133,7 +133,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test", password_digest: "$2a$04$existing" });
     (u as any).password = "";
-    expect(u.readAttribute("password_digest")).toBe("$2a$04$existing");
+    expect(u._readAttribute("password_digest")).toBe("$2a$04$existing");
   });
 
   it("updating an existing user with validation and a spaces only password", async () => {
@@ -148,7 +148,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test", password_digest: "$2a$04$existing" });
     (u as any).password = "";
     (u as any).passwordConfirmation = "";
-    expect(u.readAttribute("password_digest")).toBe("$2a$04$existing");
+    expect(u._readAttribute("password_digest")).toBe("$2a$04$existing");
   });
 
   it("updating an existing user with validation and a nil password", () => {
@@ -156,7 +156,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).password = null;
-    expect(u.readAttribute("password_digest")).toBe(null);
+    expect(u._readAttribute("password_digest")).toBe(null);
   });
 
   it("updating an existing user with validation and password length greater than 72", async () => {
@@ -228,14 +228,14 @@ describe("SecurePasswordTest", () => {
   it("updating an existing user with validation and a blank password digest", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    u.writeAttribute("password_digest", "");
+    u._writeAttribute("password_digest", "");
     expect(await u.isValid()).toBe(false);
   });
 
   it("updating an existing user with validation and a nil password digest", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    u.writeAttribute("password_digest", null);
+    u._writeAttribute("password_digest", null);
     expect(await u.isValid()).toBe(false);
   });
 
@@ -243,9 +243,9 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    const digest = u.readAttribute("password_digest");
+    const digest = u._readAttribute("password_digest");
     (u as any).password = "";
-    expect(u.readAttribute("password_digest")).toBe(digest);
+    expect(u._readAttribute("password_digest")).toBe(digest);
   });
 
   it("setting a nil password should clear an existing password", () => {
@@ -253,7 +253,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).password = null;
-    expect(u.readAttribute("password_digest")).toBe(null);
+    expect(u._readAttribute("password_digest")).toBe(null);
   });
 
   it("override secure password attribute", () => {
@@ -266,7 +266,7 @@ describe("SecurePasswordTest", () => {
     hasSecurePassword(User, "token");
     const u = new User({ name: "test" });
     (u as any).token = "mytoken";
-    expect(u.readAttribute("token_digest")).not.toBe(null);
+    expect(u._readAttribute("token_digest")).not.toBe(null);
     expect((u as any).authenticateToken("mytoken")).toBe(u);
     expect((u as any).authenticateToken("wrong")).toBe(false);
   });
@@ -289,7 +289,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    const digest = u.readAttribute("password_digest") as string;
+    const digest = u._readAttribute("password_digest") as string;
     const salt = digest.slice(0, 29);
     expect(salt).toMatch(/^\$2[aby]?\$\d{2}\$[./A-Za-z0-9]{22}$/);
   });
@@ -298,13 +298,13 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     expect((u as any).password).toBe(null);
-    expect(u.readAttribute("password_digest")).toBe(null);
+    expect(u._readAttribute("password_digest")).toBe(null);
   });
 
   it("password_salt should return nil when password digest is nil", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    expect(u.readAttribute("password_digest")).toBe(null);
+    expect(u._readAttribute("password_digest")).toBe(null);
   });
 
   it("Password digest cost defaults to bcrypt default cost when min_cost is false", () => {
@@ -312,7 +312,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    const digest = u.readAttribute("password_digest") as string;
+    const digest = u._readAttribute("password_digest") as string;
     expect(digest).toMatch(/\$12\$/);
   });
 
@@ -321,7 +321,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    const digest = u.readAttribute("password_digest") as string;
+    const digest = u._readAttribute("password_digest") as string;
     expect(digest).toMatch(/\$12\$/);
     expect((u as any).authenticate("secret")).toBe(u);
   });
@@ -331,7 +331,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    const digest = u.readAttribute("password_digest") as string;
+    const digest = u._readAttribute("password_digest") as string;
     expect(digest).toContain("$04$");
   });
 
@@ -339,7 +339,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.readAttribute("password_digest")).not.toBe(null);
+    expect(u._readAttribute("password_digest")).not.toBe(null);
     (u as any).password = "newpassword";
     expect((u as any).authenticate("newpassword")).toBe(u);
     expect((u as any).authenticate("secret")).toBe(false);
@@ -348,7 +348,7 @@ describe("SecurePasswordTest", () => {
   it("constructor mass-assignment hashes password and removes plaintext", () => {
     const User = createUserClass();
     const u = new User({ name: "test", password: "secret" });
-    expect(u.readAttribute("password_digest")).not.toBe(null);
+    expect(u._readAttribute("password_digest")).not.toBe(null);
     expect(u.attributes.password).toBeUndefined();
     expect((u as any).authenticate("secret")).toBe(u);
   });
@@ -357,7 +357,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.readAttribute("password_digest")).not.toBe(null);
+    expect(u._readAttribute("password_digest")).not.toBe(null);
     expect((u as any).authenticate("secret")).toBe(u);
   });
 
@@ -365,7 +365,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
-    const digest = builder.readAttribute("password_digest");
+    const digest = builder._readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
     expect(await u.isValid()).toBe(true);
     (u as any).passwordChallenge = "secret";
@@ -386,7 +386,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
-    const digest = builder.readAttribute("password_digest");
+    const digest = builder._readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
     expect(await u.isValid()).toBe(true);
     (u as any).password = "newpassword";
@@ -419,7 +419,7 @@ describe("SecurePasswordTest", () => {
     const User = createUserClass();
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
-    const digest = builder.readAttribute("password_digest");
+    const digest = builder._readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
     (u as any).passwordChallenge = "wrong";
     expect(await u.isValid()).toBe(false);
@@ -454,7 +454,7 @@ describe("SecurePasswordTest", () => {
   it("whitespace-only password digest treated as blank", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    u.writeAttribute("password_digest", "   ");
+    u._writeAttribute("password_digest", "   ");
     expect(await u.isValid()).toBe(false);
     expect(u.errors.messagesFor("password")).toContain("can't be blank");
   });

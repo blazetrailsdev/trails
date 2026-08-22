@@ -39,7 +39,7 @@ describe("NestedErrorTest", () => {
   it("message", () => {
     const topic = new Topic({ author_name: "Bruce" });
     const innerError = new ActiveModelError(topic, "title", ":not_enough", {
-      message: (model: Topic) => `not good enough for ${model.readAttribute("author_name")}`,
+      message: (model: Topic) => `not good enough for ${model._readAttribute("author_name")}`,
     });
     const reply = new Reply({ author_name: "Mark" });
     const error = new NestedError(reply, innerError);
@@ -50,7 +50,7 @@ describe("NestedErrorTest", () => {
   it("full message", () => {
     const topic = new Topic({ author_name: "Bruce" });
     const innerError = new ActiveModelError(topic, "title", ":not_enough", {
-      message: (model: Topic) => `not good enough for ${model.readAttribute("author_name")}`,
+      message: (model: Topic) => `not good enough for ${model._readAttribute("author_name")}`,
     });
     const reply = new Reply({ author_name: "Mark" });
     const error = new NestedError(reply, innerError);

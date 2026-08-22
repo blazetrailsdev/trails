@@ -1675,6 +1675,19 @@ export const ClassMethods = {
   loadSchemaFromAdapter,
 };
 
+/**
+ * Mirrors: `delegate :type_for_attribute, :column_for_attribute, to: :class`
+ * (model_schema.rb:183). Only `column_for_attribute` is here — the instance
+ * `type_for_attribute` delegate still lives on `ActiveModel::Model`.
+ */
+export const InstanceMethods = {
+  columnForAttribute(this: { constructor: unknown }, name: string): unknown {
+    return (this.constructor as { columnForAttribute(n: string): unknown }).columnForAttribute(
+      name,
+    );
+  },
+};
+
 /** @internal */
 function initializeLoadSchemaMonitor(this: SchemaHost): void {
   // no-op: JS is single-threaded; no Monitor/Mutex needed

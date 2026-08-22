@@ -10,7 +10,9 @@
  */
 
 interface BeforeTypeCastRecord extends AttributeOwner {
-  readonly attributesBeforeTypeCast: Record<string, unknown>;
+  _attributes: AttributeOwner["_attributes"] & {
+    valuesBeforeTypeCast(): Record<string, unknown>;
+  };
 }
 
 /**
@@ -22,18 +24,23 @@ export function readAttributeBeforeTypeCast(
   record: BeforeTypeCastRecord,
   attrName: string,
 ): unknown {
-  const name = record.constructor.attributeAliases?.[attrName] ?? attrName;
+  const name = (
+    record.constructor as unknown as { resolveAttributeName(n: string): string }
+  ).resolveAttributeName(String(attrName));
 
-  return attributeBeforeTypeCast.call(record, name);
+  return attributeBeforeTypeCast.call(record, name) ?? null;
 }
 
 /**
  * Return all attribute values before type casting.
  *
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#attributes_before_type_cast
+ * (before_type_cast.rb:82-84). Ruby's zero-arg reader is an accessor property
+ * here — see CLAUDE.md, "Generated attribute readers are properties" — so
+ * base.ts installs it with `Object.defineProperty` rather than `include()`.
  */
 export function attributesBeforeTypeCast(record: BeforeTypeCastRecord): Record<string, unknown> {
-  return record.attributesBeforeTypeCast;
+  return record._attributes.valuesBeforeTypeCast();
 }
 
 interface DatabaseRecord extends AttributeOwner {

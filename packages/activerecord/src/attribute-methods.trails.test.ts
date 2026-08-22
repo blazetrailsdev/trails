@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
+import { Model } from "@blazetrails/activemodel";
 import { GeneratedAttributeMethods, isMethodDefinedWithin } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
@@ -461,5 +462,60 @@ describe("define_attribute_methods abstract gate (trails)", () => {
     expect("author_name" in ConcreteTopic.prototype).toBe(true);
     expect("author_nameBeforeTypeCast" in ConcreteTopic.prototype).toBe(true);
     expect("author_nameForDatabase" in ConcreteTopic.prototype).toBe(true);
+  });
+});
+
+class AccessTopic extends Base {
+  static {
+    this.attribute("title", "string");
+    this.attribute("body", "string");
+  }
+}
+type TrackingTopic = InstanceType<typeof AccessTopic> & {
+  title: string;
+  slice(...names: string[]): Record<string, unknown>;
+  valuesAt(...names: string[]): unknown[];
+};
+
+describe("ActiveRecord attribute read/write surface lives on Base, not Model", () => {
+  it("defines the ActiveRecord-only members on Base.prototype", () => {
+    for (const name of [
+      "readAttribute",
+      "writeAttribute",
+      "readAttributeBeforeTypeCast",
+      "attributesBeforeTypeCast",
+      "columnForAttribute",
+      "hasAttribute",
+      "attributePresent",
+    ]) {
+      expect(Object.getOwnPropertyDescriptor(Base.prototype, name)).toBeDefined();
+      expect(Object.getOwnPropertyDescriptor(Model.prototype, name)).toBeUndefined();
+    }
+  });
+
+  // Rails marks a read on the Attribute itself, inside `fetch_value`
+  // (activemodel/attribute.rb:41-44), so every public read path feeds
+  // `accessed_fields` (attribute_methods.rb:460). trails keeps the marker on the
+  // record, so each of these paths has to set it; `slice` and `valuesAt` are
+  // Base's own (persistence.ts), which read through `readAttribute`.
+  it.each([
+    ["readAttribute", (t: TrackingTopic) => t.readAttribute("title")],
+    ["the generated reader", (t: TrackingTopic) => t.title],
+    ["slice", (t: TrackingTopic) => t.slice("title")],
+    ["valuesAt", (t: TrackingTopic) => t.valuesAt("title")],
+  ] as const)("marks the field accessed when read through %s", (_label, read) => {
+    const t = AccessTopic.new({ title: "access-test", body: "hello" }) as TrackingTopic;
+    expect(t.accessedFields()).toEqual([]);
+    read(t);
+    expect(t.accessedFields()).toEqual(["title"]);
+  });
+
+  it("keeps attributesBeforeTypeCast a getter rather than a data property", () => {
+    // before_type_cast.rb:82 is a zero-arg reader, so it ports as an accessor
+    // property; include() copies an object literal by value and would flatten
+    // it into a data property holding the getter's one-time result.
+    const descriptor = Object.getOwnPropertyDescriptor(Base.prototype, "attributesBeforeTypeCast")!;
+    expect(typeof descriptor.get).toBe("function");
+    expect("value" in descriptor).toBe(false);
   });
 });

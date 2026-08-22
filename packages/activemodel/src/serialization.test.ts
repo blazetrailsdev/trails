@@ -52,7 +52,7 @@ describe("SerializationTest", () => {
         this.attribute("name", "string");
       }
       get name(): string {
-        return "OVERRIDE:" + (this.readAttribute("name") as string);
+        return "OVERRIDE:" + (this._readAttribute("name") as string);
       }
     }
     const p = new Person({ name: "Bob" });
@@ -116,7 +116,7 @@ describe("SerializationTest", () => {
         this.attribute("name", "string");
       }
       greeting(): string {
-        return "Hi " + (this.readAttribute("name") as string);
+        return "Hi " + (this._readAttribute("name") as string);
       }
     }
     const p = new Person({ name: "Bob" });
@@ -339,7 +339,7 @@ describe("SerializationTest", () => {
       this.attribute("email", "string");
     }
     get greeting(): string {
-      return `Hi ${this.readAttribute("name")}`;
+      return `Hi ${this._readAttribute("name")}`;
     }
   }
 
@@ -543,7 +543,7 @@ describe("SerializationTest", () => {
       }
       const w = new Weird({ toJSON: "raw-value", name: "w" });
       expect(JSON.parse(JSON.stringify(w))).toEqual({ toJSON: "raw-value", name: "w" });
-      expect(w.readAttribute("toJSON")).toBe("raw-value");
+      expect(w._readAttribute("toJSON")).toBe("raw-value");
     });
 
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
@@ -596,7 +596,7 @@ describe("Serialization", () => {
     }
 
     get summary(): string {
-      return String(this.readAttribute("title")).slice(0, 10);
+      return String(this._readAttribute("title")).slice(0, 10);
     }
   }
 
@@ -670,8 +670,8 @@ describe("fromJson", () => {
     }
     const u = new User({});
     u.fromJson('{"name":"Alice","age":30}');
-    expect(u.readAttribute("name")).toBe("Alice");
-    expect(u.readAttribute("age")).toBe(30);
+    expect(u._readAttribute("name")).toBe("Alice");
+    expect(u._readAttribute("age")).toBe(30);
   });
 
   it("returns this for chaining", () => {
@@ -693,7 +693,7 @@ describe("fromJson", () => {
     }
     const u = new User({});
     u.fromJson('{"user":{"name":"Charlie"}}', true);
-    expect(u.readAttribute("name")).toBe("Charlie");
+    expect(u._readAttribute("name")).toBe("Charlie");
   });
 
   it("marks attributes as changed via dirty tracking", () => {

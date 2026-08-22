@@ -276,7 +276,7 @@ describe("CallbacksTest", () => {
     const log: string[] = [];
     const auditor = {
       beforeValidation(record: any) {
-        log.push(`auditing ${record.readAttribute("name")}`);
+        log.push(`auditing ${record._readAttribute("name")}`);
       },
     };
     class Person extends Model {
@@ -333,7 +333,7 @@ describe("CallbacksTest", () => {
     const log: string[] = [];
     const observer = {
       beforeProcess(record: any) {
-        log.push(`processing ${record.readAttribute("name")}`);
+        log.push(`processing ${record._readAttribute("name")}`);
       },
     };
     class Job extends Model {
@@ -911,7 +911,7 @@ describe("Callbacks (extended)", () => {
         this.validate("validateCustom");
       }
       validateCustom() {
-        if (this.readAttribute("value") === 0) {
+        if (this._readAttribute("value") === 0) {
           this.errors.add("value", ":invalid", { message: "cannot be zero" });
         }
       }

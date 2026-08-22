@@ -147,7 +147,7 @@ describe("ValidatesTest", () => {
         this.attribute("active", "boolean");
         this.validates("name", {
           presence: true,
-          if: (r: any) => r.readAttribute("active") === true,
+          if: (r: any) => r._readAttribute("active") === true,
         });
       }
     }
@@ -162,7 +162,7 @@ describe("ValidatesTest", () => {
         this.attribute("skip", "boolean");
         this.validates("name", {
           presence: true,
-          unless: (r: any) => r.readAttribute("skip") === true,
+          unless: (r: any) => r._readAttribute("skip") === true,
         });
       }
     }
@@ -173,7 +173,7 @@ describe("ValidatesTest", () => {
   it("validates with validator class", async () => {
     class MyValidator {
       validate(record: any) {
-        if (!record.readAttribute("name")) {
+        if (!record._readAttribute("name")) {
           record.errors.add("name", ":blank", { message: "must be present" });
         }
       }
@@ -193,7 +193,7 @@ describe("ValidatesTest", () => {
     const Validators = {
       NameValidator: class {
         validate(record: any) {
-          if (!record.readAttribute("name")) {
+          if (!record._readAttribute("name")) {
             record.errors.add("name", ":blank", { message: "is required" });
           }
         }
@@ -240,7 +240,7 @@ describe("ValidatesTest", () => {
         this.validates("name", {
           presence: true,
           length: { minimum: 3 },
-          if: (r: any) => r.readAttribute("active") === true,
+          if: (r: any) => r._readAttribute("active") === true,
         });
       }
     }
@@ -271,7 +271,7 @@ describe("ValidatesTest", () => {
         this.min = options.minimum ?? 0;
       }
       validate(record: any) {
-        const val = record.readAttribute("name");
+        const val = record._readAttribute("name");
         if (typeof val === "string" && val.length < this.min) {
           record.errors.add("name", ":too_short", { message: "is too short" });
         }

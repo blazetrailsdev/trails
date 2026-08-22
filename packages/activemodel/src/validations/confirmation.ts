@@ -33,7 +33,7 @@ export class ConfirmationValidator extends EachValidator {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
     const confirmed =
-      (rec.readAttribute as ((a: string) => unknown) | undefined)?.(confirmationAttr) ??
+      (rec._readAttribute as ((a: string) => unknown) | undefined)?.(confirmationAttr) ??
       rec[confirmationAttr];
     if (confirmed == null) return;
     if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
