@@ -3079,14 +3079,6 @@ export class Relation<T extends Base> {
   }
 
   // Mirrors relation.rb:1381-1393.
-  /**
-   * @missingRailsCall build_bind_attribute — PERMANENT: Satisfied by
-   *   QueryAttribute.withCastValue: Rails build_bind_attribute
-   *   (predicate_builder.rb:67-69) is a PRESERVING constructor because
-   *   QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails
-   *   QueryAttribute#typeCast casts its input, so calling buildBindAttribute
-   *   here would cast twice.
-   */
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this.table.get(name);
@@ -3100,15 +3092,8 @@ export class Relation<T extends Base> {
         // render as `SET col = (select ...)`, which SQLite/MySQL/PG require.
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
-      // Rails casts exactly once here: `build_bind_attribute` hands the already-cast
-      // value to `QueryAttribute.new` (predicate_builder.rb:67-69), and
-      // `QueryAttribute#type_cast` is identity (query_attribute.rb:22-24). trails'
-      // `QueryAttribute#typeCast` instead casts its input — most of its callers pass
-      // RAW values and rely on that — so routing a cast value through
-      // `buildBindAttribute` would cast twice. `withCastValue` is the preserving
-      // constructor that matches Rails' semantics.
       const type = this.model.typeForAttribute(attr.name);
-      return [attr, QueryAttribute.withCastValue(attr.name, type.cast(value), type)];
+      return [attr, this.predicateBuilder.buildBindAttribute(attr.name, type.cast(value))];
     });
   }
 
