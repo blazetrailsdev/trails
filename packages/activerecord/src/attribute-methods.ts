@@ -3,11 +3,11 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { include, Module } from "@blazetrails/activesupport";
+import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
-  MissingAttributeError,
   missingAttribute,
+  type AttributeMethodPattern,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   defineAttributeMethods as amDefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
@@ -80,14 +80,6 @@ interface InstanceMethodHost {
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
   _writeAttribute(name: string, value: unknown): void;
-}
-
-/** Minimal shape for inline property-descriptor get/set callbacks. */
-interface AttributeAccessorHost {
-  readAttribute(name: string): unknown;
-  /** @internal */
-  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
-  writeAttribute(name: string, value: unknown): void;
 }
 
 /**
@@ -208,10 +200,29 @@ interface AttributeMethodsHost {
   abstractClass?: boolean;
   aliasAttribute(newName: string, oldName: string): void;
   _hasAttribute(attrName: string): boolean;
+  attributeMethodPatterns: AttributeMethodPattern[];
+  /** @internal */
+  attributeMethodPatternsCache(): Map<string, unknown>;
+  /** @internal */
+  generatedAttributeMethods(): Module;
+  defineAttributeMethodPattern(
+    pattern: AttributeMethodPattern,
+    attrName: string,
+    options: { owner: CodeGenerator; as: string; override?: boolean },
+  ): void;
   defineAttributeMethods?(): boolean;
-  generateAliasAttributeMethods?(newName: string, oldName: string): void;
+  generateAliasAttributeMethods?(
+    codeGenerator: CodeGenerator,
+    newName: string,
+    oldName: string,
+  ): void;
   generateAliasAttributes?(): void;
 }
+
+// Rails threads `__FILE__, __LINE__` into every `CodeGenerator.batch`; the pair
+// is inert here for the reason activemodel/attribute-methods.ts:30-38 gives.
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 const RESTRICTED_CLASS_METHODS = new Set(["allocate", "new", "name", "parent", "superclass"]);
 
@@ -317,88 +328,57 @@ export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldN
   }
 }
 
-export function eagerlyGenerateAliasAttributeMethods(this: AttributeMethodsHost): void {
-  this._aliasAttributesMassGenerated = true;
-}
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#eagerly_generate_alias_attribute_methods
+ * (attribute_methods.rb:76-78) — deliberately empty. "alias attributes in
+ * Active Record are lazily generated", by `generate_alias_attributes` off
+ * `define_attribute_methods`. This overrides ActiveModel's eager version
+ * (activemodel/attribute_methods.rb:211-215), so it is assigned onto `Base`
+ * for `alias_attribute` to reach this arm instead of that one.
+ */
+export function eagerlyGenerateAliasAttributeMethods(
+  this: AttributeMethodsHost,
+  _newName: string,
+  _oldName: string,
+): void {}
 
 /**
- * DIVERGES from ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attribute_methods
- * (attribute_methods.rb:80-85), which is
- *
- *     attribute_method_patterns.each do |pattern|
- *       alias_attribute_method_definition(code_generator, pattern, new_name, old_name)
- *     end
- *     attribute_method_patterns_cache.clear
- *
- * This body defines the alias once, through the descriptor helper below,
- * instead of once per pattern, and never clears the pattern cache. It is NOT
- * converged, and the shape is not defensible on its own — it is blocked on the
- * eager/lazy split, not chosen.
- *
- * Porting the loop means routing each pattern through
- * `defineAttributeMethodPattern(pattern, oldName, { owner, as: newName,
- * override: true })`, which is what ActiveModel's own
- * `aliasAttributeMethodDefinition` already does
- * (activemodel/attribute-methods.ts:354-366). Doing that here generates every
- * alias TWICE: Rails reaches this method as an alias' only generator because
- * its `eagerly_generate_alias_attribute_methods` is a no-op
- * (attribute_methods.rb:76-78, "alias attributes in Active Record are lazily
- * generated"), but trails never assigns that override (below, :309) onto
- * `Base`, so `alias_attribute` still runs ActiveModel's EAGER arm. Measured:
- * `id|id_value` is emitted by both activemodel/attribute-methods.ts:340 and
- * this pass.
- *
- * Wiring the override — making AR aliases lazy as Rails has them — is the fix,
- * and it also moves when `DangerousAttributeError` surfaces (Rails raises it
- * from `instance_method_already_implemented?` during `define_attribute_methods`,
- * attribute_methods.rb:165-179). Tracked by story
- * `converge-lazy-alias-attribute-method-generation`, which carries this
- * method's acceptance criteria.
- *
- * The call-set gate cannot hold this: it never pairs this function with
- * `attribute_methods.rb:80`, so those calls are outside the measured
- * population and a `@missingRailsCall` receipt for them reads as a STALE tag.
- * The story is the register.
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attribute_methods
+ * (attribute_methods.rb:80-85) — one alias definition per attribute-method
+ * pattern, then the pattern cache is cleared so the alias' names resolve.
  */
 export function generateAliasAttributeMethods(
   this: AttributeMethodsHost,
+  codeGenerator: CodeGenerator,
   newName: string,
   oldName: string,
 ): void {
-  aliasAttributeMethodDefinition.call(this, newName, oldName);
+  for (const pattern of this.attributeMethodPatterns) {
+    aliasAttributeMethodDefinition.call(this, codeGenerator, pattern, newName, oldName);
+  }
+  this.attributeMethodPatternsCache().clear();
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#alias_attribute_method_definition
- * (attribute_methods.rb:87-96).
+ * (attribute_methods.rb:87-96) — the alias is generated by the same pattern
+ * path as a regular attribute method, under the alias' name, with the override
+ * arm on.
  */
 export function aliasAttributeMethodDefinition(
   this: AttributeMethodsHost,
+  codeGenerator: CodeGenerator,
+  pattern: AttributeMethodPattern,
   newName: string,
   oldName: string,
 ): void {
   oldName = String(oldName);
 
-  // Rails generates pattern-based alias methods for a single pattern.
-  // Define a direct getter/setter for the alias name.
-  if (this.prototype && !(newName in this.prototype)) {
-    Object.defineProperty(this.prototype, newName, {
-      get(this: AttributeAccessorHost) {
-        // Rails' generated alias reader is `_read_attribute(canonical) { |n|
-        // missing_attribute(n, caller) }` — a known-but-unselected column yields
-        // to the block and raises, matching `record[attr]`.
-        return this._readAttribute(oldName, (n) => {
-          throw new MissingAttributeError(
-            `missing attribute '${n}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-          );
-        });
-      },
-      set(this: AttributeAccessorHost, value: unknown) {
-        this.writeAttribute(oldName, value);
-      },
-      configurable: true,
-    });
-  }
+  this.defineAttributeMethodPattern(pattern, oldName, {
+    owner: codeGenerator,
+    as: newName,
+    override: true,
+  });
 }
 
 export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean {
@@ -491,9 +471,11 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
     return;
   }
   if (this.attributeAliases) {
-    for (const [newName, oldName] of Object.entries(this.attributeAliases)) {
-      generateAliasAttributeMethods.call(this, newName, oldName);
-    }
+    CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
+      for (const [newName, oldName] of Object.entries(this.attributeAliases!)) {
+        generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
+      }
+    });
   }
   this._aliasAttributesMassGenerated = true;
 }
