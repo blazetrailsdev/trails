@@ -202,6 +202,18 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
+ * MRI's `num_exact` (`time.c`), the conversion every `Time.at` argument goes
+ * through: an Integer and a Rational are exact already, and a Float becomes
+ * its own exact ratio through `Float#to_r` ({@link fToR}) — which is why
+ * `Time.at(946684800.123456789).nsec` is `123456835` rather than `...789`.
+ */
+function numExact(v: number | bigint | Rational): Rational {
+  if (v instanceof Rational) return v;
+  if (typeof v === "bigint") return new Rational(v, 1);
+  return fToR(v);
+}
+
+/**
  * MRI's `months[]` table (`time.c`), the three-letter month names
  * `month_arg` matches a String positional against.
  */
@@ -279,6 +291,40 @@ export class Time {
       plain.hour,
       plain.minute,
       plain.second + plain.millisecond / 1_000 + plain.microsecond / 1_000_000,
+    );
+  }
+
+  /**
+   * Ruby `Time.at(seconds, microseconds_with_frac = 0)` (`time.c`
+   * `time_s_at`), which builds a time in the LOCAL zone from the seconds since
+   * the Epoch. Both arguments take the Integer, Float or Rational MRI's
+   * `num_exact` takes, and the sum is carried exactly and then floored at the
+   * nanosecond, MRI's own seat: `Time.at(946684800, 123456.789).nsec` is
+   * `123456789`, and `Time.at(-0.5).to_i` is `-1`.
+   */
+  static at(
+    seconds: number | bigint | Rational,
+    microsecondsWithFrac: number | bigint | Rational = 0,
+  ): Time {
+    const timew = numExact(seconds)
+      .mul(1_000_000_000)
+      .add(numExact(microsecondsWithFrac).mul(1_000));
+    const nanoseconds =
+      timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
+    const zoned = Temporal.Instant.fromEpochNanoseconds(nanoseconds).toZonedDateTimeISO(
+      Temporal.Now.timeZoneId(),
+    );
+    return new Time(
+      zoned.year,
+      zoned.month,
+      zoned.day,
+      zoned.hour,
+      zoned.minute,
+      new Rational(
+        BigInt(zoned.second) * 1_000_000_000n +
+          BigInt(zoned.millisecond * 1_000_000 + zoned.microsecond * 1_000 + zoned.nanosecond),
+        1_000_000_000n,
+      ),
     );
   }
 

@@ -17,6 +17,18 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 +0000 UTC");
   });
 
+  it("Time.at builds a local time from the seconds since the Epoch", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
+    expect(Time.at(946684800).strftime("%Y-%m-%d %H:%M:%S %z")).toBe("2000-01-01 00:00:00 +0000");
+    // MRI truncates the Float at the nanosecond, so the nearest double to
+    // 946684800.123456789 answers 123456835 rather than 123456789.
+    expect(Time.at(Number("946684800.123456789")).nsec).toBe(123456835);
+    expect(Time.at(946684800, 123456.789).nsec).toBe(123456789);
+    expect(Time.at(new Rational(1, 3)).nsec).toBe(333333333);
+    expect(Time.at(-0.5).nsec).toBe(500000000);
+    expect(Time.at(-0.5).strftime("%Y-%m-%d %H:%M:%S")).toBe("1969-12-31 23:59:59");
+  });
+
   it("Time.new builds a time at the given offset", () => {
     const time = new Time(2008, 3, 1, 6, 0, 0, "-05:00");
     expect(time.hour).toBe(6);
