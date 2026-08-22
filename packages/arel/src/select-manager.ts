@@ -5,11 +5,9 @@ import { SelectCore } from "./nodes/select-core.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Distinct } from "./nodes/terminal.js";
 import { Offset, Limit, Lock, On, DistinctOn, Group, OptimizerHints } from "./nodes/unary.js";
-import { CrossJoin, Join } from "./nodes/binary.js";
+import { Join } from "./nodes/binary.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
-import { RightOuterJoin } from "./nodes/right-outer-join.js";
-import { FullOuterJoin } from "./nodes/full-outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
 import { EmptyJoinError } from "./errors.js";
 import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
@@ -27,6 +25,11 @@ import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/and.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
+
+const UNION_NODE_CLASSES: Record<
+  string,
+  new (left: SelectStatement, right: SelectStatement) => Union
+> = { UnionAll };
 
 /**
  * SelectManager — the chainable API for building SELECT queries.
@@ -364,10 +367,30 @@ export class SelectManager extends TreeManager {
 
   /**
    * UNION with another manager.
+   *
+   * Mirrors: Arel::SelectManager#union (select_manager.rb:187-196). The
+   * one-argument form is `union(other)`; `union(":all", other)` produces a
+   * `Nodes::UnionAll`. A Ruby Symbol is a colon-prefixed string here (see
+   * CLAUDE.md), and `UNION_NODE_CLASSES` stands in for
+   * `Nodes.const_get("Union#{operation.to_s.capitalize}")`, which JS has no
+   * equivalent of.
    */
-  union(other: SelectManager | SelectStatement): Union {
+  union(
+    operation: string | SelectManager | SelectStatement,
+    other: SelectManager | SelectStatement | null = null,
+  ): Union {
+    let nodeClass: new (left: SelectStatement, right: SelectStatement) => Union;
+    if (other) {
+      const name = String(operation).slice(1);
+      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      nodeClass = UNION_NODE_CLASSES[`Union${capitalized}`];
+    } else {
+      other = operation as SelectManager | SelectStatement;
+      nodeClass = Union;
+    }
+
     const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new Union(this.ast, otherAst);
+    return new nodeClass(this.ast, otherAst);
   }
 
   /**
@@ -467,48 +490,11 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * RIGHT OUTER JOIN.
-   */
-  rightOuterJoin(table: Node | string, onCondition?: Node): this {
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-    const onNode = onCondition ? new On(onCondition) : null;
-    this.core.source.right.push(new RightOuterJoin(tableNode, onNode));
-    return this;
-  }
-
-  /**
-   * FULL OUTER JOIN.
-   */
-  fullOuterJoin(table: Node | string, onCondition?: Node): this {
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-    const onNode = onCondition ? new On(onCondition) : null;
-    this.core.source.right.push(new FullOuterJoin(tableNode, onNode));
-    return this;
-  }
-
-  /**
-   * CROSS JOIN.
-   */
-  crossJoin(table: Node | string): this {
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-    this.core.source.right.push(new CrossJoin(tableNode, null));
-    return this;
-  }
-
-  /**
    * Set WITH RECURSIVE.
    */
   withRecursive(...ctes: Node[]): this {
     this.ast.with = new WithRecursive(ctes);
     return this;
-  }
-
-  /**
-   * UNION ALL with another manager.
-   */
-  unionAll(other: SelectManager | SelectStatement): UnionAll {
-    const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new UnionAll(this.ast, otherAst);
   }
 
   /**
@@ -581,40 +567,6 @@ export class SelectManager extends TreeManager {
     if (groupValuesColumns.length > 0) dm.group(groupValuesColumns);
     if (havingClause !== null) dm.having(havingClause);
     return dm;
-  }
-
-  /**
-   * Append a raw-SQL join fragment (a StringJoin) to the FROM sources.
-   * Use this instead of reaching into `core.source.right` directly when
-   * you need to add a pre-built JOIN string (e.g. `LEFT OUTER JOIN … ON …`).
-   *
-   * Mirrors: the join_sources mutation pattern in Rails' JoinDependency
-   * (relation.joins!(join_dependency) calls join_constraints which pushes
-   * StringJoin nodes onto the Arel manager's join_sources).
-   */
-  appendStringJoin(sql: string): this {
-    this.core.source.right.push(new StringJoin(new SqlLiteral(sql), null));
-    return this;
-  }
-
-  /**
-   * Insert existing Arel join nodes at the front of join_sources, preserving
-   * their relative order. Mirrors the leading_join bucket in Rails' build_joins,
-   * which places LeadingJoin nodes before any alias-tracker-generated joins.
-   */
-  prependJoinNodes(...nodes: Join[]): this {
-    this.core.source.right.unshift(...nodes);
-    return this;
-  }
-
-  /**
-   * Append an existing Arel join node to join_sources.
-   *
-   * Mirrors: join_sources.concat(join_nodes) in Rails build_joins.
-   */
-  appendJoinNode(node: Join): this {
-    this.core.source.right.push(node);
-    return this;
   }
 }
 

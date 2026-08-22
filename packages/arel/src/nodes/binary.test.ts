@@ -26,7 +26,7 @@ describe("NodesTest", () => {
 
     it("UnionAll is a Binary", () => {
       const sm = new SelectManager(users);
-      const unionAll = sm.unionAll(new SelectManager(users));
+      const unionAll = sm.union(":all", new SelectManager(users));
       expect(unionAll).toBeInstanceOf(Nodes.Binary);
     });
 

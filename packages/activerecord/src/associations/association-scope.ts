@@ -1,7 +1,6 @@
 import { isPlainObject } from "@blazetrails/activesupport";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
-import { typeCondition } from "../inheritance.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
@@ -76,7 +75,7 @@ export interface AssociationScopeable {
  * a reflection plus `attr_reader :aliased_table` and
  * `def all_includes; nil; end`.)
  */
-/** The `Relation` surface `_buildEntryScope` needs off `build_scope`. */
+/** The `Relation` surface `evalScope` needs off `build_scope`. */
 type AliasedScope = { where(predicate: unknown): AliasedScope };
 
 type ScopeBuilder = {
@@ -835,11 +834,8 @@ export class AssociationScope {
    * Evaluate a chain entry's scope lambda against a fresh relation built
    * from its klass. Rails: `relation = reflection.build_scope(reflection
    * .aliased_table); relation.instance_exec(owner, &scope)`
-   * (association_scope.rb:169-172). We build the relation via
-   * `_buildEntryScope` (`reflection.build_scope(aliased_table)` when the
-   * chain entry is aliased, else `klass.unscoped`, which carries the STI
-   * type_condition) and invoke with `invokeScopeLambda`'s arity / `this`
-   * semantics: 0-arg → `call(relation)`; 1+-arg → `call(relation, relation,
+   * (association_scope.rb:169-172), and invoke with `invokeScopeLambda`'s
+   * arity / `this` semantics: 0-arg → `call(relation)`; 1+-arg → `call(relation, relation,
    * owner)`. The common 0-arg form Rails uses for scope_for_association /
    * source_type_scope (`function () { return this.where(...) }`) relies on
    * `this` being the relation. Unlike Rails we omit the `|| relation`
@@ -864,14 +860,11 @@ export class AssociationScope {
     // `where(...)` predicates to the ALIASED table. For a self-referential
     // polymorphic through (a repeated table) the entry's `imageable_type`
     // source-type filter must qualify the joined-in alias
-    // (`children_imageables`), not the FROM table. Only repoint when the
-    // tracker actually produced an alias (a `TableAlias` node); the
-    // non-aliased case keeps `klass.arelTable` so SQL is byte-identical.
-    const aliased = (reflection as ReflectionProxy).aliasedTable;
-    const relation = this._buildEntryScope(
+    // (`children_imageables`), not the FROM table.
+    const relation = (reflection as unknown as ScopeBuilder).buildScope(
+      (reflection as ReflectionProxy).aliasedTable,
+      undefined,
       entryKlass,
-      aliased instanceof Nodes.TableAlias ? aliased : undefined,
-      reflection,
     );
     return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
   }
@@ -887,37 +880,6 @@ export class AssociationScope {
    */
   private join(table: unknown, constraint: unknown): unknown {
     return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
-  }
-
-  /**
-   * Build a fresh scope for evaluating a chain entry's lambda.
-   *
-   * Aliased entries go through `AbstractReflection#build_scope`
-   * (reflection.rb:336-338), the seat Rails' `association_scope.rb:169` calls
-   * with `reflection.aliased_table`, and take their STI predicate on that same
-   * alias the way `join_scope` does (reflection.rb:285-286) — a
-   * self-referential through must filter the joined-in alias, not the FROM
-   * table. Without an alias this is `entryKlass.unscoped`, whose `relation()`
-   * (core.rb:431-435) carries the type condition already, so the non-aliased
-   * SQL stays byte-identical.
-   */
-  protected _buildEntryScope(
-    entryKlass: typeof Base,
-    aliasedTable?: unknown,
-    reflection?: AbstractReflection | ReflectionProxy,
-  ): unknown {
-    if (aliasedTable && reflection) {
-      const scope = (reflection as unknown as ScopeBuilder).buildScope(
-        aliasedTable,
-        undefined,
-        entryKlass,
-      );
-      if (entryKlass.isFinderNeedsTypeCondition()) {
-        return scope.where(typeCondition(entryKlass, aliasedTable as never));
-      }
-      return scope;
-    }
-    return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }
 
   /**

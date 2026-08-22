@@ -310,7 +310,12 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       ).constraints?.() ?? [];
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      const entryScope = this._buildEntryScope(klass);
+      const entryScope = (
+        reflection as unknown as {
+          buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): unknown;
+          aliasedTable?: unknown;
+        }
+      ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable, undefined, klass);
       const evaluated =
         c.length === 0
           ? (c as () => unknown).call(entryScope)

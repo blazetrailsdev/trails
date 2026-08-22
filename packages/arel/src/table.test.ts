@@ -47,7 +47,7 @@ describe("TableTest", () => {
       const onClause = new Nodes.On(users.get("id").eq(posts.get("user_id")));
       const join = users.createJoin(posts, onClause, Nodes.OuterJoin);
       const mgr = users.project(star);
-      mgr.appendJoinNode(join);
+      mgr.joinSources().push(join);
       const sql = mgr.toSql();
       expect(sql).toContain('LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
     });
