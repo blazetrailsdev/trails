@@ -112,7 +112,7 @@ export interface GroupingFolders {
  * structurally for the same reason {@link GroupingFolders} is: the bodies below
  * cannot name `Predications` while it is still being defined.
  */
-export interface RangePredicates {
+interface RangePredicates {
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
   /** @internal */

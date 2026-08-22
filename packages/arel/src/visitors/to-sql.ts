@@ -262,10 +262,8 @@ export class ToSql extends Visitor {
     // uses add_bind. Inlines exactly like visitQuoted.
     //
     // Ruby's `value_for_database` is one zero-arg method however the receiver
-    // defines it, so Rails just calls it. In TS the ported readers split: a
-    // QueryAttribute answers with a method, an ActiveModel::Attribute with a
-    // getter, so a `Casted` wrapping either hands back a value or a function
-    // and the second half has to be applied here.
+    // spells it; in TS a QueryAttribute answers with a method and an
+    // ActiveModel::Attribute with a getter, so the call half is applied here.
     let valueForDatabase = o.valueForDatabase();
     if (
       valueForDatabase &&
@@ -1240,9 +1238,6 @@ export class ToSql extends Visitor {
     // bare SelectStatement / SqlLiteral relations, which don't self-wrap, so add
     // the parens explicitly only for those — otherwise an array CTE
     // (UnionAll) or a SqlLiteral CTE (Grouping) double-wraps to `AS ((…))`.
-    // A `Grouping`, a set-operation node or a `SelectManager` emits its own
-    // parens (`visit_Arel_SelectManager`, to_sql.rb:358-361), so wrapping again
-    // would render `AS ((…))`.
     if (
       (o.relation as unknown) instanceof SelectManager ||
       o.relation instanceof Nodes.Grouping ||
