@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
+    "rubyName": "alias_attribute_method_definition",
+    "call": "has_attribute?",
+    "reason": "Deviation (RFC 0106): Rails' `!abstract_class? && !has_attribute?(old_name)` ArgumentError (attribute_methods.rb:90-92) is LAZY — it fires only when attribute methods are actually generated, and `type_for_attribute` never generates them, which is why `attributes_test.rb:54` can `alias_attribute :overloaded_float, :x` against a column `overloaded_types` does not have (schema.rb:1408-1415) and still pass. trails reaches `generateAliasAttributes` eagerly, so porting the guard as-is raises on that Rails test and on `Firm`'s `id_value` alias under ignored columns. Converging needs the alias-method generation to become lazy first; tracked by story `converge-lazy-alias-attribute-method-generation`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
     "rubyName": "attributes_for_create",
     "call": "id",
     "reason": "Deviation (RFC 0106): Rails' `id.nil?` reads the composite-PK reader, which returns an Array for a composite key and so is never nil even when one member is. trails checks the per-column attribute value instead so a composite PK drops each unset member individually. Converging depends on the composite `id` reader story."

@@ -6,7 +6,6 @@
 import { include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
-  ArgumentError,
   MissingAttributeError,
   missingAttribute,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
@@ -209,7 +208,6 @@ interface AttributeMethodsHost {
   abstractClass?: boolean;
   aliasAttribute(newName: string, oldName: string): void;
   _hasAttribute(attrName: string): boolean;
-  hasAttribute(attrName: string): boolean;
   defineAttributeMethods?(): boolean;
   generateAliasAttributeMethods?(newName: string, oldName: string): void;
   generateAliasAttributes?(): void;
@@ -349,13 +347,6 @@ export function aliasAttributeMethodDefinition(
   oldName: string,
 ): void {
   oldName = String(oldName);
-
-  if (!this.abstractClass && !this.hasAttribute(oldName)) {
-    throw new ArgumentError(
-      `${this.name} model aliases \`${oldName}\`, but \`${oldName}\` is not an attribute. ` +
-        `Use \`alias_method :${newName}, :${oldName}\` or define the method manually.`,
-    );
-  }
 
   // Rails generates pattern-based alias methods for a single pattern.
   // Define a direct getter/setter for the alias name.
