@@ -384,6 +384,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * `database` key.
    */
   constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
+  /**
+   * @missingRailsCall merge — Per-entry verified (RFC 0106 sqlite3 construction
+   *   cluster), sqlite3_adapter.rb:128-132: Rails merges `@config` into
+   *   `@connection_parameters` because the sqlite3 gem takes the whole config
+   *   hash as driver options. trails' constructor takes `(filename, options)` —
+   *   the driver (node:sqlite / better-sqlite3) accepts no config hash — so
+   *   there is no parameters hash to merge into. Tracked for construction
+   *   convergence by RFC 0094 (sqlite3-adapter-construction-fidelity).
+   */
   constructor(
     filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
     options: SQLite3AdapterOptions = {},
@@ -1507,6 +1516,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows?.[0]?.encoding ?? "UTF-8";
   }
 
+  /**
+   * @missingRailsCall fetch — Per-entry verified (RFC 0106 sqlite3 construction
+   *   cluster), sqlite3_adapter.rb:473: Rails reads `@config.fetch(:flags,
+   *   0).anybits?(SHAREDCACHE)`. There is no `flags` bitmask in trails' config —
+   *   no JS sqlite driver exposes SQLITE_OPEN_SHAREDCACHE — so `isSharedCache`
+   *   inspects the `cache=shared` query parameter of the database URI instead,
+   *   which is the only way shared cache can be requested here. Tracked by RFC
+   *   0094.
+   */
   isSharedCache(): boolean {
     const qIdx = this._filename.indexOf("?");
     if (qIdx === -1) return false;
@@ -1524,6 +1542,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * synchronously; an async-only driver (no `openSync()`) answers a Promise,
    * which the pool memo resolves. Nothing is open on the deferred
    * async-checkout path, where Rails has no connection to ask at all.
+   *
+   * @missingRailsCall query_value — Per-entry verified (RFC 0106 sqlite3
+   *   introspection cluster), sqlite3_adapter.rb:477: Rails reads the version
+   *   through `query_value(..., "SCHEMA")`, whose trails counterpart is `async`,
+   *   while `getDatabaseVersion` must be able to answer synchronously for an
+   *   in-process driver (the pool memo at pool_config.rb:39-41 fills
+   *   `databaseVersion` on demand and callers read it synchronously). The query
+   *   is therefore issued straight on the driver; the deviation is documented on
+   *   the method's JSDoc.
    */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
@@ -1576,6 +1603,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._memoryDatabase || (await getFs().exists(this._filename));
   }
 
+  /**
+   * @missingRailsCall include? — Per-entry verified (RFC 0106 sqlite3
+   *   construction cluster), sqlite3_adapter.rb:36-41: Rails rescues
+   *   `Errno::ENOENT` and re-raises `NoDatabaseError` only when
+   *   `error.message.include?("No such file or directory")`. trails' `newClient`
+   *   constructs an adapter rather than opening a file, so there is no open-time
+   *   errno to classify; the missing-database mapping happens in
+   *   `translateException`. Tracked by RFC 0094.
+   */
   static newClient(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },
@@ -1585,6 +1621,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // Mirrors Rails' SQLite3Adapter.dbconsole: `-#{mode}` / `-header` flags
   // precede the database path. The PTY exec itself is unported (Ruby-only).
+  /**
+   * @missingRailsCall find_cmd_and_exec — Per-entry verified (RFC 0106 sqlite3
+   *   cluster), sqlite3_adapter.rb:51:
+   *   `find_cmd_and_exec(ActiveRecord.database_cli[:sqlite], *args)` execs the
+   *   sqlite CLI over a PTY. Process spawning is Ruby-only in trails (no
+   *   `node:*` imports, no `process.*`), so `dbconsole` returns the assembled
+   *   argv and the exec itself is unported — noted on the method.
+   */
   static override dbconsole(
     config?: { database?: string },
     options: { mode?: string; header?: boolean } = {},
@@ -2462,7 +2506,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
   private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall last — Per-entry verified (RFC 0106 sqlite3 introspection
+   *   cluster), sqlite3_adapter.rb:781-782: `result.partition(REGEX).last` —
+   *   `String#partition` returns a 3-tuple and `Array#last` takes its tail. JS
+   *   `String` has no `partition`, so the port slices from the match index
+   *   directly, which is that whole expression, not an omitted call.
+   * @missingRailsCall union — Per-entry verified (RFC 0106 sqlite3 introspection
+   *   cluster), sqlite3_adapter.rb:786: `Regexp.union(column_names).source`
+   *   builds an alternation from the column names. JS `RegExp` has no `union`,
+   *   so the port escapes and joins the names with `|` inline — the same
+   *   alternation source, spelled out.
+   */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
     // Rails: `unless column_names ... column_names = column_info.map { ... }`
     // (sqlite3_adapter.rb:758-761).
@@ -2597,7 +2654,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   */
   private async copyTable(
     from: string,
     to: string,
@@ -2774,7 +2833,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return def;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall new_client — Per-entry verified (RFC 0106 sqlite3
+   *   construction cluster), sqlite3_adapter.rb:807: `@raw_connection =
+   *   self.class.new_client(@connection_parameters)` hands the sqlite3 gem the
+   *   whole config hash. trails has no `@connection_parameters` hash and its
+   *   `newClient` returns an adapter rather than a raw driver handle, so
+   *   `connect()` opens the driver directly from the expanded filename. Tracked
+   *   by RFC 0094 (sqlite3-adapter-construction-fidelity).
+   */
   private connect(): void {
     const openConfig = this.openConfig();
     try {
@@ -2992,6 +3061,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * Promise that awaits each PRAGMA — the base `attemptConfigureConnection()`
    * awaits it, so both the initial-open and reconnect paths apply pragmas.
    * @internal
+   *
+   * @missingRailsCall fetch — Per-entry verified (RFC 0106 sqlite3 construction
+   *   cluster), sqlite3_adapter.rb:837: `@config.fetch(:pragmas,
+   *   {}).stringify_keys`. `Hash#fetch` with a default has no JS analogue that
+   *   preserves a stored `nil`; the port reads the pragmas option directly.
+   *   Tracked by RFC 0094.
    */
   override configureConnection(): void | Promise<void> {
     this.castTimeout();

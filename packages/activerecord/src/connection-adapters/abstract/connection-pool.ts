@@ -751,6 +751,13 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Pin / Unpin ---
 
+  /**
+   * @missingRailsCall checkout — pinConnectionBang acquires the pinned
+   *   connection via the sync `_acquireConnection` helper (the trails
+   *   pinned-checkout path); `checkout` is now async
+   *   (converge-connection-pool-checkout-lease-async) and cannot be awaited from
+   *   this path.
+   */
   async pinConnectionBang(_lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
     // Accept `pinConnectionBang(true)` (Rails-compat boolean), `pinConnectionBang()`,
     // and `pinConnectionBang({ fixture: true })`. The boolean form is retained for
@@ -896,6 +903,19 @@ export class ConnectionPool implements ReapablePool {
   // the method NAME + semantics (per-checkout verify/self-heal), NOT the sync
   // return type — do not "converge back" to a sync return. See RFC
   // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
+  /**
+   * @missingRailsCall acquire_connection — Tracked debt (RFC 0073 pool-checkout
+   *   convergence): connection_pool.rb:548 is
+   *   `checkout_and_verify(acquire_connection(checkout_timeout))`; trails
+   *   inlines the acquire at connection-pool.ts:906-925 because its
+   *   `acquire_connection` does not block on the queue (the wait is
+   *   `_available.poll`, which is async). Owned by 0073's checkout reshape, not
+   *   by this burndown.
+   * @missingRailsCall lock — Tracked debt (RFC 0073 pool-checkout convergence):
+   *   connection_pool.rb:550 is `@pinned_connection.lock.synchronize`; trails
+   *   has no per-connection Monitor — JS is single-threaded and the pinned path
+   *   is guarded by the same-tick `_resolvePinnedConnection`. Owned by 0073.
+   */
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
     // Rails' guard clause: `return checkout_and_verify(acquire_connection(
@@ -1047,6 +1067,14 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
+  /**
+   * @missingRailsCall count — Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool.rb:687-689 derives busy/dead/idle with three
+   *   `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps
+   *   the same numbers as maintained sets (`_checkedOut.size`,
+   *   `_available.length`) and has no `dead` bucket because there are no dead
+   *   owner threads.
+   */
   stat(): {
     size: number;
     connections: number;
@@ -1075,6 +1103,11 @@ export class ConnectionPool implements ReapablePool {
    * `Promise` return is an intentional, documented divergence from Rails'
    * synchronous `disconnect` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
+   *
+   * @missingRailsCall checkin — Tracked debt (RFC 0073 pool-checkout
+   *   convergence): connection_pool.rb:457-458 is `conn.steal!; checkin conn`;
+   *   trails' _disconnect clears `_checkedOut`/`_leases` wholesale instead, for
+   *   the same async-checkin reason. Owned by 0073.
    */
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
@@ -1182,6 +1215,13 @@ export class ConnectionPool implements ReapablePool {
    * immediately for sync drivers. The `Promise` return is an intentional,
    * documented divergence from Rails' synchronous `clear_reloadable_connections`
    * (forced by promise-returning `driver.close()`), NOT a regression to revert.
+   *
+   * @missingRailsCall checkin — Tracked debt (RFC 0073 pool-checkout
+   *   convergence): connection_pool.rb:510-511 is `conn.steal!; checkin conn`;
+   *   trails' _clearReloadableConnections (connection-pool.ts:1209-1218) inlines
+   *   the checkin as `_checkedOut.delete` + `_leases._peek(ctx).clear` +
+   *   `expire()` because `checkin` is async here. Owned by 0073's checkin
+   *   reshape.
    */
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
@@ -1234,6 +1274,19 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
+  /**
+   * @missingRailsCall checkin — Per-site verified (RFC 0106 wave 4b): reap
+   *   recovers connections whose OWNER THREAD died (connection_pool.rb:628-642).
+   *   JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no
+   *   stale set to steal, reset and check back in; the guard is the discarded?
+   *   early return Rails also has.
+   * @missingRailsCall remove — Per-site verified (RFC 0106 wave 4b): see
+   *   `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640
+   *   cannot arise in a single-threaded runtime.
+   * @missingRailsCall select — Per-site verified (RFC 0106 wave 4b): see
+   *   `reap`/`checkin` above — connection_pool.rb:628-633 selects on
+   *   `conn.owner.alive?`, which has no JS analogue.
+   */
   reap(): void {
     if (this.isDiscarded()) return;
     // In Rails, reap recovers connections whose owner thread has died.
@@ -1248,6 +1301,12 @@ export class ConnectionPool implements ReapablePool {
    * drivers. The `Promise` return is an intentional, documented divergence from
    * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
+   *
+   * @missingRailsCall select — Per-site verified (RFC 0106 wave 4b):
+   *   connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`;
+   *   trails' _flush partitions in one `for..of` over `_available.clear()`
+   *   because eviction and re-add must happen under the same synchronous pass.
+   *   Same predicate (`!in_use?` and idle >= minimum_idle).
    */
   async flush(minimumIdle?: number | null): Promise<void> {
     await Promise.all(this._flush(minimumIdle));
