@@ -4639,8 +4639,7 @@ extend(Base, {
 });
 
 include(Base, {
-  // AttributeMethods::Write — `HasReadonlyAttributes`' overrides are included
-  // per-class by `attrReadonly` (readonly_attributes.rb:33).
+  // AttributeMethods::Write
   writeAttribute: _writeAttributeMethod,
   // Persistence
   isNewRecord: _Persistence.isNewRecord,

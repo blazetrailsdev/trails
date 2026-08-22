@@ -76,6 +76,13 @@ export interface AssociationScopeable {
  * a reflection plus `attr_reader :aliased_table` and
  * `def all_includes; nil; end`.)
  */
+/** The `Relation` surface `_buildEntryScope` needs off `build_scope`. */
+type AliasedScope = { where(predicate: unknown): AliasedScope };
+
+type ScopeBuilder = {
+  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope;
+};
+
 export class ReflectionProxy {
   // AbstractReflection rather than AssociationReflection because chain
   // entries can be ThroughReflection / PolymorphicReflection wrappers;
@@ -162,12 +169,8 @@ export class ReflectionProxy {
    * (reflection.rb:336-338) — the Rails seat for a relation built against a
    * possibly-aliased Arel table.
    */
-  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): unknown {
-    return (
-      this.reflection as unknown as {
-        buildScope(t?: unknown, pb?: unknown, k?: typeof Base): unknown;
-      }
-    ).buildScope(table, predicateBuilder, klass);
+  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope {
+    return (this.reflection as unknown as ScopeBuilder).buildScope(table, predicateBuilder, klass);
   }
 
   constraints(): Array<(...args: unknown[]) => unknown> {
@@ -887,39 +890,30 @@ export class AssociationScope {
   }
 
   /**
-   * Build a fresh scope for evaluating a chain entry's lambda. Without an
-   * alias this is `entryKlass.unscoped` — Rails' `unscoped` retains the STI
-   * type filter via `relation()` (core.rb:431-435), and `Base.unscoped` wires
-   * that through `relation`, so no compensation is needed there.
+   * Build a fresh scope for evaluating a chain entry's lambda.
+   *
+   * Aliased entries go through `AbstractReflection#build_scope`
+   * (reflection.rb:336-338), the seat Rails' `association_scope.rb:169` calls
+   * with `reflection.aliased_table`, and take their STI predicate on that same
+   * alias the way `join_scope` does (reflection.rb:285-286) — a
+   * self-referential through must filter the joined-in alias, not the FROM
+   * table. Without an alias this is `entryKlass.unscoped`, whose `relation()`
+   * (core.rb:431-435) carries the type condition already, so the non-aliased
+   * SQL stays byte-identical.
    */
   protected _buildEntryScope(
     entryKlass: typeof Base,
     aliasedTable?: unknown,
     reflection?: AbstractReflection | ReflectionProxy,
   ): unknown {
-    // Rails: `reflection.build_scope(reflection.aliased_table)`
-    // (association_scope.rb:169) — `AbstractReflection#build_scope`
-    // (reflection.rb:336-338) is the seat that takes a table, so the scope
-    // lambda's `where(...)` predicates qualify by the alias. The STI predicate
-    // is layered on the same aliased table the way reflection.rb:285-286 does
-    // in `join_scope`: for a self-referential through (a repeated table) it
-    // must land on the joined-in alias, not the FROM table. We only take this
-    // path when the tracker produced a real alias; otherwise keep `unscoped()`
-    // so non-aliased SQL is byte-identical.
     if (aliasedTable && reflection) {
-      let scope = (
-        reflection as unknown as {
-          buildScope(t?: unknown, pb?: unknown, k?: typeof Base): { where(v: unknown): unknown };
-        }
-      ).buildScope(aliasedTable, undefined, entryKlass);
-      if (
-        (
-          entryKlass as unknown as { isFinderNeedsTypeCondition(): boolean }
-        ).isFinderNeedsTypeCondition()
-      ) {
-        scope = scope.where(typeCondition(entryKlass, aliasedTable as never)) as {
-          where(v: unknown): unknown;
-        };
+      const scope = (reflection as unknown as ScopeBuilder).buildScope(
+        aliasedTable,
+        undefined,
+        entryKlass,
+      );
+      if (entryKlass.isFinderNeedsTypeCondition()) {
+        return scope.where(typeCondition(entryKlass, aliasedTable as never));
       }
       return scope;
     }
