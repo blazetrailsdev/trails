@@ -25,6 +25,33 @@ import {
 } from "./date.js";
 
 /**
+ * MRI reads the process's zone once and caches it (`time.c`
+ * `localtime_with_gmtoff_zone`, over the libc `tzset` cache); every
+ * `Temporal.Now.timeZoneId()` is an `Intl` `resolvedOptions()` round trip
+ * instead, ~15x the cost of reading the clock itself, and `Time.now` sits on
+ * trails' production clock read. The memo is per-process, exactly as MRI's is.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `::Time` internals; MRI's own zone
+ * cache, which JS gives no equivalent for.
+ */
+let localTimeZoneId: string | null = null;
+
+function nowTimeZoneId(): string {
+  return (localTimeZoneId ??= Temporal.Now.timeZoneId());
+}
+
+/**
+ * Drop the {@link nowTimeZoneId} memo. MRI re-reads the zone when `TZ` changes
+ * under it (`tzset`); a test that rewrites `TZ` — or stubs
+ * `Temporal.Now.timeZoneId` — mid-process needs the same.
+ *
+ * @noRailsEquivalent PERMANENT — the reset half of the memo above.
+ */
+export function resetLocalTimeZoneId(): void {
+  localTimeZoneId = null;
+}
+
+/**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
  * `"+09"`, `"+0900"`, `"+09:00"`, `"+09:00:30"` or a number of seconds east of
  * UTC, which is the form Rails passes
@@ -274,8 +301,34 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
  * counterpart for a port to converge on. trails carries only the members a
  * caller duck-types.
  */
+/**
+ * The seat `Time.#atInstant` fills before entering the constructor, so the
+ * instant path skips `obj2ubits`/`validate_vtm` and the `Temporal.PlainDateTime`
+ * build for positionals that came off a `Temporal.ZonedDateTime` and are valid
+ * by construction — and whose `#instant`/`#utcOffset` the caller overwrote
+ * immediately afterwards anyway. A private field can only be installed by the
+ * constructor, so the seat is handed in rather than assigned onto a bare object.
+ *
+ * @noRailsEquivalent PERMANENT — MRI's `time_new_timew` builds the struct
+ * directly; JS private fields admit no such second constructor.
+ */
+let seatedTime: {
+  zoned: Temporal.ZonedDateTime;
+  instant: Temporal.Instant;
+  timeZoneId: string | null;
+} | null = null;
+
 export class Time {
-  readonly #plain: Temporal.PlainDateTime;
+  #plainMemo: Temporal.PlainDateTime | null;
+  /**
+   * @internal The `Temporal.ZonedDateTime` the instant path was seated with,
+   * and which the wall clock and the offset are read off on first use. MRI's
+   * `time_new_timew` seats the epoch alone and fills its `struct vtm` lazily,
+   * on the first field read (`time.c` `time_get_tm` / `MAKE_TM`); a `Time.now`
+   * that only ever names an instant — trails' production clock read — pays for
+   * neither.
+   */
+  #zoned: Temporal.ZonedDateTime | null;
   /**
    * @internal The instant the receiver names. MRI's `::Time` holds the epoch
    * itself (`time.c` `time_new_timew`); a wall clock alone does not name one
@@ -286,7 +339,17 @@ export class Time {
   /** @internal The receiver's zone, or `null` when it was built from an offset. */
   #timeZoneId: string | null;
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
-  #utcOffset: number;
+  #utcOffsetMemo: number | null;
+
+  /** @internal The wall clock, derived from {@link #zoned} on first read. */
+  get #plain(): Temporal.PlainDateTime {
+    return (this.#plainMemo ??= this.#zoned!.toPlainDateTime());
+  }
+
+  /** @internal Ruby's `Time#utc_offset`, derived from {@link #zoned} on first read. */
+  get #utcOffset(): number {
+    return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
+  }
 
   /** Ruby `Time.now`, the current time in the local zone. */
   static now(): Time {
@@ -321,24 +384,10 @@ export class Time {
    */
   static #atInstant(instant: Temporal.Instant, zone: string | number | null = null): Time {
     const timeZoneId =
-      zone == null ? Temporal.Now.timeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
+      zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
     const zoned = instant.toZonedDateTimeISO(timeZoneId);
-    const time = new Time(
-      zoned.year,
-      zoned.month,
-      zoned.day,
-      zoned.hour,
-      zoned.minute,
-      new Rational(
-        BigInt(zoned.second) * 1_000_000_000n +
-          BigInt(zoned.millisecond * 1_000_000 + zoned.microsecond * 1_000 + zoned.nanosecond),
-        1_000_000_000n,
-      ),
-    );
-    time.#instant = instant;
-    time.#timeZoneId = typeof zone === "number" ? null : timeZoneId;
-    time.#utcOffset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
-    return time;
+    seatedTime = { zoned, instant, timeZoneId: typeof zone === "number" ? null : timeZoneId };
+    return new Time(0);
   }
 
   /**
@@ -500,6 +549,16 @@ export class Time {
     sec: number | string | Rational | null = 0,
     zone: string | number | null = null,
   ) {
+    if (seatedTime !== null) {
+      const seat = seatedTime;
+      seatedTime = null;
+      this.#plainMemo = null;
+      this.#utcOffsetMemo = null;
+      this.#zoned = seat.zoned;
+      this.#instant = seat.instant;
+      this.#timeZoneId = seat.timeZoneId;
+      return;
+    }
     year = obj2vint(year);
     month = month == null ? 1 : monthArg(month);
     day = day == null ? 1 : obj2vint(day);
@@ -530,11 +589,12 @@ export class Time {
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
     ).add({ days: day - 1 });
-    this.#plain =
+    this.#zoned = null;
+    this.#plainMemo =
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
-    const utcOffset = zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone);
+    const utcOffset = zone == null ? nowTimeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
-    this.#utcOffset =
+    this.#utcOffsetMemo =
       typeof utcOffset === "number"
         ? utcOffset
         : Number(this.#plain.toZonedDateTime(utcOffset).offsetNanoseconds) / 1_000_000_000;

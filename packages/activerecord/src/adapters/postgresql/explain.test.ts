@@ -106,22 +106,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).toContain("Result");
     });
 
-    it("buildExplainClause renders FORMAT JSON for { format: 'json' }", async () => {
-      const clause = await adapter.buildExplainClause([{ format: "json" }]);
+    it("buildExplainClause renders FORMAT JSON", async () => {
+      const clause = await adapter.buildExplainClause(["FORMAT JSON"]);
       expect(clause).toBe("EXPLAIN (FORMAT JSON)");
     });
 
-    it("buildExplainClause combines string flags and format hash", async () => {
-      const clause = await adapter.buildExplainClause(["analyze", { format: "json" }]);
+    it("buildExplainClause combines string flags and format", async () => {
+      const clause = await adapter.buildExplainClause(["analyze", "format json"]);
       expect(clause).toBe("EXPLAIN (ANALYZE, FORMAT JSON)");
     });
 
-    it("buildExplainClause rejects unknown format", async () => {
-      await expect(adapter.buildExplainClause([{ format: "bogus" }])).rejects.toThrow();
-    });
-
-    it("explain executes with { format: 'json' } and returns JSON plan", async () => {
-      const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
+    it("explain executes with FORMAT JSON and returns JSON plan", async () => {
+      const result = await adapter.explain("SELECT 1", [], ["FORMAT JSON"]);
       // The prior stringifier rendered pg-auto-parsed plans as "[object Object]".
       expect(result).not.toContain("[object Object]");
       // Rails wraps JSON output in the "QUERY PLAN" header block; JSON.parse(result) would fail.

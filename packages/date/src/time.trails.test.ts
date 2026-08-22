@@ -8,7 +8,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Rational } from "./date.js";
-import { Time } from "./time.js";
+import { Time, resetLocalTimeZoneId } from "./time.js";
 
 describe("Time", () => {
   it("Time.utc builds a UTC time", () => {
@@ -216,10 +216,12 @@ describe("Time", () => {
   describe("in a local zone `Intl` has no abbreviation for", () => {
     afterEach(() => {
       vi.restoreAllMocks();
+      resetLocalTimeZoneId();
     });
 
     function inZone(timeZoneId: string): void {
       vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue(timeZoneId);
+      resetLocalTimeZoneId();
     }
 
     it("Time#zone answers the tzdata abbreviation, not Intl's short name", () => {
