@@ -1,7 +1,8 @@
 /**
- * Shared benchmark helper, mirroring `ActiveSupport::Benchmarkable#benchmark`.
- * Used by both `ActionController::Logger`/`AbstractController` and
- * `ActiveRecord::Base.benchmark` so the two stay in lock-step.
+ * `ActiveSupport::Benchmarkable` — mixed into `AbstractController::Logger`
+ * and `ActiveRecord::Base` exactly as Rails' `include Benchmarkable` does
+ * (benchmarkable.rb:4-52). `benchmark` reads the host's `logger` reader
+ * (benchmarkable.rb:38,44,46) rather than taking it as a parameter.
  */
 
 export interface BenchmarkLogger {
@@ -33,21 +34,26 @@ const ERROR_LEVEL = 3;
 
 const monotonicNow = (): number => globalThis.performance?.now() ?? Date.now();
 
+/** The host of `include ActiveSupport::Benchmarkable` — supplies `logger`. */
+export interface Benchmarkable {
+  logger?: BenchmarkLogger | null;
+}
+
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
+  this: Benchmarkable,
   message: string,
   block: () => T | Promise<T>,
 ): T | Promise<Awaited<T>>;
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
+  this: Benchmarkable,
   message: string,
   options: BenchmarkOptions,
   block: () => T | Promise<T>,
 ): T | Promise<Awaited<T>>;
 export function benchmark<T>(
-  logger: BenchmarkLogger | null | undefined,
-  message: string,
-  optionsOrBlock: BenchmarkOptions | (() => T | Promise<T>),
+  this: Benchmarkable,
+  message = "Benchmarking",
+  optionsOrBlock?: BenchmarkOptions | (() => T | Promise<T>),
   maybeBlock?: () => T | Promise<T>,
 ): T | Promise<Awaited<T>> {
   const block = (typeof optionsOrBlock === "function" ? optionsOrBlock : maybeBlock!) as () =>
@@ -57,8 +63,8 @@ export function benchmark<T>(
     typeof optionsOrBlock === "function" ? {} : (optionsOrBlock ?? {});
   const level = options.level ?? "info";
 
+  const logger = this?.logger;
   if (!logger) return block() as T | Promise<Awaited<T>>;
-
   const start = monotonicNow();
   const log = (): void => {
     const fn = (logger as Record<string, unknown>)[level];

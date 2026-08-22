@@ -17,20 +17,11 @@ export interface LoggerHost {
 }
 
 /**
- * Mirrors `ActiveSupport::Benchmarkable#benchmark`. Thin wrapper around
- * the shared `benchmark` helper in `@blazetrails/activesupport` —
- * preserved here so existing actionpack callers don't break.
+ * Mirrors `ActiveSupport::Benchmarkable#benchmark`, mixed in the way Rails'
+ * `include ActiveSupport::Benchmarkable` mixes it into
+ * `AbstractController::Logger` (logger.rb:13) — `this` is the controller, and
+ * the logger comes from its own `logger` reader (benchmarkable.rb:38).
  */
-export function benchmark<T>(logger: LoggerLike | undefined, message: string, block: () => T): T;
-export function benchmark<T>(
-  logger: LoggerLike | undefined,
-  message: string,
-  block: () => Promise<T>,
-): Promise<T>;
-export function benchmark<T>(
-  logger: LoggerLike | undefined,
-  message: string,
-  block: () => T | Promise<T>,
-): T | Promise<T> {
-  return benchmarkable(logger, message, { logOnError: true }, block) as T | Promise<T>;
+export function benchmark<T>(this: LoggerHost, message: string, block: () => T): T {
+  return benchmarkable.call(this, message, { logOnError: true }, block) as T;
 }

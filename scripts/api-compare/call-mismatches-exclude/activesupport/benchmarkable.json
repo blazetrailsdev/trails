@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "benchmarkable.ts",
-    "rubyName": "benchmark",
-    "call": "logger",
-    "reason": "Rails reads the mixin's `logger` reader (benchmarkable.rb:38,44,46); trails' benchmark is a shared free function whose host passes the logger in as its first parameter, so there is no `logger` reader to call."
-  }
-]

@@ -730,6 +730,11 @@ export class JoinDependency {
     const baseAliasCols = aliases.columnsForNode(joinRoot);
     const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
+    // join_dependency.rb:108-114 `Hash.new { ... }.compare_by_identity` /
+    // `Hash.new { |h, klass| h[klass] = {} }`. The settled default-block-Hash
+    // spelling (an inline Proxy `get` trap) vivifies string keys only; these
+    // two hashes are keyed by identity on record and JoinPart objects, so the
+    // default block is open-coded on a `Map` below instead.
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
     const modelCache = new Map<JoinPart, Map<unknown, any>>();
     const parents = new Map<unknown, any>();
