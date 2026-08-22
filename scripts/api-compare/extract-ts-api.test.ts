@@ -1190,6 +1190,49 @@ describe("extractFileLocalHelpers", () => {
   });
 });
 
+describe("extractClass — constructor parameter properties", () => {
+  // `ExclusionConstraintDefinition = Struct.new(:table_name, :expression, :options)`
+  // (postgresql/schema_definitions.rb:192) generates a reader and a writer per
+  // member; the port spells them as constructor parameter properties
+  // (schema-definitions.ts:108).
+  it("records a parameter property as a member of the class", () => {
+    const info = extractFromSource(`
+      export class Foo {
+        constructor(
+          readonly tableName: string,
+          public expression: string,
+          options: object,
+        ) {}
+      }
+    `);
+    const names = info.instanceMethods.map((m) => m.name);
+    expect(names).toContain("tableName");
+    expect(names).toContain("expression");
+    expect(names).not.toContain("options");
+    const tableName = info.instanceMethods.find((m) => m.name === "tableName")!;
+    expect(tableName.visibility).toBe("public");
+    expect(tableName.params).toEqual([]);
+    expect(tableName.internal).toBeUndefined();
+  });
+
+  it("tags a `private` / `protected` parameter property with its visibility", () => {
+    const info = extractFromSource(`
+      export class Foo {
+        constructor(
+          private conn: object,
+          protected owner: object,
+        ) {}
+      }
+    `);
+    const conn = info.instanceMethods.find((m) => m.name === "conn")!;
+    expect(conn.visibility).toBe("private");
+    expect(conn.internal).toBe(true);
+    const owner = info.instanceMethods.find((m) => m.name === "owner")!;
+    expect(owner.visibility).toBe("protected");
+    expect(owner.internal).toBe(true);
+  });
+});
+
 describe("extractClass — internal tagging", () => {
   it("emits public members without the internal flag", () => {
     const info = extractFromSource(`
