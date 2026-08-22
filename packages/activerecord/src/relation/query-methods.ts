@@ -3365,12 +3365,16 @@ export function selectInnerNamedJoins(
 export function buildJoinBuckets(
   this: QueryMethodsHost,
 ): [Record<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
-  const buckets: Record<string, unknown[]> = {
-    leading_join: [],
-    join_node: [],
-    stashed_join: [],
-    named_join: [],
-  };
+  // query_methods.rb:1826 — `buckets = Hash.new { |h, k| h[k] = [] }`. JS has no
+  // Hash default block, so the auto-vivifying read is spelled as a Proxy `get`
+  // trap: a missing string key stores and returns a fresh array, exactly as the
+  // Ruby block does. Non-string keys (symbol protocol lookups) fall through.
+  const buckets = new Proxy({} as Record<string, unknown[]>, {
+    get(h, k) {
+      if (typeof k !== "string") return Reflect.get(h, k);
+      return (h[k] ??= []);
+    },
+  });
 
   const joinsValues = this.joinsValues;
 
