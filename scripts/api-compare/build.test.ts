@@ -14,6 +14,7 @@ import {
   buildExpectations,
   fileModuleName,
   lowerMarksForDropped,
+  staleTagKey,
 } from "./build.js";
 import { serializeBaseline } from "./baseline-json.js";
 import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
@@ -325,6 +326,39 @@ describe("reconcileFileText", () => {
     expect(
       reconcileFileText("foo.ts", r.text!, expectations, () => "PERMANENT: x").text,
     ).toBeNull();
+  });
+
+  it("retires a tag compare.ts reports stale, and only that one", () => {
+    // The other half of the #6873 fix: with no expectation the run preserves,
+    // but compare.ts's `staleCallTags` is positive knowledge that the call is
+    // no longer flagged there — that tag goes, its neighbour stays.
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * @missingRailsCall logger — PERMANENT: no logger yet.",
+      "   */",
+      "  bar(): void {}",
+      "",
+      "  /**",
+      "   * @missingRailsCall with_raw_connection — PERMANENT: escapes inline.",
+      "   */",
+      "  quoteString(): void {}",
+      "}",
+    ].join("\n");
+    const r = reconcileFileText(
+      "foo.ts",
+      src,
+      new Map(),
+      () => "PERMANENT: x",
+      undefined,
+      new Set([staleTagKey("bar", "logger")]),
+    );
+    expect(r.text!).not.toContain("@missingRailsCall logger");
+    expect(r.text!).toContain("@missingRailsCall with_raw_connection — PERMANENT: escapes inline.");
+    expect(r.harvested.map((h) => [h.tsName, h.entry.call])).toEqual([["bar", "logger"]]);
+    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([
+      ["quoteString", "with_raw_connection"],
+    ]);
   });
 
   it("is idempotent: a second run produces zero edits", () => {
