@@ -6,7 +6,7 @@ describe("TestFactoryMethods", () => {
   const users = new Table("users");
   const posts = new Table("posts");
   it("create join", () => {
-    const join = users.createJoin(posts, users.attr("id").eq(posts.attr("user_id")));
+    const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
     expect(join).toBeInstanceOf(Nodes.InnerJoin);
   });
 
@@ -33,7 +33,7 @@ describe("TestFactoryMethods", () => {
   });
 
   it("create on", () => {
-    const on = users.createOn(users.attr("id").eq(posts.attr("user_id")));
+    const on = users.createOn(users.get("id").eq(posts.get("user_id")));
     expect(on).toBeInstanceOf(Nodes.On);
   });
 

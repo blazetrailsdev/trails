@@ -1,4 +1,3 @@
-import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
@@ -16,7 +15,7 @@ function isAppendableCollector(c: unknown): c is AppendableCollector {
 }
 
 /** Mirrors `Arel::Visitors::Dot::Node` — a labeled box with side-fields. */
-export class DotNode {
+export class Node {
   readonly name: string;
   readonly id: number;
   readonly fields: string[];
@@ -34,12 +33,12 @@ export class DotNode {
  * `withNode()` call that supplies the destination. `toDot` asserts it's
  * populated by the time the graph is rendered.
  */
-export class DotEdge {
+export class Edge {
   readonly name: string;
-  readonly from: DotNode;
-  to?: DotNode;
+  readonly from: Node;
+  to?: Node;
 
-  constructor(name: string, from: DotNode) {
+  constructor(name: string, from: Node) {
     this.name = name;
     this.from = from;
   }
@@ -55,11 +54,11 @@ export class DotEdge {
  * by multiple node types, mirroring Rails' `alias`.
  */
 export class Dot extends Visitor {
-  private nodes: DotNode[] = [];
-  private edges: DotEdge[] = [];
-  private nodeStack: DotNode[] = [];
-  private edgeStack: DotEdge[] = [];
-  private seen: Map<unknown, DotNode> = new Map();
+  private nodes: Node[] = [];
+  private edges: Edge[] = [];
+  private nodeStack: Node[] = [];
+  private edgeStack: Edge[] = [];
+  private seen: Map<unknown, Node> = new Map();
   private nextId = 0;
 
   /**
@@ -70,7 +69,7 @@ export class Dot extends Visitor {
    */
   private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
 
-  override accept(object: Node, collector?: unknown): { value: string } {
+  override accept(object: Nodes.Node, collector?: unknown): { value: string } {
     if (!this.dispatch.has(Table)) {
       this.dispatch.set(Table, "visitArelTable");
     }
@@ -173,15 +172,15 @@ export class Dot extends Visitor {
   }
 
   /** Aliased to CurrentRow / Distinct in dispatch (Rails: `alias`). */
-  protected visitNoEdges(_o: Node): void {}
+  protected visitNoEdges(_o: Nodes.Node): void {}
 
   /** Rails: `alias :visit_Arel_Nodes_CurrentRow :visit__no_edges` (dot.rb:104). */
-  protected visitArelNodesCurrentRow(o: Node): void {
+  protected visitArelNodesCurrentRow(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
 
   /** Rails: `alias :visit_Arel_Nodes_Distinct :visit__no_edges` (dot.rb:105). */
-  protected visitArelNodesDistinct(o: Node): void {
+  protected visitArelNodesDistinct(o: Nodes.Node): void {
     this.visitNoEdges(o);
   }
 
@@ -436,7 +435,7 @@ export class Dot extends Visitor {
     //     NilClass node represents Rails' nil singleton;
     //   - booleans / numbers / bigints / symbols, via typed-prefix keys
     //     so repeated equal scalar edges (e.g. Regexp#caseSensitive) reuse
-    //     one DotNode the way Rails does;
+    //     one Node the way Rails does;
     //   - strings are explicitly excluded — they DON'T dedupe in Ruby
     //     (each String.new gets its own object_id), and a value-based
     //     dedupe would wrongly collapse same-named Tables.
@@ -468,7 +467,7 @@ export class Dot extends Visitor {
     // Mirrors Rails' Dot#visit: every value (including primitives) gets a
     // Node entry whose `name` is the value's class. visit_String / visit_Hash
     // / visit_Array then mutate the new node's fields/edges.
-    const node = new DotNode(this.classNameOf(object), this.nextId++);
+    const node = new Node(this.classNameOf(object), this.nextId++);
     if (seenKey !== undefined) {
       this.seen.set(seenKey, node);
     }
@@ -489,7 +488,7 @@ export class Dot extends Visitor {
 
   /** Mirrors Rails' Dot#edge — push edge, run block, pop. */
   protected edge(name: string, block: () => void): void {
-    const edge = new DotEdge(name, this.nodeStack[this.nodeStack.length - 1]);
+    const edge = new Edge(name, this.nodeStack[this.nodeStack.length - 1]);
     this.edgeStack.push(edge);
     this.edges.push(edge);
     try {
@@ -500,7 +499,7 @@ export class Dot extends Visitor {
   }
 
   /** Mirrors Rails' Dot#with_node — link incoming edge then push node. */
-  protected withNode(node: DotNode, block: () => void): void {
+  protected withNode(node: Node, block: () => void): void {
     const e = this.edgeStack[this.edgeStack.length - 1];
     if (e) e.to = node;
     this.nodeStack.push(node);
@@ -540,7 +539,7 @@ export class Dot extends Visitor {
   }
 
   /** Convenience entry that returns the dot string directly. */
-  compile(node: Node): string {
+  compile(node: Nodes.Node): string {
     return this.accept(node).value;
   }
 

@@ -219,10 +219,6 @@ export class Table extends Node {
     return this.typeCaster != null;
   }
 
-  attr(name: string): Attribute {
-    return this.get(name);
-  }
-
   /**
    * The `*` projection for this table — `table.*` after visitor compilation.
    *

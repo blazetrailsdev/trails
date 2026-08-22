@@ -29,7 +29,7 @@ import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
  * `In(this, undefined)`. A `Node` is excluded: it is the `else`-arm value
  * itself, not a manager wrapping one.
  */
-export function isSelectManagerLike(value: unknown): value is { ast: Node } {
+function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -59,7 +59,7 @@ export function isSelectManagerLike(value: unknown): value is { ast: Node } {
  *   Hash pair-expansion. This is a decided split, not an accident; both arms
  *   are pinned by tests.
  */
-export function isEnumerable(value: unknown): value is Iterable<unknown> {
+function isEnumerable(value: unknown): value is Iterable<unknown> {
   return typeof value === "object" && value !== null && Symbol.iterator in value;
 }
 

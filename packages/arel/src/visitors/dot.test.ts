@@ -11,7 +11,7 @@ import {
   Nodes,
   Visitors,
 } from "../index.js";
-import { DotNode } from "./dot.js";
+import { Node as DotNode } from "./dot.js";
 
 /**
  * Drive Dot#visit on a bare value (rather than an AST root) and render the

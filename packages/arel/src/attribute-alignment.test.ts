@@ -26,7 +26,7 @@ describe("Attribute aggregates return typed Function subclasses", () => {
 
 describe("Attribute concat / contains / overlaps return typed infix subclasses", () => {
   it("concat builds a Concat (SQL ||), not a CONCAT(...) function", () => {
-    const c = users.attr("first").concat(users.attr("last"));
+    const c = users.get("first").concat(users.get("last"));
     expect(c).toBeInstanceOf(Nodes.Concat);
     const sql = compile(c);
     expect(sql).toBe('"users"."first" || "users"."last"');
@@ -35,14 +35,14 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
 
   it("contains is a Contains (PostgreSQL @>)", () => {
     const arr = new Nodes.SqlLiteral("ARRAY[1,2]");
-    const c = users.attr("ids").contains(arr);
+    const c = users.get("ids").contains(arr);
     expect(c).toBeInstanceOf(Nodes.Contains);
     expect(compile(c)).toContain("@>");
   });
 
   it("overlaps is an Overlaps (PostgreSQL &&)", () => {
     const arr = new Nodes.SqlLiteral("ARRAY[1,2]");
-    const o = users.attr("ids").overlaps(arr);
+    const o = users.get("ids").overlaps(arr);
     expect(o).toBeInstanceOf(Nodes.Overlaps);
     expect(compile(o)).toContain("&&");
   });
@@ -51,9 +51,9 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
     // Mirrors Rails' Predications#contains/#overlaps which call
     // `quoted_node(other)`. On Attribute that wraps the value in
     // Casted(value, this) so the visitor can apply column type-casting.
-    const c = users.attr("ids").contains([1, 2]);
+    const c = users.get("ids").contains([1, 2]);
     expect(c.right).toBeInstanceOf(Nodes.Casted);
-    const o = users.attr("ids").overlaps([1, 2]);
+    const o = users.get("ids").overlaps([1, 2]);
     expect(o.right).toBeInstanceOf(Nodes.Casted);
   });
 });
@@ -64,7 +64,7 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
   // becomes Casted(value, this) and keeps the column type-cast path;
   // ActiveModel::Attribute instances become BindParam and raw Nodes pass through.
   it("wraps a scalar in Casted(value, attribute)", () => {
-    const attr = users.attr("id");
+    const attr = users.get("id");
     const out = attr.quotedNode(42);
     expect(out).toBeInstanceOf(Nodes.Casted);
     expect((out as Nodes.Casted).value).toBe(42);
@@ -73,7 +73,7 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
 
   it("wraps null/undefined in Casted(nil, attribute)", () => {
     for (const nil of [null, undefined]) {
-      const attr = users.attr("id");
+      const attr = users.get("id");
       const out = attr.quotedNode(nil);
       expect(out).toBeInstanceOf(Nodes.Casted);
       expect((out as Nodes.Casted).attribute).toBe(attr);
@@ -83,7 +83,7 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
 
   it("passes through raw Nodes unchanged", () => {
     const lit = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");
-    expect(users.attr("created_at").quotedNode(lit)).toBe(lit);
+    expect(users.get("created_at").quotedNode(lit)).toBe(lit);
   });
 });
 
@@ -99,11 +99,11 @@ describe("Per-class `as(name)` marks the alias SqlLiteral as retryable", () => {
     new Visitors.ToSql(testConnection).accept(n, new Collectors.SQLString()).retryable;
 
   it("Attribute#as keeps the collector retryable", () => {
-    expect(collectorIsRetryableAfter(users.attr("id").as("aliased"))).toBe(true);
+    expect(collectorIsRetryableAfter(users.get("id").as("aliased"))).toBe(true);
   });
 
   it("Binary subclass `as` (via Equality#as) keeps the collector retryable", () => {
-    const eq = new Nodes.Equality(users.attr("id"), new Nodes.SqlLiteral("1", { retryable: true }));
+    const eq = new Nodes.Equality(users.get("id"), new Nodes.SqlLiteral("1", { retryable: true }));
     expect(collectorIsRetryableAfter(eq.as("aliased"))).toBe(true);
   });
 

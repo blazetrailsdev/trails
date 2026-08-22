@@ -732,7 +732,7 @@ describe("the to_sql visitor", () => {
       const core = new Nodes.SelectCore();
       core.setQuantifier = new Nodes.DistinctOn(new Nodes.SqlLiteral("aaron"));
       expect(() => new Visitors.ToSql(testConnection).compile(core)).toThrow(
-        Visitors.NotImplementedError,
+        "DISTINCT ON not implemented for this db",
       );
     });
   });
@@ -741,7 +741,7 @@ describe("the to_sql visitor", () => {
     it("raises not implemented error", () => {
       const node = new Nodes.Regexp(users.get("name"), new Nodes.Quoted("foo%"));
       expect(() => new Visitors.ToSql(testConnection).compile(node)).toThrow(
-        Visitors.NotImplementedError,
+        "~ not implemented for this db",
       );
     });
   });
@@ -750,7 +750,7 @@ describe("the to_sql visitor", () => {
     it("raises not implemented error", () => {
       const node = new Nodes.NotRegexp(users.get("name"), new Nodes.Quoted("foo%"));
       expect(() => new Visitors.ToSql(testConnection).compile(node)).toThrow(
-        Visitors.NotImplementedError,
+        "!~ not implemented for this db",
       );
     });
   });
