@@ -20,8 +20,6 @@ describe("Time", () => {
   it("Time.at builds a local time from the seconds since the Epoch", () => {
     vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
     expect(Time.at(946684800).strftime("%Y-%m-%d %H:%M:%S %z")).toBe("2000-01-01 00:00:00 +0000");
-    // MRI truncates the Float at the nanosecond, so the nearest double to
-    // 946684800.123456789 answers 123456835 rather than 123456789.
     expect(Time.at(Number("946684800.123456789")).nsec).toBe(123456835);
     expect(Time.at(946684800, 123456.789).nsec).toBe(123456789);
     expect(Time.at(new Rational(1, 3)).nsec).toBe(333333333);

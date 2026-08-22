@@ -956,6 +956,10 @@ export class TimeZone {
    *
    *   Time.zone.at(946684800.0)           # => Fri, 31 Dec 1999 14:00:00 HST -10:00
    *   Time.at(946684800, 123456.789).nsec # => 123456789
+   *
+   * `getutc` is Ruby's `Time#utc` on an immutable receiver (trails' `::Time`
+   * has no in-place conversion), and `toTime().toInstant()` is the instant a
+   * `TimeWithZone` holds where Ruby's `in_time_zone` takes the `::Time` itself.
    */
   at(
     seconds: number | bigint | Rational,

@@ -2183,16 +2183,15 @@ export function addReflection(
 
 /**
  * Mirrors: ActiveRecord::Reflection.add_aggregate_reflection
+ * (reflection.rb:29-31). `aggregate_reflections` is a `class_attribute`
+ * (reflection.rb:12), so the reassignment is the whole per-class mechanism:
+ * the read walks the constructor chain, the write lands on `ar`.
  */
 export function addAggregateReflection(
   ar: typeof Base,
   name: string,
   reflection: AggregateReflection,
 ): void {
-  // Rails: `ar.aggregate_reflections = ar.aggregate_reflections.merge(name.to_sym => reflection)`
-  // (reflection.rb:30). `aggregate_reflections` is a `class_attribute`
-  // (reflection.rb:12), so the reassignment is what makes the registry
-  // per-class: the read walks the constructor chain, the write lands here.
   ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
 }
 
