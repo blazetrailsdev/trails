@@ -4,6 +4,7 @@
  */
 
 import { NameError } from "./core-ext/name-error.js";
+import { PROTOCOL_PROBES } from "./method-missing-proxy.js";
 
 /**
  * Ruby's `NoMethodError`, raised when the delegator calls a method the target
@@ -135,6 +136,21 @@ export namespace Delegation {
         if (__target == null) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(globalThis.String(prop), target);
+        }
+        if (!(globalThis.String(prop) in Object(__target))) {
+          // Rails' `else super` (`:172`, `:193`), which raises NoMethodError.
+          // A `get` trap cannot raise there — `typeof x.foo === "function"` and
+          // `"foo" in x` both route through it — so the read returns a function
+          // that raises when called, which is where Ruby raises too. Same shape
+          // and same reasoning as `methodMissingProxy`.
+          if (PROTOCOL_PROBES.has(globalThis.String(prop))) return undefined;
+          return () => {
+            throw new NoMethodError(
+              `undefined method '${globalThis.String(prop)}' for an instance of ${
+                (obj as object).constructor.name
+              }`,
+            );
+          };
         }
         const value = (__target as Record<string, unknown>)[globalThis.String(prop)];
         return typeof value === "function" ? value.bind(__target) : value;

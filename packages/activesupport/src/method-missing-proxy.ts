@@ -20,7 +20,16 @@ class NoMethodError extends NameError {
  * `toJSON`, vitest's matchers read `asymmetricMatch`/`$$typeof`. A raising
  * function in those slots would be *called* by the probe, so they stay absent.
  */
-const PROTOCOL_PROBES = new Set([
+/**
+ * @noRailsEquivalent PERMANENT — the same language shortcoming as
+ * {@link methodMissingProxy} below, which this set exists for and which spells
+ * it out: Ruby resolves an undefined method through `method_missing`, JS has
+ * only `Proxy`, and a `get` trap must stay silent for the names JS itself
+ * probes. Exported so `Delegation.generate_method_missing`'s trap — the other
+ * `method_missing` mirror in this package — reads the one list rather than
+ * repeating it.
+ */
+export const PROTOCOL_PROBES = new Set([
   "then",
   "catch",
   "finally",

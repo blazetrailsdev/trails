@@ -96,6 +96,16 @@ describe("Delegation.generate", () => {
 });
 
 describe("Delegation.generateMethodMissing", () => {
+  it("raises NoMethodError when a non-nil target does not answer the method", () => {
+    const obj = Delegation.generateMethodMissing({ delegate: {} } as object, "delegate") as Record<
+      string,
+      () => unknown
+    >;
+
+    expect("nonexistentMethod" in obj).toBe(false);
+    expect(() => obj["nonexistentMethod"]()).toThrow(/undefined method 'nonexistentMethod'/);
+  });
+
   it("does not answer marshal_dump or _dump but still forwards an explicit call", () => {
     const delegate = {
       marshal_dump() {
