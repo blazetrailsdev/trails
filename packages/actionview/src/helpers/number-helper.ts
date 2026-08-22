@@ -118,7 +118,13 @@ export function escapeUnits(units: Record<string, string | SafeBuffer>): Record<
   return escaped;
 }
 
-/** @internal */
+/**
+ * Mirrors: `wrap_with_output_safety_handling` (number_helper.rb:141-152). On the
+ * `valid_float` arm `NumberConverter#execute` took its `convert` arm, so
+ * `formatted_number` (number_helper.rb:148) is a String.
+ *
+ * @internal
+ */
 export function wrapWithOutputSafetyHandling(
   number: unknown,
   raiseOnInvalid: boolean,
@@ -126,8 +132,6 @@ export function wrapWithOutputSafetyHandling(
 ): unknown {
   const valid = validFloat(number);
   if (raiseOnInvalid && !valid) throw new InvalidNumberError(number);
-  // On the `valid_float` arm `execute` took its `convert` arm, so
-  // `formatted_number` (number_helper.rb:148) is a String.
   return valid || isHtmlSafe(number) ? htmlSafe(formatted as string) : formatted;
 }
 

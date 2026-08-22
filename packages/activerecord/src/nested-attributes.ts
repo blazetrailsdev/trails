@@ -59,6 +59,9 @@ export interface NestedAttributeOptions {
 /**
  * Configure nested attributes for an association.
  *
+ * The registry write is nested_attributes.rb:361-363 — dup the hash, assign the
+ * key, write the whole hash back through the `class_attribute` writer.
+ *
  * Mirrors: ActiveRecord::Base.accepts_nested_attributes_for
  *
  * Usage:
@@ -120,8 +123,6 @@ export function acceptsNestedAttributesFor(
   // nested_attributes.rb. We mirror that in
   // assignNestedAttributesForOneToOneAssociation.
 
-  // nested_attributes.rb:361-363 — dup the hash, assign the key, write the
-  // whole hash back through the `class_attribute` writer.
   const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
   nestedAttributesOptions[associationName] = options;
   modelClass.nestedAttributesOptions = nestedAttributesOptions;

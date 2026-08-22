@@ -270,6 +270,10 @@ export function validateColumnSize(this: any, attributeName: string): void {
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#encrypts
  * (encryptable_record.rb:49-55). `this` is the model class, the receiver Ruby's
  * `class_methods do` block gives the method.
+ *
+ * `self.encrypted_attributes ||= Set.new` (encryptable_record.rb:50) seeds this
+ * class's own Set; the comment there records why it is deliberately not a
+ * `class_attribute` `default:` — that instance would be shared across classes.
  */
 export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
   let options: SchemeOptions = {};
@@ -283,9 +287,6 @@ export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
     }
   }
 
-  // encryptable_record.rb:50 — `self.encrypted_attributes ||= Set.new`; the
-  // comment there says the Set is deliberately NOT a `class_attribute` default
-  // because the instance would then be shared across classes.
   this.encryptedAttributes ??= new Set<string>();
 
   for (const name of names) {
@@ -451,6 +452,9 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  * (via encryption.ts#encrypts) and direct callers route through here, mirroring
  * Rails' single `encrypt_attribute`.
  *
+ * `encrypted_attributes << name.to_sym` (encryptable_record.rb:85) adds to this
+ * class's own Set in place, which `encrypts` has already seeded.
+ *
  * The scheme is built by `schemeFor` — Rails' one `scheme_for` — inside the
  * `PendingEncryption` getter, because Rails calls `scheme_for` inside the
  * `decorate_attributes` block (encryptable_record.rb:85-88).
@@ -459,9 +463,6 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  */
 export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
   const modelClass = this;
-  // `encrypted_attributes << name.to_sym` (encryptable_record.rb:85) — an
-  // in-place add, the way Rails does it; `encrypts` has already seeded this
-  // class's own Set.
   modelClass.encryptedAttributes.add(name);
   delete modelClass._deterministicEncryptedAttributes;
 
@@ -508,8 +509,8 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
   // can re-run the missing-column check against the authoritative DB column
   // set — closing the fail-open gap when the adapter isn't connected at
-  // declaration time. Own-property guarded so a
-  // subclass declaring ignoreCase doesn't mutate the parent's Set.
+  // declaration time. Own-property guarded so a subclass declaring ignoreCase
+  // doesn't mutate the parent's Set.
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
     modelClass._ignoreCasePreservedAttributes = new Set<string>(
       modelClass._ignoreCasePreservedAttributes ?? [],

@@ -4624,11 +4624,7 @@ classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} }
 classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
-// readonly_attributes.rb:11 — `class_attribute :_attr_readonly,
-// instance_accessor: false, default: []`.
 classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
-// default.rb:19-20 — `default_scope_override` stays nil until
-// `build_default_scope` memoizes it.
 classAttribute.call(Base, "defaultScopes", {
   instanceWriter: false,
   instancePredicate: false,
@@ -4639,7 +4635,6 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-// time_zone_conversion.rb:61-62.
 classAttribute.call(Base, "skipTimeZoneConversionForAttributes", {
   instanceWriter: false,
   default: [],
@@ -4648,10 +4643,7 @@ classAttribute.call(Base, "timeZoneAwareTypes", {
   instanceWriter: false,
   default: ["datetime", "time"],
 });
-// nested_attributes.rb:15.
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
-// encryptable_record.rb:11 — `class_attribute :encrypted_attributes`, with no
-// `default:` on purpose (see the comment at encryptable_record.rb:50).
 classAttribute.call(Base, "encryptedAttributes");
 classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,

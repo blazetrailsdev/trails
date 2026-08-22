@@ -40,16 +40,15 @@ export class ReadonlyAttributeError extends ActiveRecordError {
  * Declare attributes as readonly. Once a record is persisted, these
  * attributes cannot be changed via update/save.
  *
+ * `self._attr_readonly |= attributes.map(&:to_s)` (readonly_attributes.rb:30) —
+ * `Array#|` is union-with-dedup, and the assignment (not a mutation of the
+ * inherited Array) is what keeps the write local to this class.
+ *
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#attr_readonly
  */
 export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
-  // `self._attr_readonly |= attributes.map(&:to_s)` (readonly_attributes.rb:30):
-  // `Array#|` is union-with-dedup, and the assignment is what makes the write
-  // local to this class — `_attrReadonly` is a `classAttribute`.
-  const attrReadonly = (this as any)._attrReadonly as string[];
   (this as any)._attrReadonly = [
-    ...attrReadonly,
-    ...attributes.map(String).filter((attr) => !attrReadonly.includes(attr)),
+    ...new Set([...((this as any)._attrReadonly as string[]), ...attributes.map(String)]),
   ];
   // readonly_attributes.rb:33 — Rails reads `raise_on_assign_to_attr_readonly`
   // HERE, at declaration time, and only `include HasReadonlyAttributes` — the

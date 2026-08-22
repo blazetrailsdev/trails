@@ -31,6 +31,10 @@ export namespace NumericWithFormat {
    * which this parameter type excludes, so the `when Symbol` fallback to `to_s`
    * is the last arm here. `to_s(format)` dispatches on the receiver:
    * `BigDecimal#to_s` takes a format string, `Integer#to_s` a base.
+   *
+   * `self` is always a Numeric, so `NumberConverter#execute`
+   * (number_converter.rb:130-137) always takes its `convert` arm and every
+   * helper below answers a String.
    */
   export function toFs(
     self: number | BigDecimal,
@@ -45,9 +49,6 @@ export namespace NumericWithFormat {
         : self.toString(format as number);
     }
 
-    // `self` is always a Numeric here, so `NumberConverter#execute`
-    // (number_converter.rb:130-137) always takes its `convert` arm and every
-    // helper below answers a String.
     switch (format) {
       case ":phone":
         return NumberHelper.numberToPhone(self, options ?? {}) as string;

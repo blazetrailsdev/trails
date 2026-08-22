@@ -91,7 +91,6 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
     }
   }
 
-  // encryptable_record.rb:50 — `self.encrypted_attributes ||= Set.new`.
   klass.encryptedAttributes ??= new Set<string>();
 
   for (const name of names) {
