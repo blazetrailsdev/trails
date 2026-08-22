@@ -4878,10 +4878,9 @@ include(Base, {
   // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
   // above: the readers are accessor properties, and only those calls copy
   // descriptors — this object literal is read by value and would flatten them.
-  // `isSavedChangeToAttribute` / `isWillSaveChangeToAttribute` are defined in
-  // the class body above (they carry the alias + enum type_cast step), so they
-  // are deliberately absent here — this literal is assigned onto the prototype
-  // after the class and would otherwise clobber them.
+  // `isSavedChangeToAttribute` / `isWillSaveChangeToAttribute` are absent on
+  // purpose: this literal lands on the prototype after the class body and would
+  // clobber the overrides there that carry the alias + enum type_cast step.
   savedChangeToAttribute: _savedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
   attributeChangeToBeSaved: _attributeChangeToBeSaved,
