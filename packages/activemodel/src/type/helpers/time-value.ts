@@ -132,7 +132,9 @@ export function typeCastForSchema(value: unknown): string {
  * `DateAndTime::Zones#in_time_zone` (`core_ext/date_and_time/zones.rb:20-27`).
  * A TS free function has no receiver to dispatch on, so the arm is chosen from
  * the value's type — and each arm calls the ported core-ext, so no parsing
- * lives here.
+ * lives here. The `Temporal.Instant` arm is `zones.rb:22-27` inline:
+ * `time_with_zone(self, time_zone)` when a zone resolves, else the time
+ * itself.
  */
 export function userInputInTimeZone(
   value: unknown,
@@ -141,8 +143,6 @@ export function userInputInTimeZone(
   if (value instanceof TimeWithZone) return value.inTimeZone();
   if (value instanceof Temporal.ZonedDateTime) return value;
   if (value instanceof Temporal.Instant) {
-    // `DateAndTime::Zones#in_time_zone` (zones.rb:20-27) on the `Time` arm:
-    // `time_with_zone(self, time_zone)` when a zone resolves, else `self`.
     const timeZone = zone();
     return timeZone ? new TimeWithZone(value, timeZone) : value;
   }

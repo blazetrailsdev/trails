@@ -54,6 +54,15 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return resolveIsUtc(this._subtype);
   }
 
+  /**
+   * Mirrors: `TimeZoneConverter#cast` (time_zone_conversion.rb:19-32).
+   *
+   * Rails gives `String` an `in_time_zone` through CoreExt, so a string takes
+   * the `respond_to?(:in_time_zone)` arm — `super(user_input_in_time_zone(value))
+   * || super` (`:24`), whose `user_input_in_time_zone` is
+   * `Helpers::TimeValue`'s (time_value.rb:42-44), reached through the
+   * `DelegateClass` hop to the subtype.
+   */
   override cast(value: unknown): unknown {
     if (value == null) return null;
     // Hash (multiparameter attributes): cast via subtype, then treat wall-clock
@@ -81,12 +90,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
       const instant = value.toZonedDateTime(zoneForIsUtc(this._subtypeIsUtc)).toInstant();
       return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
     }
-    // Strings: Rails gives String an `in_time_zone` via CoreExt, so a string
-    // takes the `respond_to?(:in_time_zone)` arm —
-    // `super(user_input_in_time_zone(value)) || super`
-    // (time_zone_conversion.rb:24). `user_input_in_time_zone` is
-    // `Helpers::TimeValue`'s (time_value.rb:42-44), reached through the
-    // DelegateClass hop to the subtype.
     if (typeof value === "string") {
       return (
         this._subtype.cast((this._subtype as TimeValueSubtype).userInputInTimeZone(value)) ??

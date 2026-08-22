@@ -1013,95 +1013,6 @@ export class TimeZone {
    * memoizes (time_with_zone.rb:72-74) and reads `dst?` /
    * `observed_utc_offset` / `abbreviation` off.
    */
-  /**
-   * `parts_to_time(parts, now)` (time_zone.rb:585-608).
-   *
-   *   def parts_to_time(parts, now)
-   *     raise ArgumentError, "invalid date" if parts.nil?
-   *     return if parts.empty?
-   *
-   *     if parts[:seconds]
-   *       time = Time.at(parts[:seconds])
-   *     else
-   *       time = Time.new(
-   *         parts.fetch(:year, now.year),
-   *         parts.fetch(:mon, now.month),
-   *         parts.fetch(:mday, parts[:year] || parts[:mon] ? 1 : now.day),
-   *         parts.fetch(:hour, 0),
-   *         parts.fetch(:min, 0),
-   *         parts.fetch(:sec, 0) + parts.fetch(:sec_fraction, 0),
-   *         parts.fetch(:offset, 0)
-   *       )
-   *     end
-   *
-   *     if parts[:offset] || parts[:seconds]
-   *       TimeWithZone.new(time.utc, self)
-   *     else
-   *       TimeWithZone.new(nil, self, time)
-   *     end
-   *   end
-   *
-   * Ruby's `Time.new(..., offset)` defaults its offset to `0`, so the
-   * no-offset arm builds the wall clock as a UTC-flagged `::Time` and hands it
-   * to the LOCAL seat of the `TimeWithZone` constructor, which resolves it
-   * through `period_for_local` — that is where the DST-gap and ambiguity
-   * policy lives. `Temporal.PlainDateTime` is that wall clock here, and it
-   * carries the `sec_fraction` down to the nanosecond, which `TimeZone#local`
-   * (millisecond arguments) cannot.
-   */
-  private partsToTime(parts: DateParts | null, now: TimeWithZone): TimeWithZone | undefined {
-    if (parts == null) throw new ArgumentError("invalid date");
-    if (Object.keys(parts).length === 0) return undefined;
-
-    if (parts.seconds != null) {
-      // Ruby's `Time.at(parts[:seconds])` followed by the
-      // `TimeWithZone.new(time.utc, self)` arm below is what `TimeZone#at`
-      // (time_zone.rb:378-380) already is: `Time.at(*args).utc.in_time_zone(self)`.
-      return this.at(
-        parts.seconds instanceof Rational ? parts.seconds.toF() : Number(parts.seconds),
-      );
-    }
-
-    const secFraction = parts.secFraction;
-    const nanosecond =
-      secFraction == null
-        ? 0
-        : secFraction instanceof Rational
-          ? secFraction.mul(1_000_000_000).toI()
-          : Math.trunc(Number(secFraction) * 1_000_000_000);
-    // Ruby's `Time.new` raises `ArgumentError, "argument out of range"` for
-    // out-of-range components (`Date._parse("9000", false)` is
-    // `{mon: 90, mday: 0}`); Temporal answers a `RangeError` for the same.
-    let time: Temporal.PlainDateTime;
-    try {
-      time = Temporal.PlainDateTime.from({
-        year: Number("year" in parts ? parts.year : now.year),
-        month: "mon" in parts ? parts.mon! : now.month,
-        day: "mday" in parts ? parts.mday! : parts.year != null || parts.mon != null ? 1 : now.day,
-        hour: "hour" in parts ? parts.hour! : 0,
-        minute: "min" in parts ? parts.min! : 0,
-        second: "sec" in parts ? parts.sec! : 0,
-        millisecond: Math.trunc(nanosecond / 1_000_000),
-        microsecond: Math.trunc(nanosecond / 1000) % 1000,
-        nanosecond: nanosecond % 1000,
-      });
-    } catch {
-      throw new ArgumentError("argument out of range");
-    }
-
-    if (parts.offset != null) {
-      const offset = parts.offset instanceof Rational ? parts.offset.toF() : Number(parts.offset);
-      return new TimeWithZone(
-        time
-          .toZonedDateTime("UTC")
-          .toInstant()
-          .subtract({ nanoseconds: Math.round(offset * 1e9) }),
-        this,
-      );
-    }
-    return new TimeWithZone(null, this, time);
-  }
-
   periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
     return this.tzinfo.periodForUtc(date);
   }
@@ -1326,6 +1237,96 @@ export class TimeZone {
       return zones;
     }, {});
     return zonesMapMemo;
+  }
+
+  /**
+   * `parts_to_time(parts, now)` (time_zone.rb:585-608).
+   *
+   *   def parts_to_time(parts, now)
+   *     raise ArgumentError, "invalid date" if parts.nil?
+   *     return if parts.empty?
+   *
+   *     if parts[:seconds]
+   *       time = Time.at(parts[:seconds])
+   *     else
+   *       time = Time.new(
+   *         parts.fetch(:year, now.year),
+   *         parts.fetch(:mon, now.month),
+   *         parts.fetch(:mday, parts[:year] || parts[:mon] ? 1 : now.day),
+   *         parts.fetch(:hour, 0),
+   *         parts.fetch(:min, 0),
+   *         parts.fetch(:sec, 0) + parts.fetch(:sec_fraction, 0),
+   *         parts.fetch(:offset, 0)
+   *       )
+   *     end
+   *
+   *     if parts[:offset] || parts[:seconds]
+   *       TimeWithZone.new(time.utc, self)
+   *     else
+   *       TimeWithZone.new(nil, self, time)
+   *     end
+   *   end
+   *
+   * Ruby's `Time.new(..., offset)` defaults its offset to `0`, so the
+   * no-offset arm builds the wall clock as a UTC-flagged `::Time` and hands it
+   * to the LOCAL seat of the `TimeWithZone` constructor, which resolves it
+   * through `period_for_local` — that is where the DST-gap and ambiguity
+   * policy lives. `Temporal.PlainDateTime` is that wall clock here, and it
+   * carries the `sec_fraction` down to the nanosecond, which `TimeZone#local`
+   * (millisecond arguments) cannot.
+   *
+   * `Time.at(parts[:seconds])` followed by that `TimeWithZone.new(time.utc,
+   * self)` arm is what `TimeZone#at` (time_zone.rb:378-380) already is —
+   * `Time.at(*args).utc.in_time_zone(self)` — so the `:seconds` arm returns
+   * through it. And `Time.new` raises `ArgumentError, "argument out of range"`
+   * for out-of-range components (`Date._parse("9000", false)` is `{mon: 90,
+   * mday: 0}`), where Temporal answers a `RangeError`.
+   */
+  private partsToTime(parts: DateParts | null, now: TimeWithZone): TimeWithZone | undefined {
+    if (parts == null) throw new ArgumentError("invalid date");
+    if (Object.keys(parts).length === 0) return undefined;
+
+    if (parts.seconds != null) {
+      return this.at(
+        parts.seconds instanceof Rational ? parts.seconds.toF() : Number(parts.seconds),
+      );
+    }
+
+    const secFraction = parts.secFraction;
+    const nanosecond =
+      secFraction == null
+        ? 0
+        : secFraction instanceof Rational
+          ? secFraction.mul(1_000_000_000).toI()
+          : Math.trunc(Number(secFraction) * 1_000_000_000);
+    let time: Temporal.PlainDateTime;
+    try {
+      time = Temporal.PlainDateTime.from({
+        year: Number("year" in parts ? parts.year : now.year),
+        month: "mon" in parts ? parts.mon! : now.month,
+        day: "mday" in parts ? parts.mday! : parts.year != null || parts.mon != null ? 1 : now.day,
+        hour: "hour" in parts ? parts.hour! : 0,
+        minute: "min" in parts ? parts.min! : 0,
+        second: "sec" in parts ? parts.sec! : 0,
+        millisecond: Math.trunc(nanosecond / 1_000_000),
+        microsecond: Math.trunc(nanosecond / 1000) % 1000,
+        nanosecond: nanosecond % 1000,
+      });
+    } catch {
+      throw new ArgumentError("argument out of range");
+    }
+
+    if (parts.offset != null) {
+      const offset = parts.offset instanceof Rational ? parts.offset.toF() : Number(parts.offset);
+      return new TimeWithZone(
+        time
+          .toZonedDateTime("UTC")
+          .toInstant()
+          .subtract({ nanoseconds: Math.round(offset * 1e9) }),
+        this,
+      );
+    }
+    return new TimeWithZone(null, this, time);
   }
 
   /**
