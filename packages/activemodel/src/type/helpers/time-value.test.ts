@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Rational, Temporal } from "@blazetrails/date";
-import { useZone } from "@blazetrails/activesupport";
+import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import {
   applySecondsPrecision,
   fastStringToTime,
@@ -151,17 +151,42 @@ describe("fastStringToTime", () => {
 // (time_value.rb:42-44) — `value.in_time_zone`, whose else arm with no
 // Time.zone set is a bare `to_time` (date_and_time/zones.rb:20-27).
 describe("userInputInTimeZone", () => {
-  it("answers a zoneless value when Time.zone is unset", () => {
+  it("answers String#to_time when Time.zone is unset", () => {
     const result = userInputInTimeZone("2024-06-15 14:30:00");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    expect(result?.toString()).toBe("2024-06-15T14:30:00");
+    expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect((result as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
+      "2024-06-15T14:30:00",
+    );
   });
 
-  it("anchors to Time.zone when one is set", () => {
+  it("parses in Time.zone when one is set", () => {
     useZone("Eastern Time (US & Canada)", () => {
-      const result = userInputInTimeZone("2024-06-15 14:30:00");
-      expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
-      expect((result as Temporal.ZonedDateTime).timeZoneId).toBe("America/New_York");
+      const result = userInputInTimeZone("2024-06-15 14:30:00") as TimeWithZone;
+      expect(result).toBeInstanceOf(TimeWithZone);
+      expect(result.timeZone.name).toBe("Eastern Time (US & Canada)");
+      expect(result.hour).toBe(14);
+    });
+  });
+
+  it("keeps sub-millisecond precision through the zone parse", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = userInputInTimeZone("2024-06-15 14:30:00.123456789") as TimeWithZone;
+      expect(result.utc().epochNanoseconds % 1_000_000_000n).toBe(123456789n);
+    });
+  });
+
+  it("honours an explicit offset in the string", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = userInputInTimeZone("2024-06-15T10:30:00Z") as TimeWithZone;
+      expect(result.hour).toBe(6);
+    });
+  });
+
+  it("reads a date-only string as midnight in the zone", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = userInputInTimeZone("2024-06-15") as TimeWithZone;
+      expect(result.hour).toBe(0);
+      expect(result.day).toBe(15);
     });
   });
 });

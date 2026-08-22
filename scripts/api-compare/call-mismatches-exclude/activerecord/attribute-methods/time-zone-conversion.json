@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/time-zone-conversion.ts",
-    "rubyName": "cast",
-    "call": "user_input_in_time_zone",
-    "reason": "Verified per-site (RFC 0106 wave 4g): `super(user_input_in_time_zone(value)) || super` (time_zone_conversion.rb:24). trails parses the string arm through the file-local `parseStringInZone` (time-zone-conversion.ts:82-92, :278-320) rather than the shared `TimeValue#userInputInTimeZone` (activemodel/type/helpers/time-value.ts:125), because that helper does not yet handle explicit offsets, DST disambiguation via `zone.local`, or date-only strings. Routing the call through it today would regress those. Convergence tracked in story `converge-parse-string-in-zone-onto-user-input-in-time-zone`."
-  }
-]

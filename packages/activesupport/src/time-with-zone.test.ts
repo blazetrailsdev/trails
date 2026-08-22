@@ -42,14 +42,14 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("creates from TimeZone.parse() with ISO string", () => {
-    const twz = eastern.parse("2024-06-15T12:00:00Z");
+    const twz = eastern.parse("2024-06-15T12:00:00Z")!;
     // 12:00 UTC = 8:00 EDT
     expect(twz.hour).toBe(8);
     expect(twz.day).toBe(15);
   });
 
   it("parses a string without timezone info as local to the zone", () => {
-    const twz = eastern.parse("2024-06-15 12:00:00");
+    const twz = eastern.parse("2024-06-15 12:00:00")!;
     expect(twz.hour).toBe(12);
     expect(twz.day).toBe(15);
   });

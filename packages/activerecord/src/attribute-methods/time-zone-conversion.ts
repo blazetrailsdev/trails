@@ -3,10 +3,18 @@
  */
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
-import { TimeWithZone, TimeZone, zone as timeZone } from "@blazetrails/activesupport";
+import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
+
+/**
+ * The `Helpers::TimeValue` member Rails reaches on the wrapped subtype through
+ * `DelegateClass(Type::Value)` — `user_input_in_time_zone` (time_value.rb:42-44).
+ */
+interface TimeValueSubtype extends Type {
+  userInputInTimeZone(value: unknown): unknown;
+}
 
 export interface TimeZoneConversion {
   timeZoneAwareAttributes: boolean;
@@ -73,23 +81,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
       const instant = value.toZonedDateTime(zoneForIsUtc(this._subtypeIsUtc)).toInstant();
       return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
     }
-    // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
-    // take the respond_to?(:in_time_zone) branch and are parsed as local to
-    // Time.zone (user_input_in_time_zone = value.in_time_zone = zone.parse(value)).
-    // Without this, subtype would interpret the string in default_timezone and
-    // convertTimeToTimeZone would only shift display — wrong underlying instant.
-    // Parse inline (not via zone.parse()) to preserve full nanosecond precision.
+    // Strings: Rails gives String an `in_time_zone` via CoreExt, so a string
+    // takes the `respond_to?(:in_time_zone)` arm —
+    // `super(user_input_in_time_zone(value)) || super`
+    // (time_zone_conversion.rb:24). `user_input_in_time_zone` is
+    // `Helpers::TimeValue`'s (time_value.rb:42-44), reached through the
+    // DelegateClass hop to the subtype.
     if (typeof value === "string") {
-      const zone = timeZone();
-      if (zone) {
-        // Mirrors Rails' `super(user_input_in_time_zone(value)) || super`:
-        // parse in the current zone; fall back to subtype cast if the format
-        // isn't recognized (preserves support for formats parseStringInZone
-        // doesn't handle, e.g. non-standard strings the subtype accepts).
-        const parsed = parseStringInZone(value, zone);
-        if (parsed !== null) return parsed;
-        return this.convertTimeToTimeZone(this._subtype.cast(value));
-      }
+      return (
+        this._subtype.cast((this._subtype as TimeValueSubtype).userInputInTimeZone(value)) ??
+        this._subtype.cast(value)
+      );
     }
     // Rails: `map(super) { |v| cast(v) }` (time_zone_conversion.rb:31) — the
     // DelegateClass hop to the subtype's own `map` hook, which rebuilds an
@@ -272,51 +274,6 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
     return value.inTimeZone(zone);
   }
   return value;
-}
-
-/** @internal */
-function parseStringInZone(value: string, zone: TimeZone): TimeWithZone | null {
-  try {
-    const trimmed = value.trim();
-    if (trimmed === "") return null;
-    // Normalize space separator → T first (e.g. "2024-06-15 10:30:00-04:00").
-    const withT = trimmed.replace(" ", "T");
-    // Detect offset: Z/z, ±HH:MM, ±HHMM, or short ±HH (without minutes).
-    if (/[Zz]$|[+-]\d{2}(?::?\d{2})?$/.test(withT)) {
-      // Normalize to a form Temporal.Instant.from() accepts (RFC 3339: no spaces,
-      // colon-separated offset). TimeWithZone#toString() emits "YYYY-MM-DD HH:MM:SS ±HHMM";
-      // after the space→T step the offset remains " ±HHMM" — strip the space and insert
-      // the colon. Also handles: ±HH:MM (already canonical), ±HHMM (add colon), ±HH (add :00).
-      const normalized = withT
-        .replace(/\s*([-+])(\d{2}):?(\d{2})$/, "$1$2:$3")
-        .replace(/\s*([-+]\d{2})$/, "$1:00");
-      return new TimeWithZone(Temporal.Instant.from(normalized), zone);
-    }
-    // No offset → wall-clock components local to the current zone.
-    // Date-only strings ("YYYY-MM-DD") → midnight, matching Rails' in_time_zone behavior.
-    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(withT);
-    const datetimeStr = isDateOnly ? `${withT}T00:00:00` : withT;
-    const pdt = Temporal.PlainDateTime.from(datetimeStr, { overflow: "reject" });
-    // zone.local() gives correct DST disambiguation at millisecond precision;
-    // add back sub-millisecond precision (microseconds + nanoseconds) separately.
-    const base = zone.local(
-      pdt.year,
-      pdt.month,
-      pdt.day,
-      pdt.hour,
-      pdt.minute,
-      pdt.second,
-      pdt.millisecond,
-    );
-    const subMs = pdt.microsecond * 1000 + pdt.nanosecond;
-    if (subMs === 0) return base;
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
-      zone,
-    );
-  } catch {
-    return null;
-  }
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

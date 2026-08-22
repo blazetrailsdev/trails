@@ -12,7 +12,8 @@
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Rational } from "@blazetrails/date";
+import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
@@ -901,277 +902,19 @@ export class TimeZone {
   }
 
   /**
-   * Parse a string into a TimeWithZone in this timezone.
+   * `parse(str, now = now())` (time_zone.rb:453-455):
+   * `parts_to_time(Date._parse(str, false), now)`.
    */
-  parse(str: string): TimeWithZone {
-    const trimmed = str.trim();
-
-    // If string has no timezone info, parse components manually to avoid
-    // system timezone interference, then treat as local to this zone
-    if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
-      // Try to extract date/time components directly
-      const match = trimmed.match(
-        /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.(\d+))?)?)?$/,
-      );
-      if (match) {
-        const y = parseInt(match[1], 10);
-        const m = parseInt(match[2], 10);
-        const d = parseInt(match[3], 10);
-        const h = match[4] ? parseInt(match[4], 10) : 0;
-        const min = match[5] ? parseInt(match[5], 10) : 0;
-        const s = match[6] ? parseInt(match[6], 10) : 0;
-        let ms = 0;
-        if (match[7]) {
-          ms = parseInt(match[7].padEnd(3, "0").slice(0, 3), 10);
-        }
-        return this.local(y, m, d, h, min, s, ms);
-      }
-
-      // Fall back to Date parser for other formats
-      const date = new Date(str);
-      if (isNaN(date.getTime())) {
-        throw new Error(`Could not parse time: "${str}"`);
-      }
-      const y = date.getFullYear();
-      const m = date.getMonth() + 1;
-      const d = date.getDate();
-      const h = date.getHours();
-      const min = date.getMinutes();
-      const s = date.getSeconds();
-      const ms = date.getMilliseconds();
-      return this.local(y, m, d, h, min, s, ms);
-    }
-
-    // String has timezone info — parse and convert the UTC instant to this zone
-    const date = new Date(str);
-    if (isNaN(date.getTime())) {
-      throw new Error(`Could not parse time: "${str}"`);
-    }
-    return new TimeWithZone(instantFrom(date), this);
+  parse(str: string, now: TimeWithZone = this.now()): TimeWithZone | undefined {
+    return this.partsToTime(RubyDate._parse(str, false), now);
   }
 
   /**
-   * Parse a time string using a strftime-style format.
-   * The parsed time is interpreted in this timezone unless the format
-   * extracts an explicit timezone offset from the string.
+   * `strptime(str, format, now = now())` (time_zone.rb:487-489):
+   * `parts_to_time(DateTime._strptime(str, format), now)`.
    */
-  strptime(str: string, format: string, base?: TimeWithZone): TimeWithZone {
-    const now = base ?? this.now();
-    let year = now.year;
-    let month = now.month;
-    let day = now.day;
-    let hour = 0;
-    let minute = 0;
-    let second = 0;
-    const ms = 0;
-    let explicitOffsetSeconds: number | null = null;
-    let epochMs: number | null = null;
-
-    // Build a regex from the format string and extract components
-    let pos = 0;
-    let strPos = 0;
-
-    while (pos < format.length) {
-      if (format[pos] === "%" && pos + 1 < format.length) {
-        // Check for escaped %
-        if (format[pos + 1] === "%") {
-          if (str[strPos] !== "%") {
-            throw new Error(`ArgumentError: strptime: input does not match format`);
-          }
-          strPos++;
-          pos += 2;
-          continue;
-        }
-
-        // Handle optional : prefix for zone formats
-        let spec = format[pos + 1];
-        let specLen = 2;
-        if (spec === ":" && pos + 2 < format.length) {
-          if (
-            format[pos + 2] === ":" &&
-            pos + 3 < format.length &&
-            format[pos + 3] === ":" &&
-            pos + 4 < format.length &&
-            format[pos + 4] === "z"
-          ) {
-            spec = ":::z";
-            specLen = 5;
-          } else if (
-            format[pos + 2] === ":" &&
-            pos + 3 < format.length &&
-            format[pos + 3] === "z"
-          ) {
-            spec = "::z";
-            specLen = 4;
-          } else if (format[pos + 2] === "z") {
-            spec = ":z";
-            specLen = 3;
-          }
-        }
-
-        switch (spec) {
-          case "Y": {
-            const m = str.slice(strPos).match(/^(\d{4})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            year = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "m": {
-            const m = str.slice(strPos).match(/^(\d{1,2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            month = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "b": {
-            const m = str
-              .slice(strPos)
-              .match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            const months: Record<string, number> = {
-              jan: 1,
-              feb: 2,
-              mar: 3,
-              apr: 4,
-              may: 5,
-              jun: 6,
-              jul: 7,
-              aug: 8,
-              sep: 9,
-              oct: 10,
-              nov: 11,
-              dec: 12,
-            };
-            month = months[m[1].toLowerCase()];
-            strPos += m[1].length;
-            break;
-          }
-          case "d":
-          case "e": {
-            const m = str.slice(strPos).match(/^\s*(\d{1,2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            day = parseInt(m[1], 10);
-            strPos += m[0].length;
-            break;
-          }
-          case "H": {
-            const m = str.slice(strPos).match(/^(\d{1,2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            hour = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "M": {
-            const m = str.slice(strPos).match(/^(\d{1,2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            minute = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "S": {
-            const m = str.slice(strPos).match(/^(\d{1,2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            second = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "s": {
-            const m = str.slice(strPos).match(/^(\d+)/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            epochMs = parseInt(m[1], 10) * 1000;
-            strPos += m[1].length;
-            break;
-          }
-          case "Q": {
-            const m = str.slice(strPos).match(/^(\d+)/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            epochMs = parseInt(m[1], 10);
-            strPos += m[1].length;
-            break;
-          }
-          case "Z": {
-            // Timezone abbreviation like PST, EST
-            const m = str.slice(strPos).match(/^([A-Z]{3,5})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            const abbrevOffsets: Record<string, number> = {
-              PST: -8 * 3600,
-              PDT: -7 * 3600,
-              MST: -7 * 3600,
-              MDT: -6 * 3600,
-              CST: -6 * 3600,
-              CDT: -5 * 3600,
-              EST: -5 * 3600,
-              EDT: -4 * 3600,
-              UTC: 0,
-              GMT: 0,
-            };
-            if (m[1] in abbrevOffsets) {
-              explicitOffsetSeconds = abbrevOffsets[m[1]];
-            }
-            strPos += m[1].length;
-            break;
-          }
-          case ":z": {
-            // +HH:MM
-            const m = str.slice(strPos).match(/^([+-])(\d{2}):(\d{2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            const sign = m[1] === "+" ? 1 : -1;
-            explicitOffsetSeconds = sign * (parseInt(m[2], 10) * 3600 + parseInt(m[3], 10) * 60);
-            strPos += m[0].length;
-            break;
-          }
-          case "::z": {
-            // +HH:MM:SS
-            const m = str.slice(strPos).match(/^([+-])(\d{2}):(\d{2}):(\d{2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            const sign = m[1] === "+" ? 1 : -1;
-            explicitOffsetSeconds =
-              sign * (parseInt(m[2], 10) * 3600 + parseInt(m[3], 10) * 60 + parseInt(m[4], 10));
-            strPos += m[0].length;
-            break;
-          }
-          case ":::z": {
-            // +HH (minimal)
-            const m = str.slice(strPos).match(/^([+-])(\d{2})/);
-            if (!m) throw new Error("ArgumentError: strptime: input does not match format");
-            const sign = m[1] === "+" ? 1 : -1;
-            explicitOffsetSeconds = sign * parseInt(m[2], 10) * 3600;
-            strPos += m[0].length;
-            break;
-          }
-          default:
-            throw new Error(`ArgumentError: strptime: unsupported format directive %${spec}`);
-        }
-        pos += specLen;
-      } else {
-        // Literal character
-        if (str[strPos] !== format[pos]) {
-          throw new Error("ArgumentError: strptime: input does not match format");
-        }
-        strPos++;
-        pos++;
-      }
-    }
-
-    // Verify remaining input was consumed (allow trailing whitespace)
-    if (strPos < str.length && str.slice(strPos).trim().length > 0) {
-      throw new Error("ArgumentError: strptime: input does not match format");
-    }
-
-    if (epochMs !== null) {
-      return new TimeWithZone(Temporal.Instant.fromEpochMilliseconds(epochMs), this);
-    }
-
-    if (explicitOffsetSeconds !== null) {
-      // The parsed time was in an explicit offset — convert to UTC then to this zone
-      const utcMs =
-        Date.UTC(year, month - 1, day, hour, minute, second, ms) - explicitOffsetSeconds * 1000;
-      return new TimeWithZone(Temporal.Instant.fromEpochMilliseconds(utcMs), this);
-    }
-
-    // No explicit offset — interpret as local time in this zone
-    return this.local(year, month, day, hour, minute, second, ms);
+  strptime(str: string, format: string, now: TimeWithZone = this.now()): TimeWithZone | undefined {
+    return this.partsToTime(RubyDate._strptime(str, format), now);
   }
 
   /**
@@ -1270,6 +1013,95 @@ export class TimeZone {
    * memoizes (time_with_zone.rb:72-74) and reads `dst?` /
    * `observed_utc_offset` / `abbreviation` off.
    */
+  /**
+   * `parts_to_time(parts, now)` (time_zone.rb:585-608).
+   *
+   *   def parts_to_time(parts, now)
+   *     raise ArgumentError, "invalid date" if parts.nil?
+   *     return if parts.empty?
+   *
+   *     if parts[:seconds]
+   *       time = Time.at(parts[:seconds])
+   *     else
+   *       time = Time.new(
+   *         parts.fetch(:year, now.year),
+   *         parts.fetch(:mon, now.month),
+   *         parts.fetch(:mday, parts[:year] || parts[:mon] ? 1 : now.day),
+   *         parts.fetch(:hour, 0),
+   *         parts.fetch(:min, 0),
+   *         parts.fetch(:sec, 0) + parts.fetch(:sec_fraction, 0),
+   *         parts.fetch(:offset, 0)
+   *       )
+   *     end
+   *
+   *     if parts[:offset] || parts[:seconds]
+   *       TimeWithZone.new(time.utc, self)
+   *     else
+   *       TimeWithZone.new(nil, self, time)
+   *     end
+   *   end
+   *
+   * Ruby's `Time.new(..., offset)` defaults its offset to `0`, so the
+   * no-offset arm builds the wall clock as a UTC-flagged `::Time` and hands it
+   * to the LOCAL seat of the `TimeWithZone` constructor, which resolves it
+   * through `period_for_local` — that is where the DST-gap and ambiguity
+   * policy lives. `Temporal.PlainDateTime` is that wall clock here, and it
+   * carries the `sec_fraction` down to the nanosecond, which `TimeZone#local`
+   * (millisecond arguments) cannot.
+   */
+  private partsToTime(parts: DateParts | null, now: TimeWithZone): TimeWithZone | undefined {
+    if (parts == null) throw new ArgumentError("invalid date");
+    if (Object.keys(parts).length === 0) return undefined;
+
+    if (parts.seconds != null) {
+      // Ruby's `Time.at(parts[:seconds])` followed by the
+      // `TimeWithZone.new(time.utc, self)` arm below is what `TimeZone#at`
+      // (time_zone.rb:378-380) already is: `Time.at(*args).utc.in_time_zone(self)`.
+      return this.at(
+        parts.seconds instanceof Rational ? parts.seconds.toF() : Number(parts.seconds),
+      );
+    }
+
+    const secFraction = parts.secFraction;
+    const nanosecond =
+      secFraction == null
+        ? 0
+        : secFraction instanceof Rational
+          ? secFraction.mul(1_000_000_000).toI()
+          : Math.trunc(Number(secFraction) * 1_000_000_000);
+    // Ruby's `Time.new` raises `ArgumentError, "argument out of range"` for
+    // out-of-range components (`Date._parse("9000", false)` is
+    // `{mon: 90, mday: 0}`); Temporal answers a `RangeError` for the same.
+    let time: Temporal.PlainDateTime;
+    try {
+      time = Temporal.PlainDateTime.from({
+        year: Number("year" in parts ? parts.year : now.year),
+        month: "mon" in parts ? parts.mon! : now.month,
+        day: "mday" in parts ? parts.mday! : parts.year != null || parts.mon != null ? 1 : now.day,
+        hour: "hour" in parts ? parts.hour! : 0,
+        minute: "min" in parts ? parts.min! : 0,
+        second: "sec" in parts ? parts.sec! : 0,
+        millisecond: Math.trunc(nanosecond / 1_000_000),
+        microsecond: Math.trunc(nanosecond / 1000) % 1000,
+        nanosecond: nanosecond % 1000,
+      });
+    } catch {
+      throw new ArgumentError("argument out of range");
+    }
+
+    if (parts.offset != null) {
+      const offset = parts.offset instanceof Rational ? parts.offset.toF() : Number(parts.offset);
+      return new TimeWithZone(
+        time
+          .toZonedDateTime("UTC")
+          .toInstant()
+          .subtract({ nanoseconds: Math.round(offset * 1e9) }),
+        this,
+      );
+    }
+    return new TimeWithZone(null, this, time);
+  }
+
   periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
     return this.tzinfo.periodForUtc(date);
   }
@@ -1356,7 +1188,7 @@ export class TimeZone {
     ) {
       throw new Error("invalid date");
     }
-    return this.parse(trimmed);
+    return this.parse(trimmed)!;
   }
 
   /**
