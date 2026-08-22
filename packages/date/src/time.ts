@@ -30,9 +30,6 @@ import {
  * `Temporal.Now.timeZoneId()` is an `Intl` `resolvedOptions()` round trip
  * instead, ~15x the cost of reading the clock itself, and `Time.now` sits on
  * trails' production clock read. The memo is per-process, exactly as MRI's is.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `::Time` internals; MRI's own zone
- * cache, which JS gives no equivalent for.
  */
 let localTimeZoneId: string | null = null;
 
@@ -308,9 +305,8 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
  * by construction — and whose `#instant`/`#utcOffset` the caller overwrote
  * immediately afterwards anyway. A private field can only be installed by the
  * constructor, so the seat is handed in rather than assigned onto a bare object.
- *
- * @noRailsEquivalent PERMANENT — MRI's `time_new_timew` builds the struct
- * directly; JS private fields admit no such second constructor.
+ * MRI's `time_new_timew` builds the struct directly; JS private fields admit no
+ * such second constructor.
  */
 let seatedTime: {
   zoned: Temporal.ZonedDateTime;
