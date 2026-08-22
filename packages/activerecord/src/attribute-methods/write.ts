@@ -1,16 +1,19 @@
 /**
  * Attribute writing methods.
  *
- * `writeAttribute` here is the base `Write#write_attribute`. `Base.prototype`
- * currently receives `HasReadonlyAttributes#write_attribute`
- * (readonly-attributes.ts), which inlines this body behind its guards instead
- * of reaching it the way Ruby's `super` (readonly_attributes.rb:54) does —
- * tracked by the `converge-readonly-write-attribute-onto-write-super` story.
+ * `writeAttribute` here is the base `Write#write_attribute`, reached from
+ * `HasReadonlyAttributes#write_attribute` (readonly-attributes.ts) where Ruby
+ * writes `super` (readonly_attributes.rb:54).
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */
 
-import { Model, AttrNames, buildMangledName } from "@blazetrails/activemodel";
+import {
+  Model,
+  MissingAttributeError,
+  AttrNames,
+  buildMangledName,
+} from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 import { completeHalfAccessor } from "./read.js";
 
@@ -30,11 +33,41 @@ export interface Write {
  * Mirrors: ActiveRecord::AttributeMethods::Write#write_attribute (write.rb:31-38)
  */
 export function writeAttribute(this: Model, attrName: string, value: unknown): void {
-  const name = (
+  let name = (
     this.constructor as unknown as { resolveAttributeName(n: string): string }
   ).resolveAttributeName(String(attrName));
 
-  this._writeAttribute(name, value);
+  // write.rb:35 — `name = @primary_key if name == "id" && @primary_key`, where
+  // `@primary_key` is `klass.primary_key` (core.rb:844).
+  // - Scalar custom PK: `@primary_key` is a string, so `id` remaps to the real
+  //   PK column (a standard `id` PK remaps to itself, a no-op).
+  // - Composite PK: `@primary_key` is the array, so Rails calls
+  //   `write_from_user([...], v)`; the array key misses the attribute hash and
+  //   resolves to a `Null` attribute → `MissingAttributeError` — even when the
+  //   table has a real `id` column (e.g. cpk_books). Mirror that raise here
+  //   rather than writing the scalar `id`. (Composite `id=` assignment flows
+  //   through the per-column `_writeAttribute` path, not this one.)
+  // The `_initializingAttributes` guard on that arm has no Rails counterpart:
+  // during `new X(…)` it must stay quiet, because Ruby builds the attribute set
+  // before any writer runs.
+  const pk = (this.constructor as unknown as { primaryKey: string | string[] | null }).primaryKey;
+  if (name === "id" && pk != null) {
+    if (typeof pk === "string") {
+      name = pk;
+    } else if (!this._initializingAttributes) {
+      // Rails calls `write_from_user(@primary_key, …)` with the PK array, so the
+      // Null attribute's name — and the interpolated message (attribute.rb:236) —
+      // is the array in Ruby `#inspect` form, e.g. `["author_id", "id"]`.
+      const arrayName = `[${pk.map((c) => `"${c}"`).join(", ")}]`;
+      throw new MissingAttributeError(`can't write unknown attribute \`${arrayName}\``);
+    }
+  }
+
+  // write.rb:36 — `@attributes.write_from_user(name, value)`. `Model`'s
+  // `_writeAttribute` is that call plus trails' dirty bookkeeping; going through
+  // `this._writeAttribute` would instead re-enter
+  // `HasReadonlyAttributes#_write_attribute`, a guard Rails does not run twice.
+  Model.prototype._writeAttribute.call(this, name, value);
 }
 
 /**

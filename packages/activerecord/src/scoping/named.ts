@@ -26,8 +26,8 @@ import { Default } from "./default.js";
 /**
  * Mirrors `ActiveRecord::AttributeMethods::ClassMethods::RESTRICTED_CLASS_METHODS`
  * (`%w(private public protected allocate new name superclass)`), plus `relation`:
- * Rails reserves the private `AR::Base#relation`, which trails names
- * `_buildUnscopedRelation`, so the public `relation` name stays reserved here.
+ * Rails reserves the private `AR::Base#relation` (core.rb:431), so a scope may
+ * not shadow it.
  */
 const RESTRICTED_CLASS_METHODS = new Set([
   "private",
@@ -144,7 +144,7 @@ interface NamedHost {
   // Rails' `relation` (core.rb) — a pristine Relation with the STI type
   // condition but neither current_scope nor default_scope applied. It is the
   // default `scope` argument for both methods below.
-  _buildUnscopedRelation?(): any;
+  relation?(): any;
 }
 
 /**
@@ -154,7 +154,7 @@ interface NamedHost {
  * current_scope is itself an empty scope.
  */
 export function scopeForAssociation(this: NamedHost, scope?: any): any {
-  const rel = scope ?? this._buildUnscopedRelation?.();
+  const rel = scope ?? this.relation?.();
   if (this.currentScope?.()?.isEmptyScope) {
     return rel;
   }
@@ -183,7 +183,7 @@ export function defaultScoped(
   // Relation instance.
   const kwargsOnly =
     scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
-  const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this._buildUnscopedRelation?.();
+  const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this.relation?.();
   const opts = kwargsOnly ? (scopeOrOptions as { allQueries?: boolean | null }) : options;
   return Default.buildDefaultScope.call(this, scope, { allQueries: opts?.allQueries }) ?? scope;
 }

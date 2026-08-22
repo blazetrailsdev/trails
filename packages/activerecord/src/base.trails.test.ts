@@ -11,6 +11,7 @@ import { registerSubclass } from "./inheritance.js";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
+import { Firm } from "./test-helpers/models/company.js";
 
 describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {
   function makeModel() {
@@ -131,6 +132,23 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
         ),
       );
     });
+  });
+});
+
+describe("Base.relation with a cleared inheritance column (trails)", () => {
+  fixtures(["companies"]);
+
+  it("skips the type condition when the inheritance column is gone", async () => {
+    await Firm.loadSchema();
+    expect(Firm.isFinderNeedsTypeCondition()).toBe(true);
+
+    const previous = Firm.inheritanceColumn;
+    Firm.inheritanceColumn = null;
+    try {
+      expect(() => (Firm as unknown as { relation(): unknown }).relation()).not.toThrow();
+    } finally {
+      Firm.inheritanceColumn = previous;
+    }
   });
 });
 

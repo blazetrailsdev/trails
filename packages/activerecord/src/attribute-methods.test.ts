@@ -729,7 +729,7 @@ describe("AttributeMethodsTest", () => {
   it("read attributes_before_type_cast", () => {
     const { Post } = makeModel();
     const p = new Post({ title: "raw", score: "99" });
-    const raw = p.attributesBeforeTypeCast;
+    const raw = p.attributesBeforeTypeCast();
     expect(raw.score).toBe("99");
     expect(p.score).toBe(99);
   });

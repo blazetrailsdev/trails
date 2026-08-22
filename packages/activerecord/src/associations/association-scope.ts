@@ -256,7 +256,7 @@ export class AssociationScope {
     // bypasses default_scope but STILL applies the STI `type_condition`
     // because `relation()` adds it for `finder_needs_type_condition?`
     // classes (`core.rb:431-435`). `Base.unscoped` now wires STI through
-    // `_buildUnscopedRelation`, so no compensation is needed here.
+    // `relation`, so no compensation is needed here.
     const scopeRelation = klass.unscoped() as {
       aliasTracker: () => AliasTracker;
     };
@@ -874,7 +874,7 @@ export class AssociationScope {
    * Build a fresh scope for evaluating a chain entry's lambda. Mirrors
    * `entryKlass.unscoped` — Rails' `unscoped` retains the STI type filter
    * via `relation()` (core.rb:431-435), and `Base.unscoped` now wires that
-   * through `_buildUnscopedRelation`, so no compensation is needed here.
+   * through `relation`, so no compensation is needed here.
    */
   protected _buildEntryScope(entryKlass: typeof Base, aliasedTable?: unknown): unknown {
     // Build the entry relation against the chain entry's alias so the scope
@@ -887,9 +887,9 @@ export class AssociationScope {
     // the table when the tracker produced a real alias; otherwise keep
     // `unscoped()` so non-aliased SQL is byte-identical.
     if (aliasedTable) {
-      return (
-        entryKlass as unknown as { _buildUnscopedRelation: (t: unknown) => unknown }
-      )._buildUnscopedRelation(aliasedTable);
+      return (entryKlass as unknown as { relation: (t: unknown) => unknown }).relation(
+        aliasedTable,
+      );
     }
     return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }

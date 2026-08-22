@@ -63,13 +63,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       let boolean = await BooleanType.createBang({ archived: true, published: true } as any);
       await (boolean as any).reload();
-      let attributes = (boolean as any).attributesBeforeTypeCast;
+      let attributes = (boolean as any).attributesBeforeTypeCast();
       expect(attributes["archived"]).toBe(1);
       expect(attributes["published"]).toBe("1");
 
       boolean = await BooleanType.createBang({ archived: false, published: false } as any);
       await (boolean as any).reload();
-      attributes = (boolean as any).attributesBeforeTypeCast;
+      attributes = (boolean as any).attributesBeforeTypeCast();
       expect(attributes["archived"]).toBe(0);
       expect(attributes["published"]).toBe("0");
 
@@ -82,13 +82,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       let boolean = await BooleanType.createBang({ archived: true, published: true } as any);
       await (boolean as any).reload();
-      let attributes = (boolean as any).attributesBeforeTypeCast;
+      let attributes = (boolean as any).attributesBeforeTypeCast();
       expect(attributes["archived"]).toBe(1);
       expect(attributes["published"]).toBe("1");
 
       boolean = await BooleanType.createBang({ archived: false, published: false } as any);
       await (boolean as any).reload();
-      attributes = (boolean as any).attributesBeforeTypeCast;
+      attributes = (boolean as any).attributesBeforeTypeCast();
       expect(attributes["archived"]).toBe(0);
       expect(attributes["published"]).toBe("0");
 

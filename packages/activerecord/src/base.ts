@@ -40,16 +40,12 @@ import {
 import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { Relation } from "./relation.js";
+import { Relation } from "./relation.js";
 // Side-effect import: relation.ts registers the `Relation` family slot that
 // `relationClassFor` builds every per-model relation subclass from. relation.ts
 // no longer imports base.js for its value, so this edge is one-way.
 import "./relation.js";
-import {
-  wrapWithScopeProxy,
-  relationClassFor,
-  generatedRelationMethods as _generatedRelationMethods,
-} from "./relation/delegation.js";
+import { generatedRelationMethods as _generatedRelationMethods } from "./relation/delegation.js";
 import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
@@ -65,6 +61,7 @@ import {
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
   isFinderNeedsTypeCondition,
+  typeCondition,
   primaryAbstractClass,
   applicationRecordClassQ as _applicationRecordClassQ,
   stiClassFor,
@@ -203,6 +200,7 @@ import {
   pkAttribute as _pkAttribute,
   readAttributeBeforeTypeCast as _readAttributeBeforeTypeCast,
   readAttributeForDatabase as _readAttributeForDatabase,
+  attributesBeforeTypeCast as _attributesBeforeTypeCast,
   attributesForDatabase as _attributesForDatabase,
   attributeBeforeTypeCast as _attributeBeforeTypeCast,
   attributeForDatabase as _attributeForDatabase,
@@ -238,10 +236,7 @@ import {
   defineMethodAttribute as _defineMethodAttribute,
 } from "./attribute-methods/read.js";
 import { setDefineMethodAttribute as _setDefineMethodAttribute } from "./attribute-methods/write.js";
-import {
-  attributeCameFromUser as _attributeCameFromUser,
-  attributesBeforeTypeCast as _attributesBeforeTypeCastFn,
-} from "./attribute-methods/before-type-cast.js";
+import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -327,6 +322,7 @@ import {
 
 import {
   Default as DefaultScoping,
+  isIgnoreDefaultScope,
   defaultScope as _defaultScope,
   isScopeAttributes as _isScopeAttributes,
   unscoped as _unscoped,
@@ -395,15 +391,6 @@ export type PrimaryKeyScalar = string | number | bigint | null | undefined;
  * Mirrors: the value returned by `ActiveRecord::Base#id`.
  */
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
-
-/**
- * @internal The per-model `Relation` subclass ctor (Rails' `relation_class_for`).
- * Base relations are constructed from the per-model subclass so generated
- * relation methods resolve as real methods via its prototype carrier.
- */
-function _relationCtorFor(this: void, model: typeof Base): new (m: typeof Base, t?: any) => any {
-  return relationClassFor(model) as new (m: typeof Base, t?: any) => any;
-}
 
 /**
  * Rails' `persistence.rb#update` / `#update!` dispatch on the first arg:
@@ -2186,51 +2173,41 @@ export class Base extends Model {
     return this._buildDefaultRelation();
   }
 
-  /** @internal Build a scope-proxy-wrapped Relation with no default scope
-   *  applied. Used by `unscoped()` in scoping/default.ts. Mirrors Rails'
-   *  `relation` (core.rb:431-435): `unscoped` bypasses the default scope but
-   *  STILL applies the STI `type_condition` for `finder_needs_type_condition?`
-   *  classes, so callers like `AssociationScope` get a type-filtered base
-   *  without re-adding the condition themselves. */
-  static _buildUnscopedRelation(table?: any): any {
-    // `table` lets callers build the relation against a specific Arel table
-    // (e.g. an association-scope chain entry's aliased table). Passing it to
-    // the ctor means the STI `type_condition` that `_applyStiTypeCondition`
-    // adds below is qualified by that same table — so a self-referential
-    // through doesn't end up with the STI predicate on the FROM table and
-    // the source-type predicate on the alias.
-    const rel = new (_relationCtorFor(this))(this, table);
-    return this._applyStiTypeCondition(wrapWithScopeProxy(rel));
-  }
+  /**
+   * Mirrors: ActiveRecord::Core::ClassMethods#relation (core.rb:431-435).
+   *
+   * The `table` argument has no Rails counterpart: `AbstractReflection#build_scope`
+   * (reflection.rb:336-338) and `AssociationScope` build against a possibly-aliased
+   * Arel table, and passing it here qualifies the STI `type_condition` by that same
+   * table — so a self-referential through doesn't end up with the STI predicate on
+   * the FROM table and the source-type predicate on the alias.
+   *
+   * @internal Rails-private (core.rb:408 `private`).
+   */
+  static relation(table?: any): any {
+    const relation = Relation.create(this, { table });
 
-  /** @internal Re-apply the STI `type_condition` WHERE for subclasses.
-   *  Rails bakes this into `relation()` so both `unscoped` and the
-   *  default-scoped path carry it; we layer it onto the base relation. */
-  private static _applyStiTypeCondition(rel: any): any {
-    // Rails gates the finder type-condition on `finder_needs_type_condition?`
-    // (hierarchical + inheritance-column presence), not on an explicit
-    // `inheritanceColumn` assignment — so any non-abstract subclass over a
-    // `type`-bearing table scopes
-    // by type. The column resolves on the subclass itself (default "type").
-    if (isFinderNeedsTypeCondition(this)) {
-      const col = this.inheritanceColumn;
-      if (col === null) return rel;
-      // Rails: `([self] + descendants).map(&:sti_name)` (inheritance.rb#type_condition)
-      // — `sti_name` honors `store_full_sti_class` / overrides, not the bare class name.
-      const stiNames = [stiName(this), ...this.descendants.map((d: typeof Base) => stiName(d))];
-      return rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
+    if (isFinderNeedsTypeCondition(this) && !isIgnoreDefaultScope.call(this)) {
+      // `finder_needs_type_condition?` memoizes on first call (inheritance.rb:92),
+      // so clearing `inheritance_column` afterwards leaves it answering true.
+      // Rails' `type_condition` then builds `table[nil]` (inheritance.rb:322);
+      // trails' `typeCondition` raises instead, so skip the arm rather than
+      // turning a Rails no-op into an error.
+      if (this.inheritanceColumn === null) return relation;
+      return relation.whereBang(typeCondition(this, table));
+    } else {
+      return relation;
     }
-    return rel;
   }
 
   private static _buildDefaultRelation(allQueries?: boolean | null): any {
-    const buildBase = () => {
-      const r = new (_relationCtorFor(this))(this);
-      return wrapWithScopeProxy(r);
-    };
-    const rel =
-      DefaultScoping.buildDefaultScope.call(this, buildBase(), { allQueries }) ?? buildBase();
-    return this._applyStiTypeCondition(rel);
+    // named.rb:45 — `default_scoped(scope = relation, all_queries: nil)`: the
+    // base relation, STI condition and all, is built BEFORE `build_default_scope`
+    // arms the recursion guard, and the default scope merges into it.
+    return (
+      DefaultScoping.buildDefaultScope.call(this, this.relation(), { allQueries }) ??
+      this.relation()
+    );
   }
 
   // Scope extension methods: scope name -> Record of extra methods
@@ -2393,7 +2370,7 @@ export class Base extends Model {
       if (scope._model === this) {
         return scope.clone();
       }
-      return this._buildUnscopedRelation().mergeBang(scope);
+      return this.relation().mergeBang(scope);
     }
     return this.defaultScoped({ allQueries: options?.allQueries });
   }
@@ -3845,7 +3822,7 @@ export class Base extends Model {
   declare hasAttribute: (name: string) => boolean;
   declare attributePresent: (name: string) => boolean;
   declare readAttributeBeforeTypeCast: (name: string) => unknown;
-  declare readonly attributesBeforeTypeCast: Record<string, unknown>;
+  declare attributesBeforeTypeCast: () => Record<string, unknown>;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
@@ -4767,16 +4744,6 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
-// before_type_cast.rb:82 — a Ruby zero-arg reader ports as an accessor property
-// (CLAUDE.md, "Generated attribute readers are properties"), and include()
-// copies the object literal by value, which would flatten the getter into a
-// data property. Install the descriptor directly instead.
-Object.defineProperty(Base.prototype, "attributesBeforeTypeCast", {
-  get(this: Base) {
-    return _attributesBeforeTypeCastFn(this as never);
-  },
-  configurable: true,
-});
 include(Base, ModelSchema.InstanceMethods);
 include(Base, _PrimaryKey);
 // Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
@@ -4894,6 +4861,7 @@ include(Base, {
   formatForInspect: _formatForInspect,
   pkAttribute: _pkAttribute,
   readAttributeForDatabase: _readAttributeForDatabase,
+  attributesBeforeTypeCast: _attributesBeforeTypeCast,
   attributesForDatabase: _attributesForDatabase,
   attributeBeforeTypeCast: _attributeBeforeTypeCast,
   attributeForDatabase: _attributeForDatabase,
