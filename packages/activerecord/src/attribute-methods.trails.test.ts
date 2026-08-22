@@ -465,6 +465,18 @@ describe("define_attribute_methods abstract gate (trails)", () => {
   });
 });
 
+class AccessTopic extends Base {
+  static {
+    this.attribute("title", "string");
+    this.attribute("body", "string");
+  }
+}
+type TrackingTopic = InstanceType<typeof AccessTopic> & {
+  title: string;
+  slice(...names: string[]): Record<string, unknown>;
+  valuesAt(...names: string[]): unknown[];
+};
+
 describe("ActiveRecord attribute read/write surface lives on Base, not Model", () => {
   it("defines the ActiveRecord-only members on Base.prototype", () => {
     for (const name of [
@@ -481,20 +493,20 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     }
   });
 
-  it("marks the field accessed when read through readAttribute", () => {
-    // Rails tracks the read inside `fetch_value` (activemodel/attribute.rb:44-47),
-    // which `read_attribute` reaches at read.rb:33, so a public read counts
-    // toward `accessed_fields` (attribute_methods.rb:460). trails keeps the
-    // marker on the record, so `readAttribute` has to set it itself.
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = Topic.new({ title: "access-test", body: "hello" });
+  // Rails marks a read on the Attribute itself, inside `fetch_value`
+  // (activemodel/attribute.rb:41-44), so every public read path feeds
+  // `accessed_fields` (attribute_methods.rb:460). trails keeps the marker on the
+  // record, so each of these paths has to set it; `slice` and `valuesAt` are
+  // Base's own (persistence.ts), which read through `readAttribute`.
+  it.each([
+    ["readAttribute", (t: TrackingTopic) => t.readAttribute("title")],
+    ["the generated reader", (t: TrackingTopic) => t.title],
+    ["slice", (t: TrackingTopic) => t.slice("title")],
+    ["valuesAt", (t: TrackingTopic) => t.valuesAt("title")],
+  ] as const)("marks the field accessed when read through %s", (_label, read) => {
+    const t = AccessTopic.new({ title: "access-test", body: "hello" }) as TrackingTopic;
     expect(t.accessedFields()).toEqual([]);
-    t.readAttribute("title");
+    read(t);
     expect(t.accessedFields()).toEqual(["title"]);
   });
 

@@ -27,10 +27,12 @@ interface AttributeHolder {
  * been type cast.
  *
  * Rails marks the read on the Attribute itself, inside `fetch_value`
- * (activemodel/attribute.rb:44-47), so `read_attribute` (read.rb:33) feeds
+ * (activemodel/attribute.rb:41-44), so `read_attribute` (read.rb:33) feeds
  * `accessed_fields` (attribute_methods.rb:460) like every other read path.
- * trails keeps that marker on the record instead — see
- * {@link readGeneratedAttribute} — so each public read path sets it itself.
+ * trails keeps that marker on the record, so each public read path sets it
+ * itself — see {@link readGeneratedAttribute}, and the
+ * `converge-accessed-fields-onto-attribute-set-accessed` story for why the
+ * marker cannot yet move to the Attribute.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Read#read_attribute (read.rb:29-34)
  */
