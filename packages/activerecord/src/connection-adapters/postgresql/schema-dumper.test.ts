@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import type { SchemaSource } from "../../schema-dumper.js";
@@ -7,6 +8,7 @@ const emptySource: SchemaSource = {
   tables: () => [],
   columns: () => [],
   indexes: () => [],
+  lookupCastTypeFromColumn: () => new ValueType(),
 };
 
 function makeColumn(

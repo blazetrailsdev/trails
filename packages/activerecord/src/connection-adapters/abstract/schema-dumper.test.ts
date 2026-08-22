@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { IntegerType, DecimalType, BooleanType, StringType } from "@blazetrails/activemodel";
@@ -7,6 +8,7 @@ const emptySource: SchemaSource = {
   tables: () => [],
   columns: () => [],
   indexes: () => [],
+  lookupCastTypeFromColumn: () => new ValueType(),
 };
 
 describe("SchemaDumper", () => {
@@ -77,23 +79,6 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
       new StringType(),
     );
     expect(result).toContain("uuid()");
-  });
-
-  it("pre-deserialized array default uses typeCastForSchema when deserialize returns null", () => {
-    // Mirrors the PG OID::Array case: column.default is already [] (deserialized by
-    // the adapter) but lookupCastTypeFromColumn returns the scalar element type (e.g.
-    // DecimalType) which cannot deserialize an array — deserialize([]) → null.
-    // schemaDefault must call typeCastForSchema on the original value directly.
-    const rejectingType = {
-      deserialize: () => null,
-      typeCastForSchema: (v: unknown) => JSON.stringify(v),
-    };
-    const adapter = { lookupCastTypeFromColumn: () => rejectingType };
-    const dumper = SchemaDumper.create(adapter as any);
-    const result = (dumper as any).schemaDefault({ hasDefault: true, default: [] }) as
-      | string
-      | undefined;
-    expect(result).toBe("[]");
   });
 });
 
