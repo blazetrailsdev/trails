@@ -509,13 +509,4 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     read(t);
     expect(t.accessedFields()).toEqual(["title"]);
   });
-
-  it("keeps attributesBeforeTypeCast a getter rather than a data property", () => {
-    // before_type_cast.rb:82 is a zero-arg reader, so it ports as an accessor
-    // property; include() copies an object literal by value and would flatten
-    // it into a data property holding the getter's one-time result.
-    const descriptor = Object.getOwnPropertyDescriptor(Base.prototype, "attributesBeforeTypeCast")!;
-    expect(typeof descriptor.get).toBe("function");
-    expect("value" in descriptor).toBe(false);
-  });
 });

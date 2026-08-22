@@ -66,8 +66,11 @@ export interface JsdocOrigin {
  *  rather than growing a near-copy of it. */
 const tagLine = (tag: string): RegExp =>
   new RegExp(`^\\s*\\*?\\s*${tag}\\s+(\\S+)(?:\\s+—\\s?(.*))?$`);
-const callLessTagLine = (tag: string): RegExp =>
-  new RegExp(`^\\s*\\*?\\s*${tag}(?:\\s+—(?:\\s.*)?)?\\s*$`);
+/** A line that OPENS the tag, whatever follows it. Anything matching this and
+ *  not `tagLine` is malformed — the bare tag, one going straight to the
+ *  em-dash, or one naming several comma-separated calls — and is a hard error
+ *  rather than prose the parser walks past (RFC 0099). */
+const tagLineStart = (tag: string): RegExp => new RegExp(`^\\s*\\*?\\s*${tag}\\b`);
 // A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
 // reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
 // hang indent (`*   `) can place one at line start — deeper-indented `@`
@@ -125,12 +128,15 @@ function toCommentLines(comment: string, tag: string): CommentLine[] {
  *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
  *  `@` tag) attach to the preceding entry.
  *
- *  A tag with NO call at all — the bare tag, or one going straight to the
- *  em-dash — is a hard error too, distinguished from the empty-reason one by
- *  "needs a call". It matches no other rule here, so before RFC 0083 it was
- *  read as prose: no suppression, no stale-tag report, no empty-reason error.
- *  That was the last way to write a tag the parser ignores without complaint,
- *  the same quiet-direction hazard as the one-line form one level up.
+ *  A tag line that opens the tag and does not parse is a hard error too,
+ *  distinguished from the empty-reason one by "needs a call": the bare tag, one
+ *  going straight to the em-dash, and — the shape RFC 0099 closed — one naming
+ *  several comma-separated calls, which `tagLine` cannot match past the first
+ *  token. Each matched no other rule here and so was read as prose: no
+ *  suppression, no stale-tag report, no empty-reason error, and invisible to
+ *  the permanence gate. That was the last way to write a tag the parser ignores
+ *  without complaint, the same quiet-direction hazard as the one-line form one
+ *  level up.
  *
  *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
  *  every tag in the tree is written with a reason — the generator only emits a
@@ -151,13 +157,14 @@ export function parseJsdoc(
   const at = (sourceIndex: number): string =>
     origin ? ` ${origin.fileName}:${origin.startLine + sourceIndex}` : "";
   for (const { text: line, sourceIndex, synthetic } of toCommentLines(comment, tag)) {
-    if (callLessTagLine(tag).test(line)) {
+    const m = line.match(tagLine(tag));
+    if (!m && tagLineStart(tag).test(line)) {
       throw new Error(
-        `${tag} needs a call:${at(sourceIndex)} — name the Rails call that is ` +
-          `not made here, as \`${tag} <ruby_call> — <reason>\`.`,
+        `${tag} needs a call:${at(sourceIndex)} — name ONE Rails call that is ` +
+          `not made here, as \`${tag} <ruby_call> — <reason>\`. Several calls take ` +
+          `one tag each; a comma-separated list matches nothing and would suppress nothing.`,
       );
     }
-    const m = line.match(tagLine(tag));
     if (m) {
       // Trimmed at capture: `tagLine` absorbs only one space after the
       // em-dash, so trailing whitespace would otherwise read as a non-empty

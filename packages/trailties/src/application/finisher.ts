@@ -145,9 +145,12 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
  * Mirrors `Finisher`'s `set_routes_reloader_hook` initializer
  * (`finisher.rb:158-179`).
  *
- * @missingRailsCall reloaders, to_run — CONVERGEABLE: `Application#reloaders` and
- * `ActiveSupport::Reloader#to_run` are not ported, so the reloader is only
- * executed once here instead of being re-run on every reload.
+ * @missingRailsCall reloaders — CONVERGEABLE: `Application#reloaders` is not
+ * ported, so the reloader is never registered on the reloaders collection
+ * (`finisher.rb:162`).
+ * @missingRailsCall to_run — CONVERGEABLE: `ActiveSupport::Reloader#to_run` is
+ * not ported, so the reloader is only executed once here instead of being
+ * re-run on every reload (`finisher.rb:164-177`).
  */
 Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherHost) {
   const reloader = this.routesReloader();

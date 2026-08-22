@@ -45,6 +45,14 @@ describe("suppressedCallsIn", () => {
     );
   });
 
+  it("throws on a tag naming several comma-separated calls", () => {
+    expect(() =>
+      suppressedCallsIn(
+        block("@missingRailsCall reloaders, to_run — PERMANENT: neither is ported."),
+      ),
+    ).toThrow(/needs a call/);
+  });
+
   it("throws on a call-less one-line tag", () => {
     expect(() => suppressedCallsIn("/** @missingRailsCall */")).toThrow(/needs a call/);
   });

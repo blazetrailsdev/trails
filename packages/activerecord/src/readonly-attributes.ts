@@ -1,7 +1,8 @@
 import type { Base } from "./base.js";
-import { Model, MissingAttributeError } from "@blazetrails/activemodel";
+import { Model } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
+import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
 
 /**
  * Raised when a persisted record attempts to write to a column declared
@@ -78,79 +79,50 @@ export function readonlyAttributeQ(this: typeof Base, attribute: string): boolea
 }
 
 /**
- * AR's `write_attribute` override — Rails' `HasReadonlyAttributes` mixin in
- * readonly_attributes.rb (line 49). Adds two guards before delegating to the
- * base Model implementation:
+ * Rails' `HasReadonlyAttributes#write_attribute` (readonly_attributes.rb:49-55):
+ * a readonly guard, then `super` into `AttributeMethods::Write#write_attribute`
+ * (write.rb:31-38), which resolves the alias, remaps `"id"` to the primary key
+ * and writes.
  *
- *   - frozen record: raises `Cannot modify a frozen X`.
- *   - readonly column on a persisted record: raises `ReadonlyAttributeError`
- *     when the guard was armed at declaration time (`_readonlyAttributesRaise`,
- *     captured from `raise_on_assign_to_attr_readonly` when `attrReadonly` ran);
- *     otherwise the write falls through to `super` and the value is written in
- *     memory (Rails leaves HasReadonlyAttributes uninstalled in that case).
+ * Two trails-only details ride along:
  *
- * During construction the `_newRecord` field initializer on `Base` hasn't
- * run yet when `Model`'s constructor invokes `writeAttribute` — gate the
- * readonly check on the definitively-persisted state (`_newRecord === false`)
- * rather than `!isNewRecord()` so initial assignments during `new X(...)`
- * aren't mistakenly blocked.
+ *   - the frozen-record guard, which Rails does not have in this module: it
+ *     raises `Cannot modify a frozen X` before anything else.
+ *   - `_readonlyAttributesRaise`. Rails includes `HasReadonlyAttributes` only
+ *     when `raise_on_assign_to_attr_readonly` was true at `attr_readonly`
+ *     declaration time (readonly_attributes.rb:33); trails always installs the
+ *     method, so the flag captured there stands in for the absent module and
+ *     the write falls through to `super` when it is false — the value IS
+ *     written in memory, and persist-time exclusion of readonly columns
+ *     (attributesForUpdate) keeps it out of the UPDATE.
+ *
+ * During construction the `_newRecord` field initializer on `Base` hasn't run
+ * yet when `Model`'s constructor invokes `writeAttribute` — gate the readonly
+ * check on the definitively-persisted state (`_newRecord === false`) rather
+ * than `!isNewRecord()` so initial assignments during `new X(...)` aren't
+ * mistakenly blocked.
  *
  * `Base.prototype.writeAttribute` installed via include() in base.ts.
  *
  * Mirrors: ActiveRecord::HasReadonlyAttributes#write_attribute
  */
-export function writeAttribute(this: Base, name: string, value: unknown): void {
+export function writeAttribute(this: Base, attrName: string, value: unknown): void {
   if (this._attributes.isFrozen()) {
     throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
   }
   const ctor = this.constructor as typeof Base;
-  // Rails' `write_attribute` resolves `attribute_aliases[name]` before the
-  // chain runs, so HasReadonlyAttributes' check sees the canonical name and
-  // writing via an alias cannot bypass readonly enforcement.
-  let canonical = ctor.resolveAttributeName(String(name));
-  // Rails `write_attribute` remaps the `id` literal to the primary key before
-  // `write_from_user` (write.rb:35: `name = @primary_key if name == "id" &&
-  // @primary_key`), where `@primary_key` is `klass.primary_key` (core.rb:844).
-  // - Scalar custom PK: `@primary_key` is a string, so `id` remaps to the real
-  //   PK column (a standard `id` PK remaps to itself, a no-op).
-  // - Composite PK: `@primary_key` is the array, so Rails calls
-  //   `write_from_user([...], v)`; the array key misses the attribute hash and
-  //   resolves to a `Null` attribute → `MissingAttributeError` — even when the
-  //   table has a real `id` column (e.g. cpk_books). Mirror that raise here
-  //   rather than writing the scalar `id`. (Composite `id=` assignment flows
-  //   through the per-column `_writeAttribute` path, not this one.)
-  const pk = ctor.primaryKey;
-  if (canonical === "id" && pk != null) {
-    if (typeof pk === "string") {
-      canonical = pk;
-    } else if (!(this as { _initializingAttributes?: boolean })._initializingAttributes) {
-      // Rails calls `write_from_user(@primary_key, …)` with the PK array, so the
-      // Null attribute's name — and the interpolated message (attribute.rb:236) —
-      // is the array in Ruby `#inspect` form, e.g. `["author_id", "id"]`.
-      const arrayName = `[${pk.map((c) => `"${c}"`).join(", ")}]`;
-      throw new MissingAttributeError(`can't write unknown attribute \`${arrayName}\``);
-    }
-  }
-  // Rails only installs this guard when `raise_on_assign_to_attr_readonly` was
-  // true at `attr_readonly` declaration time (captured in `_readonlyAttributesRaise`).
-  // When it was false the guard is absent, so the write falls straight through to
-  // `super` — the value IS written in memory; persist-time exclusion of readonly
-  // columns (attributesForUpdate) keeps it out of the UPDATE.
+  // readonly_attributes.rb:50 checks the RAW `attr_name` and lets `super`
+  // resolve the alias afterwards, so an aliased write escapes the guard in
+  // Rails too.
   if (
     this._newRecord === false &&
     ctor._readonlyAttributesRaise &&
-    ctor.readonlyAttributeQ(canonical)
+    ctor.readonlyAttributeQ(String(attrName))
   ) {
-    throw new ReadonlyAttributeError(canonical);
+    throw new ReadonlyAttributeError(String(attrName));
   }
-  // Mirrors Rails `write_attribute` → `write_from_user`: writing an unknown
-  // attribute raises MissingAttributeError. The raise originates in
-  // `AttributeSet#writeFromUser` (the schema cache is always warm, so an absent
-  // name is definitively unknown). Mass assignment routes through here too but
-  // rescues it (attribute-assignment.ts), so `new X({unknown: 1})` stays lenient.
-  // `super` — route through Model's _writeAttribute with the already-resolved
-  // canonical name, matching Rails' `super` into the underscore path.
-  Model.prototype._writeAttribute.call(this, canonical, value);
+
+  _writeAttributeSuper.call(this as never, attrName, value);
 }
 
 /**

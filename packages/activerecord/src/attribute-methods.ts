@@ -854,7 +854,7 @@ export function readAttributeForDatabase(this: InstanceMethodHost, attrName: str
 }
 /** @internal */
 export function attributesBeforeTypeCast(this: InstanceMethodHost): Record<string, unknown> {
-  return _attributesBeforeTypeCast(this as any);
+  return _attributesBeforeTypeCast.call(this as any);
 }
 /** @internal */
 export function attributesForDatabase(this: InstanceMethodHost): Record<string, unknown> {

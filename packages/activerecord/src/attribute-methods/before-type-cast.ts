@@ -35,12 +35,10 @@ export function readAttributeBeforeTypeCast(
  * Return all attribute values before type casting.
  *
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#attributes_before_type_cast
- * (before_type_cast.rb:82-84). Ruby's zero-arg reader is an accessor property
- * here — see CLAUDE.md, "Generated attribute readers are properties" — so
- * base.ts installs it with `Object.defineProperty` rather than `include()`.
+ * (before_type_cast.rb:82-84).
  */
-export function attributesBeforeTypeCast(record: BeforeTypeCastRecord): Record<string, unknown> {
-  return record._attributes.valuesBeforeTypeCast();
+export function attributesBeforeTypeCast(this: BeforeTypeCastRecord): Record<string, unknown> {
+  return this._attributes.valuesBeforeTypeCast();
 }
 
 interface DatabaseRecord extends AttributeOwner {

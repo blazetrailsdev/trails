@@ -89,11 +89,11 @@ export class Default {
    *
    * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#unscoped
    * (default.rb:17-26) — `block_given? ? relation.scoping(&block) : relation`.
-   * trails spells Rails' `relation` `_buildUnscopedRelation` (see named.ts).
+   * `relation` is Rails' `Core::ClassMethods#relation` (core.rb:431-435).
    * @internal
    */
   static unscoped(this: any, block?: () => any): any {
-    return block ? this._buildUnscopedRelation().scoping(block) : this._buildUnscopedRelation();
+    return block ? this.relation().scoping(block) : this.relation();
   }
 }
 
@@ -244,7 +244,7 @@ function isExecuteScope(
  * one recursion guard, and WITHOUT `skip_inherited_scope`.
  * @internal
  */
-function isIgnoreDefaultScope(this: any): boolean {
+export function isIgnoreDefaultScope(this: any): boolean {
   return !!ScopeRegistry.ignoreDefaultScope(this.baseClass);
 }
 
