@@ -25,6 +25,7 @@ import { isBlank } from "@blazetrails/activesupport";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
+import type { Type } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
 
@@ -64,6 +65,8 @@ export interface ColumnInfo {
   primaryKey?: boolean;
   null?: boolean;
   default?: unknown;
+  /** Rails `Column#has_default?` (connection_adapters/column.rb:30-32). */
+  hasDefault?: boolean;
   defaultFunction?: string | null;
   limit?: number | null;
   precision?: number | null;
@@ -151,6 +154,15 @@ export interface SchemaSource {
   columns(tableName: string): ColumnInfo[] | Promise<ColumnInfo[]>;
   /** @internal */
   indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
+  /**
+   * Rails' `@connection` in the dumper is always an adapter, so
+   * `schema_default` calls `lookup_cast_type_from_column` unconditionally
+   * (abstract/schema_dumper.rb:89). A `SchemaSource` stands in for that
+   * connection here, so the cast-type lookup is part of the interface rather
+   * than an optional method the dumper has to guard at the call site.
+   * @internal
+   */
+  lookupCastTypeFromColumn(column: ColumnInfo): Type;
 }
 
 export type SchemaDumpLanguage = "ts" | "js";
@@ -257,6 +269,11 @@ class AdapterSchemaSource implements SchemaSource {
     return this._adapter.tables();
   }
 
+  /** @internal */
+  lookupCastTypeFromColumn(column: ColumnInfo): Type {
+    return this._adapter.lookupCastTypeFromColumn(column as { sqlType: string | null }) as Type;
+  }
+
   async columns(tableName: string): Promise<ColumnInfo[]> {
     const cols = await this._adapter.columns(tableName);
     return cols.map((col) => {
@@ -291,6 +308,13 @@ class AdapterSchemaSource implements SchemaSource {
         // is false); clear it so schemaDefault doesn't emit a `default:` alongside
         // the `as:`/`stored:` generation options.
         default: isVirtual ? undefined : col.default,
+        // Rails Column#has_default? (connection_adapters/column.rb:30-32); a
+        // virtual column has none (postgresql/column.rb:33, sqlite3/column.rb).
+        hasDefault: isVirtual
+          ? false
+          : typeof (col as any).hasDefault === "boolean"
+            ? (col as any).hasDefault
+            : col.default != null || (col.defaultFunction ?? null) !== null,
         defaultFunction: col.defaultFunction ?? null,
         limit: col.limit ?? undefined,
         precision: col.precision === undefined ? undefined : col.precision,

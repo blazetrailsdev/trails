@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-dumper.ts",
-    "rubyName": "schema_default",
-    "call": "order:schemaExpression,lookupCastTypeFromColumn",
-    "reason": "Per-site (RFC 0106): abstract/schema_dumper.rb:87-95 looks the cast type up first and only falls through to `schema_expression(column)` when `type.deserialize(column.default)` is nil; trails short-circuits to `schemaExpression` on a null `column.default` BEFORE the lookup, because the dumper base also runs against hosts that expose no `lookupCastTypeFromColumn` (hence the `adapter?.lookupCastTypeFromColumn` guard on the next line). Real divergence, not equivalence: filed for convergence as 0106-wide-call-set-direct-burndown/converge-schema-default-cast-type-lookup rather than ratified here."
-  }
-]

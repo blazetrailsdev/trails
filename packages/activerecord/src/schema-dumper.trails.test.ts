@@ -10,6 +10,7 @@ import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { ValueType } from "@blazetrails/activemodel";
 
 const EMPTY_SOURCE = {
   tables: () => [],
@@ -29,9 +30,16 @@ describe("SchemaDumper trails-only cases", () => {
         // A function default reflects as `default: null` + `defaultFunction`
         // (the literal default is null; the expression rides defaultFunction),
         // which schemaDefault routes through schemaExpression to the arrow form.
-        { name: "token", type: "string", default: null, defaultFunction: "gen_random_uuid()" },
+        {
+          name: "token",
+          type: "string",
+          hasDefault: true,
+          default: null,
+          defaultFunction: "gen_random_uuid()",
+        },
       ],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     expect(output).toContain(`() => "gen_random_uuid()"`);
@@ -62,6 +70,7 @@ describe("SchemaDumper trails-only cases", () => {
         { name: "bv", type: "bitVarying" },
       ],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     for (const helper of [
@@ -98,6 +107,7 @@ describe("SchemaDumper trails-only cases", () => {
         { name: "obj_id", type: "oid" },
       ],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     // Regression guard against collapsing to the `enum` fallback. timestamptz/
@@ -348,6 +358,7 @@ describe("SchemaDumperAdapterTest", () => {
       tables: () => ["users"],
       columns: () => [{ name: "id", type: "integer", primaryKey: true }],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     class CommentDumper extends TopLevelDumper {
       protected override fetchTableOptions(_tableName: string): Record<string, unknown> {
@@ -367,6 +378,7 @@ describe("SchemaDumperAdapterTest", () => {
       tables: () => ["t"],
       columns: () => [{ name: "id", type: "integer", primaryKey: true }],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     class MysqlDumper extends TopLevelDumper {
       protected override fetchTableOptions(_t: string): Record<string, unknown> {
@@ -392,6 +404,7 @@ describe("SchemaDumperAdapterTest", () => {
         { name: "account_id", type: "integer", primaryKey: true },
       ],
       indexes: () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
     };
     const dumper = TopLevelDumper.create(source as any);
     const lines: string[] = [];
@@ -455,6 +468,7 @@ describe("formatColspec", () => {
     tables: () => [],
     columns: () => [],
     indexes: () => [],
+    lookupCastTypeFromColumn: () => new ValueType(),
   });
 
   it("emits values verbatim (Rails format_colspec), not re-quoted", () => {

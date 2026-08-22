@@ -72,12 +72,25 @@ export class AdapterSchemaSource implements SchemaSource {
       primaryKey: c.primaryKey,
       null: c.null,
       default: c.default,
+      hasDefault:
+        typeof c.hasDefault === "boolean"
+          ? c.hasDefault
+          : c.default != null || (c.defaultFunction ?? null) !== null,
       defaultFunction: c.defaultFunction ?? undefined,
       limit: c.limit ?? undefined,
       precision: c.precision === undefined ? undefined : c.precision,
       scale: c.scale ?? undefined,
       collation: c.collation ?? undefined,
     }));
+  }
+
+  /** The dumper's `schema_default` cast-type lookup, served by the adapter. */
+  lookupCastTypeFromColumn(
+    column: ColumnInfo,
+  ): ReturnType<SchemaSource["lookupCastTypeFromColumn"]> {
+    return this.adapter.lookupCastTypeFromColumn(
+      column as { sqlType: string | null },
+    ) as ReturnType<SchemaSource["lookupCastTypeFromColumn"]>;
   }
 
   async indexes(tableName: string): Promise<IndexInfo[]> {

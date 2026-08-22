@@ -170,27 +170,20 @@ export class SchemaDumper extends BaseSchemaDumper {
   // the single `emitTable`/`columnSpec` dispatch. `_adapter` is a trails-only
   // helper on the base (it reaches base-private `_source`).
 
-  /** @internal */
+  /**
+   * Mirrors `def schema_default(column)`
+   * (connection_adapters/abstract/schema_dumper.rb:87-95).
+   * @internal
+   */
   protected schemaDefault(column: Column): string | undefined {
-    if (!column.hasDefault && column.default === undefined) return undefined;
-    if (column.default == null) return this.schemaExpression(column);
-    const adapter = this._adapter();
-    if (adapter?.lookupCastTypeFromColumn) {
-      const type = adapter.lookupCastTypeFromColumn(column);
-      if (type != null && typeof type.deserialize === "function") {
-        const deserialized = type.deserialize(column.default);
-        if (deserialized == null) {
-          // column.default is already non-null (the `== null` guard above
-          // returned early). It may be a pre-deserialized JS value (e.g. []
-          // for a PG OID::Array column) that the scalar element type cannot
-          // deserialize. Apply typeCastForSchema directly on the original.
-          return type.typeCastForSchema(column.default);
-        }
-        return type.typeCastForSchema(deserialized);
-      }
+    if (!column.hasDefault) return undefined;
+    const type = this._adapter().lookupCastTypeFromColumn(column);
+    const default_ = type.deserialize(column.default);
+    if (default_ == null) {
+      return this.schemaExpression(column);
+    } else {
+      return type.typeCastForSchema(default_);
     }
-    if (typeof column.default === "string") return JSON.stringify(column.default);
-    return String(column.default);
   }
 
   /** @internal */

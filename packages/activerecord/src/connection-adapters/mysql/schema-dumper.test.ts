@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { Result } from "../../result.js";
 
-const stubSource: SchemaSource = { tables: () => [], columns: () => [], indexes: () => [] };
+const stubSource: SchemaSource = {
+  tables: () => [],
+  columns: () => [],
+  indexes: () => [],
+  lookupCastTypeFromColumn: () => new ValueType(),
+};
 const make = () => SchemaDumper.create(stubSource);
 const col = (
   o: {
