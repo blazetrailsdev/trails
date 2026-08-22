@@ -10,16 +10,11 @@
  * and no name it declares has a Rails method to converge onto. Its sibling
  * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
  * MOVED-BY-SHORT-NAME: databaseExists, open.
- * Those six score `moved` only because the oracle matches on bare camelized
- * Ruby short names, and the owners it now reports are unrelated: `close`
- * credits `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
- * `isOpen` to `Transaction#open?` (abstract/transaction.rb), `open` to
- * `SchemaCache#open` / `MigrationContext#open`, `databaseExists` to
+ * Those two score `moved` only because the oracle matches on bare camelized
+ * Ruby short names, and the owners it reports are unrelated: `open` credits
+ * `SchemaCache#open` / `MigrationContext#open`, and `databaseExists` credits
  * `AbstractAdapter#database_exists?` — which the port already carries on the
- * adapter, at its Rails name, one layer above this driver — and `changes` to
- * `ActiveModel::AttributeMutationTracker#changes`, where this one is
- * `sqlite3_changes()` off the handle, the sqlite3 gem's
- * `SQLite3::Database#changes`.
+ * adapter, at its Rails name, one layer above this driver.
  */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
