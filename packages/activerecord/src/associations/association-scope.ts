@@ -821,10 +821,18 @@ export class AssociationScope {
         reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
       ).constraints?.() ?? [];
     if (constraints.length === 0) return scope;
+    // Rails' `source_type:` chain entry is a PolymorphicReflection, whose `klass`
+    // delegates to `@reflection` (reflection.rb:1229-1230) and is read by `build_scope`'s
+    // `klass = self.klass` default (reflection.rb:336); trails' entry is the raw
+    // polymorphic belongsTo, whose `klass` raises, so resolve it here instead of
+    // threading a fourth argument past `eval_scope` (association_scope.rb:169).
+    const entry = klassOverride
+      ? (Object.create(reflection, { klass: { value: klassOverride } }) as typeof reflection)
+      : reflection;
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      const evaluated = this.evalScope(reflection, c, owner, entryKlass);
+      const evaluated = this.evalScope(entry, c, owner);
       merged = this._pushScopeIntoRelation(merged, evaluated);
     }
     return merged;
@@ -846,22 +854,9 @@ export class AssociationScope {
     reflection: AbstractReflection | ReflectionProxy,
     scopeFn: (...args: unknown[]) => unknown,
     owner: Base,
-    klassOverride?: typeof Base,
   ): unknown {
-    // `klassOverride` carries the resolved source_type target for a polymorphic
-    // belongsTo source, whose `reflection.klass` would otherwise raise.
-    const entryKlass = klassOverride ?? (reflection as { klass?: typeof Base }).klass;
-    if (!entryKlass) return undefined;
-    // Rails: `relation = reflection.build_scope(reflection.aliased_table)`
-    // (association_scope.rb:169) — the chain entry's scope lambda binds its
-    // `where(...)` predicates to the ALIASED table. For a self-referential
-    // polymorphic through (a repeated table) the entry's `imageable_type`
-    // source-type filter must qualify the joined-in alias
-    // (`children_imageables`), not the FROM table.
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
       (reflection as ReflectionProxy).aliasedTable,
-      undefined,
-      entryKlass,
     );
     return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner) ?? relation;
   }
