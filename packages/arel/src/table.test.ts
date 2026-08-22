@@ -211,7 +211,7 @@ describe("TableTest", () => {
   });
 
   it("manufactures an Attribute via attr()", () => {
-    expect(users.attr("email").name).toBe("email");
+    expect(users.get("email").name).toBe("email");
   });
 
   it("accepts :as option for table alias", () => {

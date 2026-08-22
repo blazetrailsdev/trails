@@ -107,9 +107,3 @@ export { Comment } from "./comment.js";
 export { Cte } from "./cte.js";
 export { UnaryOperation, BitwiseNot } from "./unary-operation.js";
 export { Filter } from "./filter.js";
-
-import { SqlLiteral } from "./sql-literal.js";
-
-export function sql(rawSql: string): SqlLiteral {
-  return new SqlLiteral(rawSql);
-}

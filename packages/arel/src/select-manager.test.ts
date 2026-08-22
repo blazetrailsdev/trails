@@ -1199,7 +1199,7 @@ describe("SelectManagerTest", () => {
   describe("projections", () => {
     it("reads projections", () => {
       const users = new Table("users");
-      const manager = users.project(users.attr("name"), users.attr("age"));
+      const manager = users.project(users.get("name"), users.get("age"));
       expect(manager.projections.length).toBe(2);
     });
   });
@@ -1207,9 +1207,9 @@ describe("SelectManagerTest", () => {
   describe("projections=", () => {
     it("overwrites projections", () => {
       const users = new Table("users");
-      const manager = users.project(users.attr("name"));
+      const manager = users.project(users.get("name"));
       expect(manager.projections.length).toBe(1);
-      manager.projections = [users.attr("age")];
+      manager.projections = [users.get("age")];
       expect(manager.projections.length).toBe(1);
       const sql = manager.toSql();
       expect(sql).toContain('"age"');
@@ -1222,8 +1222,8 @@ describe("SelectManagerTest", () => {
       const users = new Table("users");
       const manager = users
         .project("*")
-        .where(users.attr("name").eq("Alice"))
-        .where(users.attr("age").gt(18));
+        .where(users.get("name").eq("Alice"))
+        .where(users.get("age").gt(18));
       expect(manager.constraints.length).toBe(2);
     });
   });
@@ -1237,7 +1237,7 @@ describe("SelectManagerTest", () => {
   describe("orders", () => {
     it("returns order clauses", () => {
       const users = new Table("users");
-      const manager = users.project("*").order(users.attr("name").asc());
+      const manager = users.project("*").order(users.get("name").asc());
       expect(manager.orders.length).toBe(1);
     });
   });
@@ -1245,7 +1245,7 @@ describe("SelectManagerTest", () => {
   describe("exists", () => {
     it("can be aliased", () => {
       const users = new Table("users");
-      const subquery = users.project(users.attr("id"));
+      const subquery = users.project(users.get("id"));
       const aliased = subquery.as("sub");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect((aliased.name as Nodes.SqlLiteral).value).toBe("sub");
@@ -1261,7 +1261,7 @@ describe("SelectManagerTest", () => {
     const manager = users
       .project("*")
       .join(posts)
-      .on(users.attr("id").eq(posts.attr("user_id")));
+      .on(users.get("id").eq(posts.get("user_id")));
     expect(manager.joinSources().length).toBe(1);
     expect(manager.joinSources()[0]).toBeInstanceOf(Nodes.InnerJoin);
   });
@@ -1271,9 +1271,9 @@ describe("SelectManagerTest", () => {
     const manager = users
       .project("*")
       .join(posts)
-      .on(users.attr("id").eq(posts.attr("user_id")))
+      .on(users.get("id").eq(posts.get("user_id")))
       .outerJoin(comments)
-      .on(posts.attr("id").eq(comments.attr("post_id")));
+      .on(posts.get("id").eq(comments.get("post_id")));
     expect(manager.joinSources().length).toBe(2);
     expect(manager.joinSources()[0]).toBeInstanceOf(Nodes.InnerJoin);
     expect(manager.joinSources()[1]).toBeInstanceOf(Nodes.OuterJoin);

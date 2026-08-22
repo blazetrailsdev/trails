@@ -37,10 +37,3 @@ export class UnsupportedVisitError extends ArelError {
     this.name = "UnsupportedVisitError";
   }
 }
-
-export class NotImplementedError extends ArelError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotImplementedError";
-  }
-}

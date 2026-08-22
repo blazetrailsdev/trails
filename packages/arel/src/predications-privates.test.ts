@@ -13,20 +13,20 @@ const users = new Table("users");
 
 describe("Predications.groupingAny / groupingAll", () => {
   it("groupingAny dispatches by method-id and folds with OR (Grouping)", () => {
-    const out = Predications.groupingAny.call(users.attr("id"), "eq", [1, 2, 3]);
+    const out = Predications.groupingAny.call(users.get("id"), "eq", [1, 2, 3]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
     const inner = out.expr as Nodes.Or;
     expect(inner).toBeInstanceOf(Nodes.Or);
   });
 
   it("groupingAll dispatches by method-id and folds with AND", () => {
-    const out = Predications.groupingAll.call(users.attr("id"), "gt", [1, 2]);
+    const out = Predications.groupingAll.call(users.get("id"), "gt", [1, 2]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
     expect(out.expr).toBeInstanceOf(Nodes.And);
   });
 
   it("groupingAny accepts a closure variant (no stringly-typed dispatch)", () => {
-    const attr = users.attr("id");
+    const attr = users.get("id");
     const out = Predications.groupingAny.call(attr, (expr: unknown) => attr.eq(expr), [10, 20]);
     expect(out).toBeInstanceOf(Nodes.Grouping);
   });
@@ -36,7 +36,7 @@ describe("Predications.groupingAny / groupingAll", () => {
     // rerouting: Ruby's `Or.inject` on [] returns nil (rendered `NULL`), and an
     // empty `And` renders `()`. Both must survive the delegation unchanged,
     // since `NULL OR FALSE` is NULL while `FALSE OR FALSE` is FALSE.
-    const attr = users.attr("id");
+    const attr = users.get("id");
     const any = Predications.groupingAny.call(attr, "eq", []);
     expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
     expect((any.expr as Nodes.SqlLiteral).value).toBe("NULL");
@@ -53,7 +53,7 @@ describe("Predications.groupingAny / groupingAll", () => {
     // and 155-161 forwards only escape to does_not_match. The extras arm of
     // grouping_any exists for exactly these four callers, so pin that the
     // arguments actually reach the built node.
-    const attr = users.attr("name");
+    const attr = users.get("name");
 
     // matches.rb:11 stores `escape && build_quoted(escape)`, so the arrival
     // shape is a Quoted, not the bare string.
@@ -67,7 +67,7 @@ describe("Predications.groupingAny / groupingAll", () => {
   });
 
   it("groupingAny throws a clear TypeError when the method-id isn't callable", () => {
-    const attr = users.attr("id");
+    const attr = users.get("id");
     expect(() => Predications.groupingAny.call(attr, "noSuchMethod", [1])).toThrowError(
       /noSuchMethod.*Attribute/,
     );
@@ -115,8 +115,8 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
     // casted.rb:5-35 — Casted has no `infinite?`, so open_ended?(Casted(INFINITY))
     // is false in Rails and must stay false here.
-    expect(isInfinity(new Nodes.Casted(Infinity, users.attr("id")))).toBe(0);
-    expect(isOpenEnded(new Nodes.Casted(Infinity, users.attr("id")))).toBe(false);
+    expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(0);
+    expect(isOpenEnded(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
   });
 
   it("isUnboundable duck-types the protocol and yields the sign", () => {
@@ -158,9 +158,9 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     // between(BindParam(nil), 3) is lteq(3) rather than a Between over a nil bind.
     expect(isOpenEnded(new Nodes.BindParam(null))).toBe(true);
     expect(isOpenEnded(new Nodes.Quoted(null))).toBe(true);
-    expect(isOpenEnded(new Nodes.Casted(null, users.attr("id")))).toBe(true);
+    expect(isOpenEnded(new Nodes.Casted(null, users.get("id")))).toBe(true);
     expect(isOpenEnded(new Nodes.Quoted(3))).toBe(false);
-    expect(isOpenEnded(new Nodes.Casted(3, users.attr("id")))).toBe(false);
+    expect(isOpenEnded(new Nodes.Casted(3, users.get("id")))).toBe(false);
   });
 });
 
@@ -177,13 +177,13 @@ describe("Attribute private helpers (mirror Predications)", () => {
   };
 
   it("groupingAny / groupingAll work via method dispatch on Attribute", () => {
-    const attr = users.attr("id") as AttributePrivates;
+    const attr = users.get("id") as AttributePrivates;
     expect(attr.groupingAny("eq", [1, 2])).toBeInstanceOf(Nodes.Grouping);
     expect(attr.groupingAll("eq", [1, 2])).toBeInstanceOf(Nodes.Grouping);
   });
 
   it("isInfinity / isUnboundable / isOpenEnded match Predications semantics", () => {
-    const attr = users.attr("id") as AttributePrivates;
+    const attr = users.get("id") as AttributePrivates;
     expect(attr.isInfinity(Infinity)).toBe(1);
     expect(attr.isInfinity(-Infinity)).toBe(-1);
     expect(attr.isInfinity(0)).toBe(0);
@@ -194,7 +194,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
   });
 
   it("isUnboundable duck-types the protocol rather than always returning false", () => {
-    const attr = users.attr("id") as AttributePrivates;
+    const attr = users.get("id") as AttributePrivates;
     expect(attr.isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
     expect(attr.isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
   });
@@ -221,7 +221,7 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
   });
 
   it("an un-overridden attribute is unaffected", () => {
-    const attr = users.attr("id");
+    const attr = users.get("id");
     expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.Between);
   });
 });
@@ -239,7 +239,7 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   const mgr = new TestManager(users);
 
   it("returns the single survivor when there's only one non-null expr", () => {
-    const out = mgr.callCollapse([null, users.attr("id").eq(1), undefined]);
+    const out = mgr.callCollapse([null, users.get("id").eq(1), undefined]);
     expect(out).toBeInstanceOf(Nodes.Equality);
   });
 
@@ -250,7 +250,7 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   });
 
   it("folds multiple exprs into an And via createAnd", () => {
-    const out = mgr.callCollapse([users.attr("id").eq(1), users.attr("name").eq("a")]);
+    const out = mgr.callCollapse([users.get("id").eq(1), users.get("name").eq("a")]);
     expect(out).toBeInstanceOf(Nodes.And);
     expect((out as Nodes.And).children).toHaveLength(2);
   });
@@ -269,7 +269,7 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
 
 describe("HomogeneousIn#ivars (Rails-fidelity helper)", () => {
   it("returns the [attribute, values, type] tuple Rails uses for hash/eql", () => {
-    const attr = users.attr("id");
+    const attr = users.get("id");
     const node = new Nodes.HomogeneousIn([1, 2, 3], attr, "in");
     // ivars is `protected` so cast to access. The point: the tuple
     // shape matches Rails' `[@attribute, @values, @type]`.

@@ -4,7 +4,7 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { SelectManager } from "../select-manager.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
-import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
+import { UnsupportedVisitError, BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 // Mirrors Arel::Visitors::UnsupportedVisitError (defined in to_sql.rb:5
@@ -13,6 +13,19 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 // hierarchy alongside BindError/EmptyJoinError, but re-exports it from
 // here so parity:api finds it where Rails defines it.
 export { UnsupportedVisitError };
+
+/**
+ * Mirrors Ruby's core `NotImplementedError`, which `to_sql.rb` raises from the
+ * three strategy hooks below (:195, :521, :525). Ruby gets the class from the
+ * language, so `arel/errors.rb` declares nothing for it and neither does
+ * `errors.ts`; it stays file-local here, exactly where Rails raises it.
+ */
+class NotImplementedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotImplementedError";
+  }
+}
 
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
@@ -538,9 +551,7 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesDistinctOn(_o: Nodes.DistinctOn, _collector: SQLString): SQLString {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:194 cluster=arel-visitor-strategy
-    throw new NotImplementedError(
-      "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
-    );
+    throw new NotImplementedError("DISTINCT ON not implemented for this db");
   }
 
   private visitArelNodesWith(o: Nodes.With, collector: SQLString): SQLString {
@@ -904,16 +915,12 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesRegexp(_o: Nodes.Regexp, _collector: SQLString): SQLString {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:520 cluster=arel-visitor-strategy
-    throw new NotImplementedError(
-      "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
-    );
+    throw new NotImplementedError("~ not implemented for this db");
   }
 
   protected visitArelNodesNotRegexp(_o: Nodes.NotRegexp, _collector: SQLString): SQLString {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:524 cluster=arel-visitor-strategy
-    throw new NotImplementedError(
-      "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
-    );
+    throw new NotImplementedError("!~ not implemented for this db");
   }
 
   private visitArelNodesStringJoin(o: Nodes.StringJoin, collector: SQLString): SQLString {
