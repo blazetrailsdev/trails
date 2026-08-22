@@ -85,11 +85,6 @@ export class Cidr extends ValueType<IPAddr> {
    *   nil → nil
    *   String → IPAddr.new(value) or nil on ArgumentError
    *   else → value (pass-through for existing IPAddr instances)
-   *
-   * @missingRailsCall new — CONVERGEABLE (story pg-cidr-cast-value-should-build-an-ipaddr): Per-site verified (RFC 0106 wave 4b):
-   *   postgresql/oid/cidr.rb builds an `IPAddr.new(...)`; Ruby's IPAddr has no
-   *   port in trails, so the cast returns the normalized CIDR string. Tracked as
-   *   the PG address-type gap, not a dropped delegation.
    */
   castValue(value: unknown): IPAddr | null {
     if (value == null) return null;

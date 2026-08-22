@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/shard-selector.ts",
+    "rubyName": "call",
+    "call": "new",
+    "reason": "shard_selector.rb:41 wraps env in `ActionDispatch::Request.new(env)`; trails has no ActionDispatch, so `call()` receives the request itself and constructs nothing. Convergeable once ActionDispatch::Request is ported; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
+  }
+]

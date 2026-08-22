@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_REASON,
   NARROW_DEFAULT_REASON,
+  claimsPermanenceButNamesOwner,
   suppressedCallsIn,
 } from "./missing-rails-call-tags.js";
 import { ANY_CLASS, expectationKey, reconcileFileText } from "./build.js";
@@ -188,5 +189,39 @@ describe("parity:api:build over a hand-written one-line tag", () => {
   it("makes no further edit on a second run", () => {
     const first = reconcileFileText("foo.ts", src, expectations, () => reason).text!;
     expect(reconcileFileText("foo.ts", first, expectations, () => reason).text).toBeNull();
+  });
+});
+
+describe("claimsPermanenceButNamesOwner", () => {
+  it("flags a PERMANENT reason that hands the deviation to a future owner", () => {
+    expect(
+      claimsPermanenceButNamesOwner(
+        "PERMANENT: connection_pool/reaper.rb spawns a background Thread; trails drives the " +
+          "same period from a timer. Tracked with the rest of the threadless pool surface by RFC 0073.",
+      ),
+    ).toBe(true);
+    expect(claimsPermanenceButNamesOwner("PERMANENT: pending burndown review.")).toBe(true);
+  });
+
+  it("does not flag an RFC cited as the audit that verified the reason", () => {
+    expect(
+      claimsPermanenceButNamesOwner(
+        "PERMANENT: Per-site verified (RFC 0106 wave 4b): `result.rows.first` is `result.rows[0]` " +
+          "on a JS array; `Array#first` is not a ported method name.",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not flag a story cited as the CAUSE of a name-collision false positive", () => {
+    expect(
+      claimsPermanenceButNamesOwner(
+        "PERMANENT: Name-collision false positive (story relation-delegation-rails-named-methods): " +
+          "this unrelated call to String#split is flagged by the name-based wide call-set check.",
+      ),
+    ).toBe(false);
+  });
+
+  it("says nothing about a reason that already claims CONVERGEABLE", () => {
+    expect(claimsPermanenceButNamesOwner("CONVERGEABLE: tracked by RFC 0059.")).toBe(false);
   });
 });

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "schema.ts",
+    "rubyName": "define",
+    "call": "with_connection",
+    "reason": "`connection_pool.with_connection` (schema.rb:54) checks a connection out for the block; the port's `Schema.define` is handed the adapter explicitly (schema.ts:51-64). Tracked by RFC 0059, the one-schema convergence; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
+  }
+]

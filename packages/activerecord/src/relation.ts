@@ -1843,15 +1843,6 @@ export class Relation<T extends Base> {
    * — `_buildEagerOperandManager` is that block, and its manager is rendered
    * through the same connection path (a null manager, e.g. an unresolvable
    * association, falls through to the plain arel).
-   *
-   * @missingRailsCall with_connection — CONVERGEABLE: Rails' non-eager arm is
-   * `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`
-   * (relation.rb:1217-1219). `withConnection` is a `Promise`-returning checkout
-   * in TypeScript, and `to_sql` renders a string with no `await` in it, so
-   * taking one would make `toSql` async — 412 test and 16 source call sites
-   * treat it as synchronous. The checkout is instead the caller's, read through
-   * `_conn()`, and `unprepared_statement` is applied by hand around the render.
-   * Convergence tracked by RFC 0107 (`converge-sync-eager-builders-async-to-sql`).
    */
   toSql(): string {
     // `unprepared_statement` applied synchronously: `to_sql` is sync here, so

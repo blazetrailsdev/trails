@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/oid/cidr.ts",
+    "rubyName": "cast_value",
+    "call": "new",
+    "reason": "postgresql/oid/cidr.rb:31 builds an `IPAddr.new(...)`; Ruby's IPAddr has no port in trails, so the cast returns the normalized CIDR string. Tracked by story pg-cidr-cast-value-should-build-an-ipaddr; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
+  }
+]

@@ -850,13 +850,6 @@ export function ensureProperType(this: Base): void {
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#discriminate_class_for_record
  * @internal Private method, used by persistence to route instantiate() through STI subclasses.
- *
- * @missingRailsCall find_sti_class — CONVERGEABLE (story discriminate-class-for-record-should-call-find-sti-class): inheritance.rb:301
- *   `find_sti_class(record[inheritance_column])` — trails routes through
- *   `findStiClassForRow` (inheritance.ts:867), the registry-safe variant that
- *   matches only within `baseClass`'s tracked subtree; the bare `findStiClass`
- *   is Rails' autoloader analog and is reached from there when STI is explicitly
- *   enabled (inheritance.ts:1075-1078). Documented at inheritance.ts:1050-1059.
  */
 export function discriminateClassForRecord(
   modelClass: typeof Base,

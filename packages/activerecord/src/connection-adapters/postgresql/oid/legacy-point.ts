@@ -25,13 +25,6 @@ export class LegacyPoint extends ValueType<[number, number]> {
     return null;
   }
 
-  /**
-   * @missingRailsCall number_for_point — CONVERGEABLE (story legacy-point-serialize-should-extract-number-for-point): Per-site verified (RFC 0106 wave 4b):
-   *   postgresql/oid/legacy_point.rb's `number_for_point` strips a trailing `.0`
-   *   from each coordinate; trails' serialize formats the pair with the same
-   *   rule inline. The helper is private and one-line in Rails; extracting it
-   *   here would be surface with a single caller.
-   */
   serialize(value: unknown): string | null {
     if (value == null) return null;
     if (globalThis.Array.isArray(value) && value.length === 2) {

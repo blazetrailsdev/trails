@@ -180,7 +180,12 @@ import {
   writeMarks,
 } from "./unreviewed-ratchet.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
-import { DEFAULT_REASON, TAG, classifyReason } from "./missing-rails-call-tags.js";
+import {
+  DEFAULT_REASON,
+  TAG,
+  claimsPermanenceButNamesOwner,
+  classifyReason,
+} from "./missing-rails-call-tags.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
@@ -604,6 +609,14 @@ export function receiptsSection(title: string, receipts: readonly TagReceipt[]):
       `${title} — CONVERGEABLE by file`,
       tally(
         receipts.filter((r) => claim(r) === "convergeable"),
+        (r) => `${r.package}/${r.tsFile} ${r.tsName} ${r.call}`,
+      ),
+    ) +
+    "\n" +
+    section(
+      `${title} — PERMANENT but names a convergence owner`,
+      tally(
+        receipts.filter((r) => claimsPermanenceButNamesOwner(r.reason ?? "")),
         (r) => `${r.package}/${r.tsFile} ${r.tsName} ${r.call}`,
       ),
     )
