@@ -523,6 +523,12 @@ export class TimeWithZone {
    * Returns the local wall-clock time as a Temporal.PlainDateTime.
    * If `utcOffsetOverride` is provided (in seconds), the result is the wall-clock
    * time at that offset from UTC.
+   *
+   * @missingRailsCall getlocal — PERMANENT: `utc.getlocal(utc_offset)`
+   *   (time_with_zone.rb:83-85) is Ruby `Time#getlocal`; trails' `utc()` answers
+   *   a `Temporal.Instant`, which has no `getlocal` — the shifted wall clock is
+   *   built with `toZonedDateTimeISO("UTC").toPlainDateTime()`, and `getlocal`
+   *   is the alias of THIS method, not a call it can make.
    */
   localtime(utcOffsetOverride?: number): Temporal.PlainDateTime {
     if (utcOffsetOverride !== undefined) {
@@ -544,7 +550,15 @@ export class TimeWithZone {
     return this._zoned.toPlainDate();
   }
 
-  /** Returns the UTC instant. */
+  /**
+   * Returns the UTC instant.
+   *
+   * @missingRailsCall getlocal — PERMANENT: Rails' `to_time` returns a `::Time` re-seated
+   *   by `getlocal` per `preserve_timezone` (time_with_zone.rb:493-501); trails'
+   *   `toTime()` answers the UTC `Temporal.Instant`, which carries its own
+   *   offset and has no `getlocal`. The `preserve_timezone` three-arm split is a
+   *   separate unported behaviour, not a dropped call.
+   */
   toTime(): Temporal.Instant {
     return this.utc();
   }
@@ -627,6 +641,14 @@ export class TimeWithZone {
    * `packages/date/src/date.ts`. That `::Time` was built from an offset rather
    * than a zone, so its own `zone` is `nil` and any `%Z` the gsub left behind
    * prints empty, as in Ruby.
+   *
+   * @missingRailsCall getlocal — PERMANENT: Rails formats through
+   *   `getlocal(utc_offset).strftime(format)` (time_with_zone.rb:225-228), where
+   *   the receiver is a `::Time` whose `strftime` is the date gem's C formatter.
+   *   trails' `getlocal` answers a `Temporal.PlainDateTime`, which carries no
+   *   `strftime`, so the same date-gem formatter (`@blazetrails/date`'s
+   *   `strftime`) is called directly with the local fields it would have read
+   *   off that `::Time`.
    */
   strftime(format: string): string {
     format = format.replace(/((?:^|[^%])(?:%%)*)%Z/g, `$1${this.zone}`);
@@ -829,6 +851,20 @@ export class TimeWithZone {
   /**
    * Advance by calendar amounts. Variable parts (years, months, weeks, days)
    * are applied in local time; fixed parts (hours, minutes, seconds) from UTC.
+   *
+   * @missingRailsCall any? — CONVERGEABLE: Rails' advance (time_with_zone.rb:430-437) picks
+   *   the variable-length arm with `options.values_at(:years, :weeks, :months,
+   *   :days).any?` and hands it to `method_missing(:advance, options)`; trails
+   *   has no `method_missing` arm to hand it to and computes both arms inline,
+   *   so the guard is a plain `if (options.years)`-style test per key rather
+   *   than an `any?` over a values_at slice. Converging needs the `Time#advance`
+   *   core-ext port that the delegation targets.
+   * @missingRailsCall in_time_zone — CONVERGEABLE: The fixed-length arm is
+   *   `utc.advance(options).in_time_zone(time_zone)` (time_with_zone.rb:436);
+   *   trails has no `Time#advance` core-ext for a `Temporal.Instant` to delegate
+   *   to, so the seconds offset is applied inline and there is no cross-zone
+   *   round trip to close with `in_time_zone`. Blocked on porting
+   *   `DateAndTime::Calculations#advance` for the `Time` receiver.
    */
   advance(options: AdvanceOptions): TimeWithZone {
     const l = this._local();
@@ -884,6 +920,12 @@ export class TimeWithZone {
 
   /**
    * Return a new TimeWithZone where specified components are replaced.
+   *
+   * @missingRailsCall find_zone — CONVERGEABLE: Rails' change accepts `:zone` and `:offset`
+   *   and resolves them through `::Time.find_zone` (time_with_zone.rb:390-404);
+   *   trails' `ChangeOptions` carries no `zone`/`offset` key at all, so there is
+   *   no value to resolve. Converging means adding those two options, not adding
+   *   the call.
    */
   change(options: ChangeOptions): TimeWithZone {
     const l = this._local();

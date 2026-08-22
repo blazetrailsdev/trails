@@ -345,6 +345,15 @@ export class Association {
    * Cache: only the `AssociationScope.scope` result is memoized in
    * `_cachedScope` (Rails' `@association_scope`); `targetScope()` and
    * current-scope branches are re-evaluated each call (association.rb:294-307).
+   *
+   * @missingRailsCall create — PERMANENT: `DisableJoinsAssociationScope.create.scope(self)`
+   *   (association.rb:109). `DisableJoinsAssociationScope` cannot be imported
+   *   here — the edge closes the TDZ cycle association.ts ->
+   *   disable-joins-association-scope.ts ->
+   *   disable-joins-association-relation.ts -> relation.ts -> associations.ts —
+   *   so it is read at call time through the late-binding slot
+   *   `getDjasScopeBuilder()` (association.ts:354-359), which hands back the
+   *   already-constructed builder and leaves no `create` to call.
    */
   scope(): any {
     const klass = this.klass as typeof Base | undefined;
@@ -516,6 +525,14 @@ export class Association {
     return constantize(className) as typeof Base;
   }
 
+  /**
+   * @missingRailsCall order:scopeFor,unscoped — PERMANENT: Verified per-site (RFC 0106):
+   *   the body now makes both calls, nested exactly as Rails nests them —
+   *   `reflection.scope_for(klass.unscoped, owner)` (association.rb:173). The
+   *   extractor records a nested TS call argument before its enclosing call, so
+   *   an inner-argument call can never be recorded after its caller; the
+   *   sequence is unreachable from source, not a control-flow difference.
+   */
   get extensions(): any[] {
     // `reflection` here is Rails' rich `MacroReflection`, resolved off the
     // owner's class exactly as `klass` above does: the definition an
@@ -646,6 +663,13 @@ export class Association {
     return result;
   }
 
+  /**
+   * @missingRailsCall map — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails association.rb:206-209 maps over instance_variables
+   *   to build the ivar list; trails association.ts:529-537 dumps the fixed
+   *   `{loaded, target}` shape — Marshal introspection has no JS analogue, the
+   *   shape is explicit.
+   */
   marshalDump(): [string, Record<string, unknown>] {
     return [
       this.reflection.name,
@@ -974,6 +998,13 @@ export class Association {
    * The through-association chain merge is in `ThroughAssociation#targetScope`.
    *
    * @internal
+   *
+   * @missingRailsCall create — PERMANENT: `AssociationRelation.create(klass, self)`
+   *   (association.rb:313). `AssociationRelation` is reached through the same
+   *   late-binding slot as branch 1 of `scope()`
+   *   (`getAssociationRelationFactory()`, association.ts:983-984) to stay out of
+   *   the relation.ts import cycle; the slot exposes the factory itself, so the
+   *   `create` frame is inside it rather than in this body.
    */
   protected targetScope(): any {
     const klass = this.klass as typeof Base | undefined;
@@ -1057,6 +1088,13 @@ export class Association {
     });
   }
 
+  /**
+   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106):
+   *   `reflection.source_reflection.active_record.default_scopes.any?`
+   *   (association.rb:395) — `default_scopes` is an Array, and JS Array has no
+   *   `any?`; the port is the emptiness test `...defaultScopes?.length`
+   *   (association.ts). All three other disjuncts are called.
+   */
   private isSkipStatementCache(scope: any): boolean {
     // Rails: reflection.has_scope? || scope.eager_loading? ||
     //        klass.scope_attributes? || reflection.source_reflection.active_record.default_scopes.any?

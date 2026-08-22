@@ -15,7 +15,6 @@ import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-associat
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
-import { normalizeAssociationKey } from "./key-normalization.js";
 
 /**
  * The persisted-owner DB work `replace` defers to its awaitable caller: the
@@ -1391,26 +1390,17 @@ export class CollectionAssociation extends Association {
     const ids = args.flat(Infinity).filter((id) => id != null);
     // Rails compares `args.flatten.compact.map(&:to_s)` against `r.id.to_s`
     // (collection_association.rb:523,527), so both sides land in string shape
-    // and `find("1")` matches an Integer PK. Each key goes through
-    // `normalizeAssociationKey` first because an in-memory target PK is a
-    // BigInt (int8 under PG bigserial) while the `find(id)` argument is a
-    // number — folding `1n` to `1` before `String()` reproduces Ruby's
-    // width-agnostic `Integer#to_s`. `r.id` is an *array* for a composite-PK
-    // klass (`CompositePrimaryKey#id`), hence the per-element map on both
-    // sides.
-    const normalize = (v: unknown) =>
-      Array.isArray(v)
-        ? v.map((k) => String(normalizeAssociationKey(k))).join(",")
-        : String(normalizeAssociationKey(v));
-    const normalizedIds = [...new Set(ids.map(normalize))];
+    // and `find("1")` matches an Integer PK. `String()` is that `to_s`: it is
+    // width-agnostic over the number/BigInt split an int8 PK produces under PG.
+    const uniqIds = [...new Set(ids.map((id) => String(id)))];
 
-    if (normalizedIds.length === 1) {
-      const record = this.target.find((r) => normalize((r as any).id) === normalizedIds[0]);
+    if (uniqIds.length === 1) {
+      const id = uniqIds[0];
+      const record = this.target.find((r) => id === String((r as any).id));
       return expectsArray ? [record] : record;
     }
 
-    const idSet = new Set(normalizedIds);
-    return this.target.filter((r) => idSet.has(normalize((r as any).id)));
+    return this.target.filter((r) => uniqIds.includes(String((r as any).id)));
   }
 
   /**

@@ -136,6 +136,15 @@ export function build(
  * Instantiate a record from database attributes, dispatching through
  * STI if applicable.
  * Mirrors: ActiveRecord::Persistence::ClassMethods#instantiate
+ *
+ * @missingRailsCall instantiate_instance_of — PERMANENT: persistence.rb:102
+ *   `instantiate_instance_of(klass, attributes, column_types, &block)`. trails'
+ *   `instantiateInstanceOf` (persistence.ts:2174) passes its third argument as
+ *   `_instantiate`'s `columnTypes`, which known columns IGNORE; the public
+ *   `instantiate` entry must pass its `types` map as `overrideTypes` so it beats
+ *   the schema cast type (Rails' `LazyAttributeHash` `additional_types[name] ||
+ *   types[name]`). Routing through the helper would silently drop that override
+ *   — see the comment at persistence.ts:161-167.
  */
 export function instantiate(
   this: PersistenceHost,
@@ -220,6 +229,13 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
  * Builds and executes an INSERT for the given values.
  *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_insert_record
+ *
+ * @missingRailsCall with_cast_value — CONVERGEABLE: persistence.rb:245
+ *   `_default_attributes[primary_key].with_cast_value(primary_key_value)` — the
+ *   prefetch arm. `prefetch_primary_key?` is false for every adapter trails
+ *   ships, so no `_default_attributes` Attribute exists to re-cast; the branch
+ *   is mirrored structurally (persistence.ts:249-256) and assigns the raw
+ *   sequence value. Converges when an adapter prefetches.
  */
 export async function _insertRecord(
   this: PersistenceHost,
@@ -339,6 +355,12 @@ export async function _updateRecord(
  * Builds and executes a DELETE with the given constraints.
  *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_delete_record
+ *
+ * @missingRailsCall with_connection — CONVERGEABLE: persistence.rb:294-296 `with_connection {
+ *   |c| c.delete(dm, ...) }` — trails resolves the adapter through
+ *   `threadedConnectionFor(...) ?? this.connection` (persistence.ts:366) rather
+ *   than the block form; converging the whole package onto `withConnection` is
+ *   RFC 0073's permanent-connection-checkout flip, tracked there.
  */
 export async function _deleteRecord(
   this: PersistenceHost,
@@ -1150,6 +1172,11 @@ interface ReloadRecord {
  * just-saved row (Rails uses `find_by!`).
  *
  * Mirrors: ActiveRecord::Persistence#reload
+ *
+ * @missingRailsCall merge — PERMANENT: persistence.rb:746 `(options ||
+ *   {}).merge(all_queries: true)` — Ruby Hash#merge returning a new hash is JS
+ *   object spread (`{ ...findOptions, allQueries: true }`, persistence.ts:1422);
+ *   there is no Hash object to call `merge` on. Language shortcoming.
  */
 export async function reload<T extends ReloadRecord>(
   this: T,
@@ -1578,7 +1605,15 @@ export function _findRecord(
   return scope.findByBang(_inMemoryQueryConstraintsHash.call(this));
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall attribute — PERMANENT: persistence.rb:842 `index_with { |column_name|
+ *   attribute(column_name) }` — Rails reads the PRIVATE `attribute` reader;
+ *   trails' equivalent is the public `readAttribute` (persistence.ts:1846),
+ *   since the port has no private/public attribute-reader pair. Same value,
+ *   different spelling; tracked.
+ */
 export function _inMemoryQueryConstraintsHash(
   this: PersistencePrivateHost,
 ): Record<string, unknown> {

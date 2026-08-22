@@ -73,6 +73,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * The `_queryExecutor` arm is a diverged CollectionProxy running its own
    * mutated Relation, which the through routing would discard —
    * `HasManyAssociation#findTarget` is where that executor is honored.
+   *
+   * @missingRailsCall scope — CONVERGEABLE: Baseline (RFC 0084): `find_target` delegates to
+   *   the module-private loader in the same file, which builds and runs the
+   *   association scope; the body compared here is the delegating wrapper, so
+   *   `scope` is called one frame down. Surfaced when the loader stopped being
+   *   exported (RFC 0072).
    */
   protected override async findTarget(): Promise<Base[]> {
     if (this._queryExecutor) return super.findTarget();
@@ -147,6 +153,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#distribution
    * (has_many_through_association.rb:193-197).
+   *
+   * @missingRailsCall new — PERMANENT: Ruby's `Hash.new(0)` is an auto-zeroing hash keyed
+   *   by the record, hashing on AR::Core `hash`/`eql?`. A JS Map keys on
+   *   identity, so the buckets are an array matched with `record.equals` instead
+   *   — there is no constructor to call.
    */
   protected distribution(array: Base[]): Occurrences {
     return distribution(array);
@@ -249,6 +260,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * wires it onto that inverse so the join is created alongside the target.
    *
    * @internal
+   *
+   * @missingRailsCall map — PERMANENT: Rails' `map` is in ThroughAssociation#build_record
+   *   (through_association.rb:121-124), which
+   *   HasManyThroughAssociation#build_record reaches via `super`; trails ports
+   *   it as `throughBuildRecord` in through-association.ts and calls it from
+   *   `buildRecord`, the same module-delegation shape as the stale_state /
+   *   target_scope rows on this class.
    */
   override buildRecord(
     attributes?: Record<string, unknown>,
@@ -359,6 +377,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * the join rows pairing `owner` with `records`, then destroy/nullify/delete
    * per `method`, and prune the in-memory through target.
    * @internal
+   *
+   * @missingRailsCall count — PERMANENT: Ruby Array#count with a block:
+   *   `scope.destroy_all.count(&:destroyed?)`
+   *   (has_many_through_association.rb:150) ports to `destroyed.filter((r) =>
+   *   r.isDestroyed?.()).length`.
    */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     this.ensureNotNested();
@@ -371,6 +394,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     scope = scope.where(this.constructJoinAttributes(...records));
     const extra = this.throughScopeAttributes();
     if (Object.keys(extra).length > 0) scope = scope.where(extra);
+
+    const ctor = this.owner.constructor as {
+      _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
+    };
+    const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
+    const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
+      ?.sourceReflection;
 
     // Dispatch on `method` exactly as Rails' `delete_records` case statement:
     // `:destroy` destroys the join rows (or, on a PK-less join model, runs their
@@ -396,7 +426,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         count = await scope.deleteAll();
       }
     } else if (method === "nullify") {
-      count = await scope.updateAll({ [sourceForeignKey(this)]: null });
+      count = await scope.updateAll({
+        [sourceRefl?.foreignKey ?? `${underscore(singularize(this.reflection.name))}_id`]: null,
+      });
     } else {
       count = await scope.deleteAll();
     }
@@ -407,19 +439,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // inline (rather than in a helper) so the ported `delete_records` body makes
     // the same calls Rails' does — `decrement_counter`, `map`,
     // `update_through_counter?` — for the parity:api call-set ratchet.
-    const ctor = this.owner.constructor as {
-      _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
-    };
-    const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
-
     // Rails (159-162): when the SOURCE belongs_to (on the join model) declares
     // its own counter_cache, `klass.decrement_counter` on the target rows by id
     // for every method except `:destroy` (whose per-record callbacks handle it).
     // `klass` is the ASSOCIATION's klass (the target model), not the source
     // reflection's — a polymorphic source belongs_to has none, and taggings'
     // `taggable` is exactly such a source.
-    const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
-      ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
       const klass = this.klass as {
@@ -468,21 +493,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 }
 
-/**
- * Resolve the source reflection's foreign key — the join-table column that
- * points at the target — for `nullify` updates.
- *
- * @internal
- */
-function sourceForeignKey(assoc: HasManyThroughAssociation): string {
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
-  const sourceRefl = refl?.sourceReflection;
-  return sourceRefl?.foreignKey ?? `${underscore(singularize(assoc.reflection.name))}_id`;
-}
-
 /** Source belongs_to surface the `delete_records` counter tail reads. @internal */
 interface SourceCounterReflection {
+  foreignKey?: string;
   options?: { counterCache?: unknown };
   counterCacheColumn?: () => string | null;
   klass?: unknown;
