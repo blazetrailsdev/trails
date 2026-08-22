@@ -1102,20 +1102,17 @@ export class TimeZone {
   }
 
   /**
-   * Mirrors: TimeZone#iso8601 (time_zone.rb:396-433). Ruby's `parts.fetch(:k)`
-   * with no default raises `KeyError`, which the method's own
-   * `rescue Date::Error, KeyError` turns into this `ArgumentError`, so each
-   * missing key is spelled as that raise directly. The `Time.new(...)` build
-   * and the `parts[:offset]` UTC-vs-local wrap at the tail are exactly what
-   * `parts_to_time` (time_zone.rb:585-608) already does, with the same
-   * `fetch` defaults for `:hour`, `:min`, `:sec`, `:sec_fraction` and
-   * `:offset`, so the assembled parts return through it.
+   * Mirrors: TimeZone#iso8601 (time_zone.rb:396-433).
+   *
+   * The `str.nil?` guard is Rails' own workaround for the `date` gem versions
+   * where `Date._iso8601(nil)` raises `TypeError` rather than answering `{}`
+   * (https://github.com/ruby/date/issues/39). Ruby's `parts.fetch(:k)` with no
+   * default raises `KeyError`, which this method's `rescue Date::Error,
+   * KeyError` turns into `ArgumentError, "invalid date"` — so each missing key
+   * is spelled as that raise directly. `Time.new`'s seventh argument takes the
+   * fractional seconds Temporal wants split across its sub-second components.
    */
   iso8601(str: string | null | undefined): TimeWithZone {
-    // Historically `Date._iso8601(nil)` returns `{}`, but in the `date` gem
-    // versions `3.2.1`, `3.1.2`, `3.0.2`, and `2.0.1`, `Date._iso8601(nil)`
-    // raises `TypeError` https://github.com/ruby/date/issues/39
-    // Future `date` releases are expected to revert back to the original behavior.
     if (str == null) throw new ArgumentError("invalid date");
 
     const parts = RubyDate._iso8601(str);
@@ -1141,10 +1138,6 @@ export class TimeZone {
       mday = parts.mday;
     }
 
-    // `Time.new(year, month, day, parts.fetch(:hour, 0), parts.fetch(:min, 0),
-    // parts.fetch(:sec, 0) + parts.fetch(:sec_fraction, 0), parts.fetch(:offset, 0))`
-    // — Temporal takes the sub-second remainder as separate components, which is
-    // how `sec_fraction` keeps its nanosecond resolution here.
     const nanosecond = secFractionToNanosecond(parts.secFraction);
     let time: Temporal.PlainDateTime;
     try {
@@ -1173,8 +1166,7 @@ export class TimeZone {
    * Mirrors: TimeZone#rfc3339 (time_zone.rb:469-484). RFC 3339's zone group is
    * mandatory, so `Date._rfc3339` either fills every component this reads or
    * answers an empty hash — which is why Rails' non-defaulting `fetch`es carry
-   * no rescue here, and why the `parts[:offset]` arm of `parts_to_time` is
-   * always the UTC one.
+   * no rescue here, and why this always takes the `time.utc` arm.
    */
   rfc3339(str: string): TimeWithZone {
     const parts = RubyDate._rfc3339(str);

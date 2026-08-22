@@ -1,7 +1,5 @@
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { Composite } from "../collectors/composite.js";
-import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { SelectManager } from "../select-manager.js";
@@ -144,35 +142,13 @@ export class ToSql extends Visitor {
     this.connection = connection;
   }
 
-  compile(node: Node): string;
-  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector: Composite): [string, unknown[]];
+  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>): string;
+  compile<T>(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
   compile(
     node: Node | ReadonlyArray<Nodes.NodeOrValue>,
-    collector: SQLString | SubstituteBinds,
-  ): string;
-  compile(
-    node: Node | ReadonlyArray<Nodes.NodeOrValue>,
-    collector?: SQLString | SubstituteBinds | Composite,
-  ): string | [string, unknown[]] {
-    // Rails-faithful `compile(node, collector)`: drive the supplied collector
-    // (so callers control its bind state) and return the rendered SQL. An array
-    // node dispatches to `visit_Array` and renders as a comma-joined list — this
-    // is what bind_parameter_test's `bind_params` helper relies on to compile a
-    // list of `BindParam` nodes through a single shared collector. The collector
-    // type covers the string-rendering collectors (`SQLString` keeps `?`
-    // placeholders, `SubstituteBinds` inlines quoted values); the visitor's
-    // dispatch is typed against `SQLString`, so cast at the boundary as the rest
-    // of this file does.
-    if (collector !== undefined) {
-      this.accept(node, collector as unknown as SQLString);
-      return collector.value as string | [string, unknown[]];
-    }
-    // Mirrors Rails `compile` defaulting to a plain `SQLString` (to_sql.rb:17):
-    // Casted/Quoted inline their quoted literal in the visitor, BindParam emits
-    // `?` (BIND_BLOCK = proc { "?" }). No post-hoc inlining needed.
-    const sqlCollector = new SQLString();
-    this.accept(node, sqlCollector);
-    return sqlCollector.value;
+    collector: { value: unknown } = new SQLString(),
+  ): unknown {
+    return this.accept(node, collector as unknown as SQLString).value;
   }
 
   protected visitArelNodesDeleteStatement(

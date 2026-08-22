@@ -16,7 +16,7 @@ import { ValueType } from "@blazetrails/activemodel";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
   const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-  return visitor.compile(node as never, collector);
+  return visitor.compile(node as never, collector) as [string, unknown[]];
 }
 
 // Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map

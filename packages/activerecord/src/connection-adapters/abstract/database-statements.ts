@@ -236,6 +236,19 @@ export class DatabaseStatementsBase {
 // --- Query conversion ---
 
 /**
+ * Ruby `AbstractAdapter#collector` (abstract_adapter.rb:1176-1188), reached
+ * through the host so a bare visitor stand-in — a host that is not an adapter
+ * and carries no `collector` — still compiles through the prepared-statement
+ * `Composite`.
+ */
+function collectorFor(host: unknown): Collectors.Composite {
+  const collector = (host as { collector?(): unknown } | undefined)?.collector?.();
+  return collector instanceof Collectors.Composite
+    ? collector
+    : new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+}
+
+/**
  * Compile an Arel node to a SQL string with its bind values inlined via the
  * connection's own `quote`. Mirrors Rails' `to_sql` under
  * `unprepared_statement`, which compiles through a `SubstituteBinds` collector
@@ -347,13 +360,10 @@ export function toSqlAndBinds(
         const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
         return [inlinedSql, [], preparable, inlinedRetryable];
       }
-      // Rails builds the collector on the adapter (`collector()`,
-      // abstract_adapter.rb:1176-1188) and compiles through the ONE
-      // `visitor.compile(node, collector)` (database_statements.rb:31-45); the
-      // Composite's `value` is the `[sql, binds]` pair Rails destructures.
-      const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+      const collector = collectorFor(this);
       collector.retryable = true;
-      const [sql, extractedBinds] = visitor.compile(node, collector);
+      collector.preparable = true;
+      const [sql, extractedBinds] = visitor.compile(node, collector) as [string, unknown[]];
       const compiledAllowRetry = collector.retryable;
       const compiledPreparable = collector.preparable;
       // Rails hands the compiled binds on untouched — `ActiveModel::Attribute`
@@ -414,8 +424,7 @@ export function cacheableQuery(
 
   // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-    const [sql, binds] = visitor.compile(node, collector);
+    const [sql, binds] = visitor.compile(node, collectorFor(host)) as [string, unknown[]];
     return [klass.query(sql), binds];
   }
 
@@ -424,8 +433,7 @@ export function cacheableQuery(
   // prepared_statements is false.
   if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
     const collector = klass.partialQueryCollector() as { value: [unknown[], unknown[]] };
-    visitor.accept(node, collector);
-    const [parts, collectedBinds] = collector.value;
+    const [parts, collectedBinds] = visitor.compile(node, collector);
     return [klass.partialQuery(parts), collectedBinds];
   }
 

@@ -19,7 +19,7 @@ import { TableMetadata } from "../table-metadata.js";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
   const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-  return visitor.compile(node as never, collector);
+  return visitor.compile(node as never, collector) as [string, unknown[]];
 }
 
 // trails-specific regression guard (no Rails counterpart): Base.predicateBuilder
