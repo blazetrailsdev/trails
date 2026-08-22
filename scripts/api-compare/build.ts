@@ -110,6 +110,17 @@ export interface SuppressedCall {
   call: string;
 }
 
+/** One `@missingRailsCall` tag compare.ts reports STALE: it suppressed nothing
+ *  on the (tsFile, tsName) it is written on, so the call it names is no longer
+ *  flagged there. Confirmation enough to retire the tag even where the
+ *  declaration carries no expectation of its own. */
+export interface StaleTag {
+  package: string;
+  tsFile: string;
+  tsName: string;
+  call: string;
+}
+
 export interface Artifact {
   packages?: string[];
   mismatches: ArtifactMismatch[];
@@ -117,6 +128,10 @@ export interface Artifact {
    *  absent from `mismatches`, so reconciling against that list alone would
    *  drop the very tags that suppressed them. */
   suppressed?: SuppressedCall[];
+  /** Tags whose call compare.ts no longer flags on the declaration they sit on
+   *  (`staleCallTags`). A preserved tag named here is a confirmed convergence,
+   *  so this run retires it instead of preserving it. */
+  staleTags?: StaleTag[];
 }
 
 export interface ReconcileResult {
@@ -379,12 +394,20 @@ export function collectDeclarations(sf: ts.SourceFile): TaggableDecl[] {
 
 /** Reconcile every named function/method in one source file's text. Returns
  *  the new text (or null if unchanged) plus harvested non-placeholder drops. */
+/** Key for one stale-tag row within a file: the tag sits on a (tsName, call)
+ *  site, NOT on the class-qualified expectation key `buildExpectations` builds
+ *  — `staleCallTags` records no class. */
+export function staleTagKey(tsName: string, call: string): string {
+  return `${tsName}\u0000${call}`;
+}
+
 export function reconcileFileText(
   fileName: string,
   text: string,
   expectations: Map<string, MethodExpectation>,
   reasonFor: (rubyName: string, call: string) => string,
   onlyCall?: ReadonlySet<string>,
+  staleTags?: ReadonlySet<string>,
 ): {
   text: string | null;
   /** Tags DROPPED because the call they name is no longer flagged for a
@@ -459,14 +482,28 @@ export function reconcileFileText(
       // A tag that HAS genuinely gone stale is reported by compare.ts's
       // `staleCallTags` (the sanctioned channel), so preserving one here costs a
       // report line rather than a lost receipt.
-      const expected = exp?.calls ?? new Set<string>(entries.map((e) => e.call));
+      // ...unless compare.ts positively reports the tag STALE on this
+      // declaration: that is the same knowledge the gate's "STALE
+      // @missingRailsCall tag(s)" arm reds on, so the writer retires the tag
+      // rather than making a human do it by hand (RFC 0106).
+      const expected =
+        exp?.calls ??
+        new Set<string>(
+          entries.filter((e) => !staleTags?.has(staleTagKey(name, e.call))).map((e) => e.call),
+        );
       const r = reconcile(
         entries,
         expected,
         (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
         onlyCall,
       );
-      if (!exp) preserved.push(...entries.map((entry) => ({ tsName: name, entry })));
+      if (!exp) {
+        preserved.push(
+          ...entries
+            .filter((entry) => !staleTags?.has(staleTagKey(name, entry.call)))
+            .map((entry) => ({ tsName: name, entry })),
+        );
+      }
       skipped.push(...r.skipped);
       if (exp) {
         for (const e of [...r.kept, ...r.added]) {
@@ -615,6 +652,16 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const byFile = buildExpectations(artifact, pkg, onlyFile);
+  const staleByFile = new Map<string, Set<string>>();
+  for (const t of artifact.staleTags ?? []) {
+    if (t.package !== pkg) continue;
+    if (onlyFile && t.tsFile !== onlyFile) continue;
+    const set = staleByFile.get(t.tsFile) ?? staleByFile.set(t.tsFile, new Set()).get(t.tsFile)!;
+    set.add(staleTagKey(t.tsName, t.call));
+    // A file whose only business this run is a stale tag has no expectation to
+    // put it in `byFile`, and would otherwise never be opened.
+    if (!byFile.has(t.tsFile)) byFile.set(t.tsFile, new Map());
+  }
 
   let changed = 0;
   let skipped = 0;
@@ -639,6 +686,7 @@ async function main(argv: string[]): Promise<number> {
         (rubyName, call) =>
           reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
         onlyCall.size > 0 ? onlyCall : undefined,
+        staleByFile.get(tsFile),
       );
     } catch (err) {
       console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);

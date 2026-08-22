@@ -1,15 +1,17 @@
 import { any } from "@blazetrails/activesupport";
+import { Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
   ReflectionProxy,
   type AssociationScopeable,
   type ValueTransformation,
+  unionOrderClauses,
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { disableJoinsAssociationRelationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
-import type { WhereClause } from "../relation/where-clause.js";
+import { WhereClause } from "../relation/where-clause.js";
 import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
@@ -314,10 +316,31 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       (
         reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
       ).constraints?.() ?? [];
-    for (const c of constraints) {
-      if (typeof c !== "function") continue;
-      const evaluated = this.evalScope(reflection, c, owner);
-      scope = this._pushScopeIntoRelation(scope, evaluated);
+    for (const scopeChainItem of constraints) {
+      if (typeof scopeChainItem !== "function") continue;
+      const item = this.evalScope(reflection, scopeChainItem, owner); // Rails: `scope.unscope!(*item.unscope_values)`,
+      // `scope.where_clause += item.where_clause`,
+      // `scope.order_values = item.order_values | scope.order_values`
+      // (disable_joins_association_scope.rb:41-47). The join-less variant
+      // merges only those three — no head-scope `merge!`, no referenced-joins
+      // arm, since this path never builds a JOIN.
+      const itemUnscope = (item as { unscopeValues?: unknown[] }).unscopeValues ?? [];
+      if (itemUnscope.length > 0) {
+        (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...itemUnscope);
+      }
+      const merged = scope as { whereClause: WhereClause; orderValues?: unknown[] };
+      const itemPredicates =
+        (item as { whereClause?: { predicates?: unknown[] } }).whereClause?.predicates ?? [];
+      if (itemPredicates.length > 0) {
+        merged.whereClause = merged.whereClause.plus(
+          new WhereClause(itemPredicates as Nodes.Node[]),
+        );
+      }
+      const itemOrders = (item as { orderValues?: unknown[] }).orderValues ?? [];
+      if (itemOrders.length > 0) {
+        merged.orderValues = unionOrderClauses(itemOrders, merged.orderValues ?? []);
+      }
+      scope = merged;
     }
 
     const finalOrd = scope as { orderValues?: unknown[] };
