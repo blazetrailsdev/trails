@@ -2062,18 +2062,6 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  * hands `build_arel` the same connection and raises the same
  * `ConnectionNotEstablished` when no pool is established.
  * @internal
- *
- * @missingRailsCall build_arel — CONVERGEABLE: Surfaced by the relation.ts →
- *   relation/query-methods.ts split (RFC 0107): `arel` and `toArel` are now
- *   cross-file, so the call-set comparer can no longer see through the
- *   delegation to the `build_arel` call inside `toArel`. Folding the memo,
- *   connection acquisition and build_arel call back into `arel` itself is
- *   tracked by story fold-to-arel-into-the-arel-reader (RFC 0107).
- * @missingRailsCall with_connection — CONVERGEABLE: Relation#arel's memo, connection
- *   acquisition and build_arel call all live in `toArel`, which this body
- *   delegates to verbatim; folding them back into `arel` is tracked by story
- *   fold-to-arel-into-the-arel-reader (RFC 0107). Row moved verbatim from
- *   relation.ts with the member (RFC 0107 fan-out).
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
   return ((this as any)._arel ??= this.buildArel((this as any)._conn(), aliases));
@@ -2326,12 +2314,6 @@ export function buildBoundSqlLiteral(
 /**
  * @internal
  *
- * @missingRailsCall arel — CONVERGEABLE: Confirmed equivalent (RFC 0047): the TS body builds
- *   the Arel manager via _buildArel/toArel (the build_arel port that arel()
- *   delegates to) rather than the memoized arel reader; surfaced when arel()
- *   gained its Rails-faithful aliases param (query_methods.rb:1594). See PR
- *   #4518. Tracked by story query-methods-order-only-call-inversions (RFC
- *   0106).
  * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
  *   `optimizer_hints_values.empty?` (query_methods.rb:1609) — `empty?` on a Ruby
  *   Array, whose faithful JS spelling is `xs.length === 0`. That emits no
@@ -3033,9 +3015,8 @@ export function buildFrom(this: QueryMethodsHost): unknown {
       }
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
-    // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
-    // comprehensive builder rather than the projection-only `arel`, so the
-    // subquery stays a live AST: its binds parameterize and its retryability is
+    // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. The subquery
+    // stays a live AST: its binds parameterize and its retryability is
     // determined by the actual child nodes (not unconditionally disabled).
     // `build_arel` projects the qualified table star (`"comments".*`) and does
     // NOT run `JoinDependency#apply_column_aliases` — that column-alias
