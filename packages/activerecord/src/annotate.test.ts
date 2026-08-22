@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 describe("AnnotateTest", () => {
   // `fixtures` wires the handler suite internally, so no separate call.
@@ -14,37 +15,67 @@ describe("AnnotateTest", () => {
   // annotated `select(:id)` relation has data to read back with `.first()`
   // (Rails' `assert posts.first`). The canonical `posts` table comes from the
   // template clone.
-  const { posts } = fixtures(["posts"]);
+  fixtures(["posts"]);
 
   it("annotate wraps content in an inline comment", async () => {
-    const relation = Post.select("id").annotate("foo");
-    expect(relation.toSql()).toMatch(/SELECT .* FROM .* \/\* foo \*\//);
-    expect((await relation.first())?.id).toBe(posts("welcome").id);
+    await assertQueriesMatch(/SELECT .* FROM .* \/\* foo \*\//i, undefined, false, async () => {
+      const relation = Post.select("id").annotate("foo");
+      expect(await relation.first()).toBeTruthy();
+    });
   });
 
   it("annotate is sanitized", async () => {
     // Each annotation is routed through `sanitize_as_sql_comment`, so embedded
     // `*/` / `/*` are spaced apart and can never break out of the wrapping
-    // comment. Asserting the exact sanitized output + running `.first()`
-    // mirrors Rails' `assert_queries_match` regex + `assert posts.first`.
-    const foo = Post.select("id").annotate("*/foo/*");
-    expect(foo.toSql()).toContain("/* * /foo/ * */");
-    expect((await foo.first())?.id).toBe(posts("welcome").id);
+    // comment.
+    await assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \* \/foo\/ \* \*\//i,
+      undefined,
+      false,
+      async () => {
+        const relation = Post.select("id").annotate("*/foo/*");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
 
-    const slashes = Post.select("id").annotate("**//foo//**");
-    expect(slashes.toSql()).toContain("/* ** //foo// ** */");
-    expect((await slashes.first())?.id).toBe(posts("welcome").id);
+    await assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \*\* \/\/foo\/\/ \*\* \*\//i,
+      undefined,
+      false,
+      async () => {
+        const relation = Post.select("id").annotate("**//foo//**");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
 
-    const spaced = Post.select("id").annotate("* *//foo//* *");
-    expect(spaced.toSql()).toContain("/* * * //foo// * * */");
-    expect((await spaced.first())?.id).toBe(posts("welcome").id);
+    await assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \* \* \/\/foo\/\/ \* \* \*\//i,
+      undefined,
+      false,
+      async () => {
+        const relation = Post.select("id").annotate("* *//foo//* *");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
 
-    const chained = Post.select("id").annotate("*/foo/*").annotate("*/bar");
-    expect(chained.toSql()).toContain("/* * /foo/ * */ /* * /bar */");
-    expect((await chained.first())?.id).toBe(posts("welcome").id);
+    await assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \* \/foo\/ \* \*\/ \/\* \* \/bar \*\//i,
+      undefined,
+      false,
+      async () => {
+        const relation = Post.select("id").annotate("*/foo/*").annotate("*/bar");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
 
-    const hint = Post.select("id").annotate("+ MAX_EXECUTION_TIME(1)");
-    expect(hint.toSql()).toContain("/* + MAX_EXECUTION_TIME(1) */");
-    expect((await hint.first())?.id).toBe(posts("welcome").id);
+    await assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \+ MAX_EXECUTION_TIME\(1\) \*\//i,
+      undefined,
+      false,
+      async () => {
+        const relation = Post.select("id").annotate("+ MAX_EXECUTION_TIME(1)");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
   });
 });

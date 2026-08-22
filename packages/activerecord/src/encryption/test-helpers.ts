@@ -5,6 +5,7 @@
  *          ActiveRecord::Encryption::EncryptionHelpers (assertions).
  */
 
+import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
@@ -16,6 +17,8 @@ import { Configurable } from "./configurable.js";
 import { type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { Encryptor as EncryptorImpl } from "./encryptor.js";
+import type { KeyProviderLike } from "./encryptor.js";
 import { type Scheme } from "./scheme.js";
 import { Decryption, Encryption } from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -684,6 +687,18 @@ export function ciphertextFor(model: any, attrName: string): unknown {
     return type.serialize(value);
   }
   return model.readAttributeBeforeTypeCast(attrName);
+}
+
+/**
+ * Mirrors `assert_encryptor_works_with`
+ * (activerecord/test/cases/encryption/helper.rb:50-55) — a round-trip through a
+ * fresh Encryptor with the given key provider.
+ */
+export function assertEncryptorWorksWith(keyProvider: KeyProviderLike): void {
+  const encryptor = new EncryptorImpl();
+
+  const encryptedMessage = encryptor.encrypt("some text", { keyProvider });
+  expect(encryptor.decrypt(encryptedMessage, { keyProvider })).toEqual("some text");
 }
 
 /**

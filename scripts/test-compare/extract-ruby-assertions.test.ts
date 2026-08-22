@@ -612,3 +612,61 @@ describe("Ruby extractor assertion-value collection", () => {
     expect(v["recv"]).toEqual(["n:5", "s:hi", "s:sym", null]);
   });
 });
+
+describe("Ruby extractor mocha expectation collection", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-tests.rb");
+
+  function rubyAssertionKinds(
+    fixtures: Record<string, string>,
+  ): Record<string, string[] | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "assert-rb-mocha-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = TestExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.test_files.each { |f| f[:testCases].each { |tc| out[tc[:description]] = tc[:assertionKinds] } }
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("counts mocha expects as an assertion and tags the never modifier", () => {
+    const k = rubyAssertionKinds({
+      "cases/mocha_test.rb": `
+        class MochaTest < ActiveSupport::TestCase
+          def test_expects
+            I18n.backend.expects(:translate).with('de', :foo, {})
+            I18n.translate :foo, :locale => 'de'
+          end
+
+          def test_never
+            I18n.exception_handler.expects(:call).never
+            assert_raises(ArgumentError) { I18n.transliterate("x") }
+          end
+
+          def test_stubs_are_not_expectations
+            Transliterator.stubs(:get).raises(ArgumentError)
+          end
+        end
+      `,
+    });
+    expect(k["expects"]).toEqual(["expects"]);
+    expect(k["never"]).toEqual(["expects_never", "assert_raises"]);
+    expect(k["stubs are not expectations"]).toEqual([]);
+  });
+});

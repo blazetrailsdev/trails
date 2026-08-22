@@ -16,7 +16,7 @@ describe("ConnectionTest", () => {
 
     const type = typeCaster.typeForAttribute("name");
 
-    expect(type).not.toBeInstanceOf(DeveloperName);
-    expect(type.constructor).toBe(StringType);
+    expect(type.constructor).not.toEqual(DeveloperName);
+    expect(type.constructor).toEqual(StringType);
   });
 });

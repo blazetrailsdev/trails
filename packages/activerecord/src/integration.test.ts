@@ -47,7 +47,9 @@ describe("IntegrationTest", () => {
   const { owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
-    expect(typeof (await Client.first())!.toParam()).toBe("string");
+    // `assert_kind_of String`: a JS string primitive is not an `instanceof
+    // String`, so box it — `Object("x")` is a String wrapper, `Object(1)` is not.
+    expect(Object((await Client.first())!.toParam())).toBeInstanceOf(String);
   });
 
   it("to param returns nil if not persisted", () => {
@@ -194,7 +196,7 @@ describe("IntegrationTest", () => {
 
     // Rails `travel(1.second) { assert pet.touch }` — Pet `belongs_to :owner,
     // touch: true`, so touching the pet bumps the owner's updated_at.
-    expect(await pet.touch({ time: now.add({ seconds: 1 }) })).toBe(true);
+    expect(await pet.touch({ time: now.add({ seconds: 1 }) })).toBeTruthy();
     await owner.reload();
     expect(owner.cacheKey()).not.toBe(key);
   });

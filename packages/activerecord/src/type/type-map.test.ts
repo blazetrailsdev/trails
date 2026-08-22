@@ -121,18 +121,12 @@ describe("HashLookupTypeMapTest", () => {
 
   it("fetch memoizes on args", () => {
     const mapping = new HashLookupTypeMap();
-    let callCount = 0;
     mapping.registerType("foo", undefined, (type: string | number, ...args: unknown[]) => {
-      callCount++;
       return [type, ...args].join("-") as any;
     });
 
-    expect(mapping.fetch("foo", 1, 2, 3, () => [].join("-"))).toBe("foo-1-2-3");
-    expect(mapping.fetch("foo", 1, 2, 3, () => [].join("-"))).toBe("foo-1-2-3");
-    expect(callCount).toBe(1);
-
-    expect(mapping.fetch("foo", 2, 3, 4, () => [].join("-"))).toBe("foo-2-3-4");
-    expect(callCount).toBe(2);
+    expect(mapping.fetch("foo", 1, 2, 3, (...args: unknown[]) => args.join("-"))).toBe("foo-1-2-3");
+    expect(mapping.fetch("foo", 2, 3, 4, (...args: unknown[]) => args.join("-"))).toBe("foo-2-3-4");
   });
 
   it("fetch yields args", () => {

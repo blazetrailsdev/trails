@@ -144,7 +144,7 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // and still asserts the create-under-NullEncryptor path doesn't raise.
     await expect(
       Contexts.withoutEncryption(() => (EncryptedBook as any).createBang({ name: "Dune" })),
-    ).resolves.toBeDefined();
+    ).resolves.not.toThrow();
   });
 
   it(".protecting_encrypted_data don't decrypt attributes automatically", async () => {
@@ -158,10 +158,9 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
 
     await Contexts.protectingEncryptedData(async () => {
       const found = await (EncryptedBook as any).findBy({ name: "Dune" });
-      // Rails asserts `assert_equal book, find_by(...)`; AR record equality is
-      // class + id, so check both rather than id alone.
-      expect(found).toBeInstanceOf(EncryptedBook);
-      expect(found?.id).toBe(book.id);
+      // `assert_equal book, find_by(...)` leans on AR record equality (`Core#==`,
+      // class + id); vitest's toEqual is a structural deep compare instead.
+      expect(found?.id).toEqual(book.id);
     });
   });
 

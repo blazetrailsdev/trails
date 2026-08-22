@@ -21,18 +21,18 @@
       "value": 0
     },
     "activemodel": {
-      "assertionCount": 312,
+      "assertionCount": 307,
       "kind": 448,
       "value": 59
     },
     "activerecord": {
-      "assertionCount": 1958,
-      "kind": 3971,
-      "value": 39
+      "assertionCount": 1944,
+      "kind": 3927,
+      "value": 38
     },
     "activesupport": {
-      "assertionCount": 888,
-      "kind": 1229,
+      "assertionCount": 882,
+      "kind": 1227,
       "value": 104
     },
     "arel": {
@@ -56,7 +56,7 @@
       "value": 1
     },
     "i18n": {
-      "assertionCount": 6,
+      "assertionCount": 0,
       "kind": 0,
       "value": 0
     },

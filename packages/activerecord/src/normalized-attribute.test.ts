@@ -123,7 +123,8 @@ describe("NormalizedAttributeTest", () => {
   it("finds record by normalized value", async () => {
     expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
     const found = await NormalizedAircraft.findBy({ manufactured_at: time.toString() });
-    expect(found).not.toBeNull();
+    // Rails' `assert_equal @aircraft, find_by(...)` leans on AR record equality
+    // (`Core#==`, class + id), not a structural compare.
     expect(found!.id).toBe(aircraft.id);
   });
 

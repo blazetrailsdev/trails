@@ -339,6 +339,9 @@ describe("I18nTest", () => {
     setExceptionHandler(exceptionHandler);
 
     expect(() => transliterate("ąćó")).toThrow(ArgumentError);
+    // Rails writes this first as `I18n.exception_handler.expects(:call)`; mocha
+    // verifies the expectation at teardown, so the port asserts it at the end.
+    expect(exceptionHandler).toHaveBeenCalled();
   });
 
   it("I18n.transliterate raises I18n::ArgumentError exception", () => {
@@ -347,6 +350,8 @@ describe("I18nTest", () => {
     setExceptionHandler(exceptionHandler);
 
     expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
+    // `I18n.exception_handler.expects(:call).never`, verified at teardown by mocha.
+    expect(exceptionHandler).not.toHaveBeenCalled();
   });
 
   it("transliterate given an unavailable locale rases an I18n::InvalidLocale", () => {

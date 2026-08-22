@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { Encryptor } from "./encryptor.js";
+import { assertEncryptorWorksWith } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
+import { Message } from "./message.js";
+import { Key } from "./key.js";
+import { KeyProvider } from "./key-provider.js";
+import type { KeyGenerator } from "./key-generator.js";
 
 describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
   let originalSalt: string | undefined;
@@ -16,28 +20,36 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
     Configurable.config.storeKeyReferences = false;
   });
 
+  // Rails' setup block (derived_secret_key_provider_test.rb:6-10) builds the
+  // shared provider from `build_keys(3)` (encryption/helper.rb:57-63).
+  let keyProvider: KeyProvider;
+  beforeEach(() => {
+    const keys = Array.from(
+      { length: 3 },
+      (_v, index) =>
+        new Key((Configurable.keyGenerator as KeyGenerator).deriveKeyFrom(`some secret ${index}`)),
+    );
+    keyProvider = new KeyProvider(keys);
+  });
+
   it("will derive a key with the right length from the given password", () => {
-    const provider = new DerivedSecretKeyProvider("my-password");
-    const key = provider.encryptionKey();
-    expect(key.secret).toBeTruthy();
-    expect(key.secret.length).toBeGreaterThan(0);
+    const keyProvider = new DerivedSecretKeyProvider("some password");
+    const key = keyProvider.encryptionKey();
+
+    expect([key]).toEqual(keyProvider.decryptionKeys(new Message({ payload: "some secret" })));
+    // Rails' `key.secret.bytesize` counts the raw derived bytes; trails'
+    // KeyGenerator#deriveKeyFrom hands the secret back base64-encoded
+    // (key-generator.ts:35-39), so decode before measuring.
+    expect(Configurable.cipher.keyLength()).toEqual(Buffer.from(key.secret, "base64").byteLength);
   });
 
   it("work with multiple keys when config.store_key_references is false", () => {
     Configurable.config.storeKeyReferences = false;
-    const provider = new DerivedSecretKeyProvider(["password1", "password2"]);
-    const enc = new Encryptor({ compress: false });
-    const encrypted = enc.encrypt("hello", { keyProvider: provider });
-    const decrypted = enc.decrypt(encrypted, { keyProvider: provider });
-    expect(decrypted).toBe("hello");
+    assertEncryptorWorksWith(keyProvider);
   });
 
   it("work with multiple keys when config.store_key_references is true", () => {
     Configurable.config.storeKeyReferences = true;
-    const provider = new DerivedSecretKeyProvider(["password1", "password2"]);
-    const enc = new Encryptor({ compress: false });
-    const encrypted = enc.encrypt("hello", { keyProvider: provider });
-    const decrypted = enc.decrypt(encrypted, { keyProvider: provider });
-    expect(decrypted).toBe("hello");
+    assertEncryptorWorksWith(keyProvider);
   });
 });

@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/date";
+import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
@@ -232,7 +233,7 @@ describe("CollectionCacheKeyTest", () => {
   it("cache_key with custom timestamp column", async () => {
     const topicsRel = Topic.where("title like ?", "%Topic%");
     const lastTopicTimestamp = expectedUsec(topics("fifth").written_on);
-    expect(await topicsRel.cacheKey("written_on")).toContain(lastTopicTimestamp);
+    expect(await topicsRel.cacheKey("written_on")).toMatch(lastTopicTimestamp);
   });
 
   it("cache_key with unknown timestamp column", async () => {
@@ -270,7 +271,7 @@ describe("CollectionCacheKeyTest", () => {
     const developers = Developer.distinct().order("salary").limit(5);
 
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
-    expect(developers.isLoaded).toBe(false);
+    assertNotPredicate(developers, (d) => d.isLoaded);
   });
 
   it("cache_key with a relation having custom select and order", async () => {

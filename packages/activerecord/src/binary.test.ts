@@ -49,40 +49,40 @@ describe("BinaryTest", () => {
     // Ported from binary_test.rb:41-70. Rails interleaves two concerns: the
     // Integer-to-String casting of `name`, which ports directly, and assertions
     // that `data` / `data_before_type_cast` carry `Encoding::BINARY` /
-    // `Encoding::UTF_8`. JS has no String encoding attribute, so the encoding
-    // *labels* have no analogue. What `assert_equal Encoding::BINARY,
-    // binary.data.encoding` is asserting in Ruby terms — that the string input
-    // was cast to binary — does port: `data` must be the bytes of "text" at each
-    // phase, which is what `expectTextBytes` pins. The `_before_type_cast`
-    // encoding half stays out: Rails itself notes it is adapter-dependent after
-    // reload (PG returns the bytea_output form).
+    // `Encoding::UTF_8`. JS has no String encoding attribute, so each encoding
+    // assertion ports as the value that the encoding *implies*: a binary-encoded
+    // `data` is the bytes of "text", and a UTF-8 `data_before_type_cast` is
+    // still the JS string it was assigned.
     // `name` is a restricted attribute in trails, hence readAttribute.
     const textBytes = new TextEncoder().encode("text");
-    const expectTextBytes = () => {
-      expect(binary.data).toBeInstanceOf(Uint8Array);
-      expect(new Uint8Array(binary.data)).toEqual(textBytes);
-    };
 
     const binary = Binary.new({ name: 123 as unknown as string, data: "text" });
 
     // Before saving, attribute methods return casted values, but their
     // _before_type_cast still returns the original value. (Integer-to-String
     // conversion used for comparison.)
-    expect(binary.readAttribute("name")).toBe("123");
-    expect(binary.readAttributeBeforeTypeCast("name")).toBe(123);
-    expectTextBytes();
+    expect(binary.readAttribute("name")).toEqual("123");
+    expect(binary.readAttributeBeforeTypeCast("name")).toEqual(123);
+    expect(new Uint8Array(binary.data)).toEqual(textBytes);
+    expect(binary.readAttributeBeforeTypeCast("data")).toEqual("text");
 
     await binary.saveBang();
 
     // After saving, casted values appear throughout.
-    expect(binary.readAttribute("name")).toBe("123");
-    expect(binary.readAttributeBeforeTypeCast("name")).toBe("123");
-    expectTextBytes();
+    expect(binary.readAttribute("name")).toEqual("123");
+    expect(binary.readAttributeBeforeTypeCast("name")).toEqual("123");
+    expect(new Uint8Array(binary.data)).toEqual(textBytes);
+    expect(
+      new Uint8Array((binary.readAttributeBeforeTypeCast("data") as { bytes: Uint8Array }).bytes),
+    ).toEqual(textBytes);
 
     await binary.reload();
 
-    expect(binary.readAttribute("name")).toBe("123");
-    expect(binary.readAttributeBeforeTypeCast("name")).toBe("123");
-    expectTextBytes();
+    expect(binary.readAttribute("name")).toEqual("123");
+    expect(binary.readAttributeBeforeTypeCast("name")).toEqual("123");
+    // After reloading, data_before_type_cast is adapter-dependent. For
+    // example, PostgreSQL returns the bytea_output encoded representation,
+    // which happens to be UTF-8 — so only `data` itself is asserted here.
+    expect(new Uint8Array(binary.data)).toEqual(textBytes);
   });
 });

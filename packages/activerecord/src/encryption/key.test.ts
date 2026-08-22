@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Key } from "./key.js";
+import { Configurable } from "./configurable.js";
+import type { KeyGenerator } from "./key-generator.js";
 
 describe("ActiveRecord::Encryption::KeyTest", () => {
   it("A key can store a secret and public tags", () => {
@@ -10,11 +12,8 @@ describe("ActiveRecord::Encryption::KeyTest", () => {
   });
 
   it(".derive_from instantiates a key with its secret derived from the passed password", () => {
-    const key = Key.deriveFrom("my-password");
-    expect(key).toBeInstanceOf(Key);
-    expect(key.secret).toBeTruthy();
-    expect(key.secret.length).toBeGreaterThan(0);
-    const key2 = Key.deriveFrom("my-password");
-    expect(key2.secret).toBe(key.secret);
+    expect((Configurable.keyGenerator as KeyGenerator).deriveKeyFrom("some password")).toEqual(
+      Key.deriveFrom("some password").secret,
+    );
   });
 });

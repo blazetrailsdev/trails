@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapter_prevent_writes_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "./errors.js";
@@ -19,13 +20,13 @@ describe("AdapterPreventWritesTest", () => {
   });
 
   it("preventing writes predicate", async () => {
-    expect(connection.isPreventingWrites()).toBe(false);
+    assertNotPredicate(connection, (c) => c.isPreventingWrites());
 
     await Base.whilePreventingWrites(async () => {
-      expect(connection.isPreventingWrites()).toBe(true);
+      assertPredicate(connection, (c) => c.isPreventingWrites());
     });
 
-    expect(connection.isPreventingWrites()).toBe(false);
+    assertNotPredicate(connection, (c) => c.isPreventingWrites());
   });
 
   it("errors when an insert query is called while preventing writes", async () => {
@@ -69,7 +70,7 @@ describe("AdapterPreventWritesTest", () => {
 
   it("doesnt error when a select query has encoding errors", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.toBeDefined();
+      await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.not.toThrow();
     });
   });
 

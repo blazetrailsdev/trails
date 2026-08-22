@@ -148,7 +148,7 @@ describe("StatementCacheTest", () => {
     // changing the table name should change the query that is not cached.
     Liquid.tableName = "birds";
     try {
-      await expect(Liquid.find(liquid.id)).rejects.toBeInstanceOf(RecordNotFound);
+      await expect(Liquid.find(liquid.id)).rejects.toThrow(RecordNotFound);
     } finally {
       Liquid.tableName = "liquid";
     }

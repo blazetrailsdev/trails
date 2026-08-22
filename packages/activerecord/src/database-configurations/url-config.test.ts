@@ -44,7 +44,7 @@ describe("DatabaseConfigurations", () => {
 
     it("replica parsing", () => {
       let config = new UrlConfig("default_env", "primary", "postgres://localhost/foo", {});
-      expect(config.replica).toBe(false);
+      expect(config.replica).toBeUndefined();
 
       config = new UrlConfig("default_env", "primary", "postgres://localhost/foo?replica=true", {});
       expect(config.replica).toBe(true);
