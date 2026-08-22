@@ -1,6 +1,5 @@
 export { Node } from "./node.js";
-export { And } from "./and.js";
-export { Or } from "./or.js";
+export { And, Or } from "./nary.js";
 export { Grouping } from "./grouping.js";
 export { SqlLiteral } from "./sql-literal.js";
 export { Fragments } from "./fragments.js";
@@ -19,7 +18,6 @@ export {
   Unary,
   Offset,
   Limit,
-  Top,
   Lock,
   DistinctOn,
   Bin,
@@ -71,7 +69,7 @@ export { FullOuterJoin } from "./full-outer-join.js";
 export { StringJoin } from "./string-join.js";
 
 export { SelectCore } from "./select-core.js";
-export { SelectStatement, SelectOptions } from "./select-statement.js";
+export { SelectStatement } from "./select-statement.js";
 export { InsertStatement } from "./insert-statement.js";
 export { UpdateStatement } from "./update-statement.js";
 export { DeleteStatement } from "./delete-statement.js";

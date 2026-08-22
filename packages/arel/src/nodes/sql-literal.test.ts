@@ -80,10 +80,9 @@ describe("SqlLiteralTest", () => {
 
   describe("serialization", () => {
     it("serializes into YAML", () => {
-      const lit = new Nodes.SqlLiteral("NOW()");
-      const yaml = lit.toYAML();
-      expect(yaml).toContain("sql_literal");
-      expect(yaml).toContain("NOW()");
+      const coder = { scalar: "" };
+      new Nodes.SqlLiteral("foo").encodeWith(coder);
+      expect(coder.scalar).toBe("foo");
     });
   });
 

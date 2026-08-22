@@ -13,22 +13,22 @@ import { buildQuoted } from "./casted.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
   readonly value: string;
-  retryableFlag = false;
-
-  get retryable(): boolean {
-    return this.retryableFlag;
-  }
+  // Mirrors `attr_reader :retryable` (sql_literal.rb:11).
+  readonly retryable: boolean;
 
   constructor(value: string, options?: { retryable?: boolean }) {
     super();
     this.value = value;
-    if (options?.retryable) {
-      this.retryableFlag = true;
-    }
+    this.retryable = options?.retryable ?? false;
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {
     return undefined;
+  }
+
+  /** Mirrors: `encode_with(coder)` (sql_literal.rb:18-20). */
+  encodeWith(coder: { scalar: string }): void {
+    coder.scalar = this.toString();
   }
 
   // Rails' SqlLiteral IS a String subclass, so `to_s` returns the SQL text
@@ -67,11 +67,6 @@ export class SqlLiteral extends Node {
   /** @internal */
   plus(other: Node): Fragments {
     return this.join(other);
-  }
-
-  toYAML(): string {
-    const escaped = this.value.replace(/\n/g, "\\n");
-    return `---\n!sql_literal\nvalue: ${JSON.stringify(escaped)}`;
   }
 }
 

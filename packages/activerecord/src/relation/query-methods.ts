@@ -1065,14 +1065,13 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
 /**
  * @internal
  *
- * @missingRailsCall order:constructor,sql — CONVERGEABLE: Verified per-site (RFC 0106): ORDER
- *   only. Rails reaches `Arel.sql(opts)` in the String arm
- *   (query_methods.rb:1623) before the `WhereClause.new` at the bottom, and
- *   handles a bare Arel node in the same trailing `else`; the port early-returns
- *   the node arm as `new WhereClause([opts])` (query-methods.ts:1143) above the
- *   String arm, so the constructor is first in TS evaluation order. Same calls,
- *   same results. Tracked by story query-methods-order-only-call-inversions
- *   (RFC 0106).
+ * @missingRailsCall order:constructor,buildFromHash — CONVERGEABLE: the sanitize_sql arm
+ *   wraps the fragment in `new Nodes.SqlLiteral` where Rails stores the bare
+ *   String (query_methods.rb:1627), so a constructor Rails does not make lands
+ *   ahead of `build_from_hash`. trails' WhereClause types its predicates
+ *   `Nodes.Node[]` and lacks Rails' String predicate arms
+ *   (where_clause.rb:160,167,190,203), which the bare String needs. Tracked by
+ *   story where-clause-string-predicate-arms (RFC 0106).
  */
 export function buildWhereClause(
   this: QueryMethodsHost,
@@ -1091,15 +1090,13 @@ export function buildWhereClause(
     return buildWhereClause.call(this, head, tail);
   }
 
-  if (opts instanceof Nodes.Node) return new WhereClause([opts]);
-
+  let parts: Nodes.Node[];
   if (typeof opts === "string") {
     // Mirrors build_where_clause (query_methods.rb:1620-1628): a bare fragment is
     // wrapped verbatim as Arel.sql(opts); a fragment whose first rest arg is a
     // Hash and that carries a `:word` token builds a named BoundSqlLiteral; a `?`
     // fragment builds a positional BoundSqlLiteral; any remaining rest-bearing
     // fragment (no `?`, no named hash) falls back to sanitize_sql.
-    let parts: Nodes.Node[];
     if (rest.length === 0) {
       parts = [Arel.sql(opts)];
     } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
@@ -1111,10 +1108,7 @@ export function buildWhereClause(
         new Nodes.SqlLiteral(this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!),
       ];
     }
-    return new WhereClause(parts);
-  }
-
-  if (isPlainObject(opts)) {
+  } else if (isPlainObject(opts)) {
     // Mirrors build_where_clause (query_methods.rb:1640): a hash condition
     // auto-adds references for its nested-hash / dotted-key tables, so an
     // includes(...) with a WHERE on the joined table promotes to eager JOIN.
@@ -1139,14 +1133,17 @@ export function buildWhereClause(
     // query_methods.rb:1640-1641 — references are taken from the TRANSFORMED
     // hash, after key stringification.
     referencesBang.call(this, ...referencesFromConditions(opts));
-    const parts = this.predicateBuilder.buildFromHash(
+    parts = this.predicateBuilder.buildFromHash(
       opts as Record<string, unknown>,
       (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),
     );
-    return new WhereClause(parts);
+  } else if (opts instanceof Nodes.Node) {
+    parts = [opts];
+  } else {
+    throw argumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
   }
 
-  throw argumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
+  return new WhereClause(parts);
 }
 
 /**
@@ -3646,31 +3643,22 @@ export function buildWith(this: QueryMethodsHost, arel: any): void {
  * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106): `.join_sources.first`
  *   (query_methods.rb:1959) — Ruby `Array#first` on the join-sources Array,
  *   spelled `.joinSources()[0]` in TS.
- * @missingRailsCall order:table,constructor — CONVERGEABLE: Verified per-site (RFC 0106):
- *   ORDER only. Rails constructs `Arel::Table.new(name)` before touching `table`
- *   (query_methods.rb:1955-1957); the port hoists `this.table` into a local
- *   first so it can raise its no-arel-table guard before allocating
- *   (query-methods.ts:3658-3660). Same calls, same results. Tracked by story
- *   query-methods-order-only-call-inversions (RFC 0106).
  */
 export function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
 ): unknown {
-  const mc = this.model;
-  const table: any = this.table;
-  if (!table) throw new ActiveRecordError("Cannot build CTE join node: model has no arelTable");
   const withTable = new ArelTable(name);
+  const table: any = this.table;
+  const mc = this.model;
   // Rails: with_table[model.model_name.to_s.foreign_key].eq(table[model.primary_key])
-  const modelName = String(mc?.modelName ?? mc?.name ?? "Model");
-  const fk = foreignKey(modelName);
-  if (Array.isArray(mc?.primaryKey)) {
-    throw new ActiveRecordError("Cannot build CTE join node with composite primary keys");
-  }
-  const pk = mc?.primaryKey ?? "id";
   return table
     .join(withTable, kind)
-    .on(withTable.get(fk).eq(table.get(pk)))
+    .on(
+      withTable
+        .get(foreignKey(String(mc?.modelName ?? mc?.name ?? "Model")))
+        .eq(table.get(mc?.primaryKey ?? "id")),
+    )
     .joinSources()[0];
 }

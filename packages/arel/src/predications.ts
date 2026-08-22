@@ -15,8 +15,7 @@ import { Matches, DoesNotMatch } from "./nodes/matches.js";
 import { In } from "./nodes/in.js";
 import { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { And } from "./nodes/and.js";
-import { Or } from "./nodes/or.js";
+import { And, Or } from "./nodes/nary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
@@ -522,7 +521,7 @@ export const Predications = {
     // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
     // while still guarding against the `Array#reduce` TypeError on empty.
     if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
-    return new Grouping(nodes.reduce((memo, node) => new Or(memo, node)));
+    return new Grouping(nodes.reduce((memo, node) => new Or([memo, node])));
   },
 
   // Mirrors Arel::Predications#grouping_all — fold with AND.

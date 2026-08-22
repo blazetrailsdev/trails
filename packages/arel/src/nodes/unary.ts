@@ -1,3 +1,4 @@
+import { _setNot } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
@@ -17,7 +18,6 @@ export class Unary extends NodeExpression {
 
 export class Offset extends Unary {}
 export class Limit extends Unary {}
-export class Top extends Unary {}
 export class Lock extends Unary {}
 export class DistinctOn extends Unary {}
 export class Bin extends Unary {}
@@ -69,16 +69,12 @@ export type Rollup = RollUp;
 
 export class Group extends Unary {}
 /**
- * Rails' `Arel::Nodes::OptimizerHints` stores `[hint1, hint2, ...]` and the
- * visitor iterates them. The hints live on a dedicated typed field (rather
- * than on the now-`Node | Node[] | string | number | null` `expr`) so the
- * element type can be `string | SqlLiteral` instead of `Node`.
+ * Mirrors: `OptimizerHints` (unary.rb:38) — the hint list lives in the
+ * inherited `expr` slot, which `visit_Arel_Nodes_OptimizerHints` maps over
+ * (to_sql.rb:170-173).
  */
 export class OptimizerHints extends Unary {
-  readonly hints: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
-
-  constructor(hints: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>) {
-    super(null);
-    this.hints = hints;
-  }
+  declare readonly expr: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
 }
+
+_setNot(Not);

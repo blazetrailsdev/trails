@@ -1,4 +1,5 @@
 import { Node } from "./node.js";
+import { _buildQuoted } from "../node-slots.js";
 import type { Included } from "@blazetrails/activesupport";
 
 /**
@@ -32,24 +33,11 @@ export abstract class NodeExpression extends Node {
    */
   quotedNode(other: unknown): Node {
     if (other instanceof Node) return other;
-    if (buildQuoted) return buildQuoted(other, this);
+    if (_buildQuoted) return _buildQuoted(other, this);
     throw new Error(
       'NodeExpression.quotedNode called before buildQuoted was registered. Import from "@blazetrails/arel" so Arel package initialization runs and wires node registries.',
     );
   }
-}
-
-/**
- * `buildQuoted` lives in casted.ts, which imports NodeExpression (Casted
- * extends it). A direct import would deadlock the class-extends
- * expression at module-load time; instead casted.ts registers itself here
- * at its own module-init.
- *
- * @noRailsEquivalent ESM has no call-time constant resolution; see CLAUDE.md, "Call-time constant resolution".
- */
-let buildQuoted: ((other: unknown, ctx: unknown) => Node) | undefined;
-export function registerBuildQuoted(fn: (other: unknown, ctx: unknown) => Node): void {
-  buildQuoted = fn;
 }
 
 /**

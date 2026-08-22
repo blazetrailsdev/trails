@@ -14,18 +14,15 @@ export { relationName } from "./attributes/attribute.js";
 export { sql, star, fetchAttribute } from "./arel.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { registerNodeDeps } from "./nodes/node.js";
-import { Not } from "./nodes/unary.js";
-import { Grouping } from "./nodes/grouping.js";
-import { Or } from "./nodes/or.js";
-import { And } from "./nodes/and.js";
-import { registerBinaryInversions, _registerCteFactory } from "./nodes/binary.js";
-import { Equality } from "./nodes/equality.js";
-import { In } from "./nodes/in.js";
+import { _registerCteFactory } from "./nodes/binary.js";
 import { Cte } from "./nodes/cte.js";
+import "./nodes/unary.js";
+import "./nodes/grouping.js";
+import "./nodes/nary.js";
+import "./nodes/equality.js";
+import "./nodes/in.js";
+import "./nodes/casted.js";
 
-registerNodeDeps({ Not, Grouping, Or, And });
-registerBinaryInversions({ Equality, In });
 _registerCteFactory((name, relation) => new Cte(name, relation));
 
 /**

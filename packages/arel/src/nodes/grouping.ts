@@ -1,3 +1,4 @@
+import { _setGrouping } from "../node-slots.js";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { As } from "./binary.js";
@@ -31,3 +32,5 @@ export class Grouping extends Unary {
     return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 }
+
+_setGrouping(Grouping);

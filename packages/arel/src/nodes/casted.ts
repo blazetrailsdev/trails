@@ -1,5 +1,6 @@
 import { Node } from "./node.js";
-import { NodeExpression, registerBuildQuoted } from "./node-expression.js";
+import { NodeExpression } from "./node-expression.js";
+import { _setBuildQuoted } from "../node-slots.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { ATTRIBUTE_BRAND } from "./binary.js";
@@ -39,7 +40,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   return new Quoted(other);
 }
 
-registerBuildQuoted(buildQuoted);
+_setBuildQuoted(buildQuoted);
 
 function isAttribute(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;

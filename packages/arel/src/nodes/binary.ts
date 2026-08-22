@@ -1,10 +1,11 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
+import { include } from "@blazetrails/activesupport";
+import { _Equality, _In } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { And } from "./and.js";
-import { Or } from "./or.js";
+import { And, Or } from "./nary.js";
 import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
@@ -98,15 +99,17 @@ function isAttribute(node: unknown): boolean {
   return (node as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true;
 }
 
-export function fetchAttributeFromBinary(
-  left: NodeOrValue,
-  right: NodeOrValue,
-  block: (attr: Node) => unknown,
-): unknown {
-  if (isAttribute(left)) return block(left as Node);
-  if (isAttribute(right)) return block(right as Node);
-  return undefined;
-}
+/**
+ * Mirrors: `module Arel::Nodes::FetchAttribute` (binary.rb:32-40) — mixed
+ * into the Binary subclasses whose left or right operand may be an Attribute.
+ */
+export const FetchAttribute = {
+  fetchAttribute(this: Binary, block: (attr: Node) => unknown): unknown {
+    if (isAttribute(this.left)) return block(this.left as Node);
+    if (isAttribute(this.right)) return block(this.right as Node);
+    return undefined;
+  },
+};
 
 export class Binary extends NodeExpression {
   left: NodeOrValue;
@@ -139,8 +142,7 @@ export class Assignment extends Binary {}
 
 // Cte lives in ./cte.ts (Rails parity) and extends Binary, which would be
 // a hard cycle if `As.toCte` imported it directly. The package entrypoint
-// (`./index.ts`) calls `_registerCteFactory` at load, mirroring the
-// `registerBinaryInversions` / `registerNodeDeps` pattern used elsewhere.
+// (`./index.ts`) calls `_registerCteFactory` at load.
 let cteFactory: ((name: string | SqlLiteral, relation: Node) => Cte) | null = null;
 export function _registerCteFactory(fn: (name: string | SqlLiteral, relation: Node) => Cte): void {
   cteFactory = fn;
@@ -159,24 +161,16 @@ export class As extends Binary {
   }
 }
 
-export class Between extends Binary {
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
-}
+export class Between extends Binary {}
 
 export class NotEqual extends Binary {
   invert(): Node {
-    if (!_invertRegistry.Equality) {
+    if (!_Equality) {
       throw new Error(
-        'NotEqual.invert() requires the inversion registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',
+        'NotEqual.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }
-    return new _invertRegistry.Equality(this.left, this.right);
-  }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
+    return new _Equality(this.left, this.right);
   }
 }
 
@@ -184,19 +178,11 @@ export class GreaterThan extends Binary {
   invert(): Node {
     return new LessThanOrEqual(this.left, this.right);
   }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
 }
 
 export class GreaterThanOrEqual extends Binary {
   invert(): Node {
     return new LessThan(this.left, this.right);
-  }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
   }
 }
 
@@ -204,19 +190,11 @@ export class LessThan extends Binary {
   invert(): Node {
     return new GreaterThanOrEqual(this.left, this.right);
   }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
 }
 
 export class LessThanOrEqual extends Binary {
   invert(): Node {
     return new GreaterThan(this.left, this.right);
-  }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
   }
 }
 
@@ -224,34 +202,22 @@ export class IsDistinctFrom extends Binary {
   invert(): Node {
     return new IsNotDistinctFrom(this.left, this.right);
   }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
 }
 
 export class IsNotDistinctFrom extends Binary {
   invert(): Node {
     return new IsDistinctFrom(this.left, this.right);
   }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
 }
 
 export class NotIn extends Binary {
   invert(): Node {
-    if (!_invertRegistry.In) {
+    if (!_In) {
       throw new Error(
-        'NotIn.invert() requires the inversion registry. Import from "@blazetrails/arel" instead of deep-importing node classes.',
+        'NotIn.invert() requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.',
       );
     }
-    return new _invertRegistry.In(this.left, this.right);
-  }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
+    return new _In(this.left, this.right);
   }
 }
 
@@ -293,23 +259,6 @@ export class Intersect extends Binary {
   }
 }
 
-const _invertRegistry: {
-  Equality?: new (left: NodeOrValue, right: NodeOrValue) => Binary;
-  In?: new (left: NodeOrValue, right: NodeOrValue) => Binary;
-} = {};
-
-export function registerBinaryInversions(deps: {
-  Equality: new (left: NodeOrValue, right: NodeOrValue) => Binary;
-  In: new (left: NodeOrValue, right: NodeOrValue) => Binary;
-}): void {
-  _invertRegistry.Equality = deps.Equality;
-  _invertRegistry.In = deps.In;
-}
-
-export interface FetchAttribute {
-  fetchAttribute(block: (attr: Node) => unknown): unknown;
-}
-
 export class Except extends Binary {
   declare readonly left: Node;
   declare readonly right: Node;
@@ -318,3 +267,20 @@ export class Except extends Binary {
     super(left, right);
   }
 }
+
+// Mirrors `include FetchAttribute` on each of these Binary subclasses
+// (binary.rb:42-72).
+type Includable = new (...args: unknown[]) => object;
+const fetchAttributeModule = FetchAttribute as unknown as Record<
+  string,
+  (...args: unknown[]) => unknown
+>;
+include(Between as unknown as Includable, fetchAttributeModule);
+include(NotEqual as unknown as Includable, fetchAttributeModule);
+include(GreaterThan as unknown as Includable, fetchAttributeModule);
+include(GreaterThanOrEqual as unknown as Includable, fetchAttributeModule);
+include(LessThan as unknown as Includable, fetchAttributeModule);
+include(LessThanOrEqual as unknown as Includable, fetchAttributeModule);
+include(IsDistinctFrom as unknown as Includable, fetchAttributeModule);
+include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
+include(NotIn as unknown as Includable, fetchAttributeModule);

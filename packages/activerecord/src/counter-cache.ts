@@ -118,7 +118,7 @@ function buildPkPredicate(
       groupings.push(new Nodes.Grouping(new Nodes.And(conditions)));
     }
     if (groupings.length === 1) return groupings[0];
-    return new Nodes.Grouping(groupings.reduce((left, right) => new Nodes.Or(left, right)));
+    return new Nodes.Grouping(groupings.reduce((left, right) => new Nodes.Or([left, right])));
   }
 
   const attr = table.get(pk);

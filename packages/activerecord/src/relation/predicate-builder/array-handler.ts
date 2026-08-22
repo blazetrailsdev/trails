@@ -107,5 +107,5 @@ export class ArrayHandler {
 }
 
 function groupedOr(left: Nodes.Node, right: Nodes.Node): Nodes.Grouping {
-  return new Nodes.Grouping(new Nodes.Or(left, right));
+  return new Nodes.Grouping(new Nodes.Or([left, right]));
 }

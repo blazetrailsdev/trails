@@ -1081,7 +1081,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       // one tuple and returns the single record (wrapped per expects_array).
       const tuples = compactUniqTuples(id) as unknown[][];
       const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
-      const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
+      const orCondition = whereNodes.reduce((left, right) => new Nodes.Or([left, right]));
       const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
       if (records.length !== tuples.length) {
         raiseCouldntFindAll(

@@ -556,15 +556,6 @@ export class Dot extends Visitor {
   }
 
   /**
-   * Trails' OptimizerHints carries hints on `hints`, not on Unary's
-   * `expr` field (which stays `null` — see nodes/unary.ts). The default
-   * Unary fallback would visit `expr` and miss the hints entirely.
-   */
-  protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints): void {
-    this.visitEdge(o, "hints");
-  }
-
-  /**
    * Rails: `o.class.name`. We use the JS ctor name for objects and emit
    * Rails-style class names for primitives and nil values — `String`,
    * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
@@ -650,7 +641,5 @@ export class Dot extends Visitor {
     reg(Nodes.False, "visitNoEdges");
     reg(Nodes.BoundSqlLiteral, "visitNoEdges");
     reg(Nodes.Fragments, "visitNoEdges");
-    reg(Nodes.SelectOptions, "visitNoEdges");
-    reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
   }
 }

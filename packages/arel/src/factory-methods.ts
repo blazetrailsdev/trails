@@ -1,5 +1,5 @@
 import type { Node } from "./nodes/node.js";
-import { And } from "./nodes/and.js";
+import { And } from "./nodes/nary.js";
 import { buildQuoted } from "./nodes/casted.js";
 import type { Join } from "./nodes/binary.js";
 import { False } from "./nodes/false.js";

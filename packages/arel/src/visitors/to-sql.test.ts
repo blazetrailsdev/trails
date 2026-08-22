@@ -1157,7 +1157,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit_Arel_Nodes_Or", () => {
-    const node = new Nodes.Or(users.get("id").eq(1), users.get("id").eq(2));
+    const node = new Nodes.Or([users.get("id").eq(1), users.get("id").eq(2)]);
     const sql = new Visitors.ToSql(testConnection).compile(node);
     expect(sql).toContain("OR");
   });
@@ -1892,15 +1892,6 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain("$1");
       expect(sql).toContain("'hi'");
       expect(sql).not.toContain("?");
-    });
-
-    it("Nodes.SelectOptions visits limit/offset/lock via maybeVisit through dispatch", () => {
-      const opts = new Nodes.SelectOptions(
-        new Nodes.Limit(new Nodes.SqlLiteral("10")),
-        new Nodes.Offset(new Nodes.SqlLiteral("20")),
-      );
-      const sql = new Visitors.ToSql(testConnection).compile(opts);
-      expect(sql).toBe(" LIMIT 10 OFFSET 20");
     });
 
     it("visitActiveModelAttribute routes through bindBlock (Rails parity)", () => {

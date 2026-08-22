@@ -1,3 +1,4 @@
+import { _setAnd, _setOr } from "../node-slots.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
@@ -29,3 +30,12 @@ export class Nary extends NodeExpression {
     });
   }
 }
+
+/** Mirrors: `And = Class.new(Nary)` (nary.rb:36). */
+export class And extends Nary {}
+
+/** Mirrors: `Or = Class.new(Nary)` (nary.rb:37). */
+export class Or extends Nary {}
+
+_setAnd(And);
+_setOr(Or);

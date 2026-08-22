@@ -330,13 +330,9 @@ export class ToSql extends Visitor {
   /**
    * Mirrors Rails: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). Emits
    * limit/offset/lock via `maybeVisit`. As in Rails it is called with the
-   * `SelectStatement` itself — which carries those three fields — and is also
-   * reachable through the dispatch table for an explicit `Nodes.SelectOptions`.
+   * `SelectStatement` itself, which carries those three fields.
    */
-  protected visitArelNodesSelectOptions(
-    o: Nodes.SelectOptions | Nodes.SelectStatement,
-    collector: SQLString,
-  ): SQLString {
+  protected visitArelNodesSelectOptions(o: Nodes.SelectStatement, collector: SQLString): SQLString {
     this.maybeVisit(o.limit, collector);
     this.maybeVisit(o.offset, collector);
     this.maybeVisit(o.lock, collector);
@@ -379,7 +375,6 @@ export class ToSql extends Visitor {
       d.set(ctor, m);
     };
     reg(Nodes.SelectStatement, "visitArelNodesSelectStatement");
-    reg(Nodes.SelectOptions, "visitArelNodesSelectOptions");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
     reg(Nodes.UpdateStatement, "visitArelNodesUpdateStatement");
@@ -420,7 +415,6 @@ export class ToSql extends Visitor {
     reg(Nodes.Descending, "visitArelNodesDescending");
     reg(Nodes.Offset, "visitArelNodesOffset");
     reg(Nodes.Limit, "visitArelNodesLimit");
-    reg(Nodes.Top, "visitTop");
     reg(Nodes.Lock, "visitArelNodesLock");
     reg(Nodes.DistinctOn, "visitArelNodesDistinctOn");
     reg(Nodes.Bin, "visitArelNodesBin");
@@ -494,7 +488,7 @@ export class ToSql extends Visitor {
     // empty filter, so hints that sanitize to empty still emit the comment. The
     // node only exists when `optimizer_hints(*hints)` got a non-empty splat
     // (select_manager.rb:147-149), which is the only emptiness Rails guards.
-    const hints = o.hints.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
+    const hints = o.expr.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
     collector.append(`/*+ ${hints} */`);
     return collector;
   }
@@ -1271,7 +1265,7 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesSqlLiteral(o: Nodes.SqlLiteral, collector: SQLString): SQLString {
-    if (!(o as { retryableFlag?: boolean }).retryableFlag) {
+    if (!(o as { retryable?: boolean }).retryable) {
       collector.retryable = false;
     }
     // Mirrors to_sql.rb:764-767: plain SqlLiteral is non-preparable.
@@ -1763,16 +1757,6 @@ export class ToSql extends Visitor {
     this.visit(o.left, collector);
     collector.append(` ${op} `);
     this.visit(o.right, collector);
-    return collector;
-  }
-
-  protected visitTop(o: Nodes.Top, collector: SQLString): SQLString {
-    collector.append("TOP ");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else {
-      collector.append(String(o.expr));
-    }
     return collector;
   }
 

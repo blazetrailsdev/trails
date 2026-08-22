@@ -1502,7 +1502,7 @@ describe("SelectManagerTest", () => {
     it("stores hints as an OptimizerHints node on the SelectCore", () => {
       const mgr = new SelectManager(users).project(star).optimizerHints("X", "Y");
       expect(mgr.ast.cores[0].optimizerHints).toBeInstanceOf(Nodes.OptimizerHints);
-      expect((mgr.ast.cores[0].optimizerHints as Nodes.OptimizerHints).hints).toEqual(["X", "Y"]);
+      expect((mgr.ast.cores[0].optimizerHints as Nodes.OptimizerHints).expr).toEqual(["X", "Y"]);
     });
 
     // Mirrors Rails: `optimizer_hints` is a no-op when called with no
