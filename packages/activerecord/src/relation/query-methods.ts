@@ -2118,9 +2118,13 @@ export function async(this: QueryMethodsHost): QueryMethodsHost {
   return asyncBang.call((this as any).spawn());
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::QueryMethods#assert_modifiable!
+ * (query_methods.rb:1746-1748).
+ * @internal
+ */
 export function assertModifiableBang(this: QueryMethodsHost): void {
-  if ((this as any)._loaded) {
+  if ((this as any)._loaded || (this as any)._arel) {
     throw new UnmodifiableRelation();
   }
 }
