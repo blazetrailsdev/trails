@@ -1,6 +1,5 @@
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { Bind } from "../collectors/bind.js";
 import { Composite } from "../collectors/composite.js";
 import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
@@ -146,14 +145,15 @@ export class ToSql extends Visitor {
   }
 
   compile(node: Node): string;
+  compile(node: Node | ReadonlyArray<Nodes.NodeOrValue>, collector: Composite): [string, unknown[]];
   compile(
     node: Node | ReadonlyArray<Nodes.NodeOrValue>,
     collector: SQLString | SubstituteBinds,
   ): string;
   compile(
     node: Node | ReadonlyArray<Nodes.NodeOrValue>,
-    collector?: SQLString | SubstituteBinds,
-  ): string {
+    collector?: SQLString | SubstituteBinds | Composite,
+  ): string | [string, unknown[]] {
     // Rails-faithful `compile(node, collector)`: drive the supplied collector
     // (so callers control its bind state) and return the rendered SQL. An array
     // node dispatches to `visit_Array` and renders as a comma-joined list — this
@@ -165,7 +165,7 @@ export class ToSql extends Visitor {
     // of this file does.
     if (collector !== undefined) {
       this.accept(node, collector as unknown as SQLString);
-      return collector.value;
+      return collector.value as string | [string, unknown[]];
     }
     // Mirrors Rails `compile` defaulting to a plain `SQLString` (to_sql.rb:17):
     // Casted/Quoted inline their quoted literal in the visitor, BindParam emits
@@ -1289,12 +1289,9 @@ export class ToSql extends Visitor {
     return collector;
   }
 
+  /** Mirrors Rails: `visit_Arel_Nodes_BindParam` (to_sql.rb:760-762). */
   protected visitArelNodesBindParam(o: Nodes.BindParam, collector: SQLString): SQLString {
-    // Push the node itself (not its value) so `compile` can render `?` while
-    // `compileWithBinds` unwraps to `o.value` for the bind array. Mirrors
-    // Rails' `visit_Arel_Nodes_BindParam`: `collector.add_bind(o.value, &bind_block)`
-    // emits the placeholder and records the value separately.
-    collector.addBind(o, this.bindBlock());
+    collector.addBind(o.value, this.bindBlock());
     return collector;
   }
 
@@ -1778,39 +1775,6 @@ export class ToSql extends Visitor {
       this.visit(child.toCte(), collector);
     });
     return collector;
-  }
-
-  /**
-   * @noRailsEquivalent CONVERGEABLE (story:
-   * arel-to-sql-compile-unification). This is Rails' `Visitor#accept(object,
-   * collector)` (`visitor.rb:8-10`) under a second name — `ToSql` has one
-   * `compile(node, collector = SQLString.new)` (`to_sql.rb:17`) and nothing
-   * else. Retiring it onto `accept` touches ~15 call sites across
-   * `packages/activerecord` and the suites, which is the filed story.
-   */
-  compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
-    return this.visit(node, (externalCollector ?? new SQLString()) as SQLString);
-  }
-
-  /**
-   * Compile an AST node and extract bind values separately.
-   * Returns [sql_with_placeholders, bind_values, retryable].
-   *
-   * @noRailsEquivalent CONVERGEABLE (story:
-   * arel-to-sql-compile-unification). Rails builds the
-   * `Collectors::Composite(SQLString, Bind)` in AR's
-   * `DatabaseStatements#to_sql_and_binds` and compiles through the one
-   * `compile(node, collector)` (`to_sql.rb:17`); trails builds it here instead,
-   * so the collector construction sits on the arel side of the boundary.
-   * Moving it back touches ~40 call sites, which is the filed story.
-   */
-  compileWithBinds(node: Node): [string, unknown[], boolean, boolean] {
-    const sqlCollector = new SQLString();
-    const bindCollector = new Bind();
-    const composite = new Composite(sqlCollector, bindCollector);
-    this.visit(node, composite as unknown as SQLString);
-    const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    return [sqlCollector.value, binds, sqlCollector.retryable, composite.preparable];
   }
 
   private subselectKey(key: Node): Node {

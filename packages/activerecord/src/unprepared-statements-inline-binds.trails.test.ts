@@ -6,7 +6,7 @@
  * inlines during traversal and `binds` comes back empty.
  *
  * Rails cannot regress this — the collector choice *is* the branch. trails
- * compiles through `compileWithBinds` on every path, so the flag has to be
+ * compiles through a `Composite` collector on every path, so the flag has to be
  * consulted explicitly at each compile site; this pins that it is.
  */
 import { describe, it, expect } from "vitest";

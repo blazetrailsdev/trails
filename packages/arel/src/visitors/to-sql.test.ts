@@ -14,6 +14,11 @@ import {
 import { Attribute as AMAttribute, ValueType, StringType } from "@blazetrails/activemodel";
 import { testConnection } from "../test-helpers/connection.js";
 
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector);
+}
+
 describe("the to_sql visitor", () => {
   const users = new Table("users");
   const posts = new Table("posts");
@@ -70,7 +75,7 @@ describe("the to_sql visitor", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).compileWithCollector(node, collector);
+      new Visitors.ToSql(testConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
 
@@ -441,7 +446,7 @@ describe("the to_sql visitor", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).compileWithCollector(node, collector);
+      new Visitors.ToSql(testConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
   });
@@ -473,7 +478,7 @@ describe("the to_sql visitor", () => {
       });
       const node = new Nodes.HomogeneousIn([1, 2, 3], castedUsers.get("id"), "in");
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).compileWithCollector(node, collector);
+      new Visitors.ToSql(testConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
   });
@@ -924,37 +929,37 @@ describe("the to_sql visitor", () => {
 
   it("should mark collector as non-retryable if SQL literal is marked as retryable", () => {
     const lit = new Nodes.SqlLiteral("1", { retryable: true });
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(lit);
+    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
     expect(collector.retryable).toBe(true);
   });
 
   it("should mark collector as non-retryable if SQL literal is not retryable", () => {
     const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(lit);
+    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting SQL literal", () => {
     const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(lit);
+    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting bound SQL literal", () => {
     const lit = new Nodes.BoundSqlLiteral("id = ?", [1]);
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(lit);
+    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting delete statement node", () => {
     const stmt = new DeleteManager().from(users).ast;
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(stmt);
+    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting insert statement node", () => {
     const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(stmt);
+    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
@@ -1011,19 +1016,19 @@ describe("the to_sql visitor", () => {
 
   it("should mark collector as non-retryable when visiting named function", () => {
     const fn = users.get("name").lower();
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(fn);
+    const collector = new Visitors.ToSql(testConnection).accept(fn, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting update statement node", () => {
     const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(stmt);
+    const collector = new Visitors.ToSql(testConnection).accept(stmt, new Collectors.SQLString());
     expect(collector.retryable).toBe(false);
   });
 
   it("should not change retryable if SQL literal is marked as retryable", () => {
     const lit = new Nodes.SqlLiteral("1", { retryable: true });
-    const collector = new Visitors.ToSql(testConnection).compileWithCollector(lit);
+    const collector = new Visitors.ToSql(testConnection).accept(lit, new Collectors.SQLString());
     expect(collector.retryable).toBe(true);
   });
 
@@ -1079,7 +1084,7 @@ describe("the to_sql visitor", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").in([1, 2, 3]);
       const collector = new Collectors.SQLString();
-      new Visitors.ToSql(testConnection).compileWithCollector(node, collector);
+      new Visitors.ToSql(testConnection).accept(node, collector);
       expect(collector.preparable).toBe(false);
     });
 
@@ -1220,7 +1225,7 @@ describe("the to_sql visitor", () => {
     const users = new Table("users");
     const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
     const node = users.get("created_at").eq(new Nodes.Quoted(d));
-    const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+    const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
     // Quoted(Date) inlines per Rails to_sql.rb — _extractBinds was removed by
     // collector threading; only BindParam/ActiveModel::Attribute go to addBind.
     expect(sql).toContain("2020-01-02");
@@ -1424,7 +1429,7 @@ describe("the to_sql visitor", () => {
     const v = new Visitors.ToSql(testConnection);
     const table = new Table("users");
     const mgr = table.project(star).where(table.get("id").eq(new Nodes.BindParam(42)));
-    const [sql, binds] = v.compileWithBinds(mgr.ast);
+    const [sql, binds] = compileWithBinds(v, mgr.ast);
     expect(sql).toContain("?");
     expect(sql).not.toContain("42");
     expect(binds).toEqual([42]);
@@ -1437,7 +1442,7 @@ describe("the to_sql visitor", () => {
       .project(star)
       .where(table.get("name").eq(new Nodes.BindParam("alice")))
       .where(table.get("age").gt(new Nodes.BindParam(21)));
-    const [sql, binds] = v.compileWithBinds(mgr.ast);
+    const [sql, binds] = compileWithBinds(v, mgr.ast);
     expect(sql).toContain("?");
     expect(sql).not.toContain("alice");
     expect(sql).not.toContain("21");
@@ -1447,12 +1452,12 @@ describe("the to_sql visitor", () => {
   it("compileWithBinds with undefined BindParam", () => {
     const v = new Visitors.ToSql(testConnection);
     const node = new Nodes.BindParam();
-    const [sql, binds] = v.compileWithBinds(node);
+    const [sql, binds] = compileWithBinds(v, node);
     expect(sql).toBe("?");
     expect(binds).toHaveLength(1);
   });
 
-  it("compileWithCollector accepts external collector", () => {
+  it("accept accepts external collector", () => {
     const v = new Visitors.ToSql(testConnection);
     const table = new Table("users");
     const mgr = table.project(star).where(table.get("name").eq("alice"));
@@ -1476,7 +1481,7 @@ describe("the to_sql visitor", () => {
       },
     };
 
-    v.compileWithCollector(mgr.ast, collector);
+    v.accept(mgr.ast, collector);
     // Casted values inline their quoted literal directly (mirrors Rails
     // visit_Arel_Nodes_Casted, to_sql.rb:87-88) — no addBind, no placeholder.
     expect(binds).toHaveLength(0);
@@ -1872,7 +1877,8 @@ describe("the to_sql visitor", () => {
       const v = new NumberedVisitor(testConnection);
       // Only BindParam routes through addBind (and therefore bindBlock); Casted
       // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
-      const [sql] = v.compileWithBinds(
+      const [sql] = compileWithBinds(
+        v,
         tbl
           .where(tbl.get("id").eq(new Nodes.BindParam(1)))
           .where(tbl.get("name").eq(new Nodes.Casted("hi", tbl.get("name"))))
@@ -2108,7 +2114,7 @@ describe("the to_sql visitor", () => {
     it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
       const visitor = new Visitors.ToSql(testConnection);
       const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
-      const [sql, binds] = visitor.compileWithBinds(new Nodes.Quoted(instant));
+      const [sql, binds] = compileWithBinds(visitor, new Nodes.Quoted(instant));
       expect(sql).toContain("2026-04-30");
       expect(sql).not.toContain("?");
       expect(binds).toHaveLength(0);
@@ -2120,7 +2126,8 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted string binds raw under extractBinds", () => {
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
+      const [sql, binds] = compileWithBinds(
+        new Visitors.ToSql(testConnection),
         new Nodes.Quoted("hi"),
       );
       expect(sql).toBe("'hi'");
@@ -2128,7 +2135,8 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted number binds raw under extractBinds", () => {
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
+      const [sql, binds] = compileWithBinds(
+        new Visitors.ToSql(testConnection),
         new Nodes.Quoted(42),
       );
       expect(sql).toBe("42");
@@ -2137,7 +2145,8 @@ describe("the to_sql visitor", () => {
 
     it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
       const value = Temporal.Instant.from("2026-04-30T00:00:00.000Z");
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
+      const [sql, binds] = compileWithBinds(
+        new Visitors.ToSql(testConnection),
         new Nodes.Quoted(value),
       );
       expect(sql).toBe("'2026-04-30 00:00:00'");

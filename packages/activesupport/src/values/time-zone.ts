@@ -742,6 +742,40 @@ export class Timezone {
   }
 }
 
+/**
+ * Ruby `Time.new`'s fractional-seconds argument (`parts.fetch(:sec, 0) +
+ * parts.fetch(:sec_fraction, 0)`), which Temporal cannot take as a Rational —
+ * it wants the sub-second remainder split across its millisecond / microsecond
+ * / nanosecond components.
+ *
+ * @noRailsEquivalent Ruby's Time carries a Rational sub-second seat; Temporal
+ * carries three integer components. This is the conversion between them.
+ */
+function secFractionToNanosecond(secFraction: DateParts["secFraction"]): number {
+  if (secFraction == null) return 0;
+  return secFraction instanceof Rational
+    ? secFraction.mul(1_000_000_000).toI()
+    : Math.trunc(Number(secFraction) * 1_000_000_000);
+}
+
+/**
+ * Ruby `Time#utc` on a Time built with an explicit `offset` — the instant that
+ * local wall clock names at that offset.
+ *
+ * @noRailsEquivalent Ruby's Time holds its own UTC offset; a
+ * `Temporal.PlainDateTime` does not, so the offset has to be applied here.
+ */
+function utcInstantOf(
+  time: Temporal.PlainDateTime,
+  offset: NonNullable<DateParts["offset"]>,
+): Temporal.Instant {
+  const seconds = offset instanceof Rational ? offset.toF() : Number(offset);
+  return time
+    .toZonedDateTime("UTC")
+    .toInstant()
+    .subtract({ nanoseconds: Math.round(seconds * 1e9) });
+}
+
 export class TimeZone {
   readonly name: string;
   readonly tzinfo: Timezone;
@@ -1068,53 +1102,104 @@ export class TimeZone {
   }
 
   /**
-   * Parse an ISO 8601 string in this timezone.
+   * Mirrors: TimeZone#iso8601 (time_zone.rb:396-433). Ruby's `parts.fetch(:k)`
+   * with no default raises `KeyError`, which the method's own
+   * `rescue Date::Error, KeyError` turns into this `ArgumentError`, so each
+   * missing key is spelled as that raise directly. The `Time.new(...)` build
+   * and the `parts[:offset]` UTC-vs-local wrap at the tail are exactly what
+   * `parts_to_time` (time_zone.rb:585-608) already does, with the same
+   * `fetch` defaults for `:hour`, `:min`, `:sec`, `:sec_fraction` and
+   * `:offset`, so the assembled parts return through it.
    */
   iso8601(str: string | null | undefined): TimeWithZone {
-    if (str == null || str.trim() === "") {
-      throw new Error("invalid date");
-    }
-    const trimmed = str.trim();
+    // Historically `Date._iso8601(nil)` returns `{}`, but in the `date` gem
+    // versions `3.2.1`, `3.1.2`, `3.0.2`, and `2.0.1`, `Date._iso8601(nil)`
+    // raises `TypeError` https://github.com/ruby/date/issues/39
+    // Future `date` releases are expected to revert back to the original behavior.
+    if (str == null) throw new ArgumentError("invalid date");
 
-    // Ordinal date: YYDDD (2-digit year + 3-digit day-of-year)
-    const ordinalMatch = /^(\d{2})(\d{3})$/.exec(trimmed);
-    if (ordinalMatch) {
-      const year = 2000 + parseInt(ordinalMatch[1], 10);
-      const dayOfYear = parseInt(ordinalMatch[2], 10);
-      if (dayOfYear < 1 || dayOfYear > 366) {
-        throw new Error("invalid date");
+    const parts = RubyDate._iso8601(str);
+
+    if (parts.year == null) throw new ArgumentError("invalid date");
+    const year = Number(parts.year);
+
+    let mon: number;
+    let mday: number;
+    if (parts.yday != null) {
+      let ordinalDate: Temporal.PlainDate;
+      try {
+        ordinalDate = RubyDate.ordinal(year, parts.yday);
+      } catch (error) {
+        if (error instanceof RubyDate.Error) throw new ArgumentError("invalid date");
+        throw error;
       }
-      const jan1 = new Date(Date.UTC(year, 0, 1));
-      const target = new Date(jan1.getTime() + (dayOfYear - 1) * 86400000);
-      if (target.getUTCFullYear() !== year) {
-        throw new Error("invalid date");
-      }
-      return this.local(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate());
+      mon = ordinalDate.month;
+      mday = ordinalDate.day;
+    } else {
+      if (parts.mon == null || parts.mday == null) throw new ArgumentError("invalid date");
+      mon = parts.mon;
+      mday = parts.mday;
     }
 
-    if (
-      !/^\d{4}-?\d{2}-?\d{2}(T\d{2}:?\d{2}(:?\d{2}([.]\d+)?)?)?([Zz]|[+-]\d{2}:?\d{2})?$/.test(
-        trimmed,
-      )
-    ) {
-      throw new Error("invalid date");
+    // `Time.new(year, month, day, parts.fetch(:hour, 0), parts.fetch(:min, 0),
+    // parts.fetch(:sec, 0) + parts.fetch(:sec_fraction, 0), parts.fetch(:offset, 0))`
+    // — Temporal takes the sub-second remainder as separate components, which is
+    // how `sec_fraction` keeps its nanosecond resolution here.
+    const nanosecond = secFractionToNanosecond(parts.secFraction);
+    let time: Temporal.PlainDateTime;
+    try {
+      time = Temporal.PlainDateTime.from({
+        year,
+        month: mon,
+        day: mday,
+        hour: parts.hour ?? 0,
+        minute: parts.min ?? 0,
+        second: parts.sec ?? 0,
+        millisecond: Math.trunc(nanosecond / 1_000_000),
+        microsecond: Math.trunc(nanosecond / 1000) % 1000,
+        nanosecond: nanosecond % 1000,
+      });
+    } catch {
+      throw new ArgumentError("argument out of range");
     }
-    return this.parse(trimmed)!;
+
+    if (parts.offset != null) {
+      return new TimeWithZone(utcInstantOf(time, parts.offset), this);
+    }
+    return new TimeWithZone(null, this, time);
   }
 
   /**
-   * Parse an RFC 3339 string in this timezone.
+   * Mirrors: TimeZone#rfc3339 (time_zone.rb:469-484). RFC 3339's zone group is
+   * mandatory, so `Date._rfc3339` either fills every component this reads or
+   * answers an empty hash — which is why Rails' non-defaulting `fetch`es carry
+   * no rescue here, and why the `parts[:offset]` arm of `parts_to_time` is
+   * always the UTC one.
    */
   rfc3339(str: string): TimeWithZone {
-    const trimmed = str?.trim() ?? "";
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([.]\d+)?(Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
-      throw new Error("invalid date");
+    const parts = RubyDate._rfc3339(str);
+
+    if (Object.keys(parts).length === 0) throw new ArgumentError("invalid date");
+
+    const nanosecond = secFractionToNanosecond(parts.secFraction);
+    let time: Temporal.PlainDateTime;
+    try {
+      time = Temporal.PlainDateTime.from({
+        year: Number(parts.year),
+        month: parts.mon!,
+        day: parts.mday!,
+        hour: parts.hour!,
+        minute: parts.min!,
+        second: parts.sec!,
+        millisecond: Math.trunc(nanosecond / 1_000_000),
+        microsecond: Math.trunc(nanosecond / 1000) % 1000,
+        nanosecond: nanosecond % 1000,
+      });
+    } catch {
+      throw new ArgumentError("argument out of range");
     }
-    const date = new Date(trimmed);
-    if (isNaN(date.getTime())) {
-      throw new Error("invalid date");
-    }
-    return new TimeWithZone(instantFrom(date), this);
+
+    return new TimeWithZone(utcInstantOf(time, parts.offset ?? 0), this);
   }
 
   /**
@@ -1292,13 +1377,7 @@ export class TimeZone {
       );
     }
 
-    const secFraction = parts.secFraction;
-    const nanosecond =
-      secFraction == null
-        ? 0
-        : secFraction instanceof Rational
-          ? secFraction.mul(1_000_000_000).toI()
-          : Math.trunc(Number(secFraction) * 1_000_000_000);
+    const nanosecond = secFractionToNanosecond(parts.secFraction);
     let time: Temporal.PlainDateTime;
     try {
       time = Temporal.PlainDateTime.from({
@@ -1317,14 +1396,7 @@ export class TimeZone {
     }
 
     if (parts.offset != null) {
-      const offset = parts.offset instanceof Rational ? parts.offset.toF() : Number(parts.offset);
-      return new TimeWithZone(
-        time
-          .toZonedDateTime("UTC")
-          .toInstant()
-          .subtract({ nanoseconds: Math.round(offset * 1e9) }),
-        this,
-      );
+      return new TimeWithZone(utcInstantOf(time, parts.offset), this);
     }
     return new TimeWithZone(null, this, time);
   }

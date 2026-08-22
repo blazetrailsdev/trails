@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * InsertStatement — INSERT INTO ... VALUES ...
@@ -24,10 +24,6 @@ export class InsertStatement extends Node {
     this.columns = [];
     this.values = null;
     this.select = null;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 
   clone(): InsertStatement {

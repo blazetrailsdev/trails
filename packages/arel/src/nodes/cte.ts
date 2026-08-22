@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Table } from "../table.js";
@@ -34,9 +34,5 @@ export class Cte extends Binary {
     // (visit_Arel_Table visits a Node name). `Table` types `name` as `string`;
     // a smuggled `SqlLiteral` is cast, matching visit_Arel_Table's convention.
     return new Table(this.name as unknown as string);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

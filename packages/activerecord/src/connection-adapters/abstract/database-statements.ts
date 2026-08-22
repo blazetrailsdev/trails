@@ -284,7 +284,7 @@ export function toSql(
   // SubstituteBinds collector). Raw Arel `Node#toSql`/`ToSql#compile` keeps
   // `?` for BindParams (Rails parity); this path substitutes them via the
   // adapter quoter, the same way `Relation#toSql` does. `toSqlAndBinds` uses
-  // `compileWithBinds` for execution (placeholders + bind array).
+  // the Composite collector for execution (placeholders + bind array).
   const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
   if (visitor && node instanceof Nodes.Node) {
     const [inlinedSql] = compileInlined(visitor, node, this);
@@ -347,8 +347,15 @@ export function toSqlAndBinds(
         const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
         return [inlinedSql, [], preparable, inlinedRetryable];
       }
-      const [sql, extractedBinds, compiledAllowRetry, compiledPreparable] =
-        visitor.compileWithBinds(node);
+      // Rails builds the collector on the adapter (`collector()`,
+      // abstract_adapter.rb:1176-1188) and compiles through the ONE
+      // `visitor.compile(node, collector)` (database_statements.rb:31-45); the
+      // Composite's `value` is the `[sql, binds]` pair Rails destructures.
+      const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+      collector.retryable = true;
+      const [sql, extractedBinds] = visitor.compile(node, collector);
+      const compiledAllowRetry = collector.retryable;
+      const compiledPreparable = collector.preparable;
       // Rails hands the compiled binds on untouched — `ActiveModel::Attribute`
       // objects survive all the way to the adapter's `type_casted_binds`
       // (abstract/quoting.rb:224), which is where `value_for_database` is
@@ -407,7 +414,8 @@ export function cacheableQuery(
 
   // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds] = visitor.compileWithBinds(node);
+    const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+    const [sql, binds] = visitor.compile(node, collector);
     return [klass.query(sql), binds];
   }
 
@@ -416,7 +424,7 @@ export function cacheableQuery(
   // prepared_statements is false.
   if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
     const collector = klass.partialQueryCollector() as { value: [unknown[], unknown[]] };
-    visitor.compileWithCollector(node, collector);
+    visitor.accept(node, collector);
     const [parts, collectedBinds] = collector.value;
     return [klass.partialQuery(parts), collectedBinds];
   }
@@ -1408,7 +1416,7 @@ export const DatabaseStatements = {
     binds = compiledBinds;
     // Rails' select_all passes `prepare: prepared_statements && preparable`
     // (database_statements.rb:73), where `preparable` is the Arel collector's flag
-    // threaded through compileWithBinds → _compileSelectSql → opts.preparable.
+    // threaded through compile → _compileSelectSql → opts.preparable.
     // Callers that don't supply opts.preparable fall back to bind presence, which
     // is correct for every shape that carries binds.
     const preparable = compiledPreparable ?? (binds != null && binds.length > 0);

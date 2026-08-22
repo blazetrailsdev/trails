@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * SQL comment: appended as `/* ... *\/` to a query.
@@ -11,9 +11,5 @@ export class Comment extends Node {
   constructor(values: string[]) {
     super();
     this.values = values;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

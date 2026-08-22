@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * DeleteStatement — DELETE FROM ... WHERE ...
@@ -25,10 +25,6 @@ export class DeleteStatement extends Node {
     this.limit = null;
     this.offset = null;
     this.key = null;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 
   clone(): DeleteStatement {

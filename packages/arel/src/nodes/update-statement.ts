@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * UpdateStatement — UPDATE ... SET ... WHERE ...
@@ -27,10 +27,6 @@ export class UpdateStatement extends Node {
     this.limit = null;
     this.offset = null;
     this.key = null;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 
   clone(): UpdateStatement {

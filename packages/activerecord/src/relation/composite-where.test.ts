@@ -124,7 +124,7 @@ describe("Relation#where — composite-key form", () => {
   it("composite predicate values flow through QueryAttribute (bind params, not inlined Casted)", () => {
     // Regression: an earlier draft used `attribute.eq(rawValue)`,
     // which wraps as Arel::Nodes::Casted and inlines values into SQL.
-    // That breaks compileWithBinds / prepared-statement caching.
+    // That breaks bind extraction / prepared-statement caching.
     // Switching to buildBindAttribute makes each value a
     // QueryAttribute → BindParam at SQL emission. Inspect the node
     // tree: the AND's right-hand sides should be QueryAttribute

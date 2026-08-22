@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
 
@@ -64,9 +64,5 @@ export class SelectCore extends Node {
     c.optimizerHints = this.optimizerHints;
     c.comment = this.comment;
     return c;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

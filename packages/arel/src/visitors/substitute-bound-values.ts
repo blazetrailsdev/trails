@@ -2,7 +2,7 @@
  * Replace each `?` / `$N` placeholder in a compiled SQL string with the text
  * returned by `render(placeholder, index)`, where `index` is the placeholder's
  * left-to-right ordinal (matching the bind array order produced by
- * `ToSql#compileWithBinds`).
+ * `ToSql#compile` through a `Composite` collector).
  *
  * This is the post-traversal bind-inlining step shared by `ToSql#compile` and
  * ActiveRecord's human-readable `toSql` paths. Centralizing the placeholder

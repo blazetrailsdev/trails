@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 
 /**
  * Represents a bind parameter placeholder in a prepared statement.
@@ -10,7 +10,7 @@ import { Node, NodeVisitor } from "./node.js";
  * `collector.add_bind(o.value, &bind_block)` where `BIND_BLOCK = proc { "?" }`.
  * So `new BindParam(1).toSql()`, `new BindParam(null).toSql()`, and the
  * valueless `new BindParam().toSql()` are all `"?"`. The value is recorded
- * separately, not inlined; `ToSql#compileWithBinds` returns the SQL with `?`
+ * separately, not inlined; `ToSql#compile` through a `Composite` returns the SQL with `?`
  * markers alongside the extracted bind values. (Casted/Quoted literals do
  * inline via `quote` — only BindParam/Attribute collect a placeholder.)
  */
@@ -61,9 +61,5 @@ export class BindParam extends Node {
   isUnboundable(): 1 | -1 | false {
     const v = this.value as { isUnboundable?: () => 1 | -1 | false } | null | undefined;
     return typeof v?.isUnboundable === "function" ? v.isUnboundable() : false;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
