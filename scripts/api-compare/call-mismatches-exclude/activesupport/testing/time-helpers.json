@@ -3,13 +3,6 @@
     "package": "activesupport",
     "tsFile": "testing/time-helpers.ts",
     "rubyName": "travel_to",
-    "call": "at",
-    "reason": "`Time.at(now)` builds the stubbed Time; the trails clock method takes a `Temporal.Instant` directly, so there is no `at` constructor to call."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "testing/time-helpers.ts",
-    "rubyName": "travel_to",
     "call": "stub_object",
     "kind": "args",
     "rubyArgs": [

@@ -20,6 +20,13 @@ export class RoundingHelper {
     this.options = options;
   }
 
+  /**
+   * @missingRailsCall fetch — PERMANENT: Ruby Hash#fetch with a default:
+   *   `options.fetch(:round_mode, :default)`
+   *   (number_helper/rounding_helper.rb:16) ports to the `"roundMode" in
+   *   this.options` check, which keeps fetch's stored-value-wins semantics that
+   *   `??` would not.
+   */
   round(number: unknown): unknown {
     const precision = this.absolutePrecision(number);
     if (precision == null) return number;

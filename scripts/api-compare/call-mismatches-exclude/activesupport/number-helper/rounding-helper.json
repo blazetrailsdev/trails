@@ -5,12 +5,5 @@
     "rubyName": "convert_to_decimal",
     "call": "digit_count",
     "reason": "rounding_helper.rb:47 calls `digit_count` from the `Rational` arm alone, to size the `BigDecimal(number, ndigits)` precision; there is no trails Rational. Convergeable with the Rational port; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "number-helper/rounding-helper.ts",
-    "rubyName": "round",
-    "call": "fetch",
-    "reason": "Ruby Hash#fetch with a default: `options.fetch(:round_mode, :default)` (number_helper/rounding_helper.rb:16) ports to the `\"roundMode\" in this.options` check, which keeps fetch's stored-value-wins semantics that `??` would not."
   }
 ]

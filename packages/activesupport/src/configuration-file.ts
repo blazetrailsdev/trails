@@ -18,6 +18,12 @@ export class ConfigurationFile {
     this.content = this.read(contentPath);
   }
 
+  /**
+   * @missingRailsCall load — PERMANENT: configuration_file.rb:26-28 `YAML.unsafe_load_file`
+   *   / `YAML.load_file` — Ruby's YAML/Psych is stdlib with no port; trails
+   *   reads the file through the async fs adapter and hands the source to its
+   *   own YAML parser, so no `load` call exists to make.
+   */
   static parse(
     contentPath: string,
     options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
@@ -43,6 +49,11 @@ export class ConfigurationFile {
    * instances or Symbols, so there is nothing to permit), and `freeze:` (no
    * deep-freeze pass). Everything else — `merge:`, `version:`, `schema:`,
    * `maxAliasCount:` — reaches the loader.
+   *
+   * @missingRailsCall load — PERMANENT: configuration_file.rb:26-28 `YAML.unsafe_load_file`
+   *   / `YAML.load_file` — Ruby's YAML/Psych is stdlib with no port; trails
+   *   reads the file through the async fs adapter and hands the source to its
+   *   own YAML parser, so no `load` call exists to make.
    */
   parse({
     context,

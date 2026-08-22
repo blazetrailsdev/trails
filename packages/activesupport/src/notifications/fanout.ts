@@ -388,6 +388,12 @@ export class Fanout {
     }
   }
 
+  /**
+   * @missingRailsCall transform_values — PERMANENT: Ruby Hash#transform_values:
+   *   `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
+   *   (notifications/fanout.rb:189-191) is folded into the local groupBy helper,
+   *   which emits the delegate lists directly.
+   */
   groupsFor(name: string): Map<GroupClass, Delegate[]> {
     let groups = this.groupsForCache.get(name);
     if (!groups) {

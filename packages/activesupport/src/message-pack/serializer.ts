@@ -54,6 +54,12 @@ export class Serializer {
    * @internal Memoizes extension install + handler registration, then returns
    * the factory. Ruby builds and freezes a packer/unpacker pool here; with no
    * threads to pool against, the factory itself plays the role of the pool.
+   *
+   * @missingRailsCall fetch — PERMANENT: message_pack/serializer.rb:54
+   *   `message_pack_factory.pool(ENV.fetch("RAILS_MAX_THREADS", 5).to_i)` — the
+   *   fetch reads the thread count for a Ruby connection pool of packers. JS has
+   *   one thread, so trails holds a single factory rather than a pool, and there
+   *   is no thread count to read. Language shortcoming.
    */
   protected messagePackPool(): Factory {
     if (!this.installed) {

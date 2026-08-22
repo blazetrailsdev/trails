@@ -129,6 +129,12 @@ export class MessageVerifier extends Codec {
     }
   }
 
+  /**
+   * @missingRailsCall hexdigest — PERMANENT: Rails calls `OpenSSL::HMAC.hexdigest`; trails
+   *   routes every HMAC through the crypto adapter
+   *   (`createHmac(...).digest("hex")`), which is the same digest by a different
+   *   call.
+   */
   private generateDigest(data: string): string {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
