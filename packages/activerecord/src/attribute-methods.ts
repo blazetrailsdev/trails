@@ -485,12 +485,17 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
     return;
   }
   if (this.attributeAliases) {
-    // Rails walks `aliases_by_attribute_name` (old_name => [new_names],
-    // attribute_methods.rb:133-137); this walks the inverse `attribute_aliases`
-    // (new_name => old_name). Both enumerate exactly the same (new_name,
-    // old_name) pairs — only the grouping differs, and each pair is generated
-    // independently — so the sweep is equivalent. Not routed through
-    // `aliasesByAttributeName` because activemodel does not export it.
+    // DEVIATION: Rails walks `aliases_by_attribute_name` (old_name =>
+    // [new_names], attribute_methods.rb:133-137), a per-class ivar its
+    // `inherited` hook resets to nil (activemodel/attribute_methods.rb:387-394),
+    // so a subclass generates only ITS OWN aliases — the parent's came from the
+    // `superclass.generate_alias_attributes` cascade above. This walks the
+    // inverse `attribute_aliases`, a class_attribute that INHERITS, so a
+    // subclass re-generates every inherited alias with `override: true` and
+    // takes its own descriptor where Rails leaves it inheriting the parent's.
+    // Converging also needs activemodel's `aliasesByAttributeName` to start
+    // empty per subclass instead of copying the parent, and to be exported.
+    // Story: generate-alias-attributes-from-aliases-by-attribute-name.
     CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
       for (const [newName, oldName] of Object.entries(this.attributeAliases!)) {
         generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
