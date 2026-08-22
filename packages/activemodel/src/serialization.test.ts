@@ -706,6 +706,6 @@ describe("fromJson", () => {
     u.changesApplied();
     u.fromJson('{"name":"Updated"}');
     expect(u.changed).toBe(true);
-    expect(u.changedAttributeNamesToSave).toContain("name");
+    expect(Object.keys(u.changedAttributes)).toContain("name");
   });
 });

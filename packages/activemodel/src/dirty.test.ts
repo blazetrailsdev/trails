@@ -58,8 +58,8 @@ describe("DirtyTest", () => {
   it("list of changed attribute keys", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
     p._writeAttribute("name", "Bob");
-    expect(p.changedAttributeNamesToSave).toContain("name");
-    expect(p.changedAttributeNamesToSave).not.toContain("age");
+    expect(Object.keys(p.changedAttributes)).toContain("name");
+    expect(Object.keys(p.changedAttributes)).not.toContain("age");
   });
 
   it("changes to attribute values", () => {
@@ -176,7 +176,7 @@ describe("DirtyTest", () => {
     class Bare extends Model {}
     const b = new Bare();
     expect(b.changed).toBe(false);
-    expect(b.changedAttributeNamesToSave).toEqual([]);
+    expect(Object.keys(b.changedAttributes)).toEqual([]);
   });
 
   class Person extends Model {
@@ -248,14 +248,14 @@ describe("Dirty Tracking", () => {
   it("not changed initially", () => {
     const p = new Person({ name: "dean", age: 30 });
     expect(p.changed).toBe(false);
-    expect(p.changedAttributeNamesToSave).toEqual([]);
+    expect(Object.keys(p.changedAttributes)).toEqual([]);
   });
 
   it("setting attribute will result in change", () => {
     const p = new Person({ name: "dean" });
     p._writeAttribute("name", "sam");
     expect(p.changed).toBe(true);
-    expect(p.changedAttributeNamesToSave).toContain("name");
+    expect(Object.keys(p.changedAttributes)).toContain("name");
   });
 
   it("attributeWas returns original value", () => {
@@ -368,23 +368,6 @@ describe("attributeBeforeTypeCast", () => {
   });
 });
 
-describe("changedAttributeNamesToSave", () => {
-  it("changedAttributeNamesToSave lists pending changes", () => {
-    class Widget extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("size", "integer");
-      }
-    }
-
-    const w = new Widget({ name: "Test", size: 5 });
-    w.changesApplied();
-    w._writeAttribute("name", "Changed");
-    expect(w.changedAttributeNamesToSave).toContain("name");
-    expect(w.changedAttributeNamesToSave).not.toContain("size");
-  });
-});
-
 describe("clearChangesInformation", () => {
   it("clear_changes_information should reset all changes", () => {
     class Person extends Model {
@@ -420,11 +403,11 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio");
-    expect(m.changedAttributeNamesToSave).toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).toContain("ratio");
 
     m.clearAttributeChanges(["ratio"]);
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).not.toContain("ratio");
   });
 });
 
@@ -441,12 +424,12 @@ describe("clearAttributeChanges", () => {
     p.changesApplied();
     p._writeAttribute("name", "Bob");
     p._writeAttribute("age", 31);
-    expect(p.changedAttributeNamesToSave).toContain("name");
-    expect(p.changedAttributeNamesToSave).toContain("age");
+    expect(Object.keys(p.changedAttributes)).toContain("name");
+    expect(Object.keys(p.changedAttributes)).toContain("age");
 
     p.clearAttributeChanges(["name"]);
-    expect(p.changedAttributeNamesToSave).not.toContain("name");
-    expect(p.changedAttributeNamesToSave).toContain("age");
+    expect(Object.keys(p.changedAttributes)).not.toContain("name");
+    expect(Object.keys(p.changedAttributes)).toContain("age");
   });
 });
 
@@ -553,94 +536,6 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
   });
 });
 
-describe("changesToSave", () => {
-  it("returns the changes hash for unsaved attributes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-    User.attribute("age", "integer");
-
-    const u = new User({ name: "Alice", age: 25 });
-    u._writeAttribute("name", "Bob");
-    const changes = u.changesToSave;
-    expect(changes["name"]).toEqual(["Alice", "Bob"]);
-    expect(changes["age"]).toBeUndefined();
-  });
-
-  it("returns empty object when no changes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect(u.changesToSave).toEqual({});
-  });
-});
-
-describe("attributesInDatabase", () => {
-  it("returns database values for changed attributes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-    User.attribute("age", "integer");
-
-    const u = new User({ name: "Alice", age: 25 });
-    u._writeAttribute("name", "Bob");
-    u._writeAttribute("age", 30);
-    const dbValues = u.attributesInDatabase;
-    expect(dbValues["name"]).toBe("Alice");
-    expect(dbValues["age"]).toBe(25);
-  });
-
-  it("returns empty object when no changes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect(u.attributesInDatabase).toEqual({});
-  });
-});
-
-describe("hasChangesToSave", () => {
-  it("returns false when no changes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect(u.hasChangesToSave).toBe(false);
-  });
-
-  it("returns true when there are unsaved changes", () => {
-    class User extends Model {
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    u._writeAttribute("name", "Bob");
-    expect(u.hasChangesToSave).toBe(true);
-  });
-});
-
 describe("numeric type.isChanged integration via dirty tracking", () => {
   it("integer attribute set to non-numeric string still appears in changes — number_to_non_number? path", () => {
     class Item extends Model {
@@ -653,7 +548,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const item = new Item({ count: 10 });
     item.changesApplied();
     item._writeAttribute("count", "abc");
-    expect(item.changedAttributeNamesToSave).toContain("count");
+    expect(Object.keys(item.changedAttributes)).toContain("count");
   });
 
   it("force-change is cleared by restoreAttributes — forced flag must not survive restore", () => {
@@ -667,11 +562,11 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio");
-    expect(m.changedAttributeNamesToSave).toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).toContain("ratio");
 
     m.restoreAttributes();
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).not.toContain("ratio");
   });
 
   it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
@@ -685,11 +580,11 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio");
-    expect(m.changedAttributeNamesToSave).toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).toContain("ratio");
 
     m.changesApplied();
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).not.toContain("ratio");
   });
 
   it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
@@ -704,7 +599,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.changesApplied();
     m._dirty.forceChange("ratio");
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,
     // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
     expect(m.changes["ratio"]).toEqual([NaN, NaN]);
@@ -721,7 +616,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).not.toContain("ratio");
     expect(m.changes).not.toHaveProperty("ratio");
   });
 
@@ -736,7 +631,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const item = new Item({ count: 1 });
     item.changesApplied();
     item._writeAttribute("count", true);
-    expect(item.changedAttributeNamesToSave).toContain("count");
+    expect(Object.keys(item.changedAttributes)).toContain("count");
   });
 
   it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
@@ -750,9 +645,9 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._writeAttribute("ratio", 1.0);
-    expect(m.changedAttributeNamesToSave).toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).toContain("ratio");
     m._writeAttribute("ratio", NaN);
-    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
+    expect(Object.keys(m.changedAttributes)).not.toContain("ratio");
   });
 });
 

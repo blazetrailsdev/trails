@@ -269,6 +269,7 @@ import {
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
+import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
 import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
@@ -4387,6 +4388,38 @@ export interface Base extends Included<typeof AutosaveAssociation> {
    */
   loadHasOne(name: string): Promise<Base | null>;
   /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
+   * (attribute_methods/dirty.rb:118-120). A zero-arg Ruby reader, so an
+   * accessor property here — see CLAUDE.md, "Generated attribute readers are
+   * properties". Ported on the `Dirty` class module and mixed in, as
+   * {@link Base.attributeBeforeLastSave} is.
+   */
+  readonly savedChanges: Record<string, [unknown, unknown]>;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save?
+   * (attribute_methods/dirty.rb:169-171). Accessor property and mixed in as
+   * {@link Base.savedChanges} is.
+   */
+  readonly hasChangesToSave: boolean;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changes_to_save
+   * (attribute_methods/dirty.rb:175-177). Accessor property and mixed in as
+   * {@link Base.savedChanges} is.
+   */
+  readonly changesToSave: Record<string, [unknown, unknown]>;
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changed_attribute_names_to_save
+   * (attribute_methods/dirty.rb:181-183). Accessor property and mixed in as
+   * {@link Base.savedChanges} is.
+   */
+  readonly changedAttributeNamesToSave: string[];
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
+   * (attribute_methods/dirty.rb:191-193). Accessor property and mixed in as
+   * {@link Base.savedChanges} is.
+   */
+  readonly attributesInDatabase: Record<string, unknown>;
+  /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
    * (attribute_methods/dirty.rb:108-110).
    *
@@ -4721,6 +4754,9 @@ include(Base, {
   storeAccessorFor: _storeAccessorFor,
 });
 include(Base, ModelSchema.InstanceMethods);
+// The accessor-property half of AttributeMethods::Dirty. A class module, so
+// `include()` copies the getter descriptors rather than flattening them.
+include(Base, _Dirty);
 include(Base, _PrimaryKey);
 // Rails includes CompositePrimaryKey into a model when `primary_key=` takes an
 // Array (primary_key.rb:132); each of its bodies opens with the
@@ -4861,10 +4897,9 @@ include(Base, {
     return TouchLater.hasDeferTouchAttrs(this);
   },
   // savedChanges/hasChangesToSave/changesToSave/changedAttributeNamesToSave/
-  // attributesInDatabase — getters on Model.prototype; wiring via include() replaces
-  // the getter descriptor with a data property and breaks behavior. Category A.
-  // savedChangeToAttribute — on Model (returns boolean); AR version returns [T,T]|null
-  // pair — overriding breaks tests. Category A: resolved via Model inheritance.
+  // attributesInDatabase are accessor properties, so they arrive with
+  // `include(Base, _Dirty)` above — this object literal is read by value and
+  // would flatten them into data properties.
   // CounterCache privates
   _foreignKeysEqual: CounterCache._foreignKeysEqual,
   // Associations privates
