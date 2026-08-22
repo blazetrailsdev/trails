@@ -1,3 +1,12 @@
+/**
+ * The JS half of Ruby's `object.class`, for `Visitor#visit` dispatch.
+ *
+ * @noRailsEquivalent PERMANENT — `Visitor#visit` dispatches on
+ * `dispatch[object.class]` (visitor.rb:29), and every Ruby value has a class.
+ * A JS primitive has none, so the class name Ruby would have dispatched on has
+ * to be computed; `visitor.ts:102-121` is the call site. No Ruby file has a
+ * counterpart because Ruby needs none.
+ */
 import { temporalClassName, temporalTag } from "../temporal-tag.js";
 
 /**

@@ -77,6 +77,17 @@ describe("Delegation.generate", () => {
     expect(p.my_greet()).toBe("hello");
   });
 
+  it("raises NoMethodError when the target does not answer the method", () => {
+    class Greeter {}
+    class Person {
+      greeter = new Greeter();
+    }
+    Delegation.generate(Person.prototype, ["greet"], { to: "greeter" });
+    const p = new Person() as Person & { greet: () => string };
+    expect(() => p.greet()).toThrow(/undefined method 'greet'/);
+    expect(() => p.greet()).not.toThrow(DelegationError);
+  });
+
   it("throws when no target specified", () => {
     expect(() => {
       Delegation.generate({}, ["greet"], { to: "" });
@@ -85,6 +96,31 @@ describe("Delegation.generate", () => {
 });
 
 describe("Delegation.generateMethodMissing", () => {
+  it("raises NoMethodError when a non-nil target does not answer the method", () => {
+    const obj = Delegation.generateMethodMissing({ delegate: {} } as object, "delegate") as Record<
+      string,
+      () => unknown
+    >;
+
+    expect("nonexistentMethod" in obj).toBe(false);
+    expect(() => obj["nonexistentMethod"]()).toThrow(/undefined method 'nonexistentMethod'/);
+  });
+
+  it("does not answer marshal_dump or _dump but still forwards an explicit call", () => {
+    const delegate = {
+      marshal_dump() {
+        return "dumped";
+      },
+    };
+    const obj = Delegation.generateMethodMissing({ delegate } as object, "delegate") as Record<
+      string,
+      () => string
+    >;
+
+    expect("marshal_dump" in obj).toBe(false);
+    expect(obj["marshal_dump"]()).toBe("dumped");
+  });
+
   it("proxies method calls to delegate", () => {
     const delegate = {
       greet() {

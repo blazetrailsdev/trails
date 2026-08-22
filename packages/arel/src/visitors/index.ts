@@ -1,5 +1,4 @@
 export { ToSql, type ArelConnection } from "./to-sql.js";
-export { substituteBoundValues } from "./substitute-bound-values.js";
 export {
   splitSchemaQualifiedName,
   quoteSchemaQualifiedName,

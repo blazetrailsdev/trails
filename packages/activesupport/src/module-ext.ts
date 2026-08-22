@@ -1,5 +1,6 @@
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
+import { Delegation, type DelegateOptions } from "./delegation.js";
 
 /**
  * Module extensions mirroring Rails ActiveSupport module/class extensions.
@@ -7,72 +8,45 @@ import { constantize } from "./inflector.js";
  */
 
 /**
- * delegate — creates methods on target that forward to another property.
- * Mirrors Rails Module#delegate.
+ * delegate — provides a delegate class method to easily expose contained
+ * objects' public methods as your own.
+ *
+ * Mirrors: Module#delegate (`core_ext/module/delegation.rb:160-170`), a thin
+ * front for `ActiveSupport::Delegation.generate`.
+ *
+ * @missingRailsArgs generate — PERMANENT: `location:` names the
+ * `caller_locations` line Ruby stamps on the source `module_eval` compiles, and
+ * `private:` sets the generated `def`'s visibility. TS defines the delegators
+ * directly with `Object.defineProperty` and has no runtime method visibility,
+ * so neither keyword has a counterpart to carry.
  *
  * Usage:
  *   delegate(MyClass.prototype, "street", "city", { to: "place" });
  *   delegate(MyClass.prototype, "name", { to: "place", prefix: true });
  */
-export function delegate(
-  target: object,
-  ...args: [...string[], { to: string; prefix?: boolean | string; allowNil?: boolean }]
-): string[] {
-  const options = args[args.length - 1] as {
-    to: string;
-    prefix?: boolean | string;
-    allowNil?: boolean;
-  };
+export function delegate(target: object, ...args: [...string[], DelegateOptions]): string[] {
+  const options = args[args.length - 1] as DelegateOptions;
   const methods = args.slice(0, -1) as string[];
-  const { to, prefix, allowNil = false } = options;
+  const { to, prefix, allowNil } = options;
 
-  const generatedNames: string[] = [];
-
-  for (const method of methods) {
-    let methodName: string;
-    if (prefix === true) {
-      methodName = `${to}_${method}`;
-    } else if (typeof prefix === "string" && prefix) {
-      methodName = `${prefix}_${method}`;
-    } else {
-      methodName = method;
-    }
-
-    generatedNames.push(methodName);
-
-    Object.defineProperty(target, methodName, {
-      configurable: true,
-      enumerable: false,
-      get(this: Record<string, unknown>) {
-        const delegatee = this[to];
-        if (delegatee === null || delegatee === undefined) {
-          if (allowNil) return undefined;
-          throw new Error(`${methodName} delegated to ${to}, but ${to} is nil`);
-        }
-        return (delegatee as Record<string, unknown>)[method];
-      },
-      set(this: Record<string, unknown>, value: unknown) {
-        const delegatee = this[to];
-        if (delegatee === null || delegatee === undefined) {
-          if (allowNil) return;
-          throw new Error(`${methodName} delegated to ${to}, but ${to} is nil`);
-        }
-        (delegatee as Record<string, unknown>)[method] = value;
-      },
-    });
-  }
-
-  return generatedNames;
+  return Delegation.generate(target, methods, { to, prefix, allowNil });
 }
 
 /**
- * delegateMissingTo — forwards any missing method calls to the named property.
- * Mirrors Rails Module#delegate_missing_to.
+ * delegateMissingTo — forwards any method the receiver does not define to the
+ * named property.
+ *
+ * Mirrors: Module#delegate_missing_to
+ * (`core_ext/module/delegation.rb:218-224`). Ruby defines `method_missing` on
+ * the owner; the trails idiom is a `Proxy`, so this returns the wrapped object
+ * rather than mutating `target` in place.
  */
-export function delegateMissingTo(target: object, property: string): void {
-  // In TypeScript/JS we implement this via a Proxy wrapper helper.
-  // This attaches a marker; the proxy must be applied at construction time.
-  (target as Record<string, unknown>).__delegateMissingTo__ = property;
+export function delegateMissingTo<T extends object>(
+  target: T,
+  property: string,
+  { allowNil }: { allowNil?: boolean } = {},
+): T {
+  return Delegation.generateMethodMissing(target, property, { allowNil });
 }
 
 export interface MattrOptions {
