@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Nodes, Table, Visitors } from "@blazetrails/arel";
+import { Nodes, Table, Visitors, Collectors } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -16,6 +16,11 @@ import type { Base } from "../index.js";
 import { escapeRegExp, quoteTableName, quoteColumnName } from "../support/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
+
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector) as [string, unknown[]];
+}
 
 // trails-specific regression guard (no Rails counterpart): Base.predicateBuilder
 // is now TableMetadata-backed, and that metadata is bound to the class. The memo
@@ -56,7 +61,8 @@ describe("PredicateBuilder positive-equality bind typing", () => {
   });
 
   it("leaves an in-range joined equality as a bound predicate", () => {
-    const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
+    const [sql, binds] = compileWithBinds(
+      new Visitors.ToSql(testConnection),
       buildJoinedEquality(7n),
     );
     expect(sql).not.toContain("1=0");

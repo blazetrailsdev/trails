@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
 import { Fragments } from "./fragments.js";
@@ -69,9 +69,5 @@ export class BoundSqlLiteral extends NodeExpression {
       throw new TypeError("Expected Arel node");
     }
     return new Fragments([this, other]);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

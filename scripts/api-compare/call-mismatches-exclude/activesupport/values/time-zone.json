@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
-    "rubyName": "iso8601",
-    "call": "ordinal",
-    "reason": "Rails' iso8601 resolves an ordinal date through `Date.ordinal(year, parts.fetch(:yday))` (time_zone.rb:405) after `Date._iso8601` has parsed the string into parts; trails has neither `Date._iso8601` nor `Date.ordinal`, so the ordinal `YYDDD` form is recognised by its own regex arm and converted with day-of-year arithmetic. Blocked on porting `Date._iso8601`/`Date.ordinal`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
     "rubyName": "now",
     "call": "in_time_zone",
     "reason": "Same round trip as the `at` row above: `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518) reaches the same `new TimeWithZone(instant, self)` that this body already performs, and going through `in_time_zone` would close the `values/time-zone` -> `core-ext/date-and-time/zones` import cycle."

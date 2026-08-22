@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { testConnection, postgresqlTestConnection } from "../test-helpers/connection.js";
-import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
+import { Table, star, SelectManager, Nodes, Visitors, Collectors } from "../index.js";
 import { Temporal } from "@blazetrails/date";
+
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector) as [string, unknown[]];
+}
 
 describe("PostgresTest", () => {
   const users = new Table("users");
@@ -135,7 +140,7 @@ describe("PostgresTest", () => {
       const visitor = new Visitors.PostgreSQLWithBinds(postgresqlTestConnection);
       const a = users.get("id").eq(new Nodes.BindParam(42));
       const b = users.get("name").eq(new Nodes.BindParam("alice"));
-      const [sql, binds] = visitor.compileWithBinds(new Nodes.And([a, b]));
+      const [sql, binds] = compileWithBinds(visitor, new Nodes.And([a, b]));
       expect(sql).toContain("$1");
       expect(sql).toContain("$2");
       expect(sql).not.toContain("42");
@@ -147,7 +152,7 @@ describe("PostgresTest", () => {
       const visitor = new Visitors.PostgreSQLWithBinds(postgresqlTestConnection);
       const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
       const node = users.get("created_at").eq(new Nodes.Quoted(d));
-      const [sql, binds] = visitor.compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(visitor, node);
       // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
       expect(sql).toContain("2020-01-02");
       expect(sql).not.toContain("$1");

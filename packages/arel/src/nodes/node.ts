@@ -23,8 +23,6 @@ export const _engine: { current: ArelEngine | null } = { current: null };
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class Node {
-  abstract accept<T>(visitor: NodeVisitor<T>): T;
-
   not(): Node {
     assertRegistered("Not");
     return new _registry.Not!(this);

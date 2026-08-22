@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
+import { ArgumentError } from "./hash-utils.js";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {
@@ -165,5 +166,18 @@ describe("TimeZoneLocalPeriodsTest", () => {
     expect(zone().localToUtc(new Date(Date.UTC(2006, 9, 29, 1, 30)))).toEqual(
       new Date(Date.UTC(2006, 9, 29, 5, 30)),
     );
+  });
+
+  it("iso8601 and rfc3339 keep sub-millisecond digits", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(eastern.iso8601("1999-12-31T19:00:00.123456789").nsec).toBe(123456789);
+    expect(eastern.rfc3339("1999-12-31T19:00:00.123456789-05:00").nsec).toBe(123456789);
+  });
+
+  it("iso8601 and rfc3339 raise ArgumentError on an invalid date", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(() => eastern.iso8601(null)).toThrow(ArgumentError);
+    expect(() => eastern.iso8601("foobar")).toThrow(ArgumentError);
+    expect(() => eastern.rfc3339("1999-12-31")).toThrow(ArgumentError);
   });
 });

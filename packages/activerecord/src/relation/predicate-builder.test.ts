@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
-import { Table, Visitors, Nodes } from "@blazetrails/arel";
+import { Table, Visitors, Nodes, Collectors } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
@@ -13,6 +13,11 @@ import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 import { ValueType } from "@blazetrails/activemodel";
+
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector) as [string, unknown[]];
+}
 
 // Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map
 // converting any attribute name to a caster — because `Table#type_for_attribute`
@@ -199,7 +204,7 @@ describe("PredicateBuilderTest", () => {
     it("builds BETWEEN for ranges", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65) });
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toMatch(/BETWEEN \? AND \?/);
       expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
@@ -212,7 +217,7 @@ describe("PredicateBuilderTest", () => {
     it("does not dereference a plain object literal to its id", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), { id: 5 });
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toContain('"posts"."title" = ?');
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
@@ -220,7 +225,7 @@ describe("PredicateBuilderTest", () => {
     it("does not dereference a plain object literal inside an array", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), [{ id: 5 }]);
-      const [, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
 
@@ -241,7 +246,7 @@ describe("PredicateBuilderTest", () => {
     it("handles exclusive ranges", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65, true) });
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toMatch(/>= \?/);
       expect(sql).toMatch(/< \?/);
       expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
@@ -265,7 +270,7 @@ describe("PredicateBuilderTest", () => {
       const feTable = new Table("posts", { typeCaster: { typeForAttribute: () => forceEqType } });
       const builder = new PredicateBuilder(new TableMetadata(null, feTable));
       const node = builder.build(feTable.get("tags"), [1, 2]);
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toContain('"posts"."tags" = ?');
       expect(sql).not.toMatch(/IN \(/);
       expect(binds).toHaveLength(1);
@@ -304,7 +309,7 @@ describe("PredicateBuilderTest", () => {
       // `NOT (age >= 18 AND age < 65)` (And has no invert override).
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = buildInverted(builder, { age: new Range(18, 65, true) });
-      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toMatch(/^NOT \(/);
       expect(sql).toMatch(/>= \?/);
       expect(sql).toMatch(/< \?/);
@@ -349,7 +354,7 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql(testConnection);
-      const [sql, binds] = visitor.compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(visitor, node);
       expect(sql).toContain('"users"."name" = ?');
       expect(binds).toHaveLength(1);
     });
@@ -359,7 +364,7 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), new Substitute());
       const visitor = new Visitors.ToSql(testConnection);
-      const [sql, binds] = visitor.compileWithBinds(node);
+      const [sql, binds] = compileWithBinds(visitor, node);
       expect(sql).toContain('"users"."name" = ?');
       expect(binds).toHaveLength(1);
       expect((binds[0] as any).valueBeforeTypeCast).toBeInstanceOf(Substitute);
@@ -373,7 +378,7 @@ describe("PredicateBuilderTest", () => {
       // The value is wrapped in a BindParam, so raw Arel compile emits `?`
       // (mirrors Rails); the value is carried as a bind, not inlined.
       expect(visitor.compile(node)).toBe('"users"."name" = ?');
-      const [, binds] = visitor.compileWithBinds(node);
+      const [, binds] = compileWithBinds(visitor, node);
       expect(binds).toHaveLength(1);
     });
   });

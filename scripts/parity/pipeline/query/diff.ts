@@ -234,7 +234,7 @@ async function main(): Promise<void> {
       // paramSql and binds are informational-only — excluded from cross-side comparison:
       //   - Rails SQLite inlines datetime values in to_sql() → bound_attributes is empty
       //     → binds = [], paramSql = sql.
-      //   - trails extracts datetime values via compileWithBinds → binds is non-empty,
+      //   - trails extracts datetime values via a Composite collector → binds is non-empty,
       //     paramSql has ? placeholders.
       // This structural asymmetry means cross-side bind comparison would always fail for
       // datetime fixtures regardless of semantic correctness. Both fields remain in the

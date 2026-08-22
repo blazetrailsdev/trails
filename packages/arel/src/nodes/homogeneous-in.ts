@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
 import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 
@@ -101,9 +101,5 @@ export class HomogeneousIn extends Node {
   // / parity:api privates coverage.
   protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
     return [this.attribute, this.values, this.type];
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

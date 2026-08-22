@@ -1,4 +1,4 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
 import { NodeExpression, registerBuildQuoted } from "./node-expression.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
@@ -85,10 +85,6 @@ export class Casted extends NodeExpression {
     }
     return this.value;
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
 }
 
 /**
@@ -136,9 +132,5 @@ export class Quoted extends Unary {
 
   get value(): unknown {
     return this.expr;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

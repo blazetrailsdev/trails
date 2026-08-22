@@ -209,7 +209,7 @@ export class StatementCache {
       unknown[],
     ];
 
-    // The prepared path (compileWithBinds) already unwraps each collected
+    // The prepared path (the Composite collector) already unwraps each collected
     // BindParam to its `.value`; the unprepared PartialQueryCollector path
     // hands back the raw BindParam nodes. Normalize here so BindMap sees the
     // bound attributes/Substitutes directly — otherwise a concrete bind (e.g.

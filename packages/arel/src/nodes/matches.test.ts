@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { testConnection } from "../test-helpers/connection.js";
-import { Table, Nodes } from "../index.js";
+import { Table, Nodes, Visitors, Collectors } from "../index.js";
+
+function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
+  const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+  return visitor.compile(node as never, collector) as [string, unknown[]];
+}
 
 describe("MatchesTest", () => {
   const users = new Table("users");
@@ -29,7 +34,7 @@ describe("MatchesTest", () => {
       const { Visitors } = await import("../index.js");
       const node = users.get("name").matches("x%", "!");
       const visitor = new Visitors.ToSql(testConnection);
-      const [sql] = visitor.compileWithBinds(node);
+      const [sql] = compileWithBinds(visitor, node);
       expect(sql).toContain("ESCAPE '!'");
       expect(sql).not.toContain("ESCAPE ?");
     });

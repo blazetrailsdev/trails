@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Calculations
  */
 
-import { Nodes, Table, SelectManager } from "@blazetrails/arel";
+import { Collectors, Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
@@ -83,7 +83,7 @@ interface AliasingConnection {
 
 interface CalculationConnection {
   adapterName: AdapterName;
-  visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
+  visitor?: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
   quoteTableName(name: string): string;
@@ -312,7 +312,7 @@ function typeCastCalcBind(b: unknown): unknown {
 
 function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
   const conn = rel._conn() as {
-    visitor?: { compileWithBinds?(ast: unknown): [string, unknown[], boolean, boolean] };
+    visitor?: { compile(ast: unknown, collector: unknown): [string, unknown[]] };
     toSql(m: unknown): string;
     preparedStatements?: boolean;
     bindParamsLength?(): number;
@@ -322,8 +322,9 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
   // the collector is a `SubstituteBinds`, so every value inlines and no binds
   // are sent — not just the over-limit case below.
   if (conn.preparedStatements === false) return [conn.toSql(manager), []];
-  if (visitor?.compileWithBinds) {
-    const [sql, rawBinds] = visitor.compileWithBinds(manager.ast);
+  if (visitor?.compile) {
+    const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+    const [sql, rawBinds] = visitor.compile(manager.ast, collector);
     const binds = rawBinds.map(typeCastCalcBind);
     // Mirrors Rails to_sql_and_binds (database_statements.rb:36-38): when the
     // bind count exceeds the adapter's parameter cap, fall back to an inlined

@@ -29,6 +29,7 @@ import { join, resolve, dirname, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
 import { assertPackagesBuilt } from "./assert-packages-built.js";
+import { Collectors } from "@blazetrails/arel";
 import type { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
@@ -199,7 +200,7 @@ async function main(): Promise<void> {
 
     // 5. Extract SQL — two forms:
     //    a) Inlined: toSql() with all values embedded as literals.
-    //    b) Parameterized: compileWithBinds extracts date values as bind
+    //    b) Parameterized: a Composite collector extracts date values as bind
     //       params (? placeholders), matching the execution path Rails uses
     //       for INSERT/UPDATE and how AR actually passes values to the driver.
     const sqlStr = (result as { toSql(): string }).toSql().trim();
@@ -220,9 +221,15 @@ async function main(): Promise<void> {
           const visitor = (Base.adapter as { visitor?: InstanceType<typeof Visitors.ToSql> })
             .visitor;
           if (visitor == null) throw new Error("connection has no Arel visitor");
+          const collector = new Collectors.Composite(
+            new Collectors.SQLString(),
+            new Collectors.Bind(),
+          );
           const [ps, bs] = (
-            visitor as unknown as { compileWithBinds(node: unknown): [string, unknown[]] }
-          ).compileWithBinds((manager as { ast: unknown }).ast);
+            visitor as unknown as {
+              compile(node: unknown, collector: unknown): [string, unknown[]];
+            }
+          ).compile((manager as { ast: unknown }).ast, collector);
           // Resolve QueryAttribute/BindParam wrappers to their DB value first.
           const resolvedBinds = bs.map((b) => {
             if (b != null && typeof b === "object" && "valueForDatabase" in b) {
