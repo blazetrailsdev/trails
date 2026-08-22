@@ -279,6 +279,14 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
+  /**
+   * @missingRailsCall each_key — PERMANENT: Per-site verified (RFC 0106 wave
+   *   4b): pool_config.rb:20 is `INSTANCES.each_key(&:discard_pool!)` over the
+   *   `ObjectSpace::WeakMap` at pool_config.rb:15, used as a set of weakly-held
+   *   configs; trails' INSTANCES is a Set of WeakRefs walked with `for..of`
+   *   (pool-config.ts:287-305), which also has to skip collected refs.
+   *   `WeakMap#each_key` has no ported analogue.
+   */
   static async discardPoolsBang(): Promise<void> {
     // Match Rails' `INSTANCES.each_key(&:discard_pool!)`: take each config's
     // monitor and discard (and null) its pool, with no inter-pool waiting, so a
@@ -298,6 +306,11 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
+  /**
+   * @missingRailsCall each_key — PERMANENT: Per-site verified (RFC 0106 wave
+   *   4b): pool_config.rb:23-25 is the same `INSTANCES.each_key { ... }` idiom
+   *   over the WeakRef Set (pool-config.ts:306-320).
+   */
   static async disconnectAllBang(): Promise<void> {
     const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {

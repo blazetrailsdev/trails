@@ -163,7 +163,23 @@ export class EncryptableRecord {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall encrypted_attribute? — PERMANENT: Rails' reader lives in
+   *   an anonymous `Module.new` that is `include`d so its body can call
+   *   `super()` (encryptable_record.rb:110-118), and the `encrypted_attribute?`
+   *   guard only exists to decide between that `super()` value and the original
+   *   column; TS has no ancestor chain to `super()` into from a mixin, so trails
+   *   redefines the prototype accessor to read the original attribute directly
+   *   and the guard has nothing to guard.
+   * @missingRailsCall include — PERMANENT: Rails mixes the overriding
+   *   reader/writer in with `include(Module.new { ... })`
+   *   (encryptable_record.rb:110-123) so the generated methods can `super()`
+   *   into the attribute methods; TS has no ancestor chain, so trails defines
+   *   the accessor pair on the prototype with `Object.defineProperty` and there
+   *   is no module to include.
+   */
   static overrideAccessorsToPreserveOriginal(
     modelClass: any,
     name: string,
@@ -460,6 +476,12 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  * `decorate_attributes` block (encryptable_record.rb:85-88).
  *
  * @internal
+ *
+ * @missingRailsCall order:constructor,schemeFor — PERMANENT: Rails calls
+ *   `scheme_for` then `EncryptedAttributeType.new` inside the
+ *   `decorate_attributes` block (encryptable_record.rb:88-91); trails builds the
+ *   pending decorator first and hangs `schemeFor` off a lazy `scheme` getter on
+ *   it, so the constructor is recorded ahead of `schemeFor`.
  */
 export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
   const modelClass = this;

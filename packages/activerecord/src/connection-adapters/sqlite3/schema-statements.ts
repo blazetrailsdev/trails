@@ -101,6 +101,14 @@ const INDEX_ON_REGEX =
  * Houses the SQLite index introspection in the file Rails keeps it in; the
  * adapter delegates here. Schema-qualified names (e.g. `temp.widgets`) place
  * the qualifier before the PRAGMA keyword.
+ *
+ * @missingRailsCall quote_table_name — PERMANENT: Per-site verified (RFC 0106
+ *   wave 4b): sqlite3/schema_statements.rb:9 is `PRAGMA
+ *   index_list(#{quote_table_name(table_name)})`; trails splits an
+ *   attached-schema-qualified name first and quotes the two halves with
+ *   `quoteColumnName` (sqlite3/schema-statements.ts:109-116), because PRAGMA
+ *   takes `schema.table` as two separately-quoted identifiers, not one quoted
+ *   string.
  */
 export async function indexes(
   adapter: DatabaseAdapter,
@@ -174,6 +182,12 @@ function splitTableName(tableName: string): { schema: string; bare: string } {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
+ *
+ * @missingRailsCall any? — PERMANENT: Per-entry verified (RFC 0072 sqlite3
+ *   introspection cluster): Rails schema_statements.rb:88 ends the query_values
+ *   probe with a block-less `.any?`; the port spells that emptiness test as
+ *   `.length > 0` (JS arrays have no `any?`), same as the other `#any?` ->
+ *   `.length > 0` entries in this baseline.
  */
 export async function virtualTableExists(
   adapter: DatabaseAdapter,
@@ -276,7 +290,15 @@ export function dataSourceSql(name?: string, { type }: { type?: string } = {}): 
   return sql;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall quote — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+ *   sqlite3/schema_statements.rb:202 is `quote(name)`; trails' `quote` is a
+ *   `this`-typed dispatch function needing the adapter as receiver, and
+ *   `quotedScope` is a free function with no adapter in hand, so it applies the
+ *   same `''`-doubling inline (sqlite3/schema-statements.ts:293).
+ */
 export function quotedScope(
   name?: string,
   { type }: { type?: string } = {},

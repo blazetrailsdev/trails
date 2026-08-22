@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/cipher/aes256-gcm.ts",
-    "rubyName": "encrypt",
-    "call": "order:generateIv,constructor",
-    "reason": "Rails builds `OpenSSL::Cipher.new` before `generate_iv` (aes256_gcm.rb:38-43) only so `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv` takes the IV as a constructor argument, so the IV must be produced first and the two calls necessarily swap order."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/cipher/aes256-gcm.ts",
     "rubyName": "generate_deterministic_iv",
     "call": "digest",
     "kind": "args",
@@ -18,12 +11,5 @@
       "ref:clearText"
     ],
     "reason": "aes256_gcm.rb:94 `OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, @secret, clear_text)` is one-shot; node's HMAC is streaming, so the same three arguments land on `createHmac(\"sha256\", key).update(clearText).digest()` (aes256-gcm.ts:163-166) and `digest` itself takes none. Language shortcoming."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/cipher/aes256-gcm.ts",
-    "rubyName": "generate_deterministic_iv",
-    "call": "new",
-    "reason": "`OpenSSL::Digest::SHA256.new` (aes256_gcm.rb:95) names the digest as an object; Node's `createHmac(\"sha256\", key)` names it as a string argument, so there is no constructor call to make."
   }
 ]

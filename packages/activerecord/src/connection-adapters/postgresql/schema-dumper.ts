@@ -250,7 +250,14 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream.push("");
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   postgresql/schema_dumper.rb:43 guards with `if (exclusion_constraints = @connection.exclusion_constraints(table)).any?`;
+   *   trails guards with `.length === 0` on the JS array — `Enumerable#any?`
+   *   without a block is not a ported method name.
+   */
   protected async exclusionConstraintsInCreate(table: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: ExclusionConstraintDefinition[] =
@@ -271,7 +278,13 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream.push(stmts.sort().join("\n"));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   the same guard at postgresql/schema_dumper.rb:65 — `Enumerable#any?`
+   *   without a block is a `.length` check on the JS array.
+   */
   protected async uniqueConstraintsInCreate(table: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: UniqueConstraintDefinition[] =

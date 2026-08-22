@@ -59,6 +59,13 @@ export class Column extends BaseColumn {
     this.extra = options.extra ?? "";
   }
 
+  /**
+   * @missingRailsCall match? — PERMANENT: Per-entry verified (RFC 0032
+   *   wide-entry verification): Rails mysql/column.rb:9-11 runs the unsigned
+   *   regex against sql_type on every call; trails mysql/column.ts:12 stores
+   *   `unsigned` as a readonly boolean computed when the adapter builds columns
+   *   from SHOW FULL FIELDS.
+   */
   isUnsigned(): boolean {
     return this.unsigned;
   }
@@ -75,6 +82,13 @@ export class Column extends BaseColumn {
     return this.autoIncrement;
   }
 
+  /**
+   * @missingRailsCall match? — PERMANENT: Per-entry verified (RFC 0032
+   *   wide-entry verification): Rails mysql/column.rb:22-24 runs the
+   *   VIRTUAL/STORED/PERSISTENT regex against extra on every call; trails
+   *   mysql/column.ts:14 stores `virtual` as a readonly boolean computed at
+   *   column construction.
+   */
   isVirtual(): boolean {
     return this.virtual;
   }

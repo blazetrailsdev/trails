@@ -146,6 +146,13 @@ const MULTI_STATEMENTS_BIT = 0x10000;
  * prepared statements, but that path is deferred pending ExplainRegistry wiring.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#select_all
+ *
+ * @missingRailsCall unprepared_statement — PERMANENT: Per-site verified (RFC
+ *   0106 wave 4b): mysql2/database_statements.rb's `select_all` wraps the super
+ *   call in `unprepared_statement { }` when the arel is not preparable; trails'
+ *   Mysql2 select_all delegates to the abstract implementation, which owns the
+ *   unprepared-statement guard (abstract/database-statements.ts), so the block
+ *   is applied one level up.
  */
 export async function selectAll(
   this: DatabaseStatementsHost,
@@ -165,6 +172,14 @@ export async function selectAll(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch
  * @internal
+ *
+ * @missingRailsCall raw_execute — PERMANENT: Per-site verified (RFC 0106 wave
+ *   4b): mysql2/database_statements.rb's `execute_batch` calls
+ *   `raw_execute(combine_multi_statements(statements), name, batch: true)`;
+ *   trails routes the batch through `internalExecute` so the multi-statement
+ *   flag and the retry/materialize kwargs travel with it — see project note
+ *   `_inQueryTransformers leaks off preprocessQuery` for why the batch path must
+ *   not re-enter rawExecute directly.
  */
 export async function executeBatch(
   this: MaxAllowedPacketHost & { execute(sql: string, name?: string | null): Promise<unknown> },

@@ -410,12 +410,26 @@ export function buildTruncateStatement(this: QuoteTableNameHost | void, tableNam
   return `DELETE FROM ${quoted}`;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+ *   sqlite3/database_statements.rb:136 is `result.rows.first`, which is
+ *   `result.rows[0]` on a JS array; `Array#first` is not a ported method name.
+ */
 export function returningColumnValues(result: Result): unknown[] | undefined {
   return result.rows[0] as unknown[] | undefined;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall sql — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+ *   sqlite3/database_statements.rb:140 is `Arel.sql(column.default_function)`;
+ *   trails calls the same `Arel.sql` export, imported as `arelSql` because the
+ *   surrounding bodies bind `sql` as a parameter name
+ *   (sqlite3/database-statements.ts:11).
+ */
 export function defaultInsertValue(column: {
   defaultFunction?: string | null;
   default?: unknown;
