@@ -9,19 +9,5 @@
       "ref:name"
     ],
     "reason": "reflection.rb:26 `ar._reflections.except(name)` calls Ruby's `Hash#except` ON the hash. trails' activesupport port is a free function (`hash-utils.ts:127`), so the receiver is the extra first argument."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "add_reflection",
-    "call": "merge!",
-    "reason": "Equivalent (RFC 0106): the `.merge!(name => reflection)` half of `_reflections.except(name).merge!(...)` is a single-pair in-place merge; `except` is now the Rails call and the pair is assigned onto the returned hash, which is what `Hash#merge!` does here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "inverse_name",
-    "call": "fetch",
-    "reason": "Equivalent (RFC 0106): `options.fetch(:inverse_of) { automatic_inverse_of }` returns the STORED value whenever the key exists (including `false`), and falls back to the block otherwise. `options.inverseOf !== undefined` is exactly that key-presence test — not a `??` nullish default — so the two arms match Ruby."
   }
 ]

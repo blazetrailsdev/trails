@@ -333,14 +333,19 @@ export function castResult(
   // Rows are already positional (array-mode), mirroring Rails' `result.to_a`,
   // so build the Result directly from `result.fields` + rows — no row[col]
   // re-keying, which would collapse duplicate column names.
-  const columns = rawResult.fields.map((f) => f.name);
-  if (columns.length === 0) {
-    freeRawResult(rawResult);
-    return Result.empty();
-  }
-  const columnTypes = buildColumnTypes(rawResult.fields, (t) => this.lookupCastType(t));
-  const result = new Result(columns, rawResult.rows, columnTypes);
+  const fields = rawResult.fields;
+
+  const result =
+    fields.length === 0
+      ? Result.empty()
+      : new Result(
+          fields.map((f) => f.name),
+          rawResult.rows,
+          buildColumnTypes(fields, (t) => this.lookupCastType(t)),
+        );
+
   freeRawResult(rawResult);
+
   return result;
 }
 

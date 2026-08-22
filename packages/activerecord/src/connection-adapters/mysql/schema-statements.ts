@@ -40,6 +40,15 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
    * Returns `[]` when the table doesn't exist, matching Rails' rescue.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
+   *
+   * @missingRailsCall order:constructor,quoteColumnName — PERMANENT: Verified per-site (RFC
+   *   0106): mysql/schema_statements.rb:66-70 builds the expression-index column
+   *   map with `index[-1].to_h { |name| [name.to_sym, expressions[name] ||
+   *   quote_column_name(name)] }`. Ruby `Array#to_h` takes a block and emits no
+   *   constructor; its faithful JS spelling is `new Map(indexColumns.map(...))`,
+   *   so the `Map` constructor is the `to_h` itself and necessarily precedes the
+   *   `quoteColumnName` calls the block makes. Nothing in the TS body was
+   *   dropped or resequenced relative to Rails.
    */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     let rows: Array<Record<string, unknown>>;
