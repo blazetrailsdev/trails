@@ -199,8 +199,6 @@ export function travelTo(
 
   // `now` must be in local system timezone, because `Time.at(now)`
   // and `now.to_date` (see stubs below) will use `now`'s timezone too!
-  // Ruby's `now.getlocal` is the seconds-since-the-Epoch construction here,
-  // because the arms above land on an instant rather than on a `Time`.
   const now = Time.at(new Rational(instant.epochNanoseconds, 1_000_000_000n));
 
   const stubs = simpleStubs();
@@ -227,10 +225,9 @@ export function travelTo(
     ),
   );
 
-  // Production code reads the clock through `currentTimeInstant()` rather than
-  // through `Time.now` (time-travel.ts) — `Time.now()` costs ~70x a bare
-  // `Temporal.Now.instant()` and sits on every `TimeWithZone` construction — so
-  // that seat is stubbed alongside the receivers Rails stubs.
+  // Ruby has no fifth receiver: production code reads the clock through
+  // `currentTimeInstant()` because `Time.now()` costs ~70x a bare
+  // `Temporal.Now.instant()` and sits on every `TimeWithZone` construction.
   stubs.stubObject(clock, "now", () => instant);
 
   if (block) {
