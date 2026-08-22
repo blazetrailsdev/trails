@@ -1534,6 +1534,67 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
   });
 
+  it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
+    const m = metaMethods(`
+      module Arel
+        class Attribute < Struct.new :relation, :name
+          def type_caster
+            relation.type_for_attribute(name)
+          end
+        end
+      end
+    `);
+    expect(m["Arel::Attribute"].map((x) => x.name).sort()).toEqual([
+      "initialize",
+      "name",
+      "name=",
+      "relation",
+      "relation=",
+      "type_caster",
+    ]);
+    const init = m["Arel::Attribute"].find((x) => x.name === "initialize")!;
+    expect(init.params).toEqual([
+      { name: "relation", kind: "optional", default: "..." },
+      { name: "name", kind: "optional", default: "..." },
+    ]);
+    const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
+    expect(reader.params).toEqual([]);
+  });
+
+  it("synthesizes keyword params for a keyword_init Struct's initialize", () => {
+    const m = metaMethods(`
+      module ActiveSupport
+        class Report < Struct.new(:error, :severity, keyword_init: true)
+        end
+      end
+    `);
+    const init = m["ActiveSupport::Report"].find((x) => x.name === "initialize")!;
+    expect(init.params).toEqual([
+      { name: "error", kind: "keyword", default: "..." },
+      { name: "severity", kind: "keyword", default: "..." },
+    ]);
+  });
+
+  it("synthesizes the accessors a `CONST = Struct.new(...) do ... end` generates", () => {
+    const m = metaMethods(`
+      module Arel
+        Edge = Struct.new(:name, :from) do
+          def to_s
+            name
+          end
+        end
+      end
+    `);
+    expect(m["Arel::Edge"].map((x) => x.name).sort()).toEqual([
+      "from",
+      "from=",
+      "initialize",
+      "name",
+      "name=",
+      "to_s",
+    ]);
+  });
+
   it("unrolls a literal-array each loop that interpolates the loop variable", () => {
     const m = metaMethods(`
       module ClassMethods

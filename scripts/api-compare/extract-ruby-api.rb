@@ -572,6 +572,7 @@ class ApiExtractor
           fqn = current_fqn
           @classes[fqn] ||= new_class_info(const_name_str, fqn)
           @classes[fqn][:superclass] = "Struct"
+          synthesize_struct_members(fqn, struct_call)
           walk_body(body)
           @visibility_stack.pop
           @namespace_stack.pop
@@ -623,6 +624,7 @@ class ApiExtractor
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
+    synthesize_struct_members(fqn, node[2]) if superclass == "Struct"
 
     body = node[3] || node[2]
     @attr_names_stack.push(collect_attr_declarations(body))
@@ -632,6 +634,58 @@ class ApiExtractor
     @module_function_stack.pop
     @visibility_stack.pop
     @namespace_stack.pop
+  end
+
+  # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)
+  # generates a reader and a writer per member, plus an `initialize` taking the
+  # members positionally (by keyword under `keyword_init: true`). None of them
+  # appear in the source as `def`s.
+  def synthesize_struct_members(fqn, struct_new_node)
+    target = @classes[fqn]
+    return unless target
+    names = extract_symbol_args(struct_new_node)
+    return if names.empty?
+
+    names.each do |name|
+      target[:instanceMethods] << {
+        name: name,
+        visibility: "public",
+        params: [],
+        file: @current_file,
+        line: @current_line,
+        reader: true,
+      }
+      target[:instanceMethods] << {
+        name: "#{name}=",
+        visibility: "public",
+        params: [{ name: "value", kind: "required" }],
+        file: @current_file,
+        line: @current_line,
+      }
+    end
+    # Both arms are optional: `Struct.new(:a, :b).new` and its keyword_init
+    # twin both accept zero arguments, leaving the members nil.
+    kind = keyword_init?(struct_new_node) ? "keyword" : "optional"
+    target[:instanceMethods] << {
+      name: "initialize",
+      visibility: "public",
+      params: names.map { |name| { name: name, kind: kind, default: "..." } },
+      file: @current_file,
+      line: @current_line,
+    }
+  end
+
+  # True for `Struct.new(:a, :b, keyword_init: true)`, whose generated
+  # `initialize` takes the members as keywords rather than positionally.
+  def keyword_init?(node)
+    return false unless node.is_a?(Array)
+    if node[0] == :assoc_new && node[1].is_a?(Array) && node[1][0] == :@label &&
+       node[1][1] == "keyword_init:"
+      value = node[2]
+      return value.is_a?(Array) && value[0] == :var_ref &&
+             value[1].is_a?(Array) && value[1][1] == "true"
+    end
+    node.any? { |child| child.is_a?(Array) && keyword_init?(child) }
   end
 
   def process_sclass(node)
