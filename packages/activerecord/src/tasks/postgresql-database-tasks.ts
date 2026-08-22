@@ -41,6 +41,13 @@ export class PostgreSQLDatabaseTasks {
     this.configurationHash = { ...dbConfig.configuration };
   }
 
+  /**
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `configuration_hash.merge(encoding: encoding)`
+   *   (`postgresql_database_tasks.rb:23`) — a non-mutating Hash merge is an
+   *   object spread in TS, which is not a `merge` call the comparator can
+   *   credit.
+   */
   async create(connectionAlreadyEstablished = false): Promise<void> {
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
@@ -203,6 +210,13 @@ export class PostgreSQLDatabaseTasks {
     }
   }
 
+  /**
+   * @missingRailsCall open — PERMANENT: Verified per-site (RFC 0106):
+   *   `Tempfile.open("uncommented_structure.sql")`
+   *   (`postgresql_database_tasks.rb:132`) — the fs port has no Tempfile
+   *   analogue, so the body makes a temp dir with `mkdtempSync` and writes into
+   *   it. `open` has no TS call spelling here.
+   */
   private async removeSqlHeaderComments(filename: string): Promise<void> {
     const fs = getFs();
     const path = getPath();
@@ -237,7 +251,14 @@ export class PostgreSQLDatabaseTasks {
     await Base.establishConnection(config ?? this.dbConfig);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `configuration_hash.merge(database: "postgres", schema_search_path:
+   *   "public")` (`postgresql_database_tasks.rb:103`) — a non-mutating Hash
+   *   merge is an object spread in TS.
+   */
   private publicSchemaConfig(): ConfigHash {
     return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
   }

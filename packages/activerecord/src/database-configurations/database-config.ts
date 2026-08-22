@@ -186,6 +186,13 @@ export class DatabaseConfig {
    * Async in trails because ESM imports are async (Rails' autoload is sync).
    * After at least one await, the sync mirror is populated and
    * {@link newConnection} can run sync.
+   *
+   * @missingRailsCall resolve — PERMANENT: Verified per-site (RFC 0106):
+   *   `ActiveRecord::ConnectionAdapters.resolve(adapter)`
+   *   (`database_config.rb:18`) — `database-config.ts` cannot import the adapter
+   *   registry (it would close a module-eval cycle through
+   *   `connection-adapters`), so `resolve` is reached through the
+   *   `_setAdapterClassResolver` late-binding hook the registry installs.
    */
   async adapterClass(): Promise<new (...args: any[]) => unknown> {
     if (!_adapterClassResolver) {

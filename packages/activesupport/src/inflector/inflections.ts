@@ -101,6 +101,11 @@ export class Inflections {
     this.instances.delete(locale);
   }
 
+  /**
+   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
+   *   `@plurals.prepend([rule, replacement])` (inflector/inflections.rb:154)
+   *   ports to `this.plurals.unshift({ rule, replacement })`.
+   */
   plural(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
       this.uncountables.delete(rule);
@@ -110,6 +115,11 @@ export class Inflections {
     this.plurals.unshift({ rule, replacement });
   }
 
+  /**
+   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
+   *   `@singulars.prepend([rule, replacement])` (inflector/inflections.rb:165)
+   *   ports to `this.singulars.unshift({ rule, replacement })`.
+   */
   singular(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
       this.uncountables.delete(rule);
@@ -170,6 +180,11 @@ export class Inflections {
     }
   }
 
+  /**
+   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
+   *   `@humans.prepend([rule, replacement])` (inflector/inflections.rb:221)
+   *   ports to `this.humans.unshift({ rule, replacement })`.
+   */
   human(rule: RegExp | string, replacement: string): void {
     this.humans.unshift({ rule, replacement });
   }

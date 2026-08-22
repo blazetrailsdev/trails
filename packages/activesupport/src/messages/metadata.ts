@@ -135,6 +135,11 @@ export abstract class Metadata {
     return string.startsWith('{"_rails":{"message":');
   }
 
+  /**
+   * @missingRailsCall advance — PERMANENT: Rails advances a `Time` with
+   *   `Time.now.utc.advance(seconds:)`; trails' `Time` analogue is
+   *   `Temporal.Instant`, whose equivalent is `add({ milliseconds })`.
+   */
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
     expiresIn: number | null | undefined,
@@ -153,6 +158,14 @@ export abstract class Metadata {
     return expiry;
   }
 
+  /**
+   * @missingRailsCall iso8601 — PERMANENT: Rails parses with `Time.iso8601`; trails parses
+   *   the same ISO 8601 string with `Temporal.Instant.from`.
+   * @missingRailsCall parse — PERMANENT: Both branches are ported; Ruby's lenient
+   *   `Time.parse` has no Temporal equivalent, so the non-standard-format branch
+   *   parses with `new Date(...)` and converts to a `Temporal.Instant`, which is
+   *   the same parse under a different call name.
+   */
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
       return expiresAt;

@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations/database-config.ts",
-    "rubyName": "adapter_class",
-    "call": "resolve",
-    "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionAdapters.resolve(adapter)` (`database_config.rb:18`) — `database-config.ts` cannot import the adapter registry (it would close a module-eval cycle through `connection-adapters`), so `resolve` is reached through the `_setAdapterClassResolver` late-binding hook the registry installs."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/database-config.ts",
     "rubyName": "for_current_env?",
     "call": "call",
     "reason": "Verified per-site (RFC 0106): `env_name == ActiveRecord::ConnectionHandling::DEFAULT_ENV.call` (`database_configurations/database_config.rb:92`) — same unported `DEFAULT_ENV` Proc as `default_env`; filed as `port-connection-handling-default-env-proc`."

@@ -15,20 +15,6 @@
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
     "rubyName": "file_path_key",
-    "call": "delete",
-    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "file_path_key",
-    "call": "last",
-    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "file_path_key",
     "call": "split",
     "kind": "args",
     "rubyArgs": [

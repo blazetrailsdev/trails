@@ -36,6 +36,13 @@ export class HashConfig extends DatabaseConfig {
    * nil included — so this reads by key presence: if `seeds` is present it
    * returns its value, otherwise true for the primary database and false for
    * others.
+   *
+   * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
+   *   `configuration_hash.fetch(:seeds, primary?)`
+   *   (`database_configurations/hash_config.rb:138`) — same Hash#fetch
+   *   shortcoming as `validate?`: the configuration hash is a plain TS object,
+   *   so the body spells the stored-key test explicitly and falls back to
+   *   `isPrimary()`.
    */
   get seeds(): boolean | null {
     return "seeds" in this.configuration
@@ -89,6 +96,12 @@ export class HashConfig extends DatabaseConfig {
    *
    * Returns false for replicas; otherwise respects the :database_tasks key
    * (defaults to true).
+   *
+   * @missingRailsCall fetch — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails hash_config.rb:161-163 uses
+   *   `configuration_hash.fetch(:database_tasks, true)`; trails
+   *   hash-config.ts:97-101 reads the key with an explicit
+   *   undefined-defaults-true check.
    */
   databaseTasks(): boolean {
     if (this.replica) return false;

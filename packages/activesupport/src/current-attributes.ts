@@ -77,6 +77,19 @@ export abstract class CurrentAttributes {
    */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
+  /**
+   * @missingRailsCall generate — PERMANENT: current_attributes.rb:136-137
+   *   `Delegation.generate(singleton_class, names, to: :instance, ...)` — Rails
+   *   generates the class-level readers/writers by compiling Ruby source onto
+   *   the singleton class. trails has no singleton class and
+   *   `Delegation.generate` compiles method source strings, so the port defines
+   *   the same accessors with `Object.defineProperty` on the constructor.
+   *   Language shortcoming.
+   * @missingRailsCall merge — PERMANENT: current_attributes.rb:139 `self.defaults =
+   *   defaults.merge(names.index_with { default })` — Ruby Hash#merge returning
+   *   a new hash is JS object spread; there is no Hash to call `merge` on. Same
+   *   substitution as the `cache.ts merged_options -> merge` row.
+   */
   static attribute(...args: unknown[]): void {
     const ctor = this as unknown as CurrentAttributesClass;
     const lastArg = args[args.length - 1];
@@ -98,6 +111,13 @@ export abstract class CurrentAttributes {
               get(this: CurrentAttributes) {
                 return this.attributes[name];
               },
+              /**
+               * @missingRailsCall with — PERMANENT: current_attributes.rb:214
+               *   `with(**attributes, &block)` — `with` is a JS reserved word,
+               *   so trails' port of `Object#with` is exported as `objectWith`
+               *   and `set` calls that. Language shortcoming; the Rails name
+               *   cannot be spelled.
+               */
               set(this: CurrentAttributes, value: unknown) {
                 this.attributes[name] = value;
               },
@@ -114,6 +134,12 @@ export abstract class CurrentAttributes {
         get(this: typeof CurrentAttributes) {
           return (this.instance() as unknown as Record<string, unknown>)[name];
         },
+        /**
+         * @missingRailsCall with — PERMANENT: current_attributes.rb:214 `with(**attributes,
+         *   &block)` — `with` is a JS reserved word, so trails' port of
+         *   `Object#with` is exported as `objectWith` and `set` calls that.
+         *   Language shortcoming; the Rails name cannot be spelled.
+         */
         set(this: typeof CurrentAttributes, value: unknown) {
           (this.instance() as unknown as Record<string, unknown>)[name] = value;
         },
@@ -177,7 +203,14 @@ export abstract class CurrentAttributes {
     this.instance().reset();
   }
 
-  /** Mirrors: `delegate :set, to: :instance` (current_attributes.rb:154). */
+  /**
+   * Mirrors: `delegate :set, to: :instance` (current_attributes.rb:154).
+   *
+   * @missingRailsCall with — PERMANENT: current_attributes.rb:214 `with(**attributes,
+   *   &block)` — `with` is a JS reserved word, so trails' port of `Object#with`
+   *   is exported as `objectWith` and `set` calls that. Language shortcoming;
+   *   the Rails name cannot be spelled.
+   */
   static set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return this.instance().set(attributes, block);
   }
@@ -186,7 +219,14 @@ export abstract class CurrentAttributes {
   // Instance-level API
   // -------------------------------------------------------------------------
 
-  /** Expose attributes within a block. Mirrors: CurrentAttributes#set (:213-215) */
+  /**
+   * Expose attributes within a block. Mirrors: CurrentAttributes#set (:213-215)
+   *
+   * @missingRailsCall with — PERMANENT: current_attributes.rb:214 `with(**attributes,
+   *   &block)` — `with` is a JS reserved word, so trails' port of `Object#with`
+   *   is exported as `objectWith` and `set` calls that. Language shortcoming;
+   *   the Rails name cannot be spelled.
+   */
   set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return objectWith(this as unknown as Record<string, unknown>, attributes, () => block());
   }

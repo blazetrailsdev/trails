@@ -115,6 +115,12 @@ export class LogSubscriber extends Subscriber {
    * the gate, events for that method are silenced.
    *
    * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Ruby Hash#merge returns a NEW hash assigned back
+   *   through the class_attribute writer: `self.log_levels =
+   *   log_levels.merge(...)` (log_subscriber.rb:128); trails' logLevels getter
+   *   already copy-on-writes the parent's Map per class, so the port sets the
+   *   key on that Map instead.
    */
   static subscribeLogLevel(method: string, level: string): void {
     const check = this.LEVEL_CHECKS[level];
@@ -190,6 +196,18 @@ export class LogSubscriber extends Subscriber {
     (this.constructor as typeof LogSubscriber).colorizeLogging = value;
   }
 
+  /**
+   * @missingRailsCall call — PERMANENT: log_subscriber.rb:143
+   *   `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc
+   *   invoked through `#call`; the JS callable it ports to is invoked as
+   *   `check(l)`, so there is no `call` to make. Same substitution as the
+   *   `cache.ts key_matcher -> call` row. Language shortcoming. Cluster ruling
+   *   (RFC 0106): where Ruby `#call` is the OBJECT protocol the port converges
+   *   instead — `subscriber.ts add_event_subscriber` now hands the Subscriber
+   *   itself to `notifier.subscribe`, since `Fanout::Subscribers.new` accepts a
+   *   callable object (fanout.rb:325-331). Only Proc-invocation `#call`, as
+   *   here, stays substituted.
+   */
   silenced(event: Event | string): boolean {
     const l = this.logger;
     if (!l) return true;
