@@ -30,6 +30,10 @@ const monotonicNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function benchmark<T>(
   this: Benchmarkable,
+  block: () => T | Promise<T>,
+): T | Promise<Awaited<T>>;
+export function benchmark<T>(
+  this: Benchmarkable,
   message: string,
   options: BenchmarkOptions,
   block: () => T | Promise<T>,
@@ -41,15 +45,22 @@ export function benchmark<T>(
 ): T | Promise<Awaited<T>>;
 export function benchmark<T>(
   this: Benchmarkable,
-  message = "Benchmarking",
+  messageOrBlock: string | (() => T | Promise<T>) = "Benchmarking",
   optionsOrBlock?: BenchmarkOptions | (() => T | Promise<T>),
   maybeBlock?: () => T | Promise<T>,
 ): T | Promise<Awaited<T>> {
-  const block = (typeof optionsOrBlock === "function" ? optionsOrBlock : maybeBlock!) as () =>
-    | T
-    | Promise<T>;
+  const message = typeof messageOrBlock === "function" ? "Benchmarking" : messageOrBlock;
+  const block = (
+    typeof messageOrBlock === "function"
+      ? messageOrBlock
+      : typeof optionsOrBlock === "function"
+        ? optionsOrBlock
+        : maybeBlock!
+  ) as () => T | Promise<T>;
   const options: BenchmarkOptions =
-    typeof optionsOrBlock === "function" ? {} : (optionsOrBlock ?? {});
+    typeof optionsOrBlock === "function" || typeof optionsOrBlock === "undefined"
+      ? {}
+      : optionsOrBlock;
 
   const logger = this?.logger;
   if (logger) {

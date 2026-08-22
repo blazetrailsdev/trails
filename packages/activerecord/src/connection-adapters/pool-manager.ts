@@ -79,10 +79,11 @@ export class PoolManager {
    * (pool_manager.rb:37) is Ruby `Hash#delete`; over a plain object the JS
    * spelling is the `delete` operator, which is not a call.
    */
-  removeRole(role: string): boolean {
-    if (!Object.hasOwn(this._roleToShardMapping, role)) return false;
+  removeRole(role: string): Record<string, PoolConfig> | undefined {
+    if (!Object.hasOwn(this._roleToShardMapping, role)) return undefined;
+    const shardMap = this._roleToShardMapping[role];
     delete this._roleToShardMapping[role];
-    return true;
+    return shardMap;
   }
 
   /**
@@ -94,7 +95,6 @@ export class PoolManager {
     const shardMap = this._roleToShardMapping[role];
     const poolConfig = shardMap[shard];
     delete shardMap[shard];
-    if (Object.keys(shardMap).length === 0) delete this._roleToShardMapping[role];
     return poolConfig;
   }
 

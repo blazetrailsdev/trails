@@ -132,12 +132,6 @@ describe("PoolManager", () => {
       expect(manager.getPoolConfig("writing", "default")).toBeUndefined();
     });
 
-    it("cleans up empty role maps", () => {
-      manager.setPoolConfig("writing", "default", makePoolConfig("primary"));
-      manager.removePoolConfig("writing", "default");
-      expect(manager.roleNames).toEqual([]);
-    });
-
     it("returns undefined for missing entries", () => {
       expect(manager.removePoolConfig("writing", "default")).toBeUndefined();
     });
@@ -152,13 +146,14 @@ describe("PoolManager", () => {
       expect(manager.poolConfigs("writing")).toEqual([]);
     });
 
-    it("returns false for unknown role", () => {
-      expect(manager.removeRole("unknown")).toBe(false);
+    it("returns undefined for unknown role", () => {
+      expect(manager.removeRole("unknown")).toBeUndefined();
     });
 
-    it("returns true when role existed", () => {
-      manager.setPoolConfig("writing", "default", makePoolConfig("primary"));
-      expect(manager.removeRole("writing")).toBe(true);
+    it("returns the removed shard map when the role existed", () => {
+      const config = makePoolConfig("primary");
+      manager.setPoolConfig("writing", "default", config);
+      expect(manager.removeRole("writing")).toEqual({ default: config });
     });
   });
 });
