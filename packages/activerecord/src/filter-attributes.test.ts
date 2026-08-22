@@ -4,6 +4,7 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
 import { fixtures } from "./test-fixtures.js";
+import { pp } from "./pretty-print.js";
 
 // Rails: `fixtures :"admin/users", :"admin/accounts"` + `Admin::User`, `Admin::Account`,
 // `User`. With the YAML store coder implemented, `Admin::User` (which declares
@@ -14,6 +15,15 @@ import { fixtures } from "./test-fixtures.js";
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
+  // Rails renders these three through `PP.pp(user, StringIO.new(actual))`
+  // (filter_attributes_test.rb:120-145); trails' port of `PP.pp` is `pp` over
+  // `Core#pretty_print`.
+  async function ppString(obj: unknown): Promise<string> {
+    let out = "";
+    await pp(obj, { write: (s: string) => (out += s) });
+    return out;
+  }
+
   let previousFilterAttributes: (string | RegExp | ((k: string, v: unknown) => unknown))[];
 
   beforeEach(() => {
@@ -134,28 +144,26 @@ describe("FilterAttributesTest", () => {
     expect(user.inspect()).toContain('token: "[FILTERED]"');
   });
 
-  it("filter_attributes on pretty_print", () => {
+  it("filter_attributes on pretty_print", async () => {
     const user = adminUsers("david");
-    const output = user.inspect();
+    const output = await ppString(user);
     expect(output).toContain("name: [FILTERED]");
     expect(output.match(/\[FILTERED\]/g)?.length).toBe(1);
   });
 
-  it("filter_attributes on pretty_print should not filter nil value", () => {
+  it("filter_attributes on pretty_print should not filter nil value", async () => {
     const user = new AdminUser({});
-    const output = user.inspect();
+    const output = await ppString(user);
     expect(output).toContain("name: nil");
     expect(output).not.toContain("name: [FILTERED]");
     expect(output.match(/\[FILTERED\]/g)?.length ?? 0).toBe(0);
   });
 
-  it("filter_attributes on pretty_print should handle [FILTERED] value properly", () => {
+  it("filter_attributes on pretty_print should handle [FILTERED] value properly", async () => {
     User.filterAttributes = ["auth"];
     const user = new User({ token: "[FILTERED]", auth_token: "[FILTERED]" });
-    const output = user.inspect();
+    const output = await ppString(user);
     expect(output).toContain("auth_token: [FILTERED]");
-    // Rails' `assert_includes actual, "token: [FILTERED]"` reads PP output, where
-    // the filtered marker is unquoted; trails' `inspect` quotes the string value.
-    expect(output).toContain('token: "[FILTERED]"');
+    expect(output).toContain("token: [FILTERED]");
   });
 });
