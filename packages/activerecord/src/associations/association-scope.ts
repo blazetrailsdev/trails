@@ -697,8 +697,9 @@ export class AssociationScope {
     // OuterJoins (`_mergeReferencedJoins`, Rails' `construct_join_dependency
     // (associations, Arel::Nodes::OuterJoin)` branch, association_scope.rb:
     // 138-141) and applies its `unscope!` directives. The head reflection
-    // (chain[0]) is handled by the scope/scopeFor branch below — Rails'
-    // chain_head item in add_constraints.
+    // (chain[0]) is the LAST entry the loop reaches, and its own scope is one
+    // `scope_chain_item` inside the same body — Rails' `if scope_chain_item ==
+    // chain_head.scope` arm (association_scope.rb:137).
     //
     // Rails' add_constraints references `Arel::Nodes::OuterJoin` directly (the
     // eager-load branch above); trails routes that construction through the
@@ -708,40 +709,9 @@ export class AssociationScope {
     // Rails: `chain_head = chain.first` (association_scope.rb:131), read by the
     // one `reverse_each` body that handles every chain position.
     const chainHead = chain[0];
-    for (let i = chain.length - 1; i >= 1; i--) {
+    for (let i = chain.length - 1; i >= 0; i--) {
       scope = this._mergeReflectionScopeChain(scope, chain[i], owner, chainHead);
     }
-    // Apply the head reflection's scope. Rails: reflection.rb:448,
-    // scope_for — 0-arity scopes get `this`=relation, >=1-arity get
-    // (relation, owner) per `relation.instance_exec(owner, &scope) ||
-    // relation`. For ordinary AssociationReflections we call `scopeFor`
-    // when present. ThroughReflection does NOT implement `scopeFor`;
-    // it only exposes `.scope`, which delegates to its `delegateReflection`
-    // (the through reflection's OWN scope — Rails `delegate :scope, to:
-    // :delegate_reflection`, reflection.rb:1229), NOT the source reflection's
-    // scope. So detect through explicitly and invoke `.scope` directly with
-    // the same arity / `this` semantics. The source reflection's scope is a
-    // SEPARATE concern, merged below.
-    const head = chainHead as {
-      scopeFor?: (rel: unknown, owner: unknown) => unknown;
-      scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
-      isThroughReflection?: () => boolean;
-    };
-    const isThrough = typeof head.isThroughReflection === "function" && head.isThroughReflection();
-    if (!isThrough && typeof head.scopeFor === "function") {
-      scope = head.scopeFor.call(head, scope, owner);
-    } else if (typeof head.scope === "function") {
-      const result = invokeScopeLambda(head.scope as ScopeLambda<unknown>, scope, owner);
-      if (result) scope = result;
-    }
-    // Rails' `chain.reverse_each` folds the CHAIN HEAD too
-    // (association_scope.rb:132), and a through head's `constraints` is
-    // `source_reflection.constraints << scope` (reflection.rb:1180-1184) — that
-    // is how a scope on the SOURCE reflection merges, evaluated against the
-    // head's own `klass`. For a `source_type:` through that klass is the runtime
-    // `@association.klass` (`RuntimeReflection#klass`, reflection.rb:1265), so
-    // the polymorphic belongsTo's uncomputable `klass` is never read.
-    scope = this._mergeReflectionScopeChain(scope, chainHead, owner, chainHead);
     return scope;
   }
 
@@ -788,11 +758,10 @@ export class AssociationScope {
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      // Rails: `if scope_chain_item == chain_head.scope` (association_scope.rb:137)
-      // takes the merge-except path, which trails applies in `addConstraints`.
-      if (c === (chainHead as { scope?: unknown } | undefined)?.scope) continue;
       const evaluated = this.evalScope(reflection, c, owner);
-      merged = this._pushScopeIntoRelation(merged, evaluated);
+      // Rails: `if scope_chain_item == chain_head.scope` (association_scope.rb:137).
+      const isChainHeadScope = c === (chainHead as { scope?: unknown } | undefined)?.scope;
+      merged = this._pushScopeIntoRelation(merged, evaluated, reflection, isChainHeadScope);
     }
     return merged;
   }
@@ -840,19 +809,57 @@ export class AssociationScope {
    * select / joins / etc override the main scope, which Rails
    * explicitly avoids.
    */
-  protected _pushScopeIntoRelation(scope: unknown, evaluated: unknown): unknown {
+  protected _pushScopeIntoRelation(
+    scope: unknown,
+    evaluated: unknown,
+    reflection?: AbstractReflection | ReflectionProxy,
+    isChainHeadScope = false,
+  ): unknown {
     if (!evaluated) return scope;
-    // Rails add_constraints' chain.reverse_each folds each item's joins /
-    // left_outer_joins and eager-load-as-join into the main scope when the
-    // item's `where(...)` referenced a joined table (`!item.references_values
-    // .empty?` → `scope.merge! item.only(:joins, :left_outer_joins)` +
-    // `scope.joins! item.construct_join_dependency(eager_load|includes,
-    // OuterJoin)`, association_scope.rb:138-146). A through scope such as
-    // `-> { where("comments.id" => nil).includes(:comments) }` relies on this
-    // to actually JOIN comments; without it the WHERE references a missing
-    // table. `all_includes` does NOT yield for chain entries (ReflectionProxy),
-    // so includes_values themselves are not carried forward — only the join is.
-    this._mergeReferencedJoins(scope, evaluated);
+    if (isChainHeadScope) {
+      // Rails: `scope.merge! item.except(:where, :includes, :unscope, :order)`
+      // (association_scope.rb:138) — the chain head's own scope merges every
+      // OTHER value (limit, select, joins, …) with Relation#merge's precedence,
+      // and its where / order still reach the relation through the shared push
+      // below, exactly as every other chain item's do.
+      (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
+        (evaluated as { except: (...skips: string[]) => unknown }).except(
+          "where",
+          "includes",
+          "unscope",
+          "order",
+        ),
+      );
+    } else {
+      // Rails add_constraints' chain.reverse_each folds each item's joins /
+      // left_outer_joins and eager-load-as-join into the main scope when the
+      // item's `where(...)` referenced a joined table (`!item.references_values
+      // .empty?` → `scope.merge! item.only(:joins, :left_outer_joins)` +
+      // `scope.joins! item.construct_join_dependency(eager_load|includes,
+      // OuterJoin)`, association_scope.rb:138-146). A through scope such as
+      // `-> { where("comments.id" => nil).includes(:comments) }` relies on this
+      // to actually JOIN comments; without it the WHERE references a missing
+      // table. `all_includes` does NOT yield for chain entries (ReflectionProxy),
+      // so includes_values themselves are not carried forward — only the join is.
+      this._mergeReferencedJoins(scope, evaluated);
+    }
+    // Rails: `reflection.all_includes { scope.includes_values |= item.includes_values }`
+    // (association_scope.rb:148-150). The block yields for the chain HEAD
+    // (`RuntimeReflection#all_includes`, reflection.rb:1279) and NOT for a
+    // `ReflectionProxy` chain entry, so a head scope's `includes(:comments)`
+    // still reaches the relation the head's `except(:includes)` merge withheld.
+    const allIncludes = (
+      reflection as { allIncludes?: (cb: () => void) => unknown } | undefined
+    )?.allIncludes?.bind(reflection);
+    if (allIncludes) {
+      allIncludes(() => {
+        const itemIncludes = (evaluated as { includesValues?: unknown[] }).includesValues ?? [];
+        if (itemIncludes.length === 0) return;
+        const host = scope as { includesValues?: unknown[] };
+        const current = host.includesValues ?? [];
+        host.includesValues = [...current, ...itemIncludes.filter((v) => !current.includes(v))];
+      });
+    }
     // Rails: `scope.unscope!(*item.unscope_values)` runs BEFORE the item's own
     // where clause is appended, so a `unscope(where: :skimmer)` chain entry
     // strips the target's default-scope predicate without dropping the item's

@@ -287,8 +287,44 @@ describe("reconcileFileText", () => {
   });
 
   it("still harvests a human-authored reason when its call converges", () => {
-    const r = reconcileFileText("foo.ts", FILE, new Map(), () => DEFAULT_TAG_REASON);
+    // `bar` HAS an expectation, for a different call: the artifact knows the
+    // declaration, so `stale_call` genuinely no longer fires.
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
+    const r = reconcileFileText("foo.ts", FILE, expectations, () => DEFAULT_TAG_REASON);
     expect(r.harvested.map((h) => h.entry.reason)).toEqual(["placeholder to drop"]);
+    expect(r.preserved).toEqual([]);
+  });
+
+  it("preserves a pre-existing tag on a declaration the artifact knows nothing about", () => {
+    // The PR #6873 loss: migrating one method's rows rewrote the JSDoc of every
+    // declaration in the file, and a reviewed receipt on an unrelated one — with
+    // no baseline row anywhere to put it back — was deleted on a `harvested`
+    // line that read like a successful migration.
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * Mirrors Rails `Foo#bar`.",
+      "   */",
+      "  bar(): void {}",
+      "",
+      "  /**",
+      "   * @missingRailsCall with_raw_connection — PERMANENT: escapes inline.",
+      "   */",
+      "  quoteString(): void {}",
+      "}",
+    ].join("\n");
+    const expectations = new Map([owned("Foo", "bar", new Set(["save"]))]);
+    const r = reconcileFileText("foo.ts", src, expectations, () => "PERMANENT: x");
+    expect(r.text!).toContain("@missingRailsCall save — PERMANENT: x");
+    expect(r.text!).toContain("@missingRailsCall with_raw_connection — PERMANENT: escapes inline.");
+    expect(r.harvested).toEqual([]);
+    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([
+      ["quoteString", "with_raw_connection"],
+    ]);
+    // And a second run over the result is still a no-op.
+    expect(
+      reconcileFileText("foo.ts", r.text!, expectations, () => "PERMANENT: x").text,
+    ).toBeNull();
   });
 
   it("is idempotent: a second run produces zero edits", () => {
@@ -357,7 +393,10 @@ describe("reconcileFileText", () => {
       "  bar(): void {}",
       "}",
     ].join("\n");
-    const { text } = reconcileFileText("foo.ts", src, new Map(), () => "x");
+    // An expectation with an EMPTY call set: the artifact knows the
+    // declaration and flags nothing on it, so the tag has genuinely converged.
+    const expectations = new Map([owned("Foo", "bar", new Set<string>())]);
+    const { text } = reconcileFileText("foo.ts", src, expectations, () => "x");
     expect(text!).not.toContain("@missingRailsCall");
     expect(text!).not.toContain("/**");
     expect(text!).toContain("  bar(): void {}");

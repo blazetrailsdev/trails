@@ -14,7 +14,9 @@
  *     nothing, so minting it would only add inert prose to a source file while
  *     the reason kept living in the baseline JSON (RFC 0083);
  *   - tags for now-satisfied calls are dropped (human-authored reasons are
- *     harvested to stdout, never destroyed unseen);
+ *     harvested to stdout, never destroyed unseen). A call is "now-satisfied"
+ *     only where the artifact carries an expectation for the declaration; a tag
+ *     on a declaration the artifact says nothing about is preserved verbatim;
  *   - existing tags that still apply are kept byte-for-byte (idempotent:
  *     a second run produces zero edits);
  *   - a tag with no reason fails the run (see the empty-reason contract in
@@ -385,7 +387,13 @@ export function reconcileFileText(
   onlyCall?: ReadonlySet<string>,
 ): {
   text: string | null;
+  /** Tags DROPPED because the call they name is no longer flagged for a
+   *  declaration the artifact does know — a genuine convergence, reported so
+   *  the receipt does not vanish unseen. */
   harvested: { tsName: string; entry: TagEntry }[];
+  /** Tags left exactly as written on a declaration the artifact carries no
+   *  expectation for. Nothing here was migrated, and nothing here was dropped. */
+  preserved: { tsName: string; entry: TagEntry }[];
   /** Every (rubyName, call) the file now tags with a real justification — kept
    *  and newly-added alike. These are the baseline rows the tag supersedes, so
    *  `main` drops them from the split baseline in the same operation (RFC
@@ -404,6 +412,7 @@ export function reconcileFileText(
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
+  const preserved: { tsName: string; entry: TagEntry }[] = [];
   const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
   const skipped: string[] = [];
@@ -440,13 +449,24 @@ export function reconcileFileText(
             }
           : undefined,
       );
-      const expected = exp?.calls ?? new Set<string>();
+      // With no expectation, the artifact knows nothing about this
+      // declaration — compare.ts matched no Ruby method onto it, so it reports
+      // neither a flag nor a suppression for any call. An empty `expected`
+      // would then read every pre-existing tag as satisfied and delete it, which
+      // is how PR #6873 silently dropped two reviewed receipts that had no
+      // baseline row to put them back. Expect exactly what the file already
+      // tags instead: the run is tag-preserving where it has nothing to say.
+      // A tag that HAS genuinely gone stale is reported by compare.ts's
+      // `staleCallTags` (the sanctioned channel), so preserving one here costs a
+      // report line rather than a lost receipt.
+      const expected = exp?.calls ?? new Set<string>(entries.map((e) => e.call));
       const r = reconcile(
         entries,
         expected,
         (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
         onlyCall,
       );
+      if (!exp) preserved.push(...entries.map((entry) => ({ tsName: name, entry })));
       skipped.push(...r.skipped);
       if (exp) {
         for (const e of [...r.kept, ...r.added]) {
@@ -479,12 +499,12 @@ export function reconcileFileText(
     .filter(([k]) => !seen.has(k))
     .map(([, e]) => e.tsName)
     .sort();
-  if (edits.length === 0) return { text: null, harvested, tagged, unmatched, skipped };
+  if (edits.length === 0) return { text: null, harvested, preserved, tagged, unmatched, skipped };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested, tagged, unmatched, skipped };
+  return { text: out, harvested, preserved, tagged, unmatched, skipped };
 }
 
 /** (tsFile → tsName → expectation) for one package: every call the artifact
@@ -624,11 +644,27 @@ async function main(argv: string[]): Promise<number> {
       console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
       return 1;
     }
-    const { text: next, harvested, tagged, unmatched, skipped: fileSkipped } = reconciled;
+    const {
+      text: next,
+      harvested,
+      preserved,
+      tagged,
+      unmatched,
+      skipped: fileSkipped,
+    } = reconciled;
     skipped += fileSkipped.length;
     for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
     for (const h of harvested) {
-      console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
+      console.log(
+        `DROPPED ${TAG} on ${tsFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +
+          `longer flagged there, so its receipt is retired. Reason it carried: ${h.entry.reason}`,
+      );
+    }
+    for (const kept of preserved) {
+      console.log(
+        `preserved ${TAG} on ${tsFile} ${kept.tsName} for \`${kept.entry.call}\` — no expectation ` +
+          "for that declaration in the artifact; the tag is left exactly as written.",
+      );
     }
     if (unmatched.length > 0) {
       console.log(`unmatched (${tsFile}): ${unmatched.join(", ")} — no body-bearing declaration`);

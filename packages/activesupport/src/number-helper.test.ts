@@ -8,6 +8,7 @@ import {
   numberToHumanSize,
   numberToHuman,
 } from "./number-helper.js";
+import { Rational } from "@blazetrails/date";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 
 /** Mirrors: number_helper_test.rb:18-25's `NumberWithToD`. */
@@ -134,6 +135,11 @@ describe("NumberHelperTest", () => {
       "111.23460000000000000000",
     );
     expect(numberToRounded("111.2346", { precision: 100 })).toBe(`111.2346${"0".repeat(96)}`);
+    expect(numberToRounded(new Rational(1112346, 10000), { precision: 20 })).toBe(
+      "111.23460000000000000000",
+    );
+    expect(numberToRounded(new Rational(1112346, 10000), { precision: 4 })).toBe("111.2346");
+    expect(numberToRounded(new Rational(0, 1), { precision: 2 })).toBe("0.00");
     expect(numberToRounded("x")).toBe("x");
   });
 
@@ -167,6 +173,15 @@ describe("NumberHelperTest", () => {
     expect(numberToRounded(0.001111, { precision: 3, significant: true })).toBe("0.00111");
     expect(numberToRounded(9775, { precision: 20, significant: true })).toBe(
       "9775.0000000000000000",
+    );
+    expect(numberToRounded(new Rational(9775, 1), { precision: 20, significant: true })).toBe(
+      "9775.0000000000000000",
+    );
+    expect(numberToRounded(new Rational(9775, 100), { precision: 20, significant: true })).toBe(
+      "97.750000000000000000",
+    );
+    expect(numberToRounded(new Rational(9772, 100), { precision: 3, significant: true })).toBe(
+      "97.7",
     );
     expect(numberToRounded(new BigDecimal("9775"), { precision: 20, significant: true })).toBe(
       "9775.0000000000000000",
