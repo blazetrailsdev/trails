@@ -455,7 +455,7 @@ function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
 
 /**
  * Per-model prototype carrier for the `Relation` delegate class. Relations
- * built for `modelClass` (via `Base._buildDefaultRelation` &c.) are constructed
+ * built for `modelClass` (via `Base.defaultScoped` &c.) are constructed
  * from this subclass.
  *
  * Mirrors: ActiveRecord::Delegation::ClassMethods#relation_class_for

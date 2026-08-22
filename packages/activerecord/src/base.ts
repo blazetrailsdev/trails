@@ -235,7 +235,11 @@ import {
   _readAttribute as _readAttributeFn,
   defineMethodAttribute as _defineMethodAttribute,
 } from "./attribute-methods/read.js";
-import { setDefineMethodAttribute as _setDefineMethodAttribute } from "./attribute-methods/write.js";
+import {
+  setDefineMethodAttribute as _setDefineMethodAttribute,
+  writeAttribute as _writeAttributeMethod,
+  _writeAttribute as _writeAttributeLowLevel,
+} from "./attribute-methods/write.js";
 import { attributeCameFromUser as _attributeCameFromUser } from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
@@ -321,7 +325,6 @@ import {
 } from "./transactions.js";
 
 import {
-  Default as DefaultScoping,
   isIgnoreDefaultScope,
   defaultScope as _defaultScope,
   isScopeAttributes as _isScopeAttributes,
@@ -1756,17 +1759,6 @@ export class Base extends Model {
   // -- Readonly attributes --
   static _readonlyAttributes: Set<string> = new Set();
 
-  // Whether the readonly write guards (Rails' HasReadonlyAttributes mixin) are
-  // active for this class. Rails decides at `attr_readonly` declaration time
-  // whether to `include HasReadonlyAttributes` — only when
-  // `raise_on_assign_to_attr_readonly` is true at that moment. Once included it
-  // raises unconditionally regardless of later flag flips; when not included a
-  // write to a readonly attr goes straight through (value written in memory,
-  // persist-time exclusion keeps it out of the UPDATE). We capture the flag
-  // value when `attrReadonly` runs into this own-property, inherited down the
-  // prototype chain like Ruby's include. (readonly_attributes.rb:33)
-  static _readonlyAttributesRaise = false;
-
   // Suppresses after_initialize in the constructor when set by _instantiate /
   // directInstantiate (inheritance.ts) so we can fire after_find first, then
   // after_initialize — matching Rails' init_with_attributes call order.
@@ -2170,22 +2162,16 @@ export class Base extends Model {
 
   /** @internal Like all() but skips currentScope — used by the preloader. */
   static _allForPreload(): any {
-    return this._buildDefaultRelation();
+    return this.defaultScoped();
   }
 
   /**
    * Mirrors: ActiveRecord::Core::ClassMethods#relation (core.rb:431-435).
    *
-   * The `table` argument has no Rails counterpart: `AbstractReflection#build_scope`
-   * (reflection.rb:336-338) and `AssociationScope` build against a possibly-aliased
-   * Arel table, and passing it here qualifies the STI `type_condition` by that same
-   * table — so a self-referential through doesn't end up with the STI predicate on
-   * the FROM table and the source-type predicate on the alias.
-   *
    * @internal Rails-private (core.rb:408 `private`).
    */
-  static relation(table?: any): any {
-    const relation = Relation.create(this, { table });
+  static relation(): any {
+    const relation = Relation.create(this);
 
     if (isFinderNeedsTypeCondition(this) && !isIgnoreDefaultScope.call(this)) {
       // `finder_needs_type_condition?` memoizes on first call (inheritance.rb:92),
@@ -2194,20 +2180,10 @@ export class Base extends Model {
       // trails' `typeCondition` raises instead, so skip the arm rather than
       // turning a Rails no-op into an error.
       if (this.inheritanceColumn === null) return relation;
-      return relation.whereBang(typeCondition(this, table));
+      return relation.whereBang(typeCondition(this));
     } else {
       return relation;
     }
-  }
-
-  private static _buildDefaultRelation(allQueries?: boolean | null): any {
-    // named.rb:45 — `default_scoped(scope = relation, all_queries: nil)`: the
-    // base relation, STI condition and all, is built BEFORE `build_default_scope`
-    // arms the recursion guard, and the default scope merges into it.
-    return (
-      DefaultScoping.buildDefaultScope.call(this, this.relation(), { allQueries }) ??
-      this.relation()
-    );
   }
 
   // Scope extension methods: scope name -> Record of extra methods
@@ -3337,7 +3313,7 @@ export class Base extends Model {
 
   declare static collectionCacheKey: typeof _collectionCacheKey;
 
-  declare writeAttribute: typeof ReadonlyAttributes.writeAttribute;
+  declare writeAttribute: typeof _writeAttributeMethod;
 
   declare id: PrimaryKeyValue;
 
@@ -4663,8 +4639,8 @@ extend(Base, {
 });
 
 include(Base, {
-  // ReadonlyAttributes
-  writeAttribute: ReadonlyAttributes.writeAttribute,
+  // AttributeMethods::Write
+  writeAttribute: _writeAttributeMethod,
   // Persistence
   isNewRecord: _Persistence.isNewRecord,
   isPersisted: _Persistence.isPersisted,
@@ -4736,7 +4712,7 @@ include(Base, {
   set: _set,
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
-  _writeAttribute: ReadonlyAttributes._writeAttribute,
+  _writeAttribute: _writeAttributeLowLevel,
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)

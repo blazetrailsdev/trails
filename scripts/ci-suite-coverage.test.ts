@@ -791,6 +791,26 @@ describe("CI runs every tooling test suite", () => {
     }
   });
 
+  // LINT_ALL_RE only covers a rule's declared INPUTS. A TYPE-AWARE rule's real
+  // input is the whole program: narrowing a return type in one file can make an
+  // assertion in a file no PR touched redundant, and the changed-files scope
+  // can never see it. The standing coverage for that class is a full-tree lint
+  // on every non-PR event, so `main` goes red in the run that landed the break
+  // instead of only on an agent's laptop.
+  it("lints the whole tree on every non-pull_request event", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+
+    expect(yml).toContain(
+      `if [ "\${{ github.event_name }}" != "pull_request" ]; then
+` + `              echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"`,
+    );
+
+    const wf = parseYaml(yml) as { on: Record<string, unknown> };
+    expect(Object.keys(wf.on)).toContain("schedule");
+    expect(Object.keys(wf.on)).toContain("workflow_dispatch");
+    expect((wf.on.push as { branches: string[] }).branches).toContain("main");
+  });
+
   it("keeps the lint file filter to extensions eslint is configured for", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const lintable = gateRegex(yml, "LINTABLE_RE");

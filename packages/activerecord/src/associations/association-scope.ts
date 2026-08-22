@@ -1,6 +1,7 @@
 import { isPlainObject } from "@blazetrails/activesupport";
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
+import { typeCondition } from "../inheritance.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
@@ -75,6 +76,13 @@ export interface AssociationScopeable {
  * a reflection plus `attr_reader :aliased_table` and
  * `def all_includes; nil; end`.)
  */
+/** The `Relation` surface `_buildEntryScope` needs off `build_scope`. */
+type AliasedScope = { where(predicate: unknown): AliasedScope };
+
+type ScopeBuilder = {
+  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope;
+};
+
 export class ReflectionProxy {
   // AbstractReflection rather than AssociationReflection because chain
   // entries can be ThroughReflection / PolymorphicReflection wrappers;
@@ -154,6 +162,15 @@ export class ReflectionProxy {
         }
       ).scopeFor?.(relation, owner) ?? relation
     );
+  }
+
+  /**
+   * SimpleDelegator forwarding of `AbstractReflection#build_scope`
+   * (reflection.rb:336-338) — the Rails seat for a relation built against a
+   * possibly-aliased Arel table.
+   */
+  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope {
+    return (this.reflection as unknown as ScopeBuilder).buildScope(table, predicateBuilder, klass);
   }
 
   constraints(): Array<(...args: unknown[]) => unknown> {
@@ -819,7 +836,8 @@ export class AssociationScope {
    * from its klass. Rails: `relation = reflection.build_scope(reflection
    * .aliased_table); relation.instance_exec(owner, &scope)`
    * (association_scope.rb:169-172). We build the relation via
-   * `_buildEntryScope` (= `klass.unscoped`, which carries the STI
+   * `_buildEntryScope` (`reflection.build_scope(aliased_table)` when the
+   * chain entry is aliased, else `klass.unscoped`, which carries the STI
    * type_condition) and invoke with `invokeScopeLambda`'s arity / `this`
    * semantics: 0-arg → `call(relation)`; 1+-arg → `call(relation, relation,
    * owner)`. The common 0-arg form Rails uses for scope_for_association /
@@ -853,6 +871,7 @@ export class AssociationScope {
     const relation = this._buildEntryScope(
       entryKlass,
       aliased instanceof Nodes.TableAlias ? aliased : undefined,
+      reflection,
     );
     return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
   }
@@ -871,25 +890,32 @@ export class AssociationScope {
   }
 
   /**
-   * Build a fresh scope for evaluating a chain entry's lambda. Mirrors
-   * `entryKlass.unscoped` — Rails' `unscoped` retains the STI type filter
-   * via `relation()` (core.rb:431-435), and `Base.unscoped` now wires that
-   * through `relation`, so no compensation is needed here.
+   * Build a fresh scope for evaluating a chain entry's lambda.
+   *
+   * Aliased entries go through `AbstractReflection#build_scope`
+   * (reflection.rb:336-338), the seat Rails' `association_scope.rb:169` calls
+   * with `reflection.aliased_table`, and take their STI predicate on that same
+   * alias the way `join_scope` does (reflection.rb:285-286) — a
+   * self-referential through must filter the joined-in alias, not the FROM
+   * table. Without an alias this is `entryKlass.unscoped`, whose `relation()`
+   * (core.rb:431-435) carries the type condition already, so the non-aliased
+   * SQL stays byte-identical.
    */
-  protected _buildEntryScope(entryKlass: typeof Base, aliasedTable?: unknown): unknown {
-    // Build the entry relation against the chain entry's alias so the scope
-    // lambda's `where(...)` predicates — AND any STI `type_condition` — qualify
-    // by the alias (Rails' `build_scope(reflection.aliased_table)`,
-    // reflection.rb:336). For a self-referential through (repeated table) the
-    // source-type filter must land on the joined-in alias, not the FROM table.
-    // The `TableAlias` node delegates `typeForAttribute` / `typeCastForDatabase`
-    // to the underlying table, so attribute casting is preserved. We only feed
-    // the table when the tracker produced a real alias; otherwise keep
-    // `unscoped()` so non-aliased SQL is byte-identical.
-    if (aliasedTable) {
-      return (entryKlass as unknown as { relation: (t: unknown) => unknown }).relation(
+  protected _buildEntryScope(
+    entryKlass: typeof Base,
+    aliasedTable?: unknown,
+    reflection?: AbstractReflection | ReflectionProxy,
+  ): unknown {
+    if (aliasedTable && reflection) {
+      const scope = (reflection as unknown as ScopeBuilder).buildScope(
         aliasedTable,
+        undefined,
+        entryKlass,
       );
+      if (entryKlass.isFinderNeedsTypeCondition()) {
+        return scope.where(typeCondition(entryKlass, aliasedTable as never));
+      }
+      return scope;
     }
     return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }
