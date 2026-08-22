@@ -724,7 +724,7 @@ export async function isAssociationValid(
   if (await record.isValid(context)) return true;
 
   let associatedErrors: any[];
-  if (record.changed || record.isNewRecord() || context) {
+  if (record.isChanged || record.isNewRecord() || context) {
     associatedErrors = record.errors.objects;
   } else {
     associatedErrors = record.errors.objects.filter(

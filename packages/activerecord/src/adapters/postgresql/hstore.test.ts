@@ -265,7 +265,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (hstore as any).saveBang();
       await (hstore as any).reload();
       expect((hstore as any).settings["three"]).toBe("four");
-      expect((hstore as any).changed).toBe(false);
+      expect((hstore as any).isChanged).toBe(false);
     });
 
     it("dirty from user equal", async () => {
@@ -273,7 +273,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const hstore = await Hstore.createBang({ settings });
       (hstore as any).settings = { key: "value", alongkey: "anything" };
       expect((hstore as any).settings).toEqual(settings);
-      expect((hstore as any).changed).toBe(false);
+      expect((hstore as any).isChanged).toBe(false);
     });
 
     it("hstore dirty from database equal", async () => {
@@ -282,7 +282,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (hstore as any).reload();
       expect((hstore as any).settings).toEqual(settings);
       (hstore as any).settings = settings;
-      expect((hstore as any).changed).toBe(false);
+      expect((hstore as any).isChanged).toBe(false);
     });
 
     it("spaces", async () => {

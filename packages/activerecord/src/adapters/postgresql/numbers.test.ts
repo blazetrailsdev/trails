@@ -97,7 +97,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       record.single = Infinity;
       record.double = -Infinity;
       // Rails: assert_not_predicate record, :changed?
-      expect(record.changed).toBe(false);
+      expect(record.isChanged).toBe(false);
     });
 
     it("reassigning nan does not mark record as changed", async () => {
@@ -111,7 +111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       record.single = NaN;
       record.double = NaN;
       // Rails: assert_not_predicate record, :changed?
-      expect(record.changed).toBe(false);
+      expect(record.isChanged).toBe(false);
     });
   });
 });

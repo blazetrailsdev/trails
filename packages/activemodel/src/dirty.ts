@@ -10,7 +10,8 @@ import { attributeMissing as attributeMissingDispatch } from "./attribute-method
  * Model implements this interface via DirtyTracker delegation.
  */
 export interface Dirty {
-  readonly changed: boolean;
+  readonly isChanged: boolean;
+  readonly changed: string[];
   readonly changedAttributes: Record<string, unknown>;
   readonly changes: Record<string, [unknown, unknown]>;
   readonly previousChanges: Record<string, [unknown, unknown]>;
@@ -20,7 +21,7 @@ export interface Dirty {
   attributeWas(name: string): unknown;
   attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
   attributePreviouslyWas(name: string): unknown;
-  restoreAttributes(): void;
+  restoreAttributes(attrNames?: string[]): void;
   changesApplied(): void;
   clearChangesInformation(): void;
   clearAttributeChanges(attributes: string[]): void;

@@ -50,7 +50,7 @@ describe("TouchLaterTest", () => {
   it("touch later dont set dirty attributes", async () => {
     const invoice = await Invoice.create();
     await invoice.touchLater();
-    assertNotPredicate(invoice, (i) => i.changed);
+    assertNotPredicate(invoice, (i) => i.isChanged);
   });
 
   it("touch later respects no touching policy", async () => {

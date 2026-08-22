@@ -646,7 +646,7 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
   try {
     const joinRecord = this.buildThroughRecord(record);
     if (!joinRecord) return true;
-    if (!joinRecord.changed) return true;
+    if (!joinRecord.isChanged) return true;
     await (joinRecord as any).saveBang();
     return true;
   } finally {

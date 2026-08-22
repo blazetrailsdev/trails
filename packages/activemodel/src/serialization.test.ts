@@ -705,7 +705,7 @@ describe("fromJson", () => {
     const u = new User({ name: "Original" });
     u.changesApplied();
     u.fromJson('{"name":"Updated"}');
-    expect(u.changed).toBe(true);
-    expect(Object.keys(u.changedAttributes)).toContain("name");
+    expect(u.isChanged).toBe(true);
+    expect(u.changed).toContain("name");
   });
 });

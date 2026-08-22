@@ -56,7 +56,7 @@ describe("bigint model round-trip (all adapters)", () => {
     const m = await Metric.create({ score: BIG, label: "a" });
     const found = await Metric.find(m.id);
     found.score = BIG;
-    expect(found.changed).toBe(false);
+    expect(found.isChanged).toBe(false);
   });
 
   it("dirty tracking: change detected on different bigint", async () => {
@@ -64,7 +64,7 @@ describe("bigint model round-trip (all adapters)", () => {
     const m = await Metric.create({ score: BIG, label: "a" });
     const found = await Metric.find(m.id);
     found.score = BIG + 1n;
-    expect(found.changed).toBe(true);
+    expect(found.isChanged).toBe(true);
     expect(found.changes.score).toEqual([BIG, BIG + 1n]);
   });
 
