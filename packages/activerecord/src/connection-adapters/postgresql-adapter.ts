@@ -169,6 +169,19 @@ import {
 const OID_JSON = 114;
 const OID_JSONB = 3802;
 
+/**
+ * The `:variables` hash from `@config` (postgresql_adapter.rb:977, :1000).
+ */
+type SessionVariables = Record<string, string | number | boolean | null | "default">;
+
+/**
+ * Ruby's `Hash#fetch(key, default)` returns the STORED value whenever the key
+ * exists — including a stored `nil` — where `??` would substitute the default.
+ */
+function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
+  return key in hash ? (hash[key] as T) : defaultValue;
+}
+
 // Internal liveness flags node-pg sets on its `pg.Client` (lib/client.js).
 // Not part of pg's public typings, so we narrow the client through this shape
 // to mirror libpq's `PGconn#finished?`. See `rawConnectionFinished()`.
@@ -517,7 +530,6 @@ export class PostgreSQLAdapter
   private _schemaSearchPathMemo: string | null = null;
   private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
-  private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};
   // Whether _maybeConfigureConnection has run for the current _rawConnection.
   // Reset on reconnect.
   private _connectionConfigured = false;
@@ -639,7 +651,6 @@ export class PostgreSQLAdapter
       );
     if (typeof config === "string") {
       this._minMessages = "warning";
-      this._sessionVariables = {};
       this._pgClientOptions = {
         connectionString: config,
         types: {
@@ -733,9 +744,6 @@ export class PostgreSQLAdapter
       }
     }
     this._minMessages = minMessages ?? "warning";
-    // Freeze a shallow copy so post-construction mutation can't bypass the
-    // key/value validation above and introduce un-sanitized SQL fragments.
-    this._sessionVariables = Object.freeze({ ...(variables ?? {}) });
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
     )?.getTypeParser;
@@ -852,10 +860,13 @@ export class PostgreSQLAdapter
     this._mappedDefaultTimezone = null;
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
     await client.query("SET standard_conforming_strings = on");
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
     await client.query("SET intervalstyle = iso_8601");
     await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
-    for (const [key, val] of Object.entries(this._sessionVariables)) {
+    // SET statements from :variables config hash
+    // https://www.postgresql.org/docs/current/static/sql-set.html
+    for (const [key, val] of Object.entries(variables)) {
       if (val === null) continue;
       if (val === "default") {
         await client.query(`SET SESSION ${key} TO DEFAULT`);
@@ -2829,9 +2840,6 @@ export class PostgreSQLAdapter
    *
    * @internal
    *
-   * @missingRailsCall fetch — CONVERGEABLE (0106-wide-call-set-direct-burndown/converge-pg-configure-connection-variables-fetch): The whole configure body lives in
-   *   `_maybeConfigureConnection`, which reads the already-parsed frozen
-   *   `_sessionVariables` instead of re-fetching `@config[:variables]` per call.
    * @missingRailsCall internal_execute — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): configure runs while the acquire
    *   machinery still holds the connection, so the SET statements go straight to
    *   the pg.Client — routing them through internalExecute would re-enter
@@ -4322,9 +4330,6 @@ export class PostgreSQLAdapter
    * Mirrors: PostgreSQLAdapter#reconfigure_connection_timezone
    * @internal
    *
-   * @missingRailsCall fetch — CONVERGEABLE (0106-wide-call-set-direct-burndown/converge-pg-configure-connection-variables-fetch): Reads the already-parsed frozen
-   *   `_sessionVariables` rather than re-fetching `@config[:variables]`, which
-   *   the config parse resolved once at construction.
    * @missingRailsCall raw_execute — CONVERGEABLE (RFC 0073-permanent-connection-checkout-disallowed): Runs as the first step of `_performQuery`,
    *   itself the block already executing inside withRawConnection, so the SET
    *   goes to the acquired client directly rather than re-entering rawExecute's
@@ -4342,7 +4347,8 @@ export class PostgreSQLAdapter
     // Rails returns early when `variables["timezone"]` was set by the user
     // (postgresql_adapter.rb:1005): configure_connection already applied it and
     // it must never be overridden by the default_timezone SET below.
-    if (this._sessionVariables["timezone"]) return;
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
+    if (variables["timezone"]) return;
     const tz = ActiveRecord.defaultTimezone;
     // Off the withRawConnection loop. This runs as the first step of
     // `_performQuery` (the adapter's one perform_query), which is itself the block
