@@ -3,6 +3,9 @@ import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
+/** Mirrors: Arel::Visitors::PostgreSQL::BIND_BLOCK (postgresql.rb:81-82), a private constant. */
+const BIND_BLOCK: (index: number) => string = (i: number) => `$${i}`;
+
 /**
  * PostgreSQL visitor — extends generic ToSql with PostgreSQL-specific features.
  *
@@ -117,6 +120,11 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
+  /** Mirrors: Arel::Visitors::PostgreSQL#bind_block (postgresql.rb:81-84). */
+  protected override bindBlock(): (index: number) => string {
+    return BIND_BLOCK;
+  }
+
   /**
    * Mirrors Rails Postgres `grouping_array_or_grouping_element` (postgresql.rb:87).
    * Trails' `GroupingElement` always carries an `expressions: Node[]`
@@ -140,14 +148,5 @@ export class PostgreSQL extends ToSql {
 
   static {
     PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
-  }
-}
-
-/**
- * PostgreSQL visitor — uses numbered bind parameters ($1, $2, ...).
- */
-export class PostgreSQLWithBinds extends PostgreSQL {
-  protected override bindBlock(): (index: number) => string {
-    return (i: number) => `$${i}`;
   }
 }

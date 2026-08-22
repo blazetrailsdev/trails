@@ -734,7 +734,7 @@ describe("PersistenceTest", () => {
     await t.updateColumn("title", "super_title");
     expect(t.author_name).toBe("John");
     expect(t.title).toBe("super_title");
-    expect(t.changed).toBe(true);
+    expect(t.isChanged).toBe(true);
     expect(t.attributeChanged("author_name")).toBe(true);
 
     await t.reload();
@@ -749,7 +749,7 @@ describe("PersistenceTest", () => {
     await t.updateColumns({ title: "super_title" });
     expect(t.author_name).toBe("John");
     expect(t.title).toBe("super_title");
-    expect(t.changed).toBe(true);
+    expect(t.isChanged).toBe(true);
     expect(t.attributeChanged("author_name")).toBe(true);
 
     await t.reload();
@@ -1038,7 +1038,7 @@ describe("PersistenceTest", () => {
     const t = (await Topic.first())!;
     await t.updateAttributeBang("title", "super_title");
     expect(t.title).toBe("super_title");
-    expect(t.changed).toBe(false);
+    expect(t.isChanged).toBe(false);
     expect(t.attributeChanged("title")).toBe(false);
     expect(t.attributeChange("title")).toBeNull();
     await t.reload();
@@ -1265,7 +1265,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "a" });
     await t.updateAttribute("title", "super_title");
     expect(t.title).toBe("super_title");
-    expect(t.changed).toBe(false);
+    expect(t.isChanged).toBe(false);
     expect(t.attributeChanged("title")).toBe(false);
     expect(t.attributeChange("title")).toBeNull();
     await t.reload();
@@ -1295,9 +1295,9 @@ describe("PersistenceTest", () => {
   it("update columns should not leave the object dirty", async () => {
     const t = await Topic.create({ title: "old" });
     t.title = "dirty";
-    expect(t.changed).toBe(true);
+    expect(t.isChanged).toBe(true);
     await t.updateColumns({ title: "clean" });
-    expect(t.changed).toBe(false);
+    expect(t.isChanged).toBe(false);
   });
 
   it("update columns returns boolean", async () => {
@@ -1435,11 +1435,11 @@ describe("PersistenceTest", () => {
 
     await topic.reload();
     await topic.updateColumn("content", "--- You too\n...\n");
-    expect(topic.changed).toBe(false);
+    expect(topic.isChanged).toBe(false);
 
     await topic.reload();
     await topic.updateColumn("content", "--- Have a nice day\n...\n");
-    expect(topic.changed).toBe(false);
+    expect(topic.isChanged).toBe(false);
   });
 
   it("update columns", async () => {

@@ -3181,7 +3181,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   override arelVisitor(): Visitors.ToSql {
-    return new Visitors.PostgreSQLWithBinds(this);
+    return new Visitors.PostgreSQL(this);
   }
 
   supportsDdlTransactions(): boolean {

@@ -450,7 +450,7 @@ describe("CustomPropertiesTest", () => {
     expect((model as any).foo).toBe("lol");
 
     (model as any).foo = "lol";
-    expect(model.changed).toBe(false);
+    expect(model.isChanged).toBe(false);
   });
 
   it("attributes not backed by database columns appear in inspect", () => {

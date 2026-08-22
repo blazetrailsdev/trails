@@ -16,7 +16,7 @@ import type { Base } from "../base.js";
  */
 export async function lockBang<T extends Base>(this: T, lock: boolean | string = true): Promise<T> {
   if (this.isPersisted()) {
-    if (this.changed) {
+    if (this.isChanged) {
       // Mirrors Rails' squished message order: the save/reload guidance first,
       // then `Changed attributes: #{changed.map(&:inspect).join(', ')}.` last.
       const dirtyAttrs = this.changedAttributeNamesToSave.map((a) => `"${a}"`).join(", ");

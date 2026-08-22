@@ -985,7 +985,7 @@ export class CollectionAssociation extends Association {
       (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
       !!this.reflection.options.strictLoading ||
       this.owner.isNewRecord() ||
-      this.target.some((r) => r.isNewRecord() || r.changed)
+      this.target.some((r) => r.isNewRecord() || r.isChanged)
     );
   }
 

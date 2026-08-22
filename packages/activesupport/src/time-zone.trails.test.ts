@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
 import { ArgumentError } from "./hash-utils.js";
+import { Rational } from "@blazetrails/date";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {
@@ -179,5 +180,18 @@ describe("TimeZoneLocalPeriodsTest", () => {
     expect(() => eastern.iso8601(null)).toThrow(ArgumentError);
     expect(() => eastern.iso8601("foobar")).toThrow(ArgumentError);
     expect(() => eastern.rfc3339("1999-12-31")).toThrow(ArgumentError);
+  });
+
+  it("strptime %Q keeps digits below the millisecond", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const twz = eastern.strptime("946684800123456", "%Q")!;
+    expect(twz.toI()).toBe(946684800123);
+    expect(twz.nsec).toBe(456000000);
+  });
+
+  it("at keeps digits below the millisecond", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(eastern.at(946684800, 123456.789).nsec).toBe(123456789);
+    expect(eastern.at(new Rational(946684800123456789n, 1_000_000_000n)).nsec).toBe(123456789);
   });
 });

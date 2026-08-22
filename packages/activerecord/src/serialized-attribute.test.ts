@@ -618,7 +618,7 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await CoderTopic.create({ content: "bar" as any });
     void (topic as any).content; // read to trigger isChangedInPlace check
-    expect(topic.changed).toBe(false);
+    expect(topic.isChanged).toBe(false);
   });
 
   it.skip("serialized attribute works under concurrent initial access", () => {

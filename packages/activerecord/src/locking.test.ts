@@ -254,7 +254,7 @@ describe("OptimisticLockingTest", () => {
     expect(p1.lock_version).toBe(0);
     await p1.touch();
     expect(p1.lock_version).toBe(1);
-    expect(p1.changed).toBe(false);
+    expect(p1.isChanged).toBe(false);
     expect(Object.keys(p1.savedChanges).sort()).toEqual(["lock_version", "updated_at"]);
   });
 
@@ -365,7 +365,7 @@ describe("OptimisticLockingTest", () => {
     expect(t1.lock_version).toBe(0);
     await t1.touch();
     expect(t1.lock_version).toBe(1);
-    expect(t1.changed).toBe(false);
+    expect(t1.isChanged).toBe(false);
     expect(Object.keys(t1.savedChanges).length).toBeGreaterThan(0);
     expect(Object.keys(t1.savedChanges).sort()).toEqual(
       expect.arrayContaining(["lock_version", "updated_at"]),

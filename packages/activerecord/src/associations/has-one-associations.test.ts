@@ -867,7 +867,7 @@ describe("HasOneAssociationsTest", () => {
     expect(newShip.isNewRecord()).toBe(true);
     expect(await newShip.isInvalid()).toBe(true);
     expect(origShip.pirate_id).toBeNull();
-    expect(origShip.changed).toBe(false); // check it was saved
+    expect(origShip.isChanged).toBe(false); // check it was saved
   });
 
   it("creation failure replaces existing with dependent option", async () => {
@@ -1043,7 +1043,7 @@ describe("HasOneAssociationsTest", () => {
     await ship.save();
 
     ship.name = "new name";
-    expect(ship.changed).toBe(true);
+    expect(ship.isChanged).toBe(true);
     await assertQueriesCount(3, false, async () => {
       // One query for updating name, not triggering query for updating pirate_id
       await (pirate as any).setShip(ship);

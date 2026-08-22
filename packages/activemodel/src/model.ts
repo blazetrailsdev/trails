@@ -1745,8 +1745,22 @@ export class Model {
     return duped;
   }
 
-  get changed(): boolean {
+  /**
+   * Returns `true` if any of the attributes has unsaved changes.
+   *
+   * Mirrors: ActiveModel::Dirty#changed? (dirty.rb:285-288)
+   */
+  get isChanged(): boolean {
     return this._dirty.changed;
+  }
+
+  /**
+   * Returns an array with the name of the attributes with unsaved changes.
+   *
+   * Mirrors: ActiveModel::Dirty#changed (dirty.rb:294-297)
+   */
+  get changed(): string[] {
+    return this._dirty.changedAttributeNames;
   }
 
   /**
@@ -1817,8 +1831,13 @@ export class Model {
     return change ? change[0] : this._readAttribute(name);
   }
 
-  restoreAttributes(): void {
-    this._dirty.restore(this._attributes);
+  /**
+   * Restore all previous data of the provided attributes.
+   *
+   * Mirrors: ActiveModel::Dirty#restore_attributes (dirty.rb:319-322)
+   */
+  restoreAttributes(attrNames: string[] = this.changed): void {
+    attrNames.forEach((attrName) => this.restoreAttribute(attrName));
   }
 
   /**

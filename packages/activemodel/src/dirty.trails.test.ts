@@ -28,7 +28,7 @@ describe("Dirty across dup", () => {
     // MRI: t.changes == dup.changes == {"title"=>["A", "B"]}
     expect(duped.changes).toEqual(t.changes);
     expect(duped.changes).toEqual({ title: ["A", "B"] });
-    expect(duped.changed).toBe(true);
+    expect(duped.isChanged).toBe(true);
     expect(duped.attributeWas("title")).toEqual("A");
     // MRI: dup.previous_changes == t.previous_changes
     expect(duped.previousChanges).toEqual(t.previousChanges);
@@ -42,7 +42,7 @@ describe("Dirty across dup", () => {
 
     expect(duped.changes).toEqual({ body: [null, "new"] });
     expect(t.changes).toEqual({});
-    expect(t.changed).toBe(false);
+    expect(t.isChanged).toBe(false);
     expect(t.body).toBeNull();
   });
 
@@ -54,6 +54,6 @@ describe("Dirty across dup", () => {
 
     expect(t.changes).toEqual({ body: [null, "new"] });
     expect(duped.changes).toEqual({});
-    expect(duped.changed).toBe(false);
+    expect(duped.isChanged).toBe(false);
   });
 });

@@ -127,13 +127,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         cidr_address: "192.168.1.0/24",
       })) as any;
       model.cidr_address = "192.168.1.0/24";
-      expect(model.changed).toBe(false);
+      expect(model.isChanged).toBe(false);
 
       model.cidr_address = "192.168.2.0/24";
-      expect(model.changed).toBe(true);
+      expect(model.isChanged).toBe(true);
 
       model.cidr_address = "192.168.1.0/25";
-      expect(model.changed).toBe(true);
+      expect(model.isChanged).toBe(true);
     });
 
     it("mac address change case does not mark dirty", async () => {
@@ -144,7 +144,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       model.mac_address = (model.mac_address as string).replace(/[a-zA-Z]/g, (c: string) =>
         c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase(),
       );
-      expect(model.changed).toBe(false);
+      expect(model.isChanged).toBe(false);
     });
   });
 });

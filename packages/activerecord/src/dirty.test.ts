@@ -94,7 +94,7 @@ async function withTravel(offsetMs: number, fn: () => Promise<void>): Promise<vo
 
 /** Mirrors Rails' private `check_pirate_after_save_failure(pirate)`. */
 function checkPirateAfterSaveFailure(pirate: Rec): void {
-  expect(pirate.changed).toBe(true);
+  expect(pirate.isChanged).toBe(true);
   expect(pirate.attributeChanged("parrot_id")).toBe(true);
   expect(pirate.changedAttributeNamesToSave).toEqual(["parrot_id"]);
   expect(pirate.attributeWas("parrot_id")).toBeNull();
@@ -377,10 +377,10 @@ describe("DirtyTest", () => {
     pirate.catchphrase = "arrr";
     expect(await pirate.saveBang()).toBeTruthy();
 
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
 
     pirate.parrot_id = "0";
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
   });
 
   it("integer zero to integer zero not marked as changed", async () => {
@@ -389,17 +389,17 @@ describe("DirtyTest", () => {
     pirate.catchphrase = "arrr";
     expect(await pirate.saveBang()).toBeTruthy();
 
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
 
     pirate.parrot_id = 0;
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
   });
 
   it("float zero to string zero not marked as changed", async () => {
     const data = new NumericData({ temperature: 0.0 }) as Rec;
     await data.saveBang();
 
-    expect(data.changed).toBe(false);
+    expect(data.isChanged).toBe(false);
 
     data.temperature = "0";
     expect(data.changes).toEqual({});
@@ -440,18 +440,18 @@ describe("DirtyTest", () => {
 
   it("object should be changed if any attribute is changed", async () => {
     const pirate = new Pirate() as Rec;
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
     expect(pirate.changedAttributeNamesToSave).toEqual([]);
     expect(pirate.changes).toEqual({});
 
     pirate.catchphrase = "arrr";
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     expect(pirate.attributeWas("catchphrase")).toBeNull();
     expect(pirate.changedAttributeNamesToSave).toEqual(["catchphrase"]);
     expect(pirate.changes).toEqual({ catchphrase: [null, "arrr"] });
 
     await pirate.save();
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
     expect(pirate.changedAttributeNamesToSave).toEqual([]);
     expect(pirate.changes).toEqual({});
   });
@@ -482,7 +482,7 @@ describe("DirtyTest", () => {
     const pirate = (await Pirate.createBang({ catchphrase: "jarl" })) as Rec;
     const parrot = await Parrot.createBang({ name: "Lorre" });
     pirate.parrot = parrot;
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     expect(pirate.changedAttributeNamesToSave).toEqual(["parrot_id"]);
   });
 
@@ -601,9 +601,9 @@ describe("DirtyTest", () => {
   it("reload should clear changed attributes", async () => {
     const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
     pirate.catchphrase = "*hic*";
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     await pirate.reload();
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
   });
 
   it("dup objects should not copy dirty flag from creator", async () => {
@@ -619,9 +619,9 @@ describe("DirtyTest", () => {
     const phrase = "shiver me timbers";
     const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
     pirate.catchphrase = "*hic*";
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     pirate.catchphrase = phrase;
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
   });
 
   it("reverted changes are not dirty after multiple changes", async () => {
@@ -629,23 +629,23 @@ describe("DirtyTest", () => {
     const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
     for (let i = 0; i < 10; i++) {
       pirate.catchphrase = "*hic*".repeat(i);
-      expect(pirate.changed).toBe(true);
+      expect(pirate.isChanged).toBe(true);
     }
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     pirate.catchphrase = phrase;
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
   });
 
   it("reverted changes are not dirty going from nil to value and back", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
 
     pirate.parrot_id = 1;
-    expect(pirate.changed).toBe(true);
+    expect(pirate.isChanged).toBe(true);
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
 
     pirate.parrot_id = null;
-    expect(pirate.changed).toBe(false);
+    expect(pirate.isChanged).toBe(false);
     expect(pirate.attributeChanged("parrot_id")).toBe(false);
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
   });
@@ -654,15 +654,15 @@ describe("DirtyTest", () => {
     await withPartialWrites(Topic, true, async () => {
       const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
 
-      expect(topic.changed).toBe(false);
+      expect(topic.isChanged).toBe(false);
 
       (topic.content as Record<string, string>)["b"] = "b";
 
-      expect(topic.changed).toBe(true);
+      expect(topic.isChanged).toBe(true);
 
       await (topic as unknown as Topic).saveBang();
 
-      expect(topic.changed).toBe(false);
+      expect(topic.isChanged).toBe(false);
       expect((topic.content as Record<string, string>)["b"]).toBe("b");
 
       await (topic as unknown as Topic).reload();
@@ -678,11 +678,11 @@ describe("DirtyTest", () => {
 
     (topic.content as Record<string, string>)["b"] = "b";
 
-    expect(topic.changed).toBe(true);
+    expect(topic.isChanged).toBe(true);
 
     await (topic as unknown as Topic).saveBang();
 
-    expect(topic.changed).toBe(false);
+    expect(topic.isChanged).toBe(false);
     expect(topic.previousChanges).toHaveProperty("content");
     expect(topic.savedChanges).toHaveProperty("content");
     expect((topic.previousChanges["content"][0] as Record<string, string>)["a"]).toBe("a");
@@ -1009,13 +1009,13 @@ describe("DirtyTest", () => {
 
   it("attributes assigned but not selected are dirty", async () => {
     const person = (await Person.select("id").first()) as Rec;
-    expect(person.changed).toBe(false);
+    expect(person.isChanged).toBe(false);
 
     person.first_name = "Sean";
-    expect(person.changed).toBe(true);
+    expect(person.isChanged).toBe(true);
 
     person.first_name = null;
-    expect(person.changed).toBe(true);
+    expect(person.isChanged).toBe(true);
   });
 
   it("attributes not selected are still missing after save", async () => {
@@ -1099,7 +1099,7 @@ describe("DirtyTest", () => {
       static {
         this.tableName = "people";
         this.afterSave(function (record: Rec) {
-          if (record.changed) throw new Error("changed? should be false");
+          if (record.isChanged) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
           if (!call<boolean>(record, "isSavedChanges"))
             throw new Error("saved_changes? should be true");
@@ -1110,7 +1110,7 @@ describe("DirtyTest", () => {
     };
 
     const person = (await klass.create({ first_name: "Sean" })) as Rec;
-    expect(person.changed).toBe(false);
+    expect(person.isChanged).toBe(false);
   });
 
   it("changed? in around callbacks after yield returns false", async () => {
@@ -1119,7 +1119,7 @@ describe("DirtyTest", () => {
         this.tableName = "people";
         this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
           await proceed();
-          if (record.changed) throw new Error("changed? should be false");
+          if (record.isChanged) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
           if (!call<boolean>(record, "isSavedChanges"))
             throw new Error("saved_changes? should be true");
@@ -1130,7 +1130,7 @@ describe("DirtyTest", () => {
     };
 
     const person = (await klass.create({ first_name: "Sean" })) as Rec;
-    expect(person.changed).toBe(false);
+    expect(person.isChanged).toBe(false);
   });
 
   it("partial insert off with unchanged default function attribute", async () => {

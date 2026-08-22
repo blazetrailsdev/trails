@@ -515,7 +515,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await x.reload();
       expect(x.hstores).toEqual([{ a: "c" }, { b: "b" }]);
       // Rails: assert_not_predicate x, :changed?
-      expect(x.changed).toBe(false);
+      expect(x.isChanged).toBe(false);
     });
     it("datetime with timezone awareness", async () => {
       const tz = "Pacific Time (US & Canada)";

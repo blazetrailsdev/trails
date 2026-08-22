@@ -26,7 +26,7 @@ const { authors } = fixtures({
 describe("StringTypeTest", () => {
   it("string mutations are detected", async () => {
     const author = await StringTestAuthor.find(authors("sean").id);
-    assertNotPredicate(author, (a) => a.changed);
+    assertNotPredicate(author, (a) => a.isChanged);
 
     // JS strings are immutable; assignment goes through the setter rather than mutating in place.
     // nameChanged() fires via dirty-tracker change detection, not isChangedInPlace.
@@ -37,6 +37,6 @@ describe("StringTypeTest", () => {
     await author.reload();
 
     expect(author.name).toEqual("Sean Griffin");
-    assertNotPredicate(author, (a) => a.changed);
+    assertNotPredicate(author, (a) => a.isChanged);
   });
 });

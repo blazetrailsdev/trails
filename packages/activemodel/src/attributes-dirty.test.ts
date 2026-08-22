@@ -63,14 +63,14 @@ describe("AttributesDirtyTest", () => {
   it("setting attribute will result in change", () => {
     const p = new DirtyPerson({ name: "Alice" });
     p._writeAttribute("name", "Bob");
-    expect(p.changed).toBe(true);
+    expect(p.isChanged).toBe(true);
   });
 
   it("list of changed attribute keys", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
     p._writeAttribute("name", "Bob");
-    expect(Object.keys(p.changedAttributes)).toContain("name");
-    expect(Object.keys(p.changedAttributes)).not.toContain("age");
+    expect(p.changed).toContain("name");
+    expect(p.changed).not.toContain("age");
   });
 
   it("changes to attribute values", () => {
@@ -89,15 +89,15 @@ describe("AttributesDirtyTest", () => {
   it("setting color to same value should not result in change being recorded", () => {
     const p = new DirtyPerson({ color: "red" });
     p._writeAttribute("color", "red");
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
   });
 
   it("saving should reset model's changed status", () => {
     const p = new DirtyPerson({ name: "Alice" });
     p._writeAttribute("name", "Bob");
-    expect(p.changed).toBe(true);
+    expect(p.isChanged).toBe(true);
     p.changesApplied();
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
   });
 
   it("saving should preserve previous changes", () => {
@@ -144,7 +144,7 @@ describe("AttributesDirtyTest", () => {
     p.changesApplied();
     p._writeAttribute("name", "Charlie");
     p.clearChangesInformation();
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
     expect(Object.keys(p.previousChanges).length).toBe(0);
   });
 
@@ -155,15 +155,15 @@ describe("AttributesDirtyTest", () => {
     p.restoreAttributes();
     expect(p._readAttribute("name")).toBe("Alice");
     expect(p._readAttribute("age")).toBe(25);
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
   });
 
   it("resetting attribute", () => {
     const p = new DirtyPerson({ name: "Alice" });
     p._writeAttribute("name", "Bob");
-    expect(p.changed).toBe(true);
+    expect(p.isChanged).toBe(true);
     p._writeAttribute("name", "Alice");
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
   });
   it("attribute mutation", () => {
     class Person extends Model {
@@ -172,9 +172,9 @@ describe("AttributesDirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.changed).toBe(false);
+    expect(p.isChanged).toBe(false);
     p._writeAttribute("name", "Bob");
-    expect(p.changed).toBe(true);
+    expect(p.isChanged).toBe(true);
     expect(p.changes).toEqual({ name: ["Alice", "Bob"] });
   });
 

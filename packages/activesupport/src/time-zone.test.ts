@@ -250,9 +250,12 @@ describe("TimeZoneTest", () => {
 
   it("at with microseconds", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.at(946684800);
+    const secs = 946684800.0;
+    const microsecs = 123456.789;
+    const twz = zone.at(secs, microsecs);
     expect(twz.timeZone).toBe(zone);
-    expect(twz.utc().epochMilliseconds).toBe(946684800000);
+    expect(twz.toI()).toBe(secs);
+    expect(twz.nsec).toBe(123456789);
   });
 
   // ---------------------------------------------------------------------------

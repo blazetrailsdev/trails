@@ -78,7 +78,7 @@ describe("TimestampTest", () => {
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
     expect(developer.salary).toBe(previousSalary + 10000);
     expect(developer.attributeChanged("salary")).toBe(true);
-    expect(developer.changed).toBe(true);
+    expect(developer.isChanged).toBe(true);
     expect(developer.changedAttributeNamesToSave).toEqual(["salary"]);
     expect((developer as any).isSavedChanges()).toBe(true);
     expect(Object.keys(developer.savedChanges).sort()).toEqual([
@@ -95,7 +95,7 @@ describe("TimestampTest", () => {
     await dev.touch();
 
     expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
-    expect(dev.changed).toBe(false);
+    expect(dev.isChanged).toBe(false);
     expect((dev as any).isSavedChanges()).toBe(true);
     expect(Object.keys(dev.savedChanges).sort()).toEqual([
       "legacy_updated_at",
@@ -147,7 +147,7 @@ describe("TimestampTest", () => {
     }
 
     expect(developer.attributeChanged("legacy_created_at")).toBe(false);
-    expect(developer.changed).toBe(false);
+    expect(developer.isChanged).toBe(false);
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
@@ -161,7 +161,7 @@ describe("TimestampTest", () => {
     }
 
     expect(developer.attributeChanged("legacy_updated_at")).toBe(false);
-    expect(developer.changed).toBe(false);
+    expect(developer.isChanged).toBe(false);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
 
