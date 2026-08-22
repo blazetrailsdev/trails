@@ -3,6 +3,7 @@ import {
   getPath,
   getEnv,
   camelize,
+  groupBy,
   underscore,
   humanize,
   isPlainObject,
@@ -503,6 +504,16 @@ export class Migration {
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
+   *   `Migration::Current#create_table` (migration.rb:580-586), a wrapper whose only
+   *   job is to yield the block through the identity hook
+   *   `compatible_table_definition` (migration.rb:612-614) so a
+   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
+   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
+   *   scope for the port, so the wrapper is not ported and the base
+   *   `create_table` is what pairs here.
+   */
   async createTable(
     name: string,
     optionsOrFn?:
@@ -539,6 +550,16 @@ export class Migration {
     await this.connection.createTable(tname, optionsOrFn, fn);
   }
 
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
+   *   `Migration::Current#drop_table` (migration.rb:602-608), a wrapper whose only
+   *   job is to yield the block through the identity hook
+   *   `compatible_table_definition` (migration.rb:612-614) so a
+   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
+   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
+   *   scope for the port, so the wrapper is not ported and the base
+   *   `drop_table` is what pairs here.
+   */
   async dropTable(
     ...args: Array<
       | string
@@ -1001,6 +1022,16 @@ export class Migration {
     await this.connection.removeTimestamps(tableName);
   }
 
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
+   *   `Migration::Current#create_join_table` (migration.rb:594-600), a wrapper whose only
+   *   job is to yield the block through the identity hook
+   *   `compatible_table_definition` (migration.rb:612-614) so a
+   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
+   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
+   *   scope for the port, so the wrapper is not ported and the base
+   *   `create_join_table` is what pairs here.
+   */
   async createJoinTable(
     table1: string,
     table2: string,
@@ -1028,6 +1059,16 @@ export class Migration {
     await this.connection.dropJoinTable(table1, table2, options);
   }
 
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT: the caller is
+   *   `Migration::Current#change_table` (migration.rb:588-592), a wrapper whose only
+   *   job is to yield the block through the identity hook
+   *   `compatible_table_definition` (migration.rb:612-614) so a
+   *   `Migration[x.y]` compatibility class can override it (compatibility.rb:156,
+   *   219, 262, 310, 408, 462). `Migration[x.y]` version compatibility is out of
+   *   scope for the port, so the wrapper is not ported and the base
+   *   `change_table` is what pairs here.
+   */
   async changeTable(
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
@@ -1281,6 +1322,14 @@ export class Migration {
    * Run the migration in a given direction.
    *
    * Mirrors: ActiveRecord::Migration#migrate
+   *
+   * @missingRailsCall with_connection — CONVERGEABLE:
+   *   `DatabaseTasks.migration_connection.pool.with_connection` (migration.rb:973)
+   *   checks a connection out for the duration of `exec_migration`; trails runs
+   *   the migration body against the already-seated `this.connection`.
+   *   Convergence is RFC 0051 story
+   *   `migration-migrate-drops-pool-with-connection`, which lands on RFC 0073's
+   *   permanent-checkout flip.
    */
   async migrate(direction: "up" | "down"): Promise<void> {
     this.announce(direction === "up" ? "migrating" : "reverting");
@@ -1497,6 +1546,12 @@ export class Migration {
     };
   }
 
+  /**
+   * @missingRailsCall call — PERMANENT: Ruby's `options[:on_skip].call(scope,
+   *   migration)` (migration.rb:1216) is a Proc invocation; a JS callback is
+   *   invoked directly as `options.onSkip(scope, source)`, which records no
+   *   `call` token.
+   */
   static async copy(
     destination: string,
     sources: Record<string, string>,
@@ -1791,7 +1846,15 @@ export class Migration {
     return migrationArConfig()!.configurations().configsFor({ envName: this.env() });
   }
 
-  /** @internal */
+  /**
+   * @internal Mirrors: `ActiveRecord::Migration.env` (`migration.rb:771-773`).
+   *
+   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
+   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
+   *   (`DEFAULT_ENV.call`, migration.rb:772); trails has no ported
+   *   `DEFAULT_ENV` Proc yet and reads the env vars here directly. Convergence
+   *   is RFC 0023 story `port-connection-handling-default-env-proc`.
+   */
   static env(): string {
     return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
   }
@@ -2133,6 +2196,13 @@ export class MigrationContext<
    * @internal Mirrors: ActiveRecord::MigrationContext#current_environment
    * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
    * trails counterpart is {@link DatabaseConfigurations.currentEnv}.
+   *
+   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
+   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
+   *   (`DEFAULT_ENV.call`, migration.rb:1341); trails has no ported
+   *   `DEFAULT_ENV` Proc yet, so this reads
+   *   `DatabaseConfigurations.currentEnv()` instead. Convergence is RFC 0023
+   *   story `port-connection-handling-default-env-proc`.
    */
   get currentEnvironment(): string {
     return DatabaseConfigurations.currentEnv();
@@ -2185,7 +2255,14 @@ export class MigrationContext<
     }
   }
 
-  /** @internal Mirrors: ActiveRecord::MigrationContext#needs_migration? */
+  /**
+   * @internal Mirrors: ActiveRecord::MigrationContext#needs_migration?
+   * (`migration.rb:1295-1297`).
+   *
+   * @missingRailsCall size — PERMANENT: Ruby `Array#size` (migration.rb:1296)
+   *   is a method; the JS counterpart `.length` is a property, so no callee is
+   *   recorded.
+   */
   async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }
@@ -2278,6 +2355,10 @@ export class MigrationContext<
    * @internal Mirrors: ActiveRecord::MigrationContext#parse_migration_filename
    * (`migration.rb:1374-1376`) — Rails'
    * `/\A([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.rb\z/` with `ts|js` for `rb`.
+   *
+   * @missingRailsCall first — PERMANENT: Ruby `Array#first` on the `scan`
+   *   result (migration.rb:1375) is a method; JS reads the first match off the
+   *   `String#match` result by index, which records no callee.
    */
   private parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "");
@@ -2791,36 +2872,24 @@ export class Migrator {
     return [...migrations].sort(byVersion);
   }
 
-  /** @internal */
+  /**
+   * @internal Mirrors: ActiveRecord::Migrator#validate (`migration.rb:1557-1563`).
+   *
+   * Rails' `group_by(&:name).find { |_, v| v.length > 1 }` reports the first
+   * *name* in first-occurrence order that has any duplicate — not the name
+   * whose repeat appears earliest — and names are checked before versions, so
+   * a list of same-name, version-less migrations raises
+   * DuplicateMigrationNameError rather than being rejected for a missing
+   * version. A JS `Map` preserves insertion order the same way Ruby's Hash
+   * does, so the group/find pair carries both properties.
+   */
   private validate(migrations: MigrationProxy[]): void {
-    // Rails' Migrator#validate checks duplicate names before touching
-    // versions, and tolerates a nil version. Mirror that ordering so a list of
-    // same-name, version-less migrations raises DuplicateMigrationNameError
-    // rather than being rejected for a missing version.
-    //
-    // Rails uses `group_by(&:name).find { |_, v| v.length > 1 }`, which reports
-    // the first *name* in first-occurrence order that has any duplicate — not
-    // the name whose repeat appears earliest. Count first, then walk the list
-    // in order to find the first duplicated name/version, to match that.
-    const nameCounts = new Map<string, number>();
-    for (const m of migrations) {
-      nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
-    }
-    for (const m of migrations) {
-      if (nameCounts.get(m.name)! > 1) {
-        throw new DuplicateMigrationNameError(m.name);
-      }
-    }
+    const [name] = [...groupBy(migrations, (m) => m.name)].find(([, v]) => v.length > 1) ?? [];
+    if (name != null) throw new DuplicateMigrationNameError(name);
 
-    const versionCounts = new Map<number, number>();
-    for (const m of migrations) {
-      versionCounts.set(m.version, (versionCounts.get(m.version) ?? 0) + 1);
-    }
-    for (const m of migrations) {
-      if (versionCounts.get(m.version)! > 1) {
-        throw new DuplicateMigrationVersionError(m.version);
-      }
-    }
+    const [version] =
+      [...groupBy(migrations, (m) => m.version)].find(([, v]) => v.length > 1) ?? [];
+    if (version != null) throw new DuplicateMigrationVersionError(version);
   }
 
   private _schemaTablesEnsured?: Promise<void>;
@@ -3022,10 +3091,24 @@ export class CheckPending {
     this._migrations = options.migrations ?? [];
   }
 
-  // Rails' `@mutex.synchronize` (migration.rb:657) guards the
-  // `@watcher ||= build_watcher` memo and the `@needs_check` flag. trails
-  // registers migrations programmatically, so it has neither, and nothing else
-  // on `this` is written across the awaits below — no critical section to hold.
+  /**
+   * Mirrors: ActiveRecord::Migration::CheckPending#call (migration.rb:656-672).
+   *
+   * Rails' `@mutex.synchronize` (migration.rb:657) guards the
+   * `@watcher ||= build_watcher` memo and the `@needs_check` flag. trails
+   * registers migrations programmatically, so it has neither, and nothing else
+   * on `this` is written across the awaits below — no critical section to hold.
+   *
+   * @missingRailsCall build_watcher — CONVERGEABLE: Rails memoizes a
+   *   `FileUpdateChecker` over the migration paths (migration.rb:658,
+   *   675-680); trails registers migrations programmatically and has no
+   *   watcher to build, so `call` checks the migrator directly. Convergence is
+   *   RFC 0051 story `check-pending-has-no-file-update-checker-watcher` (which
+   *   depends on RFC 0023 `port-activesupport-file-update-checker`).
+   * @missingRailsCall execute — CONVERGEABLE: `@watcher.execute`
+   *   (migration.rb:664) is the same `FileUpdateChecker` hop, absent for the
+   *   same reason and converging with the same story.
+   */
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
       await this._migrator.loadMigrated();
