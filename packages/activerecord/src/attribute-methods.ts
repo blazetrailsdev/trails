@@ -861,14 +861,9 @@ import {
   savedChangeToAttribute as _savedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
   isSavedChanges as _isSavedChanges,
-  savedChanges as _savedChanges,
   isWillSaveChangeToAttribute as _isWillSaveChangeToAttribute,
   attributeChangeToBeSaved as _attributeChangeToBeSaved,
   attributeInDatabase as _attributeInDatabase,
-  isHasChangesToSave,
-  changesToSave as _changesToSave,
-  changedAttributeNamesToSave as _changedAttributeNamesToSave,
-  attributesInDatabase as _attributesInDatabase,
   attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods/dirty.js";
@@ -933,10 +928,6 @@ export function isSavedChanges(this: InstanceMethodHost): boolean {
   return _isSavedChanges(this as any);
 }
 /** @internal */
-export function savedChanges(this: InstanceMethodHost): Record<string, [unknown, unknown]> {
-  return _savedChanges(this as any);
-}
-/** @internal */
 export function isWillSaveChangeToAttribute(
   this: InstanceMethodHost,
   attr: string,
@@ -954,22 +945,6 @@ export function attributeChangeToBeSaved(
 /** @internal */
 export function attributeInDatabase(this: InstanceMethodHost, attr: string): unknown {
   return _attributeInDatabase(this as any, attr);
-}
-/** @internal */
-export function hasChangesToSave(this: InstanceMethodHost): boolean {
-  return isHasChangesToSave(this as any);
-}
-/** @internal */
-export function changesToSave(this: InstanceMethodHost): Record<string, [unknown, unknown]> {
-  return _changesToSave(this as any);
-}
-/** @internal */
-export function changedAttributeNamesToSave(this: InstanceMethodHost): string[] {
-  return _changedAttributeNamesToSave(this as any);
-}
-/** @internal */
-export function attributesInDatabase(this: InstanceMethodHost): Record<string, unknown> {
-  return _attributesInDatabase(this as any);
 }
 /** @internal */
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {

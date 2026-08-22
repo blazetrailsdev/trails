@@ -91,15 +91,6 @@ export function isSavedChanges(record: DirtyRecord): boolean {
 }
 
 /**
- * Return all changes from the last save.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
- */
-export function savedChanges(record: DirtyRecord): Record<string, [unknown, unknown]> {
-  return record.previousChanges;
-}
-
-/**
  * Check if a specific attribute will change on the next save.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
@@ -137,42 +128,72 @@ export function attributeInDatabase(record: DirtyRecord, attr: string): unknown 
 }
 
 /**
- * Check if there are any unsaved changes.
+ * The half of ActiveRecord::AttributeMethods::Dirty whose Ruby bodies are
+ * zero-arg readers, so they port as accessor properties (CLAUDE.md,
+ * "Generated attribute readers are properties"). A class module rather than a
+ * plain-object one because only `include()`'s class branch copies accessor
+ * descriptors; an object literal is read by value and would flatten each
+ * getter into a data property.
  *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save?
+ * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
-export function isHasChangesToSave(record: DirtyRecord): boolean {
-  return record.changed;
-}
-
-/**
- * Return all pending changes that will be saved.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#changes_to_save
- */
-export function changesToSave(record: DirtyRecord): Record<string, [unknown, unknown]> {
-  return record.changes;
-}
-
-/**
- * Return the names of attributes that have unsaved changes.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#changed_attribute_names_to_save
- */
-export function changedAttributeNamesToSave(record: DirtyRecord): string[] {
-  return Object.keys(record.changes);
-}
-
-/**
- * Returns a hash of original database values for attributes with unsaved changes.
- * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
- */
-export function attributesInDatabase(record: DirtyRecord): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, [oldVal]] of Object.entries(record.changes)) {
-    result[key] = oldVal;
+export class Dirty {
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes
+   * (dirty.rb:118-120) — `mutations_before_last_save.changes`.
+   */
+  get savedChanges(): Record<string, [unknown, unknown]> {
+    return (this as unknown as DirtyGetterHost)._dirty.previousChanges;
   }
-  return result;
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save?
+   * (dirty.rb:169-171) — `mutations_from_database.any_changes?`.
+   */
+  get hasChangesToSave(): boolean {
+    return (this as unknown as DirtyGetterHost)._dirty.changed;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changes_to_save
+   * (dirty.rb:175-177) — `mutations_from_database.changes`.
+   */
+  get changesToSave(): Record<string, [unknown, unknown]> {
+    return (this as unknown as DirtyGetterHost).changes;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#changed_attribute_names_to_save
+   * (dirty.rb:181-183) — `mutations_from_database.changed_attribute_names`.
+   */
+  get changedAttributeNamesToSave(): string[] {
+    return (this as unknown as DirtyGetterHost)._dirty.changedAttributeNames;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
+   * (dirty.rb:191-193) — `mutations_from_database.changed_values`.
+   */
+  get attributesInDatabase(): Record<string, unknown> {
+    const record = this as unknown as DirtyGetterHost;
+    const result: Record<string, unknown> = {};
+    for (const name of record._dirty.changedAttributeNames) {
+      result[name] = record._dirty.attributeWas(name) ?? record._readAttribute(name);
+    }
+    return result;
+  }
+}
+
+interface DirtyGetterHost {
+  changes: Record<string, [unknown, unknown]>;
+  _dirty: {
+    changed: boolean;
+    changedAttributeNames: string[];
+    previousChanges: Record<string, [unknown, unknown]>;
+    attributeWas(name: string): unknown;
+  };
+  /** @internal */
+  _readAttribute(name: string): unknown;
 }
 
 interface DirtyPrivateHost {

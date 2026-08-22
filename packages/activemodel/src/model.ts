@@ -1750,15 +1750,6 @@ export class Model {
   }
 
   /**
-   * Check if there are any unsaved changes.
-   *
-   * Mirrors: ActiveModel::Dirty#has_changes_to_save?
-   */
-  get hasChangesToSave(): boolean {
-    return this._dirty.changed;
-  }
-
-  /**
    * Map of each changed attribute's name to its old (pre-change) value.
    *
    * Mirrors: ActiveModel::Dirty#changed_attributes
@@ -1795,48 +1786,6 @@ export class Model {
 
   get previousChanges(): Record<string, [unknown, unknown]> {
     return this._dirty.previousChanges;
-  }
-
-  /**
-   * Alias for previousChanges — the changes that were persisted in the last save.
-   *
-   * Mirrors: ActiveModel::Dirty#saved_changes
-   */
-  get savedChanges(): Record<string, [unknown, unknown]> {
-    return this._dirty.previousChanges;
-  }
-
-  /**
-   * Return the list of attribute names that have unsaved changes.
-   *
-   * Mirrors: ActiveModel::Dirty#changed_attribute_names_to_save
-   */
-  get changedAttributeNamesToSave(): string[] {
-    return this._dirty.changedAttributeNames;
-  }
-
-  /**
-   * Return the changes hash that will be saved on the next save.
-   * Same as `changes` — returns { attr: [old, new] } for unsaved attributes.
-   *
-   * Mirrors: ActiveModel::Dirty#changes_to_save
-   */
-  get changesToSave(): Record<string, [unknown, unknown]> {
-    return this.changes;
-  }
-
-  /**
-   * Return a hash of all attributes with their database values
-   * (i.e. the values from before any unsaved changes).
-   *
-   * Mirrors: ActiveModel::Dirty#attributes_in_database
-   */
-  get attributesInDatabase(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const name of this._dirty.changedAttributeNames) {
-      result[name] = this._dirty.attributeWas(name) ?? this._readAttribute(name);
-    }
-    return result;
   }
 
   /**
