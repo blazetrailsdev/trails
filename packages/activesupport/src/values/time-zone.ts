@@ -890,7 +890,8 @@ export class TimeZone {
    *   `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518) reaches the same
    *   `new TimeWithZone(instant, self)` that this body already performs, and
    *   going through `in_time_zone` would close the `values/time-zone` ->
-   *   `core-ext/date-and-time/zones` import cycle.
+   *   `core-ext/date-and-time/zones` import cycle (zones.ts:17 imports
+   *   `TimeZone` from this file), which ESM cannot express.
    */
   now(): TimeWithZone {
     // `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518).
@@ -973,7 +974,8 @@ export class TimeZone {
    *   and `in_time_zone`'s own `TimeZone` arm is that same constructor call
    *   (core-ext/date-and-time/zones.ts `timeWithZone`). Routing through it would
    *   close a `values/time-zone` -> `zones` -> `values/time-zone` module cycle
-   *   for no behavioural difference.
+   *   (zones.ts:17 imports `TimeZone` from this file, and `timeWithZone` is not
+   *   exported), which ESM cannot express — for no behavioural difference.
    */
   at(
     seconds: number | bigint | Rational,
