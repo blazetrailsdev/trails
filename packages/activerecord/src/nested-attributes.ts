@@ -44,7 +44,7 @@ export function _destroy(this: Base): boolean {
 export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean =>
   Object.entries(attributes).every(([key, value]) => key === "_destroy" || isBlank(value));
 
-interface NestedAttributeOptions {
+export interface NestedAttributeOptions {
   allowDestroy?: boolean;
   // The owner record is passed as a second argument so method-style predicates
   // (Rails `reject_if: :some_method`) can consult the owner (e.g. `persisted?`).
@@ -56,31 +56,11 @@ interface NestedAttributeOptions {
   updateOnly?: boolean;
 }
 
-interface NestedAttributeConfig {
-  associationName: string;
-  options: NestedAttributeOptions;
-}
-
-/**
- * Rails: `class_attribute :nested_attributes_options, default: {}` — the
- * per-model map of `associationName => options` populated by
- * `accepts_nested_attributes_for`. Trails records the same data in the
- * dynamically-assigned `_nestedAttributeConfigs` array; expose the Rails-shaped
- * hash reader (the `=`/`?` forms map to the same accessor).
- *
- * Mirrors: ActiveRecord::NestedAttributes#nested_attributes_options
- */
-export function nestedAttributesOptions(
-  this: typeof Base,
-): Readonly<Record<string, NestedAttributeOptions>> {
-  const configs: NestedAttributeConfig[] = (this as any)._nestedAttributeConfigs ?? [];
-  const out: Record<string, NestedAttributeOptions> = {};
-  for (const c of configs) out[c.associationName] = c.options;
-  return out;
-}
-
 /**
  * Configure nested attributes for an association.
+ *
+ * The registry write is nested_attributes.rb:361-363 — dup the hash, assign the
+ * key, write the whole hash back through the `class_attribute` writer.
  *
  * Mirrors: ActiveRecord::Base.accepts_nested_attributes_for
  *
@@ -143,20 +123,9 @@ export function acceptsNestedAttributesFor(
   // nested_attributes.rb. We mirror that in
   // assignNestedAttributesForOneToOneAssociation.
 
-  // Store config on the class
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeConfigs")) {
-    (modelClass as any)._nestedAttributeConfigs = [];
-  }
-  // Upsert: replace existing entry for this association (mirrors Rails'
-  // nested_attributes_options[name] = options hash-assignment).
-  const configs: NestedAttributeConfig[] = (modelClass as any)._nestedAttributeConfigs;
-  const existingIdx = configs.findIndex((c) => c.associationName === associationName);
-  const entry: NestedAttributeConfig = { associationName, options };
-  if (existingIdx >= 0) {
-    configs[existingIdx] = entry;
-  } else {
-    configs.push(entry);
-  }
+  const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
+  nestedAttributesOptions[associationName] = options;
+  modelClass.nestedAttributesOptions = nestedAttributesOptions;
 
   const type =
     assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
@@ -215,9 +184,8 @@ export function assignNestedAttributes(
   // is exceeded — mirror that here so callers see the misconfiguration
   // at assign time, not at save time.
   const ctor = record.constructor as typeof Base;
-  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
-  const config = configs.find((c) => c.associationName === associationName);
-  const resolvedLimit = resolveNestedLimit(config?.options.limit, record);
+  const options = ctor.nestedAttributesOptions[associationName];
+  const resolvedLimit = resolveNestedLimit(options?.limit, record);
   if (resolvedLimit !== undefined && attrs.length > resolvedLimit) {
     throw new TooManyRecords(
       `Maximum ${resolvedLimit} records are allowed. ` + `Got ${attrs.length} records instead.`,
@@ -240,10 +208,9 @@ async function processNestedAttributes(record: Base): Promise<void> {
   if (!pending) return;
 
   const ctor = record.constructor as typeof Base;
-  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
 
   for (const [assocName, attrsList] of pending) {
-    const config = configs.find((c) => c.associationName === assocName);
+    const config = ctor.nestedAttributesOptions[assocName];
     if (!config) continue;
 
     const associations: any[] = (ctor as any)._associations ?? [];
@@ -328,7 +295,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       assertNestedAttributesAreKnown(targetModel, childAttrs);
 
       // Check _destroy before rejectIf — destroy should work regardless of rejectIf
-      if (_destroy && config.options.allowDestroy) {
+      if (_destroy && config.allowDestroy) {
         // Destroy existing record
         if (pkValue) {
           const existing = await (targetModel as any).find(pkValue);
@@ -340,7 +307,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       // Check rejectIf only for create/update, not destroy. The `"all_blank"`
       // symbol is resolved to a proc at declaration time, so this is always a
       // function here.
-      const rejectIf = config.options.rejectIf;
+      const rejectIf = config.rejectIf;
       if (typeof rejectIf === "function" && rejectIf(attrs, record)) {
         continue;
       }
@@ -430,8 +397,8 @@ export function hasDestroyFlag(hash: Record<string, unknown>): boolean {
 
 /** @internal */
 export function isAllowDestroy(this: Base, associationName: string): boolean {
-  const configs: NestedAttributeConfig[] = (this.constructor as any)._nestedAttributeConfigs ?? [];
-  return configs.find((c) => c.associationName === associationName)?.options.allowDestroy ?? false;
+  const ctor = this.constructor as typeof Base;
+  return ctor.nestedAttributesOptions[associationName]?.allowDestroy ?? false;
 }
 
 /** @internal */
@@ -450,8 +417,8 @@ export function callRejectIf(
   attributes: Record<string, unknown>,
 ): boolean {
   if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
-  const configs: NestedAttributeConfig[] = (this.constructor as any)._nestedAttributeConfigs ?? [];
-  const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
+  const ctor = this.constructor as typeof Base;
+  const rejectIf = ctor.nestedAttributesOptions[associationName]?.rejectIf;
   // `"all_blank"` is resolved to a proc in acceptsNestedAttributesFor, so a
   // stored rejectIf is always a function here.
   return typeof rejectIf === "function" ? rejectIf(attributes, this) : false;
@@ -784,8 +751,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 
   const ctor = record.constructor as typeof Base;
-  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
-  const options = configs.find((c) => c.associationName === associationName)?.options ?? {};
+  const options = ctor.nestedAttributesOptions[associationName] ?? {};
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
@@ -897,8 +863,7 @@ export function assignNestedAttributesForCollectionAssociation(
     );
   }
   const ctor = record.constructor as typeof Base;
-  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
-  const config = configs.find((c) => c.associationName === associationName);
+  const config = ctor.nestedAttributesOptions[associationName];
 
   let attrs: Record<string, unknown>[];
   if (Array.isArray(attributesCollection)) {
@@ -915,7 +880,7 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  checkRecordLimitBang(resolveNestedLimit(config?.options.limit, record), attrs);
+  checkRecordLimitBang(resolveNestedLimit(config?.limit, record), attrs);
 
   // Rails `assign_nested_attributes_for_collection_association` marks matching
   // records for destruction *in memory* at assign time, so validations run
@@ -934,7 +899,7 @@ export function assignNestedAttributesForCollectionAssociation(
   // against nor marked here. The DB rows are still correctly destroyed by the
   // post-save flush; only the pre-save size-validation interaction is skipped
   // for the unloaded case (not exercised by any test).
-  if (config?.options.allowDestroy) {
+  if (config?.allowDestroy) {
     const loaded = loadedCollectionTarget(record, associationName);
     if (loaded.length > 0) {
       const targetModel = resolveCollectionTargetModel(record, associationName);

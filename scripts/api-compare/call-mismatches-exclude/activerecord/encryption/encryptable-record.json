@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "encrypt_attribute",
-    "call": "order:constructor,schemeFor",
-    "reason": "Rails calls `scheme_for` then `EncryptedAttributeType.new` inside the `decorate_attributes` block (encryptable_record.rb:88-91); trails builds the pending decorator first and hangs `schemeFor` off a lazy `scheme` getter on it, so the constructor is recorded ahead of `schemeFor`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "override_accessors_to_preserve_original",
     "call": "encrypted_attribute?",
     "reason": "Rails' reader lives in an anonymous `Module.new` that is `include`d so its body can call `super()` (encryptable_record.rb:110-118), and the `encrypted_attribute?` guard only exists to decide between that `super()` value and the original column; TS has no ancestor chain to `super()` into from a mixin, so trails redefines the prototype accessor to read the original attribute directly and the guard has nothing to guard."

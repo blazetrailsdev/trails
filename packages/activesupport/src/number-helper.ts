@@ -82,7 +82,7 @@ export interface NumberToHumanOptions {
   roundMode?: string;
 }
 
-export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {}): string {
+export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {}): unknown {
   return NumberToPhoneConverter.convert(number, options);
 }
 
@@ -95,7 +95,7 @@ export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {
 export function numberToDelimited(
   number: unknown,
   options: NumberWithDelimiterOptions = {},
-): string {
+): unknown {
   return NumberToDelimitedConverter.convert(number, options);
 }
 
@@ -107,30 +107,33 @@ export function numberToDelimited(
 export function numberWithDelimiter(
   number: unknown,
   options: NumberWithDelimiterOptions = {},
-): string {
+): unknown {
   return numberToDelimited(number, options);
 }
 
-export function numberToRounded(number: unknown, options: NumberToRoundedOptions = {}): string {
+export function numberToRounded(number: unknown, options: NumberToRoundedOptions = {}): unknown {
   return NumberToRoundedConverter.convert(number, options);
 }
 
-export function numberToCurrency(number: unknown, options: NumberToCurrencyOptions = {}): string {
+export function numberToCurrency(number: unknown, options: NumberToCurrencyOptions = {}): unknown {
   return NumberToCurrencyConverter.convert(number, options);
 }
 
 export function numberToPercentage(
   number: unknown,
   options: NumberToPercentageOptions = {},
-): string {
+): unknown {
   return NumberToPercentageConverter.convert(number, options);
 }
 
-export function numberToHumanSize(number: unknown, options: NumberToHumanSizeOptions = {}): string {
+export function numberToHumanSize(
+  number: unknown,
+  options: NumberToHumanSizeOptions = {},
+): unknown {
   return NumberToHumanSizeConverter.convert(number, options);
 }
 
-export function numberToHuman(number: unknown, options: NumberToHumanOptions = {}): string {
+export function numberToHuman(number: unknown, options: NumberToHumanOptions = {}): unknown {
   return NumberToHumanConverter.convert(number, options);
 }
 

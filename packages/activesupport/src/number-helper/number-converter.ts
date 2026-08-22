@@ -75,7 +75,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   static namespace: string | undefined;
 
-  static convert(number: unknown, options?: any): string {
+  static convert(number: unknown, options?: any): any {
     return new (this as any)(number, options ?? {}).execute();
   }
 
@@ -84,9 +84,15 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     this.opts = options;
   }
 
-  execute(): string {
-    if (this.number === null || this.number === undefined) return String(this.number);
-    if (this.validateFloat && !this.validBigdecimal()) return String(this.number);
+  /**
+   * Mirrors: `NumberConverter#execute` (number_converter.rb:130-137). The
+   * first two arms answer `nil` and the unconverted `number` — a `String`
+   * comes back out of `number_to_human("x")` only because the input already
+   * was one.
+   */
+  execute(): unknown {
+    if (this.number == null || this.number === false) return null;
+    if (this.validateFloat && !this.validBigdecimal()) return this.number;
     return this.convert();
   }
 

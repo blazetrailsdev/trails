@@ -292,7 +292,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
       }),
     });
     return {
-      _encryptedAttributes: new Set(["email"]),
+      encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
     };
   }
@@ -358,7 +358,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const avPrev = new AdditionalValue("plain@example.com", prevType);
 
     const model = {
-      _encryptedAttributes: new Set(["email"]),
+      encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
     };
     const relation = {
@@ -376,7 +376,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
   it("leaves attributes alone when whereValuesHash has no matching entry", () => {
     const type = makeType(true);
     const model = {
-      _encryptedAttributes: new Set(["email"]),
+      encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
     };
     const relation = { model, whereValuesHash: () => ({}) };
@@ -391,7 +391,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const type = makeType(false);
     const av = new AdditionalValue("enc", type);
     const model = {
-      _encryptedAttributes: new Set(["body"]),
+      encryptedAttributes: new Set(["body"]),
       typeForAttribute: () => type,
     };
     const relation = { model, whereValuesHash: () => ({ body: [av] }) };
@@ -403,7 +403,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
   it("ignores scalar (non-array) where values", () => {
     const type = makeType(true);
     const model = {
-      _encryptedAttributes: new Set(["email"]),
+      encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
     };
     const relation = {
@@ -439,7 +439,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
         this.attribute("email", "string");
       }
     }
-    (Contact as any)._encryptedAttributes = new Set(["email"]);
+    (Contact as any).encryptedAttributes = new Set(["email"]);
     (Contact as any).decorateAttributes(["email"], () => type);
 
     const avCurrent = new AdditionalValue("plain@example.com", type);
@@ -517,7 +517,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
         }),
       });
       const model = {
-        _encryptedAttributes: new Set(["email"]),
+        encryptedAttributes: new Set(["email"]),
         typeForAttribute: () => type,
       };
       const rel = new (targets.Relation as any)(model);
@@ -541,7 +541,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       });
       const av = new AdditionalValue("plain@x", type);
       const model = {
-        _encryptedAttributes: new Set(["email"]),
+        encryptedAttributes: new Set(["email"]),
         typeForAttribute: () => type,
       };
       const rel = new (targets.Relation as any)(model);
@@ -564,7 +564,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
         }),
       });
       class Contact extends (targets.Base as any) {
-        static _encryptedAttributes = new Set(["email"]);
+        static encryptedAttributes = new Set(["email"]);
         static typeForAttribute = () => type;
       }
       (Contact as any).findBy({ email: "x" });

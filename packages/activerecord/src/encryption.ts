@@ -91,6 +91,8 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
     }
   }
 
+  klass.encryptedAttributes ??= new Set<string>();
+
   for (const name of names) {
     encryptAttribute.call(klass, name, options);
   }
@@ -115,7 +117,7 @@ export function applyPendingEncryptions(klass: any): void {
   // so subclasses that have already snapped their callback chain don't miss it —
   // if a subclass registered callbacks before the parent installed this
   // validator, `in` would suppress installation even though the subclass lacks it.
-  // The validator reads `record.constructor._encryptedAttributes` at call time,
+  // The validator reads `record.constructor.encryptedAttributes` at call time,
   // so it correctly handles STI subclasses with different encrypted attribute sets.
   if (
     !Object.prototype.hasOwnProperty.call(klass, "_frozenEncryptionValidatorInstalled") &&

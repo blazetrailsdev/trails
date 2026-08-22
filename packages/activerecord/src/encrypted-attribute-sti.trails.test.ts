@@ -34,7 +34,7 @@ class ReflectedEncryptedCompany extends Company {}
 const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name);
 
 const encryptedAttributesOf = (klass: typeof Company) =>
-  (klass as unknown as { _encryptedAttributes?: Set<string> })._encryptedAttributes ??
+  (klass as unknown as { encryptedAttributes?: Set<string> }).encryptedAttributes ??
   new Set<string>();
 
 describe("STI subclass encrypts", () => {

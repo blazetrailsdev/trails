@@ -69,19 +69,6 @@ const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
  *   EncryptableRecord.encrypts(User, "email", { deterministic: true })
  */
 export class EncryptableRecord {
-  /**
-   * `class_attribute :encrypted_attributes` (encryptable_record.rb:11) also
-   * generates the predicate, whose body is `!!encrypted_attributes` — true once
-   * the slot has been assigned (`self.encrypted_attributes ||= Set.new`,
-   * encryptable_record.rb:50), including for an assigned-but-empty Set. That is
-   * NOT `has_encrypted_attributes?`, which is `present?` and so false when the
-   * Set is empty (encryptable_record.rb:204-206). The reader's `?? new Set()`
-   * default can't answer it, so read the slot directly.
-   */
-  static isEncryptedAttributes(modelClass: any): boolean {
-    return modelClass._encryptedAttributes != null;
-  }
-
   static sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined {
     return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
       ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
@@ -231,7 +218,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static addLengthValidationForEncryptedColumns(modelClass: any): void {
-    const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set<string>();
+    const attrs: Set<string> = modelClass.encryptedAttributes ?? new Set<string>();
     for (const name of attrs) {
       validateColumnSize.call(modelClass, name);
     }
@@ -244,8 +231,7 @@ export class EncryptableRecord {
     const names =
       attributeNames ??
       (typeof record.attributeNames === "function" ? record.attributeNames() : []);
-    const encryptedAttrs: Set<string> =
-      record.constructor._encryptedAttributes ?? new Set<string>();
+    const encryptedAttrs: Set<string> = record.constructor.encryptedAttributes ?? new Set<string>();
     const merged = [...new Set<string>([...names, ...[...encryptedAttrs].map(String)])];
     return record._createRecord?.(merged);
   }
@@ -253,7 +239,7 @@ export class EncryptableRecord {
   /** @internal */
   static cantModifyEncryptedAttributesWhenFrozen(record: any): void {
     const klass = record.constructor;
-    const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
+    const encryptedAttrs: Set<string> = klass.encryptedAttributes ?? new Set();
     // changedAttributeNamesToSave is the string[] of changed attribute names.
     // Iterate changed once and check Set membership — O(n+m) vs O(n×m).
     const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
@@ -284,6 +270,10 @@ export function validateColumnSize(this: any, attributeName: string): void {
  * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#encrypts
  * (encryptable_record.rb:49-55). `this` is the model class, the receiver Ruby's
  * `class_methods do` block gives the method.
+ *
+ * `self.encrypted_attributes ||= Set.new` (encryptable_record.rb:50) seeds this
+ * class's own Set; the comment there records why it is deliberately not a
+ * `class_attribute` `default:` — that instance would be shared across classes.
  */
 export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
   let options: SchemeOptions = {};
@@ -297,19 +287,11 @@ export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
     }
   }
 
-  // `encryptAttribute` own-property-guards `_encryptedAttributes` itself.
+  this.encryptedAttributes ??= new Set<string>();
+
   for (const name of names) {
     encryptAttribute.call(this, name, options);
   }
-}
-
-/**
- * The `class_attribute :encrypted_attributes` reader (encryptable_record.rb:11).
- * `this` is the model class; the slot is inherited through the prototype chain,
- * matching `class_attribute`'s subclass visibility.
- */
-export function encryptedAttributes(this: any): Set<string> {
-  return this._encryptedAttributes ?? new Set<string>();
 }
 
 /**
@@ -324,7 +306,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
     return this._deterministicEncryptedAttributes;
   }
   const result = new Set<string>();
-  for (const attributeName of encryptedAttributes.call(this)) {
+  for (const attributeName of this.encryptedAttributes ?? new Set<string>()) {
     const type = encryptedTypeOf(this.typeForAttribute(attributeName));
     if (type?.deterministic) {
       result.add(attributeName);
@@ -342,7 +324,7 @@ export function deterministicEncryptedAttributes(this: any): Set<string> {
  */
 export function encryptedAttribute(this: any, attributeName: string): boolean {
   const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
-  if (!encryptedAttributes.call(this.constructor).has(name)) return false;
+  if (!(this.constructor.encryptedAttributes ?? new Set<string>()).has(name)) return false;
   // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
   // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
   const type = encryptedTypeOf(this.constructor.typeForAttribute(name));
@@ -429,7 +411,7 @@ export function validateEncryptionAllowed(this: any): void {
  * @internal
  */
 export function hasEncryptedAttributes(this: any): boolean {
-  return encryptedAttributes.call(this.constructor).size > 0;
+  return (this.constructor.encryptedAttributes ?? new Set<string>()).size > 0;
 }
 
 /**
@@ -439,7 +421,7 @@ export function hasEncryptedAttributes(this: any): boolean {
  */
 export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  for (const attributeName of encryptedAttributes.call(this.constructor)) {
+  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
     result[attributeName] =
       typeof this.readAttribute === "function"
         ? this.readAttribute(attributeName)
@@ -455,7 +437,7 @@ export function buildEncryptAttributeAssignments(this: any): Record<string, unkn
  */
 export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  for (const attributeName of encryptedAttributes.call(this.constructor)) {
+  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
     const type = this.constructor.typeForAttribute(attributeName) as {
       deserialize: (v: unknown) => unknown;
     };
@@ -470,6 +452,9 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  * (via encryption.ts#encrypts) and direct callers route through here, mirroring
  * Rails' single `encrypt_attribute`.
  *
+ * `encrypted_attributes << name.to_sym` (encryptable_record.rb:85) adds to this
+ * class's own Set in place, which `encrypts` has already seeded.
+ *
  * The scheme is built by `schemeFor` — Rails' one `scheme_for` — inside the
  * `PendingEncryption` getter, because Rails calls `scheme_for` inside the
  * `decorate_attributes` block (encryptable_record.rb:85-88).
@@ -478,12 +463,7 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  */
 export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
   const modelClass = this;
-  // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
-  // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_encryptedAttributes")) {
-    modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
-  }
-  modelClass._encryptedAttributes.add(name);
+  modelClass.encryptedAttributes.add(name);
   delete modelClass._deterministicEncryptedAttributes;
 
   const pending: PendingEncryption = {
@@ -529,8 +509,8 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
   // can re-run the missing-column check against the authoritative DB column
   // set — closing the fail-open gap when the adapter isn't connected at
-  // declaration time. Own-property guarded like `_encryptedAttributes` so a
-  // subclass declaring ignoreCase doesn't mutate the parent's Set.
+  // declaration time. Own-property guarded so a subclass declaring ignoreCase
+  // doesn't mutate the parent's Set.
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
     modelClass._ignoreCasePreservedAttributes = new Set<string>(
       modelClass._ignoreCasePreservedAttributes ?? [],

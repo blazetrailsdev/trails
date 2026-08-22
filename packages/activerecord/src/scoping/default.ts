@@ -168,8 +168,7 @@ export function defaultScope<T extends typeof Base>(
       : (optionsOrAllQueries?.allQueries ?? false);
 
   const scopeObj = new DefaultScope(scope as (rel: any) => any, allQueries);
-  const existing: DefaultScope[] = (this as any).defaultScopes ?? [];
-  (this as any).defaultScopes = [...existing, scopeObj];
+  (this as any).defaultScopes = [...(this as any).defaultScopes, scopeObj];
 }
 
 /**
