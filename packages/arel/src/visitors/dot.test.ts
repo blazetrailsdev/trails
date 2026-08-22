@@ -414,7 +414,7 @@ describe("TestDot", () => {
       const node = new Nodes.OptimizerHints(["IDX(t1)", "MAX_EXEC_TIME(1000)"]);
       const out = dot.compile(node);
       expect(out).toContain("OptimizerHints");
-      expect(out).toMatch(/-> \d+ \[label="hints"\];/);
+      expect(out).toMatch(/-> \d+ \[label="expr"\];/);
       expect(out).toContain("IDX(t1)");
       expect(out).toContain("MAX_EXEC_TIME(1000)");
     });

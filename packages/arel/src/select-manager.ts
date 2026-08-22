@@ -22,7 +22,7 @@ import { DeleteManager } from "./delete-manager.js";
 import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
-import { And } from "./nodes/and.js";
+import { And } from "./nodes/nary.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
 

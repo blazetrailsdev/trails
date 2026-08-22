@@ -8,7 +8,7 @@ describe("Arel", () => {
     it("makes an OR node", () => {
       const a = users.get("id").eq(1);
       const b = users.get("id").eq(2);
-      const or = new Nodes.Or(a, b);
+      const or = new Nodes.Or([a, b]);
       expect(or).toBeInstanceOf(Nodes.Or);
       expect(or.left).toBe(a);
       expect(or.right).toBe(b);
@@ -16,14 +16,14 @@ describe("Arel", () => {
 
     describe("equality", () => {
       it("is equal with equal ivars", () => {
-        const a = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
-        const b = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
+        const a = new Nodes.Or([new Nodes.Quoted("foo"), new Nodes.Quoted("bar")]);
+        const b = new Nodes.Or([new Nodes.Quoted("foo"), new Nodes.Quoted("bar")]);
         expect(a.hash()).toBe(b.hash());
       });
 
       it("is not equal with different ivars", () => {
-        const a = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("bar"));
-        const b = new Nodes.Or(new Nodes.Quoted("foo"), new Nodes.Quoted("baz"));
+        const a = new Nodes.Or([new Nodes.Quoted("foo"), new Nodes.Quoted("bar")]);
+        const b = new Nodes.Or([new Nodes.Quoted("foo"), new Nodes.Quoted("baz")]);
         expect(a.hash()).not.toBe(b.hash());
       });
     });

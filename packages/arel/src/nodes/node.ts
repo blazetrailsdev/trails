@@ -1,3 +1,4 @@
+import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
 import { SQLString } from "../collectors/sql-string.js";
 
 /**
@@ -24,24 +25,21 @@ export const _engine: { current: ArelEngine | null } = { current: null };
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class Node {
   not(): Node {
-    assertRegistered("Not");
-    return new _registry.Not!(this);
+    return new (assertRegistered(_Not, "Not"))(this);
   }
 
   or(right: Node): Node {
-    assertRegistered("Grouping");
-    assertRegistered("Or");
-    return new _registry.Grouping!(new _registry.Or!([this, right]));
+    return new (assertRegistered(_Grouping, "Grouping"))(
+      new (assertRegistered(_Or, "Or"))([this, right]),
+    );
   }
 
   and(right: Node): Node {
-    assertRegistered("And");
-    return new _registry.And!([this, right]);
+    return new (assertRegistered(_And, "And"))([this, right]);
   }
 
   invert(): Node {
-    assertRegistered("Not");
-    return new _registry.Not!(this);
+    return new (assertRegistered(_Not, "Not"))(this);
   }
 
   /**
@@ -100,33 +98,13 @@ export abstract class Node {
   }
 }
 
-interface NodeRegistry {
-  Not?: new (expr: Node) => Node;
-  Grouping?: new (expr: Node) => Node;
-  Or?: new (children: Node[]) => Node;
-  And?: new (children: Node[]) => Node;
-}
-
-const _registry: NodeRegistry = {};
-
-function assertRegistered(name: keyof NodeRegistry): void {
-  if (!_registry[name]) {
+function assertRegistered<T>(ctor: T | undefined, name: string): T {
+  if (!ctor) {
     throw new Error(
-      `Node.${name} requires the arel registry. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
+      `Node.${name} requires the arel node slots. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
     );
   }
-}
-
-export function registerNodeDeps(deps: {
-  Not: new (expr: Node) => Node;
-  Grouping: new (expr: Node) => Node;
-  Or: new (children: Node[]) => Node;
-  And: new (children: Node[]) => Node;
-}): void {
-  _registry.Not = deps.Not;
-  _registry.Grouping = deps.Grouping;
-  _registry.Or = deps.Or;
-  _registry.And = deps.And;
+  return ctor;
 }
 
 function fnv1a32(input: string): number {

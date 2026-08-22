@@ -1,4 +1,6 @@
-import { Binary, NotIn, fetchAttributeFromBinary } from "./binary.js";
+import { include } from "@blazetrails/activesupport";
+import { _setIn } from "../node-slots.js";
+import { Binary, NotIn, FetchAttribute } from "./binary.js";
 import type { Node } from "./node.js";
 
 export class In extends Binary {
@@ -9,8 +11,12 @@ export class In extends Binary {
   invert(): Node {
     return new NotIn(this.left, this.right);
   }
-
-  fetchAttribute(block: (attr: Node) => unknown): unknown {
-    return fetchAttributeFromBinary(this.left, this.right, block);
-  }
 }
+
+// Mirrors `include FetchAttribute` (in.rb:6).
+include(
+  In as unknown as new (...args: unknown[]) => object,
+  FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
+);
+
+_setIn(In);
