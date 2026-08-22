@@ -863,10 +863,6 @@ export class AssociationScope {
       undefined,
       entryKlass,
     );
-    // Rails: `relation.instance_exec(owner, &scope) || relation`
-    // (association_scope.rb:171) — a scope lambda that returns a falsy value
-    // yields the bare `build_scope` relation, which contributes no WHERE or
-    // ORDER to the caller.
     return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner) ?? relation;
   }
 

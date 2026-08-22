@@ -242,17 +242,12 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     ordered: boolean,
   ): unknown {
     const klass = (reflection as { klass: typeof Base }).klass;
-    // Rails: `reflection.build_scope(reflection.aliased_table)`
-    // (disable_joins_association_scope.rb:34) — a bare
-    // `Relation.create(klass, table:, predicate_builder:)`
-    // (reflection.rb:336-338): no default scope, no STI predicate, bound to
-    // the reflection's aliased table.
     let scope: unknown = (
       reflection as unknown as {
-        buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): unknown;
+        buildScope(table?: unknown): unknown;
         aliasedTable?: unknown;
       }
-    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable, undefined, klass);
+    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable);
     if (keyCols.length === 1) {
       // Single-column key: hash WHERE typically compiles to
       // `key IN (?, ?, ...)`. The PredicateBuilder array handler
@@ -321,9 +316,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       ).constraints?.() ?? [];
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      // Rails: `item = eval_scope(reflection, scope_chain_item, owner)`
-      // (disable_joins_association_scope.rb:42).
-      const evaluated = this.evalScope(reflection, c, owner, klass);
+      const evaluated = this.evalScope(reflection, c, owner);
       scope = this._pushScopeIntoRelation(scope, evaluated);
     }
 
