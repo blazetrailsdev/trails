@@ -69,12 +69,14 @@ export function _setBuildQuoted(fn: (other: any, ctx: any) => any): void {
   _buildQuoted = fn;
 }
 
-// The one non-node slot: `Arel::Attributes::Attribute` is the class Rails
-// narrows on with `is_a?` in `FetchAttribute#fetch_attribute` (binary.rb:33-37)
-// and `Nodes.build_quoted` (casted.rb:48-52). A value import of
-// `attributes/attribute.js` from either reader closes a cycle back through
-// every node module the Attribute mixins reach.
-/** @internal */
+/**
+ * `Arel::Attributes::Attribute` — the class Rails narrows on with `is_a?` in
+ * `FetchAttribute#fetch_attribute` (binary.rb:33-37) and `Nodes.build_quoted`
+ * (casted.rb:48-52). A value import of `attributes/attribute.js` from either
+ * reader closes a cycle back through every node module the Attribute mixins
+ * reach.
+ * @internal
+ */
 export let _Attribute: (new (relation: any, name: string) => any) | undefined;
 /** @internal */
 export function _setAttribute(ctor: new (relation: any, name: string) => any): void {

@@ -27,7 +27,6 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
   if (other && typeof other === "object") {
-    // Arel::Attributes::Attribute
     if (_Attribute && other instanceof _Attribute) return other as Node;
     // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
     // returning `other`. Class dispatch, like Rails.
