@@ -80,9 +80,10 @@ jobs:
       # `__ALL__` means "couldn't compute a reliable diff, check everything".
       prettier_files: ${{ steps.filter.outputs.prettier_files }}
       # Same shape as prettier_files, narrowed to the extensions ESLint is
-      # configured for. `__ALL__` additionally covers the case where a changed
-      # file feeds a rule's inputs rather than being linted itself — see
-      # LINT_ALL_RE below.
+      # configured for. `__ALL__` additionally covers every non-PR event (a
+      # type-aware rule can break a file no PR touched) and the case where a
+      # changed file feeds a rule's inputs rather than being linted itself —
+      # see LINT_ALL_RE below.
       lint_files: ${{ steps.filter.outputs.lint_files }}
     steps:
       - uses: actions/checkout@v5
@@ -176,7 +177,19 @@ jobs:
             else
               echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
             fi
-            if echo "$files" | grep -qE "$LINT_ALL_RE"; then
+            # A type-aware rule (no-unnecessary-type-assertion &c.) reads
+            # declarations in OTHER files, so narrowing a return type in one PR
+            # can make an assertion in a file NO PR touched redundant. That file
+            # is never re-linted, CI stays green, and `main` carries a lint error
+            # every agent then hits locally. Lint the whole tree on every non-PR
+            # event — the push to main that landed it, the weekly sweep,
+            # workflow_dispatch — so the break surfaces with its file and rule in
+            # the run itself. The per-PR changed-files scope is deliberately
+            # untouched; a full-tree lint on every PR is what the scope exists to
+            # avoid.
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
+            elif echo "$files" | grep -qE "$LINT_ALL_RE"; then
               echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
             elif lfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
               {
