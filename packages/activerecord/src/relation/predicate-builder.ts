@@ -126,8 +126,6 @@ export class PredicateBuilder {
       const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
       return [this.build(this.table.arelTable.get(columnName), mapped)];
     }
-    // Multi-mapping: one AND-group per object over every mapped column, ORed
-    // together (grouping_queries), mirroring expand_from_hash.
     const queryGroups: Nodes.Node[][] = values.map((object) =>
       mapping.map(([fieldAttr, aggregateAttr]) =>
         this.build(
@@ -204,11 +202,9 @@ export class PredicateBuilder {
       // column reference, so no guard beyond this note.
       return assocPb.expandFromHash({ [rawPk as string]: value });
     }
-    // Core non-polymorphic, non-through path.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
     const queryGroups: Nodes.Node[][] = [];
     for (const query of queries) {
-      // Cycle guard: prevents infinite recursion when FK name == association name.
       if (isSameHash(query, attributes)) {
         queryGroups.push([this.build(this.table.arelTable.get(key), value)]);
       } else {
@@ -589,8 +585,6 @@ function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): 
     const v = (object as Record<string, unknown>)[attr];
     return typeof v === "function" ? (v as (...a: unknown[]) => unknown).call(object) : v;
   }
-  // Multi-mapping (`try!`) surfaces the missing attribute; single-mapping
-  // (`respond_to? ? … : object`) falls back to the scalar passthrough.
   if (tryBang) {
     throw new TypeError(
       `composed_of value ${describeAggregateValue(object)} does not respond to mapped attribute '${attr}'`,

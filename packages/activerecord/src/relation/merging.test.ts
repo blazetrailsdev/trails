@@ -281,10 +281,8 @@ describe("RelationMergingTest", () => {
     // reordered to `[RAW, a, b]`.
     const rawJoin = "INNER JOIN authors ON authors.id = posts.author_id";
     const source = Post.joins(":comments", rawJoin, ":author");
-    // `merge` routes through Merger#mergeJoins...
     const merged = Post.all().merge(source);
     expect(merged.joinsValues).toEqual([":comments", rawJoin, ":author"]);
-    // ...and `mergeBang` folds field-by-field; both must preserve the order.
     const banged = Post.all();
     (banged as any).mergeBang(source);
     expect(banged.joinsValues).toEqual([":comments", rawJoin, ":author"]);

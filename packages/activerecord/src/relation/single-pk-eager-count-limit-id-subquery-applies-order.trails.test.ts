@@ -34,16 +34,10 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
     [Post, Comment].forEach((m) => registerModel(m as unknown as typeof Base));
   });
 
-  // Order by title ascending picks a different top-2 than pk order:
-  //   pk order (1, 2)  → tags_count {5, 7} → COUNT(DISTINCT) = 2
-  //   title order (A=2, B=3) → tags_count {7, 7} → COUNT(DISTINCT) = 1
-  // So a limited id set that ignores the order would (wrongly) count 2.
   async function seedPosts(): Promise<void> {
     await Post.create({ id: 1, title: "C", body: "b", tags_count: 5 });
     await Post.create({ id: 2, title: "A", body: "b", tags_count: 7 });
     await Post.create({ id: 3, title: "B", body: "b", tags_count: 7 });
-    // Two comments on post 2 fan the LEFT OUTER JOIN, so the DISTINCT-pk id
-    // fetch must de-duplicate.
     await Comment.create({ post_id: 2, body: "c1" });
     await Comment.create({ post_id: 2, body: "c2" });
     await Comment.create({ post_id: 1, body: "c3" });
@@ -64,7 +58,6 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
     // have tags_count 7, so the answer is 1. An unordered top-2 (posts 1 & 2)
     // would wrongly return 2.
     expect(count).toBe(1);
-    // The id-materialization subquery carries the ORDER BY title.
     const idSql = sqls.find((s) => /DISTINCT/i.test(s) && /ORDER BY/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();
     expect(idSql).toMatch(/ORDER BY.*title/i);
@@ -72,9 +65,6 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
 
   it("eager_load(:comments).order(:title).offset(n).count(column) counts over the ordered rows after the offset", async () => {
     await seedPosts();
-    // title order: A=2, B=3, C=1. offset(1) drops post 2, leaving posts 3 & 1
-    // → tags_count {7, 5} → COUNT(DISTINCT) = 2. An unordered offset could drop
-    // a different row and diverge.
     const count = await Post.eagerLoad("comments")
       .order("title")
       .offset(1)

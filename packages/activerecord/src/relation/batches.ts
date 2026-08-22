@@ -154,9 +154,6 @@ export class Batches {
   ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
     const self = this;
     const cursor = Array(cursorOption ?? this.primaryKey).map(String);
-    // `ensure_valid_options_for_batching!` reaches the schema cache, which is
-    // async here, so the validation runs when the batches are first pulled
-    // rather than at `in_batches` call time.
     const ensureValidOptions = () =>
       ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
 
@@ -433,7 +430,6 @@ export function batchOnLoadedRelation(opts: {
   batchLimit: number;
 }): any[] {
   const { relation, cursor, batchLimit } = opts;
-  // relation.records() is async in this codebase; loaded records live on _records.
   let records: any[] = globalThis.Array.isArray(relation._records) ? relation._records : [];
   const order = buildBatchOrders(cursor, opts.order as any).map(([, second]) => second);
 

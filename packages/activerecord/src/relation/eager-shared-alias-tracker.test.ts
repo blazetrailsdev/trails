@@ -18,9 +18,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
-// Opt into the canonical-model autoload index so the `author` association target
-// (`Author`) resolves by name during eager build_joins — no manual
-// `registerModel`.
 import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 
@@ -31,15 +28,9 @@ describe("eager build_joins shared AliasTracker", () => {
     const rel = Post.includes("author")
       .references("author")
       .joins("INNER JOIN authors ON authors.id = posts.author_id");
-    // Strip identifier quoting so the assertions hold across adapters (sqlite /
-    // postgres use `"`, MariaDB/MySQL use backticks).
     const sql = (rel as unknown as { toSql(): string }).toSql().replace(/["`]/g, "");
 
-    // The manual join keeps the real `authors` name; the eager OUTER JOIN
-    // collides against the shared tracker's seed and re-aliases to its
-    // `alias_candidate` (`authors_posts`).
     expect(sql).toContain("LEFT OUTER JOIN authors authors_posts");
-    // Its column-alias projection reads the now-aliased table, not bare `authors`.
     expect(sql).toContain("authors_posts.id AS t1_r0");
     expect(sql).toContain("INNER JOIN authors ON authors.id = posts.author_id");
   });

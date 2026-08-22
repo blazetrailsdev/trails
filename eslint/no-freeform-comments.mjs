@@ -16,7 +16,9 @@
  *      constant path. This is the fidelity anchor CLAUDE.md asks for.
  *   3. Tool directives — `eslint-*`, `@ts-*`, `prettier-ignore`, coverage
  *      pragmas, and this repo's own `boundary:` / `@boundary-file:` (read by
- *      `no-native-date`). Deleting these changes what the toolchain does.
+ *      `no-native-date`) and `@nie disposition=` (read by
+ *      `nie-requires-annotation`). Deleting these changes what the toolchain
+ *      does.
  *
  * There is no opt-out marker. The rule shipped with a `keep:` escape hatch and
  * the sweep across arel and activemodel used it zero times, so it was removed:
@@ -59,9 +61,13 @@
  * losing a note. They are matched anywhere in the comment, not just at the
  * start, because `no-native-date` accepts them mid-line
  * (`} /* boundary: *\/ else if (x instanceof Date)`).
+ *
+ * `@nie disposition=` is likewise read by `eslint/nie-requires-annotation.mjs`,
+ * which REQUIRES it on every `throw new NotImplementedError(...)` — deleting
+ * one reds that rule.
  */
 const DIRECTIVE_RE =
-  /^\s*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:/iu;
+  /^\s*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=/iu;
 
 /**
  * A reference to the Rails source. Deliberately generous: a false KEEP costs

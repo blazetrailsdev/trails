@@ -18,9 +18,6 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 // class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel([Author, Post, SpecialPost, Comment, Paragraph, Categorization]);
 
-// Compare via `<`/`>` (not subtraction): PG round-trips `id` as a BigInt and a
-// BigInt-returning sort comparator throws "Cannot convert a BigInt value to a
-// number" when Array.sort coerces it. `<`/`>` work for both number and BigInt.
 const byId = (records: any[]) =>
   [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
@@ -248,8 +245,6 @@ describe("OrTest", () => {
   });
 });
 
-// The maximum expression tree depth is 1000 by default for SQLite3.
-// https://www.sqlite.org/limits.html#max_expr_depth
 describe("TooManyOrTest", () => {
   fixtures(["paragraphs"]);
 

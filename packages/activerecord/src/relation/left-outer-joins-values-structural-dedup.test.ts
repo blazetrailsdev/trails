@@ -15,9 +15,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
-// Opt into the canonical-model autoload index so the `posts`/`comments`
-// association targets (`Post`, `Comment`) resolve by name during build_joins —
-// no manual `registerModel`.
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 
@@ -40,7 +37,7 @@ describe("join value union structural dedup", () => {
     // so the value survives once — mirroring Rails, not JS reference identity.
     expect(asHost(rel).leftOuterJoinsValues).toHaveLength(1);
     const sql = asHost(rel).toSql();
-    expect((sql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2); // posts + comments, no dup
+    expect((sql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
   });
 
   it("emits a single INNER JOIN for a structurally-equal Hash spec joined twice", () => {
@@ -49,12 +46,10 @@ describe("join value union structural dedup", () => {
     const rel = Author.joins({ ":posts": ":comments" }).joins({ ":posts": ":comments" });
     expect(asHost(rel).joinsValues).toHaveLength(1);
     const sql = asHost(rel).toSql();
-    expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(2); // posts + comments, no dup
+    expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(2);
   });
 
   it("keeps distinct Hash specs as separate joins", () => {
-    // Dedup is by value, not by shape: two hashes with the same key but
-    // different nested target must both survive.
     const rel = Author.leftJoins({ ":posts": ":comments" }).leftJoins({ ":posts": ":author" });
     expect(asHost(rel).leftOuterJoinsValues).toHaveLength(2);
   });

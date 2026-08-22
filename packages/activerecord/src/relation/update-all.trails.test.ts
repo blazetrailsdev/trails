@@ -114,8 +114,6 @@ describe("update_all value substitution", () => {
     const rel = Topic.where({ id: 1 });
     try {
       const { binds } = await captureUpdate(rel, () => rel.updateAll({ title: "x" }));
-      // Cast exactly once, on the RAW value — the bind must preserve the result
-      // rather than casting it a second time.
       expect(casts).toEqual(["x"]);
       expect(binds[0]).toBe("cast(x)");
     } finally {

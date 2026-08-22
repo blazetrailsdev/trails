@@ -25,12 +25,9 @@ import { TableMetadata } from "../table-metadata.js";
 // structurally by resetting @predicate_builder in `inherited` (core.rb:422-425).
 describe("Base.predicateBuilder STI memoization", () => {
   it("does not leak the parent's builder to an STI subclass", () => {
-    // Warm the parent first: with a prototype-chain memo, this instance would
-    // then be returned for the subclass too.
     const companyPb = Company.predicateBuilder;
     const firmPb = Firm.predicateBuilder;
     expect(firmPb).not.toBe(companyPb);
-    // Idempotent per class.
     expect(Company.predicateBuilder).toBe(companyPb);
     expect(Firm.predicateBuilder).toBe(firmPb);
   });
@@ -117,7 +114,6 @@ describe("association hash expansion grouping shape", () => {
     const rel = CpkOrderWithSingularBookChapters.where({
       chapters: [[1, 2]],
     }) as unknown as HasWhereClause;
-    // One tuple → one query group → predicates spliced flat, one per PK column.
     const preds = rel.whereClause.predicates;
     expect(preds).toHaveLength(2);
     for (const pred of preds) expect(pred).not.toBeInstanceOf(Nodes.Grouping);

@@ -23,9 +23,6 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
 import { registerModel } from "../index.js";
-// Loading these registers each delegate class with the relation family so the
-// carrier resolvers find their base ctor and `uncacheableMethods()` sees the
-// subclass-only methods (`target`, …).
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../disable-joins-association-relation.js";
@@ -38,7 +35,6 @@ describe("generated relation methods — per-model prototype carrier", () => {
     generateRelationMethod(Post as never, "somethingGenerated", fn);
 
     const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
-    // Real own property on the carrier prototype — not a WeakMap side-table entry.
     expect(Object.prototype.hasOwnProperty.call(carrier, "somethingGenerated")).toBe(true);
     expect(carrier.somethingGenerated).toBe(fn);
   });
@@ -82,12 +78,9 @@ describe("generated relation methods — per-model prototype carrier", () => {
   });
 
   it("never generates an uncacheable method onto the carrier (gate is load-bearing)", () => {
-    // `Developer.target` is delegated in `DelegationCachingTest`; `target` is
-    // uncacheable (subclass-only), so it must never land on the carrier where it
-    // would shadow `CollectionProxy#target`.
-    expect("target" in CollectionProxy.prototype).toBe(true); // family loaded
+    expect("target" in CollectionProxy.prototype).toBe(true);
     const uncacheable = uncacheableMethods();
-    expect(uncacheable.has("target")).toBe(true); // guard: not a vacuous loop
+    expect(uncacheable.has("target")).toBe(true);
     const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
     for (const name of uncacheable) {
       expect(Object.prototype.hasOwnProperty.call(carrier, name)).toBe(false);
@@ -119,9 +112,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("installs already-generated methods when a carrier is created later (includeInto catch-up)", () => {
-    // Generate BEFORE the Comment association/proxy carriers exist: creating them
-    // must back-fill the stored method as a real own property (the `includeInto`
-    // catch-up loop), not miss it.
     generateRelationMethod(Comment as never, "lateCarrierGenerated", () => "late");
     for (const carrier of [
       associationRelationClassFor(Comment as never),
@@ -166,7 +156,6 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     generateRelationMethod(Company as never, "stiOverridden", () => "base");
     const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
     expect((firmCarrier.stiOverridden as () => string)()).toBe("child");
-    // The base carrier (Company) only sees its own module, so it resolves "base".
     const companyCarrier = relationClassFor(Company as never).prototype as Record<string, unknown>;
     expect((companyCarrier.stiOverridden as () => string)()).toBe("base");
   });
@@ -182,7 +171,7 @@ describe("generated relation methods — remaining delegate-class carriers", () 
 
   it("never generates an uncacheable method onto any of the four carriers", () => {
     const uncacheable = uncacheableMethods();
-    expect(uncacheable.has("target")).toBe(true); // guard: not a vacuous loop
+    expect(uncacheable.has("target")).toBe(true);
     for (const carrier of allCarriersFor(Post as never)) {
       const proto = carrier.prototype as Record<string, unknown>;
       for (const name of uncacheable) {
@@ -217,8 +206,6 @@ describe("name delegate — property-reader typing invariant", () => {
   });
 
   it("stays a supertype of `string` so string literals remain assignable at call sites", () => {
-    // The other half: `RelationName` must accept a plain string, so
-    // `expect(relation.name).toBe("Comment")` type-checks without a cast.
     const rel = Comment.all();
     const name: typeof rel.name = "Comment";
     expect(name).toBe("Comment");
@@ -284,9 +271,6 @@ describe("respond_to_missing? — `in` on the dispatch proxies", () => {
   });
 
   it("keeps an own property whose value is undefined off the delegation path", async () => {
-    // `whatAreYou` is a real Comment class method, so the delegation path would
-    // fabricate a callable for it. An own field of the same name holding
-    // `undefined` must win: the property is defined here, it is just unset.
     const rel = Comment.all() as unknown as Record<string, unknown>;
     Object.defineProperty(rel, "whatAreYou", { value: undefined, configurable: true });
     expect(rel.whatAreYou).toBeUndefined();

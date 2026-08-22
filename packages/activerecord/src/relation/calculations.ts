@@ -555,7 +555,6 @@ export async function calculate(
                 ? [...primaryKey]
                 : [primaryKey];
         }
-        // PostgreSQL: ORDER BY expressions must appear in SELECT list when using DISTINCT
         if (this.groupValues.length === 0) relation.orderValues = [];
       }
 
@@ -575,7 +574,6 @@ export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
 ): Promise<unknown[]> {
-  // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
   if (this.isNullRelation()) return [];
 
   // calculations.rb:300 — a loaded relation whose plucked columns are all
@@ -651,10 +649,6 @@ export async function pluck(
         return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
       }
       if (typeof c !== "string") return c;
-      // Table-qualified ("table.col"), quoted ('"table"."col"'), function expressions,
-      // or comma-separated lists must pass through as raw SQL.
-      // Comma-separated lists are not allowed in a single pluck argument —
-      // each column must be passed as a separate argument for correct result mapping.
       if (hasTopLevelComma(c)) {
         throw argumentError(
           `pluck does not allow comma-separated column lists in a single argument. ` +
@@ -931,7 +925,6 @@ function hasTopLevelComma(s: string): boolean {
         i++;
         continue;
       }
-      // SQL doubled-quote escape ("" or ``)
       if (ch === quote && s[i + 1] === quote) {
         i++;
         continue;
@@ -1227,7 +1220,6 @@ export async function executeGroupedCalculation(
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
     association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
-    // only count belongs_to associations
     associated = association != null && association.belongsTo?.() === true;
     // calculations.rb:521 — `Array(association.foreign_key)` expands a
     // composite-key belongs_to to every FK column; the rest of the body
@@ -1336,8 +1328,6 @@ export async function executeGroupedCalculation(
       // passes here (calculations.rb:562-563), one-column key included
       // (predicate_builder.rb:87-90).
       const records: any[] = await klass.where(primaryKey, keyIds).toArray();
-      // The composite-PK `id` accessor returns an array, so `index_by(&:id)` is
-      // keyed by the raw per-column attribute values to match the group-key tuple.
       keyRecords = new Map(
         records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
       );
@@ -1491,7 +1481,6 @@ export function typeCastPluckValues(
     joinDependencies ??= buildJoinDependencies.call(rel as any);
     return (
       (lookupCastTypeFromJoinDependencies(rel, name, joinDependencies) as ColumnType | null) ??
-      // Driver OID type (e.g. PostgreSQL) or identity fallback.
       columnType(result, name, i, {})
     );
   });

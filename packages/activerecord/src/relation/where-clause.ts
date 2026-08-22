@@ -171,9 +171,6 @@ export class WhereClause {
       if (typeof c === "string") colStrings.add(c);
       else if (c instanceof Nodes.Attribute) {
         attrNodes.push(c);
-        // Also register as qualified "table.column" so cross-model merges work
-        // even when two Table instances for the same table have different klass/
-        // typeCaster (and thus different stableSerialize outputs, breaking eql).
         colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
       } else if (c instanceof Nodes.Node) {
         // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
@@ -191,7 +188,6 @@ export class WhereClause {
       }
       if (attrNodes.some((a) => a.eql(attr))) return false;
       if (colStrings.has(attr.name)) return false;
-      // Match qualified "table.column" strings against the attribute's relation + name
       const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
       if (colStrings.has(qualified)) return false;
       return true;
@@ -240,10 +236,6 @@ export class WhereClause {
     return hash;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /** @internal */
 function invertPredicate(node: Nodes.Node): Nodes.Node {
@@ -333,13 +325,13 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral): Nodes.Node {
 function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
   fetchAttribute(node, (attr: Nodes.Node) => {
-    if (!(attr instanceof Nodes.Attribute)) return true; // not an attribute — keep traversing
+    if (!(attr instanceof Nodes.Attribute)) return true;
     if (attrNode !== null && !attrNode.eql(attr)) {
       attrNode = null;
-      return false; // conflict: multiple different attributes — stop
+      return false;
     }
     attrNode = attr;
-    return true; // found a match — keep traversing (Nary may have more children)
+    return true;
   });
   return attrNode;
 }

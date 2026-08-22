@@ -150,7 +150,6 @@ describe("ActiveRecord::Relation", () => {
         { length: 10 },
         (_, i) => new WhereClause([t.get(`id${i}`).eq(bindParam(i))]),
       );
-      // wcs[0] + wcs[1] + wcs[2].or(wcs[3]) + wcs[4] + wcs[5] + wcs[6].or(wcs[7]) + wcs[8] + wcs[9]
       const wc = [
         wcs[1],
         wcs[2].or(wcs[3]),
@@ -160,7 +159,6 @@ describe("ActiveRecord::Relation", () => {
         wcs[8],
         wcs[9],
       ].reduce((acc, c) => acc.plus(c), wcs[0]);
-      // wcs[0] + wcs[2].or(wcs[3]) + wcs[5] + wcs[6].or(wcs[7]) + wcs[9]
       const expected = [wcs[2].or(wcs[3]), wcs[5], wcs[6].or(wcs[7]), wcs[9]].reduce(
         (acc, c) => acc.plus(c),
         wcs[0],

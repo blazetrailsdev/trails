@@ -16,9 +16,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
-// Opt into the canonical-model autoload index so the belongsTo("author") target
-// (`Author`) resolves by name during JoinDependency construction — no manual
-// `registerModel`.
 import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -27,9 +24,6 @@ import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
 
-  // The FROM clause onward — the whole join sequence. Adapter-quoted (MySQL uses
-  // backticks), so a hardcoded `FROM "posts"` would miss there and slice to the
-  // string's tail, leaving the containment assertions vacuously true.
   const fromClause = (sql: string): string => {
     const marker = `FROM ${quoteTableName("posts")}`;
     const at = sql.indexOf(marker);
@@ -59,8 +53,6 @@ describe("build_joins from(subquery) dedup", () => {
       Post.from(Post.leftOuterJoins(":author"), "posts") as unknown as { toSql(): string }
     ).toSql();
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(1);
-    // The short-circuited live path emits the exact same LEFT OUTER JOIN clause
-    // as the subquery `from(relation)` path — not just a coincidentally-similar one.
     expect(joinFragment(liveSql)).not.toBe("");
     expect(joinFragment(liveSql)).toBe(joinFragment(subSql));
   });
@@ -75,9 +67,7 @@ describe("build_joins from(subquery) dedup", () => {
     const build = () => Post.leftOuterJoins(":comments").merge(Comment.leftOuterJoins(":post"));
     const liveSql = (build() as unknown as { toSql(): string }).toSql();
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
-    // Base `comments` join + the merged cross-klass `post` JoinDependency.
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
-    // The whole FROM…joins structure of the live path is the subquery's inner query.
     expect(subSql).toContain(fromClause(liveSql));
   });
 
@@ -127,7 +117,6 @@ describe("build_joins from(subquery) dedup", () => {
   it("appends a raw join that trails a named join instead of leading with it", () => {
     const build = () => Post.joins(":comments").joins("CROSS JOIN categories");
     const q = (name: string) => escapeRegExp(quoteTableName(name));
-    // Both halves of the split see the raw-vs-named interleaving, so both append.
     for (const sql of [
       (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql(),
       (build() as unknown as { toSql(): string }).toSql(),
@@ -166,16 +155,11 @@ describe("build_joins from(subquery) dedup", () => {
     expect(liveSql).toMatch(new RegExp(`LEFT OUTER JOIN ${q("authors")} ${q("authors_posts")}`));
   });
 
-  // Live and `from(relation)` subquery paths must emit the same join sequence for
-  // an eager + left-outer + raw-join combination: one shared `build_joins` call
-  // with one AliasTracker on both halves.
   it("emits the same joins for eager_load + left_outer_joins + a raw join on both paths", () => {
     const build = () =>
       Post.joins("CROSS JOIN categories").eagerLoad(":author").leftOuterJoins(":comments");
     const liveSql = (build() as unknown as { toSql(): string }).toSql();
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
-    // The eager live path projects `t0_r*` aliases, so compare from the FROM on:
-    // the whole join sequence of the live query is the subquery's inner query.
     const liveFrom = fromClause(liveSql);
     expect(liveFrom).toContain("CROSS JOIN categories");
     expect(subSql).toContain(liveFrom);

@@ -28,7 +28,6 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
     [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
   });
 
-  // Three orders in shop 1. Book counts per order: 1 → 1, 2 → 3, 3 → 2.
   async function seedOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
     for (const id of [1, 2, 3]) {

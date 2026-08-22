@@ -21,7 +21,6 @@ import { Relation } from "../relation.js";
 import { relationClassFor } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 
-// Warm the per-model subclass so both cases benchmark steady-state `new`.
 const PerModelRelation = relationClassFor(Post);
 
 describe("relation construction hot path", () => {

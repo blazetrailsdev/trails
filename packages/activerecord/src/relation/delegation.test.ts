@@ -75,18 +75,11 @@ describe("DelegationTest", () => {
       expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
         NotImplementedError,
       );
-      // `namedExtension` is a real own static defined on `Post` itself (below
-      // `Base` in the static chain), so it is exempt — proving subclass-defined
-      // class members stay delegable.
       expect(Object.prototype.hasOwnProperty.call(Post, "namedExtension")).toBe(true);
       expect(() => guardBaseMethodDelegation(Post as any, "namedExtension")).not.toThrow();
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {
-      // Production default `true` preserves ordinary
-      // `Post.where(...).<baseMethod>` chains: the call is delegated rather than
-      // raising the guard. (The test harness flips this to `false` suite-wide,
-      // so set it back explicitly here.)
       DelegateCache.delegateBaseMethods = true;
       const relation = Post.all() as any;
       expect(() => relation.belongsTo("author")).not.toThrow(NotImplementedError);
@@ -218,7 +211,7 @@ describe("DelegationTest", () => {
         expect(typeof (Post as any)[method]).toBe("function");
       }
     });
-  }); // QueryingMethodsDelegationTest
+  });
 
   describe("DelegationCachingTest", () => {
     it("delegation doesn't override methods defined in other relation subclasses", () => {
@@ -246,7 +239,7 @@ describe("DelegationTest", () => {
         targetGetter,
       );
     });
-  }); // DelegationCachingTest
+  });
 
   describe("delegateArrayMethod curated list", () => {
     // Rails delegates only the curated `delegate ... to: :records` set plus the
@@ -318,11 +311,9 @@ describe("DelegationTest", () => {
     it("delegates partition to Array", async () => {
       const post = await Post.first();
       const target = (post as any).comments;
-      // Unloaded — partition is still present and loads the rows on call.
       expect(typeof target.partition).toBe("function");
       expect(target.loaded).toBe(false);
 
-      // Predicate value from an independent query so the proxy stays unloaded.
       const someId = (await Comment.first())!.id;
       const [matched, unmatched] = await target.partition((c: any) => c.id === someId);
 
@@ -331,7 +322,6 @@ describe("DelegationTest", () => {
       expect(target.loaded).toBe(true);
       const records: any[] = target.target;
       expect(records.length).toBeGreaterThan(0);
-      // [matched, unmatched] preserve the records' relative order.
       expect(matched.map((c: any) => c.id)).toEqual(
         records.filter((c: any) => c.id === someId).map((c: any) => c.id),
       );
@@ -344,7 +334,6 @@ describe("DelegationTest", () => {
       it(`test_delegates_${method}_to_Array`, async () => {
         const post = await Post.first();
         const target = (post as any).comments;
-        // assert_respond_to: method is present on an *unloaded* proxy.
         expect(target.loaded).toBe(false);
         expect(typeof target[method]).toBe("function");
       });
@@ -365,12 +354,11 @@ describe("DelegationTest", () => {
       const ids = sorted.map((c: any) => c.id);
       expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
-  }); // DelegationAssociationTest
+  });
 
   describe("DelegationRelationTest", () => {
     it("delegates partition to Array", async () => {
       const target = Comment.all();
-      // Unloaded — partition is still present and loads the rows on call.
       expect(typeof (target as any).partition).toBe("function");
 
       const someId = (await Comment.first())!.id;
@@ -378,7 +366,6 @@ describe("DelegationTest", () => {
 
       const records: any[] = await (target as any).toArray();
       expect(records.length).toBeGreaterThan(0);
-      // [matched, unmatched] preserve the records' relative order.
       expect(matched.map((c: any) => c.id)).toEqual(
         records.filter((c: any) => c.id === someId).map((c: any) => c.id),
       );
@@ -390,14 +377,12 @@ describe("DelegationTest", () => {
     for (const method of DELEGATED_ARRAY_METHODS) {
       it(`test_delegates_${method}_to_Array`, () => {
         const target = Comment.all();
-        // assert_respond_to: method is present on an *unloaded* relation.
         expect(typeof (target as any)[method]).toBe("function");
       });
     }
 
     it("delegates sort to Array loading records on call", async () => {
       const target = Comment.all();
-      // sort on an unloaded relation loads via toArray() and returns a sorted copy.
       const sorted = await (target as any).sort((a: any, b: any) =>
         a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
       );
@@ -406,7 +391,7 @@ describe("DelegationTest", () => {
       const ids = sorted.map((c: any) => c.id);
       expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
-  }); // DelegationRelationTest
+  });
 
   // The `delegate ... to: :records` / `to: :model` set exposed under their exact
   // Rails names (delegation.rb:101-106) via DelegationMethods. Each `to: :records`
@@ -414,7 +399,6 @@ describe("DelegationTest", () => {
   // synchronously). Rails generates `test_delegates_<method>_to_Array` per
   // ARRAY_DELEGATES entry as an `assert_respond_to`.
   describe("DelegationNamedMethods", () => {
-    // ruby name → trails camelCase property
     const RECORD_DELEGATES: ReadonlyArray<readonly [string, string]> = [
       ["each", "each"],
       ["join", "join"],
@@ -437,14 +421,11 @@ describe("DelegationTest", () => {
 
     for (const [rubyName, jsName] of RECORD_DELEGATES) {
       it(`test_delegates_${rubyName}_to_Array`, () => {
-        // assert_respond_to: present as a real named method on an unloaded relation.
         expect(typeof (Comment.all() as any)[jsName]).toBe("function");
       });
     }
 
     it("index and rindex locate records by value", async () => {
-      // Same loaded relation, so index()/rindex() see the cached instances and
-      // identity comparison matches.
       const relation = Comment.all();
       const records = await relation;
       const mid = records[Math.floor(records.length / 2)];
@@ -500,8 +481,6 @@ describe("DelegationTest", () => {
     });
 
     it("to_xml serializes the collection with a plural root and singular children", async () => {
-      // Array#to_xml: root reflects the pluralized class name, each record under
-      // root.singularize, and the collection carries `type="array"`.
       const base = Comment.where({ type: "Comment" });
       const xml = await base.toXml();
       expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
@@ -574,7 +553,7 @@ describe("DelegationTest", () => {
     it("delegates name to the model class name", () => {
       expect(Comment.all().name).toBe("Comment");
     });
-  }); // DelegationNamedMethods
+  });
 });
 
 describe("DelegationCachingTest", () => {
@@ -598,9 +577,6 @@ describe("DelegationCachingTest", () => {
     // proxy miss path.
     expect(await (Developer.all() as any).target()).toBe("__target__");
 
-    // The cache must not override CollectionProxy#target: a Developer-typed
-    // collection proxy still resolves its own loaded target accessor, never the
-    // cached "__target__" delegation.
     const project = projects("active_record");
     const proxy = (project as any).developersWithCallbacks;
     await proxy.load();

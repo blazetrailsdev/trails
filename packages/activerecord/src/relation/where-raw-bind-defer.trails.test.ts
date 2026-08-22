@@ -27,7 +27,6 @@ describe("where value defer-to-bind casting", () => {
     await first.update({ parent_id: 0 });
     const rel = Topic.where().not({ parent_id: "not-a-number" });
     expect(rel.toSql()).not.toMatch(/IS NOT NULL/i);
-    // `parent_id != NULL` matches nothing — including rows whose parent_id IS NULL.
     expect(await rel).toHaveLength(0);
   });
 
@@ -38,15 +37,12 @@ describe("where value defer-to-bind casting", () => {
   });
 
   it("having with an un-castable string binds it instead of IS NULL", async () => {
-    // Select only the grouped column — PG rejects an ungrouped `topics.*`.
     const rel = Topic.select("parent_id").group("parent_id").having({ parent_id: "not-a-number" });
     expect(rel.toSql()).not.toMatch(/IS NULL/i);
     expect(await rel).toHaveLength(0);
   });
 
   it("non-string scalars for a numeric column take the same bind path as strings", async () => {
-    // The retired pre-cast only touched `typeof value === "string"`; a raw
-    // number and its string spelling must compile to the same predicate shape.
     const numeric = Topic.where({ parent_id: 1 }).toSql();
     const stringy = Topic.where({ parent_id: "1" }).toSql();
     expect(stringy).toBe(numeric);

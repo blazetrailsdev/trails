@@ -48,8 +48,6 @@ export class RelationHandler {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
-    // Always positive — `where.not(...)` reaches the negated marker via
-    // `DeferredDistinctPkIn#invert` (WhereClause#invert).
     return new DeferredDistinctPkIn(attribute, inlineSubquery, value);
   }
 

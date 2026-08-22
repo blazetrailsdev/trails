@@ -111,9 +111,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     ).toEqual(POSTS_WITH_COMMENTS.length);
   });
 
-  // Regression: the CTE body and the outer WHERE both carry a bound parameter,
-  // so prependCtes must thread the CTE-body bind ahead of the body binds and
-  // renumber the body's PG `$N` placeholders past it (instead of inlining).
   it("count after with call with bound conditions", async () => {
     const relation = Post.with({ typed_posts: Post.where({ type: "Post" }) })
       .from("typed_posts AS posts")
@@ -143,7 +140,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     const relation = Post.with({
       posts_with_special_type_or_tags_or_comments: [
         Post.where({ type: "SpecialPost" }),
-        arelSql("SELECT * FROM posts WHERE tags_count > 0") as any, // arel node on purpose
+        arelSql("SELECT * FROM posts WHERE tags_count > 0") as any,
         Post.where("legacy_comments_count > 0"),
       ],
     }).from("posts_with_special_type_or_tags_or_comments AS posts");
@@ -211,8 +208,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
       }).joins(":commented_posts") as unknown as { toSql(): string }
     ).toSql();
 
-    // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
-    // MariaDB/MySQL), so the quote char is optional in the match.
     const q = `["\`]?`;
     expect(sql).toMatch(
       new RegExp(
@@ -229,7 +224,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
 
     const records = await relation.order("id");
 
-    // Make sure we load all records (thus, left outer join is used)
     expect(records.length).toEqual(await Post.count());
     expect(
       records
@@ -258,8 +252,6 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
 
     const sql = (relation as unknown as { toSql(): string }).toSql();
 
-    // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
-    // MariaDB/MySQL), so the quote char is optional in the match.
     const q = `["\`]?`;
     expect(sql).toMatch(
       new RegExp(

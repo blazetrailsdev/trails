@@ -87,7 +87,6 @@ async function recordsIntersection(rel: any, other: readonly unknown[]): Promise
  * merge algorithm; `merge` (performMerge) reaches it via `spawn.merge!`.
  */
 export function mergeBang(this: any, other: any): any {
-  // A bare Relation is detected by its `whereClause`.
   if (other && typeof other === "object" && "whereClause" in other) {
     return new Merger(this, other).merge();
   }

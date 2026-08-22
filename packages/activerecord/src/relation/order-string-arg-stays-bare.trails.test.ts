@@ -3,7 +3,6 @@ import { fixtures } from "../test-fixtures.js";
 import { Customer } from "../test-helpers/models/customer.js";
 import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
-// Adapter-aware `"customers"."name"` — backticks on MySQL/MariaDB.
 const qualifiedName = escapeRegExp(quoteTableName("customers.name"));
 
 /**

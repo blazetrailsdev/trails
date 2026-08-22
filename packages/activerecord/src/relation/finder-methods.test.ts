@@ -325,10 +325,6 @@ describe("raiseNotFoundSingle", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// findSome — expected_size accounting (Gap 1)
-// ---------------------------------------------------------------------------
-
 const postModelStub = {
   primaryKey: "id",
   name: "Post",
@@ -356,7 +352,6 @@ function makeFindSomeRel(
     primaryKey: postModelStub.primaryKey,
     limitValue: opts.limit ?? null,
     offsetValue: opts.offset ?? null,
-    // ordered=true simulates a relation with ORDER BY (findSome stays in the accounting path)
     orderValues: opts.ordered !== false ? ["id ASC"] : [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
@@ -386,7 +381,6 @@ describe("findSome — expected_size respects limit and offset", () => {
   });
 
   it("succeeds when limit clips expected_size and result matches limit", async () => {
-    // 5 ids, limit 3 → expected 3; DB returns 3 rows → no error
     const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const rel = makeFindSomeRel(rows, { limit: 3 });
     const result = await findSome.call(rel, [1, 2, 3, 4, 5]);
@@ -394,7 +388,6 @@ describe("findSome — expected_size respects limit and offset", () => {
   });
 
   it("succeeds when offset + limit produce expected_size=2 from 11 ids", async () => {
-    // 11 ids, limit 3, offset 9 → expected = min(3, 11-9) = 2
     const rows = [{ id: 10 }, { id: 11 }];
     const rel = makeFindSomeRel(rows, { limit: 3, offset: 9 });
     const result = await findSome.call(rel, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
@@ -406,10 +399,6 @@ describe("findSome — expected_size respects limit and offset", () => {
     await expect(findSome.call(rel, [1, 2])).rejects.toBeInstanceOf(RecordNotFound);
   });
 });
-
-// ---------------------------------------------------------------------------
-// findSome — select_values narrowing on ordered path (Story I-followup-2)
-// ---------------------------------------------------------------------------
 
 describe("findSome — narrows to pk column when select_values non-empty (ordered path)", () => {
   it("calls .select(pk) when the relation has select values", async () => {
@@ -439,23 +428,14 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
   });
 });
 
-// ---------------------------------------------------------------------------
-// findSome → findSomeOrdered dispatch (Story I-followup gap 1)
-// ---------------------------------------------------------------------------
-
 describe("findSome — dispatches to findSomeOrdered when relation has no order values", () => {
   it("returns records in requested id order for an unordered relation", async () => {
-    // DB returns them in arbitrary order; we expect [5, 1, 3] back
     const dbRows = [{ id: 3 }, { id: 5 }, { id: 1 }];
     const rel = makeFindSomeRel(dbRows, { ordered: false });
     const result = await findSome.call(rel, [5, 1, 3]);
     expect(result.map((r: any) => r.id)).toEqual([5, 1, 3]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// findSomeOrdered — id slicing by offset/limit + result ordering (Story I-followup gap 2)
-// ---------------------------------------------------------------------------
 
 function makeFindSomeOrderedRel(
   records: any[],
@@ -495,7 +475,6 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
   });
 
   it("slices to first limit ids when limit is set", async () => {
-    // 50 ids requested but limit 10 → only first 10 ids are queried
     const ids = Array.from({ length: 50 }, (_, i) => i + 1);
     const dbRows = ids.slice(0, 10).map((id) => ({ id }));
     let queriedIds: unknown[] | undefined;
@@ -519,7 +498,6 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
 
   it("slices ids by offset and limit (11 ids, limit 3, offset 9 → 2 records)", async () => {
     const ids = Array.from({ length: 11 }, (_, i) => i + 1);
-    // ids.slice(9, 9+3) = [10, 11]
     const dbRows = [{ id: 11 }, { id: 10 }];
     let queriedIds: unknown[] | undefined;
     const rel = {
@@ -563,14 +541,10 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
       },
     };
     const result = await findSomeOrdered.call(rel, [1, 2]);
-    expect(selectArg).toBe("id"); // arelTable.get("id") returns "id" in the mock
+    expect(selectArg).toBe("id");
     expect(result.map((r: any) => r.id)).toEqual([1, 2]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// findTake / findTakeWithLimit — loaded? fast-path (Gap 3)
-// ---------------------------------------------------------------------------
 
 function makeLoadedRel(records: any[]): any {
   return {
@@ -608,10 +582,6 @@ describe("findTakeWithLimit — slices loaded relation without querying", () => 
     expect(spy).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// _orderColumns — implicit_order_column + query_constraints_list (Gap 2)
-// ---------------------------------------------------------------------------
 
 function makeRelForOrder(mc: {
   primaryKey?: string | string[];

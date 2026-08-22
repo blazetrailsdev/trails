@@ -75,7 +75,6 @@ export class WhereChain<R = any> {
             | QueryMethodsHost["_model"]
             | null,
       );
-      // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added.
       if (nodes.length > 0) {
         scope.whereClause = scope.whereClause.plus(new WhereClause(nodes).invert());
       }
@@ -289,10 +288,6 @@ export type OrderArg =
   // -argument guard compact_blanks it away before it reaches the bang variant.
   | null;
 
-// ---------------------------------------------------------------------------
-// Host interface: the shape of `this` for bang methods mixed into Relation.
-// Uses TS `private` keyword fields which are accessible at runtime.
-// ---------------------------------------------------------------------------
 interface QueryMethodsHost {
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
@@ -346,10 +341,6 @@ interface QueryMethodsHost {
   table: ArelTable;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Bang variants — mutate `this` in place, return `this`.
@@ -752,8 +743,6 @@ function inOrderOf(
   const arelColumn: any =
     column instanceof Nodes.SqlLiteral ? column : orderColumn.call(this, String(column));
 
-  // The Arel CASE node is pushed as a node (not pre-rendered SQL) so its embedded
-  // bind values thread through the outer collector when the statement is compiled.
   let scope = orderBang.call(
     this.spawn(),
     buildCaseForValuePosition.call(this, arelColumn, values, { filter }) as any,
@@ -2031,7 +2020,6 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // the (rare) no-load path; eager materialization here would require an async
   // `excluding`, breaking the chainable contract.
   const attribute = this.predicateBuilder.table.arelTable.get(pk);
-  // Mirror the array handler's `x.is_a?(Base) ? x.id : x` deref.
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
   // Build the positive `IN (subquery)` (Rails builds positively and inverts);
   // only its subquery `right` is needed for the marker's display fallback.
@@ -2352,9 +2340,6 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
     );
   }
   return orderQuery.flatMap((o) => {
-    // Use reverse() when available (Ascending, Descending, NullsFirst, NullsLast),
-    // fall back to desc() for other Arel nodes (Attribute, NodeExpression, etc.).
-    // Guard instanceof Nodes.Node to avoid matching arrays which also have reverse().
     if (o instanceof Nodes.Node) {
       if (typeof (o as any).reverse === "function") return [(o as any).reverse()];
       if (typeof (o as any).desc === "function") return [(o as any).desc()];
@@ -2438,7 +2423,6 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
         if (isPlainObject(value)) {
-          // Nested hash { table: { col: dir } } — key is the table name.
           refs.push(key);
         } else {
           const t = extractTableNameFrom(String(key));
@@ -2570,9 +2554,6 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
   });
 }
 
-// ---------------------------------------------------------------------------
-// Module export — all bang variants as a single object for `include()`.
-// ---------------------------------------------------------------------------
 /**
  * `QueryMethods.public_instance_methods(false)` — the members Ruby defines
  * above the first `protected` (query_methods.rb:1604). `CollectionProxy`
@@ -2746,10 +2727,6 @@ export const QueryMethodBangs = {
   ...QueryMethodsPrivateInstanceMethods,
 } as const;
 
-// ---------------------------------------------------------------------------
-// PR 2a private helpers — column resolution, select/from/with building.
-// ---------------------------------------------------------------------------
-
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2823,7 +2800,7 @@ export function arelColumn(
 /** @internal */
 export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
-    if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
+    if (field instanceof Nodes.Node) return [field];
     if (typeof field === "string") return [arelColumn.call(this, field)];
     if (typeof field === "function") return [field()];
     if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
@@ -3001,9 +2978,6 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   return opts;
 }
 
-// A table's `.*` projection. `Table#star` is a getter; a table ALIAS
-// (Nodes.TableAlias) has no such helper, but `get("*")` yields the equivalent
-// `<alias>.*` Attribute (the "*" sentinel skips column-name quoting either way).
 function tableStar(table: any): unknown {
   return table.star ?? table.get("*");
 }
@@ -3526,8 +3500,6 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // query_methods.rb:1882 — `return if joins_values.empty? && left_outer_joins_values.empty?`.
   if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return;
 
-  // Buckets fold eager into stashed_join. Delegate emission to the shared
-  // `build_joins` port.
   const [buckets, joinType] = buildJoinBuckets.call(this);
   const leadingJoins = buckets.leading_join as Nodes.Join[];
   const joinNodes = buckets.join_node as Nodes.Join[];

@@ -23,24 +23,12 @@ import { Person } from "../test-helpers/models/person.js";
 import { Friendship } from "../test-helpers/models/friendship.js";
 import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 
-// Person self-registers on import; Friendship does not, but `followers`
-// (through friendships, source follower) needs it in the registry.
 registerModel(Friendship);
 
 describe("SELECT * column collision in joined relations", () => {
-  // `fixtures` wires the handler suite + transactional fixtures +
-  // fixture seeding in one call; the canonical `people` / `friendships` tables
-  // come from the template clone.
   const { people } = fixtures(["people", "friendships"]);
 
   it("hydrates the target's columns, not the join table's, when ids collide", async () => {
-    // friendships("Connection 1"): id=1, friend_id=michael(1), follower_id=david(2).
-    // michael.followers joins friendships (friend_id = michael.id=1) to its
-    // follower (david, people.id=2). The friendship's id=1 collides with
-    // michael's own id=1, so a bare `*` projection would hydrate id=1 (michael)
-    // instead of david. Reading `michael.followers` exercises the public
-    // CollectionProxy path, which routes this non-nested through association
-    // through AssociationScope — the same JOIN/projection path used in production.
     const michael = people("michael");
     const followers = await michael.followers;
     expect(followers.map((p) => ({ id: p.id, first_name: p.first_name }))).toEqual([

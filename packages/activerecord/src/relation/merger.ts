@@ -69,10 +69,6 @@ export class Merger {
     const rel = this.relation;
     for (const name of Merger.NORMAL_VALUES) {
       const value = this.values[name];
-      // The unless clause is here mostly for performance reasons (since the `send` call might be
-      // moderately expensive), most of the time the value is going to be `nil` or `.blank?`, the
-      // only catch is that `false.blank?` returns `true`, so there needs to be an extra check so
-      // that explicit `false` values don't fall through the cracks.
       if (value == null || (isBlank(value) && value !== false)) continue;
       const bang = `${name}Bang`;
       if (Array.isArray(value)) rel[bang](...value);
@@ -207,10 +203,8 @@ export class Merger {
   // Mirrors merge_multi_values (merger.rb:154-167).
   private mergeMultiValues(rel: any): void {
     if (this.other.reorderingValue) {
-      // override any order specified in the original relation
       rel.reorderBang(...this.other.orderValues);
     } else if (this.other.orderValues.length > 0) {
-      // merge in order_values from relation
       rel.orderBang(...this.other.orderValues);
     }
 
