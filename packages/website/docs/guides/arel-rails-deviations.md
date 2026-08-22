@@ -44,6 +44,8 @@ join a cycle, and it exports a mutable binding plus a setter that the defining
 module calls at the bottom of its own body. Readers import the binding and use
 it at call time — exactly where Ruby resolves the constant.
 
+<!-- typecheck:skip -->
+
 ```ts
 // nodes/binary.ts — Rails: left.is_a?(Arel::Attributes::Attribute)
 if (_Attribute && this.left instanceof _Attribute) return block(this.left);
