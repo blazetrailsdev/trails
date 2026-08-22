@@ -276,22 +276,48 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
  */
 export class Time {
   readonly #plain: Temporal.PlainDateTime;
+  /**
+   * @internal The instant the receiver names. MRI's `::Time` holds the epoch
+   * itself (`time.c` `time_new_timew`); a wall clock alone does not name one
+   * instant inside a DST fall-back's repeated hour, so the seat is carried
+   * here too rather than re-derived from `#plain` on every read.
+   */
+  #instant: Temporal.Instant;
   /** @internal The receiver's zone, or `null` when it was built from an offset. */
   readonly #timeZoneId: string | null;
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
-  readonly #utcOffset: number;
+  #utcOffset: number;
 
   /** Ruby `Time.now`, the current time in the local zone. */
   static now(): Time {
-    const plain = Temporal.Now.plainDateTimeISO();
-    return new Time(
-      plain.year,
-      plain.month,
-      plain.day,
-      plain.hour,
-      plain.minute,
-      plain.second + plain.millisecond / 1_000 + plain.microsecond / 1_000_000,
+    return Time.#atInstant(Temporal.Now.instant());
+  }
+
+  /**
+   * The instant-taking construction path MRI's `time_new_timew` is: the
+   * receiver's seat is the epoch, and the wall clock and the `utc_offset` are
+   * read OFF it. Building through the public constructor instead would hand
+   * the wall clock back to `toZonedDateTime`, whose `compatible`
+   * disambiguation picks the earlier offset for the repeated hour after a DST
+   * fall-back — so `Time.at(t)` could answer an instant an hour from `t`.
+   */
+  static #atInstant(instant: Temporal.Instant): Time {
+    const zoned = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+    const time = new Time(
+      zoned.year,
+      zoned.month,
+      zoned.day,
+      zoned.hour,
+      zoned.minute,
+      new Rational(
+        BigInt(zoned.second) * 1_000_000_000n +
+          BigInt(zoned.millisecond * 1_000_000 + zoned.microsecond * 1_000 + zoned.nanosecond),
+        1_000_000_000n,
+      ),
     );
+    time.#instant = instant;
+    time.#utcOffset = Number(zoned.offsetNanoseconds) / 1_000_000_000;
+    return time;
   }
 
   /**
@@ -311,21 +337,7 @@ export class Time {
       .add(numExact(microsecondsWithFrac).mul(1_000));
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
-    const zoned = Temporal.Instant.fromEpochNanoseconds(nanoseconds).toZonedDateTimeISO(
-      Temporal.Now.timeZoneId(),
-    );
-    return new Time(
-      zoned.year,
-      zoned.month,
-      zoned.day,
-      zoned.hour,
-      zoned.minute,
-      new Rational(
-        BigInt(zoned.second) * 1_000_000_000n +
-          BigInt(zoned.millisecond * 1_000_000 + zoned.microsecond * 1_000 + zoned.nanosecond),
-        1_000_000_000n,
-      ),
-    );
+    return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(nanoseconds));
   }
 
   /**
@@ -492,6 +504,9 @@ export class Time {
       typeof utcOffset === "number"
         ? utcOffset
         : Number(this.#plain.toZonedDateTime(utcOffset).offsetNanoseconds) / 1_000_000_000;
+    this.#instant = this.#plain
+      .toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset))
+      .toInstant();
   }
 
   get year(): number {
@@ -565,7 +580,7 @@ export class Time {
    */
   get zone(): string | null {
     if (this.#timeZoneId == null) return null;
-    return tzdataAbbreviation(this.#plain.toZonedDateTime(this.#timeZoneId));
+    return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
   }
 
   /** Ruby `Time#utc_offset`, the receiver's offset from UTC in seconds. */
@@ -586,7 +601,7 @@ export class Time {
    * where it has one and its offset where it does not.
    */
   toTime(): Temporal.ZonedDateTime {
-    return this.#plain.toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset));
+    return this.#instant.toZonedDateTimeISO(this.#timeZoneId ?? of2str(this.#utcOffset));
   }
 
   /**

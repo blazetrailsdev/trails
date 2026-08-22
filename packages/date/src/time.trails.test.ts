@@ -251,5 +251,23 @@ describe("Time", () => {
       inZone("Asia/Kathmandu");
       expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("+0545");
     });
+
+    it("Time.at answers the exact instant inside a DST fall-back's repeated hour", () => {
+      // America/New_York falls back at 2008-11-02 02:00 EDT, so 01:30 local
+      // names two instants: 05:30 UTC at -0400 and 06:30 UTC at -0500. MRI's
+      // `::Time` holds the epoch, so `Time.at` answers each of them exactly.
+      inZone("America/New_York");
+      const edt = Time.at(1225603800);
+      expect(edt.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-11-02 01:30:00 -0400 EDT");
+      expect(edt.utcOffset).toBe(-14400);
+      expect(Number(edt.toTime().epochMilliseconds) / 1_000).toBe(1225603800);
+      expect(edt.getutc().strftime("%Y-%m-%d %H:%M:%S")).toBe("2008-11-02 05:30:00");
+
+      const est = Time.at(1225607400);
+      expect(est.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-11-02 01:30:00 -0500 EST");
+      expect(est.utcOffset).toBe(-18000);
+      expect(Number(est.toTime().epochMilliseconds) / 1_000).toBe(1225607400);
+      expect(est.getutc().strftime("%Y-%m-%d %H:%M:%S")).toBe("2008-11-02 06:30:00");
+    });
   });
 });
