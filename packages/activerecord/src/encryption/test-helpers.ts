@@ -18,6 +18,7 @@ import { type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryptor as EncryptorImpl } from "./encryptor.js";
+import type { KeyProviderLike } from "./encryptor.js";
 import { type Scheme } from "./scheme.js";
 import { Decryption, Encryption } from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -693,11 +694,11 @@ export function ciphertextFor(model: any, attrName: string): unknown {
  * (activerecord/test/cases/encryption/helper.rb:50-55) — a round-trip through a
  * fresh Encryptor with the given key provider.
  */
-export function assertEncryptorWorksWith(keyProvider: unknown): void {
+export function assertEncryptorWorksWith(keyProvider: KeyProviderLike): void {
   const encryptor = new EncryptorImpl();
 
-  const encryptedMessage = encryptor.encrypt("some text", { keyProvider } as never);
-  expect(encryptor.decrypt(encryptedMessage, { keyProvider } as never)).toEqual("some text");
+  const encryptedMessage = encryptor.encrypt("some text", { keyProvider });
+  expect(encryptor.decrypt(encryptedMessage, { keyProvider })).toEqual("some text");
 }
 
 /**
