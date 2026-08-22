@@ -74,11 +74,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * mutated Relation, which the through routing would discard —
    * `HasManyAssociation#findTarget` is where that executor is honored.
    *
-   * @missingRailsCall scope — CONVERGEABLE: Baseline (RFC 0084): `find_target` delegates to
-   *   the module-private loader in the same file, which builds and runs the
-   *   association scope; the body compared here is the delegating wrapper, so
-   *   `scope` is called one frame down. Surfaced when the loader stopped being
-   *   exported (RFC 0072).
+   * @missingRailsCall scope — CONVERGEABLE (story
+   *   hmt-find-target-disable-joins-arm-routes-through-two-free-functions, RFC
+   *   0112): `return scope.to_a if disable_joins`
+   *   (has_many_through_association.rb:228). trails splits that arm into
+   *   `_canRouteThroughViaDisableJoinsAssociationScope` and
+   *   `_loadThroughViaDisableJoinsScope`, and the latter is what calls
+   *   `scope()` — one frame down from the body compared here.
    */
   protected override async findTarget(): Promise<Base[]> {
     if (this._queryExecutor) return super.findTarget();
@@ -261,12 +263,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    *
    * @internal
    *
-   * @missingRailsCall map — PERMANENT: Rails' `map` is in ThroughAssociation#build_record
-   *   (through_association.rb:121-124), which
-   *   HasManyThroughAssociation#build_record reaches via `super`; trails ports
-   *   it as `throughBuildRecord` in through-association.ts and calls it from
-   *   `buildRecord`, the same module-delegation shape as the stale_state /
-   *   target_scope rows on this class.
+   * @missingRailsCall map — PERMANENT: Rails' `map` is in
+   *   `ThroughAssociation#build_record` (through_association.rb:121-124),
+   *   reached from here by `super` because Ruby's `include ThroughAssociation`
+   *   puts the module in the ancestor chain. JS has single inheritance and this
+   *   class already extends `HasManyAssociation`, so `super` cannot reach the
+   *   mixin; the module method is ported as `throughBuildRecord` and called by
+   *   name, the same shape as `staleState` / `targetScope` on this class.
    */
   override buildRecord(
     attributes?: Record<string, unknown>,
@@ -493,7 +496,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 }
 
-/** Source belongs_to surface the `delete_records` counter tail reads. @internal */
+/** Source belongs_to surface `delete_records` reads — the nullify FK and the counter tail. @internal */
 interface SourceCounterReflection {
   foreignKey?: string;
   options?: { counterCache?: unknown };

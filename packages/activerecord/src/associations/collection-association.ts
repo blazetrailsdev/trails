@@ -1387,20 +1387,25 @@ export class CollectionAssociation extends Association {
 
   private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
     const expectsArray = Array.isArray(args[0]);
-    const ids = args.flat(Infinity).filter((id) => id != null);
-    // Rails compares `args.flatten.compact.map(&:to_s)` against `r.id.to_s`
-    // (collection_association.rb:523,527), so both sides land in string shape
-    // and `find("1")` matches an Integer PK. `String()` is that `to_s`: it is
-    // width-agnostic over the number/BigInt split an int8 PK produces under PG.
-    const uniqIds = [...new Set(ids.map((id) => String(id)))];
+    // `String()` is Rails' `to_s` (collection_association.rb:523,527): both
+    // sides land in string shape, so `find("1")` matches an Integer PK, and it
+    // is width-agnostic over the number/BigInt split an int8 PK gives under PG.
+    const ids = [
+      ...new Set(
+        args
+          .flat(Infinity)
+          .filter((id) => id != null)
+          .map((id) => String(id)),
+      ),
+    ];
 
-    if (uniqIds.length === 1) {
-      const id = uniqIds[0];
+    if (ids.length === 1) {
+      const id = ids[0];
       const record = this.target.find((r) => id === String((r as any).id));
       return expectsArray ? [record] : record;
     }
 
-    return this.target.filter((r) => uniqIds.includes(String((r as any).id)));
+    return this.target.filter((r) => ids.includes(String((r as any).id)));
   }
 
   /**

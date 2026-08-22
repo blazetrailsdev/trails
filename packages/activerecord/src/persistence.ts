@@ -230,7 +230,8 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
  *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_insert_record
  *
- * @missingRailsCall with_cast_value — CONVERGEABLE: persistence.rb:245
+ * @missingRailsCall with_cast_value — CONVERGEABLE (story
+ * insert-record-prefetch-arm-skips-with-cast-value, RFC 0112): persistence.rb:245
  *   `_default_attributes[primary_key].with_cast_value(primary_key_value)` — the
  *   prefetch arm. `prefetch_primary_key?` is false for every adapter trails
  *   ships, so no `_default_attributes` Attribute exists to re-cast; the branch

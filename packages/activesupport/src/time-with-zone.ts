@@ -852,14 +852,16 @@ export class TimeWithZone {
    * Advance by calendar amounts. Variable parts (years, months, weeks, days)
    * are applied in local time; fixed parts (hours, minutes, seconds) from UTC.
    *
-   * @missingRailsCall any? — CONVERGEABLE: Rails' advance (time_with_zone.rb:430-437) picks
+   * @missingRailsCall any? — CONVERGEABLE (story
+   *   time-with-zone-advance-change-delegations, RFC 0023): Rails' advance (time_with_zone.rb:430-437) picks
    *   the variable-length arm with `options.values_at(:years, :weeks, :months,
    *   :days).any?` and hands it to `method_missing(:advance, options)`; trails
    *   has no `method_missing` arm to hand it to and computes both arms inline,
    *   so the guard is a plain `if (options.years)`-style test per key rather
    *   than an `any?` over a values_at slice. Converging needs the `Time#advance`
    *   core-ext port that the delegation targets.
-   * @missingRailsCall in_time_zone — CONVERGEABLE: The fixed-length arm is
+   * @missingRailsCall in_time_zone — CONVERGEABLE (story
+   *   time-with-zone-advance-change-delegations, RFC 0023): The fixed-length arm is
    *   `utc.advance(options).in_time_zone(time_zone)` (time_with_zone.rb:436);
    *   trails has no `Time#advance` core-ext for a `Temporal.Instant` to delegate
    *   to, so the seconds offset is applied inline and there is no cross-zone
@@ -921,7 +923,8 @@ export class TimeWithZone {
   /**
    * Return a new TimeWithZone where specified components are replaced.
    *
-   * @missingRailsCall find_zone — CONVERGEABLE: Rails' change accepts `:zone` and `:offset`
+   * @missingRailsCall find_zone — CONVERGEABLE (story
+   *   time-with-zone-advance-change-delegations, RFC 0023): Rails' change accepts `:zone` and `:offset`
    *   and resolves them through `::Time.find_zone` (time_with_zone.rb:390-404);
    *   trails' `ChangeOptions` carries no `zone`/`offset` key at all, so there is
    *   no value to resolve. Converging means adding those two options, not adding

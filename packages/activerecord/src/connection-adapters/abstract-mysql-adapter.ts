@@ -1394,7 +1394,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
    *
-   * @missingRailsCall column_for — CONVERGEABLE: Verified per-site (RFC 0106):
+   * @missingRailsCall column_for — CONVERGEABLE (story
+   *   mysql-mismatched-fk-details-omits-primary-key-column, RFC 0112): Verified per-site (RFC 0106):
    *   `options[:primary_key_column] = column_for(...)`
    *   (abstract_mysql_adapter.rb:995) is an async schema read in trails, while
    *   this method is reached synchronously from `_translateException`. The
