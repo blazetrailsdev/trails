@@ -25,7 +25,7 @@ package. The per-package guides cover the ones specific to each:
 
 - [**Arel**](./arel-rails-deviations.md) — the least-deviating package.
   SQL AST building is purely synchronous; deviations are limited to
-  naming, symbol branding, and added TypeScript generics.
+  naming, call-time constant resolution, and added TypeScript generics.
 - [**ActiveModel**](./activemodel-rails-deviations.md) — generated
   attribute methods instead of `method_missing`, async-capable
   callbacks, encapsulated dirty tracking.

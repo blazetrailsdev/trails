@@ -1,9 +1,8 @@
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
-import { _setBuildQuoted } from "../node-slots.js";
+import { _Attribute, _setBuildQuoted } from "../node-slots.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
-import { ATTRIBUTE_BRAND } from "./binary.js";
 import { BindParam } from "./bind-param.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
@@ -28,24 +27,19 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
   if (other && typeof other === "object") {
-    // Arel::Attributes::Attribute (duck-typed via symbol brand)
-    if ((other as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true) return other as Node;
+    if (_Attribute && other instanceof _Attribute) return other as Node;
     // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
     // returning `other`. Class dispatch, like Rails.
     if (other instanceof ModelAttribute) return new BindParam(other);
     const maybeAst = (other as { ast?: unknown }).ast;
     if (maybeAst instanceof Node) return maybeAst;
   }
-  if (isAttribute(attribute)) return new Casted(other, attribute as Attribute);
+  if (_Attribute && attribute instanceof _Attribute)
+    return new Casted(other, attribute as Attribute);
   return new Quoted(other);
 }
 
 _setBuildQuoted(buildQuoted);
-
-function isAttribute(value: unknown): boolean {
-  if (!value || typeof value !== "object") return false;
-  return (value as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true;
-}
 
 /**
  * Casted — a value bound to a specific attribute for type casting.

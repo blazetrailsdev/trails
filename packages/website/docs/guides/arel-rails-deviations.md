@@ -1,6 +1,6 @@
 ---
 title: "Arel: Deviations from Rails"
-description: How Trails' Arel package differs from Rails Arel — naming, symbol branding, typed generics. No async deviations.
+description: How Trails' Arel package differs from Rails Arel — naming, call-time constant resolution, typed generics. No async deviations.
 ---
 
 # Arel: Deviations from Rails
@@ -10,7 +10,7 @@ description: How Trails' Arel package differs from Rails Arel — naming, symbol
 Arel is the least-deviating package in Trails. It is a pure SQL AST builder
 with no I/O, so JavaScript's async/single-threaded model has almost no impact.
 The deviations here are mostly about Ruby idioms that don't translate
-(symbols, `method_missing`, keyword args) and TypeScript features we use to
+(symbols, `method_missing`, keyword args, call-time constant resolution) and TypeScript features we use to
 add safety Rails can't.
 
 If you know Rails Arel, you already know Trails Arel. The shapes are
@@ -25,19 +25,33 @@ index: [method casing](./index.md#method-casing) (camelCase everywhere) and
 `Arel::Table.new(:users, as: "u")` becomes `new Table("users", { as:
 "u" })`. Nothing Arel-specific about this.
 
-## Symbol branding instead of class checks
+## Call-time constant resolution: the zero-import slot
 
-Rails Arel relies on Ruby's class system (`is_a?`) and duck typing
-(`respond_to?`) to identify node kinds. We can't rely on `instanceof` across
-module boundaries (multiple copies of a class can coexist across bundles), so
-core node types are branded with `Symbol.for(...)` and detected by symbol
-presence.
+Ruby resolves a constant named inside a method body when the method _runs_, and
+Zeitwerk autoloads the file at that moment. So `Arel::Nodes.build_quoted` can
+name `Arel::Attributes::Attribute` (`casted.rb:47-59`) without `casted.rb`
+taking a load-order dependency on it.
 
-- See `packages/arel/src/nodes/binary.ts` for the `ATTRIBUTE_BRAND`
-  pattern. `isAttribute(node)` checks the branded symbol rather than
-  `instanceof Attribute`.
+ESM has no equivalent: every `import` is eager, so naming a class in a method
+body costs a module-evaluation edge — and in Arel those edges close cycles
+whose members all `extend Node` / `extend Binary`, which throws
+`Cannot access 'Binary' before initialization` depending on which module you
+enter the graph through.
 
-This is a pure-TS concern; Rails never needs it.
+Where that happens, the constructor is read through a **zero-import slot
+module**, `packages/arel/src/node-slots.ts`: it imports nothing, so it cannot
+join a cycle, and it exports a mutable binding plus a setter that the defining
+module calls at the bottom of its own body. Readers import the binding and use
+it at call time — exactly where Ruby resolves the constant.
+
+```ts
+// nodes/binary.ts — Rails: left.is_a?(Arel::Attributes::Attribute)
+if (_Attribute && this.left instanceof _Attribute) return block(this.left);
+```
+
+The narrowing itself is plain `instanceof`, the direct equivalent of Ruby's
+`is_a?`; the slot only defers _which module the class arrives from_. This is a
+pure-TS concern; Rails never needs it.
 
 ## No `method_missing`, no Proxy
 

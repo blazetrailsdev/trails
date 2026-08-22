@@ -14,7 +14,7 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
-import { Nodes, Table, relationName } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
@@ -29,7 +29,7 @@ function nodeAt(jd: JoinDependency, path: string): JoinPart {
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
   return joins.find((join) => {
     const rel = join.left as Table | Nodes.TableAlias;
-    return relationName(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
+    return String(rel.tableAlias ?? rel.name) === node.effectiveSqlName;
   })!;
 }
 

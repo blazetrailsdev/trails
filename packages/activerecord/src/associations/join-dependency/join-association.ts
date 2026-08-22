@@ -9,7 +9,7 @@
  */
 
 import type { Base } from "../../base.js";
-import { Nodes, Table, fetchAttribute, relationName } from "@blazetrails/arel";
+import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
@@ -36,13 +36,13 @@ export class JoinAssociation extends JoinPart {
   get table(): string {
     const t = this._table;
     if (!t) return this.reflection.tableName;
-    return relationName(t.tableAlias ?? t.name);
+    return String(t.tableAlias ?? t.name);
   }
 
   set table(value: string) {
     const table = aliasedArelTableForReflection(this.reflection, this.reflection.tableName, value);
     this._table = table;
-    if (!this.tables.some((t) => relationName(t.tableAlias ?? t.name) === value)) {
+    if (!this.tables.some((t) => String(t.tableAlias ?? t.name) === value)) {
       this.tables.push(table);
     }
   }
@@ -98,8 +98,7 @@ export class JoinAssociation extends JoinPart {
       if (!this._table) this._table = table;
       if (
         !this.tables.some(
-          (t) =>
-            relationName(t.tableAlias ?? t.name) === relationName(table.tableAlias ?? table.name),
+          (t) => String(t.tableAlias ?? t.name) === String(table.tableAlias ?? table.name),
         )
       ) {
         this.tables.push(table);
@@ -150,7 +149,7 @@ export class JoinAssociation extends JoinPart {
       if (nodes instanceof Nodes.And) {
         const remaining: Nodes.Node[] = [];
         for (const child of nodes.children) {
-          if (!nodeReferencesTable(child, relationName(table.tableAlias ?? table.name))) {
+          if (!nodeReferencesTable(child, String(table.tableAlias ?? table.name))) {
             others.push(child);
           } else {
             remaining.push(child);
@@ -250,7 +249,7 @@ function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
   fetchAttribute(node, (attr: Nodes.Node) => {
     if (attr instanceof Nodes.Attribute) {
       const rel = attr.relation;
-      if (relationName(rel.tableAlias ?? rel.name) === tableName) {
+      if (String(rel.tableAlias ?? rel.name) === tableName) {
         found = true;
         return false;
       }
