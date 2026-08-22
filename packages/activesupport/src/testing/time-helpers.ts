@@ -138,11 +138,6 @@ export function travel(
  * errors with external services, like MySQL (which will round instead of floor,
  * leading to off-by-one-second errors), unless the `withUsec` argument is set
  * to `true`.
- *
- * @missingRailsCall at — CONVERGEABLE (story
- *   `travel-to-should-stub-rails-time-receivers`): `Time.at(now)` builds the
- *   stubbed Time; the trails clock method takes a `Temporal.Instant` directly,
- *   so there is no `at` constructor to call.
  */
 export function travelTo(
   dateOrTime: Temporal.PlainDate | globalThis.Date | Temporal.Instant | Time | string,
