@@ -498,17 +498,40 @@ export class Transaction {
     if (this._runCommitCallbacks) {
       const recs = this.records;
       if (recs) {
-        // Mirrors Rails before_commit_records: when before_committed_on_all_records
-        // is true, before_committed! fires on every distinct in-memory copy
-        // (dedup by object identity); when false (the default), only the first
-        // copy of each logical record runs (dedup by record equality), so a
-        // deferred touch held on a second copy of a parent never flushes.
-        const ite = ActiveRecord.beforeCommittedOnAllRecords
-          ? this.uniqueRecords()
-          : this.uniqueRecordsByEquality(recs);
-        for (const record of ite) {
-          if (typeof (record as any).beforeCommittedBang === "function") {
-            await (record as any).beforeCommittedBang();
+        if (ActiveRecord.beforeCommittedOnAllRecords) {
+          const ite = this.uniqueRecords();
+
+          // Rails' `records.each_with_object({}) { |record, candidates|
+          // candidates[record] = record }` (transaction.rb:280-282) — a Hash
+          // keyed by record equality, so the LAST equal copy is the candidate.
+          const entries: Array<[unknown, unknown]> = [];
+          const find = (rec: unknown): [unknown, unknown] | undefined =>
+            entries.find((e) => this.recordsEqual(rec, e[0]));
+          for (const record of recs) {
+            const entry = find(record);
+            if (entry) entry[1] = record;
+            else entries.push([record, record]);
+          }
+          const instancesToRunCallbacksOn: CandidateLookup = { get: (rec) => find(rec)?.[1] };
+
+          await this.runActionOnRecords(
+            ite,
+            instancesToRunCallbacksOn,
+            async (record, shouldRunCallbacks) => {
+              if (shouldRunCallbacks && typeof (record as any).beforeCommittedBang === "function") {
+                await (record as any).beforeCommittedBang();
+              }
+            },
+          );
+        } else {
+          // Rails: `records.uniq.each(&:before_committed!)` (transaction.rb:288)
+          // — `Array#uniq` dedups by record equality, so only the first copy of
+          // each logical record runs and a deferred touch held on a second copy
+          // of a parent never flushes.
+          for (const record of this.uniqueRecordsByEquality(recs)) {
+            if (typeof (record as any).beforeCommittedBang === "function") {
+              await (record as any).beforeCommittedBang();
+            }
           }
         }
       }
@@ -942,16 +965,47 @@ export class TransactionManager {
     this._connection = connection;
   }
 
+  /**
+   * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106): `@stack.last ||
+   *   NULL_TRANSACTION` (`connection_adapters/abstract/transaction.rb:662`) —
+   *   the TS body reads the last stack slot and falls back to the same
+   *   `NULL_TRANSACTION`. `first`/`last`/`size` are positional/property idioms
+   *   with no JS call form, deliberately left uncredited by RFC 0092
+   *   (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment)
+   *   so the reason-text route is the sanctioned one; nothing was dropped from
+   *   the TS body.
+   */
   get currentTransaction(): Transaction | NullTransaction {
     return this._stack.length > 0
       ? this._stack[this._stack.length - 1]
       : TransactionManager.NULL_TRANSACTION;
   }
 
+  /**
+   * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): `@stack.size`
+   *   (`connection_adapters/abstract/transaction.rb:658`) — the TS body is
+   *   `this._stack.length`, the whole method. `first`/`last`/`size` are
+   *   positional/property idioms with no JS call form, deliberately left
+   *   uncredited by RFC 0092 (`positional-idiom-analogues`, see
+   *   JS_ENUMERABLE_ALIASES' header comment) so the reason-text route is the
+   *   sanctioned one; nothing was dropped from the TS body.
+   */
   get openTransactions(): number {
     return this._stack.length;
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106): `@stack.empty?`
+   *   (transaction.rb:510) — `empty?` on a Ruby Array, whose faithful JS
+   *   spelling is `xs.length === 0`. That emits no callee, so no TS call can
+   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
+   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
+   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
+   *   TS body was dropped.
+   * @missingRailsCall size — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   transaction.rb's `@stack.size` on a Ruby Array is `this._stack.length` on
+   *   the JS array — `Array#size` is not a ported method name.
+   */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
@@ -1095,6 +1149,10 @@ export class TransactionManager {
    * callers (manual TM use outside `within_new_transaction`) get the same
    * exclusion the body-internal callers already have. Reentrant for the
    * common case where this is called from inside `_withinNewTransactionBody`.
+   *
+   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b): Ruby's
+   *   `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array;
+   *   `Array#last` is not a ported method name.
    */
   async commitTransaction(): Promise<void> {
     await this._connection.lock.synchronize(() => this._commitTransactionInner());
@@ -1123,6 +1181,10 @@ export class TransactionManager {
    * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#rollback_transaction
    * (`abstract/transaction.rb:610`). Wrapped in `synchronize` for the same
    * reason as {@link commitTransaction}.
+   *
+   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b): Ruby's
+   *   `@stack.last` is `this._stack[this._stack.length - 1]` on a JS array;
+   *   `Array#last` is not a ported method name.
    */
   async rollbackTransaction(transaction?: Transaction): Promise<void> {
     await this._connection.lock.synchronize(() => this._rollbackTransactionInner(transaction));

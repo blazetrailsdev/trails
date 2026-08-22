@@ -1084,6 +1084,13 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#exec_main_query (relation.rb:1423-1452).
    * Returns rows; `instantiateRecords` turns them into records.
+   *
+   * @missingRailsCall wrap — CONVERGEABLE (story port-load-async-future-result-for-select-async-arm): Verified per-site (RFC 0106): relation.rb:1426 is
+   *   `FutureResult.wrap([])`, the async arm of the `@none` short-circuit.
+   *   trails has no FutureResult — `loadAsync` memoizes the load PROMISE itself
+   *   (relation.ts:753-765) because instantiation/eager-loading/preloading are
+   *   all awaited inside `execQueries` — so the async arm returns the same
+   *   `Result.empty()` the sync arm does.
    */
   private async execMainQuery(async = false): Promise<Result> {
     // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
@@ -1135,6 +1142,11 @@ export class Relation<T extends Base> {
    * not already joined — triggers promoting includes to eager_load.
    *
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
+   *
+   * @missingRailsCall empty? — PERMANENT: Ruby's `!(references_values -
+   *   joined_tables).empty?` is Array#- followed by Array#empty?; TS has
+   *   neither, so the identical set difference is spelled `.some(ref =>
+   *   !joined.includes(ref))` (relation.rb:1488).
    */
   private referencesEagerLoadedTables(): boolean {
     // relation.rb:1475 `build_joins([])`. Rails' `build_joins` appends to the
@@ -1829,6 +1841,22 @@ export class Relation<T extends Base> {
    * — `_buildEagerOperandManager` is that block, and its manager is rendered
    * through the same connection path (a null manager, e.g. an unresolvable
    * association, falls through to the plain arel).
+   *
+   * @missingRailsCall apply_join_dependency — CONVERGEABLE (story relation-arel-build-arel-routing): Verified per-site (RFC 0106):
+   *   relation.rb:1211-1215 renders the eager arm inside an
+   *   `apply_join_dependency` block. trails' `toSql` is synchronous
+   *   (relation.ts:1935) while `applyJoinDependency` is async, so the eager arm
+   *   renders the aliased manager `_buildEagerOperandManager()` returns instead.
+   *   Retires with the build_arel/apply_join_dependency routing convergence
+   *   (story relation-arel-build-arel-routing), not here.
+   * @missingRailsCall with_connection — CONVERGEABLE (story converge-sync-eager-builders-async-to-sql): Rails' non-eager arm is
+   *   `model.with_connection { |conn| conn.unprepared_statement {
+   *   conn.to_sql(arel) } }` (relation.rb:1217-1219). `withConnection` is a
+   *   `Promise`-returning checkout in TypeScript and `toSql` renders
+   *   synchronously, so the checkout is the caller's, read through `_conn()`,
+   *   and `unprepared_statement` is applied by hand around the render. Tracked
+   *   by RFC 0107 (`converge-sync-eager-builders-async-to-sql`); returned from a
+   *   `@missingRailsCall` tag by the RFC 0106 permanence audit.
    */
   toSql(): string {
     // `unprepared_statement` applied synchronously: `to_sql` is sync here, so
@@ -3051,6 +3079,14 @@ export class Relation<T extends Base> {
   }
 
   // Mirrors relation.rb:1381-1393.
+  /**
+   * @missingRailsCall build_bind_attribute — PERMANENT: Satisfied by
+   *   QueryAttribute.withCastValue: Rails build_bind_attribute
+   *   (predicate_builder.rb:67-69) is a PRESERVING constructor because
+   *   QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails
+   *   QueryAttribute#typeCast casts its input, so calling buildBindAttribute
+   *   here would cast twice.
+   */
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this.table.get(name);
