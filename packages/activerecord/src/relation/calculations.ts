@@ -1095,7 +1095,17 @@ function buildCountSubquery(
     : relation.buildSubquery(subqueryAlias, selectValue);
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106):
+ *   `result.cast_values.first` (calculations.rb:510) — Ruby `Array#first` on the
+ *   cast-values Array, which TS indexes as `castValues()[0]`.
+ * @missingRailsCall wrap — CONVERGEABLE (story port-load-async-future-result-for-select-async-arm): Verified per-site (RFC 0106): calculations.rb:491 is
+ *   `FutureResult.wrap(ActiveRecord::Result.empty)`, the async arm of the
+ *   contradiction short-circuit. trails has no FutureResult (see the same row on
+ *   relation.ts `exec_main_query`), so both arms return `Result.empty()`.
+ */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -1192,6 +1202,12 @@ export async function executeSimpleCalculation(
  * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
  * (calculations.rb:514-593)
  * @internal
+ *
+ * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106): calculations.rb:569 is
+ *   `calculated_data.column_types.fetch(aliaz, Type.default_value)`. A JS record
+ *   has no `fetch`, so the port spells Hash#fetch's key-presence semantics with
+ *   `Object.hasOwn` (a stored value wins over the default even when it is null)
+ *   — same behaviour, no call the extractor can see.
  */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
@@ -1403,7 +1419,13 @@ function typeCasterFor(column: unknown): unknown {
   return tryCall(column as object, "typeCaster") ?? null;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall last — PERMANENT: Verified per-site (RFC 0106):
+ *   `field.to_s.split(".").last` (calculations.rb:598) — Ruby `Array#last` on
+ *   the split parts, spelled by indexing the final element in TS.
+ */
 export function typeFor(
   rel: CalculationRelation,
   field: string | Nodes.Node | number,
@@ -1419,7 +1441,15 @@ export function typeFor(
   return rel.model.typeForAttribute?.(fieldName, block);
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
+ *   `join.base_klass.attribute_types.fetch(name, nil)` (calculations.rb:604) — a
+ *   Hash#fetch whose default is `nil`, i.e. a plain missing-key read; the TS
+ *   spelling is the `castTypeFromKlass` own-property lookup
+ *   (calculations.ts:1444), not a `fetch` call.
+ */
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
@@ -1459,6 +1489,15 @@ function castTypeFromKlass(klass: any, name: string): unknown {
  * the same columns.
  *
  * @internal
+ *
+ * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
+ *   `model.attribute_types.fetch(name) { ... }` (calculations.rb:617) —
+ *   Hash#fetch WITH A BLOCK, whose TS spelling is the miss test
+ *   `pluckCastTypeForKnownColumn(...)` followed by the block body
+ *   (calculations.ts:1490-1497); JS has no fetch-with-block call to make.
+ * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106): `result.columns.size !=
+ *   columns.size` (calculations.rb:611) — Ruby `Array#size` on two plain Arrays,
+ *   spelled `.length` in TS.
  */
 export function typeCastPluckValues(
   result: Result,
