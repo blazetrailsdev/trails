@@ -52,7 +52,6 @@ export {
   IsNotDistinctFrom,
   NotIn,
   Join,
-  CrossJoin,
   Union,
   UnionAll,
   Intersect,

@@ -265,8 +265,6 @@ export abstract class Join extends Binary {
   }
 }
 
-export class CrossJoin extends Join {}
-
 /** Set operations — Rails defines via const_set in binary.rb */
 export class Union extends Binary {
   declare readonly left: Node;

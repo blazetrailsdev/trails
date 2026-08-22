@@ -425,7 +425,13 @@ export abstract class SchemaDumper {
     this._tableName = value;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall insert — PERMANENT: Ruby `String#insert` (schema_dumper.rb:89)
+   *   mutates the receiver in place; JS strings are immutable, so the port
+   *   builds the underscored version from `slice` instead.
+   */
   formattedVersion(): string {
     const s = this._version ?? "";
     if (s.length !== 14) return s;
@@ -721,7 +727,73 @@ export abstract class SchemaDumper {
     await this.table(tableName, stream);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall column_spec — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall column_spec_for_primary_key — CONVERGEABLE: verified at
+   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
+   *   port's `table` hands that half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall exclusion_constraints_in_create — CONVERGEABLE: verified at
+   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
+   *   port's `table` hands that half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall format_colspec — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall format_options — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall indexes_in_create — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall table_options — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall unique_constraints_in_create — CONVERGEABLE: verified at
+   *   schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the
+   *   port's `table` hands that half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   * @missingRailsCall valid_type? — CONVERGEABLE: verified at schema_dumper.rb:158-243 —
+   *   Rails' `table` emits the columns inline; the port's `table` hands that
+   *   half to `emitTable`
+   *   (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this
+   *   call. The gate credits same-FILE helpers only, so the delegation reads as
+   *   an omission. Convergence is RFC 0051 story
+   *   `inline-schema-dumper-table-retire-emit-table`.
+   */
   async table(table: string, stream: string[]): Promise<void> {
     // Mirrors Rails' reliance on `@connection.primary_key(table)`: capture the
     // authoritative PK column order before iterating columns so `emitTable` /
@@ -770,6 +842,10 @@ export abstract class SchemaDumper {
    * the `remaining` stream of `ctx.addCheckConstraint(...)` calls the caller
    * prints after the block.
    * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Ruby's block-less `any?` (schema_dumper.rb:284) is
+   *   an emptiness test on the fetched array; the port spells it `.length > 0`,
+   *   which records no callee.
    */
   protected async checkConstraintsInCreate(
     table: string,
@@ -988,7 +1064,25 @@ export abstract class SchemaDumper {
     return parts;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Ruby's block-less `any?`
+   *   (schema_dumper.rb:245,246,252) is an emptiness test on the fetched array;
+   *   the port spells it `.length > 0`, which records no callee.
+   * @missingRailsCall exclusion_constraints — PERMANENT:
+   *   `@connection.exclusion_constraints(table)` (schema_dumper.rb:245-252) is
+   *   an async read in trails, and `indexesInCreate` is synchronous: its caller
+   *   awaits the list and passes it in (schema-dumper.ts:995).
+   * @missingRailsCall indexes — PERMANENT: `@connection.indexes(table)`
+   *   (schema_dumper.rb:245-252) is an async read in trails, and
+   *   `indexesInCreate` is synchronous: its caller awaits the list and passes it
+   *   in (schema-dumper.ts:995).
+   * @missingRailsCall unique_constraints — PERMANENT:
+   *   `@connection.unique_constraints(table)` (schema_dumper.rb:245-252) is an
+   *   async read in trails, and `indexesInCreate` is synchronous: its caller
+   *   awaits the list and passes it in (schema-dumper.ts:995).
+   */
   indexesInCreate(table: string, stream: string[], indexes: IndexInfo[] = []): void {
     const stripped = this.removePrefixAndSuffix(table);
     for (const index of indexes) {
@@ -1036,7 +1130,18 @@ export abstract class SchemaDumper {
     return parts;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Ruby's block-less `any?` (schema_dumper.rb:317) is
+   *   an emptiness test on the fetched array; the port spells it `.length > 0`,
+   *   which records no callee.
+   * @missingRailsCall order:foreignKeyColumnFor,removePrefixAndSuffix — PERMANENT:
+   *   ORDER-only: Rails evaluates `remove_prefix_and_suffix` for both table
+   *   names before the `foreign_key_column_for` comparison
+   *   (schema_dumper.rb:320-324); the port hoists the column comparison, which
+   *   the async read forces.
+   */
   async foreignKeys(tableName: string, stream: string[]): Promise<void> {
     const host = this._hookHost("foreignKeys");
     if (!host) return;

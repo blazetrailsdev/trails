@@ -1188,14 +1188,6 @@ describe("SelectManagerTest", () => {
     expect(mgr.toSql()).toContain("FULL OUTER JOIN");
   });
 
-  it("crossJoin generates CROSS JOIN", () => {
-    const mgr = new SelectManager(users);
-    mgr.project(star);
-    mgr.join(posts, Nodes.CrossJoin);
-    expect(mgr.toSql()).toContain("CROSS JOIN");
-    expect(mgr.toSql()).toContain('"posts"');
-  });
-
   it("window creates a named window", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
