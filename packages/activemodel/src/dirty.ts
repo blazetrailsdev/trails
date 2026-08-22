@@ -575,13 +575,15 @@ export class DirtyTracker {
 
   /**
    * Restore a single attribute to its pre-change value, matching Rails
-   * `ActiveModel::Dirty#restore_attribute!(attr)` (activemodel/lib/active_model/dirty.rb).
+   * `ActiveModel::Dirty#restore_attribute!(attr)` (dirty.rb:414-420). The guard
+   * is `attribute_changed?`, which is true for an attribute changed *in place*
+   * as well as by assignment, and the value written back is `attribute_was`.
    */
   restoreAttribute(
     attributes: { set(name: string, value: unknown): void; delete?(name: string): boolean },
     name: string,
   ): void {
-    if (!this._changedAttributes.has(name)) return;
+    if (!this.attributeChanged(name)) return;
     this._restoreOne(attributes, name);
     this._deleteChange(name);
   }
@@ -593,8 +595,7 @@ export class DirtyTracker {
     if (!this._originalHas.has(name)) {
       attributes.delete?.(name);
     } else {
-      const original = resolveValue(this._originalAttributes.get(name));
-      attributes.set(name, original);
+      attributes.set(name, this.attributeWas(name));
     }
   }
 

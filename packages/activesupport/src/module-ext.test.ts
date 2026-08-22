@@ -23,9 +23,9 @@ describe("ModuleTest", () => {
       }
     }
     delegate(Person.prototype, "street", "city", { to: "place" });
-    const p = new Person(new Place()) as Person & { street: string; city: string };
-    expect(p.street).toBe("Paulina");
-    expect(p.city).toBe("Chicago");
+    const p = new Person(new Place()) as Person & { street(): string; city(): string };
+    expect(p.street()).toBe("Paulina");
+    expect(p.city()).toBe("Chicago");
   });
 
   it("delegate with prefix true — prepends target name", () => {
@@ -39,8 +39,8 @@ describe("ModuleTest", () => {
       }
     }
     delegate(Invoice.prototype, "label", { to: "client", prefix: true });
-    const inv = new Invoice(new Client()) as Invoice & { client_label: string };
-    expect(inv.client_label).toBe("David");
+    const inv = new Invoice(new Client()) as Invoice & { client_label(): string };
+    expect(inv.client_label()).toBe("David");
   });
 
   it("delegate with custom prefix — prepends custom prefix", () => {
@@ -54,8 +54,8 @@ describe("ModuleTest", () => {
       }
     }
     delegate(Invoice.prototype, "label", { to: "client", prefix: "customer" });
-    const inv = new Invoice(new Client()) as Invoice & { customer_label: string };
-    expect(inv.customer_label).toBe("David");
+    const inv = new Invoice(new Client()) as Invoice & { customer_label(): string };
+    expect(inv.customer_label()).toBe("David");
   });
 
   it("delegate with allowNil true — returns undefined when target is nil", () => {
@@ -63,8 +63,8 @@ describe("ModuleTest", () => {
       person: null | { title: string } = null;
     }
     delegate(Project.prototype, "title", { to: "person", allowNil: true });
-    const proj = new Project() as Project & { title: string | undefined };
-    expect(proj.title).toBeUndefined();
+    const proj = new Project() as Project & { title(): string | undefined };
+    expect(proj.title()).toBeUndefined();
   });
 
   it("delegate without allowNil — throws when target is nil", () => {
@@ -72,8 +72,8 @@ describe("ModuleTest", () => {
       place: null | { street: string } = null;
     }
     delegate(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street: string };
-    expect(() => s.street).toThrow();
+    const s = new Someone() as Someone & { street(): string };
+    expect(() => s.street()).toThrow();
   });
 
   it("delegate returns generated method names", () => {

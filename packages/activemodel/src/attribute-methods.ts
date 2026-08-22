@@ -489,14 +489,16 @@ export function undefineAttributeMethods(this: ClassMethods): void {
   }
 }
 
+/**
+ * Mirrors: ClassMethods#aliases_by_attribute_name
+ * (`activemodel/lib/active_model/attribute_methods.rb:382-384`), a plain
+ * per-class ivar. Rails' `inherited` hook resets it on every subclass
+ * (`:387-394`), so a subclass starts empty; JS has no such hook (CLAUDE.md,
+ * "Module mixins"), and the own-property check is the port of that reset.
+ */
 export function aliasesByAttributeName(host: AttributeMethodHost): Map<string, string[]> {
   if (!Object.prototype.hasOwnProperty.call(host, "_aliasesByAttributeName")) {
-    const parent = host._aliasesByAttributeName;
-    const copy = new Map<string, string[]>();
-    if (parent) {
-      for (const [k, v] of parent) copy.set(k, [...v]);
-    }
-    host._aliasesByAttributeName = copy;
+    host._aliasesByAttributeName = new Map<string, string[]>();
   }
   return host._aliasesByAttributeName;
 }

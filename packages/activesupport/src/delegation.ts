@@ -21,44 +21,62 @@ export interface DelegateOptions {
 }
 
 export namespace Delegation {
+  /**
+   * Mirrors: `ActiveSupport::Delegation.generate`
+   * (`activesupport/lib/active_support/delegation.rb:23-158`). Ruby builds the
+   * delegator bodies as source and `module_eval`s them; TS defines them as
+   * properties on `owner`, so the `location` / `signature` / `nilable` /
+   * `private` / `as` keywords — all of which exist to shape that generated
+   * source or its `def` visibility — have no TS counterpart and are omitted.
+   */
   export function generate<T extends object>(
-    target: T,
+    owner: T,
     methods: string[],
     options: DelegateOptions,
-  ): void {
+  ): string[] {
     const { to, prefix, allowNil } = options;
 
     if (!to) {
       throw new Error(
-        "Delegation needs a target. Supply a 'to' option (e.g. Delegation.generate(target, ['hello'], { to: 'greeter' })).",
+        "Delegation needs a target. Supply a keyword argument 'to' (e.g. delegate :hello, to: :greeter).",
       );
     }
 
-    const methodPrefix = prefix === true ? `${to}_` : prefix ? `${prefix}_` : "";
+    if (prefix === true && /^[^a-z_]/.test(to)) {
+      throw new Error(
+        "Can only automatically set the delegation prefix when delegating to a method.",
+      );
+    }
+
+    const methodPrefix = prefix ? `${prefix === true ? to : prefix}_` : "";
+
+    const methodNames: string[] = [];
 
     for (const method of methods) {
       const methodName = `${methodPrefix}${method}`;
+      methodNames.push(methodName);
 
-      Object.defineProperty(target, methodName, {
+      Object.defineProperty(owner, methodName, {
         configurable: true,
         enumerable: false,
         writable: true,
         value(...args: unknown[]) {
-          const receiver = (this as Record<string, unknown>)[to];
-          if (receiver == null) {
+          const _ = (this as Record<string, unknown>)[to];
+          if (_ == null) {
             if (allowNil) return undefined;
             throw DelegationError.nilTarget(methodName, to);
           }
-          const fn = (receiver as Record<string, unknown>)[method];
-          if (typeof fn !== "function") {
-            throw new DelegationError(
-              `${methodName} delegated to ${to}, but ${to}.${globalThis.String(method)} is not a function`,
-            );
-          }
-          return fn.apply(receiver, args);
+          const member = (_ as Record<string, unknown>)[method];
+          // Ruby's `_.method(...)` is a call either way, because a Ruby
+          // attr_reader IS a method. A trails reader is a property (CLAUDE.md,
+          // "Generated attribute readers are properties"), so the delegator
+          // calls what is callable and reads what is not.
+          return typeof member === "function" ? member.apply(_, args) : member;
         },
       });
     }
+
+    return methodNames;
   }
 
   export function generateMethodMissing<T extends object>(

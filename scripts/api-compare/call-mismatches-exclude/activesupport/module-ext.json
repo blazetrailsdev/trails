@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "delegate",
-    "call": "generate",
-    "reason": "Rails' `delegate` is a thin front for `ActiveSupport::Delegation.generate` (delegation.rb:280), the module trails has not ported; `delegate` reimplements the method generation inline instead. A real divergence, surfaced (not introduced) by bucketing `core_ext/module/delegation.rb` on module-ext.ts."
-  }
-]

@@ -16,9 +16,8 @@ describe("ModuleTest", () => {
       }
     }
     delegate(Wrapper.prototype, "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & Record<string, unknown>;
-    const getFn = w.get as Container["get"];
-    expect(getFn.call(w.container, "key")).toBe("value");
+    const w = new Wrapper() as Wrapper & { get(key: string): unknown };
+    expect(w.get("key")).toBe("value");
   });
 
   it("delegation to index set method", () => {
@@ -38,11 +37,12 @@ describe("ModuleTest", () => {
       }
     }
     delegate(Wrapper.prototype, "set", "get", { to: "container" });
-    const w = new Wrapper() as Wrapper & Record<string, unknown>;
-    const setFn = w.set as Container["set"];
-    const getFn = w.get as Container["get"];
-    setFn.call(w.container, "x", 42);
-    expect(getFn.call(w.container, "x")).toBe(42);
+    const w = new Wrapper() as Wrapper & {
+      set(k: string, v: unknown): void;
+      get(k: string): unknown;
+    };
+    w.set("x", 42);
+    expect(w.get("x")).toBe(42);
   });
 
   it("delegation with allow nil and false value", () => {
@@ -53,8 +53,8 @@ describe("ModuleTest", () => {
       settings: Settings | null = new Settings();
     }
     delegate(App.prototype, "enabled", { to: "settings", allowNil: true });
-    const app = new App() as App & { enabled: boolean | undefined };
-    expect(app.enabled).toBe(false);
+    const app = new App() as App & { enabled(): boolean | undefined };
+    expect(app.enabled()).toBe(false);
   });
 
   it("delegation with allow nil and invalid value", () => {
@@ -65,10 +65,10 @@ describe("ModuleTest", () => {
       target: Target | null = new Target();
     }
     delegate(Host.prototype, "value", { to: "target", allowNil: true });
-    const h = new Host() as Host & { value: unknown };
-    expect(h.value).toBeUndefined();
+    const h = new Host() as Host & { value(): unknown };
+    expect(h.value()).toBeUndefined();
     h.target = null;
-    expect(h.value).toBeUndefined();
+    expect(h.value()).toBeUndefined();
   });
 
   it("delegation to method that exists on nil when allowing nil", () => {
@@ -81,10 +81,10 @@ describe("ModuleTest", () => {
       greeter: Greeter | null = null;
     }
     delegate(Host.prototype, "greet", { to: "greeter", allowNil: true });
-    const h = new Host() as Host & Record<string, unknown>;
-    expect(h.greet).toBeUndefined();
+    const h = new Host() as Host & { greet(): unknown };
+    expect(h.greet()).toBeUndefined();
     h.greeter = new Greeter();
-    expect(typeof h.greet).toBe("function");
+    expect(h.greet()).toBe("hello");
   });
 
   it("delegate line with nil", () => {
@@ -95,8 +95,8 @@ describe("ModuleTest", () => {
       name: Name | null = null;
     }
     delegate(Person.prototype, "first", { to: "name", allowNil: true });
-    const p = new Person() as Person & { first: string | undefined };
-    expect(p.first).toBeUndefined();
+    const p = new Person() as Person & { first(): string | undefined };
+    expect(p.first()).toBeUndefined();
   });
 
   it("delegate missing to does not delegate to fake methods", () => {
@@ -129,9 +129,9 @@ describe("ModuleTest", () => {
       constructor(public place: Place) {}
     }
     delegate(Person.prototype, "street", "city", { to: "place" });
-    const p = new Person(new Place()) as Person & { street: string; city: string };
-    expect(p.street).toBe("Paulina");
-    expect(p.city).toBe("Chicago");
+    const p = new Person(new Place()) as Person & { street(): string; city(): string };
+    expect(p.street()).toBe("Paulina");
+    expect(p.city()).toBe("Chicago");
   });
 
   it("delegation to assignment method", () => {
@@ -148,8 +148,8 @@ describe("ModuleTest", () => {
       box = new Box();
     }
     delegate(Container.prototype, "color", { to: "box" });
-    const c = new Container() as Container & { color: string };
-    expect(c.color).toBe("red");
+    const c = new Container() as Container & { color(): string };
+    expect(c.color()).toBe("red");
   });
 
   it("delegation down hierarchy", () => {
@@ -177,8 +177,8 @@ describe("ModuleTest", () => {
       owner = new Owner();
     }
     delegate(Thing.prototype, "name", { to: "owner" });
-    const t = new Thing() as Thing & { name: string };
-    expect(t.name).toBe("Owner");
+    const t = new Thing() as Thing & { name(): string };
+    expect(t.name()).toBe("Owner");
   });
 
   it("delegation to class method", () => {
@@ -200,8 +200,8 @@ describe("ModuleTest", () => {
       place: null | { street: string } = null;
     }
     delegate(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street: string };
-    expect(() => s.street).toThrow();
+    const s = new Someone() as Someone & { street(): string };
+    expect(() => s.street()).toThrow();
   });
 
   it("delegation target when prefix is true", () => {
@@ -212,8 +212,8 @@ describe("ModuleTest", () => {
       client = new Client();
     }
     delegate(Invoice.prototype, "name", { to: "client", prefix: true });
-    const inv = new Invoice() as Invoice & { client_name: string };
-    expect(inv.client_name).toBe("David");
+    const inv = new Invoice() as Invoice & { client_name(): string };
+    expect(inv.client_name()).toBe("David");
   });
 
   it("delegation prefix", () => {
@@ -224,8 +224,8 @@ describe("ModuleTest", () => {
       client = new Client();
     }
     delegate(Invoice.prototype, "name", { to: "client", prefix: true });
-    const inv = new Invoice() as Invoice & { client_name: string };
-    expect(inv.client_name).toBe("David");
+    const inv = new Invoice() as Invoice & { client_name(): string };
+    expect(inv.client_name()).toBe("David");
   });
 
   it("delegation custom prefix", () => {
@@ -236,8 +236,8 @@ describe("ModuleTest", () => {
       client = new Client();
     }
     delegate(Invoice.prototype, "name", { to: "client", prefix: "customer" });
-    const inv = new Invoice() as Invoice & { customer_name: string };
-    expect(inv.customer_name).toBe("David");
+    const inv = new Invoice() as Invoice & { customer_name(): string };
+    expect(inv.customer_name()).toBe("David");
   });
 
   it("delegation prefix with nil or false", () => {
@@ -248,8 +248,8 @@ describe("ModuleTest", () => {
       place = new Place();
     }
     delegate(Person.prototype, "street", { to: "place", prefix: false });
-    const p = new Person() as Person & { street: string };
-    expect(p.street).toBe("Paulina");
+    const p = new Person() as Person & { street(): string };
+    expect(p.street()).toBe("Paulina");
   });
 
   it("delegation prefix with instance variable", () => {
@@ -260,8 +260,8 @@ describe("ModuleTest", () => {
       client = new Client();
     }
     delegate(Invoice.prototype, "name", { to: "client", prefix: "client" });
-    const inv = new Invoice() as Invoice & { client_name: string };
-    expect(inv.client_name).toBe("David");
+    const inv = new Invoice() as Invoice & { client_name(): string };
+    expect(inv.client_name()).toBe("David");
   });
 
   it("delegation with implicit block", () => {
@@ -283,8 +283,8 @@ describe("ModuleTest", () => {
       person: null | { name: string } = null;
     }
     delegate(Project.prototype, "name", { to: "person", allowNil: true });
-    const proj = new Project() as Project & { name: string | undefined };
-    expect(proj.name).toBeUndefined();
+    const proj = new Project() as Project & { name(): string | undefined };
+    expect(proj.name()).toBeUndefined();
   });
 
   it("delegation with allow nil and nil value", () => {
@@ -292,8 +292,8 @@ describe("ModuleTest", () => {
       person: null | { name: string } = null;
     }
     delegate(Project.prototype, "name", { to: "person", allowNil: true });
-    const proj = new Project() as Project & { name: string | undefined };
-    expect(proj.name).toBeUndefined();
+    const proj = new Project() as Project & { name(): string | undefined };
+    expect(proj.name()).toBeUndefined();
   });
 
   it("delegation with allow nil and nil value and prefix", () => {
@@ -301,8 +301,8 @@ describe("ModuleTest", () => {
       person: null | { name: string } = null;
     }
     delegate(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
-    const proj = new Project() as Project & { person_name: string | undefined };
-    expect(proj.person_name).toBeUndefined();
+    const proj = new Project() as Project & { person_name(): string | undefined };
+    expect(proj.person_name()).toBeUndefined();
   });
 
   it("delegation without allow nil and nil value", () => {
@@ -310,8 +310,8 @@ describe("ModuleTest", () => {
       place: null | { street: string } = null;
     }
     delegate(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street: string };
-    expect(() => s.street).toThrow();
+    const s = new Someone() as Someone & { street(): string };
+    expect(() => s.street()).toThrow();
   });
 
   it("delegation to method that exists on nil", () => {
@@ -342,10 +342,10 @@ describe("ModuleTest", () => {
       place: null = null;
     }
     delegate(Someone.prototype, "street", { to: "place" });
-    const s = new Someone() as Someone & { street: string };
+    const s = new Someone() as Someone & { street(): string };
     let err: Error | null = null;
     try {
-      s.street;
+      s.street();
     } catch (e) {
       err = e as Error;
     }
@@ -358,8 +358,8 @@ describe("ModuleTest", () => {
       place: null = null;
     }
     delegate(Someone.prototype, "street", { to: "place", allowNil: true });
-    const s = new Someone() as Someone & { street: string | undefined };
-    expect(() => s.street).not.toThrow();
+    const s = new Someone() as Someone & { street(): string | undefined };
+    expect(() => s.street()).not.toThrow();
   });
 
   it("delegation invokes the target exactly once", () => {
@@ -374,8 +374,8 @@ describe("ModuleTest", () => {
       counter = new Counter();
     }
     delegate(Wrapper.prototype, "value", { to: "counter" });
-    const w = new Wrapper() as Wrapper & { value: string };
-    w.value;
+    const w = new Wrapper() as Wrapper & { value(): string };
+    w.value();
     expect(calls).toBe(1);
   });
 
@@ -384,8 +384,8 @@ describe("ModuleTest", () => {
       val: null = null;
     }
     delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something: unknown };
-    expect(() => c.something).toThrow();
+    const c = new Container() as Container & { something(): unknown };
+    expect(() => c.something()).toThrow();
   });
 
   it("delegation with method arguments", () => {
@@ -459,8 +459,8 @@ describe("ModuleTest", () => {
       val: null = null;
     }
     delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something: unknown };
-    expect(() => c.something).toThrow();
+    const c = new Container() as Container & { something(): unknown };
+    expect(() => c.something()).toThrow();
   });
 
   it("delegate missing to returns nil if allow nil and nil target", () => {
@@ -468,8 +468,8 @@ describe("ModuleTest", () => {
       val: null = null;
     }
     delegate(Container.prototype, "something", { to: "val", allowNil: true });
-    const c = new Container() as Container & { something: unknown };
-    expect(c.something).toBeUndefined();
+    const c = new Container() as Container & { something(): unknown };
+    expect(c.something()).toBeUndefined();
   });
 
   it("delegate missing with allow nil when called on self", () => {
@@ -477,8 +477,8 @@ describe("ModuleTest", () => {
       val: null = null;
     }
     delegate(Container.prototype, "something", { to: "val", allowNil: true });
-    const c = new Container() as Container & { something: unknown };
-    expect(c.something).toBeUndefined();
+    const c = new Container() as Container & { something(): unknown };
+    expect(c.something()).toBeUndefined();
   });
 
   it("delegate missing to affects respond to", () => {
@@ -613,8 +613,8 @@ describe("ModuleTest", () => {
       val: undefined = undefined;
     }
     delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something: unknown };
-    expect(() => c.something).toThrow();
+    const c = new Container() as Container & { something(): unknown };
+    expect(() => c.something()).toThrow();
   });
 
   it("delegation arity to module", () => {
