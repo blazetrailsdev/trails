@@ -86,6 +86,10 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     return this.rotate();
   }
 
+  /**
+   * @missingRailsCall clear — PERMANENT: Equivalent: JS arrays have no `clear`; the
+   *   rotate-options array is emptied by assignment instead.
+   */
   clearRotations(): this {
     this.changingConfigurationBang();
     this.#rotateOptions = [];
@@ -98,7 +102,12 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     return callback;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall any? — PERMANENT: Equivalent: `@codecs.any?` over a Hash is
+   *   `this.#codecs.size > 0` on a Map, which has no `any?`.
+   */
   private changingConfigurationBang(): void {
     if (this.#codecs.size > 0) {
       throw new RuntimeError(
@@ -109,7 +118,13 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall filter_map — PERMANENT: No JS analogue: Ruby filter_maps
+   *   `Method#parameters` for the generator's keyword names; TS has no parameter
+   *   reflection, so a generator declares them on `parameters`.
+   */
   private normalizeOptions(options: RotateOptions): BuildOptions {
     const normalized = { ...options } as Record<string, unknown>;
 

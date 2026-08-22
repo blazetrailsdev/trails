@@ -7,26 +7,5 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "messages/rotation-coordinator.ts",
-    "rubyName": "changing_configuration!",
-    "call": "any?",
-    "reason": "Equivalent: `@codecs.any?` over a Hash is `this.#codecs.size > 0` on a Map, which has no `any?`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "messages/rotation-coordinator.ts",
-    "rubyName": "clear_rotations",
-    "call": "clear",
-    "reason": "Equivalent: JS arrays have no `clear`; the rotate-options array is emptied by assignment instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "messages/rotation-coordinator.ts",
-    "rubyName": "normalize_options",
-    "call": "filter_map",
-    "reason": "No JS analogue: Ruby filter_maps `Method#parameters` for the generator's keyword names; TS has no parameter reflection, so a generator declares them on `parameters`."
   }
 ]

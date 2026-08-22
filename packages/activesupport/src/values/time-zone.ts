@@ -885,6 +885,12 @@ export class TimeZone {
 
   /**
    * Current time in this timezone.
+   *
+   * @missingRailsCall in_time_zone — PERMANENT: Same round trip as the `at` row above:
+   *   `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518) reaches the same
+   *   `new TimeWithZone(instant, self)` that this body already performs, and
+   *   going through `in_time_zone` would close the `values/time-zone` ->
+   *   `core-ext/date-and-time/zones` import cycle.
    */
   now(): TimeWithZone {
     // `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518).
@@ -960,6 +966,14 @@ export class TimeZone {
    * `getutc` is Ruby's `Time#utc` on an immutable receiver (trails' `::Time`
    * has no in-place conversion), and `toTime().toInstant()` is the instant a
    * `TimeWithZone` holds where Ruby's `in_time_zone` takes the `::Time` itself.
+   *
+   * @missingRailsCall in_time_zone — PERMANENT: `Time.at(*args).utc.in_time_zone(self)`
+   *   (time_zone.rb:379-381) round-trips through the `Time` core-ext to land in
+   *   `self`; trails builds the `TimeWithZone` directly from the epoch instant,
+   *   and `in_time_zone`'s own `TimeZone` arm is that same constructor call
+   *   (core-ext/date-and-time/zones.ts `timeWithZone`). Routing through it would
+   *   close a `values/time-zone` -> `zones` -> `values/time-zone` module cycle
+   *   for no behavioural difference.
    */
   at(
     seconds: number | bigint | Rational,

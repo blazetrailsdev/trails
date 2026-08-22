@@ -38,13 +38,6 @@ export function benchmark<T>(
   options: BenchmarkOptions,
   block: () => T | Promise<T>,
 ): T | Promise<Awaited<T>>;
-/**
- * @missingRailsCall logger — CONVERGEABLE (story
- *   `benchmarkable-should-mix-in-logger-reader`): Rails reads the mixin's
- *   `logger` reader (benchmarkable.rb:38,44,46); trails' benchmark is a shared
- *   free function whose host passes the logger in as its first parameter, so
- *   there is no `logger` reader to call.
- */
 export function benchmark<T>(
   this: Benchmarkable,
   message: string,
