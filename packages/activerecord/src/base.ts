@@ -1961,7 +1961,7 @@ export class Base extends Model {
   // changes (attributeChanged) and persisted changes (isSavedChangeToAttribute).
   // All enums are label-stored via the registered EnumType with their mapping
   // in the single `_enums` registry.
-  override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+  override attributeChanged(name: string, options?: DirtyOptions): boolean {
     if (options) {
       const ctor = this.constructor as typeof Base;
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;

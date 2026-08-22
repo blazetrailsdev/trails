@@ -10,13 +10,13 @@
 import { Temporal } from "@blazetrails/date";
 import type { DirtyOptions } from "@blazetrails/activemodel";
 
-export type { DirtyOptions };
-
 interface DirtyRecord {
   changed: boolean;
   changedAttributes: Record<string, unknown>;
   changes: Record<string, [unknown, unknown]>;
   previousChanges: Record<string, [unknown, unknown]>;
+  mutationsFromDatabase: Record<string, [unknown, unknown]>;
+  mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
   readAttribute(name: string): unknown;
   /** @internal */
   _dirty: {
@@ -35,14 +35,14 @@ interface DirtyRecord {
  * (dirty.rb:86-88) — `mutations_before_last_save.changed?(attr_name.to_s,
  * **options)`.
  *
- * @missingRailsArgs changed? — CONVERGEABLE: trails' single DirtyTracker holds both of Ruby's tracker instances' change sets, so the set Ruby names by receiver is `changed?`'s leading argument here. See `DirtyTracker#isChanged`.
+ * @missingRailsArgs changed? — CONVERGEABLE: trails' single DirtyTracker holds both of Ruby's tracker instances' change sets, so the set Ruby names by receiver is `changed?`'s leading argument here. Story: `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`.
  */
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
   options?: DirtyOptions,
 ): boolean {
-  return record._dirty.isChanged(record.previousChanges, attr, options);
+  return record._dirty.isChanged(record.mutationsBeforeLastSave, attr, options);
 }
 
 /**
@@ -90,7 +90,7 @@ export function isWillSaveChangeToAttribute(
   attr: string,
   options?: DirtyOptions,
 ): boolean {
-  return record._dirty.isChanged(record.changes, attr, options);
+  return record._dirty.isChanged(record.mutationsFromDatabase, attr, options);
 }
 
 /**

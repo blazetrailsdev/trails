@@ -12,6 +12,7 @@ import {
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   defineAttributeMethods as amDefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
+  type DirtyOptions,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
@@ -898,7 +899,6 @@ import { queryCastAttribute as _queryCastAttribute } from "./attribute-methods/q
 // import from it here (cycle). These 5 delegates are inlined the same way
 // toKey/id are inlined above (see comment near line 12).
 import {
-  type DirtyOptions,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   savedChangeToAttribute as _savedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,

@@ -187,8 +187,7 @@ export class DirtyTracker {
    * `attribute_changed?` conjoined with the `from:`/`to:` comparisons.
    */
   attributeChanged(name: string, options?: DirtyOptions): boolean {
-    if (!(this._changedAttributes.has(name) || this._isInPlaceMutableChange(name))) return false;
-    return this.isChanged(this.changes, name, options);
+    return this.isChanged(this.mutationsFromDatabase, name, options);
   }
 
   /**
@@ -196,7 +195,7 @@ export class DirtyTracker {
    * (attribute_mutation_tracker.rb:44-48) over `mutations_before_last_save`.
    */
   attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean {
-    return this.isChanged(this.previousChanges, name, options);
+    return this.isChanged(this.mutationsBeforeLastSave, name, options);
   }
 
   /**
@@ -206,7 +205,7 @@ export class DirtyTracker {
    * `saved_change_to_attribute?` / `will_save_change_to_attribute?` reader
    * delegates to.
    *
-   * @missingRailsArgs changed? — CONVERGEABLE: Rails picks the change set by picking one of its two tracker INSTANCES (`mutations_from_database` / `mutations_before_last_save`); trails has a single DirtyTracker holding both sets, so the set Ruby chose by receiver is a leading argument here. It converges when DirtyTracker splits into two AttributeMutationTracker instances (story `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments` owns that split).
+   * @missingRailsArgs changed? — CONVERGEABLE: Rails picks the change set by picking one of its two tracker INSTANCES (`mutations_from_database` / `mutations_before_last_save`); trails has a single DirtyTracker holding both sets, so the set Ruby chose by receiver is a leading argument here. It converges when DirtyTracker splits into two AttributeMutationTracker instances (story `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers` owns that split).
    */
   isChanged(
     changes: Record<string, [unknown, unknown]>,
