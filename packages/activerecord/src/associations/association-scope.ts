@@ -664,9 +664,11 @@ export class AssociationScope {
   }
 
   /**
-   * Fold `last_chain_scope` over the chain and merge any user-supplied
-   * `scope` lambdas (reflection.scope / reflection.constraints) into the
-   * relation. PR 1 applies the scope lambda on the tail only.
+   * Fold `last_chain_scope` over the chain, walk the pairs, then merge every
+   * chain entry's scope lambdas into the relation — Rails' one loop body,
+   * inline: `chain.reverse_each` → `reflection.constraints.each` → the
+   * `scope_chain_item == chain_head.scope` / `!item.references_values.empty?`
+   * arms → `all_includes` → `unscope!` / `where_clause +=` / `order_values |`.
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#add_constraints
    * (association_scope.rb:124-159).
@@ -678,92 +680,213 @@ export class AssociationScope {
   ): unknown {
     const last = chain[chain.length - 1];
     scope = this.lastChainScope(scope, last, owner);
-    // For multi-step chains, walk pairs and add INNER JOINs — Rails'
-    // `chain.each_cons(2) { |r, nr| next_chain_scope(scope, r, nr) }`
+    // Rails: `chain.each_cons(2) { |r, nr| next_chain_scope(scope, r, nr) }`
     // (association_scope.rb:128-130).
     for (let i = 0; i < chain.length - 1; i++) {
       scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
     }
-    // Rails' chain.reverse_each over reflection.constraints (Rails:
-    // association_scope.rb:131-156) merges scope-chain items into the
-    // relation. For each non-head reflection in the chain (in REVERSE
-    // order to match Rails' chain.reverse_each), we apply its scope
-    // lambda to a fresh klass.(unscoped + STI type filter), then push
-    // only the WHERE and ORDER predicates onto the main scope —
-    // matching Rails' `where_clause +=` / `order_values |=` granular
-    // merging (NOT a full Relation#merge, which would let the chain
-    // entry's limit/select/etc override the main scope). It ALSO folds in
-    // the item's joins / left_outer_joins and referenced eager-loads as
-    // OuterJoins (`_mergeReferencedJoins`, Rails' `construct_join_dependency
-    // (associations, Arel::Nodes::OuterJoin)` branch, association_scope.rb:
-    // 138-141) and applies its `unscope!` directives. The head reflection
-    // (chain[0]) is the LAST entry the loop reaches, and its own scope is one
-    // `scope_chain_item` inside the same body — Rails' `if scope_chain_item ==
-    // chain_head.scope` arm (association_scope.rb:137).
-    //
-    // Rails' add_constraints references `Arel::Nodes::OuterJoin` directly (the
-    // eager-load branch above); trails routes that construction through the
-    // `_mergeReferencedJoins` helper, so keep the arel dependency visible on
-    // this method to match Rails' activerecord → arel edge (dep-parity gate).
-    void Nodes.OuterJoin;
-    // Rails: `chain_head = chain.first` (association_scope.rb:131), read by the
-    // one `reverse_each` body that handles every chain position.
+
     const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 0; i--) {
-      scope = this._mergeReflectionScopeChain(scope, chain[i], owner, chainHead);
-    }
-    return scope;
-  }
+      const reflection = chain[i];
+      // Iterate `reflection.constraints()` rather than special-casing
+      // PolymorphicReflection via instanceof. For ordinary
+      // AssociationReflection / ReflectionProxy entries `constraints()`
+      // returns `chain.flatMap(scopes)` — for non-through chain entries that's
+      // just `[self.scope].compact`. For PolymorphicReflection (sourceType
+      // wrapper) `constraints()` ALSO returns the `source_type_scope` lambda
+      // (`where(foreign_type: source_type)`). Iterating handles both cases
+      // without an instanceof check, avoiding a value-import cycle
+      // (reflection → associations → association-scope → reflection).
+      const constraints =
+        (
+          reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
+        ).constraints?.() ?? [];
+      for (const scopeChainItem of constraints) {
+        if (typeof scopeChainItem !== "function") continue;
+        const item = this.evalScope(reflection, scopeChainItem, owner);
+        if (!item) continue;
 
-  /**
-   * Apply one chain entry's scope lambdas — Rails' `chain.reverse_each` loop
-   * body. Rails' add_constraints
-   * does this via `eval_scope` + `scope.where_clause += item.where_clause`
-   * + `scope.order_values = item.order_values | scope.order_values` —
-   * granular per-attribute merging that pushes ONLY where and order
-   * predicates onto the main relation. A through-reflection scope's
-   * limit / select / joins / etc must NOT override the main scope.
-   *
-   * The lambda is evaluated against a fresh
-   * `entry.klass.unscoped` (with STI type_condition re-applied for
-   * subclasses, matching the head-scope path in `scope()`) so its
-   * `where(...)` calls bind to the correct table. We then push the
-   * resulting WHERE predicates onto the main scope and union the
-   * ORDER clauses.
-   *
-   * Mirrors: ActiveRecord::Associations::AssociationScope#add_constraints
-   * (association_scope.rb:131-156).
-   */
-  private _mergeReflectionScopeChain(
-    scope: unknown,
-    reflection: AbstractReflection | ReflectionProxy,
-    owner: Base,
-    chainHead?: AbstractReflection | ReflectionProxy,
-  ): unknown {
-    // Iterate `reflection.constraints()` rather than special-casing
-    // PolymorphicReflection via instanceof. For ordinary
-    // AssociationReflection / ReflectionProxy entries `constraints()`
-    // returns `chain.flatMap(scopes)` — for non-through chain entries
-    // that's just `[self.scope].compact`. For PolymorphicReflection
-    // (sourceType wrapper) `constraints()` ALSO returns the
-    // `source_type_scope` lambda
-    // (`where(foreign_type: source_type)`). Iterating handles both
-    // cases without an instanceof check, avoiding a value-import cycle
-    // (reflection → associations → association-scope → reflection).
-    const constraints =
-      (
-        reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
-      ).constraints?.() ?? [];
-    if (constraints.length === 0) return scope;
-    let merged = scope;
-    for (const c of constraints) {
-      if (typeof c !== "function") continue;
-      const evaluated = this.evalScope(reflection, c, owner);
-      // Rails: `if scope_chain_item == chain_head.scope` (association_scope.rb:137).
-      const isChainHeadScope = c === (chainHead as { scope?: unknown } | undefined)?.scope;
-      merged = this._pushScopeIntoRelation(merged, evaluated, reflection, isChainHeadScope);
+        if (scopeChainItem === (chainHead as { scope?: unknown } | undefined)?.scope) {
+          // Rails: `scope.merge! item.except(:where, :includes, :unscope, :order)`
+          // (association_scope.rb:137-138) — the chain head's own scope merges
+          // every OTHER value (limit, select, joins, …) with Relation#merge's
+          // precedence, and its where / order still reach the relation through
+          // the shared push below, exactly as every other chain item's do.
+          (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
+            (item as { except: (...skips: string[]) => unknown }).except(
+              "where",
+              "includes",
+              "unscope",
+              "order",
+            ),
+          );
+        } else if (
+          (
+            ((item as { referencesValues?: Array<string | Nodes.SqlLiteral> }).referencesValues ??
+              []) as unknown[]
+          ).length > 0
+        ) {
+          // Rails: `scope.merge! item.only(:joins, :left_outer_joins)`, then
+          // `associations = item.eager_load_values | item.includes_values` and
+          // `scope.joins! item.construct_join_dependency(associations,
+          // OuterJoin)` (association_scope.rb:139-146). A through scope such as
+          // `-> { where("comments.id" => nil).includes(:comments) }` relies on
+          // this to actually JOIN comments; without it the WHERE references a
+          // missing table.
+          //
+          // `merge!` routes the named `joins` / `left_outer_joins` through
+          // Merger#merge_joins / #merge_outer_joins (merger.rb:118-150), which
+          // branch on `other.model == relation.model`: when the item's klass
+          // equals the target scope's klass the names union directly into
+          // `joins_values` / `left_outer_joins_values`; otherwise a cross-klass
+          // JoinDependency is built against the ITEM and stashed. Both branches
+          // are mirrored here (the same split Relation::Merger implements) so a
+          // same-klass entry — e.g. a self-through whose chain entry resolves to
+          // the association's own target — folds its join names in for the
+          // receiver to resolve rather than pre-building a JD.
+          const itemValues = item as {
+            joinsValues?: unknown[];
+            leftOuterJoinsValues?: unknown[];
+            includesValues?: unknown[];
+            eagerLoadValues?: unknown[];
+            _model?: typeof Base;
+          };
+          const target = scope as {
+            joinsValues: unknown[];
+            leftOuterJoinsValues: unknown[];
+            _model?: typeof Base;
+          };
+          const sameKlass = itemValues._model !== undefined && itemValues._model === target._model;
+          // merger.rb:123-126 — `other.joins_values.partition { |join| case join
+          // when Hash, Symbol, Array; true end }`: association specs on one
+          // side, raw SQL / Arel nodes and stashed JoinDependencies on the other.
+          const namedInner: unknown[] = [];
+          const others: unknown[] = [];
+          for (const v of itemValues.joinsValues ?? []) {
+            if (
+              isPlainObject(v) ||
+              Array.isArray(v) ||
+              (typeof v === "string" && v.startsWith(":"))
+            ) {
+              namedInner.push(v);
+            } else {
+              others.push(v);
+            }
+          }
+          for (const v of others) target.joinsValues = [...target.joinsValues, v];
+          if (namedInner.length > 0) {
+            if (sameKlass) {
+              for (const v of namedInner)
+                if (!target.joinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+                  target.joinsValues = [...target.joinsValues, v];
+            } else {
+              target.joinsValues = [
+                ...target.joinsValues,
+                constructJoinDependency.call(
+                  itemValues as never,
+                  namedInner as never,
+                  Nodes.InnerJoin,
+                ),
+              ];
+            }
+          }
+          const namedLeft = (itemValues.leftOuterJoinsValues ?? []).filter(
+            (v) => !(v instanceof JoinDependency),
+          );
+          const leftDeps = (itemValues.leftOuterJoinsValues ?? []).filter(
+            (v) => v instanceof JoinDependency,
+          );
+          if (namedLeft.length > 0) {
+            if (sameKlass) {
+              for (const v of namedLeft)
+                if (
+                  !target.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v))
+                )
+                  target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, v];
+            } else {
+              target.leftOuterJoinsValues = [
+                ...target.leftOuterJoinsValues,
+                constructJoinDependency.call(
+                  itemValues as never,
+                  namedLeft as never,
+                  Nodes.OuterJoin,
+                ),
+              ];
+            }
+          }
+          target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, ...leftDeps];
+          // associations = eager_load_values | includes_values → OuterJoin.
+          // Rails' `|` unions with dedup, so an association named in BOTH
+          // eager_load and includes yields a single JoinDependency entry (not a
+          // double join).
+          const associations = [
+            ...new Set([
+              ...(itemValues.eagerLoadValues ?? []),
+              ...(itemValues.includesValues ?? []),
+            ]),
+          ];
+          if (associations.length > 0) {
+            target.leftOuterJoinsValues = [
+              ...target.leftOuterJoinsValues,
+              constructJoinDependency.call(
+                itemValues as never,
+                associations as never,
+                Nodes.OuterJoin,
+              ),
+            ];
+          }
+        }
+
+        // Rails: `reflection.all_includes { scope.includes_values |= item.includes_values }`
+        // (association_scope.rb:148-150). The block yields for the chain HEAD
+        // (`RuntimeReflection#all_includes`, reflection.rb:1279) and NOT for a
+        // `ReflectionProxy` chain entry, so a head scope's `includes(:comments)`
+        // still reaches the relation the head's `except(:includes)` merge withheld.
+        const allIncludes = (
+          reflection as { allIncludes?: (cb: () => void) => unknown } | undefined
+        )?.allIncludes?.bind(reflection);
+        if (allIncludes) {
+          allIncludes(() => {
+            const itemIncludes = (item as { includesValues?: unknown[] }).includesValues ?? [];
+            if (itemIncludes.length === 0) return;
+            const host = scope as { includesValues?: unknown[] };
+            const current = host.includesValues ?? [];
+            host.includesValues = [...current, ...itemIncludes.filter((v) => !current.includes(v))];
+          });
+        }
+        // Rails: `scope.unscope!(*item.unscope_values)` (association_scope.rb:152)
+        // runs BEFORE the item's own where clause is appended, so a
+        // `unscope(where: :skimmer)` chain entry strips the target's
+        // default-scope predicate without dropping the item's additions.
+        const itemUnscope = (item as { unscopeValues?: unknown[] }).unscopeValues ?? [];
+        if (itemUnscope.length > 0) {
+          (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...itemUnscope);
+        }
+        const merged = scope as { whereClause: WhereClause; orderValues?: unknown[] };
+        // Rails: `scope.where_clause += item.where_clause`
+        // (association_scope.rb:153). The assignment matters: the preceding
+        // `unscope!` deletes the `:where` key, and an unset clause reader
+        // returns a fresh `WhereClause.empty()` per call, so appending to the
+        // read value would never reach `@values`.
+        const itemPredicates =
+          (item as { whereClause?: { predicates?: unknown[] } }).whereClause?.predicates ?? [];
+        if (itemPredicates.length > 0) {
+          merged.whereClause = merged.whereClause.plus(
+            new WhereClause(itemPredicates as Nodes.Node[]),
+          );
+        }
+        // Rails: `scope.order_values = item.order_values | scope.order_values`
+        // (association_scope.rb:154). Chain-entry-first + structural dedup.
+        const itemOrders = (item as { orderValues?: unknown[] }).orderValues ?? [];
+        if (itemOrders.length > 0) {
+          merged.orderValues = unionOrderClauses(itemOrders, merged.orderValues ?? []);
+        }
+        scope = merged;
+      }
     }
-    return merged;
+
+    return scope;
   }
 
   /**
@@ -801,190 +924,6 @@ export class AssociationScope {
   private join(table: unknown, constraint: unknown): unknown {
     return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
   }
-
-  /**
-   * Push ONLY the entry's WHERE predicates and ORDER clauses onto
-   * the main scope — Rails' `where_clause += ...` / `order_values |=`
-   * semantics. A full Relation#merge would let the entry's limit /
-   * select / joins / etc override the main scope, which Rails
-   * explicitly avoids.
-   */
-  protected _pushScopeIntoRelation(
-    scope: unknown,
-    evaluated: unknown,
-    reflection?: AbstractReflection | ReflectionProxy,
-    isChainHeadScope = false,
-  ): unknown {
-    if (!evaluated) return scope;
-    if (isChainHeadScope) {
-      // Rails: `scope.merge! item.except(:where, :includes, :unscope, :order)`
-      // (association_scope.rb:138) — the chain head's own scope merges every
-      // OTHER value (limit, select, joins, …) with Relation#merge's precedence,
-      // and its where / order still reach the relation through the shared push
-      // below, exactly as every other chain item's do.
-      (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
-        (evaluated as { except: (...skips: string[]) => unknown }).except(
-          "where",
-          "includes",
-          "unscope",
-          "order",
-        ),
-      );
-    } else {
-      // Rails add_constraints' chain.reverse_each folds each item's joins /
-      // left_outer_joins and eager-load-as-join into the main scope when the
-      // item's `where(...)` referenced a joined table (`!item.references_values
-      // .empty?` → `scope.merge! item.only(:joins, :left_outer_joins)` +
-      // `scope.joins! item.construct_join_dependency(eager_load|includes,
-      // OuterJoin)`, association_scope.rb:138-146). A through scope such as
-      // `-> { where("comments.id" => nil).includes(:comments) }` relies on this
-      // to actually JOIN comments; without it the WHERE references a missing
-      // table. `all_includes` does NOT yield for chain entries (ReflectionProxy),
-      // so includes_values themselves are not carried forward — only the join is.
-      this._mergeReferencedJoins(scope, evaluated);
-    }
-    // Rails: `reflection.all_includes { scope.includes_values |= item.includes_values }`
-    // (association_scope.rb:148-150). The block yields for the chain HEAD
-    // (`RuntimeReflection#all_includes`, reflection.rb:1279) and NOT for a
-    // `ReflectionProxy` chain entry, so a head scope's `includes(:comments)`
-    // still reaches the relation the head's `except(:includes)` merge withheld.
-    const allIncludes = (
-      reflection as { allIncludes?: (cb: () => void) => unknown } | undefined
-    )?.allIncludes?.bind(reflection);
-    if (allIncludes) {
-      allIncludes(() => {
-        const itemIncludes = (evaluated as { includesValues?: unknown[] }).includesValues ?? [];
-        if (itemIncludes.length === 0) return;
-        const host = scope as { includesValues?: unknown[] };
-        const current = host.includesValues ?? [];
-        host.includesValues = [...current, ...itemIncludes.filter((v) => !current.includes(v))];
-      });
-    }
-    // Rails: `scope.unscope!(*item.unscope_values)` runs BEFORE the item's own
-    // where clause is appended, so a `unscope(where: :skimmer)` chain entry
-    // strips the target's default-scope predicate without dropping the item's
-    // additions. Apply the item's recorded unscope directives to the main scope.
-    const evalUnscope = (evaluated as { unscopeValues?: unknown[] }).unscopeValues ?? [];
-    if (evalUnscope.length > 0) {
-      (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...evalUnscope);
-    }
-    const evalWhere = (evaluated as { whereClause?: { predicates?: unknown[] } }).whereClause;
-    const evalPredicates = evalWhere?.predicates ?? [];
-    const evalOrders = (evaluated as { orderValues?: unknown[] }).orderValues ?? [];
-    const merged = scope as {
-      whereClause: WhereClause;
-      orderValues?: unknown[];
-    };
-    // Rails: `scope.where_clause += item.where_clause` (association_scope.rb:153).
-    // The assignment matters: the preceding `unscope!` deletes the `:where` key,
-    // and an unset clause reader returns a fresh `WhereClause.empty()` per call,
-    // so appending to the read value would never reach `@values`.
-    if (evalPredicates.length > 0) {
-      merged.whereClause = merged.whereClause.plus(new WhereClause(evalPredicates as Nodes.Node[]));
-    }
-    // Rails: `scope.order_values = item.order_values | scope.order_values`
-    // (association_scope.rb:153). Chain-entry-first + structural dedup.
-    if (evalOrders.length > 0) {
-      merged.orderValues = unionOrderClauses(evalOrders, merged.orderValues ?? []);
-    }
-    return merged;
-  }
-
-  /**
-   * Fold a chain entry's joins / left_outer_joins and any referenced
-   * eager-load associations into the main scope as real JOINs. Mirrors the
-   * `elsif !item.references_values.empty?` branch of Rails' add_constraints
-   * (association_scope.rb:138-146):
-   *
-   *   scope.merge! item.only(:joins, :left_outer_joins)
-   *   associations = item.eager_load_values | item.includes_values
-   *   scope.joins! item.construct_join_dependency(associations, OuterJoin)
-   *
-   * `merge!` routes the named `joins` / `left_outer_joins` through
-   * Merger#merge_joins / #merge_outer_joins (merger.rb:118-150), which branch on
-   * `other.model == relation.model`: when the item's klass equals the target
-   * scope's klass the names union directly into `joins_values` /
-   * `left_outer_joins_values`; otherwise a cross-klass JoinDependency is built
-   * against the ITEM and stashed. Mirror both branches here (the same split
-   * Relation::Merger implements) so a same-klass entry — e.g. a self-through
-   * whose chain entry resolves to the association's own target — folds its join
-   * names in for the receiver to resolve rather than pre-building a JD.
-   */
-  private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
-    const item = evaluated as {
-      referencesValues?: Array<string | Nodes.SqlLiteral>;
-      joinsValues?: unknown[];
-      leftOuterJoinsValues?: unknown[];
-      includesValues?: unknown[];
-      eagerLoadValues?: unknown[];
-      _model?: typeof Base;
-    };
-    const refs = item.referencesValues ?? [];
-    if (refs.length === 0) return;
-    const target = scope as {
-      joinsValues: unknown[];
-      leftOuterJoinsValues: unknown[];
-      _model?: typeof Base;
-    };
-    const sameKlass = item._model !== undefined && item._model === target._model;
-    // item.only(:joins, :left_outer_joins) — union named association joins
-    // (same-klass) or build cross-klass JoinDependencies (Merger#merge_joins /
-    // #merge_outer_joins).
-    // merger.rb:123-126 — `other.joins_values.partition { |join| case join when
-    // Hash, Symbol, Array; true end }`: association specs on one side, raw SQL /
-    // Arel nodes and stashed JoinDependencies on the other.
-    const namedInner: unknown[] = [];
-    const others: unknown[] = [];
-    for (const v of item.joinsValues ?? []) {
-      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
-        namedInner.push(v);
-      } else {
-        others.push(v);
-      }
-    }
-    for (const v of others) target.joinsValues = [...target.joinsValues, v];
-    if (namedInner.length > 0) {
-      if (sameKlass) {
-        for (const v of namedInner)
-          if (!target.joinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-            target.joinsValues = [...target.joinsValues, v];
-      } else {
-        target.joinsValues = [
-          ...target.joinsValues,
-          constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
-        ];
-      }
-    }
-    const namedLeft = (item.leftOuterJoinsValues ?? []).filter(
-      (v) => !(v instanceof JoinDependency),
-    );
-    const leftDeps = (item.leftOuterJoinsValues ?? []).filter((v) => v instanceof JoinDependency);
-    if (namedLeft.length > 0) {
-      if (sameKlass) {
-        for (const v of namedLeft)
-          if (!target.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-            target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, v];
-      } else {
-        target.leftOuterJoinsValues = [
-          ...target.leftOuterJoinsValues,
-          constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
-        ];
-      }
-    }
-    target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, ...leftDeps];
-    // associations = eager_load_values | includes_values → OuterJoin. Rails'
-    // `|` unions with dedup, so an association named in BOTH eager_load and
-    // includes yields a single JoinDependency entry (not a double join).
-    const associations = [
-      ...new Set([...(item.eagerLoadValues ?? []), ...(item.includesValues ?? [])]),
-    ];
-    if (associations.length > 0) {
-      target.leftOuterJoinsValues = [
-        ...target.leftOuterJoinsValues,
-        constructJoinDependency.call(item as never, associations as never, Nodes.OuterJoin),
-      ];
-    }
-  }
 }
 
 /**
@@ -1009,8 +948,9 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
  * `[col, "asc"|"desc"]` tuples). `Array#includes` only does reference
  * equality, so two tuples with equal contents created separately
  * wouldn't match. Rails' `|` operator on order_values is structural.
+ * @internal
  */
-function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
+export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
   const result: unknown[] = [];
   const seen = new Set<string>();
   for (const o of [...first, ...second]) {
