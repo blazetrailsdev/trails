@@ -14,7 +14,14 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import type { JoinPart } from "./join-dependency/join-part.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
-import { Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
+import { Nodes, Table, relationName } from "@blazetrails/arel";
+
+/** Rails' uniform SQL-name read for a table reference — `relation.table_alias ||
+ *  relation.name`, which both `Arel::Table` (table.rb:11-12) and
+ *  `Arel::Nodes::TableAlias` (table_alias.rb:6-8) answer. */
+function sqlName(rel: Table | Nodes.TableAlias): string {
+  return relationName(rel.tableAlias ?? rel.name);
+}
 
 /** The tree node a JoinDependency built for a dotted association path. */
 function nodeAt(jd: JoinDependency, path: string): JoinPart {
@@ -27,7 +34,9 @@ function nodeAt(jd: JoinDependency, path: string): JoinPart {
  * it (join_dependency.rb:189-211 concatenates the joins into the arel).
  */
 function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
-  return joins.find((join) => tableSqlName(join.left as TableRef) === node.effectiveSqlName)!;
+  return joins.find(
+    (join) => sqlName(join.left as Table | Nodes.TableAlias) === node.effectiveSqlName,
+  )!;
 }
 
 describe("JoinDependency Arel node construction", () => {

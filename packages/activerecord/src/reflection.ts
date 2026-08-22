@@ -14,7 +14,7 @@ import {
   foreignKey as deriveForeignKey,
   except,
 } from "@blazetrails/activesupport";
-import { Table, type TableRef } from "@blazetrails/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
 import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
@@ -244,11 +244,15 @@ export class AbstractReflection {
    * (scope_for_association) and `joinScope`, so the chain scopes built here
    * never carry a wrong-table STI predicate.
    */
-  buildScope(table?: TableRef, predicateBuilder?: any, klass?: typeof Base): any {
+  buildScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any, klass?: typeof Base): any {
     return Relation.create(klass ?? this.klass, { table, predicateBuilder });
   }
 
-  joinScope(table: TableRef, foreignTable: TableRef, foreignKlass: typeof Base): any {
+  joinScope(
+    table: Table | Nodes.TableAlias,
+    foreignTable: Table | Nodes.TableAlias,
+    foreignKlass: typeof Base,
+  ): any {
     const predicateBuilder = (this.klass as any).predicateBuilder.with(
       new TableMetadata(this.klass, table),
     );
@@ -290,14 +294,19 @@ export class AbstractReflection {
     return scope;
   }
 
-  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(
+    table: Table | Nodes.TableAlias,
+    predicateBuilder?: any,
+    klass?: typeof Base,
+    record?: any,
+  ): any[] {
     if (this.scope) {
       return [this._concrete().scopeFor(this.buildScope(table, predicateBuilder, klass), record)];
     }
     return [];
   }
 
-  klassJoinScope(table?: TableRef, predicateBuilder?: any): any {
+  klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any): any {
     // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
@@ -1620,7 +1629,12 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.scopeFor(relation, owner);
   }
 
-  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(
+    table: Table | Nodes.TableAlias,
+    predicateBuilder?: any,
+    klass?: typeof Base,
+    record?: any,
+  ): any[] {
     const sourceScopes =
       this.sourceReflection?.joinScopes(table, predicateBuilder, klass, record) ?? [];
     return [...sourceScopes, ...super.joinScopes(table, predicateBuilder, klass, record)];
@@ -1957,7 +1971,12 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
   }
 
-  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(
+    table: Table | Nodes.TableAlias,
+    predicateBuilder?: any,
+    klass?: typeof Base,
+    record?: any,
+  ): any[] {
     const scopes = super.joinScopes(table, predicateBuilder, klass, record);
     if (!(this._previousReflection as any).isThroughReflection?.()) {
       const prevScopes =

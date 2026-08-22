@@ -9,13 +9,7 @@
  */
 
 import type { Base } from "../../base.js";
-import {
-  Nodes,
-  fetchAttribute,
-  relationName,
-  tableSqlName,
-  type TableRef,
-} from "@blazetrails/arel";
+import { Nodes, Table, fetchAttribute, relationName } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
@@ -25,12 +19,12 @@ type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
   reflection: AbstractReflection,
   remainingChain: AbstractReflection[],
-) => [TableRef, boolean];
+) => [Table | Nodes.TableAlias, boolean];
 
 export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
-  private _table: TableRef | null = null;
-  readonly tables: TableRef[] = [];
+  private _table: Table | Nodes.TableAlias | null = null;
+  readonly tables: (Table | Nodes.TableAlias)[] = [];
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
@@ -42,13 +36,13 @@ export class JoinAssociation extends JoinPart {
   get table(): string {
     const t = this._table;
     if (!t) return this.reflection.tableName;
-    return tableSqlName(t);
+    return relationName(t.tableAlias ?? t.name);
   }
 
   set table(value: string) {
     const table = aliasedArelTableForReflection(this.reflection, this.reflection.tableName, value);
     this._table = table;
-    if (!this.tables.some((t) => tableSqlName(t) === value)) {
+    if (!this.tables.some((t) => relationName(t.tableAlias ?? t.name) === value)) {
       this.tables.push(table);
     }
   }
@@ -79,20 +73,20 @@ export class JoinAssociation extends JoinPart {
    * Mirrors: ActiveRecord::Associations::JoinDependency::JoinAssociation#join_constraints
    */
   joinConstraints(
-    foreignTable: TableRef,
+    foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
     joinType: JoinType,
     aliasTracker?: AliasTracker,
     resolveTable?: TableResolver,
   ): Nodes.Node[] {
     const joins: Nodes.Node[] = [];
-    const chain: [AbstractReflection, TableRef][] = [];
+    const chain: [AbstractReflection, Table | Nodes.TableAlias][] = [];
 
     const reflectionChain = this.reflection.chain;
 
     for (let index = 0; index < reflectionChain.length; index++) {
       const refl = reflectionChain[index];
-      let table: TableRef;
+      let table: Table | Nodes.TableAlias;
       let terminated = false;
 
       if (resolveTable) {
@@ -102,7 +96,12 @@ export class JoinAssociation extends JoinPart {
       }
 
       if (!this._table) this._table = table;
-      if (!this.tables.some((t) => tableSqlName(t) === tableSqlName(table))) {
+      if (
+        !this.tables.some(
+          (t) =>
+            relationName(t.tableAlias ?? t.name) === relationName(table.tableAlias ?? table.name),
+        )
+      ) {
         this.tables.push(table);
       }
 
@@ -151,7 +150,7 @@ export class JoinAssociation extends JoinPart {
       if (nodes instanceof Nodes.And) {
         const remaining: Nodes.Node[] = [];
         for (const child of nodes.children) {
-          if (!nodeReferencesTable(child, tableSqlName(table))) {
+          if (!nodeReferencesTable(child, relationName(table.tableAlias ?? table.name))) {
             others.push(child);
           } else {
             remaining.push(child);
