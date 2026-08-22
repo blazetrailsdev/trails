@@ -637,10 +637,9 @@ class ApiExtractor
   end
 
   # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)
-  # generates a reader and a writer per member plus an `initialize` taking the
-  # members positionally, none of which appear in the source as `def`s. Without
-  # them the ported TS fields have no Ruby counterpart in the same file and score
-  # as extra/moved surface.
+  # generates a reader and a writer per member, plus an `initialize` taking the
+  # members positionally (by keyword under `keyword_init: true`). None of them
+  # appear in the source as `def`s.
   def synthesize_struct_members(fqn, struct_new_node)
     target = @classes[fqn]
     return unless target
@@ -664,13 +663,27 @@ class ApiExtractor
         line: @current_line,
       }
     end
+    kind = keyword_init?(struct_new_node) ? "keyword" : "optional"
     target[:instanceMethods] << {
       name: "initialize",
       visibility: "public",
-      params: names.map { |name| { name: name, kind: "optional" } },
+      params: names.map { |name| { name: name, kind: kind } },
       file: @current_file,
       line: @current_line,
     }
+  end
+
+  # True for `Struct.new(:a, :b, keyword_init: true)`, whose generated
+  # `initialize` takes the members as keywords rather than positionally.
+  def keyword_init?(node)
+    return false unless node.is_a?(Array)
+    if node[0] == :assoc_new && node[1].is_a?(Array) && node[1][0] == :@label &&
+       node[1][1] == "keyword_init:"
+      value = node[2]
+      return value.is_a?(Array) && value[0] == :var_ref &&
+             value[1].is_a?(Array) && value[1][1] == "true"
+    end
+    node.any? { |child| child.is_a?(Array) && keyword_init?(child) }
   end
 
   def process_sclass(node)

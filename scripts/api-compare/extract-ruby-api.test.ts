@@ -1534,9 +1534,6 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
   });
 
-  // `class Attribute < Struct.new :relation, :name`
-  // (activerecord/lib/arel/attributes/attribute.rb:5) generates the member
-  // accessors and an `initialize`; none of them appear in the source as `def`s.
   it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
     const m = metaMethods(`
       module Arel
@@ -1562,6 +1559,20 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     ]);
     const reader = m["Arel::Attribute"].find((x) => x.name === "relation")!;
     expect(reader.params).toEqual([]);
+  });
+
+  it("synthesizes keyword params for a keyword_init Struct's initialize", () => {
+    const m = metaMethods(`
+      module ActiveSupport
+        class Report < Struct.new(:error, :severity, keyword_init: true)
+        end
+      end
+    `);
+    const init = m["ActiveSupport::Report"].find((x) => x.name === "initialize")!;
+    expect(init.params).toEqual([
+      { name: "error", kind: "keyword" },
+      { name: "severity", kind: "keyword" },
+    ]);
   });
 
   it("synthesizes the accessors a `CONST = Struct.new(...) do ... end` generates", () => {
