@@ -234,7 +234,7 @@ interface CalculationRelation {
   /** Mirrors `Relation#ids`. */
   ids(): Promise<unknown[]>;
   /** @internal Rails `build_arel` (query_methods.rb:1750). */
-  toArel(aliases?: unknown): SelectManager;
+  arel(aliases?: unknown): SelectManager;
 }
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
@@ -684,7 +684,7 @@ export async function pluck(
     // is what makes a zero-column `pluck` project `table[Arel.star]` via
     // `build_select`'s else arm instead of emitting a projection-less `SELECT FROM`.
     rel.selectValues = columns as any;
-    const manager = rel.toArel();
+    const manager = rel.arel();
 
     // Rails: `select_all(relation.arel, "#{model.name} Pluck")` (calculations.rb:317).
     const result = await this.skipQueryCacheIfNecessary(() =>

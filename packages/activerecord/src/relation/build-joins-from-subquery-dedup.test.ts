@@ -2,7 +2,7 @@
  * Regression coverage for the unified `build_joins` emitter
  * (RFC 0022 unify-join-emission-build-joins).
  *
- * The live `toSql`/`toArel` path (`buildArel` -> `buildJoins`) and the
+ * The live `toSql`/`arel` path (`buildArel` -> `buildJoins`) and the
  * `from(relation)` subquery path (`build_from` → `buildArel` → `buildJoins`)
  * now delegate to one shared emitter (`emitJoinPlan`), so the left_outer/joins
  * dedup fold (PR #3501 / #3890) lives in a single place and cannot re-drift.

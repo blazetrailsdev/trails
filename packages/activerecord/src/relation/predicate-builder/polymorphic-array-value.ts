@@ -114,7 +114,7 @@ export class PolymorphicArrayValue {
   /** @internal */
   private klass(value: unknown): unknown {
     if (typeof value !== "object" || value === null) return null;
-    if ("_model" in value && "toArel" in value) return (value as any)._model;
+    if ("_model" in value && "arel" in value) return (value as any)._model;
     return (value as any).constructor ?? null;
   }
 
@@ -122,7 +122,7 @@ export class PolymorphicArrayValue {
   private convertToId(value: unknown): unknown {
     if (value === null || value === undefined) return null;
     if (typeof value === "object" && value !== null) {
-      if ("_model" in value && "toArel" in value) {
+      if ("_model" in value && "arel" in value) {
         const pk = this.primaryKey(value);
         const arelTable = (value as any)._model?.arelTable;
         return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);

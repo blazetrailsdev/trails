@@ -338,7 +338,7 @@ interface FinderRelation {
   ): Promise<R>;
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
-  toArel(): { ast: unknown };
+  arel(): { ast: unknown };
   skipQueryCacheIfNecessary<R>(block: () => R): R;
   withConnection<R>(block: (c: any) => R): R;
 }
@@ -747,8 +747,7 @@ export async function exists(
   if (relation.whereClause.isContradiction()) return false;
   return await this.skipQueryCacheIfNecessary(() =>
     this.withConnection(
-      async (c) =>
-        (await c.selectRows(relation.toArel(), `${this.model.name} Exists?`)).length === 1,
+      async (c) => (await c.selectRows(relation.arel(), `${this.model.name} Exists?`)).length === 1,
     ),
   );
 }

@@ -178,6 +178,6 @@ export class AssociationQueryValue {
   }
 
   private isRelation(value: unknown): boolean {
-    return typeof value === "object" && value !== null && "_model" in value && "toArel" in value;
+    return typeof value === "object" && value !== null && "_model" in value && "arel" in value;
   }
 }

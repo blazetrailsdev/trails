@@ -491,6 +491,11 @@ export class Relation<T extends Base> {
   _seedWherePredicates: readonly unknown[] = [];
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue = false;
+  /**
+   * @internal Rails `@arel` — the memoized `build_arel` manager
+   * (query_methods.rb:1595). Cleared by `reset` (relation.rb:1198).
+   */
+  _arel?: SelectManager;
   private _loaded = false;
   // Rails `@delegate_to_model` (relation.rb:90) — true only while a scope body
   // runs via `_exec_scope`, which is what makes `already_in_scope?` (and hence
@@ -669,6 +674,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reset
    */
   reset(): this {
+    this._arel = undefined;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -1113,14 +1119,14 @@ export class Relation<T extends Base> {
           if (relation.isNullRelation()) return Result.empty();
           joinDependency.applyColumnAliases(relation);
           this._joinDependency = joinDependency;
-          return this._conn().selectAll(relation.toArel(), "SQL", [], { async });
+          return this._conn().selectAll(relation.arel(), "SQL", [], { async });
         });
       }
 
       // Mirrors relation.rb:1449 (`_query_by_sql` → querying.rb:67-68). A
       // scheduled FutureResult is a thenable, so the promise this returns
       // settles to the same rows `future.result` yields in `execQueries`.
-      return c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async });
+      return c.selectAll(this.arel(), `${this.model.name} Load`, [], { async });
     });
   }
 
@@ -1637,26 +1643,6 @@ export class Relation<T extends Base> {
   // -- SQL generation --
 
   /**
-   * Return the complete query AST as a SelectManager — projections, joins,
-   * wheres, order, distinct, limit/offset, group, having, lock, hints, from,
-   * CTEs, and annotate() comments. Mirrors Rails `build_arel`
-   * (active_record/relation/query_methods.rb:1750): the single manager Rails
-   * then compiles, so anything consuming `relation.arel()` as a subquery
-   * (`where(id: subrel.arel)`, `from(relation)`) carries the full query rather
-   * than a projection-only fragment.
-   */
-  toArel(aliases?: AliasTracker): SelectManager {
-    // Rails' `arel` reader is `with_connection { |c| build_arel(c, aliases) }`
-    // (query_methods.rb:1595), so `build_arel` always has a connection. trails'
-    // `withConnection` is a `Promise`-returning checkout and this reader is
-    // synchronous, so the acquisition is the direct `_conn()` lease rather than
-    // a `with_connection` block; either way `build_arel` never sees a missing
-    // connection, and a model with no established pool raises
-    // `ConnectionNotEstablished` here exactly as Rails' `with_connection` does.
-    return this.buildArel(this._conn(), aliases);
-  }
-
-  /**
    * Mirrors: ActiveRecord::FinderMethods#apply_join_dependency
    * (finder_methods.rb:457-481).
    *
@@ -1761,7 +1747,7 @@ export class Relation<T extends Base> {
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
     );
-    return this._limitedDistinctRelation(jd, basePk).toArel();
+    return this._limitedDistinctRelation(jd, basePk).arel();
   }
 
   /**
@@ -1856,7 +1842,7 @@ export class Relation<T extends Base> {
         const manager = this._buildEagerOperandManager();
         if (manager !== null) return conn.toSql(manager.ast);
       }
-      return conn.toSql(this.toArel().ast);
+      return conn.toSql(this.arel().ast);
     } finally {
       conn.preparedStatements = wasPrepared;
     }
@@ -1921,7 +1907,7 @@ export class Relation<T extends Base> {
           rel = rel.where(this.table.get(column).in(tuples.map((tuple) => tuple[i]) as never));
         });
       } else {
-        const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).toArel();
+        const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).arel();
         rel = rel.where(this.table.get(basePk).in(ids as never));
       }
       rel.limitValue = null;
@@ -2016,7 +2002,7 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     const distinctSelect = this._distinctSelectForLimitedIds(basePk);
     const idResult = await this._conn().selectAll(
-      this._limitedDistinctRelation(jd, basePk, distinctSelect).toArel(),
+      this._limitedDistinctRelation(jd, basePk, distinctSelect).arel(),
       "SQL",
     );
     const idRows = idResult.toArray();
@@ -2112,7 +2098,7 @@ export class Relation<T extends Base> {
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
-    return eagerRelation.toArel();
+    return eagerRelation.arel();
   }
 
   /**
@@ -2863,7 +2849,7 @@ export class Relation<T extends Base> {
       } else {
         const query = collection.unscope("order");
         query.selectValues = [sql(selectValues.replace("%s", column))];
-        arel = query.toArel();
+        arel = query.arel();
       }
 
       [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];

@@ -30,7 +30,7 @@ export class RelationHandler {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
     const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
-    return attribute.in(relation.toArel());
+    return attribute.in(relation.arel());
   }
 
   // Rails routes an eager-loading subquery with a limit/offset over a collection

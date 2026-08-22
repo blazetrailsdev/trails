@@ -331,8 +331,12 @@ interface QueryMethodsHost {
   clone(): any;
   /** Mirrors: ActiveRecord::SpawnMethods#spawn (spawn_methods.rb:9-11). */
   spawn(): any;
-  /** Rails `Relation#to_arel` — the built SelectManager (`arel`'s callee). */
-  toArel(aliases?: AliasTracker): any;
+  /**
+   * Mirrors: ActiveRecord::QueryMethods#build_arel (query_methods.rb:1749).
+   *
+   * @internal
+   */
+  buildArel(connection: unknown, aliases?: AliasTracker): any;
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue: boolean;
   _model: typeof import("../base.js").Base;
@@ -1261,14 +1265,14 @@ function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | n
  * True for values that PredicateBuilder will route through its
  * RelationHandler (subquery IN/NOT IN). Mirrors the shape check in
  * `PredicateBuilder#isRelation`: a Relation exposes `_model` and a
- * `toArel()` method.
+ * `arel()` method.
  */
 function isRelationLike(value: unknown): boolean {
   return (
     typeof value === "object" &&
     value !== null &&
     "_model" in value &&
-    typeof (value as { toArel?: unknown }).toArel === "function"
+    typeof (value as { arel?: unknown }).arel === "function"
   );
 }
 
@@ -2050,6 +2054,13 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  * already claimed by the caller.
  *
  * Mirrors: ActiveRecord::QueryMethods#arel (query_methods.rb:1594-1596)
+ * @missingRailsCall with_connection — PERMANENT: `with_connection`
+ * (query_methods.rb:1595) is the connection acquisition around `build_arel`.
+ * trails' `Relation#withConnection` is a `Promise`-returning checkout and this
+ * reader is synchronous — every caller reads `relation.arel()` inline while
+ * building a query — so the acquisition is the direct `_conn()` lease, which
+ * hands `build_arel` the same connection and raises the same
+ * `ConnectionNotEstablished` when no pool is established.
  * @internal
  *
  * @missingRailsCall build_arel — CONVERGEABLE: Surfaced by the relation.ts →
@@ -2065,7 +2076,10 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  *   relation.ts with the member (RFC 0107 fan-out).
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
-  return this.toArel(aliases);
+  // `@arel ||= with_connection { |c| build_arel(c, aliases) }`
+  // (query_methods.rb:1595) — see the `@missingRailsCall` note above for the
+  // synchronous `_conn()` lease standing in for the `with_connection` block.
+  return ((this as any)._arel ??= this.buildArel((this as any)._conn(), aliases));
 }
 
 /**
@@ -2333,12 +2347,12 @@ export function buildSubquery(
   // query_methods.rb:1606: `except(:optimizer_hints).arel.as(subquery_alias)`.
   const relation =
     typeof (this as any).except === "function" ? (this as any).except("optimizerHints") : this;
-  if (typeof relation.toArel !== "function") {
-    throw new ActiveRecordError("Cannot build subquery: relation does not support toArel()");
+  if (typeof relation.arel !== "function") {
+    throw new ActiveRecordError("Cannot build subquery: relation does not support arel()");
   }
   // No identifier gate — the alias is caller-trusted and wrapped verbatim in a
   // `SqlLiteral` by `SelectManager#as`, matching Rails' `build_from`.
-  const subquery = relation.toArel().as(subqueryAlias);
+  const subquery = relation.arel().as(subqueryAlias);
   const sm = new SelectManager(subquery);
   sm.project(selectValue as any);
   const hints: string[] = (this as any).optimizerHintsValues ?? [];
@@ -2978,7 +2992,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   const fromClause = (this as any).fromClause;
   const opts = fromClause?.value;
   let name = fromClause?.name;
-  if (opts && typeof opts.toArel === "function") {
+  if (opts && typeof opts.arel === "function") {
     name ??= "subquery";
     const alias = String(name);
     // No identifier gate: Rails' `build_from` stores the caller-provided
@@ -3019,7 +3033,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
-    // comprehensive builder rather than the projection-only `toArel`, so the
+    // comprehensive builder rather than the projection-only `arel`, so the
     // subquery stays a live AST: its binds parameterize and its retryability is
     // determined by the actual child nodes (not unconditionally disabled).
     // `build_arel` projects the qualified table star (`"comments".*`) and does
@@ -3030,7 +3044,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // the where-subquery path (`relation-handler`); this is intentional, not a
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
-    return resolved.toArel().as(alias);
+    return resolved.arel().as(alias);
   }
   return opts;
 }
