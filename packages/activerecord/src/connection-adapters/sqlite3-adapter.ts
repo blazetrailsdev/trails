@@ -1525,7 +1525,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * which the pool memo resolves. Nothing is open on the deferred
    * async-checkout path, where Rails has no connection to ask at all.
    *
-   * @missingRailsCall query_value — Per-entry verified (RFC 0106 sqlite3
+   * @missingRailsCall query_value — PERMANENT: Per-entry verified (RFC 0106 sqlite3
    *   introspection cluster), sqlite3_adapter.rb:477: Rails reads the version
    *   through `query_value(..., "SCHEMA")`, whose trails counterpart is `async`,
    *   while `getDatabaseVersion` must be able to answer synchronously for an
@@ -1595,7 +1595,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // Mirrors Rails' SQLite3Adapter.dbconsole: `-#{mode}` / `-header` flags
   // precede the database path. The PTY exec itself is unported (Ruby-only).
   /**
-   * @missingRailsCall find_cmd_and_exec — Per-entry verified (RFC 0106 sqlite3
+   * @missingRailsCall find_cmd_and_exec — PERMANENT: Per-entry verified (RFC 0106 sqlite3
    *   cluster), sqlite3_adapter.rb:51:
    *   `find_cmd_and_exec(ActiveRecord.database_cli[:sqlite], *args)` execs the
    *   sqlite CLI over a PTY. Process spawning is Ruby-only in trails (no
@@ -2482,12 +2482,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * @internal
    *
-   * @missingRailsCall last — Per-entry verified (RFC 0106 sqlite3 introspection
+   * @missingRailsCall last — PERMANENT: Per-entry verified (RFC 0106 sqlite3 introspection
    *   cluster), sqlite3_adapter.rb:781-782: `result.partition(REGEX).last` —
    *   `String#partition` returns a 3-tuple and `Array#last` takes its tail. JS
    *   `String` has no `partition`, so the port slices from the match index
    *   directly, which is that whole expression, not an omitted call.
-   * @missingRailsCall union — Per-entry verified (RFC 0106 sqlite3 introspection
+   * @missingRailsCall union — PERMANENT: Per-entry verified (RFC 0106 sqlite3 introspection
    *   cluster), sqlite3_adapter.rb:786: `Regexp.union(column_names).source`
    *   builds an alternation from the column names. JS `RegExp` has no `union`,
    *   so the port escapes and joins the names with `|` inline — the same

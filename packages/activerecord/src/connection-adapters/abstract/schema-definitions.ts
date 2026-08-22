@@ -355,7 +355,7 @@ export class ForeignKeyDefinition {
   }
 
   /**
-   * @missingRailsCall fetch — Verified per-site (RFC 0106):
+   * @missingRailsCall fetch — PERMANENT: Verified per-site (RFC 0106):
    *   `options.fetch(:validate, true)`
    *   (`connection_adapters/schema_definitions.rb:153`) — `options` is a plain
    *   TS object, not a Hash, so the default-substituting read has no `fetch`
@@ -372,7 +372,7 @@ export class ForeignKeyDefinition {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   /**
-   * @missingRailsCall match? — Verified per-site (RFC 0106):
+   * @missingRailsCall match? — PERMANENT: Verified per-site (RFC 0106):
    *   `!ActiveRecord::SchemaDumper.fk_ignore_pattern.match?(name) if name`
    *   (`connection_adapters/schema_definitions.rb:158`). Ruby's `Regexp#match?`
    *   is stateless; JS `RegExp#test` advances `lastIndex` on a `/g` pattern, and
@@ -884,7 +884,7 @@ export class ReferenceDefinition {
   /**
    * @internal
    *
-   * @missingRailsCall slice — Per-entry verified (RFC 0032 wide-entry
+   * @missingRailsCall slice — PERMANENT: Per-entry verified (RFC 0032 wide-entry
    *   verification): Rails schema_definitions.rb:254-256 is
    *   `options.slice(:if_exists, :if_not_exists)`; trails
    *   schema-definitions.ts:675-680 picks the two keys explicitly.
@@ -899,11 +899,11 @@ export class ReferenceDefinition {
   /**
    * @internal
    *
-   * @missingRailsCall merge — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:259 chains two `merge`s, spelled as one object
    *   spread in trails (schema-definitions.ts:870-878). Same keys, same
    *   precedence.
-   * @missingRailsCall slice — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall slice — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:259's `options.slice(:null, :first, :after)` is
    *   spelled as three presence-guarded spreads in trails
    *   (schema-definitions.ts:874-876) — `Hash#slice` has no ported analogue for
@@ -927,7 +927,7 @@ export class ReferenceDefinition {
   /**
    * @internal
    *
-   * @missingRailsCall merge — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:267 is
    *   `as_options(index).merge(conditional_options)`, spelled as an object
    *   spread in trails (schema-definitions.ts:884-895). Same keys, same
@@ -947,7 +947,7 @@ export class ReferenceDefinition {
   /**
    * @internal
    *
-   * @missingRailsCall merge — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall merge — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:277 is `as_options(foreign_key).merge(column:
    *   column_name, **conditional_options)`; trails spells the same merge as an
    *   object spread (schema-definitions.ts:896-902). `Hash#merge` has no ported
@@ -974,7 +974,7 @@ export class ReferenceDefinition {
   /**
    * @internal
    *
-   * @missingRailsCall fetch — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall fetch — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:297-299 is `foreign_key_options.fetch(:to_table) {
    *   ... }`; `to_table` is a declared optional property on trails'
    *   ReferenceForeignKeyOptions, so the block default is spelled `?? (...)`
@@ -1108,7 +1108,7 @@ export class TableDefinition {
   }
 
   /**
-   * @missingRailsCall get_primary_key — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall get_primary_key — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_definitions.rb:397 is `Base.get_primary_key(...)`; importing `Base`
    *   from the connection-adapter layer is a module cycle, so trails reads it
    *   through the `table-name-options.ts` registration slot as
@@ -1218,7 +1218,7 @@ export class TableDefinition {
    * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#remove_column
    * (Rails deletes from `@columns_hash`; this port keeps an array.)
    *
-   * @missingRailsCall delete — Newly comparable (RFC 0072 arity sweep): Rails
+   * @missingRailsCall delete — PERMANENT: Newly comparable (RFC 0072 arity sweep): Rails
    *   deletes from the `@columns_hash` Hash; TableDefinition here stores
    *   `columns` as an ordered array, so the same removal is a findIndex/splice.
    *   Equivalent — no Hash to delete from.

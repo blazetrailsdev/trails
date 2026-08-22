@@ -1606,7 +1606,7 @@ export class SchemaStatements {
   }
 
   /**
-   * @missingRailsCall size — RFC 0106: Ruby Array#size — JS spells it `.length`,
+   * @missingRailsCall size — PERMANENT: RFC 0106: Ruby Array#size — JS spells it `.length`,
    *   no call to converge (schema_statements.rb:1259-1260).
    */
   foreignKeyOptions(
@@ -2011,7 +2011,7 @@ export class SchemaStatements {
   /**
    * @internal
    *
-   * @missingRailsCall first — RFC 0106: Ruby String#first(10) on a hexdigest —
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
    *   the port slices (schema_statements.rb:1603).
    */
   generateIndexName(tableName: string, column: string | string[]): string {
@@ -2273,9 +2273,9 @@ export class SchemaStatements {
   /**
    * @internal
    *
-   * @missingRailsCall first — RFC 0106: Ruby String#first(10) on a hexdigest —
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
    *   the port slices (schema_statements.rb:1755-1762).
-   * @missingRailsCall map — RFC 0106: Ruby Array#map(&:to_s) over already-string
+   * @missingRailsCall map — PERMANENT: RFC 0106: Ruby Array#map(&:to_s) over already-string
    *   column names — the port has no to_s hop to map
    *   (schema_statements.rb:1757).
    */
@@ -2342,7 +2342,7 @@ export class SchemaStatements {
    * The stored value is then read for Ruby truthiness, not as a boolean.
    * @internal
    *
-   * @missingRailsCall fetch — RFC 0106: schema_statements.rb:1783-1785 is
+   * @missingRailsCall fetch — PERMANENT: RFC 0106: schema_statements.rb:1783-1785 is
    *   `@config.fetch(:foreign_keys, true)`. The port already matches its
    *   SEMANTICS — schema-statements.ts:2328-2331 spells the key-present test as
    *   `"foreignKeys" in this._config ? ... : true`, so a stored null stays falsy
@@ -2368,7 +2368,7 @@ export class SchemaStatements {
    * raises Ruby's core `KeyError` there, with `key not found: :expression`.
    * @internal
    *
-   * @missingRailsCall first — RFC 0106: Ruby String#first(10) on a hexdigest —
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
    *   the port slices; no call to converge (schema_statements.rb:1787-1795).
    */
   checkConstraintName(
@@ -2464,7 +2464,7 @@ export class SchemaStatements {
   /**
    * @internal
    *
-   * @missingRailsCall empty? — Verified per-site (RFC 0106):
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
    *   `options.except(:name, :algorithm).empty?` (schema_statements.rb:1830) —
    *   `empty?` on a Ruby Hash, whose faithful JS spelling is
    *   `Object.keys(h).length === 0`. That emits no callee, so no TS call can

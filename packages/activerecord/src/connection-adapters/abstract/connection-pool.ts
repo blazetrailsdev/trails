@@ -1048,7 +1048,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * @missingRailsCall count — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall count — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   connection_pool.rb:687-689 derives busy/dead/idle with three
    *   `@connections.count { ... }` passes keyed on `owner.alive?`; trails keeps
    *   the same numbers as maintained sets (`_checkedOut.size`,
@@ -1243,15 +1243,15 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * @missingRailsCall checkin — Per-site verified (RFC 0106 wave 4b): reap
+   * @missingRailsCall checkin — PERMANENT: Per-site verified (RFC 0106 wave 4b): reap
    *   recovers connections whose OWNER THREAD died (connection_pool.rb:628-642).
    *   JS has no threads, so trails' reap (connection-pool.ts:1237-1241) has no
    *   stale set to steal, reset and check back in; the guard is the discarded?
    *   early return Rails also has.
-   * @missingRailsCall remove — Per-site verified (RFC 0106 wave 4b): see
+   * @missingRailsCall remove — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
    *   `reap`/`checkin` above — the dead-owner branch of connection_pool.rb:640
    *   cannot arise in a single-threaded runtime.
-   * @missingRailsCall select — Per-site verified (RFC 0106 wave 4b): see
+   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b): see
    *   `reap`/`checkin` above — connection_pool.rb:628-633 selects on
    *   `conn.owner.alive?`, which has no JS analogue.
    */
@@ -1270,7 +1270,7 @@ export class ConnectionPool implements ReapablePool {
    * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
    *
-   * @missingRailsCall select — Per-site verified (RFC 0106 wave 4b):
+   * @missingRailsCall select — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   connection_pool.rb:653-660 is `@connections.select { ... }.each { ... }`;
    *   trails' _flush partitions in one `for..of` over `_available.clear()`
    *   because eviction and re-add must happen under the same synchronous pass.
