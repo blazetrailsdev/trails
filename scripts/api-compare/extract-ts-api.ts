@@ -2260,12 +2260,6 @@ export function extractClass(
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
       });
-      // A constructor parameter property (`constructor(readonly tableName: string)`)
-      // declares a field of the class as surely as a `readonly tableName: string`
-      // in the class body does — it is how the ports spell the members a Ruby
-      // `Struct.new(:table_name, ...)` superclass generates
-      // (postgresql/schema_definitions.rb:192). Record each one as its own member
-      // so the Ruby reader/writer has a counterpart in the file that declares it.
       for (const param of member.parameters) {
         if (!ts.isIdentifier(param.name)) continue;
         const paramVisibility = parameterPropertyVisibility(param);

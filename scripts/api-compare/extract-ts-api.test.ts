@@ -1191,10 +1191,6 @@ describe("extractFileLocalHelpers", () => {
 });
 
 describe("extractClass — constructor parameter properties", () => {
-  // `ExclusionConstraintDefinition = Struct.new(:table_name, :expression, :options)`
-  // (postgresql/schema_definitions.rb:192) generates a reader and a writer per
-  // member; the port spells them as constructor parameter properties
-  // (schema-definitions.ts:108).
   it("records a parameter property as a member of the class", () => {
     const info = extractFromSource(`
       export class Foo {
