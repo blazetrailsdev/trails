@@ -59,7 +59,6 @@ function hasValueEquality(value: unknown): boolean {
   return primitive !== value && (primitive === null || typeof primitive !== "object");
 }
 
-
 /**
  * Unwraps `toHash()`-bearing objects (HashWithIndifferentAccess) so the wrapped
  * contents — not the Map-backed internal shape — drive comparison.
