@@ -61,7 +61,9 @@ export class TimeZoneConverter extends ValueType<unknown> {
    * the `respond_to?(:in_time_zone)` arm — `super(user_input_in_time_zone(value))
    * || super` (`:24`), whose `user_input_in_time_zone` is
    * `Helpers::TimeValue`'s (time_value.rb:42-44), reached through the
-   * `DelegateClass` hop to the subtype.
+   * `DelegateClass` hop to the subtype. That `||` falls through on `nil` and
+   * `false` only, so it is spelled as the explicit falsy check rather than a
+   * `??` (which keeps a `false`) or a bare truthiness test (which drops a `0`).
    */
   override cast(value: unknown): unknown {
     if (value == null) return null;
@@ -91,10 +93,10 @@ export class TimeZoneConverter extends ValueType<unknown> {
       return setTimeZoneWithoutConversion(instant, this._subtypeIsUtc);
     }
     if (typeof value === "string") {
-      return (
-        this._subtype.cast((this._subtype as TimeValueSubtype).userInputInTimeZone(value)) ??
-        this._subtype.cast(value)
+      const casted = this._subtype.cast(
+        (this._subtype as TimeValueSubtype).userInputInTimeZone(value),
       );
+      return casted != null && casted !== false ? casted : this._subtype.cast(value);
     }
     // Rails: `map(super) { |v| cast(v) }` (time_zone_conversion.rb:31) — the
     // DelegateClass hop to the subtype's own `map` hook, which rebuilds an
