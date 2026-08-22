@@ -1593,7 +1593,11 @@ describe("buildReport — interface declaration names", () => {
           "ActiveModel::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
           // Declared in a DIFFERENT Rails file: a TS interface of this name in
           // foo.ts is misplaced surface, not an impossible-by-construction shape.
-          "ActiveModel::Quoting": rubyClass({ name: "Quoting", file: "quoting.rb" }),
+          "ActiveModel::Quoting": rubyClass({
+            name: "Quoting",
+            file: "quoting.rb",
+            instance: [method("quoted_table_name")],
+          }),
         },
         modules: {},
       },
@@ -1647,12 +1651,47 @@ describe("buildReport — interface declaration names", () => {
     ]);
   });
 
-  it("still scores an interface's members, which the exemption does not reach", () => {
+  it("exempts the members of an exempt-by-kind interface along with it", () => {
     const report = run(
       ruby,
       tsWith([{ name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] }]),
     );
-    expect(report.packages[0].extraFiles[0].extras).toEqual([
+    expect(report.packages[0].extraFiles).toEqual([]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(2);
+  });
+
+  it("exempts a member of an exempt-by-kind interface that Rails defines elsewhere", () => {
+    // The RFC 0117 case: a structural stand-in's member names a method some
+    // OTHER Ruby class owns, so it scored as moved surface of the `.rb` the
+    // file mirrors purely by sharing the file.
+    const report = run(
+      ruby,
+      tsWith([{ name: "RelationLike", isInterface: true, members: ["quotedTableName"] }]),
+    );
+    expect(report.packages[0].extraFiles).toEqual([]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(2);
+  });
+
+  it("still scores the members of an interface name Rails uses elsewhere", () => {
+    const report = run(
+      ruby,
+      tsWith([{ name: "Quoting", isInterface: true, members: ["tsOnlyHelper"] }]),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "tsOnlyHelper", kind: "novel" },
+      { name: "Quoting", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalInterfaceExempt).toBe(0);
+  });
+
+  it("does not exempt an interface member a class in the same file also declares", () => {
+    const ts = tsWith([
+      { name: "ConnectionHost", isInterface: true, members: ["tsOnlyHelper"] },
+      { name: "Adapter", members: ["tsOnlyHelper"] },
+    ]);
+    const report = run(ruby, ts);
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Adapter", kind: "novel" },
       { name: "tsOnlyHelper", kind: "novel" },
     ]);
   });
