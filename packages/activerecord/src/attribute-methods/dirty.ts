@@ -159,7 +159,7 @@ export class Dirty {
    * (dirty.rb:175-177) — `mutations_from_database.changes`.
    */
   get changesToSave(): Record<string, [unknown, unknown]> {
-    return (this as unknown as DirtyGetterHost).changes;
+    return (this as unknown as DirtyGetterHost)._dirty.changes;
   }
 
   /**
@@ -175,25 +175,18 @@ export class Dirty {
    * (dirty.rb:191-193) — `mutations_from_database.changed_values`.
    */
   get attributesInDatabase(): Record<string, unknown> {
-    const record = this as unknown as DirtyGetterHost;
-    const result: Record<string, unknown> = {};
-    for (const name of record._dirty.changedAttributeNames) {
-      result[name] = record._dirty.attributeWas(name) ?? record._readAttribute(name);
-    }
-    return result;
+    return (this as unknown as DirtyGetterHost)._dirty.changedAttributes;
   }
 }
 
 interface DirtyGetterHost {
-  changes: Record<string, [unknown, unknown]>;
   _dirty: {
     changed: boolean;
+    changes: Record<string, [unknown, unknown]>;
     changedAttributeNames: string[];
+    changedAttributes: Record<string, unknown>;
     previousChanges: Record<string, [unknown, unknown]>;
-    attributeWas(name: string): unknown;
   };
-  /** @internal */
-  _readAttribute(name: string): unknown;
 }
 
 interface DirtyPrivateHost {

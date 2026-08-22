@@ -7,7 +7,7 @@ import { Base } from "../index.js";
 // branch — an object-literal module is read by value and flattens each getter
 // into a data property whose value is the getter's result at include time, so
 // every record would answer the same stale hash. Pin the descriptor kind.
-describe("DirtyTest", () => {
+describe("AttributeMethods::Dirty accessor descriptors", () => {
   const SAVE_SIDE_READERS = [
     "savedChanges",
     "hasChangesToSave",
