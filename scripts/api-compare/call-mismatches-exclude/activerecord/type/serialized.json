@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "type/serialized.ts",
-    "rubyName": "default_value?",
-    "call": "load",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

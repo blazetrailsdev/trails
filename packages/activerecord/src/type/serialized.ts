@@ -251,21 +251,10 @@ export class Serialized extends ValueType {
   readonly subtype: Type;
   readonly coder: Coder;
 
-  private _defaultValue: unknown;
-  private _defaultValueJson: string | undefined;
-
   constructor(subtype: Type, coder: Coder) {
     super();
     this.subtype = subtype;
     this.coder = coder;
-    this._defaultValue = coder.load(null);
-    if (isValueComparable(this._defaultValue)) {
-      try {
-        this._defaultValueJson = canonicalKey(this._defaultValue);
-      } catch {
-        this._defaultValueJson = undefined;
-      }
-    }
   }
 
   // Rails: Type::Serialized#accessor returns Store::IndifferentHashAccessor.
@@ -369,12 +358,15 @@ export class Serialized extends ValueType {
   }
 
   private isDefaultValue(value: unknown): boolean {
-    if (value === this._defaultValue) return true;
+    // Ruby `==` is a value comparison, so a freshly loaded default still equals
+    // an equal object; JS `===` is identity, hence the canonical-key fallback.
+    const defaultValue = this.coder.load(null);
+    if (value === defaultValue) return true;
     if (value === null || value === undefined)
-      return this._defaultValue === null || this._defaultValue === undefined;
-    if (typeof value === "object" && this._defaultValueJson !== undefined) {
+      return defaultValue === null || defaultValue === undefined;
+    if (typeof value === "object" && isValueComparable(defaultValue)) {
       try {
-        return canonicalKey(value) === this._defaultValueJson;
+        return canonicalKey(value) === canonicalKey(defaultValue);
       } catch {
         return false;
       }
@@ -392,18 +384,7 @@ export class Serialized extends ValueType {
  * @internal
  */
 export function encoded(this: Serialized, value: unknown): unknown {
-  // Use the constructor-cached default to avoid calling coder.load(null) again,
-  // which would produce a fresh object on every call and break reference equality.
-  const s = this as any;
-  const defaultVal = s._defaultValue;
-  if (value === defaultVal) return undefined;
-  if (typeof value === "object" && value !== null && s._defaultValueJson !== undefined) {
-    try {
-      if (canonicalKey(value) === s._defaultValueJson) return undefined;
-    } catch {
-      // non-serializable; treat as non-default
-    }
-  }
+  if ((this as any).isDefaultValue(value)) return undefined;
   const payload = this.coder.dump(value);
   // Rails: if payload && subtype.binary? → ActiveModel::Type::Binary::Data.new(payload)
   if (payload && ((this.subtype as any).binary?.() ?? (this.subtype as any).isBinary?.())) {

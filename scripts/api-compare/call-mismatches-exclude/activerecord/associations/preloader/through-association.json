@@ -4,14 +4,14 @@
     "tsFile": "associations/preloader/through-association.ts",
     "rubyName": "records_by_owner",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106 wave 4g): `scope.order_values.any?` (preloader/through_association.rb:33) — `Enumerable#any?` without a block on a Ruby Array, spelled `this.scope?.orderValues?.length > 0` (through-association.ts:82). A `.length` read emits no callee, so no TS call can credit the Ruby one (RFC 0092, JS_ENUMERABLE_ALIASES)."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/through-association.ts",
     "rubyName": "records_by_owner",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106 wave 4g): `owners.first.association(through_reflection.name).loaded?` (preloader/through_association.rb:20) is index-0 access on a Ruby Array, spelled `this.owners[0].association(...)` (through-association.ts:69). `Array#first` is a positional idiom with no JS call form (RFC 0092)."
   },
   {
     "package": "activerecord",

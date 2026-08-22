@@ -32,7 +32,11 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
   it("coder.load is called exactly once during deserialize — not inside databaseTypeToText", () => {
     // Rails: binary_cast_type = cast_type.serialized? ? cast_type.subtype : cast_type
     // In databaseTypeToText we use BinaryType (subtype) to convert BinaryData→Uint8Array→latin1 string.
-    // Only after decryption does castType.deserialize run, which calls coder.load exactly once.
+    // Only after decryption does castType.deserialize run, which loads the payload exactly once.
+    // Rails' deserialize also probes `coder.load(nil)` via default_value?
+    // (serialized.rb:18-23, :61-63), so the payload loads are counted apart
+    // from that probe — a databaseTypeToText regression shows up as a second
+    // payload load, which is what this guards.
     const coder = {
       // coder.load receives Uint8Array from BinaryType.deserialize (the decrypted binary payload).
       load: vi.fn((v: unknown) => {
@@ -54,7 +58,8 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
     coder.dump.mockClear();
 
     const decrypted = encType.deserialize(cipherBinary);
-    expect(coder.load).toHaveBeenCalledTimes(1);
+    const payloadLoads = coder.load.mock.calls.filter(([v]) => v !== null);
+    expect(payloadLoads).toHaveLength(1);
     expect(decrypted).toEqual(plaintext);
   });
 });

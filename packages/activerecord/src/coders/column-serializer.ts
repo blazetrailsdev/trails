@@ -42,7 +42,6 @@ export class ColumnSerializer {
     this._attrName = coder.attrName;
     this._objectClass = coder.objectClass;
     this._coder = coder.coder;
-    this.checkArityOfConstructor();
   }
 
   /**
@@ -92,12 +91,10 @@ export class ColumnSerializer {
 
   /** @internal */
   checkArityOfConstructor(): void {
-    if (this._objectClass === (Object as unknown)) return;
-    // Mirrors Rails: catch ArgumentError from object_class.new with no args.
-    // In JS, Function.length is unreliable (optional params have length 1 too),
-    // so we rely solely on whether new objectClass() succeeds.
+    // Ruby narrows this to `rescue ArgumentError`; JS throws a bare TypeError
+    // for a constructor that will not take zero arguments, so catch everything.
     try {
-      new (this._objectClass as new () => unknown)();
+      this.load(null);
     } catch (e: unknown) {
       throw new TypeError(
         `Cannot serialize ${this._objectClass.name}. Classes passed to \`serialize\` must have a 0 argument constructor.`,
