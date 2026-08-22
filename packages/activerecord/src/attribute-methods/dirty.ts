@@ -11,10 +11,6 @@ import { Temporal } from "@blazetrails/date";
 import type { DirtyOptions } from "@blazetrails/activemodel";
 
 interface DirtyRecord {
-  changed: boolean;
-  changedAttributes: Record<string, unknown>;
-  changes: Record<string, [unknown, unknown]>;
-  previousChanges: Record<string, [unknown, unknown]>;
   mutationsFromDatabase: Record<string, [unknown, unknown]>;
   mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
   readAttribute(name: string): unknown;
@@ -54,7 +50,7 @@ export function savedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
 ): [unknown, unknown] | null {
-  return record.previousChanges[attr] ?? null;
+  return record.mutationsBeforeLastSave[attr] ?? null;
 }
 
 /**
@@ -73,7 +69,7 @@ export function attributeBeforeLastSave(record: DirtyRecord, attr: string): unkn
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes?
  */
 export function isSavedChanges(record: DirtyRecord): boolean {
-  return Object.keys(record.previousChanges).length > 0;
+  return Object.keys(record.mutationsBeforeLastSave).length > 0;
 }
 
 /**
@@ -102,7 +98,7 @@ export function attributeChangeToBeSaved(
   record: DirtyRecord,
   attr: string,
 ): [unknown, unknown] | null {
-  return record.changes[attr] ?? null;
+  return record.mutationsFromDatabase[attr] ?? null;
 }
 
 /**
