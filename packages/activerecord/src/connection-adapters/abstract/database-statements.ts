@@ -103,6 +103,13 @@ export function inspectExplainOption(o: unknown): string {
 export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
   /**
+   * Mixed in from `AbstractAdapter` — Rails' `collector`
+   * (abstract_adapter.rb:1176-1188), the `Composite` under prepared statements
+   * and a `SubstituteBinds` without them.
+   * @internal
+   */
+  collector?(): Collectors.Composite | Collectors.SubstituteBinds;
+  /**
    * Mixed in from `Quoting` — the single Rails `type_casted_binds`
    * (quoting.rb:224). Payload producers must reach it through `this` so the
    * adapter's `type_cast` override applies.
@@ -236,19 +243,6 @@ export class DatabaseStatementsBase {
 // --- Query conversion ---
 
 /**
- * Ruby `AbstractAdapter#collector` (abstract_adapter.rb:1176-1188), reached
- * through the host so a bare visitor stand-in — a host that is not an adapter
- * and carries no `collector` — still compiles through the prepared-statement
- * `Composite`.
- */
-function collectorFor(host: unknown): Collectors.Composite {
-  const collector = (host as { collector?(): unknown } | undefined)?.collector?.();
-  return collector instanceof Collectors.Composite
-    ? collector
-    : new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
-}
-
-/**
  * Compile an Arel node to a SQL string with its bind values inlined via the
  * connection's own `quote`. Mirrors Rails' `to_sql` under
  * `unprepared_statement`, which compiles through a `SubstituteBinds` collector
@@ -360,7 +354,7 @@ export function toSqlAndBinds(
         const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
         return [inlinedSql, [], preparable, inlinedRetryable];
       }
-      const collector = collectorFor(this);
+      const collector = (this as DatabaseStatementsHost).collector!() as Collectors.Composite;
       collector.retryable = true;
       collector.preparable = true;
       const [sql, extractedBinds] = visitor.compile(node, collector) as [string, unknown[]];
@@ -424,7 +418,10 @@ export function cacheableQuery(
 
   // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds] = visitor.compile(node, collectorFor(host)) as [string, unknown[]];
+    const [sql, binds] = visitor.compile(node, host.collector!() as Collectors.Composite) as [
+      string,
+      unknown[],
+    ];
     return [klass.query(sql), binds];
   }
 
