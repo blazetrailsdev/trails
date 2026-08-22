@@ -717,9 +717,10 @@ interface PackageTotals {
   totalMoved: number;
   totalAllowlisted: number;
   /**
-   * Names dropped by the interface-declaration kind exemption
-   * (`collectInterfaceOnlyNames`). Reported so the exemption stays measurable:
-   * it is the one allowance with no per-declaration tag to count.
+   * Names dropped by the interface kind exemption — declaration names
+   * (`collectInterfaceOnlyNames`) and the members they cover
+   * (`collectInterfaceMemberOnlyNames`). Reported so the exemption stays
+   * measurable: it is the one allowance with no per-declaration tag to count.
    */
   totalInterfaceExempt: number;
   /**
@@ -798,9 +799,10 @@ set — every public name in them is extra. Trees mirroring Rails' test/ code
 extractor reads lib/ only. The NoCntrp column reports that slice separately.
 
 A novel \`interface\` DECLARATION name is exempt by kind and needs no tag: it is a
-type-only shape Ruby leaves to duck typing, so no Ruby counterpart is possible.
-An interface name that does appear in Rails stays scored (as moved) — that is
-the drift case a blanket exemption would hide.
+type-only shape Ruby leaves to duck typing, so no Ruby counterpart is possible,
+and its MEMBERS are exempt with it. An interface name that does appear in Rails
+stays scored (as moved), members included — that is the drift case a blanket
+exemption would hide.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -927,6 +929,12 @@ export function collectTsFileNames(
 interface SurfaceName {
   name: string;
   interfaceDeclaration: boolean;
+  /**
+   * The `interface` whose body declares this MEMBER, or `null` for surface
+   * that is not an interface member (a class/namespace member, a top-level
+   * function, or a declaration name — including an interface's own).
+   */
+  interfaceMemberOf: string | null;
 }
 
 /**
@@ -940,14 +948,15 @@ function walkTsFileSurface(
   fileFunctions: MethodInfo[] | undefined,
 ): SurfaceName[] {
   const out: SurfaceName[] = [];
-  const pushMember = (m: MethodInfo): void => {
+  const pushMember = (m: MethodInfo, interfaceMemberOf: string | null): void => {
     if (m.internal === true) return;
     if (m.name.startsWith("_")) return;
-    out.push({ name: m.name, interfaceDeclaration: false });
+    out.push({ name: m.name, interfaceDeclaration: false, interfaceMemberOf });
   };
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
     const skipForeign = c.synthesizedMixin === true;
+    const declaredByInterface = c.isInterface === true && c.declaredAsNamespace !== true;
     if (!skipForeign && !c.name.startsWith("_")) {
       // `declaredAsNamespace` matters because declaration merging collapses an
       // `interface` and a same-named `namespace` into one entry: the merged
@@ -955,15 +964,24 @@ function walkTsFileSurface(
       // non-interface declaration of the name and must stay scored.
       out.push({
         name: c.name,
-        interfaceDeclaration: c.isInterface === true && c.declaredAsNamespace !== true,
+        interfaceDeclaration: declaredByInterface,
+        interfaceMemberOf: null,
       });
     }
+    // `interfaceMembers` is what tells the two halves of a declaration-merged
+    // `interface`+`namespace` apart: only the names it lists came from the
+    // interface body, so a namespace member is not covered by the interface's
+    // exemption — the same split `collectTaggedEntries` applies to a tagged
+    // interface's members.
+    const interfaceMembers = c.interfaceMembers;
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
       if (skipForeign && m.declaredIn !== undefined) continue;
-      pushMember(m);
+      const fromInterface =
+        c.isInterface === true && (interfaceMembers ? interfaceMembers.includes(m.name) : true);
+      pushMember(m, fromInterface ? c.name : null);
     }
   }
-  for (const fn of fileFunctions ?? []) pushMember(fn);
+  for (const fn of fileFunctions ?? []) pushMember(fn, null);
   return out;
 }
 
@@ -991,6 +1009,9 @@ function walkTsFileSurface(
  * names Rails never uses at all — which therefore cannot be a drifting port of
  * anything — drop out.
  *
+ * The members of an exempt interface go with it — see
+ * `collectInterfaceMemberOnlyNames`.
+ *
  * Names shared with a member or with a class/namespace declaration are NOT
  * exempt — including the `namespace` half of a declaration-merged
  * `interface`+`namespace` pair, which the extractor collapses into one entry
@@ -1016,6 +1037,62 @@ export function collectInterfaceOnlyNames(
   }
   for (const name of others) interfaces.delete(name);
   return interfaces;
+}
+
+/**
+ * Member names a file contributes ONLY through the body of an `interface` —
+ * mapped to the interfaces that declare them.
+ *
+ * RFC 0117, decided here: an `interface` whose declaration name is exempt by
+ * kind (`collectInterfaceOnlyNames` — a structural shape Ruby leaves to duck
+ * typing) covers its MEMBERS too, exactly as a `@noRailsEquivalent` tag on an
+ * interface declaration already does (see `collectTaggedEntries`). The
+ * declaration and its body are one statement about one type: if the type
+ * itself has no Ruby counterpart by construction, neither does any member of
+ * it, and scoring those members against the `.rb` the file happens to mirror
+ * is a category error. `Arel::Attributes::Attribute#relation` is typed
+ * `RelationLike` in `attributes/attribute.ts`, so its `tableAlias` /
+ * `typeForAttribute` — members of `Arel::Table` (`arel/table.rb:26,90`), never
+ * of `Arel::Attributes::Attribute` (`arel/attributes/attribute.rb:5-40`) —
+ * were reported as `attribute.rb`'s moved surface purely because the stand-in
+ * shares its file.
+ *
+ * The exemption is deliberately NOT unconditional on interface members. It
+ * rides on the declaration's verdict, which the scorer applies: an interface
+ * named after something Rails uses may be a real port of a Ruby module's
+ * shape, so its members stay scored and stay tag-able — the drift case a
+ * blanket member exemption would hide.
+ *
+ * A name anything else in the file also contributes — a class member, a
+ * top-level function, any declaration name — is excluded, on the same
+ * reasoning as `collectInterfaceOnlyNames`: the extra set is a flat Set of
+ * bare names, so one name carries one verdict and exempting on the
+ * interface's behalf would silently absolve the other contributor.
+ */
+export function collectInterfaceMemberOnlyNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+): Map<string, string[]> {
+  const members = new Map<string, string[]>();
+  const others = new Set<string>();
+  for (const { name, interfaceMemberOf } of walkTsFileSurface(
+    file,
+    classes,
+    modules,
+    fileFunctions,
+  )) {
+    if (interfaceMemberOf === null) {
+      others.add(name);
+      continue;
+    }
+    const owners = members.get(name);
+    if (owners === undefined) members.set(name, [interfaceMemberOf]);
+    else if (!owners.includes(interfaceMemberOf)) owners.push(interfaceMemberOf);
+  }
+  for (const name of others) members.delete(name);
+  return members;
 }
 
 /**
@@ -1521,6 +1598,12 @@ function buildPackageReport(
     const tsNames = collectTsFileNames(expectedTs, classes, modules, fileFns);
     if (tsNames.size === 0) continue;
     const interfaceOnly = collectInterfaceOnlyNames(expectedTs, classes, modules, fileFns);
+    const interfaceMemberOnly = collectInterfaceMemberOnlyNames(
+      expectedTs,
+      classes,
+      modules,
+      fileFns,
+    );
 
     const allowed =
       rubyFile === null
@@ -1562,6 +1645,20 @@ function buildPackageReport(
       // its own name, so the tag doesn't go stale and the inheritance in
       // `collectTaggedEntries` keeps working.
       if (kind === "novel" && interfaceOnly.has(name)) {
+        interfaceExemptCount++;
+        continue;
+      }
+      // A member of an exempt-by-kind interface inherits its declaration's
+      // verdict — see `collectInterfaceMemberOnlyNames`. Unlike the
+      // declaration exemption this one is not restricted to novel names: a
+      // structural stand-in's member routinely names a method some OTHER Rails
+      // class defines (`Arel::Table#table_alias`), which is exactly the moved
+      // row the wrong `.rb` was being charged for.
+      const memberOwners = interfaceMemberOnly.get(name);
+      if (
+        memberOwners !== undefined &&
+        memberOwners.every((o) => interfaceOnly.has(o) && !globalRubyCandidates.has(o))
+      ) {
         interfaceExemptCount++;
         continue;
       }
@@ -1753,7 +1850,7 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
   );
   const interfaceExempt = report.packages.reduce((n, pkg) => n + pkg.totalInterfaceExempt, 0);
   console.log(
-    `${p.dim}  Excluded by kind: ${interfaceExempt} novel \`interface\` declaration name(s) — type-only shapes Ruby ` +
+    `${p.dim}  Excluded by kind: ${interfaceExempt} novel \`interface\` declaration name(s) and member(s) — type-only shapes Ruby ` +
       `leaves to duck typing. An interface name Rails DOES use stays scored as moved.${p.reset}`,
   );
   console.log(
