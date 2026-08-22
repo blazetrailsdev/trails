@@ -168,8 +168,9 @@ export function defaultScope<T extends typeof Base>(
       : (optionsOrAllQueries?.allQueries ?? false);
 
   const scopeObj = new DefaultScope(scope as (rel: any) => any, allQueries);
-  const existing: DefaultScope[] = (this as any).defaultScopes ?? [];
-  (this as any).defaultScopes = [...existing, scopeObj];
+  // `self.default_scopes += [default_scope]` (default.rb:142) — the
+  // reassignment is what makes the write local to this class.
+  (this as any).defaultScopes = [...(this as any).defaultScopes, scopeObj];
 }
 
 /**

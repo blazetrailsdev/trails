@@ -35,7 +35,7 @@ class Topic extends Model {
     this._price = value;
   }
 
-  get price(): string | null {
+  get price(): unknown {
     return NumberHelper.numberToCurrency(this._price as number);
   }
 

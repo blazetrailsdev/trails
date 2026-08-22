@@ -1366,14 +1366,13 @@ export class CollectionAssociation extends Association {
 
         const memAttributeNames = new Set(memRecord.attributeNames());
         const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
-        const attrReadonly: ReadonlySet<string> =
-          (memRecord.constructor as unknown as { _readonlyAttributes?: ReadonlySet<string> })
-            ._readonlyAttributes ?? new Set<string>();
+        const attrReadonly = (memRecord.constructor as unknown as { _attrReadonly: string[] })
+          ._attrReadonly;
         for (const name of record
           .attributeNames()
           .filter((name) => memAttributeNames.has(name))
           .filter((name) => !changedAttributeNamesToSave.has(name))
-          .filter((name) => !attrReadonly.has(name))) {
+          .filter((name) => !attrReadonly.includes(name))) {
           memRecord._writeAttribute(name, record.get(name));
         }
 

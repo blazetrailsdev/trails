@@ -45,21 +45,24 @@ export namespace NumericWithFormat {
         : self.toString(format as number);
     }
 
+    // `self` is always a Numeric here, so `NumberConverter#execute`
+    // (number_converter.rb:130-137) always takes its `convert` arm and every
+    // helper below answers a String.
     switch (format) {
       case ":phone":
-        return NumberHelper.numberToPhone(self, options ?? {});
+        return NumberHelper.numberToPhone(self, options ?? {}) as string;
       case ":currency":
-        return NumberHelper.numberToCurrency(self, options ?? {});
+        return NumberHelper.numberToCurrency(self, options ?? {}) as string;
       case ":percentage":
-        return NumberHelper.numberToPercentage(self, options ?? {});
+        return NumberHelper.numberToPercentage(self, options ?? {}) as string;
       case ":delimited":
-        return NumberHelper.numberToDelimited(self, options ?? {});
+        return NumberHelper.numberToDelimited(self, options ?? {}) as string;
       case ":rounded":
-        return NumberHelper.numberToRounded(self, options ?? {});
+        return NumberHelper.numberToRounded(self, options ?? {}) as string;
       case ":human":
-        return NumberHelper.numberToHuman(self, options ?? {});
+        return NumberHelper.numberToHuman(self, options ?? {}) as string;
       case ":human_size":
-        return NumberHelper.numberToHumanSize(self, options ?? {});
+        return NumberHelper.numberToHumanSize(self, options ?? {}) as string;
       default:
         return self.toString();
     }

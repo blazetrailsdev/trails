@@ -118,7 +118,7 @@ export class EncryptedQuery {
     checkForAdditionalValues: boolean,
   ): unknown[] {
     const model = owner._model ?? owner;
-    const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
+    const encryptedAttrs = model.encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size) return args;
 
     if (!Array.isArray(args) || args.length === 0) return args;
@@ -220,7 +220,7 @@ export class RelationQueries {
     originalScopeForCreate: (...args: any[]) => unknown,
   ): Record<string, unknown> {
     const model = this.model ?? this;
-    const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
+    const encryptedAttrs = model.encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size) return originalScopeForCreate.call(this) as Record<string, unknown>;
 
     const scopeAttrs = originalScopeForCreate.call(this) as Record<string, unknown>;

@@ -295,13 +295,13 @@ describe("NumberHelperTest", () => {
   });
 
   it("number helpers should return nil when given nil", () => {
-    // null is not numeric, so helpers return the string representation
-    expect(numberToPhone(null as unknown as number)).toBe("null");
-    expect(numberToCurrency(null as unknown as number)).toBe("null");
-    expect(numberToDelimited(null as unknown as number)).toBe("null");
-    expect(numberToRounded(null as unknown as number)).toBe("null");
-    expect(numberToHumanSize(null as unknown as number)).toBe("null");
-    expect(numberToHuman(null as unknown as number)).toBe("null");
+    expect(numberToPhone(null)).toBeNull();
+    expect(numberToCurrency(null)).toBeNull();
+    expect(numberToPercentage(null)).toBeNull();
+    expect(numberToDelimited(null)).toBeNull();
+    expect(numberToRounded(null)).toBeNull();
+    expect(numberToHumanSize(null)).toBeNull();
+    expect(numberToHuman(null)).toBeNull();
   });
 
   it("number helpers do not mutate options hash", () => {

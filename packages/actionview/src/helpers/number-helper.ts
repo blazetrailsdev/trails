@@ -80,10 +80,10 @@ export function numberToHuman(number: NumberLike, options: NumberHelperOptions =
 
 /** @internal */
 export function delegateNumberHelperMethod(
-  method: (n: unknown, o: Record<string, unknown>) => string,
+  method: (n: unknown, o: Record<string, unknown>) => unknown,
   number: NumberLike,
   options: NumberHelperOptions,
-): string | SafeBuffer | null {
+): unknown {
   if (number == null) return null;
   const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions(options);
   return wrapWithOutputSafetyHandling(
@@ -122,11 +122,13 @@ export function escapeUnits(units: Record<string, string | SafeBuffer>): Record<
 export function wrapWithOutputSafetyHandling(
   number: unknown,
   raiseOnInvalid: boolean,
-  formatted: string,
-): string | SafeBuffer {
+  formatted: unknown,
+): unknown {
   const valid = validFloat(number);
   if (raiseOnInvalid && !valid) throw new InvalidNumberError(number);
-  return valid || isHtmlSafe(number) ? htmlSafe(formatted) : formatted;
+  // On the `valid_float` arm `execute` took its `convert` arm, so
+  // `formatted_number` (number_helper.rb:148) is a String.
+  return valid || isHtmlSafe(number) ? htmlSafe(formatted as string) : formatted;
 }
 
 /** @internal */

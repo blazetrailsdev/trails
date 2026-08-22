@@ -33,7 +33,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     });
 
     const klass = {
-      _encryptedAttributes: new Set(["email"]),
+      encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
     };
     const record = { constructor: klass };
@@ -78,7 +78,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       scheme: new Scheme({ deterministic: false, encryptor: encryptorA }),
     });
     const klass = {
-      _encryptedAttributes: new Set(["body"]),
+      encryptedAttributes: new Set(["body"]),
       typeForAttribute: () => type,
     };
     const record = { constructor: klass };

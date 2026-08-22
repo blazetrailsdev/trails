@@ -19,7 +19,7 @@ export class PriceEstimate extends Base {
   }
 
   // Rails overrides the `price` reader with `number_to_currency(super)`.
-  get price(): string {
+  get price(): unknown {
     return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }
 }

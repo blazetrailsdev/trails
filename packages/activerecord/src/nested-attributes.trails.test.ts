@@ -220,17 +220,10 @@ describe("nested attributes assignment ordering (trails-only)", () => {
   // attributes are already set — even when the nested key sits first in the
   // literal.
   it("assigns nested parameter hashes after the base attributes", async () => {
-    const config = (
-      Pirate as unknown as {
-        _nestedAttributeConfigs: {
-          associationName: string;
-          options: { rejectIf?: unknown };
-        }[];
-      }
-    )._nestedAttributeConfigs.find((c) => c.associationName === "ship")!;
-    const originalRejectIf = config.options.rejectIf;
+    const config = Pirate.nestedAttributesOptions.ship;
+    const originalRejectIf = config.rejectIf;
     const observed: unknown[] = [];
-    config.options.rejectIf = async (_attrs: Record<string, unknown>, record: Base) => {
+    config.rejectIf = (_attrs: Record<string, unknown>, record: Base) => {
       observed.push((record as Pirate).catchphrase);
       return false;
     };
@@ -242,7 +235,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
         catchphrase: "Aye",
       });
     } finally {
-      config.options.rejectIf = originalRejectIf;
+      config.rejectIf = originalRejectIf;
     }
 
     expect(observed).toEqual(["Aye"]);
@@ -349,12 +342,8 @@ describe("nested attributes assignment ordering (trails-only)", () => {
       events.push("remove_target!:end");
     };
 
-    const config = (
-      Pirate as unknown as {
-        _nestedAttributeConfigs: { associationName: string; options: { rejectIf?: unknown } }[];
-      }
-    )._nestedAttributeConfigs.find((c) => c.associationName === "parrots")!;
-    config.options.rejectIf = () => {
+    const config = Pirate.nestedAttributesOptions.parrots;
+    config.rejectIf = () => {
       events.push("parrots");
       return false;
     };
@@ -391,12 +380,8 @@ describe("nested attributes assignment ordering (trails-only)", () => {
       events.push("remove_target!:end");
     };
 
-    const config = (
-      Pirate as unknown as {
-        _nestedAttributeConfigs: { associationName: string; options: { rejectIf?: unknown } }[];
-      }
-    )._nestedAttributeConfigs.find((c) => c.associationName === "parrots")!;
-    config.options.rejectIf = () => {
+    const config = Pirate.nestedAttributesOptions.parrots;
+    config.rejectIf = () => {
       events.push("parrots");
       return false;
     };

@@ -294,7 +294,6 @@ import {
   globalCurrentScope as _globalCurrentScope,
   setGlobalCurrentScope as _setGlobalCurrentScope,
   scopeAttributes,
-  defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
 } from "./scoping.js";
 import {
@@ -955,14 +954,14 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.skip_time_zone_conversion_for_attributes
    */
-  static skipTimeZoneConversionForAttributes: string[] = [];
+  declare static skipTimeZoneConversionForAttributes: string[];
 
   /**
    * Column types eligible for time-zone conversion.
    *
    * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_types
    */
-  static timeZoneAwareTypes: string[] = ["datetime", "time"];
+  declare static timeZoneAwareTypes: string[];
 
   static get protectedEnvironments(): string[] {
     return ModelSchema.protectedEnvironments.call(this);
@@ -1753,9 +1752,6 @@ export class Base extends Model {
     ModelSchema.ignoredColumns.call(this, columns);
   }
 
-  // -- Readonly attributes --
-  static _readonlyAttributes: Set<string> = new Set();
-
   // Suppresses after_initialize in the constructor when set by _instantiate /
   // directInstantiate (inheritance.ts) so we can fire after_find first, then
   // after_initialize — matching Rails' init_with_attributes call order.
@@ -1783,9 +1779,10 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.nested_attributes_options
    */
-  static get nestedAttributesOptions(): Readonly<Record<string, unknown>> {
-    return _NestedAttributes.nestedAttributesOptions.call(this);
-  }
+  declare static nestedAttributesOptions: Record<
+    string,
+    import("./nested-attributes.js").NestedAttributeOptions
+  >;
 
   /**
    * Declare that this model accepts nested attributes for an association.
@@ -1806,20 +1803,6 @@ export class Base extends Model {
 
   static set verboseQueryLogs(value: boolean) {
     _setVerboseQueryLogs(value);
-  }
-
-  /**
-   * Whether this model defines its own default_scope (vs only inheriting it).
-   * Nil until `build_default_scope` first memoizes it (Rails class_attribute).
-   *
-   * Mirrors: ActiveRecord::Base.default_scope_override
-   */
-  static get defaultScopeOverride(): boolean | null {
-    return _defaultScopeOverride.call(this);
-  }
-
-  static set defaultScopeOverride(value: boolean | null) {
-    (this as { _defaultScopeOverride?: boolean | null })._defaultScopeOverride = value;
   }
 
   /**
@@ -1909,6 +1892,16 @@ export class Base extends Model {
   }
 
   // --- Reflection::ClassMethods (wired via extend() after class body) ---
+  /** encryptable_record.rb:11 — `class_attribute :encrypted_attributes` (no default). */
+  declare static encryptedAttributes: Set<string> | undefined;
+  /** The `class_attribute` predicate `encrypted_attributes?`. */
+  declare static readonly isEncryptedAttributes: boolean;
+  /** readonly_attributes.rb:11 — `class_attribute :_attr_readonly, instance_accessor: false, default: []`. */
+  declare static _attrReadonly: string[];
+  /** default.rb:19 — `class_attribute :default_scopes, instance_writer: false, instance_predicate: false, default: []`. */
+  declare static defaultScopes: import("./scoping/default.js").DefaultScope[];
+  /** default.rb:20 — `class_attribute :default_scope_override, ... default: nil`. */
+  declare static defaultScopeOverride: boolean | null;
   /** reflection.rb:11 — `class_attribute :_reflections, instance_writer: false, default: {}`. */
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
   /** reflection.rb:12 — `class_attribute :aggregate_reflections, instance_writer: false, default: {}`. */
@@ -2151,8 +2144,6 @@ export class Base extends Model {
 
   // -- Scopes registry (used by Relation) --
   static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
-  /** Accumulated default_scope declarations. @internal */
-  static defaultScopes: import("./scoping/default.js").DefaultScope[] = [];
 
   // --- Default scope (wired via extend() after class body) ---
   declare static defaultScope: typeof _defaultScope;
@@ -4633,6 +4624,35 @@ classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} }
 classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "_associations", { instanceWriter: false, default: [] });
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
+// readonly_attributes.rb:11 — `class_attribute :_attr_readonly,
+// instance_accessor: false, default: []`.
+classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
+// default.rb:19-20 — `default_scope_override` stays nil until
+// `build_default_scope` memoizes it.
+classAttribute.call(Base, "defaultScopes", {
+  instanceWriter: false,
+  instancePredicate: false,
+  default: [],
+});
+classAttribute.call(Base, "defaultScopeOverride", {
+  instanceWriter: false,
+  instancePredicate: false,
+  default: null,
+});
+// time_zone_conversion.rb:61-62.
+classAttribute.call(Base, "skipTimeZoneConversionForAttributes", {
+  instanceWriter: false,
+  default: [],
+});
+classAttribute.call(Base, "timeZoneAwareTypes", {
+  instanceWriter: false,
+  default: ["datetime", "time"],
+});
+// nested_attributes.rb:15.
+classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
+// encryptable_record.rb:11 — `class_attribute :encrypted_attributes`, with no
+// `default:` on purpose (see the comment at encryptable_record.rb:50).
+classAttribute.call(Base, "encryptedAttributes");
 classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,
   default: [],

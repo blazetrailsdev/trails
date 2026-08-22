@@ -43,12 +43,14 @@ export class ReadonlyAttributeError extends ActiveRecordError {
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#attr_readonly
  */
 export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
-  if (!Object.prototype.hasOwnProperty.call(this, "_readonlyAttributes")) {
-    (this as any)._readonlyAttributes = new Set((this as any)._readonlyAttributes);
-  }
-  for (const attr of attributes) {
-    (this as any)._readonlyAttributes.add(attr);
-  }
+  // `self._attr_readonly |= attributes.map(&:to_s)` (readonly_attributes.rb:30):
+  // `Array#|` is union-with-dedup, and the assignment is what makes the write
+  // local to this class — `_attrReadonly` is a `classAttribute`.
+  const attrReadonly = (this as any)._attrReadonly as string[];
+  (this as any)._attrReadonly = [
+    ...attrReadonly,
+    ...attributes.map(String).filter((attr) => !attrReadonly.includes(attr)),
+  ];
   // readonly_attributes.rb:33 — Rails reads `raise_on_assign_to_attr_readonly`
   // HERE, at declaration time, and only `include HasReadonlyAttributes` — the
   // write guards — when it is true. `include` is idempotent and one-way, so a
@@ -65,7 +67,7 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#readonly_attributes
  */
 export function readonlyAttributes(this: typeof Base): string[] {
-  return Array.from((this as any)._readonlyAttributes ?? []);
+  return (this as any)._attrReadonly;
 }
 
 /**
@@ -75,7 +77,7 @@ export function readonlyAttributes(this: typeof Base): string[] {
  * (The `Q` suffix mirrors Ruby's `?` predicate convention.)
  */
 export function readonlyAttributeQ(this: typeof Base, attribute: string): boolean {
-  return ((this as any)._readonlyAttributes as Set<string> | undefined)?.has(attribute) ?? false;
+  return ((this as any)._attrReadonly as string[]).includes(attribute);
 }
 
 /**

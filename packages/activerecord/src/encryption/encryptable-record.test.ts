@@ -34,7 +34,6 @@ import {
   decryptAttributes,
   deterministicEncryptedAttributes,
   encryptAttributes,
-  encryptedAttributes,
   encrypts,
   validateEncryptionAllowed,
 } from "./encryptable-record.js";
@@ -216,9 +215,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Post();
     new Author();
-    expect(encryptedAttributes.call(Post)).toEqual(new Set(["title", "body"]));
-    expect(encryptedAttributes.call(Author)).toEqual(new Set(["name"]));
-    expect(encryptedAttributes.call(Post)).not.toEqual(encryptedAttributes.call(Author));
+    expect(Post.encryptedAttributes).toEqual(new Set(["title", "body"]));
+    expect(Author.encryptedAttributes).toEqual(new Set(["name"]));
+    expect(Post.encryptedAttributes).not.toEqual(Author.encryptedAttributes);
   });
 
   it("deterministic_encrypted_attributes returns the list of deterministic encrypted attributes in a model (each record class holds their own list)", async () => {
@@ -991,7 +990,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   it("wires the case-preserving original_<name> column when ignoreCase is set", () => {
     const modelClass = makeMockModel(["name", "original_name"]);
     encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true });
-    const encrypted = encryptedAttributes.call(modelClass);
+    const encrypted = modelClass.encryptedAttributes;
     expect(encrypted.has("name")).toBe(true);
     expect(encrypted.has("original_name")).toBe(true);
   });
@@ -999,7 +998,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   it("does not wire original_<name> when ignoreCase is absent", () => {
     const modelClass = makeMockModel(["name"]);
     encrypts.call(modelClass, "name", { deterministic: true });
-    expect(encryptedAttributes.call(modelClass).has("original_name")).toBe(false);
+    expect(modelClass.encryptedAttributes.has("original_name")).toBe(false);
   });
 
   it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {

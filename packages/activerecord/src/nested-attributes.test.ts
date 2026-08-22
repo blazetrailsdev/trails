@@ -88,22 +88,15 @@ describe("TestNestedAttributesInGeneral", () => {
   }
 
   it("base should have an empty nested attributes options", () => {
-    // A model that never declared accepts_nested_attributes_for has no configs
-    // of its own (Rails asserts ActiveRecord::Base.nested_attributes_options == {}).
     class Plain extends Base {}
-    const configs = (Plain as any)._nestedAttributeConfigs;
-    expect(configs === undefined || (Array.isArray(configs) && configs.length === 0)).toBe(true);
+    expect(Plain.nestedAttributesOptions).toEqual({});
   });
 
   it("should add a proc to nested attributes options", () => {
-    const configs = (Pirate as any)._nestedAttributeConfigs;
-    const rejectAllBlank = configs.find(
-      (c: any) => c.associationName === "birdsWithRejectAllBlank",
-    );
-    expect(rejectAllBlank.options.rejectIf).toBe(REJECT_ALL_BLANK_PROC);
+    const options = Pirate.nestedAttributesOptions;
+    expect(options.birdsWithRejectAllBlank.rejectIf).toBe(REJECT_ALL_BLANK_PROC);
     for (const name of ["parrots", "birds"]) {
-      const cfg = configs.find((c: any) => c.associationName === name);
-      expect(typeof cfg.options.rejectIf).toBe("function");
+      expect(typeof options[name].rejectIf).toBe("function");
     }
   });
 

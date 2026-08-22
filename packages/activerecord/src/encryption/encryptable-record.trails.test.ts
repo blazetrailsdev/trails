@@ -14,7 +14,7 @@ import {
   EncryptedBook,
   UnencryptedBook,
 } from "../test-helpers/models/book-encrypted.js";
-import { EncryptableRecord, deterministicEncryptedAttributes } from "./encryptable-record.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
@@ -182,10 +182,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
  */
 describe("ActiveRecord::Encryption::EncryptableRecord.encrypted_attributes? (trails)", () => {
   it("is true once a model has declared an encrypted attribute", () => {
-    expect(EncryptableRecord.isEncryptedAttributes(EncryptedBook)).toBe(true);
+    expect(EncryptedBook.isEncryptedAttributes).toBe(true);
   });
 
   it("is false for a model that never assigned the class_attribute", () => {
-    expect(EncryptableRecord.isEncryptedAttributes(UnencryptedBook)).toBe(false);
+    expect(UnencryptedBook.isEncryptedAttributes).toBe(false);
   });
 });
