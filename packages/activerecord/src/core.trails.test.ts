@@ -268,10 +268,10 @@ describe("init_internals / initialize_dup super chain", () => {
     // Dirty#initialize_dup: the copy carries the source's pending changes but on
     // its own tracker, so writing to one no longer marks the other.
     expect(duped.title).toBe("Bob");
-    expect(duped.willSaveChangeToAttribute("title")).toBe(true);
+    expect(duped.isWillSaveChangeToAttribute("title")).toBe(true);
     duped.content = "Changed";
-    expect(duped.willSaveChangeToAttribute("content")).toBe(true);
-    expect(topic.willSaveChangeToAttribute("content")).toBe(false);
+    expect(duped.isWillSaveChangeToAttribute("content")).toBe(true);
+    expect(topic.isWillSaveChangeToAttribute("content")).toBe(false);
     expect(topic.content).toBe("Hello");
 
     expect(duped.isNewRecord()).toBe(true);

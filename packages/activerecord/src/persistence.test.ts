@@ -2064,7 +2064,7 @@ describe("PersistenceTest", () => {
   it("update attribute in before validation respects callback chain", async () => {
     let counter = 0;
     const callOnce = (record: any) => {
-      if (record.savedChangeToAuthor_name()) counter += 1;
+      if (record.isSavedChangeToAuthor_name()) counter += 1;
     };
     class TrackingTopic extends Topic {
       static {
@@ -2076,7 +2076,7 @@ describe("PersistenceTest", () => {
           callOnce(this);
         });
         self.afterUpdate(function (this: any) {
-          if (this.savedChangeToAuthor_name()) callOnce(this);
+          if (this.isSavedChangeToAuthor_name()) callOnce(this);
         });
       }
     }

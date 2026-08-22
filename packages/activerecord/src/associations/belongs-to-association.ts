@@ -222,7 +222,7 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   isSavedChangeToTarget(): boolean {
-    return this.foreignKeyNames().some((fk) => this.owner.savedChangeToAttribute(fk));
+    return this.foreignKeyNames().some((fk) => this.owner.isSavedChangeToAttribute(fk));
   }
 
   // --- Protected ---

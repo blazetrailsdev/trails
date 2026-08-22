@@ -46,7 +46,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
 
   override isSavedChangeToTarget(): boolean {
     return (
-      super.isSavedChangeToTarget() || this.owner.savedChangeToAttribute(this.foreignTypeName())
+      super.isSavedChangeToTarget() || this.owner.isSavedChangeToAttribute(this.foreignTypeName())
     );
   }
 

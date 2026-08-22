@@ -1536,7 +1536,7 @@ type PersistenceInstanceChainHost = {
   _attributes: any;
   _dirty: { reinstateNewRecordChanges(attributes: unknown, skip: Set<string>): void };
   readAttribute(name: string): unknown;
-  willSaveChangeToAttribute(name: string): boolean;
+  isWillSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
 };

@@ -789,8 +789,8 @@ export function is_recordChanged(reflection: any, record: any, key: any[]): bool
     (typeof record.isNewRecord === "function" ? record.isNewRecord() : false) ||
     isAssociationForeignKeyChanged(reflection, record, key) ||
     isInversePolymorphicAssociationChanged(reflection, record) ||
-    (typeof record.willSaveChangeToAttribute === "function"
-      ? fkCols.some((col) => record.willSaveChangeToAttribute(col))
+    (typeof record.isWillSaveChangeToAttribute === "function"
+      ? fkCols.some((col) => record.isWillSaveChangeToAttribute(col))
       : false)
   );
 }

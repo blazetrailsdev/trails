@@ -131,6 +131,7 @@ import {
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
+  type DirtyOptions,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
@@ -206,6 +207,7 @@ import {
   attributeForDatabase as _attributeForDatabase,
   queryCastAttribute as _queryCastAttribute,
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
+  savedChangeToAttribute as _savedChangeToAttribute,
   attributeBeforeLastSave as _attributeBeforeLastSave,
   isWillSaveChangeToAttribute as _isWillSaveChangeToAttribute,
   attributeChangeToBeSaved as _attributeChangeToBeSaved,
@@ -1721,12 +1723,13 @@ export class Base extends Model {
    * The `class_attribute` writer gives Active Record its own array rather than
    * mutating ActiveModel's.
    *
-   * dirty.rb:54's `attribute_method_prefix("saved_change_to_",
-   * parameters: false)` has no entry: Ruby tells the array-returning
-   * `saved_change_to_name` from the predicate `saved_change_to_name?` by the
-   * `?`, which the camel spelling drops, so both would generate
-   * `savedChangeToName`. Story:
-   * 0096-naming-identifier-burndown/saved-change-to-attribute-values-generated-half.
+   * Ruby tells the predicate `saved_change_to_name?` (dirty.rb:53) from the
+   * array-returning `saved_change_to_name` (dirty.rb:54) by the trailing `?`,
+   * which the camel spelling drops; the `is*` prefix
+   * (docs/ruby-ts-conventions.md) is where TypeScript puts the same
+   * distinction, so it goes in the pattern's own prefix and the derived
+   * `${prefix}Attribute${suffix}` proxy target (attribute_methods.rb:481)
+   * lands on `isSavedChangeToAttribute` unchanged.
    */
   static {
     this.attributeMethodPatterns = [
@@ -1734,9 +1737,10 @@ export class Base extends Model {
       new AttributeMethodPattern({ suffix: "BeforeTypeCast", parameters: false }),
       new AttributeMethodPattern({ suffix: "ForDatabase", parameters: false }),
       new AttributeMethodPattern({ suffix: "CameFromUser", parameters: false }),
-      new AttributeMethodPattern({ prefix: "savedChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ prefix: "isSavedChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ prefix: "savedChangeTo", parameters: false }),
       new AttributeMethodPattern({ suffix: "BeforeLastSave", parameters: false }),
-      new AttributeMethodPattern({ prefix: "willSaveChangeTo", parameters: "**options" }),
+      new AttributeMethodPattern({ prefix: "isWillSaveChangeTo", parameters: "**options" }),
       new AttributeMethodPattern({ suffix: "ChangeToBeSaved", parameters: false }),
       new AttributeMethodPattern({ suffix: "InDatabase", parameters: false }),
     ];
@@ -1954,7 +1958,7 @@ export class Base extends Model {
   // Cast `from:`/`to:` options through the enum mapping before comparison.
   // Rails normalises these via AttributeMutationTracker#type_cast (which calls
   // type.cast on the attribute's EnumType); we mirror it here for both live
-  // changes (attributeChanged) and persisted changes (savedChangeToAttribute).
+  // changes (attributeChanged) and persisted changes (isSavedChangeToAttribute).
   // All enums are label-stored via the registered EnumType with their mapping
   // in the single `_enums` registry.
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
@@ -1976,16 +1980,8 @@ export class Base extends Model {
    * (attribute_mutation_tracker.rb:44-48) and trails cannot: alias resolution
    * and the `type_cast(attr_name, …)` of each option through the attribute's
    * `EnumType`, both of which need the class, not the record.
-   *
-   * The NAME is forced: a generated `savedChangeToName` reaches its target
-   * through the derived `${prefix}attribute${suffix}` join
-   * (attribute_methods.rb:481), and Ruby tells the predicate from the value
-   * reader by a TRAILING `?` where TypeScript's convention is a LEADING `is` —
-   * so no pattern can derive `isSavedChangeToAttribute`, the spelling the port
-   * carries. Story:
-   * 0096-naming-identifier-burndown/converge-ar-dirty-generic-names-onto-dirty-ts.
    */
-  savedChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+  isSavedChangeToAttribute(name: string, options?: DirtyOptions): boolean {
     const ctor = this.constructor as typeof Base;
     if (options) {
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
@@ -1996,10 +1992,10 @@ export class Base extends Model {
 
   /**
    * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
-   * (attribute_methods/dirty.rb:138-140). Same split and the same forced
-   * spelling as {@link Base.savedChangeToAttribute}.
+   * (attribute_methods/dirty.rb:138-140). Same split as
+   * {@link Base.isSavedChangeToAttribute}.
    */
-  willSaveChangeToAttribute(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+  isWillSaveChangeToAttribute(name: string, options?: DirtyOptions): boolean {
     const ctor = this.constructor as typeof Base;
     if (options) {
       const canonical = (ctor as any).attributeAliases?.[name] ?? name;
@@ -3557,7 +3553,7 @@ export class Base extends Model {
           // use valueForDatabase (user-set value as expected DB version → stale if mismatch).
           // Otherwise use originalValueForDatabase() so NULL-in-DB → IS NULL.
           const lockAttr = this._attributes.getAttribute(lockCol);
-          const lockWhereValue = this.willSaveChangeToAttribute(lockCol)
+          const lockWhereValue = this.isWillSaveChangeToAttribute(lockCol)
             ? lockAttr.valueForDatabase
             : lockAttr.originalValueForDatabase();
           if (lockWhereValue == null) {
@@ -4882,9 +4878,12 @@ include(Base, {
   // with `include(Base, _PrimaryKey)` / `include(Base, _CompositePrimaryKey)`
   // above: the readers are accessor properties, and only those calls copy
   // descriptors — this object literal is read by value and would flatten them.
-  isSavedChangeToAttribute: _isSavedChangeToAttribute,
+  // `isSavedChangeToAttribute` / `isWillSaveChangeToAttribute` are defined in
+  // the class body above (they carry the alias + enum type_cast step), so they
+  // are deliberately absent here — this literal is assigned onto the prototype
+  // after the class and would otherwise clobber them.
+  savedChangeToAttribute: _savedChangeToAttribute,
   attributeBeforeLastSave: _attributeBeforeLastSave,
-  isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
   attributeChangeToBeSaved: _attributeChangeToBeSaved,
   attributeInDatabase: _attributeInDatabase,
   attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,

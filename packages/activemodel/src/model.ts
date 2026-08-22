@@ -39,6 +39,7 @@ import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import {
   DirtyTracker,
+  type DirtyOptions,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
@@ -1776,15 +1777,15 @@ export class Model {
     return this._dirty.changes;
   }
 
-  attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = (this.constructor as typeof Model).resolveAttributeName(name);
-    if (!this._dirty.attributeChanged(name)) return false;
-    if (!options) return true;
-    const change = this._dirty.attributeChange(name);
-    if (!change) return false;
-    if ("from" in options && change[0] !== options.from) return false;
-    if ("to" in options && change[1] !== options.to) return false;
-    return true;
+  /**
+   * Mirrors: ActiveModel::Dirty#attribute_changed? (dirty.rb:300-302) —
+   * `mutations_from_database.changed?(attr_name.to_s, **options)`.
+   */
+  attributeChanged(name: string, options?: DirtyOptions): boolean {
+    return this._dirty.attributeChanged(
+      (this.constructor as typeof Model).resolveAttributeName(name),
+      options,
+    );
   }
 
   attributeWas(name: string): unknown {
@@ -1808,15 +1809,11 @@ export class Model {
    *
    * Mirrors: ActiveModel::Dirty#attribute_previously_changed?
    */
-  attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    name = (this.constructor as typeof Model).resolveAttributeName(name);
-    const changes = this._dirty.previousChanges;
-    if (!(name in changes)) return false;
-    if (!options) return true;
-    const change = changes[name];
-    if ("from" in options && change[0] !== options.from) return false;
-    if ("to" in options && change[1] !== options.to) return false;
-    return true;
+  attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean {
+    return this._dirty.attributePreviouslyChanged(
+      (this.constructor as typeof Model).resolveAttributeName(name),
+      options,
+    );
   }
 
   /**
