@@ -1349,14 +1349,20 @@ export function tagsForOwner(
 /** Record one declaration's tagged calls (call → the reason that justified it,
  *  `""` for an artifact predating the reasons) under (file, name, owner). The
  *  two families are recorded identically, so they share one writer. */
-function recordTaggedCalls(
+export function recordTaggedCalls(
   byFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
   file: string,
   name: string,
   owner: string,
   calls: string[],
   reasons: Record<string, string> | undefined,
+  scope: "package" | "dep" = "package",
 ): void {
+  // Tags on a DEP package's members are never consulted here — only the
+  // package under comparison has pairs — and the map is keyed by the relative
+  // tsFile alone, so a dep tag on a same-basename file (every package ships a
+  // `gem-version.ts`) would land under this package's file and read as stale.
+  if (scope === "dep") return;
   const byName = byFileName.get(file) ?? new Map<string, Map<string, Map<string, string>>>();
   const byClass = byName.get(name) ?? new Map<string, Map<string, string>>();
   const tagged = byClass.get(owner) ?? new Map<string, string>();
@@ -2728,6 +2734,7 @@ export function main() {
           owner,
           m.missingRailsCalls,
           m.missingRailsCallReasons,
+          scope,
         );
       }
       if (m.missingRailsArgs !== undefined) {
@@ -2738,6 +2745,7 @@ export function main() {
           owner,
           m.missingRailsArgs,
           m.missingRailsArgsReasons,
+          scope,
         );
       }
       if (m.callSeq !== undefined) {

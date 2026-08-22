@@ -15,6 +15,12 @@ export const VERSION = {
  * Returns the currently loaded version of Active Support as a +Gem::Version+.
  *
  * Mirrors: `ActiveSupport.gem_version` (gem_version.rb:5-7).
+ *
+ * @missingRailsCall new — PERMANENT: `Gem::Version.new VERSION::STRING` (gem_version.rb:6)
+ *   wraps the version in RubyGems' comparable Version object. `Gem` is the
+ *   RubyGems stdlib, not Rails, and trails ports no `Gem::Version`, so
+ *   `gemVersion` answers `VERSION.STRING` itself — the same value, unwrapped —
+ *   exactly as every other package's `gemVersion` does.
  */
 export function gemVersion(): string {
   return VERSION.STRING;

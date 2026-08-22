@@ -705,8 +705,11 @@ export class AssociationScope {
     // `_mergeReferencedJoins` helper, so keep the arel dependency visible on
     // this method to match Rails' activerecord → arel edge (dep-parity gate).
     void Nodes.OuterJoin;
+    // Rails: `chain_head = chain.first` (association_scope.rb:131), read by the
+    // one `reverse_each` body that handles every chain position.
+    const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 1; i--) {
-      scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
+      scope = this._mergeReflectionScopeChain(scope, chain[i], owner, chainHead);
     }
     // Apply the head reflection's scope. Rails: reflection.rb:448,
     // scope_for — 0-arity scopes get `this`=relation, >=1-arity get
@@ -719,7 +722,7 @@ export class AssociationScope {
     // scope. So detect through explicitly and invoke `.scope` directly with
     // the same arity / `this` semantics. The source reflection's scope is a
     // SEPARATE concern, merged below.
-    const head = chain[0] as {
+    const head = chainHead as {
       scopeFor?: (rel: unknown, owner: unknown) => unknown;
       scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
       isThroughReflection?: () => boolean;
@@ -731,55 +734,27 @@ export class AssociationScope {
       const result = invokeScopeLambda(head.scope as ScopeLambda<unknown>, scope, owner);
       if (result) scope = result;
     }
-    // Rails folds the source reflection's scope into a has_many/has_one
-    // :through query via `add_constraints`' `chain.reverse_each` over
-    // `reflection.constraints` (association_scope.rb). The head branch above
-    // only applies the through reflection's OWN (delegate) scope; the SOURCE
-    // reflection's scope — e.g.
-    // `Post.has_many :nonexistent_comments, -> { where("comments.id < 0") }`
-    // for `Author.has_many :nonexistent_comments, through: :posts` — lives on
-    // the source reflection and would otherwise be dropped, so the through
-    // query returns all rows instead of the scoped subset. Merge its WHERE/
-    // ORDER predicates here, evaluated against the source klass' table.
-    //
-    // For a `source_type:` through, the source reflection is a polymorphic
-    // belongsTo whose `klass` is uncomputable (it raises "Polymorphic
-    // associations do not support computing the class."). Rails' add_constraints
-    // does NOT special-case source_type — `chain.reverse_each` always folds in
-    // `source_reflection.constraints`, so a scope declared on the polymorphic
-    // belongsTo source (e.g. `belongs_to :taggable, -> { where(...) },
-    // polymorphic: true`) must still merge. The resolved source class is the
-    // runtime `klass` off the chain head (a RuntimeReflection, whose `klass` IS
-    // the live `association.klass`, reflection.rb:1265), so pass it as an
-    // override and avoid touching the uncomputable polymorphic `klass`.
-    // (The THROUGH/join-model scope on a source_type association is carried by a
-    // `PolymorphicReflection` chain entry already merged by the reverse_each loop
-    // above — e.g. Tag's `null_taggings -> { none }` — independent of this.)
-    if (isThrough) {
-      const sourceRefl = (head as { sourceReflection?: AbstractReflection | null })
-        .sourceReflection;
-      if (sourceRefl) {
-        const sourceType = (head as { options?: { sourceType?: unknown } }).options?.sourceType;
-        scope = this._mergeReflectionScopeChain(
-          scope,
-          sourceRefl,
-          owner,
-          sourceType ? (chain[0] as { klass?: typeof Base }).klass : undefined,
-        );
-      }
-    }
+    // Rails' `chain.reverse_each` folds the CHAIN HEAD too
+    // (association_scope.rb:132), and a through head's `constraints` is
+    // `source_reflection.constraints << scope` (reflection.rb:1180-1184) — that
+    // is how a scope on the SOURCE reflection merges, evaluated against the
+    // head's own `klass`. For a `source_type:` through that klass is the runtime
+    // `@association.klass` (`RuntimeReflection#klass`, reflection.rb:1265), so
+    // the polymorphic belongsTo's uncomputable `klass` is never read.
+    scope = this._mergeReflectionScopeChain(scope, chainHead, owner, chainHead);
     return scope;
   }
 
   /**
-   * Apply a non-head chain entry's scope lambda. Rails' add_constraints
+   * Apply one chain entry's scope lambdas — Rails' `chain.reverse_each` loop
+   * body. Rails' add_constraints
    * does this via `eval_scope` + `scope.where_clause += item.where_clause`
    * + `scope.order_values = item.order_values | scope.order_values` —
    * granular per-attribute merging that pushes ONLY where and order
    * predicates onto the main relation. A through-reflection scope's
    * limit / select / joins / etc must NOT override the main scope.
    *
-   * For non-head entries we evaluate the lambda against a fresh
+   * The lambda is evaluated against a fresh
    * `entry.klass.unscoped` (with STI type_condition re-applied for
    * subclasses, matching the head-scope path in `scope()`) so its
    * `where(...)` calls bind to the correct table. We then push the
@@ -793,19 +768,8 @@ export class AssociationScope {
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
-    klassOverride?: typeof Base,
+    chainHead?: AbstractReflection | ReflectionProxy,
   ): unknown {
-    const r = reflection as {
-      scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
-      scopeFor?: (rel: unknown, owner?: unknown) => unknown;
-      klass?: typeof Base;
-    };
-    // For a polymorphic belongsTo source (source_type: through), reading
-    // `reflection.klass` raises — the caller threads the resolved source_type
-    // target class here instead. Guard the read so the polymorphic case never
-    // computes the uncomputable klass.
-    const entryKlass = klassOverride ?? r.klass;
-    if (!entryKlass) return scope;
     // Iterate `reflection.constraints()` rather than special-casing
     // PolymorphicReflection via instanceof. For ordinary
     // AssociationReflection / ReflectionProxy entries `constraints()`
@@ -821,18 +785,13 @@ export class AssociationScope {
         reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
       ).constraints?.() ?? [];
     if (constraints.length === 0) return scope;
-    // Rails' `source_type:` chain entry is a PolymorphicReflection, whose `klass`
-    // delegates to `@reflection` (reflection.rb:1229-1230) and is read by `build_scope`'s
-    // `klass = self.klass` default (reflection.rb:336); trails' entry is the raw
-    // polymorphic belongsTo, whose `klass` raises, so resolve it here instead of
-    // threading a fourth argument past `eval_scope` (association_scope.rb:169).
-    const entry = klassOverride
-      ? (Object.create(reflection, { klass: { value: klassOverride } }) as typeof reflection)
-      : reflection;
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      const evaluated = this.evalScope(entry, c, owner);
+      // Rails: `if scope_chain_item == chain_head.scope` (association_scope.rb:137)
+      // takes the merge-except path, which trails applies in `addConstraints`.
+      if (c === (chainHead as { scope?: unknown } | undefined)?.scope) continue;
+      const evaluated = this.evalScope(reflection, c, owner);
       merged = this._pushScopeIntoRelation(merged, evaluated);
     }
     return merged;
