@@ -2,28 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/cipher/aes256-gcm.ts",
-    "rubyName": "decrypt",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "const:CIPHER_TYPE"
-    ],
-    "reason": "aes256_gcm.rb:64 `OpenSSL::Cipher.new(CIPHER_TYPE)` — node's crypto builds the cipher through the `createDecipheriv(Aes256Gcm.CIPHER_TYPE, ...)` factory (aes256-gcm.ts:117), not a constructor, so CIPHER_TYPE is passed there and the body's only `new` is the Configuration error. Language shortcoming."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/cipher/aes256-gcm.ts",
-    "rubyName": "encrypt",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "const:CIPHER_TYPE"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at encryption/cipher/aes256_gcm.rb:39 `cipher = OpenSSL::Cipher.new(CIPHER_TYPE)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/cipher/aes256-gcm.ts",
     "rubyName": "encrypt",
     "call": "order:generateIv,constructor",
     "reason": "Rails builds `OpenSSL::Cipher.new` before `generate_iv` (aes256_gcm.rb:38-43) only so `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv` takes the IV as a constructor argument, so the IV must be produced first and the two calls necessarily swap order."

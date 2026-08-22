@@ -2946,7 +2946,12 @@ function recordCallSite(
   if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
 
   const name = callSiteName(call);
-  if (name !== undefined) {
+  // A thrown construction is dropped outright rather than emitted as an
+  // uncomparable site: keeping it would leave it occupying a pairing slot, so
+  // a Ruby `Cipher.new(CIPHER_TYPE)` would consume the guard message instead of
+  // pairing with the real construction the TS body makes later. Same call the
+  // ORDER stream makes at the `isThrownConstruction` use below.
+  if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
     const args = describeArgs(call.arguments, flags);
     sites.push({ name, args, flags: [...new Set(flags)] });

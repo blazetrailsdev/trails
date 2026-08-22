@@ -23,17 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{connectionPool=ref:pool}"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/sqlite3_adapter.rb:120 `raise ActiveRecord::NoDatabaseError.new(connection_pool: @pool)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "new_client",
     "call": "include?",
     "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:36-41: Rails rescues `Errno::ENOENT` and re-raises `NoDatabaseError` only when `error.message.include?(\"No such file or directory\")`. trails' `newClient` constructs an adapter rather than opening a file, so there is no open-time errno to classify; the missing-database mapping happens in `translateException`. Tracked by RFC 0094."

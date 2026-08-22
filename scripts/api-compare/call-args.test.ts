@@ -791,6 +791,18 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:tableName", "id:options"]]);
   });
 
+  it("pairs the real construction in a body that both throws and constructs", () => {
+    // aes256-gcm.ts: a `throw new EncryptionError(...)` guard ahead of the
+    // body's real `new Cipher(CIPHER_TYPE)`. With the guard dropped by the
+    // extractor, Rails' `OpenSSL::Cipher.new(CIPHER_TYPE)` pairs with the
+    // construction it actually mirrors rather than with the guard message.
+    const pairs = pairCallSites(
+      [site("new", ["const:CIPHER_TYPE"])],
+      [site("constructor", ["const:CIPHER_TYPE"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["const:CIPHER_TYPE"]]);
+  });
+
   it("prefers an exact agreement over a longer partial one", () => {
     const pairs = pairCallSites(
       [site("visit", ["id:o"])],

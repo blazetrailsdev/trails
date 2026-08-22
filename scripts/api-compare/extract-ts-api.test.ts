@@ -3249,6 +3249,37 @@ describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
+  it("drops a thrown construction so the real construction pairs", () => {
+    // `throw new Foo(msg)` is Rails' `raise Foo, msg` — no `.new` site on the
+    // Ruby side — so recording it manufactures a `constructor` site that eats
+    // the pairing slot the body's real instantiation needs.
+    expect(
+      site(
+        `class Foo {
+          create() {
+            if (!key) throw new ActiveRecordEncryptionError("key missing");
+            return new Cipher(CIPHER_TYPE);
+          }
+        }`,
+      ),
+    ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
+  });
+
+  it("keeps a construction nested inside a thrown expression", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            throw wrap(new Cipher(CIPHER_TYPE));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "wrap", args: ["call:constructor"], flags: [] },
+      { name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] },
+    ]);
+  });
+
   it("escapes a descriptor delimiter inside a string value", () => {
     expect(
       site(
