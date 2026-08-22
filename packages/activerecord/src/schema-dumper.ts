@@ -308,8 +308,7 @@ class AdapterSchemaSource implements SchemaSource {
         // is false); clear it so schemaDefault doesn't emit a `default:` alongside
         // the `as:`/`stored:` generation options.
         default: isVirtual ? undefined : col.default,
-        // Rails Column#has_default? (connection_adapters/column.rb:30-32); a
-        // virtual column has none (postgresql/column.rb:33, sqlite3/column.rb).
+        // Rails Column#has_default? (connection_adapters/column.rb:30-32).
         hasDefault: isVirtual
           ? false
           : typeof (col as any).hasDefault === "boolean"
