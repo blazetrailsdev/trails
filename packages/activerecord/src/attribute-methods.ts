@@ -6,6 +6,7 @@
 import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
+  aliasesByAttributeName,
   missingAttribute,
   type AttributeMethodPattern,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
@@ -484,24 +485,13 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   ) {
     return;
   }
-  if (this.attributeAliases) {
-    // DEVIATION: Rails walks `aliases_by_attribute_name` (old_name =>
-    // [new_names], attribute_methods.rb:133-137), a per-class ivar its
-    // `inherited` hook resets to nil (activemodel/attribute_methods.rb:387-394),
-    // so a subclass generates only ITS OWN aliases — the parent's came from the
-    // `superclass.generate_alias_attributes` cascade above. This walks the
-    // inverse `attribute_aliases`, a class_attribute that INHERITS, so a
-    // subclass re-generates every inherited alias with `override: true` and
-    // takes its own descriptor where Rails leaves it inheriting the parent's.
-    // Converging also needs activemodel's `aliasesByAttributeName` to start
-    // empty per subclass instead of copying the parent, and to be exported.
-    // Story: generate-alias-attributes-from-aliases-by-attribute-name.
-    CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
-      for (const [newName, oldName] of Object.entries(this.attributeAliases!)) {
+  CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
+    for (const [oldName, newNames] of aliasesByAttributeName(this as never)) {
+      for (const newName of newNames) {
         generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
       }
-    });
-  }
+    }
+  });
   this._aliasAttributesMassGenerated = true;
 }
 

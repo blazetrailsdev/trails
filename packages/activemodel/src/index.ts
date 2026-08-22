@@ -9,6 +9,7 @@ export { Validator, EachValidator, BlockValidator } from "./validator.js";
 export {
   MissingAttributeError,
   missingAttribute,
+  aliasesByAttributeName,
   AttributeMethodPattern,
   AttrNames,
   buildMangledName,
