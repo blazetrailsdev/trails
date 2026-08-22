@@ -177,7 +177,7 @@ export function travelTo(
   } else if (typeof dateOrTime === "string") {
     // Without a `Time.zone` set there is no zone to parse through.
     const zone = timeZone();
-    now = zone ? zone.parse(dateOrTime).toTime() : Temporal.Instant.from(dateOrTime);
+    now = zone ? zone.parse(dateOrTime)!.toTime() : Temporal.Instant.from(dateOrTime);
   } else if (dateOrTime instanceof Date) {
     now = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());
   } else {

@@ -4,7 +4,12 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Rational, Temporal } from "@blazetrails/date";
-import { toFs, zone } from "@blazetrails/activesupport";
+import {
+  TimeWithZone,
+  inTimeZone as stringInTimeZone,
+  toFs,
+  zone,
+} from "@blazetrails/activesupport";
 
 import { isUtc } from "./timezone.js";
 
@@ -114,36 +119,34 @@ export function typeCastForSchema(value: unknown): string {
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
- * (time_value.rb:42-44) — `value.in_time_zone`, whose zone is the thread-local
- * `Time.zone`.
+ * (time_value.rb:42-44)
  *
- * With no zone set at all Ruby takes `in_time_zone`'s else arm and answers a
- * bare `to_time` (`date_and_time/zones.rb:20-27`) — a value with no zone
- * attached. `Temporal.PlainDateTime` is that zoneless value, so the else arm
- * is answered as one rather than anchored to a zone Ruby never picked.
+ *   def user_input_in_time_zone(value)
+ *     value.in_time_zone
+ *   end
+ *
+ * Ruby picks `in_time_zone` off the receiver's class, and the two definitions
+ * that matter here do different things: `String#in_time_zone`
+ * (`core_ext/string/zones.rb:8-14`) is `Time.find_zone!(zone).parse(self)`,
+ * falling back to `String#to_time` with no zone set, while a `Time`'s is
+ * `DateAndTime::Zones#in_time_zone` (`core_ext/date_and_time/zones.rb:20-27`).
+ * A TS free function has no receiver to dispatch on, so the arm is chosen from
+ * the value's type — and each arm calls the ported core-ext, so no parsing
+ * lives here. The `Temporal.Instant` arm is `zones.rb:22-27` inline:
+ * `time_with_zone(self, time_zone)` when a zone resolves, else the time
+ * itself.
  */
 export function userInputInTimeZone(
   value: unknown,
-): Temporal.ZonedDateTime | Temporal.PlainDateTime | null {
+): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | null {
   if (value === null || value === undefined) return null;
+  if (value instanceof TimeWithZone) return value.inTimeZone();
   if (value instanceof Temporal.ZonedDateTime) return value;
-  const str = String(value).trim();
-  if (str === "") return null;
-  if (str.includes("[")) {
-    try {
-      return Temporal.ZonedDateTime.from(str);
-    } catch {
-      return null;
-    }
-  }
-  try {
+  if (value instanceof Temporal.Instant) {
     const timeZone = zone();
-    const time = Temporal.PlainDateTime.from(str.replace(" ", "T"));
-    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo.identifier);
-    return time;
-  } catch {
-    return null;
+    return timeZone ? new TimeWithZone(value, timeZone) : value;
   }
+  return stringInTimeZone(String(value)) ?? null;
 }
 
 /**

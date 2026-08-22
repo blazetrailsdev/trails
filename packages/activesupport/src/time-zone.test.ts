@@ -371,7 +371,7 @@ describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
   it("parse", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("1999-12-31 19:00:00");
+    const twz = zone.parse("1999-12-31 19:00:00")!;
     expect(twz.hour).toBe(19);
     expect(twz.day).toBe(31);
     expect(twz.month).toBe(12);
@@ -382,45 +382,46 @@ describe("TimeZoneTest", () => {
 
   it("parse string with timezone", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2024-01-15T12:00:00Z");
+    const twz = zone.parse("2024-01-15T12:00:00Z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2024, 0, 15, 12, 0, 0));
     expect(twz.hour).toBe(7);
   });
 
   it("parse with old date", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("1883-07-01 00:00:00");
+    const twz = zone.parse("1883-07-01 00:00:00")!;
     expect(twz.year).toBe(1883);
   });
 
   it("parse far future date with time zone offset in string", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2050-01-01T00:00:00-05:00");
+    const twz = zone.parse("2050-01-01T00:00:00-05:00")!;
     expect(twz.utc().toZonedDateTimeISO("UTC").year).toBe(2050);
   });
 
   it("parse returns nil when string without date information is passed in", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect(() => zone.parse("foobar")).toThrow();
+    expect(zone.parse("foobar")).toBeUndefined();
+    expect(zone.parse("   ")).toBeUndefined();
   });
 
   it("parse with incomplete date", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2000-01-01");
+    const twz = zone.parse("2000-01-01")!;
     expect(twz.year).toBe(2000);
     expect(twz.hour).toBe(0);
   });
 
   it("parse with day omitted", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2005-02-01");
+    const twz = zone.parse("2005-02-01")!;
     expect(twz.year).toBe(2005);
     expect(twz.month).toBe(2);
   });
 
   it("parse should not black out system timezone dst jump", () => {
     const zone = TimeZone.find("Pacific Time (US & Canada)")!;
-    const twz = zone.parse("2012-03-25 03:29:00");
+    const twz = zone.parse("2012-03-25 03:29:00")!;
     expect(twz.hour).toBe(3);
     expect(twz.min).toBe(29);
     expect(twz.day).toBe(25);
@@ -430,7 +431,7 @@ describe("TimeZoneTest", () => {
 
   it("parse should black out app timezone dst jump", () => {
     const zone = TimeZone.find("Pacific Time (US & Canada)")!;
-    const twz = zone.parse("2012-03-11 02:29:00");
+    const twz = zone.parse("2012-03-11 02:29:00")!;
     expect(twz.hour).toBe(3);
     expect(twz.min).toBe(29);
     expect(twz.day).toBe(11);
@@ -440,38 +441,38 @@ describe("TimeZoneTest", () => {
 
   it("parse with missing time components", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("1999-12-31");
+    const twz = zone.parse("1999-12-31")!;
     expect(twz.hour).toBe(0);
     expect(twz.min).toBe(0);
   });
 
   it("parse with javascript date", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2013-01-01T00:00:00");
+    const twz = zone.parse("2013-01-01T00:00:00")!;
     expect(twz.year).toBe(2013);
   });
 
   it("parse doesnt use local dst", () => {
     const zone = TimeZone.find("UTC")!;
-    const twz = zone.parse("2013-03-10 02:00:00");
+    const twz = zone.parse("2013-03-10 02:00:00")!;
     expect(twz.hour).toBe(2);
     expect(twz.day).toBe(10);
   });
 
   it("parse handles dst jump", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.parse("2006-04-02 02:00:00");
+    const twz = zone.parse("2006-04-02 02:00:00")!;
     expect(twz.hour).toBe(3);
   });
 
   it("parse with invalid date", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect(() => zone.parse("")).toThrow();
+    const zone = TimeZone.find("UTC")!;
+    expect(() => zone.parse("9000")).toThrow("argument out of range");
   });
 
   it("parse with ambiguous time", () => {
     const zone = TimeZone.find("Moscow")!;
-    const twz = zone.parse("2014-10-26 01:00:00");
+    const twz = zone.parse("2014-10-26 01:00:00")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
@@ -549,7 +550,7 @@ describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
   it("strptime", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S");
+    const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
@@ -557,7 +558,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with nondefault time zone", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S");
+    const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
@@ -565,7 +566,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with explicit time zone as abbrev", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00 PST", "%Y-%m-%d %H:%M:%S %Z");
+    const twz = zone.strptime("1999-12-31 12:00:00 PST", "%Y-%m-%d %H:%M:%S %Z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
@@ -573,7 +574,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with explicit time zone as h offset", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00 -08", "%Y-%m-%d %H:%M:%S %:::z");
+    const twz = zone.strptime("1999-12-31 12:00:00 -08", "%Y-%m-%d %H:%M:%S %:::z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
@@ -581,7 +582,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with explicit time zone as hm offset", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00 -08:00", "%Y-%m-%d %H:%M:%S %:z");
+    const twz = zone.strptime("1999-12-31 12:00:00 -08:00", "%Y-%m-%d %H:%M:%S %:z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
@@ -589,7 +590,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with explicit time zone as hms offset", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00 -08:00:00", "%Y-%m-%d %H:%M:%S %::z");
+    const twz = zone.strptime("1999-12-31 12:00:00 -08:00:00", "%Y-%m-%d %H:%M:%S %::z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
@@ -597,7 +598,7 @@ describe("TimeZoneTest", () => {
 
   it("strptime with almost explicit time zone", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1999-12-31 12:00:00 %Z", "%Y-%m-%d %H:%M:%S %%Z");
+    const twz = zone.strptime("1999-12-31 12:00:00 %Z", "%Y-%m-%d %H:%M:%S %%Z")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
     expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
@@ -606,13 +607,13 @@ describe("TimeZoneTest", () => {
   it("strptime with day omitted", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const base = zone.local(2000, 1, 1);
-    expect(zone.strptime("Feb", "%b", base).month).toBe(2);
-    expect(zone.strptime("Feb", "%b", base).day).toBe(1);
-    expect(zone.strptime("Feb 2005", "%b %Y", base).year).toBe(2005);
-    expect(zone.strptime("Feb 2005", "%b %Y", base).month).toBe(2);
-    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base).day).toBe(2);
-    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base).month).toBe(2);
-    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base).year).toBe(2005);
+    expect(zone.strptime("Feb", "%b", base)!.month).toBe(2);
+    expect(zone.strptime("Feb", "%b", base)!.day).toBe(1);
+    expect(zone.strptime("Feb 2005", "%b %Y", base)!.year).toBe(2005);
+    expect(zone.strptime("Feb 2005", "%b %Y", base)!.month).toBe(2);
+    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base)!.day).toBe(2);
+    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base)!.month).toBe(2);
+    expect(zone.strptime("2 Feb 2005", "%e %b %Y", base)!.year).toBe(2005);
   });
 
   it("strptime with malformed string", () => {
@@ -622,19 +623,19 @@ describe("TimeZoneTest", () => {
 
   it("strptime with timestamp seconds", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1470272280", "%s");
+    const twz = zone.strptime("1470272280", "%s")!;
     expect(twz.toI()).toBe(1470272280);
   });
 
   it("strptime with timestamp milliseconds", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.strptime("1470272280000", "%Q");
+    const twz = zone.strptime("1470272280000", "%Q")!;
     expect(twz.toI()).toBe(1470272280);
   });
 
   it("strptime with ambiguous time", () => {
     const zone = TimeZone.find("Moscow")!;
-    const twz = zone.strptime("2014-10-26 01:00:00", "%Y-%m-%d %H:%M:%S");
+    const twz = zone.strptime("2014-10-26 01:00:00", "%Y-%m-%d %H:%M:%S")!;
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
