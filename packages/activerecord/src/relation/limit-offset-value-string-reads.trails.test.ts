@@ -50,6 +50,6 @@ describe("string limit_value / offset_value read sites", () => {
     await expect(async () => {
       for await (const _batch of Topic.limit("asdfadf").inBatches()) {
       }
-    }).rejects.toThrow(/comparison of String with \d+ failed/);
+    }).rejects.toThrow(/invalid value for Integer\(\): "asdfadf"/);
   });
 });
