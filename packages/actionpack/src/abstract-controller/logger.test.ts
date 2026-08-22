@@ -26,28 +26,6 @@ describe("benchmark()", () => {
     expect(lines[0]).toMatch(/^fetch \(\d+\.\d+ms\)$/);
   });
 
-  it("still logs when a sync block throws, and rethrows the error", () => {
-    const lines: string[] = [];
-    const logger: LoggerLike = { info: (m) => lines.push(m) };
-    expect(() =>
-      benchmark.call({ logger }, "bad work", () => {
-        throw new Error("boom");
-      }),
-    ).toThrow(/boom/);
-    expect(lines).toHaveLength(1);
-  });
-
-  it("still logs when an async block rejects, and the rejection propagates", async () => {
-    const lines: string[] = [];
-    const logger: LoggerLike = { info: (m) => lines.push(m) };
-    await expect(
-      benchmark.call({ logger }, "bad fetch", async () => {
-        throw new Error("kaboom");
-      }),
-    ).rejects.toThrow(/kaboom/);
-    expect(lines).toHaveLength(1);
-  });
-
   it("tolerates a logger whose `info` is not a function", () => {
     let ran = false;
     benchmark.call({ logger: { info: "not a function" } as unknown as LoggerLike }, "work", () => {

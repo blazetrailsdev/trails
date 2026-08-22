@@ -2,6 +2,10 @@
  * Pool manager — manages pool configs per role and shard.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PoolManager
+ *
+ * `@role_to_shard_mapping` is `Hash.new { |h, k| h[k] = {} }`
+ * (pool_manager.rb:7); JS has no Hash default block, so the auto-vivification
+ * is a Proxy `get` trap.
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -11,8 +15,6 @@ export class PoolManager {
   private _roleToShardMapping: Record<string, Record<string, PoolConfig>>;
 
   constructor() {
-    // pool_manager.rb:7 `Hash.new { |h, k| h[k] = {} }` — JS has no Hash
-    // default block, so auto-vivification is a Proxy `get` trap.
     this._roleToShardMapping = new Proxy({} as Record<string, Record<string, PoolConfig>>, {
       get(h, k) {
         if (typeof k !== "string") return Reflect.get(h, k);

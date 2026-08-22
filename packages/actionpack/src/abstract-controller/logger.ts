@@ -1,27 +1,15 @@
 /**
- * `AbstractController::Logger` — config slot for a per-controller
- * logger. Rails additionally mixes in `ActiveSupport::Benchmarkable`
- * (`benchmark(message, &block)`); the shared helper lives in
- * `@blazetrails/activesupport` and is re-exported here so the
- * abstract-controller surface keeps the same callable shape.
+ * `AbstractController::Logger` — config slot for a per-controller logger.
+ * Rails' `included do ... include ActiveSupport::Benchmarkable end`
+ * (logger.rb:11-14) is spelled here as a re-export of the mixin, which the
+ * controller class assigns to itself; `benchmark` then reads the
+ * controller's own `logger` reader (benchmarkable.rb:38).
  *
  * @internal
  */
 
-import { benchmark as benchmarkable, type BenchmarkLogger } from "@blazetrails/activesupport";
-
-export type LoggerLike = BenchmarkLogger;
+export { benchmark, type BenchmarkLogger as LoggerLike } from "@blazetrails/activesupport";
 
 export interface LoggerHost {
-  logger?: LoggerLike;
-}
-
-/**
- * Mirrors `ActiveSupport::Benchmarkable#benchmark`, mixed in the way Rails'
- * `include ActiveSupport::Benchmarkable` mixes it into
- * `AbstractController::Logger` (logger.rb:13) — `this` is the controller, and
- * the logger comes from its own `logger` reader (benchmarkable.rb:38).
- */
-export function benchmark<T>(this: LoggerHost, message: string, block: () => T): T {
-  return benchmarkable.call(this, message, { logOnError: true }, block) as T;
+  logger?: import("@blazetrails/activesupport").BenchmarkLogger;
 }
