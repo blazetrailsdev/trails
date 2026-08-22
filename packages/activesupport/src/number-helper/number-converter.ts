@@ -1,3 +1,4 @@
+import { Rational } from "@blazetrails/date";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
@@ -94,6 +95,9 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected isValidFloat(): boolean {
     if (this.number instanceof BigDecimal) return true;
+    // Ruby's `Float(Rational(9775, 100))` is `97.75` — a Rational converts,
+    // where `Number(rational)` is `NaN` (number_helper_test.rb:225-230).
+    if (this.number instanceof Rational) return Number.isFinite(this.number.toF());
     // Ruby's `Float("")` / `Float(" ")` raise, where `Number("")` is 0.
     if (typeof this.number === "string" && this.number.trim() === "") return false;
     const n = Number(this.number);
@@ -101,6 +105,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   protected numberAsFloat(): number {
+    if (this.number instanceof Rational) return this.number.toF();
     return this.number instanceof BigDecimal
       ? Number(this.number.toString("F"))
       : Number(this.number);

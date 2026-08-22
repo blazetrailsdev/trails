@@ -1,3 +1,4 @@
+import { Rational } from "@blazetrails/date";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
 
@@ -7,6 +8,15 @@ class ArgumentError extends Error {
 
 class NoMethodError extends Error {
   override name = "NoMethodError";
+}
+
+/** Ruby's `Kernel#BigDecimal(value)` over a String, which `convert_to_decimal`
+ *  reaches from two of its three arms (`rounding_helper.rb:28` and `:32`). */
+function bigDecimal(value: string): BigDecimal {
+  if (!BIGDECIMAL_STRING.test(value)) {
+    throw new ArgumentError(`invalid value for BigDecimal(): "${value}"`);
+  }
+  return new BigDecimal(value.trim());
 }
 
 /**
@@ -50,12 +60,17 @@ export class RoundingHelper {
    * silently coerced zero.
    */
   private convertToDecimal(number: unknown): BigDecimal {
-    if (number instanceof BigDecimal) return number;
-    const value = String(number);
-    if (!BIGDECIMAL_STRING.test(value)) {
-      throw new ArgumentError(`invalid value for BigDecimal(): "${value}"`);
+    if (typeof number === "number" || typeof number === "string") {
+      return bigDecimal(String(number));
     }
-    return new BigDecimal(value.trim());
+    if (number instanceof Rational) {
+      return new BigDecimal(
+        number,
+        this.digitCount(number.toI()) + (this.options.precision as number),
+      );
+    }
+    if (number instanceof BigDecimal) return number;
+    return bigDecimal(String(number));
   }
 
   private absolutePrecision(number: unknown): number | undefined {
