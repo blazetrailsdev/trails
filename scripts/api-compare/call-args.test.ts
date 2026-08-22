@@ -791,6 +791,16 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:tableName", "id:options"]]);
   });
 
+  it("pairs the real construction in a body that both throws and constructs", () => {
+    // aes256-gcm.rb:39 `OpenSSL::Cipher.new(CIPHER_TYPE)` vs aes256-gcm.ts,
+    // whose `throw new EncryptionError(...)` guard the extractor now drops.
+    const pairs = pairCallSites(
+      [site("new", ["const:CIPHER_TYPE"])],
+      [site("constructor", ["const:CIPHER_TYPE"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["const:CIPHER_TYPE"]]);
+  });
+
   it("prefers an exact agreement over a longer partial one", () => {
     const pairs = pairCallSites(
       [site("visit", ["id:o"])],

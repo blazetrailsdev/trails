@@ -12,5 +12,16 @@
     "rubyName": "include",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "recursive.ts",
+    "rubyName": "include",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "str:"
+    ],
+    "reason": "recursive.rb:62 builds a StringIO.new(\"\") for RACK_INPUT; the port's include does not rebuild the request body at all, so its only construction is the new URL(path, base) that parses PATH_INFO/QUERY_STRING. Pending convergence of the env merge (recursive.ts:58-65 vs recursive.rb:58-62)."
   }
 ]

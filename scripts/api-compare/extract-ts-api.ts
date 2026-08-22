@@ -2946,7 +2946,7 @@ function recordCallSite(
   if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
 
   const name = callSiteName(call);
-  if (name !== undefined) {
+  if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
     const args = describeArgs(call.arguments, flags);
     sites.push({ name, args, flags: [...new Set(flags)] });
@@ -2966,6 +2966,13 @@ function recordCallSite(
  * the Rails body makes later, which is what the `order:constructor,…` rows
  * #6404 baselined actually were. The call SET is unaffected: whichever way
  * Rails spells the raise, an instantiation happens.
+ *
+ * The ARGUMENT stream drops it for the same reason, and drops it rather than
+ * marking it uncomparable: an uncomparable site still occupies a pairing slot,
+ * so Rails' `OpenSSL::Cipher.new(CIPHER_TYPE)` would go on consuming the guard
+ * message instead of pairing with the real construction the TS body makes
+ * later — the row would disappear and the comparison it should have made would
+ * never happen.
  *
  * Only the throw's own operand is ambiguous: a `new` nested inside one
  * (`throw wrap(new Foo())`) has an unambiguous position.
