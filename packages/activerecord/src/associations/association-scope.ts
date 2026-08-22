@@ -705,8 +705,11 @@ export class AssociationScope {
     // `_mergeReferencedJoins` helper, so keep the arel dependency visible on
     // this method to match Rails' activerecord → arel edge (dep-parity gate).
     void Nodes.OuterJoin;
+    // Rails: `chain_head = chain.first` (association_scope.rb:131), read by the
+    // one `reverse_each` body that handles every chain position.
+    const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 1; i--) {
-      scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
+      scope = this._mergeReflectionScopeChain(scope, chain[i], owner, chainHead);
     }
     // Apply the head reflection's scope. Rails: reflection.rb:448,
     // scope_for — 0-arity scopes get `this`=relation, >=1-arity get
@@ -719,7 +722,6 @@ export class AssociationScope {
     // scope. So detect through explicitly and invoke `.scope` directly with
     // the same arity / `this` semantics. The source reflection's scope is a
     // SEPARATE concern, merged below.
-    const chainHead = chain[0];
     const head = chainHead as {
       scopeFor?: (rel: unknown, owner: unknown) => unknown;
       scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
