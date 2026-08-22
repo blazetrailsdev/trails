@@ -792,10 +792,8 @@ describe("pairCallSites", () => {
   });
 
   it("pairs the real construction in a body that both throws and constructs", () => {
-    // aes256-gcm.ts: a `throw new EncryptionError(...)` guard ahead of the
-    // body's real `new Cipher(CIPHER_TYPE)`. With the guard dropped by the
-    // extractor, Rails' `OpenSSL::Cipher.new(CIPHER_TYPE)` pairs with the
-    // construction it actually mirrors rather than with the guard message.
+    // aes256-gcm.rb:39 `OpenSSL::Cipher.new(CIPHER_TYPE)` vs aes256-gcm.ts,
+    // whose `throw new EncryptionError(...)` guard the extractor now drops.
     const pairs = pairCallSites(
       [site("new", ["const:CIPHER_TYPE"])],
       [site("constructor", ["const:CIPHER_TYPE"])],

@@ -3250,9 +3250,6 @@ describe("callArgs", () => {
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
   it("drops a thrown construction so the real construction pairs", () => {
-    // `throw new Foo(msg)` is Rails' `raise Foo, msg` — no `.new` site on the
-    // Ruby side — so recording it manufactures a `constructor` site that eats
-    // the pairing slot the body's real instantiation needs.
     expect(
       site(
         `class Foo {
