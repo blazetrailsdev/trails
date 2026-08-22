@@ -105,7 +105,7 @@ describe("QueryAttribute", () => {
   it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
     // Rails has ONE `respond_to?(:infinite?)` protocol (query_attribute.rb:53-55),
     // which ports to `isInfinite()` — the spelling Quoted / BindParam /
-    // arel's infinitySign all use. Reading a second name here
+    // arel's Predications.isInfinity all use. Reading a second name here
     // forked the protocol.
     const finite = { isInfinite: () => false };
     const positiveInf = { isInfinite: () => 1 };
