@@ -26,6 +26,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { Type } from "@blazetrails/activemodel";
+import { defaultValue } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
 
@@ -271,7 +272,17 @@ class AdapterSchemaSource implements SchemaSource {
 
   /** @internal */
   lookupCastTypeFromColumn(column: ColumnInfo): Type {
-    return this._adapter.lookupCastTypeFromColumn(column as { sqlType: string | null }) as Type;
+    // AbstractMysqlAdapter's override returns null for a blank sqlType — a
+    // trails invention it flags itself (abstract-mysql-adapter.ts:1268-1276,
+    // story mysql-native-type-map-converges-onto-type-map). Rails' lookup ends
+    // at TypeMap#lookup, whose miss yields Type.default_value
+    // (activemodel/lib/active_model/type.rb:38-40) and never nil, so the seam
+    // supplies that default rather than handing the dumper a null.
+    return (
+      (this._adapter.lookupCastTypeFromColumn(
+        column as { sqlType: string | null },
+      ) as Type | null) ?? defaultValue()
+    );
   }
 
   async columns(tableName: string): Promise<ColumnInfo[]> {

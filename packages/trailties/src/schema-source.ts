@@ -1,3 +1,4 @@
+import { Type } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import type { SchemaSource, ColumnInfo, IndexInfo } from "@blazetrails/activerecord";
 
@@ -88,9 +89,14 @@ export class AdapterSchemaSource implements SchemaSource {
   lookupCastTypeFromColumn(
     column: ColumnInfo,
   ): ReturnType<SchemaSource["lookupCastTypeFromColumn"]> {
-    return this.adapter.lookupCastTypeFromColumn(
-      column as { sqlType: string | null },
-    ) as ReturnType<SchemaSource["lookupCastTypeFromColumn"]>;
+    // The MySQL adapter returns null for a blank sqlType; Rails' lookup ends at
+    // Type.default_value (activemodel/lib/active_model/type.rb:38-40) and never
+    // nil, so the seam supplies that default.
+    return (
+      (this.adapter.lookupCastTypeFromColumn(column as { sqlType: string | null }) as ReturnType<
+        SchemaSource["lookupCastTypeFromColumn"]
+      > | null) ?? Type.defaultValue()
+    );
   }
 
   async indexes(tableName: string): Promise<IndexInfo[]> {
