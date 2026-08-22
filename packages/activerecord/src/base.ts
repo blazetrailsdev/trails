@@ -2188,6 +2188,12 @@ export class Base extends Model {
     const relation = Relation.create(this, { table });
 
     if (isFinderNeedsTypeCondition(this) && !isIgnoreDefaultScope.call(this)) {
+      // `finder_needs_type_condition?` memoizes on first call (inheritance.rb:92),
+      // so clearing `inheritance_column` afterwards leaves it answering true.
+      // Rails' `type_condition` then builds `table[nil]` (inheritance.rb:322);
+      // trails' `typeCondition` raises instead, so skip the arm rather than
+      // turning a Rails no-op into an error.
+      if (this.inheritanceColumn === null) return relation;
       return relation.whereBang(typeCondition(this, table));
     } else {
       return relation;
@@ -2195,7 +2201,7 @@ export class Base extends Model {
   }
 
   private static _buildDefaultRelation(allQueries?: boolean | null): any {
-    // default.rb:36 — `default_scoped(scope = relation, all_queries: nil)`: the
+    // named.rb:45 — `default_scoped(scope = relation, all_queries: nil)`: the
     // base relation, STI condition and all, is built BEFORE `build_default_scope`
     // arms the recursion guard, and the default scope merges into it.
     return (
