@@ -494,12 +494,14 @@ export class DirtyTracker {
       // Attribute#changed? already compares value against original_value — for a
       // UserProvidedDefault that original_value is the column default — so defer
       // to it instead of comparing against the model-default snapshot.
-      if (attr.isChanged()) {
-        const wasValue = attr.originalValue ?? null;
-        this._originalAttributes.set(name, wasValue);
-        this._originalHas.add(name);
-        this._changedAttributes.set(name, [wasValue, attr.value ?? null]);
-      }
+      attr.withoutMarkingRead(() => {
+        if (attr.isChanged()) {
+          const wasValue = attr.originalValue ?? null;
+          this._originalAttributes.set(name, wasValue);
+          this._originalHas.add(name);
+          this._changedAttributes.set(name, [wasValue, attr.value ?? null]);
+        }
+      });
     }
   }
 

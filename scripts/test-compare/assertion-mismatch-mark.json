@@ -26,9 +26,9 @@
       "value": 59
     },
     "activerecord": {
-      "assertionCount": 1944,
-      "kind": 3927,
-      "value": 38
+      "assertionCount": 1943,
+      "kind": 3926,
+      "value": 37
     },
     "activesupport": {
       "assertionCount": 882,

@@ -45,13 +45,11 @@ export function readAttribute(
     this.constructor as unknown as { resolveAttributeName(n: string): string }
   ).resolveAttributeName(String(attrName));
 
-  if (this._attributes.has(name)) this._accessedFields.add(name);
   return this._readAttribute(name, block);
 }
 
 interface ReadAttributeHost {
   _attributes: AttributeSet;
-  _accessedFields: Set<string>;
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
@@ -121,7 +119,6 @@ export function defineMethodAttribute(
 
 interface ReadRecord {
   _attributes: AttributeSet;
-  _accessedFields: Set<string>;
   _readAttribute(n: string, block: (n: string) => unknown): unknown;
   missingAttribute(n: string, stack?: string): never;
 }
@@ -132,7 +129,6 @@ interface ReadRecord {
  * @internal Rails-private helper.
  */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
-  if (record._attributes.has(canonicalName)) record._accessedFields.add(canonicalName);
   return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
 }
 

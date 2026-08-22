@@ -275,6 +275,106 @@ function firstCuratedReason(
   return DEFAULT_TAG_REASON;
 }
 
+/**
+ * The owner name `extract-ts-api.ts` synthesizes for a file's top-level
+ * functions — the PascalCased file basename, so `aggregations.ts` records
+ * `composedOf` under `Aggregations` and `secure-password.ts` records
+ * `authenticateBy` under `SecurePassword`. compare.ts keys its expectation
+ * under that owner, so the migrator has to look there for a declaration the
+ * AST reports at the top level. The fallback yields to any owner a declaration
+ * in the file names for itself — `relation.ts` declares `class Relation`, whose
+ * members keep their own key.
+ */
+export function fileModuleName(fileName: string): string {
+  const base = (fileName.split("/").at(-1) ?? fileName).replace(/\.ts$/, "");
+  return base
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+/** One declaration a `@missingRailsCall` tag can be minted onto: its TS name,
+ *  the owner it is written under (`""` at the top level), and the node whose
+ *  leading JSDoc the tag joins. */
+interface TaggableDecl {
+  name: string;
+  owner: string;
+  node: ts.Node;
+}
+
+/** The owner a declaration is written under: the class it sits in, else the
+ *  `const` an enclosing object literal is assigned to — the settled trails
+ *  mixin idiom (CLAUDE.md "Module mixins"), which extract-ts-api.ts harvests as
+ *  a module of that name — else `""` at the top level. */
+function ownerName(node: ts.Node): string {
+  for (let p = node.parent; p; p = p.parent) {
+    if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) return p.name?.text ?? "";
+    if (
+      ts.isObjectLiteralExpression(p) &&
+      ts.isVariableDeclaration(p.parent) &&
+      ts.isIdentifier(p.parent.name)
+    ) {
+      return p.parent.name.text;
+    }
+  }
+  return "";
+}
+
+/**
+ * Every declaration in one file a tag can be minted onto.
+ *
+ * Beyond the method/function forms, this covers the two shapes the repo's own
+ * conventions produce and the migrator used to report as "no body-bearing
+ * declaration": a method inside a mixin object literal, and a property (class
+ * field or object-literal key) initialized with an arrow function. An overload
+ * SIGNATURE is still skipped — it has no body, and tagging each one duplicates
+ * the block per signature.
+ */
+export function collectDeclarations(sf: ts.SourceFile): TaggableDecl[] {
+  const decls: TaggableDecl[] = [];
+  const visit = (node: ts.Node): void => {
+    let name: string | null = null;
+    let host: ts.Node = node;
+    if (
+      (ts.isFunctionDeclaration(node) ||
+        ts.isMethodDeclaration(node) ||
+        ts.isGetAccessor(node) ||
+        ts.isSetAccessor(node)) &&
+      node.body &&
+      node.name &&
+      ts.isIdentifier(node.name)
+    ) {
+      name = node.name.text;
+    } else if (ts.isConstructorDeclaration(node) && node.body) {
+      // Ruby `initialize` matches the TS constructor (artifact tsName
+      // "constructor"), which carries no identifier.
+      name = "constructor";
+    } else if (
+      (ts.isPropertyDeclaration(node) || ts.isPropertyAssignment(node)) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      name = node.name.text;
+    } else if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) &&
+      ts.isVariableStatement(node.parent.parent)
+    ) {
+      name = node.name.text;
+      // The JSDoc of `export const foo = () => {}` leads the STATEMENT, not the
+      // declaration inside its declaration list.
+      host = node.parent.parent;
+    }
+    if (name !== null) decls.push({ name, owner: ownerName(node), node: host });
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return decls;
+}
+
 /** Reconcile every named function/method in one source file's text. Returns
  *  the new text (or null if unchanged) plus harvested non-placeholder drops. */
 export function reconcileFileText(
@@ -292,9 +392,9 @@ export function reconcileFileText(
    *  0083). A tag still carrying the seeded placeholder justifies nothing and
    *  keeps its row: it does not suppress either (see `justifies`). */
   tagged: { rubyName: string; call: string }[];
-  /** Expectation names never seen on a body-bearing declaration (mixin
-   *  host-class duplicates, prototype-patched methods, …) — reported, never
-   *  silently dropped. */
+  /** Expectation names never seen on a declaration this file can tag
+   *  (prototype-patched methods, a name declared only in another file, …) —
+   *  reported, never silently dropped. */
   unmatched: string[];
   /** Every missing call left untagged for want of a curated reason (see
    *  `reconcile`), so a zero-edit run still says how much is waiting on human
@@ -308,93 +408,72 @@ export function reconcileFileText(
   const seen = new Set<string>();
   const skipped: string[] = [];
 
-  // The class a declaration is written in — `""` at the top level — which is
-  // half of the {@link expectationKey} a tag is minted under.
-  const enclosingClassName = (node: ts.Node): string => {
-    for (let p = node.parent; p; p = p.parent) {
-      if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) return p.name?.text ?? "";
-    }
-    return "";
-  };
+  const decls = collectDeclarations(sf);
+  const declaredKeys = new Set(decls.map((d) => expectationKey(d.owner, d.name)));
+  const moduleName = fileModuleName(fileName);
 
-  const visit = (node: ts.Node): void => {
-    let name: string | null = null;
-    // Only body-bearing declarations: overload SIGNATURES (and interface /
-    // ambient members) must not be stamped — tagging each overload duplicates
-    // the block once per signature (found by the activerecord-wide run).
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isMethodDeclaration(node) ||
-        ts.isGetAccessor(node) ||
-        ts.isSetAccessor(node)) &&
-      node.body &&
-      node.name &&
-      ts.isIdentifier(node.name)
-    ) {
-      name = node.name.text;
-    } else if (ts.isConstructorDeclaration(node) && node.body) {
-      // Ruby `initialize` matches the TS constructor (artifact tsName
-      // "constructor"), which carries no identifier.
-      name = "constructor";
-    }
-    if (name !== null) {
-      const key = expectationKey(enclosingClassName(node), name);
-      const anyKey = expectationKey(ANY_CLASS, name);
-      seen.add(key);
-      if (expectations.has(anyKey)) seen.add(anyKey);
-      const exp = expectations.get(key) ?? expectations.get(anyKey);
-      const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
-      const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
-      const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
-      if (exp || (comment && comment.includes(TAG))) {
-        const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
-        const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
-        const { rest, entries } = parseJsdoc(
-          comment ?? "",
-          jsdocRange
-            ? {
-                fileName,
-                startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
-              }
-            : undefined,
-        );
-        const expected = exp?.calls ?? new Set<string>();
-        const r = reconcile(
-          entries,
-          expected,
-          (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
-          onlyCall,
-        );
-        skipped.push(...r.skipped);
-        if (exp) {
-          for (const e of [...r.kept, ...r.added]) {
-            if (!justifies(e.reason)) continue;
-            for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
-          }
-        }
-        for (const d of r.dropped) {
-          if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
-        }
-        const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent);
-        if (comment && jsdocRange) {
-          if (next === null) {
-            // Remove the comment plus its trailing newline + indent.
-            let end = jsdocRange.end;
-            if (text[end] === "\n") end += 1 + indent.length;
-            edits.push({ start: jsdocRange.pos, end, text: "" });
-          } else if (next !== comment) {
-            edits.push({ start: jsdocRange.pos, end: jsdocRange.end, text: next });
-          }
-        } else if (next !== null) {
-          // Rendered lines already carry the indent; the original declaration
-          // line (starting at lineStart) keeps its own.
-          edits.push({ start: lineStart, end: lineStart, text: next + "\n" });
+  for (const { name, owner, node } of decls) {
+    const key = expectationKey(owner, name);
+    const fileModuleKey = expectationKey(moduleName, name);
+    const anyKey = expectationKey(ANY_CLASS, name);
+    const useFileModuleKey =
+      owner === "" && fileModuleKey !== key && !declaredKeys.has(fileModuleKey);
+    seen.add(key);
+    if (useFileModuleKey && expectations.has(fileModuleKey)) seen.add(fileModuleKey);
+    if (expectations.has(anyKey)) seen.add(anyKey);
+    const exp =
+      expectations.get(key) ??
+      (useFileModuleKey ? expectations.get(fileModuleKey) : undefined) ??
+      expectations.get(anyKey);
+    const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
+    const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
+    const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
+    if (exp || (comment && comment.includes(TAG))) {
+      const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
+      const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
+      const { rest, entries } = parseJsdoc(
+        comment ?? "",
+        jsdocRange
+          ? {
+              fileName,
+              startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
+            }
+          : undefined,
+      );
+      const expected = exp?.calls ?? new Set<string>();
+      const r = reconcile(
+        entries,
+        expected,
+        (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
+        onlyCall,
+      );
+      skipped.push(...r.skipped);
+      if (exp) {
+        for (const e of [...r.kept, ...r.added]) {
+          if (!justifies(e.reason)) continue;
+          for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
         }
       }
+      for (const d of r.dropped) {
+        if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
+      }
+      const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent);
+      if (comment && jsdocRange) {
+        if (next === null) {
+          // Remove the comment plus its trailing newline + indent.
+          let end = jsdocRange.end;
+          if (text[end] === "\n") end += 1 + indent.length;
+          edits.push({ start: jsdocRange.pos, end, text: "" });
+        } else if (next !== comment) {
+          edits.push({ start: jsdocRange.pos, end: jsdocRange.end, text: next });
+        }
+      } else if (next !== null) {
+        // Rendered lines already carry the indent; the original declaration
+        // line (starting at lineStart) keeps its own.
+        edits.push({ start: lineStart, end: lineStart, text: next + "\n" });
+      }
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
+  }
 
   const unmatched = [...expectations.entries()]
     .filter(([k]) => !seen.has(k))

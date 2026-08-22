@@ -74,6 +74,11 @@ export function quoteColumnName(name: string): string {
  * abstract contract (abstract/quoting.rb:131-133) minus the backslash arm:
  * SQLite treats a backslash as an ordinary character, so only `'` is doubled.
  * **Escape-only** — `quote` adds the surrounding quotes (rb:75-76).
+ *
+ * @missingRailsCall quote — PERMANENT: sqlite3/quoting.rb's `quote_string`
+ *   delegates to the driver's `::SQLite3::Database.quote`; better-sqlite3, the
+ *   trails driver, exposes no such entry point at all, so the port applies that
+ *   driver method's own `''`-doubling rule inline.
  */
 export function quoteString(value: string): string {
   return value.replace(/'/g, "''");

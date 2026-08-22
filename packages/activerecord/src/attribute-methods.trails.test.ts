@@ -109,6 +109,22 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Topic.hasAttribute("missing")).toBe(false);
   });
 
+  it("attribute_present? is empty?, not blank?", () => {
+    // attribute_methods.rb:387-392 asks `empty?`, not `blank?`: Ruby's
+    // `" ".empty?` is FALSE, so a whitespace-only string is present.
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    const t = new Topic({ title: " ", content: "" });
+    expect(t.attributePresent("title")).toBe(true);
+    expect(t.attributePresent("heading")).toBe(true);
+    expect(t.attributePresent("content")).toBe(false);
+  });
+
   it("readonly attributes are not updated after create", async () => {
     // Rails raises ReadonlyAttributeError on a persisted-record write to an
     // attr_readonly column (readonly_attributes.rb line 49). The test name's

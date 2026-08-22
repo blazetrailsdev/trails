@@ -3,7 +3,8 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { isBlank, include, Module } from "@blazetrails/activesupport";
+import { include, Module } from "@blazetrails/activesupport";
+import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
   MissingAttributeError,
   missingAttribute,
@@ -42,9 +43,15 @@ export interface AttributeMethods {
 }
 
 interface AttributeRecord {
-  _attributes: { has(name: string): boolean; keys(): Iterable<string>; get(name: string): unknown };
-  _accessedFields: Set<string>;
+  _attributes: {
+    has(name: string): boolean;
+    keys(): Iterable<string>;
+    get(name: string): unknown;
+    accessed(): string[];
+  };
   readAttribute(name: string): unknown;
+  /** @internal */
+  _readAttribute(name: string): unknown;
 }
 
 /**
@@ -98,12 +105,34 @@ export function hasAttribute(this: AttributeRecord, name: string): boolean {
 }
 
 /**
- * Check whether an attribute is present (not null, not undefined, not empty string).
+ * Check whether an attribute is present.
  *
  * Mirrors: ActiveRecord::AttributeMethods#attribute_present?
+ * (attribute_methods.rb:387-392)
  */
 export function attributePresent(this: AttributeRecord, name: string): boolean {
-  return !isBlank(this.readAttribute(name));
+  let attrName = String(name);
+  attrName =
+    (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[
+      attrName
+    ] ?? attrName;
+  const value = this._readAttribute(attrName);
+  return value != null && !(respondsToEmpty(value) && isEmpty(value));
+}
+
+/**
+ * Ruby's `value.respond_to?(:empty?)` (attribute_methods.rb:391): true for the
+ * receivers whose `empty?` {@link isEmpty} answers on — a String, an Array, and
+ * the Hash-like Set/Map/plain object — and false for everything else, so a
+ * `Temporal` timestamp is present rather than an object with no own keys.
+ * TypeScript has no `respond_to?`, so the receiver test is written out.
+ */
+function respondsToEmpty(value: unknown): value is readonly unknown[] | string | object {
+  if (typeof value === "string" || Array.isArray(value)) return true;
+  if (value instanceof Set || value instanceof Map) return true;
+  return (
+    typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
+  );
 }
 
 /**
@@ -135,7 +164,7 @@ export function attributes(this: AttributeRecord): Record<string, unknown> {
  * Mirrors: ActiveRecord::AttributeMethods#accessed_fields
  */
 export function accessedFields(this: AttributeRecord): string[] {
-  return [...this._accessedFields];
+  return this._attributes.accessed();
 }
 
 /**

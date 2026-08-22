@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/quoting.ts",
-    "rubyName": "quote_string",
-    "call": "quote",
-    "reason": "Per-site verified (RFC 0106 wave 4b): sqlite3/quoting.rb's `quote_string` delegates to the driver's `::SQLite3::Database.quote`; better-sqlite3 exposes no such entry point, so trails applies the same `''`-doubling rule inline."
-  }
-]

@@ -345,6 +345,12 @@ export function hasSecurePassword(
  *
  * Raises an ArgumentError if the set of attributes doesn't contain at
  * least one password and one non-password attribute.
+ *
+ * @missingRailsCall map — PERMANENT:
+ *   `attributes.to_h.partition { ... }.map(&:to_h)`
+ *   (`secure_password.rb:126-128`) — `partition` yields two arrays of pairs that
+ *   `map(&:to_h)` turns back into Hashes; the TS body partitions into two entry
+ *   arrays directly, so there is no pair-array-to-Hash `map` step.
  */
 export async function authenticateBy(
   this: typeof Base,

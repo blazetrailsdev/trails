@@ -12,6 +12,7 @@ import {
   reconcileFileText,
   renderJsdoc,
   buildExpectations,
+  fileModuleName,
   lowerMarksForDropped,
 } from "./build.js";
 import { serializeBaseline } from "./baseline-json.js";
@@ -150,6 +151,103 @@ const FILE = [
 ].join("\n");
 
 describe("reconcileFileText", () => {
+  /** One expectation under a named owner — the key an artifact row with a
+   *  `tsClass` produces. */
+  const owned = (
+    tsClass: string,
+    tsName: string,
+    calls: Set<string>,
+  ): [string, MethodExpectation] => [
+    expectationKey(tsClass, tsName),
+    { rubyNames: [tsName], tsName, calls },
+  ];
+
+  it("mints a tag on a top-level function keyed under the synthesized file module", () => {
+    // extract-ts-api.ts records a file's top-level functions under a module it
+    // synthesizes from the FILE NAME, so compare.ts keys `quoteString` under
+    // `Quoting` while the AST reports no enclosing class at all.
+    const src = ["export function quoteString(v: string): string {", "  return v;", "}"].join("\n");
+    const expectations = new Map([owned("Quoting", "quoteString", new Set(["quote"]))]);
+    const r = reconcileFileText(
+      "quoting.ts",
+      src,
+      expectations,
+      () => "PERMANENT: no driver quote",
+    );
+    expect(r.unmatched).toEqual([]);
+    expect(r.text!).toContain("@missingRailsCall quote — PERMANENT: no driver quote");
+    expect(r.tagged).toEqual([{ rubyName: "quoteString", call: "quote" }]);
+  });
+
+  it("mints a tag on a method inside a mixin object literal", () => {
+    const src = ["export const ThroughAssociation = {", "  targetScope(): void {}", "};"].join(
+      "\n",
+    );
+    const expectations = new Map([owned("ThroughAssociation", "targetScope", new Set(["drop"]))]);
+    const r = reconcileFileText("through-association.ts", src, expectations, () => "PERMANENT: x");
+    expect(r.unmatched).toEqual([]);
+    expect(r.text!).toContain("@missingRailsCall drop — PERMANENT: x");
+  });
+
+  it("mints a tag on an arrow-function property", () => {
+    const src = [
+      "export class Foo {",
+      "  bar = (): void => {};",
+      "}",
+      "export const helpers = { baz: () => {} };",
+    ].join("\n");
+    const expectations = new Map([
+      owned("Foo", "bar", new Set(["save"])),
+      owned("helpers", "baz", new Set(["reload"])),
+    ]);
+    const r = reconcileFileText("foo.ts", src, expectations, () => "PERMANENT: x");
+    expect(r.unmatched).toEqual([]);
+    expect(r.text!).toContain("@missingRailsCall save — PERMANENT: x");
+    expect(r.text!).toContain("@missingRailsCall reload — PERMANENT: x");
+  });
+
+  it("is idempotent on the newly-supported declaration forms", () => {
+    const src = [
+      "export const ThroughAssociation = {",
+      "  targetScope(): void {}",
+      "};",
+      "export function quoteString(v: string): string {",
+      "  return v;",
+      "}",
+    ].join("\n");
+    const expectations = new Map([
+      owned("ThroughAssociation", "targetScope", new Set(["drop"])),
+      owned("Quoting", "quoteString", new Set(["quote"])),
+    ]);
+    const reason = () => "PERMANENT: x";
+    const first = reconcileFileText("quoting.ts", src, expectations, reason).text!;
+    expect(reconcileFileText("quoting.ts", first, expectations, reason).text).toBeNull();
+  });
+
+  it("lets a class of the file-module's name keep its own key", () => {
+    // `relation.ts` declares `class Relation`, whose name IS the synthesized
+    // file-module name: a top-level function of the same name must not claim
+    // the class's expectation.
+    const src = [
+      "export class Relation {",
+      "  toSql(): string {",
+      '    return "";',
+      "  }",
+      "}",
+      "export function toSql(): string {",
+      '  return "";',
+      "}",
+    ].join("\n");
+    const expectations = new Map([owned("Relation", "toSql", new Set(["arel"]))]);
+    const r = reconcileFileText("relation.ts", src, expectations, () => "PERMANENT: x");
+    const lines = r.text!.split("\n");
+    // The tag lands above the CLASS method, not the top-level function.
+    expect(lines.findIndex((l) => l.includes("@missingRailsCall arel"))).toBeLessThan(
+      lines.findIndex((l) => l.includes("export function toSql")),
+    );
+    expect(r.text!.match(/@missingRailsCall/g)).toHaveLength(1);
+  });
+
   it("reconciles: drops satisfied tags, adds tags, creates missing JSDoc", () => {
     const expectations = new Map([
       anyClass("bar", ["bar"], new Set(["save"])),
@@ -523,5 +621,13 @@ describe("lowerMarksForDropped", () => {
     );
     expect(moved).toEqual([]);
     expect(marks.get("activerecord/relation.json")).toBe(1);
+  });
+});
+
+describe("fileModuleName", () => {
+  it("PascalCases the file basename, as extract-ts-api.ts does", () => {
+    expect(fileModuleName("aggregations.ts")).toBe("Aggregations");
+    expect(fileModuleName("secure-password.ts")).toBe("SecurePassword");
+    expect(fileModuleName("connection-adapters/sqlite3/quoting.ts")).toBe("Quoting");
   });
 });

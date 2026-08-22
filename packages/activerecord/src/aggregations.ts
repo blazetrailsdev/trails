@@ -49,6 +49,12 @@ interface ComposedOfOptions {
  * Configure a composed-of value object on a model.
  *
  * Mirrors: ActiveRecord::Aggregations::ClassMethods#composed_of
+ *
+ * @missingRailsCall include — PERMANENT: aggregations.rb:262 reopens the model
+ *   with `include Aggregations`, and Ruby `include` has no TS equivalent. The
+ *   settled trails idiom (CLAUDE.md "Module mixins") names the mixin helper after
+ *   the module, so the call is `includeAggregations(modelClass)` and the
+ *   `unless self < Aggregations` guard lives inside it.
  */
 export function composedOf(
   modelClass: typeof Base,
