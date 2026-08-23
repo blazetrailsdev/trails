@@ -19,7 +19,7 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
-import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
+import { threadedConnectionFor, connectionPool, withConnection } from "./connection-handling.js";
 
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
@@ -1228,14 +1228,11 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
  * a query. Returns null when the table's columns aren't cached yet.
  */
 function cachedColumnNames(host: SchemaHost): Set<string> | null {
-  try {
-    const cached = reflectionAdapter(host)?.internalSchemaCache?.getCachedColumnsHash?.(
-      host.tableName,
-    ) as Record<string, unknown> | undefined;
-    if (cached) return new Set(Object.keys(cached));
-  } catch {
-    return null;
-  }
+  // Resolved through `cachedColumnsHash`'s connection-free probe rather than
+  // `reflectionAdapter`, whose last resort is `leaseConnectionSync` — a
+  // permanent checkout, which this cache-only read must never take.
+  const cached = cachedColumnsHash(host as unknown as typeof Base);
+  if (cached) return new Set(Object.keys(cached));
   return null;
 }
 
@@ -1249,47 +1246,58 @@ function cachedColumnNames(host: SchemaHost): Set<string> | null {
 async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null> {
   const cached = cachedColumnNames(host);
   if (cached) return cached;
+  const table = host.tableName;
+  if (!table) return null;
   try {
-    const conn = reflectionAdapter(host);
-    const table = host.tableName;
-    if (!conn || !table) return null;
-    // Resolve columns through the shared schema cache so the reflection is
-    // memoized (`getCachedColumnsHash` warms after this), making subsequent
-    // cold-cache writes reconcile query-free. Mirror loadSchemaFromCache's
-    // FakePool handling so a lone-connection pool (SQLite :memory:, size 1)
-    // doesn't deadlock on withConnection.
-    const cache = conn.internalSchemaCache;
-    if (cache && typeof cache.columnsHash === "function") {
-      const pool = new FakePool(conn);
-      const hash = (await cache.columnsHash(pool, table)) as Record<string, unknown> | undefined;
-      if (hash) {
-        const names = Object.keys(hash);
-        if (names.length > 0) {
-          // The shared cache is now warm. A model that synthesized a minimal
-          // columnsHash while the cache was cold (loadSchema's fallback set
-          // `_schemaLoaded` with only the declared attrs) would otherwise keep
-          // that stale view forever — leaving `columnNames()` reading the warm
-          // cache's real columns while `attributeNames()` stays minimal, so
-          // reload it the way Rails does (model_schema.rb:553-568) and let the
-          // next `loadSchema` re-reflect from the warm cache.
-          if (ownSchemaMemo(host, "_schemaLoaded")) {
-            reloadSchemaFromCache.call(host);
+    // Scoped through `with_connection`, not `reflectionAdapter` — the latter's
+    // last resort is `leaseConnectionSync`, which makes the checkout permanent
+    // and so trips `permanent_connection_checkout = :deprecated | :disallowed`
+    // on every save. `withConnection` also threads the connection through
+    // `currentQueryConnection`, so the cache reads below see it.
+    return await withConnection.call<
+      typeof Base,
+      [(conn: any) => Promise<Set<string> | null>],
+      Promise<Set<string> | null>
+    >(host as unknown as typeof Base, async (conn: any) => {
+      if (!conn) return null;
+      // Resolve columns through the shared schema cache so the reflection is
+      // memoized (`getCachedColumnsHash` warms after this), making subsequent
+      // cold-cache writes reconcile query-free. Mirror loadSchemaFromCache's
+      // FakePool handling so a lone-connection pool (SQLite :memory:, size 1)
+      // doesn't deadlock on withConnection.
+      const cache = conn.internalSchemaCache;
+      if (cache && typeof cache.columnsHash === "function") {
+        const pool = new FakePool(conn);
+        const hash = (await cache.columnsHash(pool, table)) as Record<string, unknown> | undefined;
+        if (hash) {
+          const names = Object.keys(hash);
+          if (names.length > 0) {
+            // The shared cache is now warm. A model that synthesized a minimal
+            // columnsHash while the cache was cold (loadSchema's fallback set
+            // `_schemaLoaded` with only the declared attrs) would otherwise keep
+            // that stale view forever — leaving `columnNames()` reading the warm
+            // cache's real columns while `attributeNames()` stays minimal, so
+            // reload it the way Rails does (model_schema.rb:553-568) and let the
+            // next `loadSchema` re-reflect from the warm cache.
+            if (ownSchemaMemo(host, "_schemaLoaded")) {
+              reloadSchemaFromCache.call(host);
+            }
+            return new Set(names);
           }
-          return new Set(names);
         }
+        return null;
+      }
+      // No schema cache available — fall back to a raw introspection query.
+      if (typeof conn.columns !== "function") return null;
+      const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
+      if (Array.isArray(cols) && cols.length > 0) {
+        return new Set(cols.map((c) => c.name));
       }
       return null;
-    }
-    // No schema cache available — fall back to a raw introspection query.
-    if (typeof conn.columns !== "function") return null;
-    const cols = (await conn.columns(table)) as Array<{ name: string }> | undefined;
-    if (Array.isArray(cols) && cols.length > 0) {
-      return new Set(cols.map((c) => c.name));
-    }
+    });
   } catch {
     return null;
   }
-  return null;
 }
 
 /**
@@ -1323,12 +1331,6 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
 export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
   const host = this;
   if (ownSchemaMemo(host, "_virtualAttributesReconciled")) return;
-  // The registry holds user `attribute()` declarations only, so a class that
-  // declared none has nothing to classify. Bail before resolving a connection:
-  // `reflect: true` (the write path) otherwise reaches `reflectionAdapter`'s
-  // `leaseConnectionSync`, which is a permanent checkout on every save of a
-  // purely schema-backed model.
-  if (host._attributeDefinitions.size === 0) return;
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
