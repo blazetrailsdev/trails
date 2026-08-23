@@ -70,6 +70,16 @@ export function resetLocalTimeZoneId(): void {
  * `86400`. A numeric offset needs no whole-second bound either: MRI takes a
  * `Float`/`Rational` and answers it back from `utc_offset`.
  */
+/**
+ * Whether a string names a zone rather than spelling a `utc_offset`. MRI's
+ * `Time#getlocal` takes only the offset spellings — a leading sign, or one of
+ * the military letters — plus a zone OBJECT, which a zone identifier stands in
+ * for here.
+ */
+function isZoneIdentifier(zone: string): boolean {
+  return !/^([+-]|[A-IK-Z]$)/.test(zone);
+}
+
 function utcOffsetArgument(zone: string | number): "UTC" | number {
   if (typeof zone === "number") {
     if (!Number.isFinite(zone) || Math.abs(zone) >= 86400) {
@@ -837,8 +847,17 @@ export class Time {
    * that offset. MRI's `localtime` mutates the receiver and `getlocal` answers a
    * converted copy; trails' `Time` is immutable, so the copy is the answer here
    * the way `getutc` already is.
+   *
+   * An offset spelling — `"+05:00"`, `"Z"`, a seconds Integer — is read the way
+   * the constructor's `utc_offset` is, so the answer carries the offset and no
+   * zone, and its `zone` is `nil` as MRI's is. MRI also takes a zone OBJECT
+   * here, the one thing a JS string cannot be; a zone identifier stands in for
+   * it, and seats the answer in that zone.
    */
   getlocal(utcOffset: string | number | null = null): Time {
+    if (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) {
+      return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset));
+    }
     return Time.#atInstant(this.#instant, utcOffset);
   }
 
