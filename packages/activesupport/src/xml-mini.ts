@@ -82,9 +82,14 @@ const DEFAULT_ENCODINGS: Record<string, string> = {
  * `ActiveSupport::Duration`).
  */
 const FORMATTING: Record<string, (value: unknown) => string> = {
-  // `symbol.to_s` (xml_mini.rb:47) — the Symbol's name. A Ruby Symbol is a
-  // colon-prefixed string in trails, so the leading colon comes off.
-  symbol: (value) => String(value).slice(1),
+  // `symbol.to_s` (xml_mini.rb:56). A Ruby Symbol is a colon-prefixed string
+  // in trails, so `to_s` drops the colon; a String reaching here through an
+  // explicit `type: "symbol"` option (xml_mini.rb:119) is already its own
+  // `to_s` and passes through unchanged.
+  symbol: (value) => {
+    const s = String(value);
+    return s.startsWith(":") ? s.slice(1) : s;
+  },
   date: (value) => (value instanceof Temporal.PlainDate ? value.toString() : String(value)),
   time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
   dateTime: formatDateTime,
