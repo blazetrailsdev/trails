@@ -19,6 +19,23 @@ export class ConnectionUrlResolver {
   private readonly _query: string | null;
   private readonly _emptyAuthority: boolean;
 
+  /**
+   * @missingRailsCall parse — PERMANENT. Verified per-site (RFC 0106):
+   *   `uri_parser.parse(url)` (`connection_url_resolver.rb:27`) —
+   *   `URI::RFC2396_Parser` splits opaque (`scheme:path`) from hierarchical
+   *   URIs, which WHATWG `new URL()` does not, so the constructor splits the
+   *   scheme itself and only reaches `new URL()` for the hierarchical arm.
+   * @missingRailsCall query — PERMANENT. Verified per-site (RFC 0106): `@uri.query`
+   *   (`connection_url_resolver.rb:32`) — WHATWG `URL` spells the query
+   *   component `search` (leading `?` included), so there is no `query` call for
+   *   the comparator to credit.
+   * @missingRailsCall split — PERMANENT. Name-collision false positive (story
+   *   relation-delegation-rails-named-methods): exposing the `delegate ... to:
+   *   :records` set under Rails names made `split`/`reverse`/`rindex` recognized
+   *   ported method names, so this unrelated call to String#split /
+   *   Array#reverse / String#rindex on a non-Relation receiver is flagged by the
+   *   name-based wide call-set check.
+   */
   constructor(url: string) {
     if (!url || url.trim() === "") {
       throw new Error("Database URL cannot be empty");
@@ -137,7 +154,14 @@ export class ConnectionUrlResolver {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT. Verified per-site (RFC 0106):
+   *   `query_hash.merge(...)` / `.reverse_merge(...)`
+   *   (`connection_url_resolver.rb:64-77`) — a non-mutating Hash merge is an
+   *   object spread in TS; the two precedences are the two spread orders.
+   */
   private rawConfig(): Record<string, unknown> {
     if (this._opaque !== null) {
       // Opaque URI (Rails: query_hash.merge(adapter:, database:)) — structural
@@ -167,7 +191,13 @@ export class ConnectionUrlResolver {
     };
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall path — PERMANENT. Verified per-site (RFC 0106): `uri.path`
+   *   (`connection_url_resolver.rb:94-100`) — WHATWG `URL` spells the path
+   *   component `pathname`, so no `path` call is emitted.
+   */
   private databaseFromPath(): string | undefined {
     const path = this._parsed?.pathname;
     if (!path) return undefined;

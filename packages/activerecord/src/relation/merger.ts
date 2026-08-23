@@ -87,6 +87,15 @@ export class Merger {
     return rel;
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
+   *   `other.select_values.empty?` (merger.rb:85) — `empty?` on a Ruby Array,
+   *   whose faithful JS spelling is `xs.length === 0`. That emits no callee, so
+   *   no TS call can ever credit the Ruby one. The gate flags it only because
+   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
+   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+   *   nothing in the TS body was dropped.
+   */
   private mergeSelectValues(rel: any): void {
     // Mirrors Rails' Merger#merge_select_values: union (`|=`) the other
     // relation's select_values into ours rather than replacing. When the two
@@ -100,6 +109,16 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
+   *   `other.preload_values.empty?` / `other.includes_values.empty?`
+   *   (merger.rb:97,100,101,107,111) — `empty?` on a Ruby Array, whose faithful
+   *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
+   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
+   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
+   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
+   *   TS body was dropped.
+   */
   private mergePreloads(rel: any): void {
     if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 
@@ -138,6 +157,15 @@ export class Merger {
     }
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
+   *   `other.joins_values.empty?` (merger.rb:118) — `empty?` on a Ruby Array,
+   *   whose faithful JS spelling is `xs.length === 0`. That emits no callee, so
+   *   no TS call can ever credit the Ruby one. The gate flags it only because
+   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
+   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+   *   nothing in the TS body was dropped.
+   */
   private mergeJoins(rel: any): void {
     const other = this.other;
     const joinsValues = other.joinsValues ?? [];
@@ -171,6 +199,15 @@ export class Merger {
     QueryMethodBangs.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT. Verified per-site (RFC 0106):
+   *   `other.left_outer_joins_values.empty?` (merger.rb:137) — `empty?` on a
+   *   Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no
+   *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
+   *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`,
+   *   which takes arguments since it gained Rails' `async:` kwarg
+   *   (result.rb:94-100) — nothing in the TS body was dropped.
+   */
   private mergeOuterJoins(rel: any): void {
     const other = this.other;
     const otherLeft = other.leftOuterJoinsValues ?? [];
@@ -201,6 +238,12 @@ export class Merger {
   }
 
   // Mirrors merge_multi_values (merger.rb:154-167).
+  /**
+   * @missingRailsCall any? — PERMANENT. Verified per-site (RFC 0106):
+   *   `other.order_values.any?` (merger.rb:159) and `extensions.any?` (:165) —
+   *   `any?` on Ruby Arrays, whose falsiness test is `length > 0` in TS, not a
+   *   call.
+   */
   private mergeMultiValues(rel: any): void {
     if (this.other.reorderingValue) {
       rel.reorderBang(...this.other.orderValues);
