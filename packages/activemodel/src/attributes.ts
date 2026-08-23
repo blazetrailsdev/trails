@@ -1,6 +1,5 @@
 import { include, type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
-import { defaultValue as typeDefaultValue } from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
@@ -10,10 +9,8 @@ import {
   buildMangledName,
 } from "./attribute-methods.js";
 import {
-  type PendingModification,
-  PendingType,
-  PendingDefault,
-  resetDefaultAttributes,
+  attribute as registrationAttribute,
+  type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
 export interface AttributeDefinition {
@@ -53,13 +50,11 @@ export function _writeAttribute(
 type AttributeInstanceHost = { _attributes: AttributeSet };
 
 /**
- * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-61)
- * — registers the attribute, then `define_attribute_method(name)` generates its
- * methods. Rails' body is `super; define_attribute_method(name)`, where `super`
- * is `AttributeRegistration::ClassMethods#attribute`
- * (attribute_registration.rb:12-20); the two are inlined here because TS cannot
- * spell `super` across modules. Story:
- * 0115/split-attribute-registration-attribute-from-attributes-attribute.
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-62)
+ * — `super; define_attribute_method(name)`. The `super` is
+ * `AttributeRegistration::ClassMethods#attribute`
+ * (attribute_registration.rb:12-20); TS has no `super` for a module outside the
+ * prototype chain, so the registration half is called through its import alias.
  *
  * A name the class already answers (`toJSON`, `freeze`, `attributes`)
  * gets no accessor, because `define_attribute_method_pattern`'s
@@ -69,91 +64,12 @@ type AttributeInstanceHost = { _attributes: AttributeSet };
  * @internal
  */
 export function attribute(
-  this: {
-    _attributeDefinitions: Map<string, AttributeDefinition>;
-    prototype: object;
-    _cachedDefaultAttributes?: AttributeSet | null;
-    resolveTypeName(name: string, options?: Record<string, unknown>): Type;
-    resolveAttributeName(name: string): string;
-    pendingAttributeModifications(): PendingModification[];
-    attributeTypes(): Record<string, Type>;
-    defineAttributeMethod(attrName: string): void;
-    hookAttributeType(name: string, type: Type): Type;
-  },
+  this: AttributeRegistrationHost & { defineAttributeMethod(attrName: string): void },
   name: string,
-  // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
-  // optional. When omitted, the attribute keeps its existing (schema-reflected
-  // or previously-declared) type and only the default/decorator is applied —
-  // backing the `attribute :col, default: "x"` idiom. See
-  // activemodel/lib/active_model/attribute_registration.rb:18,55-63.
   typeName?: string | Type | AttributeOptions,
   options?: AttributeOptions,
 ): void {
-  name = this.resolveAttributeName(name);
-  if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
-    options = typeName;
-    typeName = undefined;
-  }
-  const typeProvided = typeName !== undefined;
-  if (!Object.hasOwn(this, "_attributeDefinitions")) {
-    this._attributeDefinitions = new Map(this._attributeDefinitions);
-  }
-  const existing = this._attributeDefinitions.get(name);
-  // When the type is omitted, preserve the existing attribute's type (Rails'
-  // PendingType `with_type` inheritance path); fall back to the value type only
-  // when nothing is known about the attribute yet.
-  // Rails' `attribute(name, ...)` forwards `**options` straight to the type
-  // registry (attributes.rb:59-62 → attribute_registration.rb:18); the two keys
-  // consumed here — `default` and `virtual` — are the ones Rails names
-  // explicitly, so only the rest reach the registry.
-  const { default: _default, virtual: _virtual, ...typeOptions } = options ?? {};
-  let type = typeProvided
-    ? typeName instanceof Type
-      ? typeName
-      : this.resolveTypeName(
-          typeName as string,
-          Object.keys(typeOptions).length > 0
-            ? (typeOptions as Record<string, unknown>)
-            : undefined,
-        )
-    : (existing?.type ?? typeDefaultValue());
-  // attribute_registration.rb:15 — `type = hook_attribute_type(name, type) if type`.
-  if (typeProvided) type = this.hookAttributeType(name, type);
-  // Preserve the existing defaultValue when no default is explicitly provided,
-  // matching Rails' PendingType behavior: with_type only changes the type and
-  // leaves the current default/value untouched.
-  const defaultValue =
-    options?.default !== undefined ? options.default : (existing?.defaultValue ?? null);
-  this._attributeDefinitions.set(name, {
-    ...existing,
-    name,
-    type,
-    defaultValue,
-    virtual: options?.virtual ?? existing?.virtual,
-    ...(options?.limit != null ? { limit: options.limit } : {}),
-  });
-
-  // Push to pending-modification queue so _defaultAttributes() replays in
-  // the correct order relative to schema-reflected columns (AR) or other
-  // pending modifications (AM inheritance).
-  // Mirrors: ActiveModel::AttributeRegistration#attribute —
-  //   pending << PendingType.new(name, type) if type || no_default
-  //   pending << PendingDefault.new(name, default) unless no_default
-  // A bare re-declaration (no type, no default) still pushes a PendingType with
-  // a nil type so it re-anchors to the attribute's current type at replay; a
-  // default-only call pushes only PendingDefault, preserving the existing type.
-  const noDefault = options?.default === undefined;
-  if (typeProvided || noDefault) {
-    this.pendingAttributeModifications().push(new PendingType(name, typeProvided ? type : null));
-  }
-  if (!noDefault) {
-    this.pendingAttributeModifications().push(new PendingDefault(name, defaultValue));
-  }
-
-  // Mirrors: Rails reset_default_attributes — invalidate cache on this class
-  // and all known subclasses so they recompute on next _defaultAttributes() call.
-  resetDefaultAttributes(this);
-
+  registrationAttribute.call(this, name, typeName, options);
   this.defineAttributeMethod(name);
 }
 

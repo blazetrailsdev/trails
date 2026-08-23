@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
 import { ArgumentError } from "./hash-utils.js";
-import { Rational } from "@blazetrails/date";
+import { Rational, Time } from "@blazetrails/date";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {
@@ -130,7 +130,7 @@ describe("TimeZoneLocalPeriodsTest", () => {
   const zone = () => TimeZone.find("Eastern Time (US & Canada)")!;
 
   it("periods_for_local returns one period for an unambiguous local time", () => {
-    const periods = zone().periodsForLocal(new Date(Date.UTC(2024, 0, 15, 12)));
+    const periods = zone().periodsForLocal(Time.utc(2024, 1, 15, 12));
     expect(periods.length).toBe(1);
     expect(periods[0].observedUtcOffset).toBe(-5 * 3600);
     expect(periods[0].isDst()).toBe(false);
@@ -138,26 +138,24 @@ describe("TimeZoneLocalPeriodsTest", () => {
 
   it("periods_for_local returns both periods for an ambiguous local time", () => {
     // 2006-10-29 01:30 local occurs twice: once as EDT, once as EST.
-    const periods = zone().periodsForLocal(new Date(Date.UTC(2006, 9, 29, 1, 30)));
+    const periods = zone().periodsForLocal(Time.utc(2006, 10, 29, 1, 30));
     expect(periods.length).toBe(2);
     expect(periods.map((period) => period.observedUtcOffset)).toEqual([-4 * 3600, -5 * 3600]);
   });
 
   it("period_for_local resolves an ambiguous local time with the dst argument", () => {
-    const ambiguous = new Date(Date.UTC(2006, 9, 29, 1, 30));
+    const ambiguous = Time.utc(2006, 10, 29, 1, 30);
     expect(zone().periodForLocal(ambiguous).isDst()).toBe(true);
     expect(zone().periodForLocal(ambiguous, false).isDst()).toBe(false);
   });
 
   it("periods_for_local returns no periods for a nonexistent local time", () => {
     // 2024-03-10 02:30 local never happens: the clocks jump 02:00 to 03:00.
-    expect(zone().periodsForLocal(new Date(Date.UTC(2024, 2, 10, 2, 30)))).toEqual([]);
+    expect(zone().periodsForLocal(Time.utc(2024, 3, 10, 2, 30))).toEqual([]);
   });
 
   it("period_for_local raises for a nonexistent local time", () => {
-    expect(() => zone().periodForLocal(new Date(Date.UTC(2024, 2, 10, 2, 30)))).toThrow(
-      PeriodNotFound,
-    );
+    expect(() => zone().periodForLocal(Time.utc(2024, 3, 10, 2, 30))).toThrow(PeriodNotFound);
   });
 
   it("local_to_utc raises for an ambiguity dst does not resolve", () => {

@@ -12,10 +12,14 @@ import { PrimaryKey, type PrimaryKeyInstance, type PrimaryKeyRecord } from "./pr
  * trails ported that predicate as the class-level accessor
  * `Base.compositePrimaryKey`, read inline below exactly where Ruby calls it.
  *
- * Ruby's `@primary_key`, the ivar seeded from the class at `init_internals` —
- * read off the class the record was built from, in the order it declares.
+ * Ruby's `@primary_key`, the ivar seeded from the class at `init_internals`
+ * (core.rb:846) — read off the record's own slot, in the order the class
+ * declares. A record built before its schema reflected has no seat and reads
+ * through to the class; see `primaryKeyOf` in primary-key.ts.
  */
 function primaryKeyOf(record: object): string[] {
+  const seated = (record as { _primaryKey?: string[] })._primaryKey;
+  if (seated !== undefined) return seated;
   return (record.constructor as any).primaryKey as string[];
 }
 

@@ -87,13 +87,13 @@ describe("TimeZoneTest", () => {
 
   it("period for local", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect(zone.periodForLocal(new Date(Date.UTC(2000, 0, 1)))).toBeInstanceOf(TimezonePeriod);
+    expect(zone.periodForLocal(Time.utc(2000, 1, 1))).toBeInstanceOf(TimezonePeriod);
   });
 
   it("period for local with ambiguous time", () => {
     const zone = TimeZone.find("Moscow")!;
-    const period = zone.periodForLocal(new Date(Date.UTC(2015, 0, 1)));
-    expect(zone.periodForLocal(new Date(Date.UTC(2014, 9, 26, 1, 0, 0)))).toEqual(period);
+    const period = zone.periodForLocal(Time.utc(2015, 1, 1));
+    expect(zone.periodForLocal(Time.utc(2014, 10, 26, 1, 0, 0))).toEqual(period);
   });
 
   // ---------------------------------------------------------------------------

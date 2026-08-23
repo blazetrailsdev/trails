@@ -427,8 +427,22 @@ function inspect(value: unknown): string {
 /**
  * Get timezone abbreviation and offset for a given IANA zone at a specific instant.
  */
-function toDate(at: Date | Temporal.Instant): Date {
-  return at instanceof Date ? at : new Date(at.epochMilliseconds);
+function toDate(at: Date | Temporal.Instant | Time): Date {
+  if (at instanceof Date) return at;
+  if (at instanceof Time) return new Date(at.toTime().toInstant().epochMilliseconds);
+  return new Date(at.epochMilliseconds);
+}
+
+/**
+ * The `::Time` TZInfo's readers take, for a UTC instant trails carries as a
+ * `Date`.
+ *
+ * @noRailsEquivalent CONVERGEABLE — Ruby hands these readers a `::Time`
+ * throughout; the `Date`-seated callers left inside this file converge as the
+ * `TimeZone` seat itself moves onto `Time` (RFC 0098).
+ */
+function utcTimeFrom(at: Date | Temporal.Instant): Time {
+  return Time.at(new Rational(toDate(at).getTime(), 1000)).getutc();
 }
 
 function getZoneInfo(
@@ -659,7 +673,7 @@ export class Timezone {
   }
 
   /** `TZInfo::Timezone#period_for_utc`. */
-  periodForUtc(time: Date | Temporal.Instant): TimezonePeriod {
+  periodForUtc(time: Time): TimezonePeriod {
     const d = toDate(time);
     return new TimezonePeriod(this.abbr(d), this.observedUtcOffset(d), this.isDst(d));
   }
@@ -674,7 +688,7 @@ export class Timezone {
    * TZInfo hands the periods back in, and what makes Rails' `periods.last` the
    * standard-time one.
    */
-  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
+  periodsForLocal(time: Time): TimezonePeriod[] {
     const localMs = toDate(time).getTime();
     const DAY = 86_400_000;
     const around = [
@@ -686,7 +700,7 @@ export class Timezone {
     for (const offset of candidates) {
       const utc = new Date(localMs - offset * 1000);
       if (getZoneInfo(this.identifier, utc).utcOffsetSeconds === offset) {
-        periods.push(this.periodForUtc(utc));
+        periods.push(this.periodForUtc(utcTimeFrom(utc)));
       }
     }
     return periods;
@@ -700,7 +714,7 @@ export class Timezone {
    * called.
    */
   periodForLocal(
-    time: Date | Temporal.Instant,
+    time: Time,
     dst: boolean | null = true,
     block?: (periods: TimezonePeriod[]) => TimezonePeriod,
   ): TimezonePeriod {
@@ -737,7 +751,7 @@ export class Timezone {
    */
   localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
     const localMs = toDate(time).getTime();
-    const period = this.periodForLocal(time, dst);
+    const period = this.periodForLocal(utcTimeFrom(time), dst);
     return new Date(localMs - period.observedUtcOffset * 1000);
   }
 }
@@ -943,7 +957,7 @@ export class TimeZone {
     let period: TimezonePeriod;
     for (;;) {
       try {
-        period = this.periodForLocal(time);
+        period = this.periodForLocal(utcTimeFrom(time));
         break;
       } catch (error) {
         if (!(error instanceof PeriodNotFound)) throw error;
@@ -1100,7 +1114,7 @@ export class TimeZone {
    * memoizes (time_with_zone.rb:72-74) and reads `dst?` /
    * `observed_utc_offset` / `abbreviation` off.
    */
-  periodForUtc(time: Date | Temporal.Instant): TimezonePeriod {
+  periodForUtc(time: Time): TimezonePeriod {
     return this.tzinfo.periodForUtc(time);
   }
 
@@ -1109,12 +1123,12 @@ export class TimeZone {
    * `tzinfo.period_for_local(time, dst) { |periods| periods.last }`: the block
    * settles an ambiguous local time `dst` could not, by taking the last period.
    */
-  periodForLocal(time: Date | Temporal.Instant, dst: boolean | null = true): TimezonePeriod {
+  periodForLocal(time: Time, dst: boolean | null = true): TimezonePeriod {
     return this.tzinfo.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
   }
 
   /** `periods_for_local(time)` (time_zone.rb:563-565). */
-  periodsForLocal(time: Date | Temporal.Instant): TimezonePeriod[] {
+  periodsForLocal(time: Time): TimezonePeriod[] {
     return this.tzinfo.periodsForLocal(time);
   }
 

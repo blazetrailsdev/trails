@@ -39,6 +39,7 @@ import type { PrettyPrinter } from "./pretty-print.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
+import { isPrimaryKeySettled } from "./attribute-methods/primary-key.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError, runAllCallbacks } from "@blazetrails/activemodel";
@@ -891,6 +892,7 @@ export function initInternals(
     _startTransactionState: unknown;
     _strictLoading: boolean;
     _strictLoadingMode?: StrictLoadingMode;
+    _primaryKey?: string | string[] | null;
   },
   super_: () => void,
 ): void {
@@ -903,6 +905,15 @@ export function initInternals(
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
   const klass = this.constructor as any;
+  // core.rb:846 — `@primary_key = klass.primary_key`; every instance-side
+  // primary-key reader then reads the ivar (primary_key.rb:18-56).
+  // trails' schema reflection is async, so a record built before its class'
+  // columns hash has arrived would latch `get_primary_key`'s cold-cache
+  // convention ("id", attribute-methods/primary-key.ts:382) for the record's
+  // lifetime. The seat is therefore taken only once the class can answer for
+  // real — an explicitly configured key, or a loaded schema — and
+  // `primaryKeyOf` reads through to the class until then.
+  if (isPrimaryKeySettled.call(klass)) this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
 }
