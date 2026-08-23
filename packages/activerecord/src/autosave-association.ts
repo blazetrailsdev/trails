@@ -12,7 +12,6 @@ import { associationInstanceGet, type AssociationDefinition } from "./associatio
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { throwAbort, underscore } from "@blazetrails/activesupport";
 
-const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
 const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor");
 
@@ -29,6 +28,7 @@ function _guardKey(association: unknown): string {
 
 interface AutosaveAssociationHost {
   [key: symbol]: unknown;
+  _markedForDestruction: boolean;
   isNewRecord(): boolean;
   hasChangesToSave?: unknown;
   destroyedByAssociation?: unknown;
@@ -64,7 +64,7 @@ type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>
 export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
   return function (this: T, options?: ReloadOptions): Promise<T> {
     const record = this as unknown as AutosaveAssociationHost;
-    record[MARKED_FOR_DESTRUCTION] = false;
+    record._markedForDestruction = false;
     record.destroyedByAssociation = null;
     return inheritedReload.call(this, options);
   };
@@ -72,11 +72,11 @@ export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T
 
 export const AutosaveAssociation = {
   markForDestruction(this: AutosaveAssociationHost): void {
-    this[MARKED_FOR_DESTRUCTION] = true;
+    this._markedForDestruction = true;
   },
 
   markedForDestruction(this: AutosaveAssociationHost): boolean {
-    return !!this[MARKED_FOR_DESTRUCTION];
+    return this._markedForDestruction;
   },
 
   setDestroyedByAssociation(this: AutosaveAssociationHost, reflection: unknown): void {

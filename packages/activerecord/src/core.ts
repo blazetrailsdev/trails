@@ -848,6 +848,22 @@ export function arelTable(this: CoreHost): Table {
  * already assigned; the flag is raised here instead, at the first seat that
  * runs before the assignment and in Rails' own order.
  *
+ * `@primary_key = klass.primary_key` (core.rb:846) has no seat here: trails
+ * resolves the primary key off the class at read time
+ * (`primaryKeyOf`, attribute-methods/primary-key.ts), because schema reflection
+ * is asynchronous and a record constructed before its schema loads would latch
+ * a placeholder key for its whole life. Converging that slot is tracked
+ * separately (RFC 0115 `seat-the-per-instance-primary-key-slot`).
+ *
+ * `klass.define_attribute_methods` (core.rb:849) is likewise absent, and
+ * CONVERGEABLE rather than permanent: Rails can force the class's attribute
+ * methods to exist by construction time because `attribute_types` loads the
+ * schema synchronously. trails' schema load is async, so the methods are
+ * generated when the columns hash arrives (`applyColumnsHash`) instead; a call
+ * here would be either a no-op or a synchronous schema read that does not
+ * exist. (No `@missingRailsCall` tag: `parity:api:calls` does not flag the
+ * omission, and a tag it cannot see reads as stale to the gate.)
+ *
  * @internal
  */
 export function initInternals(
@@ -856,7 +872,9 @@ export function initInternals(
     _readonly: boolean;
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
+    _markedForDestruction: boolean;
     _destroyedByAssociation: unknown;
+    _startTransactionState: unknown;
     _strictLoading: boolean;
     _strictLoadingMode?: StrictLoadingMode;
   },
@@ -867,7 +885,9 @@ export function initInternals(
   this._readonly = false;
   this._previouslyNewRecord = false;
   this._destroyed = false;
+  this._markedForDestruction = false;
   this._destroyedByAssociation = null;
+  this._startTransactionState = null;
   const klass = this.constructor as any;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
