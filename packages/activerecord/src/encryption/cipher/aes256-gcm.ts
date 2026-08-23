@@ -76,12 +76,13 @@ export class Aes256Gcm {
    *   `cipher.random_iv` on it. Node's `createCipheriv` takes the IV as a
    *   constructor argument, so no cipher object exists at that point and the slot
    *   carries `@deterministic` — the value Rails reads off the receiver instead.
+   *
+   * Ruby's `clear_text` is a byte String, whose JS pair is a Buffer, so a string
+   * argument is decoded once on entry and `clearText` is bytes from there on.
    */
   encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
-    // Ruby's `clear_text` is a byte String; the JS pair of that is a Buffer, so a
-    // string argument is decoded once here and `clearText` is bytes from here on.
     if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
     const iv = this.generateIv(this.deterministic, clearText);
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
