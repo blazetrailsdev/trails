@@ -687,7 +687,7 @@ export async function lowerMarksForDropped(
 }
 
 /**
- * The baseline rows in this run's scope, both dimensions, so the run can say
+ * The baseline rows in this run's scope, BOTH dimensions, so the run can say
  * how many of them it did not migrate.
  *
  * `call-mismatches-exclude/` shards hold both dimensions (RFC 0095): a
@@ -719,7 +719,7 @@ export function scopedRows(
  * was excluding.
  */
 export function migrationSummary(
-  inScope: readonly ExcludeEntry[],
+  inScope: ExcludeEntry[],
   dropped: number,
   dryRun: boolean,
 ): string[] {
@@ -729,7 +729,7 @@ export function migrationSummary(
       `${dryRun ? "would be" : "were"} dropped from ` +
       `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
   ];
-  const argsRows = rowsOfKind([...inScope], "args");
+  const argsRows = rowsOfKind(inScope, "args");
   if (argsRows.length > 0) {
     lines.push(
       `parity:api:build: ${argsRows.length} of those row(s) are kind: "args" and ` +
@@ -764,9 +764,6 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const baseline = await loadSplitBaseline(BASELINE_DIR);
-  // Call-SET rows only: `keyOf` does not carry `kind`, so an args-kind row
-  // sharing a key would otherwise donate its reason to a `@missingRailsCall`
-  // receipt and then be dropped from the shard by the migration below.
   const callRows = rowsOfKind(baseline, "calls");
   const reasons = new Map<string, string>();
   for (const e of callRows) {
@@ -889,11 +886,7 @@ async function main(argv: string[]): Promise<number> {
     );
     for (const rel of moved) console.log(`  - ${rel}`);
   }
-  for (const line of migrationSummary(
-    scopedRows(baseline, pkg, onlyFile),
-    dropped,
-    dryRun,
-  )) {
+  for (const line of migrationSummary(scopedRows(baseline, pkg, onlyFile), dropped, dryRun)) {
     console.log(line);
   }
   console.log(
