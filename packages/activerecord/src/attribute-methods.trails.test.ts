@@ -19,11 +19,13 @@ import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-fixtures.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
-import { CpkBook } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
 registerModel(Minivan);
 registerModel(CpkBook);
+registerModel(CpkOrder);
 
 /** Internal attribute-method generation surface exercised by these tests. */
 interface Generatable {
@@ -559,6 +561,23 @@ describe("attributesForCreate (trails)", () => {
     await CpkBook.loadSchema();
     const book = new CpkBook({ author_id: 1, title: "The Rails Way" });
     expect(attributesForCreate.call(book as never, book.attributeNames())).toContain("id");
+  });
+
+  // With `partial_inserts` off, `attribute_names_for_partial_inserts`
+  // (dirty.rb:249-258) hands every non-auto-populated column to
+  // `attributes_for_create`, so the nil `shop_id` reaches the filter.
+  it("inserts a nil composite primary key member on create", async () => {
+    const oldPartialInserts = CpkOrder.partialInserts;
+    CpkOrder.partialInserts = false;
+    try {
+      let order: CpkOrder | undefined;
+      await assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, 1, false, async () => {
+        order = await CpkOrder.create({ status: "paid" });
+      });
+      expect(order?.shop_id).toBeNull();
+    } finally {
+      CpkOrder.partialInserts = oldPartialInserts;
+    }
   });
 
   it("drops the primary key of a scalar-keyed record with no id", async () => {
