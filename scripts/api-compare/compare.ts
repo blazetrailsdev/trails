@@ -2822,10 +2822,17 @@ export function main() {
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
         tsSkeletonByFileName.set(file, byName);
       }
-      if (scope === "package" && m.file !== undefined && m.file !== file) {
+      // `declaredIn` is the extractor's own foreign-declaration field, set on a
+      // synthesizedMixin pseudo-module's members (where `m.file` IS the keyed
+      // file). A member reached through a class entry keyed under a
+      // re-exporting file carries no `declaredIn` and states the same fact by
+      // disagreeing with that file — both are the declaration's real home.
+      const declaredIn =
+        m.declaredIn ?? (m.file !== undefined && m.file !== file ? m.file : undefined);
+      if (scope === "package" && declaredIn !== undefined && declaredIn !== file) {
         const byName = tsDeclFileByFileName.get(file) ?? new Map<string, Map<string, string>>();
         const byOwner = byName.get(m.name) ?? new Map<string, string>();
-        byOwner.set(owner, m.file);
+        byOwner.set(owner, declaredIn);
         byName.set(m.name, byOwner);
         tsDeclFileByFileName.set(file, byName);
       }
