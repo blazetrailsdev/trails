@@ -840,11 +840,10 @@ export class Associations {
     }
     const self = this as any;
     const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
-    scope = typeof scope === "function" ? scope : null;
 
     const joinModel = builder.throughModel();
 
-    // `const_set` + `private_constant` (associations.rb:1868-1869) against the
+    // `const_set` + `private_constant` (associations.rb:1876-1877) against the
     // registry that stands in for Ruby's constant table.
     const registryKey = `${self.name}::${joinModel.name}`;
     modelRegistry.set(registryKey, joinModel);
@@ -947,7 +946,7 @@ export class Associations {
     // RHS unregistered it latched the name-derived fallback for good.
     // `associationForeignKey` is retained on the reflection options to
     // mirror Rails' `habtm_reflection` (which keeps the full options
-    // hash); note however that `_build` and `_resolveHabtmJoin` currently
+    // hash); note however that this macro and `_resolveHabtmJoin` currently
     // hard-code the target FK as `${singular(name)}_id` — full plumbing into
     // the generated join model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
@@ -960,7 +959,9 @@ export class Associations {
         habtmOptions[k] = options[k];
       }
     }
-    const positionalScope = typeof scope === "function" ? scope : null;
+    const positionalScope = (typeof scope === "function" ? scope : null) as
+      | ((...args: any[]) => any)
+      | null;
     self._associations = [
       ...self._associations,
       { type: "hasAndBelongsToMany", name, scope: positionalScope, options: habtmOptions },
