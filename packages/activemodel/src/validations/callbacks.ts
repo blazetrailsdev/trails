@@ -9,11 +9,6 @@ import type { CallbackFn, CallbackConditions, CallbackObject } from "../callback
  * `after_validation`; `Model` picks both up through the `extend(Model, …)` at
  * the bottom of model.ts.
  */
-export interface CallbacksClassMethods {
-  beforeValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
-  afterValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
-}
-
 /**
  * The class-method half of `ActiveModel::Validations::Callbacks`
  * (callbacks.rb:32-110), mixed onto the host with `extend()`. Ruby's
@@ -63,7 +58,7 @@ export interface CallbacksInstanceMethods {
   runValidationsBang(): Promise<boolean>;
 }
 
-export type Callbacks = CallbacksClassMethods & CallbacksInstanceMethods;
+export type Callbacks = typeof ClassMethods & CallbacksInstanceMethods;
 
 type Conditional = ((record: unknown) => boolean) | string;
 

@@ -84,7 +84,7 @@ export function afterValidation<T extends ModelCtor>(
  */
 export const InstanceMethods = {
   [included](base: ModelCtor): void {
-    base.defineModelCallbacks("initialize", "find", "touch", { only: ["after"] });
+    base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
 };
