@@ -1959,11 +1959,30 @@ function excludingWithCallee(callee: "excluding" | "without") {
 
     // Rails `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1586).
     // `Relation#ids` is the seam that decides per relation whether a query runs
-    // (calculations.rb:373), draining a parked `@future_result` on the `loaded?`
-    // arm. trails cannot run that select synchronously, so every relation
-    // argument is deferred uniformly and the load pipeline materializes it
-    // through `Relation#ids` rather than second-guessing the decision here.
-    const combined: unknown[] = [...records, ...relations];
+    // (calculations.rb:373): a relation that is already `loaded?` maps its rows
+    // with `record._read_attribute(primary_key)` and runs NO query, so that arm
+    // materializes HERE, where Rails materializes, and its literal ids reach
+    // `excluding!` in the same argument position Rails puts them in.
+    //
+    // The two arms trails cannot take eagerly stay deferred: a `scheduled?`
+    // relation (relation.rb:1170) is `loaded?` with its rows still parked in
+    // `@future_result`, and draining them is asynchronous; an un-loaded one
+    // needs the `SELECT <pk>` select, which the synchronous builder cannot run.
+    // Both go to `excluding!` as relations, and the load pipeline materializes
+    // them through `Relation#ids`.
+    const flatMappedIds: unknown[] = [];
+    const deferredRelations: any[] = [];
+    for (const relation of relations) {
+      const primaryKey = relation.model.primaryKey;
+      if (relation.isLoaded && !relation.isScheduled && !Array.isArray(primaryKey)) {
+        for (const record of relation._records) {
+          flatMappedIds.push(record._readAttribute(primaryKey));
+        }
+      } else {
+        deferredRelations.push(relation);
+      }
+    }
+    const combined: unknown[] = [...records, ...flatMappedIds, ...deferredRelations];
     return excludingBang.call(this.spawn(), combined);
   };
 }
@@ -1985,7 +2004,9 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // every relation arg's eagerly-materialized ids — built into ONE predicate.
   // Ruby materializes those ids before this call (synchronous query execution);
   // trails' builder is synchronous-and-lazy, so `excluding`/`without` leave
-  // every relation argument in `records` for us to defer here.
+  // the relation arguments whose ids it could NOT map without a query — an
+  // un-loaded or `scheduled?` one — in `records` for us to defer here; a
+  // `loaded?` one was already flattened to its literal ids there.
   const deferredRelations = records.filter((r) => isRelationLike(r));
   const literalRecords = records.filter((r) => !isRelationLike(r));
 
