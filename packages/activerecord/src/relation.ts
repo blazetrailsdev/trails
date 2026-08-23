@@ -1005,51 +1005,45 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#load
    */
   async load(): Promise<LoadedRelation<this>> {
+    if (this.isNullRelation()) return stripThenable(this);
     // relation.rb:1180 `if !loaded? || scheduled?` — `load_async` leaves the
     // relation `loaded?` with its rows still parked in `@future_result`
     // (relation.rb:1149), and the `scheduled?` disjunct is what carries it into
-    // `exec_queries` to drain them.
-    if (!this.isLoaded || this.isScheduled) await this.toArray();
+    // `exec_queries` to drain them. The guard reads the `loaded?` seam, not
+    // `@loaded`, so a subclass that owns its loadedness (CollectionProxy,
+    // collection_proxy.rb:53) takes this arm correctly.
+    if (!this.isLoaded || this.isScheduled) {
+      // Run the query inside `with_connection` so the pool releases the
+      // connection afterwards instead of holding it permanently. The build /
+      // execute path reads the threaded connection via `_conn()` (see
+      // {@link withConnection}) rather than the deprecated `.connection`
+      // getter, so it never flips the lease permanent under
+      // `permanent_connection_checkout = :deprecated | :disallowed`.
+      // Mirrors Rails, whose read paths run inside `with_connection` and thread
+      // the yielded connection.
+      const token = this._loadToken;
+      const records = await this.withConnection(() => this.execQueries());
+      // A reset() landed while the query was in flight: leave the fresh state
+      // alone instead of clobbering it with the stale rows. Rails cannot have
+      // this race — `exec_queries` is synchronous.
+      // relation.rb:1181-1182 `@records = exec_queries; @loaded = true`. The
+      // assignment lives HERE, not in `exec_queries`, which is what makes
+      // `.explain` (which calls `exec_queries` directly, relation.rb:13)
+      // side-effect-free.
+      if (token === this._loadToken) this.loadRecords(records);
+    }
     return stripThenable(this);
   }
 
   /**
    * Execute the query and return all records.
    *
-   * Mirrors: ActiveRecord::Relation#to_a / #load
+   * Mirrors: ActiveRecord::Relation#to_ary / #to_a (relation.rb:337-339)
    */
   async toArray(): Promise<T[]> {
-    if (this.isNullRelation()) return [];
-    // relation.rb:1180's `loaded?` guard reads the seam, not `@loaded`, so a
-    // subclass that owns its loadedness (CollectionProxy,
-    // collection_proxy.rb:53) takes this arm correctly. The negation of Rails'
-    // second disjunct — `|| scheduled?` — is spelled here: a `load_async`
-    // relation is `loaded?` with its rows still parked, and must fall through
-    // to `exec_queries` to drain them.
-    // relation.rb:337-339 `to_ary` is `records.dup`, so the loaded arm reads
-    // the `records` seam a CollectionProxy overrides (collection_proxy.rb:
-    // 1024-1026), not the ivar. `records` re-enters `load`, whose `loaded?`
-    // guard is already satisfied, so it returns without re-entering here.
-    if (this.isLoaded && !this.isScheduled) return [...(await this.records())];
-    // Run the query inside `with_connection` so the pool releases the connection
-    // afterwards instead of holding it permanently. The build / execute path
-    // reads the threaded connection via `_conn()` (see {@link withConnection})
-    // rather than the deprecated `.connection` getter, so it never flips the lease
-    // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
-    // Mirrors Rails, whose read paths run inside `with_connection` and thread the
-    // yielded connection.
-    // Mirrors: ActiveRecord::Relation#load (relation.rb:1179-1186) —
-    // `@records = exec_queries; @loaded = true`. The assignment lives HERE, not
-    // in `exec_queries`, which is what makes `.explain` (which calls
-    // `exec_queries` directly, relation.rb:13) side-effect-free.
-    const token = this._loadToken;
-    const records = await this.withConnection(() => this.execQueries());
-    // A reset() landed while the query was in flight: return the rows we got
-    // without clobbering the fresh state.
-    if (token !== this._loadToken) return records;
-    this.loadRecords(records);
-    // relation.rb:339 `records.dup` — `loadRecords` has satisfied the `loaded?`
-    // guard, so this is the seam read, not a re-entry.
+    // relation.rb:337-339 `to_ary` is `records.dup`, so this reads the
+    // `records` seam a CollectionProxy overrides (collection_proxy.rb:
+    // 1024-1026), not the ivar.
     return [...(await this.records())];
   }
 
