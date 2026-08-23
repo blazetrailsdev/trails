@@ -108,12 +108,6 @@ export function delegatedType(
  * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
  *
  * @internal
- *
- * @missingRailsCall define_method — PERMANENT: delegated_type.rb:246-274
- *   `define_method "#{role}_class"` and its siblings — Ruby's `define_method` is
- *   `Object.defineProperty` on the prototype in JS; there is no `defineMethod`
- *   to call. Same language shortcoming as the `autosave-association.ts
- *   define_non_cyclic_method -> define_method` row.
  */
 export function defineDelegatedTypeMethods(
   modelClass: typeof Base,

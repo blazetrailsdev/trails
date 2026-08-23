@@ -10,7 +10,6 @@ import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
-import { instantiateInstanceOf } from "./persistence.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
 
@@ -166,11 +165,7 @@ export function _loadFromSql<T extends typeof Base>(
       return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
     } else {
       // Instantiate a homogeneous set
-      return resultSet
-        .toArray()
-        .map(
-          (record) => instantiateInstanceOf(this, record, columnTypes, block) as InstanceType<T>,
-        );
+      return resultSet.toArray().map((record) => this._instantiate(record, block, columnTypes));
     }
   });
 }
