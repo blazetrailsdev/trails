@@ -14,7 +14,7 @@ export class ISO8601Serializer {
   private duration: Duration;
   private precision: number | null;
 
-  // Mirrors `initialize(duration, precision: nil)` (:9-12).
+  /** Mirrors: `initialize(duration, precision: nil)` (:9-12). */
   constructor(duration: Duration, { precision = null }: { precision?: number | null } = {}) {
     this.duration = duration;
     this.precision = precision;

@@ -100,12 +100,15 @@ export class ISO8601Parser {
     this.sign = 1;
   }
 
+  /**
+   * Mirrors: `parse!` (iso8601_parser.rb:43-79). `SIGN_MARKER` has an empty
+   * alternative, so a miss is `null` while a hit can be `""` — truthy in Ruby
+   * and falsy in JS, hence each arm tests `!= null` rather than truthiness.
+   */
   parseBang(): Partial<DurationParts> {
     while (!this.isFinished()) {
       switch (this.mode) {
         case "start":
-          // `SIGN_MARKER` has an empty alternative, so a miss is `null` and a
-          // hit can be `""` — which is truthy in Ruby and falsy in JS.
           if (this.scan(SIGN_MARKER) != null) {
             this.sign = this.scanner.matched === "-" ? -1 : 1;
             this.mode = "sign";
