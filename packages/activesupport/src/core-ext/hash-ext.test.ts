@@ -295,7 +295,9 @@ describe("HashExtTest", () => {
  * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`), which
  * gates the Nokogiri legs of Rails' backend matrix. Ruby's `rescue LoadError`
  * catches only the package being absent; `import()` signals that as
- * `ERR_MODULE_NOT_FOUND` naming the specifier.
+ * `ERR_MODULE_NOT_FOUND` naming the specifier. Ruby's block then reads
+ * `Nokogiri::XML::SyntaxError` off the constant the `require` installed; ESM
+ * has no such ambient constant, so the imported module is yielded to it.
  */
 async function runWithGem(
   gemName: string,
@@ -316,11 +318,10 @@ async function runWithGem(
     }
     return;
   }
-  // Ruby reads `Nokogiri::XML::SyntaxError` off the constant the `require`
-  // installed; ESM has no such ambient constant, so the module is yielded.
   block(gem);
 }
 
+/** `Nokogiri::XML::SyntaxError`, once `runWithGem` has imported the gem. */
 let nokogiriSyntaxError: (new (...args: any[]) => Error) | undefined;
 
 function hashToXmlTests(engine: string): void {

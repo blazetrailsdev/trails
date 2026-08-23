@@ -45,7 +45,9 @@ function isLoadError(e: unknown, gemName: string): boolean {
 
 /**
  * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`): require
- * the gem, yield, and skip the suite on `LoadError`.
+ * the gem, yield, and skip the suite on `LoadError`. Ruby's block then reads
+ * `Nokogiri::XML::SyntaxError` off the constant the `require` installed; ESM
+ * has no such ambient constant, so the imported module is yielded to it.
  */
 async function runWithGem(
   gemName: string,
@@ -58,8 +60,6 @@ async function runWithGem(
     if (!isLoadError(e, gemName)) throw e;
     return;
   }
-  // Ruby reads `Nokogiri::XML::SyntaxError` off the constant the `require`
-  // installed; ESM has no such ambient constant, so the module is yielded.
   block(gem);
 }
 

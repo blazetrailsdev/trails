@@ -15,7 +15,7 @@ export class SyntaxError extends Error {
     column?: number,
   ) {
     super(message);
-    this.name = "SyntaxError";
+    this.name = "Nokogiri::XML::SyntaxError";
     this.level = level;
     this.line = line;
     this.column = column;
