@@ -342,6 +342,11 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
  * AFTER the class's mass generation already ran. The ivar is per-class, so only
  * an *own* truthy flag counts as generated (an inherited `true` belongs to the
  * parent).
+ *
+ * Seeds the generated-methods module first, standing in for the `inherited`
+ * hook Rails seeds it from (attribute_methods.rb:265-272), so ActiveModel's
+ * lazy `generated_attribute_methods` (:400-402) never seats a bare `Module`
+ * here.
  */
 export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
@@ -509,11 +514,16 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   return true;
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#generate_alias_attributes
+ * (attribute_methods.rb:76-84).
+ *
+ * Seeds the module for the same reason {@link aliasAttribute} does: Rails'
+ * superclass already holds the one its `inherited` hook seeded, and a parent
+ * reached through the recursion below may never have declared an attribute of
+ * its own.
+ */
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
-  // Rails' superclass already holds the module its `inherited` hook seeded
-  // (attribute_methods.rb:265-272); seed it here for the same reason
-  // `aliasAttribute` does, since a parent class reached this way may never have
-  // declared an attribute of its own.
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }

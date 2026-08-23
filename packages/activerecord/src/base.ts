@@ -1128,6 +1128,12 @@ export class Base extends Model {
    * (Base defines id getter/setter with CPK support) and to apply
    * any pending encryption decorations (matching Rails' deferred
    * PendingDecorator pattern).
+   *
+   * Rails seeds `@generated_attribute_methods` from `inherited`
+   * (attribute_methods.rb:265-272), so a class body never reaches ActiveModel's
+   * lazy `generated_attribute_methods` (:400-402). trails has no `inherited`
+   * hook, so this — the AR-owned entry every declaring class body passes
+   * through — seeds it, before `super` generates the first accessor.
    */
   static attribute(
     name: string,
@@ -1137,12 +1143,6 @@ export class Base extends Model {
     typeName?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void {
-    // Rails seeds `@generated_attribute_methods` from `inherited`
-    // (attribute_methods.rb:265-272), so a class body never reaches
-    // ActiveModel's lazy `generated_attribute_methods`
-    // (attribute_methods.rb:400-402). trails has no `inherited` hook, so this
-    // — the AR-owned entry every declaring class body passes through — seeds it
-    // instead, before `super` generates the first accessor.
     if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
       _initializeGeneratedModules.call(this as never);
     }

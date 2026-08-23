@@ -26,7 +26,11 @@ export { hasSecurePassword };
  * least one password and one non-password attribute.
  *
  * Mirrors: ActiveRecord::SecurePassword::ClassMethods#authenticate_by
- * (secure_password.rb:40-55).
+ * (secure_password.rb:40-55). `attributes.to_h` is `toH` here, trails being
+ * camelCase-only, and a plain object stands in for the Hash a Hash answers for
+ * itself. The not-found arm's `new(passwords)` (:53) is what makes the two
+ * paths take the same time: building a record runs the `password=` writer, and
+ * with it the BCrypt hash the found path spends.
  *
  * @missingRailsCall map — PERMANENT:
  *   `attributes.to_h.partition { ... }.map(&:to_h)`
@@ -38,8 +42,6 @@ export async function authenticateBy(
   this: typeof Base,
   attributes: Record<string, unknown> | { toH(): Record<string, unknown> },
 ): Promise<Base | null> {
-  // trails is camelCase-only, so Ruby's `to_h` is `toH` here; a plain object
-  // stands in for the Hash `attributes.to_h` answers for itself.
   const attrs =
     typeof (attributes as { toH?: unknown }).toH === "function"
       ? (attributes as { toH(): Record<string, unknown> }).toH()
@@ -73,9 +75,6 @@ export async function authenticateBy(
     ).length;
     return count === Object.keys(passwords).length ? record : null;
   } else {
-    // `new(passwords)` (secure_password.rb:53): building a record runs the
-    // `password=` writer, and with it the BCrypt hash the found path spends —
-    // which is what makes the two paths take the same time.
     new (this as unknown as new (attributes: object) => Base)(passwords);
     return null;
   }
