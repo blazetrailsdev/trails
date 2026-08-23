@@ -186,6 +186,7 @@ export class ThroughAssociation extends Association {
     );
   }
 
+  /** Mirrors: `preloader/through_association.rb:70-72`. */
   private async sourcePreloaders(): Promise<Association[]> {
     if (this._sourcePreloaders !== undefined) return this._sourcePreloaders;
 
@@ -195,51 +196,10 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
-    // Mirror Rails' `source_preloaders`, which spawns a fresh Preloader on
-    // `source_reflection.name` passing this preloader's built `scope`
-    // (through_association.rb:70-71). Rails passes the full built scope
-    // (reflection_scope merged, `preloader/association.rb:294-304`); trails empties
-    // the source where_clause ONLY when `throughScope` already resolved it
-    // by copying the FULL where_clause onto the through query and eager-loading the
-    // source there (the `!where_clause.empty?` branch, for every source kind). In
-    // that case the middle records arrive with their source association already
-    // loaded, so this stage issues no query and re-applying the where would
-    // reference the through / intermediate table this source query never joins
-    // (e.g. `no such column: memberships.favorite`). What the source query keeps is
-    // the non-where structure — `order`, `select`, `distinct` — so
-    // `orderedPostComments`' `order(id: :desc)` still orders the source query in
-    // the fallthrough where the reflection where_clause was empty (no eager-load).
-    //
-    // The `source_type` branch of `throughScope` (rb:115-116) applies ONLY
-    // the source_type filter and does NOT copy the reflection where_clause onto
-    // the through query, so the source is genuinely queried here and MUST keep the
-    // reflection scope's (source-table) predicates — otherwise a scoped
-    // polymorphic-through loses them. So empty the where only when NOT a
-    // source_type reflection.
-    //
-    // For a nested source (source is itself a through), carry nothing: the
-    // sub-chain re-derives its own scope (including order) at its own recursive
-    // preload stage, and carrying the flattened chain scope's joins/select here
-    // would duplicate the middle records.
-    let sourceScope = null;
-    const sourceIsNested = (sourceRefl as any).isThroughReflection?.() ?? false;
-    const hasSourceType = !!(this.reflection as any).options?.sourceType;
-    if (!sourceIsNested && !this.reflectionScope.isEmptyScope) {
-      sourceScope = this.reflectionScope.clone();
-      if (!hasSourceType) {
-        sourceScope.whereClause = new WhereClause([]);
-      }
-    }
-    if (sourceScope != null && this.preloadScope != null) {
-      sourceScope = sourceScope.merge(this.preloadScope);
-    } else if (sourceScope == null) {
-      sourceScope = this.preloadScope;
-    }
-
     const preloader = new Preloader({
       records: middleRecords,
       associations: [sourceRefl.name],
-      scope: sourceScope,
+      scope: this.scope,
       associateByDefault: false,
     });
     this._sourcePreloaders = await preloader.loaders();

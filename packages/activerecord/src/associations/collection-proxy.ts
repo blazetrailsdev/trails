@@ -892,7 +892,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async replace(otherArray: T[]): Promise<T[]> {
     const association = this._collectionAssociation();
     const plan = association.replace(otherArray);
-    if (plan) await association.persistReplacePlan(plan);
+    if (plan?.pending) await plan.pending;
     return this._target;
   }
 

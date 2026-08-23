@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "replace",
-    "call": "transaction",
-    "reason": "Rails wraps `replace_records` in `transaction` (collection_association.rb:251); the synchronous writer path returns a ReplacePlan and opens the transaction in `persistReplacePlan` (collection-association.ts:775-791)."
-  }
-]
