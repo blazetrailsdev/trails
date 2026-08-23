@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import { Range } from "./range-ext.js";
 
@@ -89,7 +89,7 @@ describe("TimeWithZone local-time construction", () => {
   });
 
   it("keeps a period handed to it rather than looking one up", () => {
-    const period = eastern.periodForUtc(Temporal.Instant.from("2006-07-01T00:00:00Z"));
+    const period = eastern.periodForUtc(Time.utc(2006, 7, 1));
     const twz = new TimeWithZone(
       null,
       eastern,

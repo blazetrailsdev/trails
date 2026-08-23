@@ -39,6 +39,7 @@ import type { PrettyPrinter } from "./pretty-print.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
+import { isPrimaryKeySettled } from "./attribute-methods/primary-key.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError, runAllCallbacks } from "@blazetrails/activemodel";
@@ -891,6 +892,7 @@ export function initInternals(
     _startTransactionState: unknown;
     _strictLoading: boolean;
     _strictLoadingMode?: StrictLoadingMode;
+    _primaryKey?: string | string[] | null;
   },
   super_: () => void,
 ): void {
@@ -903,6 +905,9 @@ export function initInternals(
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
   const klass = this.constructor as any;
+  // core.rb:846 — `@primary_key = klass.primary_key`, guarded because trails
+  // resolves the schema asynchronously; see `isPrimaryKeySettled`.
+  if (isPrimaryKeySettled.call(klass)) this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
 }
