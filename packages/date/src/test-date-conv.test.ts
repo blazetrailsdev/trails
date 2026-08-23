@@ -251,14 +251,20 @@ function nsec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return t.millisecond * 1_000_000 + t.microsecond * 1_000 + t.nanosecond;
 }
 
-/** Ruby `DateTime#iso8601(n)`, off the Temporal value `toDatetime` answers. */
+/**
+ * Ruby `DateTime#iso8601(n)`, off the Temporal value `toDatetime` answers. A
+ * `PlainDateTime` is that mapping's spelling of an `of` of `0` — the same
+ * reading {@link offsetSeconds} takes below — and `DateTime#iso8601` prints
+ * that offset as `+00:00` (`date_core.c` `of2str`, `:1973-1980`), never bare
+ * and never `Z`.
+ */
 function iso8601(
   d: Temporal.ZonedDateTime | Temporal.PlainDateTime,
   fractionDigits: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
 ): string {
   return d instanceof Temporal.ZonedDateTime
     ? d.toString({ fractionalSecondDigits: fractionDigits, timeZoneName: "never" })
-    : d.toString({ fractionalSecondDigits: fractionDigits });
+    : `${d.toString({ fractionalSecondDigits: fractionDigits })}+00:00`;
 }
 
 /** Ruby `DateTime#offset`, in seconds rather than as a fraction of a day. */
