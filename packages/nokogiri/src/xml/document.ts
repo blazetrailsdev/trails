@@ -1,34 +1,28 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
 import { XmlNode } from "./node.js";
 import { type Readable, readSource } from "../readable.js";
-
-export interface XmlError {
-  level: "warning" | "error" | "fatal";
-  message: string;
-  line?: number;
-  column?: number;
-}
+import { SyntaxError } from "./syntax-error.js";
 
 export class XmlDocument {
-  readonly errors: ReadonlyArray<XmlError>;
+  readonly errors: ReadonlyArray<SyntaxError>;
   private _doc: LibXmlDocument | null;
   private _root: XmlNode | null;
 
-  private constructor(doc: LibXmlDocument | null, errors: XmlError[]) {
+  private constructor(doc: LibXmlDocument | null, errors: SyntaxError[]) {
     this._doc = doc;
     this.errors = errors;
     this._root = doc !== null ? new XmlNode(doc.root) : null;
   }
 
   static parse(data: string | Readable): XmlDocument {
-    const errors: XmlError[] = [];
+    const errors: SyntaxError[] = [];
     try {
       const doc = LibXmlDocument.fromString(readSource(data));
       return new XmlDocument(doc, errors);
     } catch (e) {
       if (e instanceof XmlParseError) {
         for (const detail of e.details) {
-          errors.push({ level: "fatal", message: detail.message });
+          errors.push(new SyntaxError(detail.message, "fatal", detail.line, detail.col));
         }
         return new XmlDocument(null, errors);
       }

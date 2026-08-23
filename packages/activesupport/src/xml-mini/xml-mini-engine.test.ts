@@ -12,10 +12,8 @@
  * `Nokogiri::XML::SyntaxError`; and `NokogiriSAXEngineTest`, whose is
  * `RuntimeError`. `nokogirisax.ts` raises Ruby's `RuntimeError` for its bare
  * `raise error_message` (`nokogirisax.rb:37-39`); the DOM backend re-raises the
- * parser's own first error as a plain `Error` (`nokogiri.ts:131`) because
- * `@blazetrails/nokogiri` carries no `Nokogiri::XML::SyntaxError` counterpart
- * for Ruby's `raise doc.errors.first` (`nokogiri.rb:27`) to raise — tracked by
- * `nokogiri-backend-raises-syntax-error`.
+ * parser's own first error (`raise doc.errors.first`, `nokogiri.rb:27`), a
+ * `Nokogiri::XML::SyntaxError`.
  * The three calls live in this one file, rather than in a file per Ruby file,
  * because `parity:test` credits a Rails test file against its convention TS
  * file and every one of these names is defined in `xml_mini_engine_test.rb`.
@@ -47,16 +45,22 @@ function isLoadError(e: unknown, gemName: string): boolean {
 
 /**
  * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`): require
- * the gem, yield, and skip the suite on `LoadError`.
+ * the gem, yield, and skip the suite on `LoadError`. Ruby's block then reads
+ * `Nokogiri::XML::SyntaxError` off the constant the `require` installed; ESM
+ * has no such ambient constant, so the imported module is yielded to it.
  */
-async function runWithGem(gemName: string, block: () => void): Promise<void> {
+async function runWithGem(
+  gemName: string,
+  block: (gem: Record<string, any>) => void,
+): Promise<void> {
+  let gem: Record<string, any>;
   try {
-    await import(/* @vite-ignore */ gemName);
+    gem = await import(/* @vite-ignore */ gemName);
   } catch (e) {
     if (!isLoadError(e, gemName)) throw e;
     return;
   }
-  block();
+  block(gem);
 }
 
 interface EngineTestsOptions {
@@ -307,11 +311,11 @@ engineTests({
   expansionAttackError: RuntimeError,
 });
 
-await runWithGem("@blazetrails/nokogiri", () => {
+await runWithGem("@blazetrails/nokogiri", (Nokogiri) => {
   engineTests({
     engine: "Nokogiri",
     backendModule: XmlMini_Nokogiri,
-    expansionAttackError: Error,
+    expansionAttackError: Nokogiri.XML.SyntaxError,
   });
 
   engineTests({
