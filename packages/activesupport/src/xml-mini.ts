@@ -463,11 +463,6 @@ function inferTypeName(value: unknown): string | undefined {
   return (value as { constructor?: { name?: string } }).constructor?.name;
 }
 
-/** `key.to_s`: a symbol key renders as its name, everything else via `String`. */
-function keyToString(key: unknown): string {
-  return typeof key === "symbol" ? (key.description ?? "") : String(key);
-}
-
 /**
  * The stringified key, underscored first when `underscoreKeys` is set
  * (ActiveModel's camelCase keys) so a later `dasherize` has `_`/space
@@ -476,7 +471,7 @@ function keyToString(key: unknown): string {
  * `Hash#to_xml`/`Array#to_xml`, which each call `rename_key`).
  */
 function tagKey(key: unknown, options: ToTagOptions): string {
-  const name = keyToString(key);
+  const name = String(key);
   return options.underscoreKeys ? underscore(name) : name;
 }
 
@@ -522,7 +517,7 @@ export interface ToXmlOptions extends Omit<ToTagOptions, "builder"> {
  *   Hash#delete(:type)/#merge/#call/#to_s are satisfied by different TS idioms
  *   (immutable `{ ...options }` spread instead of merge, destructured
  *   `options.type` instead of delete, direct function invocation, and
- *   String()/keyToString()) — no behavioral omission.
+ *   String()) — no behavioral omission.
  */
 export function toTag(key: unknown, value: unknown, options: ToTagOptions): void {
   const { builder } = options;
@@ -533,7 +528,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
     // A callable receives the merged options (with the builder); arity 1 gets
     // just the options, otherwise it also gets the singularized tag name.
     if (value.length === 1) value(merged);
-    else value(merged, singularize(keyToString(key)));
+    else value(merged, singularize(String(key)));
     return;
   }
   if (value != null && typeof (value as { toXml?: unknown }).toXml === "function") {

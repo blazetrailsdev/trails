@@ -333,7 +333,10 @@ describe("ToTagTest", () => {
   });
 
   it("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {
-    toTag(Symbol("New   York"), 33, options);
+    // Rails passes the Symbol `:"New   York"` (xml_mini_test.rb:172); a Ruby
+    // Symbol is a JS string in trails, and a Symbol KEY renders as its bare
+    // name (`key.to_s`, xml_mini.rb:118) — no leading colon.
+    toTag("New   York", 33, options);
     assertXml('<New---York type="integer">33</New---York>');
   });
 

@@ -240,6 +240,49 @@ describe("Relation#load_async", () => {
     expect(relation.isScheduled).toBe(false);
   });
 
+  it("drains a scheduled relation argument to #excluding instead of re-querying its ids", async () => {
+    // `excluding` folds relation arguments with `relations.flat_map(&:ids)`
+    // (query_methods.rb:1583-1586), and `Calculations#ids` takes its `loaded?`
+    // arm through the `records` seam (calculations.rb:373), which drains a
+    // parked future — so a `load_async` relation costs no id-select of its own.
+    const excluded = await Topic.create({ title: "excluded async topic", author_name: "David" });
+    await Topic.create({ title: "kept async topic", author_name: "David" });
+
+    const connection = Base.connection as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    const scheduled = Topic.where({ title: "excluded async topic" }).loadAsync();
+    const titles = await Topic.excluding(scheduled).pluck("title");
+
+    expect(titles).toEqual(["kept async topic"]);
+    expect((excluded as { id: unknown }).id).not.toBe(null);
+    // The scheduled SELECT plus the pluck — no third query for the ids.
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("batches a scheduled relation in memory instead of re-querying", async () => {
+    // `in_batches`' `if loaded?` arm batches `records` in memory
+    // (batches.rb), and that read drains the parked future (relation.rb:1149).
+    await Topic.create({ title: "batched async topic", author_name: "David" });
+    await Topic.create({ title: "other batched async topic", author_name: "David" });
+
+    const connection = Base.connection as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    const relation = Topic.all().loadAsync();
+    const seen: string[] = [];
+    for await (const topic of relation.findEach({ batchSize: 1 })) {
+      seen.push((topic as { title: string }).title);
+    }
+
+    expect(seen.length).toBe(2);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it("runs the query in the foreground when no executor is configured", async () => {
     restoreExecutor?.();
     restoreExecutor = undefined;
