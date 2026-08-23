@@ -15,6 +15,7 @@ import { UniquenessValidator } from "../validations.js";
 import {
   freshAdapter,
   configureEncryption,
+  AUTHOR_NAME_LIMIT,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   makeEncryptedAuthor,
@@ -279,28 +280,27 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("don't use global previous schemes with a different deterministic nature", async () => {
     Configurable.config.supportUnencryptedData = false;
+    Configurable.config.deterministicKey = "12345";
     Configurable.config.previousSchemes = [];
     Configurable.config.previous = [
-      { encryptor: new TestEncryptor({ det: "cipher_det" }), deterministic: true } as SchemeOptions,
-      { encryptor: new TestEncryptor({ "STEPHEN KING": "cipher_nondet" }) } as SchemeOptions,
+      { downcase: true, deterministic: false } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
     ];
 
-    const modelClass = class extends Base {
+    const adp = await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
       static {
         this._tableName = "authors";
-        this.attribute("name", "string");
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.adapter = adp;
+        this.encrypts("name", { deterministic: true, downcase: false });
       }
     } as any;
-    modelClass.adapter = await freshAdapter();
-    // Non-deterministic attribute — only the non-deterministic global scheme is compatible.
-    encrypts.call(modelClass, "name", {
-      encryptor: new TestEncryptor({ current: "current_cipher" }),
-    });
+    new encryptedAuthorClass();
 
-    const type = modelClass.typeForAttribute("name") as unknown as EncryptedAttributeType;
-    expect(type.previousTypes).toHaveLength(1);
-    expect(type.deserialize("cipher_nondet")).toBe("STEPHEN KING");
-    expect(() => type.deserialize("cipher_det")).toThrow(Decryption);
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("STEPHEN KING");
   });
 
   it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", () => {
@@ -394,33 +394,58 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("don't use global previous schemes with a different deterministic nature when performing queries", async () => {
     Configurable.config.supportUnencryptedData = false;
-    Configurable.config.previousSchemes = [];
-    Configurable.config.previous = [
-      {
-        encryptor: new TestEncryptor({ "STEPHEN KING": "cipher_det" }),
-        deterministic: true,
-      } as SchemeOptions,
-      { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
-    ];
+    Configurable.config.deterministicKey = "12345";
+    const savedExtendQueries = Configurable.config.extendQueries;
 
-    const modelClass = class extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    } as any;
-    modelClass.adapter = await freshAdapter();
-    // Deterministic attribute — only the deterministic global scheme is compatible.
-    encrypts.call(modelClass, "name", {
-      encryptor: new TestEncryptor({ current: "current_cipher" }),
-      deterministic: true,
-    });
+    // Snapshot prototype methods before installing query patches (mirrors uniqueness-validations.test.ts).
+    const savedMethods = {
+      where: Relation.prototype.where,
+      exists: (Relation.prototype as any).exists,
+      scopeForCreate: (Relation.prototype as any).scopeForCreate,
+      findBy: (Base as any).findBy,
+      serialize: EncryptedAttributeType.prototype.serialize,
+    };
 
-    const type = modelClass.typeForAttribute("name") as unknown as EncryptedAttributeType;
-    // Only the deterministic global previous scheme is wired in.
-    expect(type.previousTypes).toHaveLength(1);
-    expect(type.deserialize("cipher_det")).toBe("STEPHEN KING");
-    expect(() => type.deserialize("cipher_nondet")).toThrow(Decryption);
+    Configurable.config.extendQueries = true;
+    installExtendedQueriesIfConfigured();
+    try {
+      Configurable.config.previousSchemes = [];
+      Configurable.config.previous = [
+        { downcase: true, deterministic: false } as SchemeOptions,
+        { downcase: false, deterministic: true } as SchemeOptions,
+      ];
+
+      const adp = await freshAdapter();
+      const encryptedAuthorClass = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+          this.adapter = adp;
+          this.encrypts("name", { deterministic: true, downcase: false });
+        }
+      } as any;
+      new encryptedAuthorClass();
+      // No transactional fixtures in this file: an earlier case in the suite
+      // leaves a row with the same deterministic ciphertext behind, which would
+      // make the find_by hit ambiguous.
+      await encryptedAuthorClass.deleteAll();
+
+      const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+      const found = await encryptedAuthorClass.findBy({ name: "STEPHEN KING" });
+      expect(found).not.toBeNull();
+      expect(String(found!.id)).toBe(String(author.id));
+      expect(await encryptedAuthorClass.findBy({ name: "stephen king" })).toBeNull();
+    } finally {
+      Relation.prototype.where = savedMethods.where;
+      (Relation.prototype as any).exists = savedMethods.exists;
+      (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+      (Base as any).findBy = savedMethods.findBy;
+      EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
+      (ExtendedDeterministicQueries as any)._installed = false;
+      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+      Configurable.config.extendQueries = savedExtendQueries;
+    }
   });
 });
 
