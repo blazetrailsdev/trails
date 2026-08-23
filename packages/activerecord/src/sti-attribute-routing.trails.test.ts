@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { pendingAttributeDeclarationQ } from "./model-schema.js";
 import { Base } from "./base.js";
 
 describe("STI subclass attribute() registration", () => {
@@ -33,7 +32,7 @@ describe("STI subclass attribute() registration", () => {
 
     // Shape IS the STI base (not a subclass), so its map is its own.
     expect(Object.prototype.hasOwnProperty.call(Shape, "_attributeDefinitions")).toBe(true);
-    expect(pendingAttributeDeclarationQ(Shape, "name")).toBe(true);
+    expect(Shape._attributeDefinitions.has("name")).toBe(true);
   });
 
   it("non-STI classes are unaffected", () => {
@@ -44,7 +43,7 @@ describe("STI subclass attribute() registration", () => {
     }
 
     expect(Object.prototype.hasOwnProperty.call(Widget, "_attributeDefinitions")).toBe(true);
-    expect(pendingAttributeDeclarationQ(Widget, "price")).toBe(true);
+    expect(Widget._attributeDefinitions.has("price")).toBe(true);
   });
 
   it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
@@ -133,11 +132,11 @@ describe("STI subclass attribute() registration", () => {
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
-    expect(Shape._attributeDefinitions.get("guid")?.type.name).toBe("uuid");
+    expect(Shape.typeForAttribute("guid").name).toBe("uuid");
     expect(Shape._attributeDefinitions.has("radius")).toBe(false);
     expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
-    expect(Circle._attributeDefinitions.get("radius")?.type.name).toBe("integer");
-    expect(Circle._attributeDefinitions.get("guid")?.type.name).toBe("uuid");
+    expect(Circle.typeForAttribute("radius").name).toBe("integer");
+    expect(Circle.typeForAttribute("guid").name).toBe("uuid");
   });
   it("own-table descendant under an STI ancestor keeps attribute() on itself", () => {
     class Shape extends Base {
