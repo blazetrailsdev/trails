@@ -256,7 +256,7 @@ describe("ToTagTest", () => {
   });
 
   it("#to_tag accepts symbol types", () => {
-    toTag("b", Symbol("name"), options);
+    toTag("b", ":name", options);
     assertXml('<b type="symbol">name</b>');
   });
 
