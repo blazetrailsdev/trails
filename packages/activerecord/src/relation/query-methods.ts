@@ -1957,23 +1957,16 @@ function excludingWithCallee(callee: "excluding" | "without") {
       );
     }
 
-    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
-    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
-    // and re-queries otherwise. A loaded relation's records are already in
-    // memory, so spread them into the literal `records` collection to match
-    // Rails exactly (no extra query). An unloaded relation is deferred:
-    // `excludingBang` records a marker that the load pipeline materializes into a
-    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
-    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
-    const combined: unknown[] = [...records];
-    for (const relation of relations) {
-      // `scheduled?` is excluded from the `loaded?` read because `excluding`
-      // is synchronous and cannot drain a parked `@future_result`
-      // (relation.rb:1149): a scheduled relation defers to the marker arm,
-      // which re-queries its ids, rather than contributing zero.
-      if (relation.isLoaded && !relation.isScheduled) combined.push(...relation._records);
-      else combined.push(relation);
-    }
+    // Rails `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1586).
+    // `Relation#ids` is the seam that decides per relation whether a query runs:
+    // it returns the already-materialized `records.map(&:id)` when the relation
+    // is `loaded?` — including a `load_async` relation, whose parked
+    // `@future_result` it drains (relation.rb:1149, calculations.rb:373) — and
+    // selects the ids otherwise. trails cannot run that select synchronously, so
+    // EVERY relation argument is deferred uniformly: `excludingBang` records a
+    // marker that the load pipeline materializes through `Relation#ids`,
+    // preserving Rails' per-relation decision instead of second-guessing it here.
+    const combined: unknown[] = [...records, ...relations];
     return excludingBang.call(this.spawn(), combined);
   };
 }
@@ -1994,15 +1987,15 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // `records` is `records + relations.flat_map(&:ids)` — scalar AR records plus
   // every relation arg's eagerly-materialized ids — built into ONE predicate.
   // Ruby materializes those ids before this call (synchronous query execution);
-  // trails' builder is synchronous-and-lazy, so `excluding`/`without` leave any
-  // UNLOADED relation in `records` for us to defer here.
-  const unloadedRelations = records.filter((r) => isRelationLike(r));
+  // trails' builder is synchronous-and-lazy, so `excluding`/`without` leave
+  // every relation argument in `records` for us to defer here.
+  const deferredRelations = records.filter((r) => isRelationLike(r));
   const literalRecords = records.filter((r) => !isRelationLike(r));
 
-  // No unloaded relations: every value's id is known now, so build the literal
+  // No relation arguments: every value's id is known now, so build the literal
   // predicate exactly as Rails does (array handler dereferences AR records to
   // their ids).
-  if (unloadedRelations.length === 0) {
+  if (deferredRelations.length === 0) {
     // Rails `predicate_builder[primary_key, records].invert` — `#[]` reads the
     // attribute straight off the builder's arel table (predicate_builder.rb:53-55).
     this.whereClause = this.whereClause.plus(
@@ -2029,11 +2022,11 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
   // Build the positive `IN (subquery)` (Rails builds positively and inverts);
   // only its subquery `right` is needed for the marker's display fallback.
-  const inlineSubquery = (this.predicateBuilder.build(attribute, unloadedRelations[0]) as Nodes.In)
+  const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
     .right as Nodes.Node;
   this.whereClause = this.whereClause.plus(
     new WhereClause([
-      new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, unloadedRelations),
+      new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, deferredRelations),
     ]),
   );
   return this;

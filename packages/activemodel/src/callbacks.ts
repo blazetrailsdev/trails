@@ -18,6 +18,8 @@ import {
   type CallbackObject as ASCallbackObject,
   type RunCallbacksOptions as ASRunCallbacksOptions,
   assertValidKeys,
+  extractOptionsBang,
+  type DefineCallbacksOptions,
   defineCallbacks as asDefineCallbacks,
   skipCallback as asSkipCallback,
   getCallbackChains as asGetCallbackChains,
@@ -27,12 +29,13 @@ import {
 type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
 /**
- * Core implementation of define_model_callbacks.
  * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
  * name. Pass `{ only: ["before"] }` as the last argument to limit which
- * timing types are created (defaults to all three).
+ * timing types are created (defaults to all three); every other option is
+ * forwarded to `defineCallbacks`, as Rails does.
  *
  * Mirrors: ActiveModel::Callbacks.define_model_callbacks
+ * (activemodel/lib/active_model/callbacks.rb:109-127)
  */
 export function defineModelCallbacks(this: object, event: string, ...rest: string[]): void;
 export function defineModelCallbacks(
@@ -41,65 +44,59 @@ export function defineModelCallbacks(
   ...rest: [...string[], DefineModelCallbacksOptions]
 ): void;
 export function defineModelCallbacks(this: object, ...args: unknown[]): void {
-  let options: DefineModelCallbacksOptions = {};
-  const eventNames: string[] = [];
+  // `options = callbacks.extract_options!` (callbacks.rb:110).
+  const [callbacks, extracted] = extractOptionsBang(args);
+  // `{ skip_after_callbacks_if_terminated: true, scope: [:kind, :name],
+  //    only: [:before, :around, :after] }.merge!(options)` (callbacks.rb:111-115).
+  // `scope` is the chain's dispatch scope, so an object callback registered by
+  // `before_save` calls `beforeSave` rather than a bare `before`
+  // (activesupport/lib/active_support/callbacks.rb, `current_scopes`).
+  const options: DefineModelCallbacksOptions = {
+    skipAfterCallbacksIfTerminated: true,
+    scope: ["kind", "name"],
+    only: ["before", "around", "after"],
+    ...(extracted as DefineModelCallbacksOptions),
+  };
 
-  const validTimings: CallbackTiming[] = ["before", "after", "around"];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (typeof arg === "string") {
-      eventNames.push(arg);
-    } else if (
-      i === args.length - 1 &&
-      arg !== undefined &&
-      arg !== null &&
-      typeof arg === "object" &&
-      !Array.isArray(arg)
-    ) {
-      options = arg as DefineModelCallbacksOptions;
-      const knownKeys = new Set(["only"]);
-      for (const key of Object.keys(options)) {
-        if (!knownKeys.has(key)) throw new ArgumentError(`Unknown option: ${key}`);
-      }
-      if (options.only) {
-        for (const t of options.only) {
-          if (!validTimings.includes(t)) {
-            throw new ArgumentError(
-              `Invalid callback type: ${t}. Must be one of: ${validTimings.join(", ")}`,
-            );
-          }
-        }
-      }
-    } else if (typeof arg !== "string") {
-      throw new ArgumentError(`Expected event name (string), got ${typeof arg}`);
+  // `types = Array(options.delete(:only))` (callbacks.rb:117).
+  const types = kernelArray(options.only);
+  delete options.only;
+
+  const klass = this as { prototype?: object };
+
+  for (const callback of callbacks as string[]) {
+    // `define_callbacks(callback, options)` (callbacks.rb:120) — the chain
+    // lives on the prototype, which is where trails' instances resolve it.
+    if (klass.prototype) asDefineCallbacks(klass.prototype, callback, options);
+
+    // `send("_define_#{type}_model_callback", self, callback)`
+    // (callbacks.rb:122-126) — driven by `types`, in the caller's order.
+    for (const type of types) {
+      _defineModelCallbackByType[type]?.(this, callback);
     }
   }
-
-  if (eventNames.length === 0) {
-    throw new ArgumentError("At least one event name must be provided to defineModelCallbacks");
-  }
-
-  const timings: CallbackTiming[] = options.only ?? ["before", "after", "around"];
-  const klass = this as { prototype?: object } & Record<string, unknown>;
-
-  for (const event of eventNames) {
-    // Register the chain on the prototype with the same config used by
-    // _registerCallbackOnProto so skipAfterCallbacksIfTerminated is consistent
-    // regardless of which call runs first.
-    // Mirrors: ActiveModel::Callbacks → define_callbacks (activesupport)
-    if (klass.prototype)
-      asDefineCallbacks(klass.prototype, event, { skipAfterCallbacksIfTerminated: true });
-    if (timings.includes("before")) _defineBeforeModelCallback(this, event);
-    if (timings.includes("after")) _defineAfterModelCallback(this, event);
-    if (timings.includes("around")) _defineAroundModelCallback(this, event);
-  }
 }
+
+/**
+ * The `send("_define_#{type}_model_callback", ...)` dispatch table
+ * (callbacks.rb:125). TypeScript has no `send`, and the three targets are
+ * module-private functions rather than members of `this`, so the interpolated
+ * method name resolves through this map.
+ * @noRailsEquivalent PERMANENT: stands in for Ruby's `send` on an interpolated
+ *   private method name; no new surface (it is not exported).
+ */
+const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
+  {
+    before: _defineBeforeModelCallback,
+    after: _defineAfterModelCallback,
+    around: _defineAroundModelCallback,
+  };
 
 /** Minimum shape required of a record object threaded through a callback chain. */
 export type CallbackRecord = object;
 
-export interface DefineModelCallbacksOptions {
-  only?: CallbackTiming[];
+export interface DefineModelCallbacksOptions extends DefineCallbacksOptions {
+  only?: CallbackTiming | CallbackTiming[];
 }
 
 export interface CallbacksClassMethods {

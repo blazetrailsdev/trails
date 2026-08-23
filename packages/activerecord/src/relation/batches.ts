@@ -192,21 +192,22 @@ export class Batches {
     let generator: () => AsyncGenerator<LoadedRelation<Relation<T>>>;
     if (remaining === 0) {
       generator = async function* () {};
-    } else if (this.loaded && !this.isScheduled) {
-      // `batchOnLoadedRelation` reads the materialized `@records` array
-      // synchronously, so a `load_async` relation — `loaded?` with its rows
-      // still parked (relation.rb:1149) — takes the querying arm instead;
-      // there is no synchronous way to drain the future here.
-      const loadedBatches = batchOnLoadedRelation({
-        relation: this,
-        start,
-        finish,
-        cursor,
-        order: (order ?? "asc") as any,
-        batchLimit,
-      });
+    } else if (this.loaded) {
       generator = async function* () {
         await ensureValidOptions();
+        // Rails' `if loaded?` arm of `in_batches` batches the relation's own
+        // `records` in memory. That read goes through the `records` seam, which
+        // drains a parked `@future_result` (relation.rb:1149), so a
+        // `load_async` relation batches its scheduled rows rather than
+        // re-querying — hence the await, and hence `loaded?` alone as the guard.
+        const loadedBatches = await batchOnLoadedRelation({
+          relation: self,
+          start,
+          finish,
+          cursor,
+          order: (order ?? "asc") as any,
+          batchLimit,
+        });
         for (const batchRows of loadedBatches) {
           const batchRel = self.clone();
           batchRel.orderValues = batchOrders.map(([col, dir]) =>
@@ -433,16 +434,17 @@ export function buildBatchOrders(
 }
 
 /** @internal */
-export function batchOnLoadedRelation(opts: {
+export async function batchOnLoadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
   cursor: string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
   batchLimit: number;
-}): any[] {
+}): Promise<any[]> {
   const { relation, cursor, batchLimit } = opts;
-  let records: any[] = globalThis.Array.isArray(relation._records) ? relation._records : [];
+  const loaded = await relation.records();
+  let records: any[] = globalThis.Array.isArray(loaded) ? loaded : [];
   const order = buildBatchOrders(cursor, opts.order as any).map(([, second]) => second);
 
   if (opts.start != null || opts.finish != null) {
