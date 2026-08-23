@@ -41,6 +41,7 @@ import {
   callTagKey,
   splitOverriddenFileBuckets,
   resolveTsOwner,
+  declFileFor,
   ownerCallArgSites,
   ambiguousTsOwner,
   ambiguousRubyOwner,
@@ -2054,6 +2055,45 @@ describe("ambiguousTsOwner", () => {
     const owners = new Set(["Relation"]);
     expect(ambiguousTsOwner(owners, resolveTsOwner(owners, "ActiveRecord::FinderMethods"))).toBe(
       false,
+    );
+  });
+});
+
+describe("declFileFor", () => {
+  // extract-ts-api attributes `Store` to the file that re-exports it
+  // (`cache.ts`), while each member keeps its declaring path.
+  const split = new Map([
+    ["cache.ts", new Map([["mergedOptions", new Map([["Store", "cache/store.ts"]])]])],
+  ]);
+
+  it("resolves the declaring file for a member split out of the matched file", () => {
+    expect(declFileFor(split, "cache.ts", "mergedOptions", "Store")).toBe("cache/store.ts");
+  });
+
+  it("records nothing for a declaration in the matched file itself", () => {
+    expect(declFileFor(split, "cache.ts", "lookupStore", "Store")).toBeUndefined();
+    expect(declFileFor(new Map(), "cache.ts", "mergedOptions", "Store")).toBeUndefined();
+  });
+
+  it("resolves an unowned pair only when every owner agrees", () => {
+    expect(declFileFor(split, "cache.ts", "mergedOptions", undefined)).toBe("cache/store.ts");
+    const disputed = new Map([
+      [
+        "cache.ts",
+        new Map([
+          [
+            "mergedOptions",
+            new Map([
+              ["Store", "cache/store.ts"],
+              ["NullStore", "cache/null-store.ts"],
+            ]),
+          ],
+        ]),
+      ],
+    ]);
+    expect(declFileFor(disputed, "cache.ts", "mergedOptions", undefined)).toBeUndefined();
+    expect(declFileFor(disputed, "cache.ts", "mergedOptions", "NullStore")).toBe(
+      "cache/null-store.ts",
     );
   });
 });
