@@ -484,6 +484,12 @@ describe("AttributeMethodsTest", () => {
     }
     const topic = new TopicClass({ title: "New topic" }) as any;
     TopicClass.undefineAttributeMethods();
+    // Ruby brings the undefined methods back on the next read, through
+    // `method_missing` (attribute_methods.rb:487-499). A JS property cannot
+    // trap a read (CLAUDE.md, "Generated attribute readers are properties"), so
+    // trails' generation point is `Core#init_internals` (core.rb:849) — the
+    // next construction is what defines them again, for `topic` too.
+    expect((new TopicClass({ title: "New topic" }) as any).title).toBe("New topic");
     expect(topic.title).toBe("New topic");
   });
   it("#method_missing define methods on the fly in a thread safe way, even when decorated", async () => {

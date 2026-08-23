@@ -388,13 +388,39 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    expect(typeof (new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBe(
-      "function",
-    );
+    const employee = new Employee({}) as unknown as { nameChanged: unknown };
+    expect(typeof employee.nameChanged).toBe("function");
 
     (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
 
-    expect((new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBeUndefined();
+    // Read through the existing record: Rails asserts `method_defined?` goes
+    // false (attribute_methods_test.rb:1098-1117), and constructing again would
+    // regenerate — `init_internals` calls `define_attribute_methods`
+    // (core.rb:849).
+    expect(employee.nameChanged).toBeUndefined();
+  });
+
+  it("seats one generated-methods carrier when construction generates first", () => {
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // `initInternals` generates at construction (core.rb:849), over the bare
+    // module ActiveModel's lazy `generated_attribute_methods` seated for the
+    // class-body `attribute` call — one carrier must answer `nameChanged`, or
+    // `undefineAttributeMethods` clears only one of them.
+    new Employee({});
+
+    let carriers = 0;
+    for (
+      let link: object | null = Employee.prototype;
+      link;
+      link = Object.getPrototypeOf(link) as object | null
+    ) {
+      if (Object.prototype.hasOwnProperty.call(link, "nameChanged")) carriers += 1;
+    }
+    expect(carriers).toBe(1);
   });
 
   it("generates once when the schema load drives generation first", () => {

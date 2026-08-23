@@ -197,6 +197,31 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
   return typeof hook === "function" ? (hook as (base: unknown) => void).bind(mod) : undefined;
 }
 
+/**
+ * Take a `Module` back out of a class's prototype chain, dropping the carrier
+ * `include()` spliced in for it.
+ *
+ * @noRailsEquivalent PERMANENT: Ruby's ancestry is a list of module entries and
+ * `include`ing a module already in it is a no-op, so a Ruby class that seats a
+ * second module over the same ivar leaves no duplicate entry behind and never
+ * needs to take one out. trails' `include()` splices a fresh carrier on every
+ * call, so replacing an already-included module — ActiveRecord's
+ * `initialize_generated_modules` seating its `GeneratedAttributeMethods` over
+ * the bare `Module` ActiveModel's lazy `generated_attribute_methods` built
+ * first — would otherwise strand the old carrier in the chain, still answering
+ * every method it defines after an `undef_method` on the new one.
+ */
+export function uninclude(klass: AnyClass, mod: Module): void {
+  const carrier = carriers.get(mod);
+  if (!carrier) return;
+  for (let link = klass.prototype as object; link; link = Object.getPrototypeOf(link)) {
+    if (Object.getPrototypeOf(link) === carrier) {
+      Object.setPrototypeOf(link, Object.getPrototypeOf(carrier));
+      return;
+    }
+  }
+}
+
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) return appendFeatures(klass);
