@@ -38,6 +38,7 @@ import {
   constantize,
   registerConstant,
   unregisterConstant,
+  privateConstant,
 } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
@@ -45,7 +46,6 @@ import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
-import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
 import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -786,39 +786,12 @@ export class Associations {
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_and_belongs_to_many
    *
-   * @missingRailsCall add_reflection — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): Rails' macro body
-   *   (associations.rb:1870-1905) builds the HABTM inline; trails ports that
-   *   same body into `HasAndBelongsToMany._build`
-   *   (builder/has-and-belongs-to-many.ts:255-414), which the macro reaches
-   *   through `HabtmBuilder.build`. `Reflection.add_reflection self,
-   *   middle_reflection.name, middle_reflection` (associations.rb:1879) is made
-   *   there, one frame down — see `Reflection.addReflection` at
-   *   has-and-belongs-to-many.ts:279 and :409.
-   * @missingRailsCall define_callbacks — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `Builder::HasMany.define_callbacks
-   *   self, middle_reflection` (associations.rb:1878) is made one frame down in
-   *   `HasAndBelongsToMany._build` — `addAutosaveAssociationCallbacks` at
-   *   has-and-belongs-to-many.ts:278 plus the
-   *   `CollectionAssociationBuilder.defineCallback` loop at :396-398 — because
-   *   trails ports the whole macro body into the builder rather than the macro.
-   * @missingRailsCall has_many — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `has_many name, scope, **hm_options,
-   *   &extension` (associations.rb:1904) is the generated through-has_many;
-   *   trails builds the same reflection one frame down in
-   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:399-409) via
-   *   `Reflection.create("hasAndBelongsToMany", ...)` + `addReflection`, because
-   *   the port has no macro-recursion path that would re-enter `hasMany` with
-   *   the HABTM options.
-   * @missingRailsCall include — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `include Module.new { def destroy_associations
-   *   ... super end }` (associations.rb:1886-1894) is ported one frame down in
-   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:303-323): JS has
-   *   no anonymous-module include, so the override is layered onto
-   *   `model.prototype.destroyAssociations` with the previous implementation
-   *   captured as the `super` chain.
-   * @missingRailsCall new — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112):
-   *   `ActiveRecord::Reflection::HasAndBelongsToManyReflection.new` and
-   *   `Builder::HasAndBelongsToMany.new` (associations.rb:1870-1872) are both
-   *   made one frame down: `new this(name, model, options)` at
-   *   has-and-belongs-to-many.ts:253 and `Reflection.create(...)` at :403,
-   *   because trails ports the macro body into the builder.
+   * @missingRailsCall include — PERMANENT: `include Module.new { def
+   *   destroy_associations ... super end }` (associations.rb:1886-1894). JS has
+   *   no anonymous-module include and no `super` for a mixed-in method, so the
+   *   override is layered onto `prototype.destroyAssociations` with the previous
+   *   implementation captured as the `super` chain — the same effect Ruby gets
+   *   from inserting a module into the ancestor chain.
    */
   static hasAndBelongsToMany(
     name: string,
@@ -847,20 +820,102 @@ export class Associations {
     if (typeof rawClassName === "symbol") {
       options = { ...options, className: rawClassName.description ?? "" };
     }
-    HabtmBuilder.build(
-      this,
+    const self = this as any;
+    const positionalScope = (typeof scope === "function" ? scope : null) as
+      | ((...args: any[]) => any)
+      | null;
+    const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,
-      scope as ((...args: any[]) => any) | null,
+      positionalScope,
       options as Record<string, unknown>,
-      { modelRegistry },
+      self,
     );
-    // Rails registers the autosave-association callbacks for every HABTM
-    // (the underlying has_many :through is built via the standard
-    // `has_many` builder, which always calls `define_callbacks`). Wire it
-    // here so `validate: false` is observable (`treasure.valid?` must not
-    // run child validations) regardless of an explicit `autosave:` option.
-    const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
-    if (habtmReflection) addAutosaveAssociationCallbacks.call(this, habtmReflection);
+
+    const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
+
+    const joinModel = builder.throughModel();
+
+    // `const_set` + `private_constant` (associations.rb:1876-1877) against the
+    // registry that stands in for Ruby's constant table.
+    const registryKey = `${self.name}::${joinModel.name}`;
+    modelRegistry.set(registryKey, joinModel);
+    privateConstant(registryKey);
+
+    const middleReflection = builder.middleReflection(joinModel);
+    const middleName = middleReflection.name;
+    HasManyBuilder.defineCallbacks(self, middleReflection);
+    Reflection.addReflection(self, middleName, middleReflection);
+    middleReflection.parentReflection = habtmReflection;
+
+    // Mirrors Rails associations.rb:1886-1894 — instead of registering a
+    // bare `before_destroy` callback per HABTM, Rails includes an anonymous
+    // module that overrides `destroy_associations` and chains with `super`.
+    // Each HABTM declaration layers its own override; multiple HABTMs on
+    // the same class chain naturally through the captured `prev` reference.
+    // `destroyAssociations` is invoked by the standard destroy flow
+    // (`Base#_destroyRow` → after before_destroy, before the row delete), so
+    // this override is all that's needed — no `before_destroy` bridge.
+    // Per-association guard: re-declaring the same HABTM (same `name` on
+    // the same class) would otherwise layer a duplicate wrapper around the
+    // existing chain, causing the join cleanup to run twice. Track the set
+    // of names already wrapped on this class's prototype and short-circuit.
+    const HABTM_WRAPPED_NAMES = Symbol.for("blazetrails.habtm.destroyAssociations.names");
+    const ownWrappedNames: Set<string> = Object.prototype.hasOwnProperty.call(
+      self.prototype,
+      HABTM_WRAPPED_NAMES,
+    )
+      ? self.prototype[HABTM_WRAPPED_NAMES]
+      : Object.defineProperty(self.prototype, HABTM_WRAPPED_NAMES, {
+          value: new Set<string>(),
+          configurable: true,
+          writable: false,
+        })[HABTM_WRAPPED_NAMES];
+    const prevDestroyAssociations = self.prototype.destroyAssociations;
+    if (ownWrappedNames.has(name)) {
+      // Skip wrapper layering on redeclaration — the existing chain already
+      // handles this association.
+    } else {
+      ownWrappedNames.add(name);
+      self.prototype.destroyAssociations = async function (this: {
+        association(n: string): { handleDependency(): Promise<void>; reset?(): void };
+        _collectionProxies?: { delete(n: string): void };
+      }): Promise<void> {
+        await this.association(middleName).handleDependency();
+        this.association(name).reset?.();
+        // Rails' `association(:name).reset` only clears the Association
+        // instance's loaded state. In this codebase, collection readers are
+        // additionally memoized in `_collectionProxies` (see associations.ts
+        // ~2334), so the user-facing reader would still return the stale
+        // proxy unless we evict it too.
+        this._collectionProxies?.delete(name);
+        if (typeof prevDestroyAssociations === "function") {
+          await prevDestroyAssociations.call(this);
+        }
+      };
+    }
+
+    const hmOptions: Record<string, unknown> = {};
+    hmOptions.through = middleName;
+    hmOptions.source = joinModel.rightReflection.name;
+
+    for (const k of [
+      "beforeAdd",
+      "afterAdd",
+      "beforeRemove",
+      "afterRemove",
+      "autosave",
+      "validate",
+      "joinTable",
+      "className",
+      "extend",
+      "strictLoading",
+    ] as const) {
+      if (Object.prototype.hasOwnProperty.call(options, k)) hmOptions[k] = options[k];
+    }
+
+    this.hasMany(name, positionalScope, hmOptions);
+    (self._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
+      habtmReflection;
   }
 }
 
@@ -983,56 +1038,6 @@ export function _ownerChainReflection(reflection: any): any {
     reflection ??
     null
   );
-}
-
-/**
- * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
- * but for `disable_joins: true` through associations — runs the chain
- * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
- * + IN list) rather than the legacy `HasManyThroughAssociation#findTarget` 2-step.
- *
- * Currently routes: single-column and composite-key through
- * associations (PR #645), polymorphic-source + `sourceType`
- * through-associations (PR #661), and nested-through
- * (`has_many :through → has_many :through`) associations (this PR).
- * Rails' DJAS has no routing gate at all and handles each shape via
- * the generic chain walk — `reflection.chain` flattens nested-through
- * into a straight list of reflection steps, and `getChain` / the
- * reverseChain walk iterate that list uniformly.
- *
- * @internal
- */
-export function _canRouteThroughViaDisableJoinsAssociationScope(
-  reflection: ReflectionLike | null | undefined,
-  options: AssociationOptions,
-): boolean {
-  if (!reflection) return false;
-  if (!options.disableJoins) return false;
-  if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection())
-    return false;
-  const src = reflection.sourceReflection;
-  if (!src) return false;
-  // `sourceType` must pair with a polymorphic source. Rails' own
-  // reflection validation rejects `has_many :through` with a
-  // polymorphic source and no `source_type`
-  // (`HasManyThroughAssociationPolymorphicSourceError`), and `source_type`
-  // with a non-polymorphic source injects a useless
-  // `PolymorphicReflection` whose `foreignType` is null
-  // (reflection.ts:544) — `_sourceTypeScope()` would emit
-  // `where({[null]: sourceType})` (invalid SQL). Reject both
-  // mismatches so the fallback loader handles them predictably:
-  // - polymorphic source without sourceType → missing type filter,
-  //   through-step pluck could mix ids across polymorphic targets.
-  // - sourceType without polymorphic source → no valid type column.
-  const srcIsPolymorphic = typeof src.isPolymorphic === "function" && src.isPolymorphic();
-  if (srcIsPolymorphic !== (options.sourceType != null)) return false;
-  // Composite-key through associations are now supported by DJAS'
-  // `_addConstraintsDj`, which builds an Arel `OR`-of-`AND` predicate
-  // (`(c1=v1a AND c2=v1b) OR ...`) for the chain walk — same shape
-  // counter-cache.ts#buildPkPredicate uses. The previous gate that
-  // bailed on multi-column joinPrimaryKey / joinForeignKey is gone —
-  // the chain walk handles both single and composite shapes.
-  return true;
 }
 
 /**
@@ -1285,108 +1290,6 @@ export async function _loadSingularViaStatementCache(
   const binds = AssociationScope.getBindValues(record, chain);
   const records = await sc.execute(binds, connection, { allowRetry: true });
   return records[0] ?? null;
-}
-
-/**
- * Unsaved-owner / null-PK short-circuit shared by every entry point
- * that runs the DJAS chain walk against an owner record.
- *
- * Why it's correctness-not-just-perf: PredicateBuilder's ArrayHandler
- * folds `where({key: [null]})` into `key IS NULL`. With no guard,
- * DJAS would seed `joinIds = [null]` for an unsaved owner and the
- * first-step WHERE would match orphan through rows whose FK is null,
- * leaking them into the chain as phantom associations.
- *
- * Read the columns the chain walk actually seeds from — the tail of
- * `reflection.chain`'s `joinForeignKey`, which is what
- * `last_scope_chain` reads off the owner
- * (`disable_joins_association_scope.rb:20`). The outer reflection's own
- * `activeRecordPrimaryKey` is not that: on a ThroughReflection it delegates to
- * the source reflection (`reflection.rb:973-974`), so it describes the source
- * edge, not the owner. `isNewRecord()` covers unsaved records; the explicit
- * PK-null check covers the defensive edge where a saved record
- * somehow has a null composite-PK component.
- *
- * @internal No Rails counterpart (`owner_has_unresolved_through_key` is defined
- * nowhere in the Rails source). Rails spells this guard inline at each site —
- * `if owner.new_record?`, or `CollectionAssociation#null_scope?`
- * (`associations/collection_association.rb:304`) — so there is no method to
- * port. Extracted here only because trails has several entry points into the
- * DJAS chain walk that must not diverge on the guard.
- */
-export function ownerHasUnresolvedThroughKey(
-  record: Base,
-  reflection: ReflectionLike | null | undefined,
-): boolean {
-  if (record.isNewRecord()) return true;
-  const ownerFk = _ownerChainReflection(reflection)?.joinForeignKey;
-  const ownerPkCols = ownerFk == null ? [] : Array.isArray(ownerFk) ? ownerFk : [ownerFk];
-  return ownerPkCols.some((col) => {
-    const v = record._readAttribute(col);
-    return v === null || v === undefined;
-  });
-}
-
-// Returns the built relation BOXED in `{ rel }`. The relation is a
-// thenable (Relation#then is a `toArray` shortcut), so returning it bare
-// across this async boundary would let `Promise.resolve` adopt it and
-// unwrap to a records array. The box defeats that — callers read `.rel`.
-async function _buildDisableJoinsScopeRelation(
-  record: Base,
-  reflection: ReflectionLike | null | undefined,
-): Promise<{ rel: unknown } | null> {
-  if (!reflection || ownerHasUnresolvedThroughKey(record, reflection)) return null;
-  // Lazy-import to avoid an eager cycle: DJAS imports
-  // DisableJoinsAssociationRelation → relation.ts → associations.ts.
-  const { DisableJoinsAssociationScope } =
-    await import("./associations/disable-joins-association-scope.js");
-  const klass = reflection.klass;
-  // DJAS.scope() now returns a sync deferred-chain Relation — the
-  // async chain walk runs on first toArray(). No more Promise<{relation}>
-  // boxing to unwrap.
-  const rel: unknown = DisableJoinsAssociationScope.create().scope({
-    owner: record,
-    reflection: reflection as never,
-    klass,
-  });
-  // DJAS has already consumed `reflection.scope` through its constraints, so
-  // there is nothing left to apply — the scope reaches the reflection
-  // positionally and lives nowhere else (association.rb:48-49).
-  return { rel };
-}
-
-/** @internal */
-export async function _loadThroughViaDisableJoinsScope(
-  record: Base,
-  reflection: ReflectionLike | null | undefined,
-  options?: AssociationOptions,
-): Promise<Base[]> {
-  const built = await _buildDisableJoinsScopeRelation(record, reflection);
-  if (built == null) return [];
-  return (built.rel as { toArray: () => Promise<Base[]> }).toArray();
-}
-
-/**
- * Singular (has_one/belongs_to) load through the disable_joins scope.
- *
- * Rails' `SingularAssociation#find_target` (singular_association.rb:47)
- * routes the `disable_joins` branch through `scope.first` →
- * `Relation#first` → `ordered_relation`, which adds `ORDER BY` primary
- * key. So unlike the plural collection load (and unlike the normal
- * non-disable-joins singular branch, which takes an unordered
- * `Array#first`), the disable_joins singular load is ORDERED. Calling
- * `rel.first()` (vs. `toArray()[0]`) preserves that: DJAR#first runs
- * `findNthWithLimit`, applying ORDER BY pk inside the connection shim.
- * @internal
- */
-export async function _loadSingularThroughViaDisableJoinsScope(
-  record: Base,
-  reflection: ReflectionLike | null | undefined,
-  options?: AssociationOptions,
-): Promise<Base | null> {
-  const built = await _buildDisableJoinsScopeRelation(record, reflection);
-  if (built == null) return null;
-  return (built.rel as { first: () => Promise<Base | null> }).first();
 }
 
 /**

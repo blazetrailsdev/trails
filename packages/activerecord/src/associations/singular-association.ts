@@ -2,9 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import {
   _builtAssociationScope,
-  _canRouteThroughViaDisableJoinsAssociationScope,
   _findTargetReachable,
-  _loadSingularThroughViaDisableJoinsScope,
   _ownerChainReflection,
   _routeThroughViaAssociationScope,
   _loadSingularViaStatementCache,
@@ -292,13 +290,6 @@ export class SingularAssociation extends Association {
    * it silently. `Association#_findTarget` handles the complementary case the
    * raise cannot see — a bare FK change that never touches the holder.
    *
-   * @missingRailsCall first — PERMANENT: Rails' `super.then(&:first)` is Array#first over
-   *   the array Association#find_target already loaded, not Relation#first;
-   *   take() (unordered LIMIT 1) is the SQL-level equivalent — Relation#first
-   *   would route through ordered_relation and add the ORDER BY that
-   *   has_one_associations_test `test_has_one_does_not_use_order_by` forbids.
-   *   The statement-cache branch's literal .first() lives in the extracted
-   *   _loadSingularViaStatementCache helper (associations.ts).
    */
   protected override async findTarget(): Promise<Base | null> {
     this._loaderWritebackSuppressed++;
@@ -318,13 +309,7 @@ export class SingularAssociation extends Association {
       // `SingularAssociation#find_target` (singular_association.rb:47-55) answers
       // a `disable_joins` association from `scope.first` and never calls `super`,
       // so that route never reaches the base body's strict-loading raise.
-      if (
-        !isBelongsTo &&
-        options.through &&
-        _canRouteThroughViaDisableJoinsAssociationScope(reflection, options)
-      ) {
-        return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
-      }
+      if (this.disableJoins) return this.scope().first();
 
       // `Association#find_target`'s first statement (association.rb:248-250).
       // Gated by `find_target?`: a new-record owner without the key present never

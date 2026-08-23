@@ -370,8 +370,11 @@ function detectHabtmParts(
  * - `targetTable` — the associated model's table, used to resolve a target label
  *   to its fixture id (CRC32 fallback);
  * - `throughModel` — the through model, consulted for timestamp filling.
- * - `isHabtm` — whether the reflection is a HABTM (`macro ===
- *   "hasAndBelongsToMany"`). A HABTM join model is anonymous and owns its table
+ * - `isHabtm` — whether the reflection is a HABTM. `_reflections[name]` is the
+ *   generated through-`has_many` (associations.rb:1904), so the HABTM identity
+ *   lives on `parent_reflection` (associations.rb:1905) — the same link
+ *   `normalized_reflections` substitutes by (reflection.rb:86-93). A HABTM join
+ *   model is anonymous and owns its table
  *   (no fixture set of its own), whereas a plain `has_many :through` join table
  *   belongs to a real model whose fixture set is requested by name. This gates
  *   the precise "join table not loaded" guard in the join-row insertion loop.
@@ -401,7 +404,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   for (const [name, refl] of Object.entries(reflections)) {
     const r = refl as {
-      macro?: string;
+      parentReflection?: { macro?: string } | null;
       isThroughReflection?: () => boolean;
       foreignKey?: string | string[];
       klass?: { tableName?: string };
@@ -429,7 +432,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
         rhsKey,
         targetTable: r.klass?.tableName,
         throughModel,
-        isHabtm: r.macro === "hasAndBelongsToMany",
+        isHabtm: r.parentReflection?.macro === "hasAndBelongsToMany",
       });
     } catch {
       continue;
@@ -442,7 +445,10 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
  * The join-table names {@link sliceSchema} must add so a model fixture can
  * materialize join rows from an owner association label.
  *
- * ONLY HABTM join tables qualify (`macro === "hasAndBelongsToMany"`): a HABTM
+ * ONLY HABTM join tables qualify. `_reflections[name]` is the generated
+ * through-`has_many` (associations.rb:1904) and the HABTM identity lives on its
+ * `parent_reflection` (associations.rb:1905), which is the link
+ * `normalized_reflections` substitutes by (reflection.rb:86-93). A HABTM
  * join model is an anonymous class the declaring model owns (its table, e.g.
  * `categories_posts`, has no fixture set of its own), so it must be pulled into
  * the slice implicitly. A plain `has_many :through` join table, by contrast,
@@ -450,7 +456,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
  * by name and slices its own table in; we deliberately do NOT pull it in from the
  * owner's reflections.
  *
- * Restricting to the HABTM macro is also what lets the canonical-model autoload
+ * Restricting to HABTM is also what lets the canonical-model autoload
  * index install globally without ballooning the derived schema. The join table
  * is read off the HABTM through reflection (whose `.klass` is the owned join
  * model, resolving no further); the association's TARGET class is never touched,
@@ -474,10 +480,10 @@ export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const names: string[] = [];
   for (const refl of Object.values(reflections)) {
     const r = refl as {
-      macro?: string;
+      parentReflection?: { macro?: string } | null;
       throughReflection?: { tableName?: string };
     };
-    if (r.macro !== "hasAndBelongsToMany") continue;
+    if (r.parentReflection?.macro !== "hasAndBelongsToMany") continue;
     try {
       // `throughReflection.tableName` resolves the anonymous join model (owned by
       // the declaring model, so no target resolution and no autoload). Guarded so

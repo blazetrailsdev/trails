@@ -365,7 +365,15 @@ export class Association {
         throw new Error(
           "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
         );
-      return djas(this);
+      // Rails' `DisableJoinsAssociationScope#scope(association)` reads
+      // `association.reflection` and gets the rich `ThroughReflection` — the one
+      // that answers `chain`. trails' `Association#reflection` is the
+      // lightweight `AssociationDefinition` a macro records (see
+      // `buildRecord` below), so the rich reflection is resolved off the owner
+      // the same way `targetScope` does (association.ts:544).
+      const ctor = this.owner.constructor as typeof Base;
+      const reflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+      return djas({ owner: this.owner, reflection, klass } as never);
     }
     // Branch 2: klass.current_scope.proxy_association == self.
     // Fires when CollectionProxy.scoping sets an AssociationRelation as

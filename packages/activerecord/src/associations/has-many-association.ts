@@ -2,11 +2,9 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
-  _canRouteThroughViaDisableJoinsAssociationScope,
   _findTargetReachable,
   _inlineOwnerKey,
   _inlinePolymorphicKeys,
-  _loadThroughViaDisableJoinsScope,
   _ownerChainReflection,
   _preloadedHolderTarget,
   _resolveInverseName,
@@ -609,18 +607,6 @@ async function findTarget(
     if (preloaded) {
       return (preloaded.value ?? []) as Base[];
     }
-  }
-
-  // `HasManyThroughAssociation#find_target` (has_many_through_association.rb
-  // :225-229) returns `scope.to_a if disable_joins` BEFORE `super`, so that
-  // route never reaches the base body's strict-loading raise. The scope-override
-  // executor below still wins, as it did when this branch sat under it.
-  const reflEarly =
-    options.through && !queryExecutor
-      ? (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)
-      : undefined;
-  if (reflEarly && _canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
-    return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
   }
 
   // `Association#find_target`'s first statement (association.rb:248-250). Gated

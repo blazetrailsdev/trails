@@ -1493,6 +1493,21 @@ export class ThroughReflection extends AbstractReflection {
     this.delegateReflection.autosave = value;
   }
 
+  // `parent_reflection` is an `attr_accessor` on AssociationReflection
+  // (reflection.rb:515) and ThroughReflection does not redefine it, so it lands
+  // in `delegate_methods` and both halves reach the delegate
+  // (reflection.rb:1222-1225). `autosave=` reads it off the same object, which
+  // is how `has_and_belongs_to_many`'s `_reflections[name].parent_reflection =
+  // habtm_reflection` (associations.rb:1905) makes nested attributes propagate
+  // autosave onto the HABTM reflection.
+  get parentReflection(): AssociationReflection | ThroughReflection | null {
+    return this.delegateReflection.parentReflection;
+  }
+
+  set parentReflection(value: AssociationReflection | ThroughReflection | null) {
+    this.delegateReflection.parentReflection = value;
+  }
+
   get activeRecord(): typeof Base {
     return this.delegateReflection.activeRecord;
   }

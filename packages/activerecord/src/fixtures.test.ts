@@ -648,3 +648,36 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
     });
   });
 });
+
+// Trails-only guard, no Rails counterpart. `has_and_belongs_to_many` registers
+// its public association by re-entering the `has_many` macro
+// (associations.rb:1904), so the raw `_reflections[name]` these two helpers walk
+// is the generated through-`has_many` and the HABTM identity lives on its
+// `parent_reflection` (associations.rb:1905) — the link `normalized_reflections`
+// substitutes by (reflection.rb:86-93). Reading `macro` off the raw reflection
+// instead silently marks every HABTM join as non-HABTM and drops its anonymous
+// join table out of fixture slices, which no other test in the suite catches.
+describe("HABTM fixture reflection walking (trails)", () => {
+  it("throughJoinTableNames pulls in the anonymous HABTM join tables", async () => {
+    const { throughJoinTableNames } = await import("./fixtures.js");
+    const { Developer } = await import("./test-helpers/models/developer.js");
+
+    const names = throughJoinTableNames(Developer as never);
+    expect(names).toContain("developers_projects");
+    expect(names).toContain("computers_developers");
+  });
+
+  it("throughLabelAssociations marks HABTM associations isHabtm", async () => {
+    await import("./index.js");
+    await import("./support/canonical-model-index.js");
+    const { throughLabelAssociations } = await import("./fixtures.js");
+    const { Developer } = await import("./test-helpers/models/developer.js");
+
+    const assocs = throughLabelAssociations(Developer as never);
+    expect(assocs.get("projects")?.isHabtm).toBe(true);
+    expect(assocs.get("projects")?.joinTable).toBe("developers_projects");
+    // `ratings` is a plain has_many :through on the same model — its join model
+    // is a real one with its own fixture set, so it must NOT be marked HABTM.
+    expect(assocs.get("ratings")?.isHabtm).toBe(false);
+  });
+});
