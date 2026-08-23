@@ -34,7 +34,10 @@
  *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--call <ruby_call>]
  *                         [--kind calls|args] [--dry-run]
  *
- * `--kind args` runs the same reconcile over the OTHER dimension: it reads
+ * `--kind args` runs the same reconcile over the OTHER dimension (the unreviewed
+ * high-water marks count call-SET seeds only, so an args migration lowers none;
+ * `keyOf` carries no `rubyArgs`, so one call's several args rows share a key and
+ * the reason that can mint wins over a seeded sibling): it reads
  * output/call-arg-mismatches.json, mints `@missingRailsArgs <ruby_call> —
  * <reason>` receipts from the `kind: "args"` rows of the SAME shards, and drops
  * those rows (RFC 0106). The tag family's extra discipline applies — a reason
@@ -540,9 +543,6 @@ export function reconcileFileText(
       // declaration: that is the same knowledge the gate's "STALE
       // @missingRailsCall tag(s)" arm reds on, so the writer retires the tag
       // rather than making a human do it by hand (RFC 0106).
-      // An artifact that records no declaring class for a stale tag (the
-      // call-ARGUMENT one) keys it under ANY_CLASS, so the wildcard is checked
-      // alongside the owner-qualified key.
       const isStale = (call: string): boolean =>
         staleTags?.has(staleTagKey(owner, name, call)) === true ||
         staleTags?.has(staleTagKey(ANY_CLASS, name, call)) === true;
@@ -651,7 +651,10 @@ export function buildExpectations(
  * pairs a tag ALREADY suppressed are folded in from `suppressed`: they are
  * absent from `mismatches`, and without them the tag that earned the
  * suppression would reconcile as satisfied and be dropped. The artifact records
- * no declaring class, so every expectation is keyed under {@link ANY_CLASS}.
+ * no declaring class, so every expectation is keyed under {@link ANY_CLASS} —
+ * which is also where a stale `@missingRailsArgs` tag's retirement key lives.
+ * A suppression receipt records no Ruby method name; the expectation only needs
+ * one to look a reason up for a NEW tag, and a suppressed call already has its.
  */
 export function buildArgExpectations(
   artifact: CallArgArtifact,
@@ -675,8 +678,6 @@ export function buildArgExpectations(
   for (const t of artifact.suppressed ?? []) {
     if (t.package !== pkg) continue;
     if (onlyFile && t.tsFile !== onlyFile) continue;
-    // A receipt records no Ruby method name; the expectation only needs one to
-    // look a reason up for a NEW tag, and this call already has its tag.
     expectationFor(t.tsFile, t.tsName, "").calls.add(t.call);
   }
   return byFile;
@@ -862,9 +863,6 @@ async function main(argv: string[]): Promise<number> {
   const justifiesFor = kind === "args" ? justifiesArgs : justifies;
   const reasons = new Map<string, string>();
   for (const e of kindRows) {
-    // `keyOf` carries no `rubyArgs`, so an args row's key is shared by every
-    // site of one call. One tag suppresses the call outright, so the reason
-    // that can actually mint it wins over a seeded sibling.
     if (reasons.has(keyOf(e)) && !justifiesFor(e.reason)) continue;
     reasons.set(keyOf(e), e.reason);
   }
@@ -982,9 +980,6 @@ async function main(argv: string[]): Promise<number> {
   if (dropped > 0 && !dryRun) {
     await writeSplitBaseline(remaining, BASELINE_DIR);
   }
-  // The unreviewed high-water marks count call-SET seeds only (their shard
-  // value is computed against the call-set seed prose), so an args migration
-  // has no mark to lower.
   if (dropped > 0 && !dryRun && kind === "calls") {
     const { marks, moved } = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
     console.log(
@@ -996,9 +991,6 @@ async function main(argv: string[]): Promise<number> {
   }
   const scoped = scopedRows(baseline, pkg, onlyFile, onlyCall.size > 0 ? onlyCall : undefined);
   for (const line of migrationSummary(
-    // An args run reports its OWN dimension's denominator; the call-set run
-    // keeps both, since naming the args rows it cannot move is the point of
-    // its second line.
     kind === "args" ? rowsOfKind(scoped, "args") : scoped,
     dropped,
     dryRun,
