@@ -9,7 +9,12 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
-import { typeRegistry, StringType, IntegerType } from "@blazetrails/activemodel";
+import {
+  typeRegistry,
+  StringType,
+  IntegerType,
+  UserProvidedDefault,
+} from "@blazetrails/activemodel";
 import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal } from "@blazetrails/activesupport";
@@ -515,6 +520,9 @@ describe("CustomPropertiesTest", () => {
 });
 
 describe("DefineAttributeTest", () => {
+  // `define_attribute` writes the type and the default attribute only
+  // (attributes.rb:231-239); it generates no reader, so these read through
+  // `read_attribute` the way Rails does before `define_attribute_methods` runs.
   it("define_attribute registers a type object directly", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
@@ -523,7 +531,7 @@ describe("DefineAttributeTest", () => {
       }
     }
     const p = new Post({ score: "42" });
-    expect(p.score).toBe(42);
+    expect(p.readAttribute("score")).toBe(42);
   });
 
   it("define_attribute with default value", () => {
@@ -534,7 +542,7 @@ describe("DefineAttributeTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.rating).toBe(5);
+    expect(p.readAttribute("rating")).toBe(5);
   });
 
   it("define_attribute preserves existing default when no default given", () => {
@@ -547,7 +555,7 @@ describe("DefineAttributeTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.score).toBe(10);
+    expect(p.readAttribute("score")).toBe(10);
   });
 
   it("define_attribute with userProvidedDefault false uses database cast", () => {
@@ -558,10 +566,22 @@ describe("DefineAttributeTest", () => {
       }
     }
     const p = new Post({});
-    expect(p.views).toBe(0);
+    expect(p.readAttribute("views")).toBe(0);
   });
 
-  it("define_attribute invalidates _defaultAttributes cache", () => {
+  it("define_attribute builds a UserProvidedDefault when the default is user-provided", () => {
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.defineAttribute("score", intType, { default: "5" });
+      }
+    }
+    expect(Post._defaultAttributes().getAttribute("score")).toBeInstanceOf(UserProvidedDefault);
+    // Ruby `_default_attributes.fetch(name.to_s) { nil }` — no prior attribute.
+    expect((Post._defaultAttributes().getAttribute("score") as any).originalAttribute).toBeNull();
+  });
+
+  it("define_attribute writes into the memoized _defaultAttributes", () => {
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
@@ -571,8 +591,11 @@ describe("DefineAttributeTest", () => {
     }
     const before = Post._defaultAttributes();
     Post.defineAttribute("score", intType);
-    const after = Post._defaultAttributes();
-    expect(before).not.toBe(after);
+    // attributes.rb:290 assigns into `_default_attributes` itself, so the set
+    // is mutated in place rather than invalidated.
+    expect(Post._defaultAttributes()).toBe(before);
+    expect(before.getAttribute("score").type.name).toBe("integer");
+    expect(Post.typeForAttribute("score").name).toBe("integer");
   });
 });
 
@@ -630,9 +653,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
-    const intType = typeRegistry.lookup("integer");
     class Post extends Base {}
-    Post.defineAttribute("views", intType, { default: 0, userProvidedDefault: false });
+    (Post as any)._columnsHash = { views: { name: "views", default: 0 } };
     Post.attribute("title", "string", { default: "untitled" });
 
     const defaults = Post._defaultAttributes();
@@ -641,9 +663,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("user attribute() declaration overrides schema column type via pending queue", () => {
-    const intType = typeRegistry.lookup("integer");
     class Post extends Base {}
-    Post.defineAttribute("score", intType, { default: 0, userProvidedDefault: false });
+    (Post as any)._columnsHash = { score: { name: "score", default: 0 } };
     Post.attribute("score", "string");
 
     const defaults = Post._defaultAttributes();
@@ -651,9 +672,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("attribute() overriding only type preserves the schema default", () => {
-    const intType = typeRegistry.lookup("integer");
     class Post extends Base {}
-    Post.defineAttribute("score", intType, { default: 5, userProvidedDefault: false });
+    (Post as any)._columnsHash = { score: { name: "score", default: 5 } };
     Post.attribute("score", "string");
 
     const defaults = Post._defaultAttributes();
@@ -674,10 +694,10 @@ describe("DefineAttributeSTITest", () => {
     }
     class Dog extends (Animal as any) {}
     (Dog as any).defineAttribute("legs", intType, { default: 4 });
-    expect((Dog as any)._attributeDefinitions.has("legs")).toBe(true);
-    expect((Animal as any)._attributeDefinitions.has("legs")).toBe(false);
+    expect((Dog as any)._defaultAttributes().isKey("legs")).toBe(true);
+    expect((Animal as any)._defaultAttributes().isKey("legs")).toBe(false);
     const d = new (Dog as any)({});
-    expect(d.legs).toBe(4);
+    expect(d.readAttribute("legs")).toBe(4);
   });
 
   it("_defaultAttributes is memoized per class, not shared with the STI base", () => {

@@ -11,34 +11,17 @@
 import {
   Attribute,
   AttributeSet,
+  UserProvidedDefault,
   type Type,
   applyPendingAttributeModifications,
   resetDefaultAttributes as amResetDefaultAttributes,
 } from "@blazetrails/activemodel";
-// The pending queue is private on ActiveModel (attribute_registration.rb:77);
-// only `attribute` (:17) pushes onto it. `define_attribute` reaches the same
-// queue from ActiveRecord, so it imports the queue accessor and the pending
-// classes off the defining module rather than the package's public barrel.
-import {
-  type PendingModification,
-  pendingAttributeModifications,
-} from "@blazetrails/activemodel/attribute-registration";
 import { registerSubclass } from "@blazetrails/activesupport";
-import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import { cachedColumnsHash, isSchemaLoaded } from "./model-schema.js";
 import { connectionPool, threadedConnectionFor } from "./connection-handling.js";
 
 type AnyClass = any;
-
-interface AttributeDefinition {
-  name: string;
-  type: Type;
-  defaultValue?: unknown;
-  limit?: number | null;
-  /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
-  virtual?: boolean;
-}
 
 /**
  * Static interface for the Attributes module.
@@ -54,104 +37,35 @@ export interface Attributes {
   defineAttribute(
     name: string,
     castType: Type,
-    options?: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null },
+    options?: { default?: unknown; userProvidedDefault?: boolean },
   ): void;
   _defaultAttributes(): AttributeSet;
 }
 
-const NO_DEFAULT = Symbol("NO_DEFAULT");
-
-const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
-
-/**
- * `define_default_attribute`'s body (attributes.rb:277-291), carried on the
- * pending-modification queue so it replays with the rest of it.
- *
- * Rails writes the result straight into `_default_attributes` because nothing
- * rebuilds that set behind it; trails rebuilds it from `columns_hash` plus the
- * queue on every `reset_default_attributes`, so an eager write is dropped by
- * the next rebuild. Deferring is the only shape that survives, and it keeps
- * the three arms and their order exactly as Rails writes them.
- */
-class PendingDefinedDefault implements PendingModification {
-  constructor(
-    readonly name: string,
-    readonly value: unknown,
-    readonly type: Type,
-    readonly fromUser: boolean,
-  ) {}
-
-  applyTo(attributeSet: AttributeSet): void {
-    let defaultAttribute: Attribute;
-    if (this.value === NO_DEFAULT_PROVIDED) {
-      defaultAttribute = attributeSet.getAttribute(this.name).withType(this.type);
-    } else if (this.fromUser) {
-      defaultAttribute = attributeSet
-        .getAttribute(this.name)
-        .withType(this.type)
-        .withUserDefault(this.value);
-    } else {
-      defaultAttribute = Attribute.fromDatabase(this.name, this.value, this.type);
-    }
-    attributeSet.set(this.name, defaultAttribute);
-  }
-}
-
 /**
  * Lower-level attribute registration that accepts a resolved type object
- * directly, bypassing string-based type lookup. Used by adapters after
- * `lookupCastTypeFromColumn` and by code that already has a type in hand.
+ * directly, bypassing string-based type lookup.
  *
  * Mirrors: ActiveRecord::Attributes::ClassMethods#define_attribute
+ * (attributes.rb:231-239):
+ *
+ *   def define_attribute(name, cast_type, default: NO_DEFAULT_PROVIDED, user_provided_default: true)
+ *     attribute_types[name] = cast_type
+ *     define_default_attribute(name, default, cast_type, from_user: user_provided_default)
+ *   end
  */
 export function defineAttribute(
   this: AnyClass,
   name: string,
   castType: Type,
-  options: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null } = {},
+  options: { default?: unknown; userProvidedDefault?: boolean } = {},
 ): void {
-  const { default: defaultValue = NO_DEFAULT, userProvidedDefault = true } = options;
+  const { default: default_ = NO_DEFAULT_PROVIDED, userProvidedDefault = true } = options;
 
-  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
-    this._attributeDefinitions = new Map(this._attributeDefinitions);
-  }
-
-  const existing: AttributeDefinition | undefined = this._attributeDefinitions.get(name);
-  const resolvedDefault = defaultValue === NO_DEFAULT ? existing?.defaultValue : defaultValue;
-
-  this._attributeDefinitions.set(name, {
-    ...existing,
-    name,
-    type: castType,
-    defaultValue: resolvedDefault ?? null,
-    ...(options.limit != null ? { limit: options.limit } : {}),
+  this.attributeTypes()[name] = castType;
+  defineDefaultAttribute.call(this, name, default_, castType, {
+    fromUser: userProvidedDefault,
   });
-
-  defineDefaultAttribute.call(
-    this,
-    name,
-    defaultValue === NO_DEFAULT ? NO_DEFAULT_PROVIDED : (resolvedDefault ?? null),
-    castType,
-    userProvidedDefault,
-  );
-
-  amResetDefaultAttributes(this);
-  this._virtualAttributesReconciled = false;
-  encryptionHooks.applyPendingEncryptions(this);
-
-  // Route prototype-accessor generation through defineAttributeMethods rather
-  // than installing inline here. Rails generates attribute methods lazily via
-  // `define_attribute_methods`; we mirror that single generation path by
-  // invalidating the generated-methods flag and regenerating, so the accessor
-  // for the just-declared attribute (and the `id`-skip) is handled in one place.
-  if (this.prototype) {
-    const klass = this as unknown as {
-      _attributeMethodsGenerated?: boolean;
-      defineAttributeMethods?: () => boolean;
-    };
-    klass._attributeMethodsGenerated = false;
-    klass.defineAttributeMethods?.();
-  }
 }
 
 /**
@@ -250,6 +164,10 @@ function reloadSchemaFromCache(this: AnyClass): void {
   amResetDefaultAttributes(this);
 }
 
+// attributes.rb:274-275 — `NO_DEFAULT_PROVIDED = Object.new`, a private
+// constant read only by `define_default_attribute`.
+const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
+
 /**
  * @internal
  * Mirrors: ActiveRecord::Attributes::ClassMethods#define_default_attribute
@@ -260,11 +178,24 @@ function defineDefaultAttribute(
   name: string,
   value: unknown,
   type: Type,
-  fromUser: boolean,
+  { fromUser }: { fromUser: boolean },
 ): void {
-  pendingAttributeModifications
-    .call(this)
-    .push(new PendingDefinedDefault(name, value, type, fromUser));
+  let defaultAttribute: Attribute;
+  if (value === NO_DEFAULT_PROVIDED) {
+    defaultAttribute = this._defaultAttributes().getAttribute(name).withType(type);
+  } else if (fromUser) {
+    defaultAttribute = new UserProvidedDefault(
+      name,
+      value,
+      type,
+      // Ruby `_default_attributes.fetch(name.to_s) { nil }` — the block runs
+      // only when the key is absent, so a stored attribute is passed through.
+      this._defaultAttributes().isKey(name) ? this._defaultAttributes().getAttribute(name) : null,
+    );
+  } else {
+    defaultAttribute = Attribute.fromDatabase(name, value, type);
+  }
+  this._defaultAttributes().set(name, defaultAttribute);
 }
 
 /**
