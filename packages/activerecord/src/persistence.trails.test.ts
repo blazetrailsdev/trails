@@ -19,6 +19,7 @@ import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -247,15 +248,22 @@ describe("PersistenceTest (trails)", () => {
   fixtures(["companies"]);
 
   // Rails' becomes allocates with `klass.allocate` (persistence.rb:487), which
-  // never enters Inheritance::ClassMethods#new — so the abstract-class / Base
-  // guard `new` enforces (inheritance.rb:57) must not fire for becomes().
-  it("becomes bypasses the Base abstract-instantiation guard", async () => {
-    const { Base } = await import("./index.js");
-    const { Company } = await import("./test-helpers/models/company.js");
+  // never enters Inheritance::ClassMethods#new — so the abstract-class guard
+  // `new` raises NotImplementedError from (inheritance.rb:56-59) must not fire
+  // for becomes(). The guard's other half, `self == Base`, is not reachable
+  // through becomes in Rails either: `allocate.send(:initialize)` seeds
+  // `@attributes` from `_default_attributes`, which loads the schema and
+  // raises TableNotSpecified for table-less Base.
+  it("becomes bypasses the abstract-instantiation guard", async () => {
+    class AbstractFirm extends Company {
+      static {
+        this.abstractClass = true;
+      }
+    }
     const company = await Company.first();
-    const asBase = company!.becomes(Base as never);
-    expect(asBase).toBeInstanceOf(Base);
-    expect((asBase as unknown as { id: unknown }).id).toBe(company!.id);
+    const asAbstract = company!.becomes(AbstractFirm as never);
+    expect(asAbstract).toBeInstanceOf(AbstractFirm);
+    expect((asAbstract as unknown as { id: unknown }).id).toBe(company!.id);
   });
 });
 
