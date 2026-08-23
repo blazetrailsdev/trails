@@ -188,9 +188,7 @@ function defineDefaultAttribute(
       name,
       value,
       type,
-      // Ruby `_default_attributes.fetch(name.to_s) { nil }` — the block runs
-      // only when the key is absent, so a stored attribute is passed through.
-      this._defaultAttributes().isKey(name) ? this._defaultAttributes().getAttribute(name) : null,
+      this._defaultAttributes().fetch(name, () => null),
     );
   } else {
     defaultAttribute = Attribute.fromDatabase(name, value, type);

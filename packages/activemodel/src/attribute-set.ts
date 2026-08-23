@@ -29,10 +29,10 @@ export class AttributeSet {
    *
    * Mirrors: `delegate :fetch, to: :attributes`.
    */
-  fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
+  fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
     const attr = this.attributes().get(name);
     if (attr !== undefined) return attr;
-    if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
+    if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
     const err = new Error(`key not found: ${JSON.stringify(name)}`);
     err.name = "KeyError";
