@@ -18,15 +18,15 @@ export class Function extends NodeExpression {
     this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
   }
 
-  constructor(expressions: Node[], aliasNode: Node | string | null = null) {
+  constructor(expr: Node[], aliaz: Node | string | null = null) {
     super();
-    this.expressions = expressions;
-    this._alias = typeof aliasNode === "string" ? new SqlLiteral(aliasNode) : aliasNode;
+    this.expressions = expr;
+    this._alias = typeof aliaz === "string" ? new SqlLiteral(aliaz) : aliaz;
     this.distinct = false;
   }
 
-  as(aliasName: string): this {
-    this.alias = aliasName;
+  as(aliaz: string): this {
+    this.alias = aliaz;
     return this;
   }
 }

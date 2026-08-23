@@ -130,7 +130,7 @@ export class Encryptor {
       throw new Configuration("key and keyProvider can't be used simultaneously");
     }
     this.validatePayloadType(clearText);
-    const text = options?.deterministic ? this.forceEncodingIfNeeded(clearText) : clearText;
+    if (options?.deterministic) clearText = this.forceEncodingIfNeeded(clearText);
     // Resolve key provider: explicit keyProvider > raw key shortcut > default.
     // Raw key is wrapped in a minimal inline provider so buildEncryptedMessage
     // has a uniform interface (mirrors Rails' key_provider keyword arg).
@@ -143,7 +143,9 @@ export class Encryptor {
         : this.defaultKeyProvider());
     if (!keyProvider) throw new Configuration("No encryption key provided");
     const cipherOptions = { deterministic: options?.deterministic };
-    return this.serializeMessage(this.buildEncryptedMessage(text, { keyProvider, cipherOptions }));
+    return this.serializeMessage(
+      this.buildEncryptedMessage(clearText, { keyProvider, cipherOptions }),
+    );
   }
 
   decrypt(

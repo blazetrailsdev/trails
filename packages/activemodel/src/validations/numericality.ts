@@ -223,6 +223,11 @@ export function optionAsNumber(
  * keeps a 17-digit integer out of the 15-significant-digit `parse_float`.
  *
  * @internal Rails-private helper.
+ *
+ * @missingRailsArgs parse_float — PERMANENT: Rails passes `Kernel.Float(raw_value)`
+ *   (numericality.rb:82), whose trails spelling is the `kernelFloat` helper —
+ *   `Kernel` is a Ruby module, not a JS object, so the call can never present the
+ *   `Float` identifier the Ruby side names.
  */
 export function parseAsNumber(
   rawValue: unknown,

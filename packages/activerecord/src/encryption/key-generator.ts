@@ -34,9 +34,8 @@ export class KeyGenerator {
   }
 
   deriveKeyFrom(password: string, { length = this.keyLength() }: { length?: number } = {}): string {
-    const salt = this.keyDerivationSalt();
     const generator = new AsKeyGenerator(password, { hashDigestClass: this.hashDigestClass });
-    return generator.generateKey(salt, length).toString("base64");
+    return generator.generateKey(this.keyDerivationSalt(), length).toString("base64");
   }
 
   /** @internal */

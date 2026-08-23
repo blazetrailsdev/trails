@@ -133,7 +133,7 @@ export class BaseLocator {
 
   /** @internal Mirrors: BaseLocator#find_records — batch find or where(pk: ids). */
   protected async findRecords(
-    klass: LocatorModel,
+    modelClass: LocatorModel,
     ids: unknown[],
     options: LocateOptions,
   ): Promise<unknown[]> {
@@ -141,12 +141,12 @@ export class BaseLocator {
     // form not yet supported by our AR layer. CPK + ignoreMissing falls
     // through to find(ids) (raises on missing) as a known limitation.
     //
-    // Use this.primaryKey(klass) as the single source of truth for the PK
+    // Use this.primaryKey(modelClass) as the single source of truth for the PK
     // shape — a subclass overriding primaryKey() must affect both the
     // composite-key gate AND the where() key consistently.
-    const pk = this.primaryKey(klass);
-    if (options.ignoreMissing && klass.where && !Array.isArray(pk)) {
-      const rel = klass.where({ [pk]: ids });
+    const pk = this.primaryKey(modelClass);
+    if (options.ignoreMissing && modelClass.where && !Array.isArray(pk)) {
+      const rel = modelClass.where({ [pk]: ids });
       if (!rel.toArray) {
         throw new Error(
           "LocatorModel.where() returned a relation without .toArray() — required for ignoreMissing.",
@@ -155,7 +155,7 @@ export class BaseLocator {
       const records = await rel.toArray();
       return Array.isArray(records) ? records : [];
     }
-    const result = await klass.find(ids);
+    const result = await modelClass.find(ids);
     return Array.isArray(result) ? result : [result];
   }
 
@@ -179,25 +179,25 @@ export class BaseLocator {
  */
 export class UnscopedLocator extends BaseLocator {
   async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
-    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    return this.unscoped(klass, () => super.locate(gid, options));
+    const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
+    return this.unscoped(modelClass, () => super.locate(gid, options));
   }
 
   /** @internal */
   protected async findRecords(
-    klass: LocatorModel,
+    modelClass: LocatorModel,
     ids: unknown[],
     options: LocateOptions,
   ): Promise<unknown[]> {
-    return this.unscoped(klass, () => super.findRecords(klass, ids, options));
+    return this.unscoped(modelClass, () => super.findRecords(modelClass, ids, options));
   }
 
   /** @internal Mirrors: UnscopedLocator#unscoped. */
   protected unscoped<R>(
-    klass: LocatorModel | undefined,
+    modelClass: LocatorModel | undefined,
     block: () => R | Promise<R>,
   ): R | Promise<R> {
-    return klass?.unscoped ? klass.unscoped(block) : block();
+    return modelClass?.unscoped ? modelClass.unscoped(block) : block();
   }
 }
 

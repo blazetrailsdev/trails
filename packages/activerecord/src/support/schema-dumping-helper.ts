@@ -28,24 +28,24 @@ import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 
 /**
- * Dump only the named `tables` from `source`, as a schema-DSL string.
+ * Dump only the named `tables` from `pool`, as a schema-DSL string.
  *
  * Mirrors `SchemaDumpingHelper#dump_table_schema(*tables)`: ignore every data
- * source except the requested ones, then run a full dump. The `source` doubles
- * as Rails' connection (it enumerates the data sources) and as the dump target.
+ * source except the requested ones, then run a full dump. Rails reads its
+ * `pool` off `ActiveRecord::Base.connection_pool`; trails takes it as the
+ * leading argument, and it doubles as Rails' `connection` (it enumerates the
+ * data sources) and as the dump target.
  */
-export async function dumpTableSchema(source: SchemaSource, ...tables: string[]): Promise<string> {
+export async function dumpTableSchema(pool: SchemaSource, ...tables: string[]): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   // Rails: `connection.data_sources - tables` (tables + views). Prefer the
   // adapter's `dataSources()` so views are also ignored; fall back to `tables()`
   // for a bare `SchemaSource` that only enumerates base tables.
-  const enumerated = source as { dataSources?: () => Promise<string[]> };
-  const dataSources = enumerated.dataSources
-    ? await enumerated.dataSources()
-    : await source.tables();
+  const enumerated = pool as { dataSources?: () => Promise<string[]> };
+  const dataSources = enumerated.dataSources ? await enumerated.dataSources() : await pool.tables();
   BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
-    return (await SchemaDumper.dump(source)).join("\n");
+    return (await SchemaDumper.dump(pool)).join("\n");
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
@@ -57,13 +57,13 @@ export async function dumpTableSchema(source: SchemaSource, ...tables: string[])
  * Mirrors `SchemaDumpingHelper#dump_all_table_schema(ignore_tables = [])`.
  */
 export async function dumpAllTableSchema(
-  source: SchemaSource,
+  pool: SchemaSource,
   ignoreTables: (string | RegExp)[] = [],
 ): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
   try {
-    return (await SchemaDumper.dump(source)).join("\n");
+    return (await SchemaDumper.dump(pool)).join("\n");
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
