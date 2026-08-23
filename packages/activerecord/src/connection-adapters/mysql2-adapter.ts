@@ -1951,6 +1951,15 @@ dirtiesQueryCache(Mysql2Adapter, "execute");
 // method of the adapter, so `raw_execute`'s `this.performQuery(...)` dispatch
 // resolves here (mysql2/database_statements.rb:41).
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
+// `Mysql2::DatabaseStatements#execute_batch` is deliberately NOT installed
+// beside it. Rails' `perform_query` turns multi-statements on for the batch
+// query itself — `raw_connection.set_server_option(OPTION_MULTI_STATEMENTS_ON)`
+// (mysql2/database_statements.rb:41-45) — and node-mysql2 ships no command
+// class for `COM_SET_OPTION` (only the `SET_OPTION: 0x1b` wire constant), so a
+// combined `a;\nb` fails with ER_PARSE_ERROR on any connection not created
+// with multi-statements. Until that is closed, mysql2 inherits AbstractAdapter's
+// per-statement loop, which is correct if uncombined. Story:
+// install-mysql2-execute-batch-once-multi-statements-are-sendable.
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
