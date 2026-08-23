@@ -1964,12 +1964,16 @@ function excludingWithCallee(callee: "excluding" | "without") {
     // materializes HERE, where Rails materializes, and its literal ids reach
     // `excluding!` in the same argument position Rails puts them in.
     //
-    // The two arms trails cannot take eagerly stay deferred: a `scheduled?`
-    // relation (relation.rb:1170) is `loaded?` with its rows still parked in
-    // `@future_result`, and draining them is asynchronous; an un-loaded one
-    // needs the `SELECT <pk>` select, which the synchronous builder cannot run.
-    // Both go to `excluding!` as relations, and the load pipeline materializes
-    // them through `Relation#ids`.
+    // The two arms trails cannot take eagerly stay deferred, and the reason is a
+    // language shortcoming, not a preference: an un-loaded relation's `ids`
+    // RUNS the `SELECT <pk>` (calculations.rb:390-404) and a `scheduled?` one
+    // (relation.rb:1170) must drain its parked `@future_result` — both
+    // asynchronous, while `excluding` is a synchronous chainable and every
+    // trails adapter's `select_all` is `Promise`-returning
+    // (connection-adapters/abstract/database-statements.ts), so there is no
+    // synchronous query to run here. Both go to `excluding!` as relations, and
+    // the load pipeline materializes them through `Relation#ids` at the first
+    // terminal.
     const flatMappedIds: unknown[] = [];
     const deferredRelations: any[] = [];
     for (const relation of relations) {
@@ -2061,13 +2065,20 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
  * already claimed by the caller.
  *
  * Mirrors: ActiveRecord::QueryMethods#arel (query_methods.rb:1594-1596)
- * @missingRailsCall with_connection — PERMANENT: `with_connection`
- * (query_methods.rb:1595) is the connection acquisition around `build_arel`.
- * trails' `Relation#withConnection` is a `Promise`-returning checkout and this
- * reader is synchronous — every caller reads `relation.arel()` inline while
- * building a query — so the acquisition is the direct `_conn()` lease, which
- * hands `build_arel` the same connection and raises the same
- * `ConnectionNotEstablished` when no pool is established.
+ * @missingRailsCall with_connection — PERMANENT: Rails is
+ * `@arel ||= with_connection { |c| build_arel(c, aliases) }`
+ * (query_methods.rb:1594-1595). The memo and the connection argument are ported
+ * verbatim; only the acquisition SHAPE differs, and a synchronous
+ * `with_connection` seam cannot exist. `ConnectionPool#withConnection`
+ * (connection-adapters/abstract/connection-pool.ts) is `async` for exactly one
+ * reason — `checkout()` awaits an available connection — so a synchronous seam
+ * could only ever serve an ALREADY-leased connection, which is precisely what
+ * `_conn()` returns (the `with_connection` block parameter threaded by the
+ * enclosing wrap, else the model's pool). This reader is read inline by ~30
+ * synchronous callers (`toSql`, `updateAll`, `deleteAll`, `selectAll`,
+ * `buildFrom`, the predicate builder), so it cannot become async either. The
+ * lease raises the same `ConnectionNotEstablished` Rails' `with_connection`
+ * raises when no pool is established.
  * @internal
  */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
