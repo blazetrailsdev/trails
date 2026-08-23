@@ -207,9 +207,9 @@ function cachedSchemaCacheFor(
  * configured key, or one the schema cache has already reflected.
  *
  * @internal
- * @noRailsEquivalent PERMANENT — Ruby's `init_internals` seats `@primary_key` from the
- * class unconditionally (core.rb:846) because `get_primary_key` is synchronous
- * there. trails reflects the schema asynchronously, so `getPrimaryKey` answers
+ * @noRailsEquivalent PERMANENT — Ruby's `init_internals` seats `@primary_key`
+ * from the class unconditionally (core.rb:846) because `get_primary_key` is
+ * synchronous there. trails reflects the schema asynchronously, so `getPrimaryKey` answers
  * the "id" convention until the cache is warm; seating that would latch it for
  * the record's lifetime. `initInternals` guards Rails' assignment with this,
  * and `primaryKeyOf` reads through to the class while it is false.

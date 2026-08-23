@@ -231,7 +231,9 @@ export class TimeWithZone {
    * Mirrors: `ActiveSupport::TimeWithZone#incorporate_utc_offset`
    * (time_with_zone.rb:562-568). Ruby's `Date` advances in DAYS, so its arm
    * spells the offset as the day fraction `Rational(offset, SECONDS_PER_DAY)`;
-   * an instant carrying that date advances by the seconds that fraction names.
+   * a wall clock carrying that date advances by the seconds that fraction
+   * names. The `else` arm is Ruby's `time + offset`, spelled through `Time.at`
+   * because trails' `Time` does not port `Time#+`.
    */
   private _incorporateUtcOffset(time: Time | Temporal.PlainDate, offset: number): Time {
     if (time instanceof Temporal.PlainDate) {
@@ -239,15 +241,6 @@ export class TimeWithZone {
         time.toPlainDateTime().add({ seconds: offset }),
       );
     }
-    return this._plusSeconds(time, offset);
-  }
-
-  /**
-   * Ruby's `Time#+` (time.c `time_plus`), which trails' `Time` does not port —
-   * the receiver's instant advanced by `offset` seconds, answered in UTC as a
-   * `Time.utc` value is.
-   */
-  private _plusSeconds(time: Time, offset: number): Time {
     return Time.at(
       new Rational(time.toTime().toInstant().epochNanoseconds, 1_000_000_000n).add(offset),
     ).getutc();
@@ -277,7 +270,7 @@ export class TimeWithZone {
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#transfer_time_values_to_utc_constructor`
    * (time_with_zone.rb:583-587) — `Time.utc(year, month, day, hour, min,
-   * sec + subsec)`, which an `Instant` (a UTC `Time`) already is.
+   * sec + subsec)`, over whichever shape carries the wall clock.
    */
   private _transferTimeValuesToUtcConstructor(time: TimeLike): Time {
     // avoid creating another Time object if possible
