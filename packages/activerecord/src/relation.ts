@@ -1984,7 +1984,23 @@ export class Relation<T extends Base> {
   ): Relation<T> {
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethodBangs.joinsBang.call(rel as any, jd as any);
-    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+    if (
+      this.hasLimitOrOffset &&
+      !(
+        this.usingLimitableReflections(jd.reflections as never) &&
+        this.usingLimitableReflections(
+          QueryMethodBangs.constructJoinDependency.call(
+            this as any,
+            _qm.selectAssociationList
+              .call(this as any, this.joinsValues, null)
+              .concat(
+                _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
+              ) as AssociationSpec[],
+            null,
+          ).reflections as never,
+        )
+      )
+    ) {
       if (Array.isArray(basePk)) {
         // Rails `where!(**Array(primary_key).zip(limited_ids.transpose).to_h)`
         // (schema_statements.rb:1448) — a per-column `IN`, not a tuple `IN`.
@@ -2018,11 +2034,12 @@ export class Relation<T extends Base> {
    * forces the distinct-parent-id rewrite even when every eager reflection is
    * singular.
    *
-   * Rails spells this guard inline in `apply_join_dependency`, and so does
-   * {@link applyJoinDependency}. This copy serves only the SYNCHRONOUS eager
-   * paths that cannot route through it — `toSql` and the deferred distinct-PK
-   * predicate cluster — pending the sync/async collapse tracked by
-   * `converge-relation-subquery-distinct-pk-materialization`.
+   * Rails spells this guard inline in `apply_join_dependency`, and so do both
+   * trails mirrors of that method — {@link applyJoinDependency} and
+   * `_applyEagerJoinDependency`. This copy has one caller left, the trails-only
+   * deferred distinct-PK predicate cluster, which asks the question WITHOUT
+   * applying the join dependency; it retires with that cluster in the sync/async
+   * collapse tracked by `converge-sync-eager-builders-async-to-sql`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
