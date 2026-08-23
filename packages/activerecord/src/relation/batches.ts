@@ -192,7 +192,11 @@ export class Batches {
     let generator: () => AsyncGenerator<LoadedRelation<Relation<T>>>;
     if (remaining === 0) {
       generator = async function* () {};
-    } else if (this.loaded) {
+    } else if (this.loaded && !this.isScheduled) {
+      // `batchOnLoadedRelation` reads the materialized `@records` array
+      // synchronously, so a `load_async` relation — `loaded?` with its rows
+      // still parked (relation.rb:1149) — takes the querying arm instead;
+      // there is no synchronous way to drain the future here.
       const loadedBatches = batchOnLoadedRelation({
         relation: this,
         start,
