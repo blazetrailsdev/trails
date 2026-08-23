@@ -18,7 +18,10 @@ import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { captureSql } from "./testing/sql-capture.js";
+import { Notifications } from "@blazetrails/activesupport";
+import type { Base } from "./base.js";
 
 describe("PersistenceTest (trails)", () => {
   const Topic = CanonicalTopic;
@@ -253,5 +256,45 @@ describe("PersistenceTest (trails)", () => {
     const asBase = company!.becomes(Base as never);
     expect(asBase).toBeInstanceOf(Base);
     expect((asBase as unknown as { id: unknown }).id).toBe(company!.id);
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["posts"]);
+
+  // persistence.rb:243-246 — the prefetch arm re-casts the sequence value
+  // through `_default_attributes[primary_key]` before it reaches the INSERT.
+  // `PostWithPrefetchedPk` returns an already-cast Integer, so a raw-value
+  // assignment is indistinguishable there; a String-returning sequence is what
+  // separates `with_cast_value` from a bare write.
+  it("prefetched pk is re-cast through the primary key's default attribute", async () => {
+    class PostWithStringSequence extends (CanonicalPost as unknown as typeof Base) {
+      static _tableName = "posts";
+      static isPrefetchPrimaryKey(): boolean {
+        return true;
+      }
+      // A String sequence value is what separates `with_cast_value` from a
+      // bare write; Rails' `next_sequence_value` is untyped.
+      static nextSequenceValue(): number {
+        return "654321" as unknown as number;
+      }
+    }
+    registerModel(PostWithStringSequence as never);
+
+    let insertBinds: unknown[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: unknown) => {
+      const payload = (event as { payload?: Record<string, unknown> }).payload;
+      if (typeof payload?.sql === "string" && payload.sql.startsWith("INSERT")) {
+        insertBinds = payload.type_casted_binds as unknown[];
+      }
+    });
+    try {
+      await PostWithStringSequence.create({ title: "prefetched", body: "b" });
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+
+    expect(insertBinds).not.toContain("654321");
+    expect(insertBinds.map(String)).toContain("654321");
   });
 });

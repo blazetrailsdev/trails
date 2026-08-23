@@ -229,14 +229,6 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
  * Builds and executes an INSERT for the given values.
  *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_insert_record
- *
- * @missingRailsCall with_cast_value — CONVERGEABLE (story
- * insert-record-prefetch-arm-skips-with-cast-value, RFC 0112): persistence.rb:245
- *   `_default_attributes[primary_key].with_cast_value(primary_key_value)` — the
- *   prefetch arm. `prefetch_primary_key?` is false for every adapter trails
- *   ships, so no `_default_attributes` Attribute exists to re-cast; the branch
- *   is mirrored structurally (persistence.ts:249-256) and assigns the raw
- *   sequence value. Converges when an adapter prefetches.
  */
 export async function _insertRecord(
   this: PersistenceHost,
@@ -257,8 +249,11 @@ export async function _insertRecord(
   // mirrored to keep the structure aligned with Rails.
   if (ctor.isPrefetchPrimaryKey?.() && primaryKey && !Array.isArray(primaryKey)) {
     if (values[primaryKey] == null) {
-      primaryKeyValue = ctor.nextSequenceValue?.() ?? null;
-      if (primaryKeyValue != null) values[primaryKey] = primaryKeyValue;
+      primaryKeyValue = ctor.nextSequenceValue?.();
+      values[primaryKey] = ctor
+        ._defaultAttributes()
+        .getAttribute(primaryKey)
+        .withCastValue(primaryKeyValue);
     }
   }
 

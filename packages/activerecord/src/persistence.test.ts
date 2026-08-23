@@ -42,6 +42,7 @@ import { queryConstraints, queryConstraintsList } from "./persistence.js";
 // `topic2s`/`item2s`. Each converted block rebinds the alias to a local `const`.
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
+import { PostWithPrefetchedPk } from "./test-helpers/models/post-with-prefetched-pk.js";
 import { Account } from "./test-helpers/models/account.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
@@ -1190,15 +1191,12 @@ describe("PersistenceTest", () => {
     await expect(Topic.destroy([99999])).rejects.toThrow();
   });
 
-  // Guard for partial_inserts=true (Rails' test ambient, which the harness now
-  // runs). Pins the callbacks.ts null-only PK skip-set; a refactor that drops
-  // it regresses this without a guard.
-  // Mirrors Rails _create_record writing a returning column back only when
-  // _read_attribute(column) is nil.
   it("create prefetched pk", async () => {
-    const t = await Topic.create({ title: "prefetched" });
-    expect(t.id).toBeTruthy();
-    expect(t.isPersisted()).toBe(true);
+    const post: any = await PostWithPrefetchedPk.createBang({
+      title: "New Message",
+      body: "New Body",
+    });
+    expect(Number(post.id)).toBe(123456);
   });
 
   it("build many through factory with block", () => {

@@ -38,6 +38,7 @@ import {
   constantize,
   registerConstant,
   unregisterConstant,
+  privateConstant,
 } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
@@ -46,6 +47,7 @@ import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
+import { CollectionAssociation as CollectionAssociationBuilder } from "./associations/builder/collection-association.js";
 import * as Reflection from "./reflection.js";
 import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -786,39 +788,28 @@ export class Associations {
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_and_belongs_to_many
    *
-   * @missingRailsCall add_reflection — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): Rails' macro body
-   *   (associations.rb:1870-1905) builds the HABTM inline; trails ports that
-   *   same body into `HasAndBelongsToMany._build`
-   *   (builder/has-and-belongs-to-many.ts:255-414), which the macro reaches
-   *   through `HabtmBuilder.build`. `Reflection.add_reflection self,
-   *   middle_reflection.name, middle_reflection` (associations.rb:1879) is made
-   *   there, one frame down — see `Reflection.addReflection` at
-   *   has-and-belongs-to-many.ts:279 and :409.
-   * @missingRailsCall define_callbacks — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `Builder::HasMany.define_callbacks
-   *   self, middle_reflection` (associations.rb:1878) is made one frame down in
-   *   `HasAndBelongsToMany._build` — `addAutosaveAssociationCallbacks` at
-   *   has-and-belongs-to-many.ts:278 plus the
-   *   `CollectionAssociationBuilder.defineCallback` loop at :396-398 — because
-   *   trails ports the whole macro body into the builder rather than the macro.
-   * @missingRailsCall has_many — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `has_many name, scope, **hm_options,
-   *   &extension` (associations.rb:1904) is the generated through-has_many;
-   *   trails builds the same reflection one frame down in
-   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:399-409) via
-   *   `Reflection.create("hasAndBelongsToMany", ...)` + `addReflection`, because
-   *   the port has no macro-recursion path that would re-enter `hasMany` with
-   *   the HABTM options.
-   * @missingRailsCall include — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `include Module.new { def destroy_associations
-   *   ... super end }` (associations.rb:1886-1894) is ported one frame down in
-   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:303-323): JS has
-   *   no anonymous-module include, so the override is layered onto
-   *   `model.prototype.destroyAssociations` with the previous implementation
-   *   captured as the `super` chain.
-   * @missingRailsCall new — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112):
-   *   `ActiveRecord::Reflection::HasAndBelongsToManyReflection.new` and
-   *   `Builder::HasAndBelongsToMany.new` (associations.rb:1870-1872) are both
-   *   made one frame down: `new this(name, model, options)` at
-   *   has-and-belongs-to-many.ts:253 and `Reflection.create(...)` at :403,
-   *   because trails ports the macro body into the builder.
+   * @missingRailsCall include — PERMANENT: `include Module.new { def
+   *   destroy_associations ... super end }` (associations.rb:1886-1894). JS has
+   *   no anonymous-module include and no `super` for a mixed-in method, so the
+   *   override is layered onto `prototype.destroyAssociations` with the previous
+   *   implementation captured as the `super` chain — the same effect Ruby gets
+   *   from inserting a module into the ancestor chain.
+   * @missingRailsArgs new — CONVERGEABLE (story
+   *   habtm-public-reflection-is-built-directly-not-via-the-has-many-macro, RFC
+   *   0112): `ActiveRecord::Reflection::HasAndBelongsToManyReflection.new(name,
+   *   scope, options, self)` (associations.rb:1871). Rails keeps that
+   *   `habtm_reflection` as a separate object and points both
+   *   `middle_reflection.parent_reflection` and `_reflections[name]
+   *   .parent_reflection` at it; trails' public reflection plays that role
+   *   itself, so there is no second construction to compare against. It splits
+   *   when the public reflection stops being a `hasAndBelongsToMany` macro.
+   * @missingRailsCall has_many — CONVERGEABLE (story
+   *   habtm-public-reflection-is-built-directly-not-via-the-has-many-macro, RFC
+   *   0112): `has_many name, scope, **hm_options, &extension`
+   *   (associations.rb:1904). trails registers the public reflection with macro
+   *   `"hasAndBelongsToMany"` via `Reflection.create` rather than re-entering
+   *   the `hasMany` macro; the macro string is read by reflection walking, join
+   *   planning and `_resolveHabtmJoin`, so the flip is its own story.
    */
   static hasAndBelongsToMany(
     name: string,
@@ -847,20 +838,166 @@ export class Associations {
     if (typeof rawClassName === "symbol") {
       options = { ...options, className: rawClassName.description ?? "" };
     }
-    HabtmBuilder.build(
-      this,
+    const self = this as any;
+    const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
+    scope = typeof scope === "function" ? scope : null;
+
+    const joinModel = builder.throughModel();
+
+    // `const_set` + `private_constant` (associations.rb:1868-1869) against the
+    // registry that stands in for Ruby's constant table.
+    const registryKey = `${self.name}::${joinModel.name}`;
+    modelRegistry.set(registryKey, joinModel);
+    privateConstant(registryKey);
+
+    const middleReflection = builder.middleReflection(joinModel);
+    const middleName = middleReflection.name;
+    HasManyBuilder.defineCallbacks(self, middleReflection);
+    Reflection.addReflection(self, middleName, middleReflection);
+
+    // Mirrors Rails associations.rb:1886-1894 — instead of registering a
+    // bare `before_destroy` callback per HABTM, Rails includes an anonymous
+    // module that overrides `destroy_associations` and chains with `super`.
+    // Each HABTM declaration layers its own override; multiple HABTMs on
+    // the same class chain naturally through the captured `prev` reference.
+    // `destroyAssociations` is invoked by the standard destroy flow
+    // (`Base#_destroyRow` → after before_destroy, before the row delete), so
+    // this override is all that's needed — no `before_destroy` bridge.
+    // Per-association guard: re-declaring the same HABTM (same `name` on
+    // the same class) would otherwise layer a duplicate wrapper around the
+    // existing chain, causing the join cleanup to run twice. Track the set
+    // of names already wrapped on this class's prototype and short-circuit.
+    const HABTM_WRAPPED_NAMES = Symbol.for("blazetrails.habtm.destroyAssociations.names");
+    const ownWrappedNames: Set<string> = Object.prototype.hasOwnProperty.call(
+      self.prototype,
+      HABTM_WRAPPED_NAMES,
+    )
+      ? self.prototype[HABTM_WRAPPED_NAMES]
+      : Object.defineProperty(self.prototype, HABTM_WRAPPED_NAMES, {
+          value: new Set<string>(),
+          configurable: true,
+          writable: false,
+        })[HABTM_WRAPPED_NAMES];
+    const prevDestroyAssociations = self.prototype.destroyAssociations;
+    if (ownWrappedNames.has(name)) {
+      // Skip wrapper layering on redeclaration — the existing chain already
+      // handles this association.
+    } else {
+      ownWrappedNames.add(name);
+      self.prototype.destroyAssociations = async function (this: {
+        association(n: string): { handleDependency(): Promise<void>; reset?(): void };
+        _collectionProxies?: { delete(n: string): void };
+      }): Promise<void> {
+        await this.association(middleName).handleDependency();
+        this.association(name).reset?.();
+        // Rails' `association(:name).reset` only clears the Association
+        // instance's loaded state. In this codebase, collection readers are
+        // additionally memoized in `_collectionProxies` (see associations.ts
+        // ~2334), so the user-facing reader would still return the stale
+        // proxy unless we evict it too.
+        this._collectionProxies?.delete(name);
+        if (typeof prevDestroyAssociations === "function") {
+          await prevDestroyAssociations.call(this);
+        }
+      };
+    }
+
+    // Tightened option set forwarded to the public HABTM reflection.
+    // Rails' `hm_options` allowlist for the generated `has_many :through`
+    // is the canonical set: before/after_add/remove, autosave, validate,
+    // join_table, class_name, extend, strict_loading (associations.rb:1899).
+    // We additionally retain `foreignKey` because our public HABTM
+    // reflection plays the dual role Rails splits between
+    // `habtm_reflection` (which keeps the full options) and the generated
+    // through-`has_many` — join-key resolution (`_resolveHabtmJoin`) reads
+    // this directly off the public reflection.
+    // `primaryKey` is intentionally NOT forwarded: Rails'
+    // `Builder::HasAndBelongsToMany` does not pass `:primary_key` to the
+    // middle has_many or rhs belongs_to, so the owner join always uses
+    // the model's primary key.
+    // Spreading `...options` previously leaked `readonly`/`dependent`
+    // into through-hasMany semantics — Rails drops those. `inverseOf` IS
+    // retained because Rails' `habtm_reflection` is constructed with the
+    // full options hash (associations.rb:1871) and consumers in this
+    // codebase consult `reflection.options.inverseOf` for inverse caching.
+    const HABTM_FORWARDED_KEYS = [
+      "beforeAdd",
+      "afterAdd",
+      "beforeRemove",
+      "afterRemove",
+      "autosave",
+      "validate",
+      "className",
+      "extend",
+      "strictLoading",
+      "foreignKey",
+      "inverseOf",
+      "indexErrors",
+      "associationForeignKey",
+    ] as const;
+    // Note: a DERIVED join-table name is deliberately not written here.
+    // Rails' `hm_options` allowlist forwards `:join_table` only when the
+    // declaration supplied one (associations.rb:1899); with the key absent,
+    // `HasAndBelongsToManyReflection#join_table` falls through to
+    // `derive_join_table`, which reads `klass.table_name` when the reflection
+    // is USED. Writing a derived name here instead resolved the RHS table at
+    // declaration time — the eager resolution Rails' join model documents
+    // against ("Table name needs to be resolved lazily because RHS class might
+    // not have been loaded", has_and_belongs_to_many.rb:25-26), and with the
+    // RHS unregistered it latched the name-derived fallback for good.
+    // `associationForeignKey` is retained on the reflection options to
+    // mirror Rails' `habtm_reflection` (which keeps the full options
+    // hash); note however that `_build` and `_resolveHabtmJoin` currently
+    // hard-code the target FK as `${singular(name)}_id` — full plumbing into
+    // the generated join model and join SQL is a follow-up.
+    const habtmOptions: Record<string, unknown> = {
+      through: middleName,
+      source: (options.source as string) ?? joinModel.rightReflection.name,
+    };
+    if (options.joinTable != null) habtmOptions.joinTable = options.joinTable;
+    for (const k of HABTM_FORWARDED_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(options, k)) {
+        habtmOptions[k] = options[k];
+      }
+    }
+    const positionalScope = typeof scope === "function" ? scope : null;
+    self._associations = [
+      ...self._associations,
+      { type: "hasAndBelongsToMany", name, scope: positionalScope, options: habtmOptions },
+    ];
+    // Register before/after_add/remove class properties for Rails parity —
+    // mirrors CollectionAssociation.defineCallbacks for has_many. The bug-fix
+    // in defineCallback ensures a subclass that redefines the HABTM without
+    // callbacks shadows the parent's array (own [] vs inherited [fn]).
+    for (const callbackName of ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const) {
+      CollectionAssociationBuilder.defineCallback(self, callbackName, name, habtmOptions);
+    }
+    // Keep `through:` in the options passed to Reflection.create so it wraps
+    // the HasAndBelongsToManyReflection in a ThroughReflection — mirrors
+    // Rails' `Builder::HasAndBelongsToMany`, which builds an internal
+    // has_many :through and registers the HABTM as a through reflection.
+    const habtmReflection = Reflection.create(
+      "hasAndBelongsToMany" as any,
       name,
-      scope as ((...args: any[]) => any) | null,
-      options as Record<string, unknown>,
-      { modelRegistry },
+      positionalScope,
+      habtmOptions,
+      self,
     );
+    Reflection.addReflection(self, name, habtmReflection as any);
+    // Mirrors Rails' `middle_reflection.parent_reflection = habtm_reflection`
+    // — the through middle is owned by the public HABTM reflection. Some
+    // reflection-walking code paths (e.g. nested-through resolution and
+    // inverse lookup) inspect this link.
+    middleReflection.parentReflection = habtmReflection;
+    CollectionAssociationBuilder.defineAccessors(self, habtmReflection);
+
     // Rails registers the autosave-association callbacks for every HABTM
     // (the underlying has_many :through is built via the standard
     // `has_many` builder, which always calls `define_callbacks`). Wire it
     // here so `validate: false` is observable (`treasure.valid?` must not
     // run child validations) regardless of an explicit `autosave:` option.
-    const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
-    if (habtmReflection) addAutosaveAssociationCallbacks.call(this, habtmReflection);
+    const publicReflection = Reflection._reflectOnAssociation(self, name);
+    if (publicReflection) addAutosaveAssociationCallbacks.call(this, publicReflection);
   }
 }
 

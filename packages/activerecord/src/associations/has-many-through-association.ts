@@ -8,8 +8,6 @@ import {
   association as collectionProxyFor,
   applyAssociationScope,
   _hmtNotFound,
-  _canRouteThroughViaDisableJoinsAssociationScope,
-  _loadThroughViaDisableJoinsScope,
 } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
@@ -63,34 +61,14 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Rails (`return [] unless ...`, :227) — including the JOIN-routable one,
    * which the flat loader used to reach without it.
    *
-   * Rails' `return scope.to_a if disable_joins` is trails'
-   * `_loadThroughViaDisableJoinsScope`: `scope()`'s own `disable_joins` branch
-   * (association.rb:302) builds the DisableJoinsAssociationScope relation, and
-   * that loader is what runs it. The routing predicate stays the single one
-   * `HasManyAssociation`'s loader consults, so the branch here and the branch
-   * there agree by construction rather than by two copies of the gate.
-   *
    * The `_queryExecutor` arm is a diverged CollectionProxy running its own
    * mutated Relation, which the through routing would discard —
    * `HasManyAssociation#findTarget` is where that executor is honored.
-   *
-   * @missingRailsCall scope — CONVERGEABLE (story
-   *   hmt-find-target-disable-joins-arm-routes-through-two-free-functions, RFC
-   *   0112): `return scope.to_a if disable_joins`
-   *   (has_many_through_association.rb:228). trails splits that arm into
-   *   `_canRouteThroughViaDisableJoinsAssociationScope` and
-   *   `_loadThroughViaDisableJoinsScope`, and the latter is what calls
-   *   `scope()` — one frame down from the body compared here.
    */
   protected override async findTarget(): Promise<Base[]> {
     if (this._queryExecutor) return super.findTarget();
     if (!this.targetReflectionHasAssociatedRecord()) return [];
-    const reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation?.(
-      this.reflection.name,
-    );
-    if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, this.reflection.options)) {
-      return _loadThroughViaDisableJoinsScope(this.owner, reflection, this.reflection.options);
-    }
+    if (this.disableJoins) return this.scope().toArray();
     return super.findTarget();
   }
 
