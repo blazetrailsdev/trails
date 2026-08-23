@@ -1,6 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
- * parity:api:build — reconcile per-method `@missingRailsCall` JSDoc blocks (minimal,
+ * parity:api:build — reconcile per-method `@missingRailsCall` (and, under
+ * `--kind args`, `@missingRailsArgs`) JSDoc blocks (minimal,
  * reconcile-only slice of docs/infrastructure/api-build-stub-generation-plan.md;
  * stub generation is a later phase).
  *
@@ -30,12 +31,26 @@
  * Method bodies are NEVER edited — only JSDoc blocks.
  *
  * Usage:
- *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--call <ruby_call>] [--dry-run]
+ *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--call <ruby_call>]
+ *                         [--kind calls|args] [--dry-run]
  *
- * `--dry-run` reports what would move WITHOUT touching a file, and names the
- * `kind: "args"` rows in scope it will never move — those belong to the
- * call-ARGUMENT dimension (`pnpm parity:api:calls:args`), and a bare `0` for a
- * shard full of them reads as "stale rows, delete the shard" (RFC 0106).
+ * `--kind args` runs the same reconcile over the OTHER dimension (the unreviewed
+ * high-water marks count call-SET seeds only, so an args migration lowers none;
+ * a tag suppresses by Ruby call NAME, so a call is migratable only when every
+ * args row sharing its `keyOf` is curated — see {@link argReasons}): it reads
+ * output/call-arg-mismatches.json, mints `@missingRailsArgs <ruby_call> —
+ * <reason>` receipts from the `kind: "args"` rows of the SAME shards, and drops
+ * those rows (RFC 0106). The tag family's extra discipline applies — a reason
+ * that makes no PERMANENT/CONVERGEABLE claim mints nothing, exactly as a seeded
+ * placeholder mints nothing on either side — and the two passes never touch
+ * each other's rows, since `keyOf` carries no `kind` and each filters with
+ * `rowsOfKind`.
+ *
+ * `--dry-run` reports what would move WITHOUT touching a file. On a call-SET
+ * run it also names the `kind: "args"` rows in scope that pass will never move
+ * — those belong to the call-ARGUMENT dimension (`pnpm parity:api:calls:args`),
+ * and a bare `0` for a shard full of them reads as "stale rows, delete the
+ * shard" (RFC 0106).
  *
  * `--call` (repeatable) migrates one cluster of Ruby calls and leaves every
  * other flagged call baselined, so a source file whose curated rows mix a
@@ -52,6 +67,7 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import {
   type ExcludeEntry,
+  type RowKind,
   callOf,
   keyOf,
   missingScope,
@@ -76,11 +92,15 @@ import {
   NARROW_DEFAULT_REASON,
   TAG,
   type TagEntry,
+  classifyReason,
   justifies,
   parseJsdoc,
 } from "./missing-rails-call-tags.js";
+import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
+import type { CallArgArtifact } from "./call-args-baseline.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
+const ARGS_ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 const BASELINE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "call-mismatches-exclude",
@@ -208,9 +228,9 @@ export function reconcile(
 }
 
 // Wrap a new tag entry to lines at ~80 cols with a two-space hang indent.
-function renderEntry(e: TagEntry, indent: string): string[] {
+function renderEntry(e: TagEntry, indent: string, tag: string = TAG): string[] {
   if (e.rawLines.length > 0) return e.rawLines;
-  const words = `${TAG} ${e.call} — ${e.reason}`.split(" ");
+  const words = `${tag} ${e.call} — ${e.reason}`.split(" ");
   const lines: string[] = [];
   let cur = `${indent} * `;
   for (const w of words) {
@@ -239,7 +259,12 @@ const oneLineProse = (line: string): string =>
  *  the `head`/`hasProse` split cannot see; with no entries it is returned
  *  verbatim, so an ordinary doc comment on an untagged method is not deleted
  *  as "tags-only". */
-export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string): string | null {
+export function renderJsdoc(
+  rest: string[],
+  entries: TagEntry[],
+  indent: string,
+  tag: string = TAG,
+): string | null {
   // Order entries by call name (code-unit order, matching the ratchet).
   const ordered = [...entries].sort((a, b) => (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
   let body = rest.slice();
@@ -267,7 +292,7 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
     if (!hasProse) return null;
     return [...head, ...tail].join("\n");
   }
-  const tagLines = ordered.flatMap((e) => renderEntry(e, indent));
+  const tagLines = ordered.flatMap((e) => renderEntry(e, indent, tag));
   const sep = hasProse ? [`${indent} *`] : [];
   return [...head, ...sep, ...tagLines, ...tail].join("\n");
 }
@@ -438,6 +463,7 @@ export function reconcileFileText(
   reasonFor: (rubyName: string, call: string) => string,
   onlyCall?: ReadonlySet<string>,
   staleTags?: ReadonlySet<string>,
+  tag: string = TAG,
 ): {
   text: string | null;
   /** Tags DROPPED because the call they name is no longer flagged for a
@@ -490,7 +516,7 @@ export function reconcileFileText(
     const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
     const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
     const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
-    if (exp || (comment && comment.includes(TAG))) {
+    if (exp || (comment && comment.includes(tag))) {
       const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
       const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
       const { rest, entries } = parseJsdoc(
@@ -501,6 +527,7 @@ export function reconcileFileText(
               startLine: sf.getLineAndCharacterOfPosition(jsdocRange.pos).line + 1,
             }
           : undefined,
+        tag,
       );
       // With no expectation, the artifact knows nothing about this
       // declaration — compare.ts matched no Ruby method onto it, so it reports
@@ -516,13 +543,11 @@ export function reconcileFileText(
       // declaration: that is the same knowledge the gate's "STALE
       // @missingRailsCall tag(s)" arm reds on, so the writer retires the tag
       // rather than making a human do it by hand (RFC 0106).
+      const isStale = (call: string): boolean =>
+        staleTags?.has(staleTagKey(owner, name, call)) === true ||
+        staleTags?.has(staleTagKey(ANY_CLASS, name, call)) === true;
       const expected =
-        exp?.calls ??
-        new Set<string>(
-          entries
-            .filter((e) => !staleTags?.has(staleTagKey(owner, name, e.call)))
-            .map((e) => e.call),
-        );
+        exp?.calls ?? new Set<string>(entries.filter((e) => !isStale(e.call)).map((e) => e.call));
       const r = reconcile(
         entries,
         expected,
@@ -532,7 +557,7 @@ export function reconcileFileText(
       if (!exp) {
         preserved.push(
           ...entries
-            .filter((entry) => !staleTags?.has(staleTagKey(owner, name, entry.call)))
+            .filter((entry) => !isStale(entry.call))
             .map((entry) => ({ tsName: name, entry })),
         );
       }
@@ -546,7 +571,7 @@ export function reconcileFileText(
       for (const d of r.dropped) {
         if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
       }
-      const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent);
+      const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent, tag);
       if (comment && jsdocRange) {
         if (next === null) {
           // Remove the comment plus its trailing newline + indent.
@@ -614,6 +639,86 @@ export function buildExpectations(
     expectationFor(c.tsFile, c.tsName, c.tsClass, c.rubyName, c.tsDeclFile).calls.add(c.call);
   }
   return byFile;
+}
+
+/**
+ * (tsFile → tsName → expectation) for one package, from the call-ARGUMENT
+ * artifact (output/call-arg-mismatches.json, RFC 0095).
+ *
+ * Only `shape` mismatches are in scope, matching the rows the args gate
+ * ratchets (`gatedRows`) — a `naming` row is report-only, so minting a receipt
+ * for it would suppress a flag no gate raises. As with the call-set half, the
+ * pairs a tag ALREADY suppressed are folded in from `suppressed`: they are
+ * absent from `mismatches`, and without them the tag that earned the
+ * suppression would reconcile as satisfied and be dropped. The artifact records
+ * no declaring class, so every expectation is keyed under {@link ANY_CLASS} —
+ * which is also where a stale `@missingRailsArgs` tag's retirement key lives.
+ * A suppression receipt records no Ruby method name; the expectation only needs
+ * one to look a reason up for a NEW tag, and a suppressed call already has its.
+ */
+export function buildArgExpectations(
+  artifact: CallArgArtifact,
+  pkg: string,
+  onlyFile?: string,
+): Map<string, Map<string, MethodExpectation>> {
+  const byFile = new Map<string, Map<string, MethodExpectation>>();
+  const expectationFor = (tsFile: string, tsName: string, rubyName: string) => {
+    const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
+    const key = expectationKey(ANY_CLASS, tsName);
+    const exp =
+      fileMap.get(key) ?? fileMap.set(key, { rubyNames: [], tsName, calls: new Set() }).get(key)!;
+    if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
+    return exp;
+  };
+  for (const m of artifact.mismatches) {
+    if (m.package !== pkg || m.class !== "shape") continue;
+    if (onlyFile && m.tsFile !== onlyFile) continue;
+    expectationFor(m.tsFile, m.tsName, m.rubyName).calls.add(m.call);
+  }
+  for (const t of artifact.suppressed ?? []) {
+    if (t.package !== pkg) continue;
+    if (onlyFile && t.tsFile !== onlyFile) continue;
+    expectationFor(t.tsFile, t.tsName, "").calls.add(t.call);
+  }
+  return byFile;
+}
+
+/**
+ * The reason each `keyOf` may mint a `@missingRailsArgs` receipt from — the
+ * grain a tag actually acts at, which is COARSER than the grain the args
+ * baseline is keyed at.
+ *
+ * `shardKeyOf` keys an args row by `rubyArgs` as well (call-args-baseline.ts),
+ * because one call in one method can be wrong two ways at two sites. A tag
+ * cannot be: compare.ts suppresses by Ruby call NAME for the whole method
+ * (`argTags?.has(ruby.name)`, compare.ts:3573), so minting one receipt stops
+ * every site of that call flagging and every sibling row goes stale with it.
+ *
+ * So a call is migratable only when EVERY row sharing its `keyOf` is curated.
+ * One reviewed reason must not buy suppression for a sibling site whose own
+ * argument shape nobody has looked at — that is the seeded-placeholder rule
+ * (RFC 0083) read at the grain the suppression really has. A key with any
+ * unreviewed sibling maps to the placeholder, so it is left baselined and
+ * reported exactly as a wholly-unreviewed one is.
+ */
+export function argReasons(rows: readonly ExcludeEntry[]): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const e of rows) {
+    const key = keyOf(e);
+    if (!justifiesArgs(e.reason)) reasons.set(key, DEFAULT_TAG_REASON);
+    else if (!reasons.has(key)) reasons.set(key, e.reason);
+  }
+  return reasons;
+}
+
+/** A reason a `@missingRailsArgs` receipt may carry: argued prose (never a
+ *  seed) that also opens with a permanence token, which is the extra discipline
+ *  `@missingRailsArgs` enforces and `@missingRailsCall` does not (RFC 0099).
+ *  A row failing it is left baselined exactly as an unjustified one is, rather
+ *  than minting a tag `suppressedArgCallsIn` would then reject as a hard
+ *  error. */
+export function justifiesArgs(reason: string): boolean {
+  return justifies(reason) && classifyReason(reason) !== "unclassified";
 }
 
 /**
@@ -730,14 +835,15 @@ export function migrationSummary(
   inScope: ExcludeEntry[],
   dropped: number,
   dryRun: boolean,
+  kind: RowKind = "calls",
 ): string[] {
   const lines = [
     `parity:api:build: ${dropped} of ${inScope.length} baseline entr(ies) in scope ` +
-      `${dryRun ? "would migrate" : "migrated"} to @missingRailsCall tags and ` +
+      `${dryRun ? "would migrate" : "migrated"} to ${kind === "args" ? ARGS_TAG : TAG} tags and ` +
       `${dryRun ? "would be" : "were"} dropped from ` +
       `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
   ];
-  const argsRows = rowsOfKind(inScope, "args");
+  const argsRows = kind === "args" ? [] : rowsOfKind(inScope, "args");
   if (argsRows.length > 0) {
     lines.push(
       `parity:api:build: ${argsRows.length} of those row(s) are kind: "args" and ` +
@@ -756,12 +862,21 @@ async function main(argv: string[]): Promise<number> {
   const onlyFile = fileIdx !== -1 ? argv[fileIdx + 1] : undefined;
   const onlyCall = new Set(argv.flatMap((a, i) => (a === "--call" ? [argv[i + 1]] : [])));
   const dryRun = argv.includes("--dry-run");
+  const kindIdx = argv.indexOf("--kind");
+  const kind: RowKind = kindIdx !== -1 && argv[kindIdx + 1] === "args" ? "args" : "calls";
+  if (kindIdx !== -1 && !["calls", "args"].includes(argv[kindIdx + 1] ?? "")) {
+    console.error('parity:api:build: --kind takes "calls" (default) or "args".');
+    return 1;
+  }
   if (!pkg) {
     console.error("parity:api:build: --package <pkg> is required (minimal reconcile-only slice).");
     return 1;
   }
 
-  const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as Artifact;
+  const tag = kind === "args" ? ARGS_TAG : TAG;
+  const artifact = JSON.parse(
+    await fs.readFile(kind === "args" ? ARGS_ARTIFACT_PATH : ARTIFACT_PATH, "utf-8"),
+  ) as Artifact & CallArgArtifact;
   const absent = missingScope(artifact);
   if (absent.length > 0) {
     console.error(
@@ -772,13 +887,15 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const baseline = await loadSplitBaseline(BASELINE_DIR);
-  const callRows = rowsOfKind(baseline, "calls");
-  const reasons = new Map<string, string>();
-  for (const e of callRows) {
-    reasons.set(keyOf(e), e.reason);
-  }
+  const kindRows = rowsOfKind(baseline, kind);
+  const justifiesFor = kind === "args" ? justifiesArgs : justifies;
+  const reasons =
+    kind === "args" ? argReasons(kindRows) : new Map(kindRows.map((e) => [keyOf(e), e.reason]));
 
-  const byFile = buildExpectations(artifact, pkg, onlyFile);
+  const byFile =
+    kind === "args"
+      ? buildArgExpectations(artifact, pkg, onlyFile)
+      : buildExpectations(artifact, pkg, onlyFile);
   // Grouped by DECLARING file, not by the row's `tsFile`: one row-file can
   // group several declaring files, and handing each of them the row-file's
   // whole stale set would retire a tag in a file compare.ts never reported it
@@ -791,7 +908,7 @@ async function main(argv: string[]): Promise<number> {
     const declFile = t.tsDeclFile ?? t.tsFile;
     const set =
       staleByDeclFile.get(declFile) ?? staleByDeclFile.set(declFile, new Set()).get(declFile)!;
-    set.add(staleTagKey(t.tsClass ?? "", t.tsName, t.call));
+    set.add(staleTagKey(t.tsClass ?? (kind === "args" ? ANY_CLASS : ""), t.tsName, t.call));
     // A file whose only business this run is a stale tag has no expectation to
     // put it in `byFile` (nor its declaring file in `groupByDeclFile`), and
     // would otherwise never be opened.
@@ -832,10 +949,13 @@ async function main(argv: string[]): Promise<number> {
           path.relative(ROOT_DIR, abs),
           text,
           group,
-          (rubyName, call) =>
-            reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
+          (rubyName, call) => {
+            const reason = reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? "";
+            return justifiesFor(reason) ? reason : DEFAULT_TAG_REASON;
+          },
           onlyCall.size > 0 ? onlyCall : undefined,
           staleByDeclFile.get(declFile),
+          tag,
         );
       } catch (err) {
         console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
@@ -853,13 +973,13 @@ async function main(argv: string[]): Promise<number> {
       for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
       for (const h of harvested) {
         console.log(
-          `DROPPED ${TAG} on ${declFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +
+          `DROPPED ${tag} on ${declFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +
             `longer flagged there, so its receipt is retired. Reason it carried: ${h.entry.reason}`,
         );
       }
       for (const kept of preserved) {
         console.log(
-          `preserved ${TAG} on ${declFile} ${kept.tsName} for \`${kept.entry.call}\` — no ` +
+          `preserved ${tag} on ${declFile} ${kept.tsName} for \`${kept.entry.call}\` — no ` +
             "expectation for that declaration in the artifact; the tag is left exactly as written.",
         );
       }
@@ -879,13 +999,13 @@ async function main(argv: string[]): Promise<number> {
     if (dryRun) console.log(`would update ${path.relative(ROOT_DIR, abs)}`);
     else await fs.writeFile(abs, texts.get(abs)!);
   }
-  const remaining = baseline.filter(
-    (e) => (e.kind ?? "calls") !== "calls" || !migrated.has(keyOf(e)),
-  );
-  const droppedEntries = callRows.filter((e) => migrated.has(keyOf(e)));
+  const remaining = baseline.filter((e) => (e.kind ?? "calls") !== kind || !migrated.has(keyOf(e)));
+  const droppedEntries = kindRows.filter((e) => migrated.has(keyOf(e)));
   const dropped = droppedEntries.length;
   if (dropped > 0 && !dryRun) {
     await writeSplitBaseline(remaining, BASELINE_DIR);
+  }
+  if (dropped > 0 && !dryRun && kind === "calls") {
     const { marks, moved } = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
     console.log(
       `parity:api:build: lowered ${moved.length} unreviewed high-water mark(s) under ` +
@@ -894,10 +1014,12 @@ async function main(argv: string[]): Promise<number> {
     );
     for (const rel of moved) console.log(`  - ${rel}`);
   }
+  const scoped = scopedRows(baseline, pkg, onlyFile, onlyCall.size > 0 ? onlyCall : undefined);
   for (const line of migrationSummary(
-    scopedRows(baseline, pkg, onlyFile, onlyCall.size > 0 ? onlyCall : undefined),
+    kind === "args" ? rowsOfKind(scoped, "args") : scoped,
     dropped,
     dryRun,
+    kind,
   )) {
     console.log(line);
   }

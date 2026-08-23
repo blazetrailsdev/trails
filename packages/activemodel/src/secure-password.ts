@@ -55,8 +55,15 @@ export function hasSecurePassword(
     get(this: Model) {
       return passwordCache.get(this) ?? null;
     },
-    set(this: Model, value: unknown) {
-      setPassword(this, value, attribute, digestAttr, passwordCache);
+    set(this: Model, unencryptedPassword: unknown) {
+      if (unencryptedPassword === null || unencryptedPassword === undefined) {
+        passwordCache.set(this, null);
+        this._writeAttribute(digestAttr, null);
+      } else if (String(unencryptedPassword) !== "") {
+        passwordCache.set(this, String(unencryptedPassword));
+        const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
+        this._writeAttribute(digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
+      }
     },
     configurable: true,
   });
@@ -106,14 +113,6 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  modelClass.setCallback("initialize", "after", (record: Model) => {
-    if (record._attributes.has(attribute)) {
-      const plaintext = record._readAttribute(attribute);
-      record._attributes.delete(attribute);
-      setPassword(record, plaintext, attribute, digestAttr, passwordCache);
-    }
-  });
-
   if (validations) {
     modelClass.validate((record: Model) => {
       const pwd = passwordCache.get(record);
@@ -149,27 +148,6 @@ export function hasSecurePassword(
       }
     });
   }
-}
-
-function setPassword(
-  instance: Model,
-  value: unknown,
-  attribute: string,
-  digestAttr: string,
-  passwordCache: WeakMap<object, string | null>,
-) {
-  if (value === null || value === undefined) {
-    passwordCache.set(instance, null);
-    instance._writeAttribute(digestAttr, null);
-    return;
-  }
-  const str = String(value);
-  if (str === "") {
-    return;
-  }
-  passwordCache.set(instance, str);
-  const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
-  instance._writeAttribute(digestAttr, bcrypt.hashSync(str, cost));
 }
 
 /**
