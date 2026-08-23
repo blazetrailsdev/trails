@@ -38,6 +38,7 @@ describe("TimeTravelTest", () => {
     expect(Time.now().toS()).toEqual(expectedTime.toS());
     expect(Time.new().toS()).toEqual(expectedTime.toS());
     expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
+    expect(Time.new({ precision: 3 }).toS()).not.toEqual(expectedTime.toS());
     expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
     expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
     expect(currentTime().getUTCFullYear()).toBe(2004);
@@ -49,6 +50,7 @@ describe("TimeTravelTest", () => {
     travelTo(expectedTime, {}, () => {
       expect(Time.now().toS()).toEqual(expectedTime.toS());
       expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(Time.new({ precision: 3 }).toS()).not.toEqual(expectedTime.toS());
       expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
       expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
