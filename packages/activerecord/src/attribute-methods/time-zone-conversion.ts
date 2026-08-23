@@ -141,13 +141,13 @@ export class TimeZoneConverter extends ValueType<unknown> {
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
     const oldInstant =
       oldValue instanceof TimeWithZone
-        ? oldValue.utc()
+        ? oldValue.utc().toTime().toInstant()
         : oldValue instanceof Temporal.Instant
           ? oldValue
           : null;
     const newInstant =
       newValue instanceof TimeWithZone
-        ? newValue.utc()
+        ? newValue.utc().toTime().toInstant()
         : newValue instanceof Temporal.Instant
           ? newValue
           : null;
@@ -177,7 +177,8 @@ export class TimeZoneConverter extends ValueType<unknown> {
   // subtype's serialize (which doesn't understand TimeWithZone) receives plain
   // Instants or timestamps.
   private _resolveForSerialize(value: unknown): unknown {
-    const extractUtc = (v: unknown): unknown => (v instanceof TimeWithZone ? v.utc() : v);
+    const extractUtc = (v: unknown): unknown =>
+      v instanceof TimeWithZone ? v.utc().toTime().toInstant() : v;
     if (Array.isArray(value)) {
       return value.map((v) => (isRangeLike(v) ? mapRange(v, extractUtc) : extractUtc(v)));
     }
@@ -271,7 +272,7 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
     const subMs = zoned.microsecond * 1000 + zoned.nanosecond;
     if (subMs === 0) return base;
     return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
+      Temporal.Instant.fromEpochNanoseconds(base.utc().toTime().epochNanoseconds + BigInt(subMs)),
       zone,
     );
   }

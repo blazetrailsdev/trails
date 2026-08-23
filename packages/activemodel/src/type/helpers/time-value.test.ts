@@ -171,7 +171,7 @@ describe("userInputInTimeZone", () => {
   it("keeps sub-millisecond precision through the zone parse", () => {
     useZone("Eastern Time (US & Canada)", () => {
       const result = userInputInTimeZone("2024-06-15 14:30:00.123456789") as TimeWithZone;
-      expect(result.utc().epochNanoseconds % 1_000_000_000n).toBe(123456789n);
+      expect(result.utc().toTime().epochNanoseconds % 1_000_000_000n).toBe(123456789n);
     });
   });
 

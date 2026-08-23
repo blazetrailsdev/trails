@@ -309,7 +309,7 @@ export const Extensions = {
   },
 
   writeTimeWithZone(twz: TimeWithZone, packer: Packer): void {
-    Extensions.writeTime(twz.utc(), packer);
+    Extensions.writeTime(twz.utc().toTime().toInstant(), packer);
     Extensions.writeTimeZone(twz.timeZone, packer);
   },
 

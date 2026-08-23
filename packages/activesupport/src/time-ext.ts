@@ -421,67 +421,34 @@ interface ChangeOptions {
   offset?: string | number;
 }
 
-/**
- * `::Time.local` (time/calculations.rb:174) — builds a time in the system's
- * local zone, taking Ruby's reversed component order.
- * @internal
- */
-function local(
-  sec: number,
-  min: number,
-  hour: number,
-  day: number,
-  month: number,
-  year: number,
-): Date {
-  const secFloor = Math.floor(sec);
-  const nsec = Math.round((sec - secFloor) * 1_000_000_000);
-  return new Date(year, month - 1, day, hour, min, secFloor, Math.floor(nsec / 1_000_000));
-}
-
 export function change(
   date: Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
 /**
- * A `::Time` receiver answers a `::Time`, as `change` does in Ruby. The
- * components it reads are the ones its `to_time` carries, so the change runs
- * through the shared `ZonedDateTime` arm and is reseated. `Time`'s constructor
- * takes an offset rather than a zone id, so a zoned receiver comes back
- * carrying its offset — Rails' own `elsif zone` arm rebuilds through
- * `::Time.local`, which reseats in the system zone rather than the receiver's,
- * so neither keeps a foreign zone's abbreviation.
+ * A `::Time` receiver answers a `::Time`, as `change` does in Ruby, and takes
+ * the same four terminal arms the Ruby body does — `:offset`, `utc?`, `zone`
+ * and the trailing `utc_offset` one. The `zone.respond_to?(:utc_to_local)` arm
+ * (time/calculations.rb:148-171) selects a receiver whose `zone` is a `TZInfo`
+ * zone OBJECT, which no trails `::Time` is; its second-occurrence correction is
+ * not lost with it, because `::Time.local`'s `isdst` makes the same choice.
  */
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
-  if (date instanceof RubyTime) {
-    const changed = change(date.toTime(), options);
-    return new RubyTime(
-      changed.year,
-      changed.month,
-      changed.day,
-      changed.hour,
-      changed.minute,
-      new Rational(
-        BigInt(changed.second) * 1_000_000_000n +
-          BigInt(
-            changed.millisecond * 1_000_000 + changed.microsecond * 1_000 + changed.nanosecond,
-          ),
-        1_000_000_000n,
-      ),
-      date.isUtc() ? "UTC" : changed.offset,
-    );
-  }
-
   // Ruby reads the components off the receiver; a JS `Date` spells those readers
-  // differently, and reads them in the system's local zone, so widen it to the
-  // one shape both arms below share.
+  // differently, and reads them in the system's local zone, and a `::Time`
+  // spells them on its own zone, so widen both to the one shape the arms below
+  // share.
   const self =
-    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
+    date instanceof Date
+      ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId())
+      : date instanceof RubyTime
+        ? date.toTime()
+        : date;
   const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
 
   const newYear = options.year ?? self.year;
@@ -532,10 +499,37 @@ export function change(
     nanosecond: newNsecOfSec % 1_000,
   };
 
+  const newSecRational = new Rational(
+    BigInt(newComponents.second) * 1_000_000_000n +
+      BigInt(
+        newComponents.millisecond * 1_000_000 +
+          newComponents.microsecond * 1_000 +
+          newComponents.nanosecond,
+      ),
+    1_000_000_000n,
+  );
+
+  // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag; a
+  // JS `Date` carries none and is never `utc?`, even under `TZ=UTC`.
+  const isUtc =
+    date instanceof RubyTime
+      ? date.isUtc()
+      : date instanceof Date
+        ? false
+        : date.timeZoneId === "UTC";
+
+  // `zone` (time/calculations.rb:172) — a `::Time`'s tzdata abbreviation, `nil`
+  // when it was built from an offset; a JS `Date`'s is the system's.
+  const zone =
+    date instanceof RubyTime ? date.zone : date instanceof Date ? Temporal.Now.timeZoneId() : null;
+
   if (newOffset !== null) {
     // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
     // the same fixed-offset zone with the String form only.
+    if (date instanceof RubyTime) {
+      return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSecRational, newOffset);
+    }
     const timeZone =
       typeof newOffset === "number"
         ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(newOffset) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(newOffset) % 3600) / 60)).padStart(2, "0")}`
@@ -544,56 +538,85 @@ export function change(
     return date instanceof Date ? newTime.toInstant() : newTime;
   }
 
-  if (!(date instanceof Date) && self.timeZoneId === "UTC") {
-    // `elsif utc?` (time/calculations.rb:147-148). Ruby's `utc?` is an explicit
-    // flag set by `Time.utc`, never true for a `Time.local` receiver whatever
-    // the host zone is; a JS `Date` carries no such flag and reads back in the
-    // system zone, so it stays off this arm even under `TZ=UTC`.
+  if (isUtc) {
+    // `elsif utc?` (time/calculations.rb:147-148).
+    if (date instanceof RubyTime) {
+      return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSecRational);
+    }
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
-  if (date instanceof Date) {
-    // `elsif zone` (time/calculations.rb:173-174): a JS `Date` carries no zone
-    // object, only the system's local zone, so it lands here rather than on the
-    // `utc_to_local` arm below or the trailing `utc_offset` one.
-    return instantFrom(local(newSec, newMin, newHour, newDay, newMonth, newYear));
+  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:148-171) —
+  // only a `Temporal.ZonedDateTime` carries a zone object to reach it.
+  if (date instanceof Temporal.ZonedDateTime) {
+    let newTime = Temporal.ZonedDateTime.from(
+      { timeZone: date.timeZoneId, ...newComponents },
+      // Ruby's `Time.new` with a zone object picks the first chronological
+      // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
+      { disambiguation: "compatible" },
+    );
+
+    // Some versions of Ruby have a bug where Time.new with a zone object and
+    // fractional seconds will end up with a broken utc_offset.
+    // This is fixed in Ruby 3.3.1 and 3.2.4
+    if (!Number.isInteger(newTime.offsetNanoseconds)) {
+      newTime = newTime.add({ nanoseconds: 0 });
+    }
+
+    // When there are two occurrences of a nominal time due to DST ending,
+    // `Time.new` chooses the first chronological occurrence (the one with a
+    // larger UTC offset). However, for `change`, we want to choose the
+    // occurrence that matches this time's UTC offset.
+    //
+    // If the new time's UTC offset is larger than this time's UTC offset, the
+    // new time might be a first chronological occurrence. So we add the offset
+    // difference to fast-forward the new time, and check if the result has the
+    // desired UTC offset (i.e. is the second chronological occurrence).
+    const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
+    let newTime2: Temporal.ZonedDateTime;
+    if (
+      offsetDifference > 0 &&
+      (newTime2 = newTime.add({ nanoseconds: offsetDifference })).offsetNanoseconds ===
+        date.offsetNanoseconds
+    ) {
+      return newTime2;
+    } else {
+      return newTime;
+    }
   }
 
-  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).
-  let newTime = Temporal.ZonedDateTime.from(
-    { timeZone: date.timeZoneId, ...newComponents },
-    // Ruby's `Time.new` with a zone object picks the first chronological
-    // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
-    { disambiguation: "compatible" },
+  if (zone !== null) {
+    // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
+    // reversed component order, `isdst` picking the occurrence of a wall clock a
+    // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
+    const newTime = RubyTime.local(
+      newSecRational,
+      newMin,
+      newHour,
+      newDay,
+      newMonth,
+      newYear,
+      null,
+      null,
+      date instanceof RubyTime ? date.isdst : null,
+      null,
+    );
+    return date instanceof Date
+      ? Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds)
+      : newTime;
+  }
+
+  // `else ::Time.new(..., utc_offset)` (time/calculations.rb:176-177) — a
+  // `::Time` built from an offset has no zone to answer.
+  return new RubyTime(
+    newYear,
+    newMonth,
+    newDay,
+    newHour,
+    newMin,
+    newSecRational,
+    (date as RubyTime).utcOffset,
   );
-
-  // Some versions of Ruby have a bug where Time.new with a zone object and
-  // fractional seconds will end up with a broken utc_offset.
-  // This is fixed in Ruby 3.3.1 and 3.2.4
-  if (!Number.isInteger(newTime.offsetNanoseconds)) {
-    newTime = newTime.add({ nanoseconds: 0 });
-  }
-
-  // When there are two occurrences of a nominal time due to DST ending,
-  // `Time.new` chooses the first chronological occurrence (the one with a
-  // larger UTC offset). However, for `change`, we want to choose the
-  // occurrence that matches this time's UTC offset.
-  //
-  // If the new time's UTC offset is larger than this time's UTC offset, the
-  // new time might be a first chronological occurrence. So we add the offset
-  // difference to fast-forward the new time, and check if the result has the
-  // desired UTC offset (i.e. is the second chronological occurrence).
-  const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
-  let newTime2: Temporal.ZonedDateTime;
-  if (
-    offsetDifference > 0 &&
-    (newTime2 = newTime.add({ nanoseconds: offsetDifference })).offsetNanoseconds ===
-      date.offsetNanoseconds
-  ) {
-    return newTime2;
-  } else {
-    return newTime;
-  }
 }
 
 // ---------------------------------------------------------------------------

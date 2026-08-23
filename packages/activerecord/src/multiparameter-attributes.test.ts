@@ -284,7 +284,7 @@ describe("MultiParameterAttributeTest", () => {
           // awareAttributes wraps as TimeWithZone at runtime; declared type is Instant|PlainDateTime
           const twz = (topic as any).written_on as TimeWithZone;
           expect(twz).toBeInstanceOf(TimeWithZone);
-          expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(23); // PDT: local 16:24 → UTC 23:24
+          expect(twz.utc().toTime().hour).toBe(23); // PDT: local 16:24 → UTC 23:24
           expect(twz.hour).toBe(16); // wall-clock in zone
         },
       );

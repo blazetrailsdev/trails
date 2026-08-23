@@ -86,7 +86,7 @@ function compare(dateOrTime: Comparable, other: Comparable): number {
 function toInstant(dateOrTime: Comparable): Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
-  if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc();
+  if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
   return dateOrTime.toZonedDateTime("UTC").toInstant();
 }

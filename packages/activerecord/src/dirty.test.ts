@@ -205,9 +205,9 @@ describe("DirtyTest", () => {
       pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 24 }), zone);
       expect(pirate.attributeChanged("created_on")).toBe(true);
       expect(pirate.attributeWas("created_on")).toBeInstanceOf(TimeWithZone);
-      expect((pirate.attributeWas("created_on") as TimeWithZone).utc().epochMilliseconds).toBe(
-        oldCreatedOn.utc().epochMilliseconds,
-      );
+      expect(
+        (pirate.attributeWas("created_on") as TimeWithZone).utc().toTime().epochMilliseconds,
+      ).toBe(oldCreatedOn.utc().toTime().epochMilliseconds);
       pirate.created_on = oldCreatedOn;
       expect(pirate.attributeChanged("created_on")).toBe(false);
     });
@@ -838,7 +838,7 @@ describe("DirtyTest", () => {
 
       const topic = (await Target.create({ written_on: writtenOn })) as Rec;
       topic.written_on = new TimeWithZone(
-        (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
+        (topic.written_on as TimeWithZone).utc().toTime().toInstant().add({ milliseconds: 300 }),
         zone,
       );
 
