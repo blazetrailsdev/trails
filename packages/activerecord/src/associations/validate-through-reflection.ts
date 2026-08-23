@@ -41,8 +41,6 @@ export function validateThroughReflection(modelClass: typeof Base, assocName: st
     | null
     | undefined;
   if (!refl) return;
-  // Re-throw a previously-cached validation error so a caller that
-  // catches it can't sneak past validation on a retry.
   if (refl[CHECKED_ERROR] !== undefined) throw refl[CHECKED_ERROR];
   if (refl[CHECKED_OK]) return;
   // `AbstractReflection#checkValidityBang` (reflection.ts:743) only
@@ -54,10 +52,6 @@ export function validateThroughReflection(modelClass: typeof Base, assocName: st
   const isThrough = typeof refl.isThroughReflection === "function" && refl.isThroughReflection();
   if (!isThrough || typeof refl.checkValidityBang !== "function") return;
 
-  // Delegate to `ThroughReflection#checkValidityBang`. Cache the
-  // outcome on the reflection: success short-circuits future calls;
-  // failure stashes the error and re-throws on every call so a
-  // misconfiguration always surfaces, even after a catch.
   try {
     refl.checkValidityBang();
     refl[CHECKED_OK] = true;

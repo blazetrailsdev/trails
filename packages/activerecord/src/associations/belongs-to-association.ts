@@ -88,14 +88,6 @@ export class BelongsToAssociation extends SingularAssociation {
    * to point to the new record.
    */
   override inversedFrom(record: Base | null): void {
-    // Make the assigned record available to `foreignKeyNames()` before
-    // `replaceKeys` derives the FK columns: its composite-PK branch reads the
-    // PK off the in-hand target instance (see `foreignKeyNames`), and without
-    // a set target it falls back to `this.klass`, forcing a registry resolve of
-    // the target class during pure inverse wiring (the has_many `<<`/push and
-    // readonly-collection paths route here via `_cacheSingularTarget`, where
-    // the class need not be registered). `super.inversedFrom` re-assigns the
-    // target and snapshots stale state; assigning early is otherwise inert.
     if (record) this.target = record;
     this.replaceKeys(record);
     super.inversedFrom(record);
@@ -231,8 +223,6 @@ export class BelongsToAssociation extends SingularAssociation {
     );
   }
 
-  // --- Protected ---
-
   protected override replace(record: Base | null): void {
     if (record) {
       this.raiseOnTypeMismatchBang(record);
@@ -257,8 +247,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const fks = this.foreignKeyNames();
     if (fks.length !== 1) return null;
     return typeof (this.owner as any)._readAttribute === "function"
-      ? // Rails passes `{ |n| owner.send(:missing_attribute, n, caller) }` — a
-        // known-but-unselected FK column raises MissingAttributeError.
+      ? // Rails: `owner.send(:missing_attribute, n, caller)` (belongs_to_association.rb:165).
         (this.owner as any)._readAttribute(fks[0], (n: string) => {
           throw new MissingAttributeError(
             `missing attribute '${n}' for ${(this.owner.constructor as { name?: string }).name ?? "unknown"}`,
@@ -342,8 +331,6 @@ export class BelongsToAssociation extends SingularAssociation {
       return value != null;
     });
   }
-
-  // --- Private helpers ---
 
   private foreignKeyName(): string {
     const fk = this.reflection.foreignKey ?? `${underscore(this.reflection.name)}_id`;

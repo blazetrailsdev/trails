@@ -60,8 +60,6 @@ export class HasAndBelongsToMany {
 
       /** @internal */
       static get tableName(): string {
-        // Table name needs to be resolved lazily
-        // because RHS class might not have been loaded
         return (tableName ??= this.tableNameResolver());
       }
 

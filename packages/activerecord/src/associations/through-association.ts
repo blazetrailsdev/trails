@@ -78,9 +78,6 @@ export function sourceReflection(assoc: { owner: Base; reflection: { name: strin
  * @internal
  */
 export function throughReflection(this: ThroughAssociationHost): unknown {
-  // Resolve the rich reflection first — this.reflection is the
-  // AssociationDefinition (no throughReflection getter), so we need
-  // ThroughReflection#throughReflection from the registry.
   type Refl = {
     throughReflection?: Refl | null;
     isThroughReflection?: () => boolean;

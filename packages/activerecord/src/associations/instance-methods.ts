@@ -32,7 +32,6 @@ import {
  */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
-  // A reflection's `type` is the polymorphic `*_type` column, not the macro.
   switch (assocDef.macro ?? assocDef.type) {
     case "belongsTo":
       if (opts.polymorphic) return new BelongsToPolymorphicAssociation(this, assocDef as any);
@@ -51,42 +50,20 @@ export function _buildAssociationInstance(this: Base, assocDef: AssocDef): Assoc
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  // Optional call: `_associationInstances` also holds minimal ad-hoc holders
-  // for undeclared inverses (`associations.ts`'s literal, seed-association-cache)
-  // that implement only `target` / `isLoaded` / `setTarget`. Those are singular
-  // by construction, so falling through is right.
   if ((instance as { isCollection?(): boolean }).isCollection?.()) {
-    // One seat since RFC 0022's fold: the proxy writes `@loaded` on this very
-    // instance, so read it here rather than back off the proxy (which resolves
-    // its seat through this function).
     if (instance.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
     return;
   }
-  // Reads the loaded target through the association cache
-  // (`Base#_associationCache`): a loaded collection proxy's canonical target
-  // array or a loaded singular holder's target. A cached "nil association"
-  // surfaces as `null` (not `undefined`), so the `!== undefined` guard still
-  // marks the instance loaded — matching `Association#doFindTarget`. When the
-  // cache *is* this very instance (a loaded singular holder caches itself),
-  // there is nothing to copy.
   const cached = this._associationCache(name);
   if (cached === instance) return;
   if (cached !== undefined) {
     if (instance.isLoaded()) {
-      // The stale state was captured at actual load time; re-snapshotting via
-      // loadedBang (inside setTarget) after a FK change would reset the
-      // detector and mask stale-target detection. Update the target directly
-      // without re-marking loaded.
       instance._writeTargetStore((cached.target as Base | Base[] | null) ?? null);
     } else {
       instance._setTargetFromLoader((cached.target as Base | Base[] | null) ?? null);
     }
     return;
   }
-  // Route through the real holder (`_preloadedHolderTarget`) so an
-  // eagerly-preloaded "nil association" (or empty collection) still marks the
-  // instance loaded — the boxed `{ value }` distinguishes a preloaded-nil from
-  // a miss, matching `Association#doFindTarget`'s cache semantics.
   const preloaded = _preloadedHolderTarget(this, name);
   if (preloaded) {
     instance._setTargetFromLoader(preloaded.value as any);
@@ -121,8 +98,6 @@ function assertSingularAssociation(
   return assocDef;
 }
 
-// Explicit `loadBelongsTo` / `loadHasOne` calls are legitimate lazy loads —
-// the caller asked for them — so they skip the strict-loading throw.
 async function bypassStrictLoading<T>(this: Base, fn: () => Promise<T>): Promise<T> {
   this._strictLoadingBypassCount += 1;
   try {
@@ -147,9 +122,6 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const ctor = this.constructor as typeof Base;
-  // A subclass that overrides an inherited association appends its own
-  // definition after the cloned parent entry, so the most-derived override
-  // is the *last* match — mirroring `_reflections` (keyed, override-wins).
   const assocDef = ctor._associations
     ?.slice()
     .reverse()

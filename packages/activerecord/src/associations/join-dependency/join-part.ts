@@ -128,8 +128,6 @@ export abstract class JoinPart {
   extractRecord(row: Record<string, unknown>, aliases: string): Record<string, unknown> {
     const record: Record<string, unknown> = {};
 
-    // Check for JoinDependency-style aliases (t{n}_r{n}) first, since
-    // the prefix `t1_` would falsely match generic prefix matching
     const indexMatch = aliases.match(/^t(\d+)$/);
     if (indexMatch) {
       const pattern = new RegExp(`^t${indexMatch[1]}_r(\\d+)$`);
@@ -149,7 +147,6 @@ export abstract class JoinPart {
       if (matched) return record;
     }
 
-    // Generic prefix matching: keys in the form `${aliases}_<attr>`
     const prefix = `${aliases}_`;
     for (const [key, value] of Object.entries(row)) {
       if (key.startsWith(prefix)) {

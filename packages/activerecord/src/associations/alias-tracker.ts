@@ -7,8 +7,6 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
 
-// DatabaseLimits' table_alias_length defaults to max_identifier_length; use the
-// abstract default directly (the free tableAliasLength now dispatches via `this`).
 const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
 /**
@@ -166,16 +164,13 @@ export class AliasTracker {
     tableName = (tableName ?? arelTable.name ?? String(arelTable)) as string;
 
     if (this._getCount(tableName) === 0) {
-      // If it's zero, we can have our table_name
       this.aliases.set(tableName, 1);
       if (arelTable.name !== tableName && typeof arelTable.alias === "function") {
         arelTable = arelTable.alias(tableName);
       }
     } else {
-      // Otherwise, we need to use an alias
       let aliasedName = this.tableAliasFor(block());
 
-      // Update the count
       const count = this._getCount(aliasedName) + 1;
       this.aliases.set(aliasedName, count);
 

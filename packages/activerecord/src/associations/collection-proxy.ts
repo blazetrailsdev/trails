@@ -31,11 +31,6 @@ import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 // via load(), so T[] is the correct contract for await semantics.
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
-  // Thenable — makes CollectionProxy awaitable. Delegates to `load()`,
-  // which both returns the loaded records AND hydrates `_target`, so
-  // subsequent sync ops (`proxy.target.length`, `proxy[0]`, iteration)
-  // work after a single `await proxy`. Wired at the bottom of the file
-  // via `applyThenable(CollectionProxy.prototype, "load")`.
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
@@ -84,13 +79,6 @@ export type AssociationProxy<
 > = CollectionProxy<T> &
   DelegatedRelationMethods<T> &
   TExtensions & {
-    // Numeric indexing — `proxy[0]` reads the loaded target via the
-    // `wrapCollectionProxy` `get` trap. Lives on AssociationProxy (not
-    // raw CollectionProxy) because the runtime support comes from the
-    // JS Proxy wrapper. A bare `new CollectionProxy(...)` does NOT
-    // support indexing — you'd get `undefined` at runtime.
-    // Out-of-range / unloaded indices return `undefined`, matching
-    // `Array<T>[i]` semantics under TS's standard lib.
     readonly [index: number]: T | undefined;
   };
 
@@ -199,9 +187,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private set _replacedOrAddedTargets(value: Set<T>) {
     this._targetAssociation._replacedOrAddedTargets = value as Set<Base>;
   }
-  // The JS Proxy wrapper returned by association() — methods that return
-  // `self` (push / concat / append) hand this back so callers get the same
-  // object they hold, since `this` is the raw target, not the wrapper.
   private _proxySelf?: this;
 
   /**
@@ -386,7 +371,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
-    // Prefer the rich reflection's klass so namespace-relative resolution applies.
     const targetModel = CollectionProxy._targetModelFor(record, assocName, assocDef);
     super(targetModel, targetModel.arelTable);
     this._record = record;
@@ -404,8 +388,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `scope.extending! reflection.extensions` (association_scope.rb:28).
     const extensions = this._targetAssociation.extensions;
     if (extensions.length > 0) {
-      // `self` in an extension body answers a named scope through
-      // `method_missing` on the extended proxy; the scope proxy is that lookup.
       const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
       for (const mod of extensions) {
         if (typeof mod === "function") {
@@ -533,9 +515,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (collection_association.rb:274).
     this._target = this._collectionAssociation().mergeTargetLists(results, this._target) as T[];
     this._targetLoaded = true;
-    // Snapshot the owner's `@stale_state` NOW (while owner FKs still reflect
-    // the load time). Letting it happen later — after a FK change — would
-    // capture the wrong state and mask the staleness.
     this._staleWrapper()?.loadedBang?.();
     return this._target;
   }
@@ -697,7 +676,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * callbacks all land on this proxy too.
    */
   async push(...records: T[]): Promise<Omit<this, "then"> | false> {
-    // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
       return stripThenable(this._proxySelf ?? this);
@@ -972,11 +950,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   override reset(): this {
-    // Call Relation.reset() so inherited query state (_records,
-    // _loaded, _loadToken, _futureResult) is cleared alongside the
-    // association-specific target cache. Without super, callers using
-    // Relation#load() / Relation#loadAsync() patterns on the proxy
-    // would see stale results after reset.
     super.reset();
     this._targetLoaded = false;
     this._target = [];
@@ -1355,17 +1328,8 @@ for (const name of delegateMethods) {
   });
 }
 
-// Route `await proxy` through `load()` (not `toArray`) so the thenable
-// also hydrates `_target` — matches the documented contract that
-// `await proxy; proxy[0]` / `proxy.target.length` work after a single await.
-// `toArray()` stays available for callers who want a fresh array
-// without hydrating this proxy's `_target` / `_loaded` (it still goes
-// through `findTarget`, which syncs into the record's association
-// instance cache — only this proxy's local cache is left untouched).
 applyThenable(CollectionProxy.prototype, "load");
 
-// Register the constructor so associations.ts can late-bind (it can't
-// value-import CP at module init without re-entering the cycle).
 _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
 );

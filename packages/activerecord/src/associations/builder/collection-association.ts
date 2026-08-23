@@ -69,8 +69,6 @@ export class CollectionAssociation extends Association {
     // Rails: `return if callback_values.empty? && !method_defined`
     if (callbackValues.length === 0) {
       if (!isMethodDefined) return;
-      // Inherited but redefining without callbacks — shadow with own [] so the
-      // subclass doesn't inherit the parent's callback list.
       if (!Object.prototype.hasOwnProperty.call(model, fullCallbackName)) {
         model[fullCallbackName] = [];
       }
@@ -102,9 +100,6 @@ export class CollectionAssociation extends Association {
     const prior = Array.isArray(existing) ? existing : [];
     model[fullCallbackName] = [...prior, ...normalized];
 
-    // Also store normalized callbacks in the association options so
-    // `CollectionAssociation#callback`'s `callbacksFor` fallback (which reads
-    // options.beforeAdd etc.) finds them
     const assocs: any[] = model._associations ?? [];
     const assocDef = assocs.find((a: any) => a.name === name);
     if (assocDef) {
@@ -140,8 +135,6 @@ export class CollectionAssociation extends Association {
       });
     }
 
-    // `<singularized>Ids` reader stays as before (not a collection of
-    // records — just the FK list).
     const idsName = `${singularize(name)}Ids`;
     if (!(idsName in mixin)) {
       Object.defineProperty(mixin, idsName, {

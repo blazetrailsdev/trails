@@ -56,8 +56,6 @@ export class Preloader {
       associateByDefault: this.associateByDefault,
       scope: this.scope,
     });
-    // An array is the final record set; a Relation is materialized lazily by
-    // `materialize()`, driven from the `isEmpty()` check in `Batch`.
     this._materialized = !isRelation(this.records);
     if (this._materialized) {
       this._tree.setPreloadedRecords(this.records as Base[]);

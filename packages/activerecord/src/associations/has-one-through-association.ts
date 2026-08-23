@@ -131,9 +131,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  protected override async detachDisplacedTarget(): Promise<void> {
-    // no-op — see JSDoc
-  }
+  protected override async detachDisplacedTarget(): Promise<void> {}
 
   /**
    * Runs the DB half of Rails' `create_through_record`
@@ -409,18 +407,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         } else {
           this._pendingReplace = { record, previousTarget: null };
         }
-        // The just-built in-memory join record masks any UNLOADED pre-existing
-        // DB row, so `persistReplace` must reset the proxy and re-read from the
-        // DB. Only this branch needs that — the already-loaded reconcile keeps
-        // the proxy's memoized target intact.
         this._pendingUnloadedThroughReconcile = true;
-        // Suppress the general has_one autosave from independently persisting the
-        // just-built join row (which would double-write against the existing DB
-        // row): a truthy `_pendingReplace` marker on the through proxy makes
-        // `autosaveHasOne` skip it. The through proxy is a plain has_one with no
-        // `persistReplace`, so `flushPendingReplaces` never invokes the marker —
-        // our `persistReplace` is the sole persister, regardless of the order
-        // `flushPendingReplaces` visits associations.
         const tp = throughProxy as {
           _pendingReplace?: { record: Base | null; previousTarget: Base | null } | null;
         };
@@ -460,11 +447,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   async persistReplace(save = true): Promise<void> {
     const pending = this._pendingReplace;
-    // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
-    // The new awaitable `writer` (inherited from HasOneAssociation) makes this
-    // path reachable concurrently (`await writer(a); await writer(b)`); without
-    // the early clear a second `replace` would mutate the shared `_pendingReplace`
-    // object still captured by reference in this call's `pending`.
     this._pendingReplace = null;
     // Only when we built a fresh in-memory join record over an UNLOADED
     // pre-existing row (else-branch reconcile): reset the through proxy so
@@ -526,8 +508,6 @@ async function createThroughRecord(
   }
 
   if (record) {
-    // Mutability is enforced inside constructJoinAttributes — keep the
-    // precondition in one place.
     const attrs = this.constructJoinAttributes(record);
 
     if (throughRecord) {

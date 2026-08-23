@@ -160,14 +160,10 @@ export class ThroughAssociation extends Association {
           if (!(chainRefl as any).isPolymorphic?.()) {
             try {
               sourceClasses.push(chainRefl.klass);
-            } catch {
-              /* polymorphic */
-            }
+            } catch {}
           }
         }
-      } catch {
-        /* chain resolution may fail */
-      }
+      } catch {}
     }
 
     const seen = new Set<typeof Base>();
@@ -304,15 +300,11 @@ export class ThroughAssociation extends Association {
 
     const whereClause = reflScope?.whereClause;
     if (options.sourceType) {
-      // scope.where!(reflection.foreign_type => source_type) (rb:115-116)
       const foreignType = (this.reflection as any).foreignType;
       if (foreignType) {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
     } else if (reflScope != null && whereClause != null && !whereClause.isEmpty()) {
-      // elsif !reflection_scope.where_clause.empty? (rb:117-143): copy the FULL
-      // where_clause onto the through query and JOIN the source reflection so
-      // every referenced column resolves in this single query.
       const sourceRefl = this.sourceReflection;
       if (sourceRefl) {
         // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
@@ -376,14 +368,11 @@ export class ThroughAssociation extends Association {
           scope = scope.joins({ [sourceName]: nestedJoins });
         }
 
-        // left_outer_joins!(source_reflection.name => left_outer_joins) (rb:136-137).
         const nestedLeftOuter: any[] = reflScope?.leftOuterJoinsValues ?? [];
         if (nestedLeftOuter.length > 0) {
           scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
         }
 
-        // scope.eager_loading? && order (rb:139-141): true here since we always
-        // includes! the source above.
         const orderClauses: any[] = reflScope?.orderValues ?? [];
         if (orderClauses.length > 0) {
           scope.orderValues = [...scope.orderValues, ...orderClauses];
@@ -391,8 +380,6 @@ export class ThroughAssociation extends Association {
       }
     }
 
-    // cascade_strict_loading: a strict-loading preload scope propagates to the
-    // through query so intermediate records inherit the constraint (rb:145).
     return this.cascadeStrictLoading(scope);
   }
 
@@ -429,9 +416,7 @@ export class ThroughAssociation extends Association {
       let throughKlass: typeof Base | null = null;
       try {
         throughKlass = throughRefl.klass;
-      } catch {
-        // klass resolution may fail for polymorphic reflections
-      }
+      } catch {}
       if (throughKlass) {
         for (const sourceName of sourceNames) {
           if (!sourceName) continue;

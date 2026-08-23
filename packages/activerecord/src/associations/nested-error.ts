@@ -58,8 +58,6 @@ export class NestedError extends ActiveModelNestedError {
       innerError,
     });
     const name = association.reflection.name;
-    // isCollection: check the Association method if available, otherwise infer
-    // from whether target is an array (CollectionProxy always has array target).
     const isCollection =
       typeof association.isCollection === "function"
         ? association.isCollection()
