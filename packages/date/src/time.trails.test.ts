@@ -8,9 +8,14 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Rational } from "./date.js";
-import { Time } from "./time.js";
+import { Time, resetLocalTimeZoneId } from "./time.js";
 
 describe("Time", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetLocalTimeZoneId();
+  });
+
   it("Time.utc builds a UTC time", () => {
     const time = Time.utc(2008, 3, 1, 6, 0, 0);
     expect(time.zone).toBe("UTC");
@@ -19,6 +24,7 @@ describe("Time", () => {
 
   it("Time.at builds a local time from the seconds since the Epoch", () => {
     vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
+    resetLocalTimeZoneId();
     expect(Time.at(946684800).strftime("%Y-%m-%d %H:%M:%S %z")).toBe("2000-01-01 00:00:00 +0000");
     expect(Time.at(Number("946684800.123456789")).nsec).toBe(123456835);
     expect(Time.at(946684800, 123456.789).nsec).toBe(123456789);
@@ -216,10 +222,12 @@ describe("Time", () => {
   describe("in a local zone `Intl` has no abbreviation for", () => {
     afterEach(() => {
       vi.restoreAllMocks();
+      resetLocalTimeZoneId();
     });
 
     function inZone(timeZoneId: string): void {
       vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue(timeZoneId);
+      resetLocalTimeZoneId();
     }
 
     it("Time#zone answers the tzdata abbreviation, not Intl's short name", () => {

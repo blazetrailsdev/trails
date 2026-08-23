@@ -2,22 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_reader",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `target.empty?` (collection_association.rb:54) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
     "rubyName": "replace",
     "call": "transaction",
     "reason": "Rails wraps `replace_records` in `transaction` (collection_association.rb:251); the synchronous writer path returns a ReplacePlan and opens the transaction in `persistReplacePlan` (collection-association.ts:775-791)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "size",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `target.empty?` / `association_scope.group_values.empty?` (collection_association.rb:214, :216) are `.length === 0` property reads, which the gate deliberately does not credit as calls (JS_ENUMERABLE_ALIASES, RFC 0092)."
   }
 ]

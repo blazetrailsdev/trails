@@ -44,7 +44,6 @@ import {
 } from "./postgresql/type-map-init.js";
 import { Timestamp } from "./postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "./postgresql/oid/timestamp-with-time-zone.js";
-import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
@@ -2303,75 +2302,13 @@ export class PostgreSQLAdapter
    * The trailing `" for:"` belongs only to `ActiveRecord::Explain`'s fallback
    * for adapters that do not define `build_explain_clause`
    * (`explain.rb:56-61`) — an adapter that defines it must not append it.
-   * PG accepts the boolean flags in `EXPLAIN_FLAGS` plus a `format` keyword
-   * (`{ format: "json" }`): `EXPLAIN (ANALYZE, FORMAT JSON)`.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_explain_clause
    * (postgresql/database_statements.rb:96-100)
    */
   async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN";
-    const parts = this._validateExplainOptions(options);
-    return `EXPLAIN (${parts.join(", ")})`;
-  }
-
-  /**
-   * Boolean PG EXPLAIN flags. Rails' `PostgreSQL::DatabaseStatements#explain`
-   * accepts the Symbols `:analyze :verbose :costs :buffers :settings
-   * :wal :timing :summary`; `format` is handled separately as a
-   * key/value hash entry (`{ format: "json" }`) because it requires a
-   * value.
-   */
-  private static readonly EXPLAIN_FLAGS = new Set([
-    "analyze",
-    "verbose",
-    "costs",
-    "buffers",
-    "settings",
-    "wal",
-    "timing",
-    "summary",
-  ]);
-
-  /**
-   * Allowed values for the `format` keyword option. PG supports
-   * `TEXT` (default), `XML`, `JSON`, `YAML` — see
-   * https://www.postgresql.org/docs/current/sql-explain.html.
-   * Values come from user code via `Relation#explain(...)`, so
-   * interpolation has to be allowlisted.
-   */
-  private static readonly EXPLAIN_FORMATS = new Set(["text", "xml", "json", "yaml"]);
-
-  private _validateExplainOptions(options: ExplainOption[]): string[] {
-    const parts: string[] = [];
-    let seenFormat = false;
-    for (const o of options) {
-      if (typeof o === "string") {
-        const key = o.toLowerCase();
-        if (!PostgreSQLAdapter.EXPLAIN_FLAGS.has(key)) {
-          throw new Error(`Unknown PostgreSQL EXPLAIN option: ${o}`);
-        }
-        parts.push(key.toUpperCase());
-        continue;
-      }
-      if (!o || typeof o !== "object" || typeof o.format !== "string") {
-        throw new Error(
-          `Unknown PostgreSQL EXPLAIN option: ${inspectExplainOption(o)} (expected a string flag or an object with a string 'format')`,
-        );
-      }
-      if (seenFormat) {
-        throw new Error("PostgreSQL EXPLAIN accepts at most one FORMAT option");
-      }
-      const fmt = o.format.toLowerCase();
-      if (!PostgreSQLAdapter.EXPLAIN_FORMATS.has(fmt)) {
-        throw new Error(
-          `Unknown PostgreSQL EXPLAIN format: ${o.format}. Allowed: text, xml, json, yaml.`,
-        );
-      }
-      parts.push(`FORMAT ${fmt.toUpperCase()}`);
-      seenFormat = true;
-    }
-    return parts;
+    return `EXPLAIN (${options.join(", ").toUpperCase()})`;
   }
 
   // Mirrors: PostgreSQLAdapter.native_database_types (postgresql_adapter.rb:404)

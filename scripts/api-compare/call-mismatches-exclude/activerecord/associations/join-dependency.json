@@ -2,22 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
-    "rubyName": "apply_column_aliases",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `relation.select_values.empty?` (join_dependency.rb:154) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
     "rubyName": "instantiate",
     "call": "match?",
     "reason": "Verified per-site (RFC 0106 wave 4g): `/\\At\\d+_r\\d+\\z/.match?(name)` (join_dependency.rb:121) is Rails' heuristic for \"is this column one of the join aliases\". trails already holds the exact alias set the aliases object emitted, so `instantiate` tests `aliasSet.has(key)` (join-dependency.ts:738) instead of re-deriving it from the alias spelling. Same partition of the result columns, no regex to match against."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
-    "rubyName": "walk",
-    "call": "map",
-    "reason": "Verified per-site (RFC 0106 wave 4g): `right.children.map { [left.children.find {...}, node1] }.partition(&:first)` (join_dependency.rb:215-217). JS has no `Enumerable#partition`, so the `map` that only exists to feed it is fused into the partitioning `for..of` that fills `intersection`/`missing` directly (join-dependency.ts:455-458) — the pair array Ruby materializes has no reader other than `partition`."
   }
 ]

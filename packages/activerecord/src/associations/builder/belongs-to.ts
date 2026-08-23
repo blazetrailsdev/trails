@@ -132,6 +132,11 @@ export class BelongsTo extends SingularAssociation {
     return { [pk]: fkValue };
   }
 
+  /**
+   * @missingRailsCall first — PERMANENT: Ruby Array#first on the [old, new]
+   *   change pair: `changes[foreign_key].first` (builder/belongs_to.rb:45) ports
+   *   to `change[0]`.
+   */
   static async touchRecord(
     record: any,
     changes: Record<string, unknown>,
@@ -306,6 +311,12 @@ export class BelongsTo extends SingularAssociation {
     });
   }
 
+  /**
+   * @missingRailsCall delete — PERMANENT: Ruby Hash#delete returns the DELETED
+   *   value: `!reflection.options.delete(:required)` (builder/belongs_to.rb:115)
+   *   ports to reading `options.required` and then `delete options.required` —
+   *   JS `delete` returns a boolean, so the two steps cannot fold.
+   */
   static override defineValidations(model: any, reflection: any): void {
     const options = reflection.options ?? {};
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toDate, toDatetime, toTime } from "./string/conversions.js";
-import { ArgumentError, Temporal, Time } from "@blazetrails/date";
+import { ArgumentError, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -109,11 +109,15 @@ describe("StringAccessTest", () => {
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
+  // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
+  // to drop it, exactly as `tzset` does.
+  resetLocalTimeZoneId();
   try {
     return fn();
   } finally {
     if (orig === undefined) delete process.env.TZ;
     else process.env.TZ = orig;
+    resetLocalTimeZoneId();
   }
 }
 

@@ -22,4 +22,4 @@ export {
   type DateParts,
   type StrftimeSubject,
 } from "./date.js";
-export { Time } from "./time.js";
+export { Time, resetLocalTimeZoneId } from "./time.js";

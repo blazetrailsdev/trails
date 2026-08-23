@@ -1102,29 +1102,23 @@ export class TimeZone {
   }
 
   /**
-   * Today's date in this timezone.
+   * `today` (time_zone.rb:520-522) — `tzinfo.now.to_date`. `TimeZone#now`
+   * (time_zone.rb:516-518) is the trails seat for `tzinfo.now`: it is the same
+   * wall clock in this zone, reached through `TimeWithZone` rather than a
+   * second `TZInfo::Timezone#now` shim.
    */
-  today(): { year: number; month: number; day: number } {
-    const n = this.now();
-    return { year: n.year, month: n.month, day: n.day };
+  today(): Temporal.PlainDate {
+    return this.now().toDate();
   }
 
-  /**
-   * Tomorrow's date in this timezone.
-   */
-  tomorrow(): { year: number; month: number; day: number } {
-    const t = this.today();
-    const d = new Date(Date.UTC(t.year, t.month - 1, t.day + 1));
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  /** `tomorrow` (time_zone.rb:526-528) — `today + 1`. */
+  tomorrow(): Temporal.PlainDate {
+    return this.today().add({ days: 1 });
   }
 
-  /**
-   * Yesterday's date in this timezone.
-   */
-  yesterday(): { year: number; month: number; day: number } {
-    const t = this.today();
-    const d = new Date(Date.UTC(t.year, t.month - 1, t.day - 1));
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  /** `yesterday` (time_zone.rb:532-534) — `today - 1`. */
+  yesterday(): Temporal.PlainDate {
+    return this.today().subtract({ days: 1 });
   }
 
   /**

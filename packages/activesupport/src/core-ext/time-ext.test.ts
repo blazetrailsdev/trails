@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { ArgumentError } from "../hash-utils.js";
 import {
   nextDay,
@@ -66,6 +66,9 @@ function zoned(
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
+  // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
+  // to drop it, exactly as `tzset` does.
+  resetLocalTimeZoneId();
   try {
     return fn();
   } finally {
@@ -74,6 +77,7 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
     } else {
       process.env.TZ = orig;
     }
+    resetLocalTimeZoneId();
   }
 }
 
@@ -84,6 +88,7 @@ afterEach(() => {
   } else {
     process.env.TZ = savedTZ;
   }
+  resetLocalTimeZoneId();
 });
 
 describe("TimeExtCalculationsTest", () => {

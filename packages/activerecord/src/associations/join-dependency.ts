@@ -449,6 +449,14 @@ export class JoinDependency {
    * right node's table to the left's (`r.table = l.table`) and recursing;
    * missing nodes get fresh constraints under `left`.
    * @internal
+   *
+   * @missingRailsCall map — PERMANENT: Verified per-site (RFC 0106 wave 4g):
+   *   `right.children.map { [left.children.find {...}, node1]
+   *   }.partition(&:first)` (join_dependency.rb:215-217). JS has no
+   *   `Enumerable#partition`, so the `map` that only exists to feed it is fused
+   *   into the partitioning `for..of` that fills `intersection`/`missing`
+   *   directly (join-dependency.ts:455-458) — the pair array Ruby materializes
+   *   has no reader other than `partition`.
    */
   private walk(
     left: JoinPart,
@@ -633,6 +641,14 @@ export class JoinDependency {
    * rest of the projection. The select value is a thunk, as in Rails, so the
    * alias columns are resolved during `build_select` — after `build_joins` has
    * aliased this dependency's nodes against the shared AliasTracker.
+   *
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `relation.select_values.empty?` (join_dependency.rb:154) — `empty?` on a
+   *   Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no
+   *   callee, so no TS call can ever credit the Ruby one. The gate flags it only
+   *   because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`,
+   *   which takes arguments since it gained Rails' `async:` kwarg
+   *   (result.rb:94-100) — nothing in the TS body was dropped.
    */
   applyColumnAliases(relation: any): any {
     this._joinRootAlias = (relation?.selectValues?.length ?? 0) === 0;

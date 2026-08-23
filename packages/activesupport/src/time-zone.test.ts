@@ -6,7 +6,8 @@ import {
 } from "./core-ext/date-and-time/compatibility.js";
 import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
+import { travelTo, travelBack } from "./testing/time-helpers.js";
 
 /** Mirrors `TimeZoneTestHelpers#with_utc_to_local_returns_utc_offset_times`
  * (time_zone_test_helpers.rb:46-52). */
@@ -143,29 +144,64 @@ describe("TimeZoneTest", () => {
   });
 
   it("today", () => {
-    const zone = TimeZone.find("Hawaii")!;
-    const twz = zone.now();
-    expect(twz.year).toBeGreaterThan(2020);
-    expect(twz.month).toBeGreaterThanOrEqual(1);
-    expect(twz.month).toBeLessThanOrEqual(12);
+    try {
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("1999-12-31");
+      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-01");
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-01");
+      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-02");
+    } finally {
+      travelBack();
+    }
   });
 
   it("tomorrow", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const today = zone.today();
-    const tomorrow = zone.tomorrow();
-    const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
-    const tomorrowDate = new Date(Date.UTC(tomorrow.year, tomorrow.month - 1, tomorrow.day));
-    expect(tomorrowDate.getTime() - todayDate.getTime()).toBe(86400000);
+    try {
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
+        "2000-01-01",
+      );
+      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
+        "2000-01-02",
+      );
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
+        "2000-01-02",
+      );
+      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
+        "2000-01-03",
+      );
+    } finally {
+      travelBack();
+    }
   });
 
   it("yesterday", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const today = zone.today();
-    const yesterday = zone.yesterday();
-    const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
-    const yesterdayDate = new Date(Date.UTC(yesterday.year, yesterday.month - 1, yesterday.day));
-    expect(todayDate.getTime() - yesterdayDate.getTime()).toBe(86400000);
+    try {
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
+        "1999-12-30",
+      );
+      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
+        "1999-12-31",
+      );
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
+        "1999-12-31",
+      );
+      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
+        "2000-01-01",
+      );
+    } finally {
+      travelBack();
+    }
   });
 
   it.skip("travel to a date");
