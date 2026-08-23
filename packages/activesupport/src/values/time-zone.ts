@@ -926,6 +926,21 @@ export class TimeZone {
     return new TimeWithZone(instantFrom(this.timeNow()), this);
   }
 
+  /** `today` (time_zone.rb:520-523) — `tzinfo.now.to_date`. */
+  today(): Temporal.PlainDate {
+    return this.tzinfo.now().toDate();
+  }
+
+  /** `tomorrow` (time_zone.rb:525-528) — `today + 1`. */
+  tomorrow(): Temporal.PlainDate {
+    return this.today().add({ days: 1 });
+  }
+
+  /** `yesterday` (time_zone.rb:530-533) — `today - 1`. */
+  yesterday(): Temporal.PlainDate {
+    return this.today().subtract({ days: 1 });
+  }
+
   /**
    * `local(*args)` (time_zone.rb:363-366): build the wall clock with
    * `Time.utc(*args)` and hand it to `TimeWithZone.new(nil, self, time)`, which
@@ -1127,21 +1142,6 @@ export class TimeZone {
   /** `dst?(time)` (time_zone.rb:571-573) — `tzinfo.dst?(time)`. */
   isDst(time: Date | Temporal.Instant): boolean {
     return this.tzinfo.isDst(time);
-  }
-
-  /** `today` (time_zone.rb:520-523) — `tzinfo.now.to_date`. */
-  today(): Temporal.PlainDate {
-    return this.tzinfo.now().toDate();
-  }
-
-  /** `tomorrow` (time_zone.rb:525-528) — `today + 1`. */
-  tomorrow(): Temporal.PlainDate {
-    return this.today().add({ days: 1 });
-  }
-
-  /** `yesterday` (time_zone.rb:530-533) — `today - 1`. */
-  yesterday(): Temporal.PlainDate {
-    return this.today().subtract({ days: 1 });
   }
 
   /**
