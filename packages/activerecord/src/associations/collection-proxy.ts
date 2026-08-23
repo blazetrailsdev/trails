@@ -884,13 +884,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `difference` / `intersection` hooks.
    *
    * The association's `replace` returns `Promise | Base[]` rather than being
-   * `async` (its `syncWrite` caller cannot await, RFC 0068); awaiting either
-   * spelling is the same one-line delegation Rails writes.
+   * `async` (its `syncWrite` caller cannot await, RFC 0068), so the one-line
+   * delegation awaits it; the value is still the association's own, which is
+   * what `test_replace_returns_target`
+   * (test/cases/associations/has_many_associations_test.rb:2688-2698) pins.
    */
-  async replace(otherArray: T[]): Promise<T[]> {
+  async replace(otherArray: T[]): Promise<T[] | undefined> {
     const association = this._collectionAssociation();
-    await association.replace(otherArray);
-    return this._target;
+    return (await association.replace(otherArray)) as T[] | undefined;
   }
 
   /**
