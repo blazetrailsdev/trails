@@ -68,10 +68,7 @@ export function tomorrow(): Temporal.PlainDate {
 /** Mirrors: `Date.current` (`date/calculations.rb:48-50`) */
 export function current(): Temporal.PlainDate {
   const zone = timeZone();
-  if (zone) {
-    const today = zone.today();
-    return new Temporal.PlainDate(today.year, today.month, today.day);
-  }
+  if (zone) return zone.today();
   return Temporal.Now.plainDateISO();
 }
 

@@ -23,13 +23,6 @@
   {
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
-    "rubyName": "today",
-    "call": "to_date",
-    "reason": "`tzinfo.now.to_date` (time_zone.rb:521-523) answers a `::Date`; trails has no `Date` value type on this seam and `today()` returns the `{ year, month, day }` triple its callers (`tomorrow`, `yesterday`) consume, read off `now()`. Converging is the `Date` port, not the missing call."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
     "rubyName": "utc_to_local",
     "call": "utc",
     "reason": "`Time.utc(t.year, ..., t.sec_fraction * 1_000_000)` (time_zone.rb:542-547). trails' non-offset arm rebuilds the same components as a JS `Date` through `Date.UTC`, the seat this method's callers read. Pre-existing: surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was ported and `utc` entered the population."

@@ -722,6 +722,27 @@ export class Timezone {
   }
 
   /**
+   * `TZInfo::Timezone#now` (`tzinfo/timezone.rb`) — `utc_to_local(Time.now.utc)`,
+   * which `TimeZone#today` (time_zone.rb:521-523) calls `to_date` on. As of
+   * tzinfo 2 the result is a local time carrying the observed UTC offset rather
+   * than a zone, so the offset is what the `zone` argument gets. `Time.now`
+   * reaches the same {@link currentTime} `TimeZone#timeNow` does, so a time
+   * travelled to moves the date here as MRI's stubbed `Time.now` moves it there.
+   */
+  now(): Time {
+    const local = this.utcToLocal(currentTime());
+    return new Time(
+      local.year,
+      local.month,
+      local.day,
+      local.hour,
+      local.minute,
+      local.second,
+      Number(local.offsetNanoseconds) / 1_000_000_000,
+    );
+  }
+
+  /**
    * `TZInfo::Timezone#utc_to_local`: as of tzinfo 2 this is the local time
    * carrying a non-zero UTC offset, which a `Temporal.ZonedDateTime` is.
    */
@@ -1101,30 +1122,19 @@ export class TimeZone {
     return this.tzinfo.isDst(time);
   }
 
-  /**
-   * Today's date in this timezone.
-   */
-  today(): { year: number; month: number; day: number } {
-    const n = this.now();
-    return { year: n.year, month: n.month, day: n.day };
+  /** `today` (time_zone.rb:520-523) — `tzinfo.now.to_date`. */
+  today(): Temporal.PlainDate {
+    return this.tzinfo.now().toDate();
   }
 
-  /**
-   * Tomorrow's date in this timezone.
-   */
-  tomorrow(): { year: number; month: number; day: number } {
-    const t = this.today();
-    const d = new Date(Date.UTC(t.year, t.month - 1, t.day + 1));
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  /** `tomorrow` (time_zone.rb:525-528) — `today + 1`. */
+  tomorrow(): Temporal.PlainDate {
+    return this.today().add({ days: 1 });
   }
 
-  /**
-   * Yesterday's date in this timezone.
-   */
-  yesterday(): { year: number; month: number; day: number } {
-    const t = this.today();
-    const d = new Date(Date.UTC(t.year, t.month - 1, t.day - 1));
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  /** `yesterday` (time_zone.rb:530-533) — `today - 1`. */
+  yesterday(): Temporal.PlainDate {
+    return this.today().subtract({ days: 1 });
   }
 
   /**
