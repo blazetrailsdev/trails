@@ -313,20 +313,19 @@ export class HashMerger {
   }
 
   merge(): any {
-    return new Merger(this.relation, this.buildOther()).merge();
+    return new Merger(this.relation, this.other()).merge();
   }
 
   // Rails `HashMerger#other`: build a fresh relation and apply each hash value
   // to it via `public_send("#{k}!", *v)` so where-value interpolation etc.
   // happens on the built relation rather than by directly merging raw values.
-  private buildOther(): any {
+  private other(): any {
     // `Relation.create(relation.model, table:, predicate_builder:)`
-    // (merger.rb:26-30) — trails' constructor takes the same three.
-    const other: any = new Relation(
-      this.relation.model,
-      this.relation.table,
-      this.relation.predicateBuilder,
-    );
+    // (merger.rb:26-30).
+    const other: any = Relation.create(this.relation.model, {
+      table: this.relation.table,
+      predicateBuilder: this.relation.predicateBuilder,
+    });
     for (const [key, value] of Object.entries(this.hash)) {
       // `select` dispatches to `_select!` (Rails renames `:select` → `:_select`
       // to avoid Enumerable#select!); trails mirrors this with `_selectBang`.

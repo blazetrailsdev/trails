@@ -140,7 +140,7 @@ export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
     value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
   }
-  const dt =
+  value =
     value instanceof Temporal.PlainTime
       ? new Temporal.PlainDateTime(
           2000,
@@ -154,7 +154,7 @@ export function quotedTime(value: QuotedTimeValue): string {
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
+  return quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {

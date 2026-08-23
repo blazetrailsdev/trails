@@ -1100,8 +1100,8 @@ export class TimeZone {
    * memoizes (time_with_zone.rb:72-74) and reads `dst?` /
    * `observed_utc_offset` / `abbreviation` off.
    */
-  periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
-    return this.tzinfo.periodForUtc(date);
+  periodForUtc(time: Date | Temporal.Instant): TimezonePeriod {
+    return this.tzinfo.periodForUtc(time);
   }
 
   /**

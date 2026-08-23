@@ -2170,11 +2170,12 @@ export class MigrationContext<
     const fileList = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
-      const [rawVersion, name, scope] = parsed;
-      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(rawVersion)) {
-        throw new InvalidMigrationTimestampError(rawVersion, name);
+      const [, name, scope] = parsed;
+      let version = parsed[0];
+      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
+        throw new InvalidMigrationTimestampError(version, name);
       }
-      const version = SchemaMigration.normalizeMigrationNumber(rawVersion);
+      version = SchemaMigration.normalizeMigrationNumber(version);
       const status = dbList.delete(version) ? ("up" as const) : ("down" as const);
       return { status, version, name: humanize(name + scope) };
     });
@@ -2284,12 +2285,14 @@ export class MigrationContext<
     const migrations = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
-      const [rawVersion, rawName, scope] = parsed;
-      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(rawVersion)) {
-        throw new InvalidMigrationTimestampError(rawVersion, rawName);
+      const scope = parsed[2];
+      let version: string | number = parsed[0];
+      let name = parsed[1];
+      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
+        throw new InvalidMigrationTimestampError(version, name);
       }
-      const version = toInteger(rawVersion);
-      const name = camelize(rawName);
+      version = toInteger(version);
+      name = camelize(name);
       let loaded: Promise<Migration> | undefined;
       return {
         version,

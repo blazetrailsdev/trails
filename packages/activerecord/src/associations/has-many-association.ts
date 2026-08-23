@@ -384,8 +384,9 @@ export class HasManyAssociation extends CollectionAssociation {
     if (reflection.hasActiveCachedCounter()) {
       // has_active_cached_counter? guarantees a counter column, but guard
       // against a null column anyway — `nil.to_i == 0` in Rails.
-      const column = reflection.counterCacheColumn();
-      count = column == null ? 0 : toI((this.owner as any).readAttribute(column));
+      const counterCacheColumn = reflection.counterCacheColumn();
+      count =
+        counterCacheColumn == null ? 0 : toI((this.owner as any).readAttribute(counterCacheColumn));
     } else {
       count = await (this as unknown as CollectionAssociation).scope().count("all");
     }

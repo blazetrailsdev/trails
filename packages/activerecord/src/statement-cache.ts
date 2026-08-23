@@ -211,10 +211,12 @@ export class StatementCache {
     const relation = callable(new Params());
     const arel = typeof relation.arel === "function" ? relation.arel() : relation.arel;
 
-    const [queryBuilder, binds] = connection.cacheableQuery(StatementCache, arel) as [
+    const cacheableQuery = connection.cacheableQuery(StatementCache, arel) as [
       Query | PartialQuery,
       unknown[],
     ];
+    const queryBuilder = cacheableQuery[0];
+    let binds = cacheableQuery[1];
 
     // The prepared path (the Composite collector) already unwraps each collected
     // BindParam to its `.value`; the unprepared PartialQueryCollector path
@@ -222,8 +224,8 @@ export class StatementCache {
     // bound attributes/Substitutes directly — otherwise a concrete bind (e.g.
     // the LIMIT added by find/find_by) reaches the adapter's quote() as a raw
     // BindParam ("can't quote BindParam").
-    const normalizedBinds = binds.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    const bindMap = new BindMap(normalizedBinds);
+    binds = binds.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
+    const bindMap = new BindMap(binds);
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 

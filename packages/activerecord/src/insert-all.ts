@@ -421,8 +421,7 @@ export class InsertAll {
 
   /** @internal */
   private resolveAttributeAliases(): void {
-    const firstInsert = first(this.inserts);
-    if (!firstInsert || !this.hasAttributeAliases(firstInsert)) return;
+    if (!this.hasAttributeAliases(first(this.inserts) ?? {})) return;
     this.inserts = this.inserts.map((insert) => {
       const resolved: Record<string, unknown> = {};
       for (const [attribute, val] of Object.entries(insert)) {

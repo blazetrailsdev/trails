@@ -303,8 +303,11 @@ export class EnumType extends ValueType<string> {
   // maps to its stored value, anything else passes through the subtype's cast
   // (so e.g. the string "true" type-casts to boolean `true` for a query).
   serialize(value: unknown): number | string | boolean | null {
-    const mapped = this._mapping.fetch(value as string, value as EnumValue);
-    return this._subtypeType.serialize(mapped) as number | string | boolean | null;
+    return this._subtypeType.serialize(this._mapping.fetch(value as string, value as EnumValue)) as
+      | number
+      | string
+      | boolean
+      | null;
   }
 
   // The in-memory value is the label string; the database value is the mapped
@@ -318,8 +321,10 @@ export class EnumType extends ValueType<string> {
 
   // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
-    const mapped = this._mapping.fetch(value as string, value as EnumValue);
-    return this._subtypeType.isSerializable(mapped, block);
+    return this._subtypeType.isSerializable(
+      this._mapping.fetch(value as string, value as EnumValue),
+      block,
+    );
   }
 
   assertValidValue(value: unknown): void {

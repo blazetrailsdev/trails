@@ -410,7 +410,7 @@ export class ConnectionHandler {
   /** @internal */
   private resolvePoolConfig(
     config: DatabaseConfig | string | Record<string, unknown>,
-    ownerName: ConnectionDescriptor | ConnectionOwner,
+    connectionName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
   ): PoolConfig {
@@ -419,6 +419,6 @@ export class ConnectionHandler {
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
-    return new PoolConfig(ownerName, dbConfig, role, shard);
+    return new PoolConfig(connectionName, dbConfig, role, shard);
   }
 }

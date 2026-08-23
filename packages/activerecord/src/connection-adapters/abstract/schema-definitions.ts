@@ -1734,8 +1734,8 @@ export class Table {
     return this._schema.indexExists(this.name, columnName, options);
   }
 
-  async renameIndex(oldName: string, newName: string): Promise<void> {
-    return this._schema.renameIndex(this.name, oldName, newName);
+  async renameIndex(indexName: string, newIndexName: string): Promise<void> {
+    return this._schema.renameIndex(this.name, indexName, newIndexName);
   }
 
   async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {

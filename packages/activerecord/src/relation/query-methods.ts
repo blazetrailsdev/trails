@@ -2806,25 +2806,25 @@ export function arelColumn(
   // default through as the literal it sums over, and `async_sum`'s nil one
   // (calculations.rb:182) as `""`, the empty `SUM()`.
   const isSymbol = isRubySymbol(field);
-  let fieldStr = isSymbol ? symbolToName(field) : field == null ? "" : String(field);
-  fieldStr = modelClass?.attributeAliases?.[fieldStr] ?? fieldStr;
+  field = isSymbol ? symbolToName(field as string) : field == null ? "" : String(field);
+  field = (modelClass?.attributeAliases?.[field] as string | undefined) ?? field;
 
   const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;
 
-  if (modelClass?.columnsHash?.()[fieldStr] && (!from || isTableNameMatches.call(this, from))) {
+  if (modelClass?.columnsHash?.()[field] && (!from || isTableNameMatches.call(this, from))) {
     const table: any = this.table;
-    return table.get(fieldStr);
+    return table.get(field);
   }
-  const dotMatch = fieldStr.match(/^(?<table>(?:\w+\.)?\w+)\.(?<column>\w+)$/);
+  const dotMatch = field.match(/^(?<table>(?:\w+\.)?\w+)\.(?<column>\w+)$/);
   if (dotMatch) {
     return arelColumnWithTable.call(this, dotMatch.groups!.table, dotMatch.groups!.column);
   }
-  if (fallback) return fallback(fieldStr);
+  if (fallback) return fallback(field);
   // Ruby `Arel.sql(is_symbol ? quote_table_name(field) : field)`
   // (query_methods.rb:2005): a Symbol names a column and is quoted; a String is
   // raw SQL and is not.
-  const quoted = isSymbol ? connectionFor(modelClass).quoteTableName(fieldStr) : fieldStr;
+  const quoted = isSymbol ? connectionFor(modelClass).quoteTableName(field) : field;
   return Arel.sql(quoted);
 }
 

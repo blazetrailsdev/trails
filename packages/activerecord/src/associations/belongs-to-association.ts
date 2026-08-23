@@ -211,18 +211,24 @@ export class BelongsToAssociation extends SingularAssociation {
    * target is an unsaved new record.
    */
   isTargetChanged(): boolean {
-    const changed = this.foreignKeyNames().some((fk) => this.owner.attributeChanged(fk));
+    const changed = this.foreignKeyNames().some((foreignKey) =>
+      this.owner.attributeChanged(foreignKey),
+    );
     return (
       changed || (!this.foreignKeyPresent() && this.target != null && this.target.isNewRecord())
     );
   }
 
   isTargetPreviouslyChanged(): boolean {
-    return this.foreignKeyNames().some((fk) => this.owner.attributePreviouslyChanged(fk));
+    return this.foreignKeyNames().some((foreignKey) =>
+      this.owner.attributePreviouslyChanged(foreignKey),
+    );
   }
 
   isSavedChangeToTarget(): boolean {
-    return this.foreignKeyNames().some((fk) => this.owner.isSavedChangeToAttribute(fk));
+    return this.foreignKeyNames().some((foreignKey) =>
+      this.owner.isSavedChangeToAttribute(foreignKey),
+    );
   }
 
   // --- Protected ---
@@ -470,10 +476,11 @@ export class BelongsToAssociation extends SingularAssociation {
         const touch = (this.reflection.options as any).touch;
         await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
       } else {
-        const foreignKey = this.foreignKeyNames().map((fk) =>
-          (this.owner as any)._readAttribute?.(fk),
+        await this.updateCountersViaScope(
+          this.klass,
+          this.foreignKeyNames().map((fk) => (this.owner as any)._readAttribute?.(fk)),
+          by,
         );
-        await this.updateCountersViaScope(this.klass, foreignKey, by);
       }
     }
   }

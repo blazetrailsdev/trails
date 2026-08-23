@@ -384,14 +384,14 @@ export class Association {
     }
     // Branches 3 + 4.
     const associationScope = this.associationScope();
-    const globalScope = klass.globalCurrentScope();
+    const scope = klass.globalCurrentScope();
     const targetScope = this.targetScope();
     const base =
       targetScope != null && typeof targetScope.mergeBang === "function"
         ? targetScope.mergeBang(associationScope)
         : associationScope;
-    if (globalScope) {
-      return typeof base?.mergeBang === "function" ? base.mergeBang(globalScope) : base;
+    if (scope) {
+      return typeof base?.mergeBang === "function" ? base.mergeBang(scope) : base;
     }
     return base;
   }
@@ -1029,11 +1029,11 @@ export class Association {
   protected targetScope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return null;
-    const sfa = (klass as any).scopeForAssociation?.() ?? null;
+    const scopeForAssociation = (klass as any).scopeForAssociation?.() ?? null;
     const arFactory = getAssociationRelationFactory();
-    if (!arFactory) return sfa;
+    if (!arFactory) return scopeForAssociation;
     const ar = arFactory(klass, this);
-    return sfa ? (ar as any).mergeBang(sfa) : ar;
+    return scopeForAssociation ? (ar as any).mergeBang(scopeForAssociation) : ar;
   }
 
   /** @internal */

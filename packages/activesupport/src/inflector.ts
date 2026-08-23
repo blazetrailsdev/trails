@@ -13,19 +13,19 @@ function applyInflections(
   rules: { rule: RegExp; replacement: string }[],
   locale = "en",
 ): string {
-  if (!word || word.length === 0) return word;
+  let result = word;
 
-  if (inflections(locale).uncountables.isUncountable(word)) {
-    return word;
-  }
-
-  for (const { rule, replacement } of rules) {
-    if (rule.test(word)) {
-      return word.replace(rule, replacement);
+  if (word.length === 0 || inflections(locale).uncountables.isUncountable(result)) {
+    return result;
+  } else {
+    for (const { rule, replacement } of rules) {
+      if (rule.test(result)) {
+        result = result.replace(rule, replacement);
+        break;
+      }
     }
+    return result;
   }
-
-  return word;
 }
 
 export function pluralize(word: string, locale = "en"): string {
@@ -171,9 +171,8 @@ export function tableize(className: string): string {
 }
 
 export function classify(tableName: string): string {
-  // Strip leading schema name: "schema.table" -> "table"
-  const stripped = tableName.replace(/.*\./, "");
-  return camelize(singularize(stripped));
+  // strip out any leading schema name
+  return camelize(singularize(tableName.replace(/.*\./, "")));
 }
 
 export function dasherize(underscoredWord: string): string {

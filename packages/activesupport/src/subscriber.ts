@@ -154,14 +154,13 @@ export class Subscriber {
 
   private static _addEventSubscriber(event: string, state: ClassState): void {
     if (this._invalidEvent(event)) return;
-    const sub = state.subscriber!;
+    const subscriber = state.subscriber!;
     const notifier = state.notifier!;
     const pattern = `${event}.${state.namespace}`;
 
-    if (sub.patterns.has(pattern)) return;
+    if (subscriber.patterns.has(pattern)) return;
 
-    const handle = notifier.subscribe(pattern, sub);
-    sub.patterns.set(pattern, handle);
+    subscriber.patterns.set(pattern, notifier.subscribe(pattern, subscriber));
   }
 
   private static _removeEventSubscriber(event: string, state: ClassState): void {

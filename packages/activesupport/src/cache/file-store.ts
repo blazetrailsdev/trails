@@ -363,17 +363,15 @@ export class FileStore extends Store implements CacheStore {
     amount = Integer(amount);
 
     return this.lockFile(key, () => {
-      const entry = this.readEntry(key, options);
+      let entry = this.readEntry(key, options);
 
       if (!entry || entry.isExpired() || entry.isMismatched(version)) {
         this.write(name, amount, options);
         return amount;
       } else {
         const num = toI(entry.value) + amount;
-        this.writeEntry(
-          key,
-          new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
-        );
+        entry = new Entry(num, { expiresAt: entry.expiresAt, version: entry.version });
+        this.writeEntry(key, entry);
         return num;
       }
     });

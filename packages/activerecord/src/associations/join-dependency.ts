@@ -189,14 +189,14 @@ export class JoinDependency {
    * (join_dependency.rb:71) — `(base, table, associations, join_type)`.
    */
   constructor(
-    baseModel: typeof Base,
+    base: typeof Base,
     table: Table | Nodes.TableAlias | null,
     associations: AssociationSpec | AssociationSpec[] | null,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
   ) {
-    this._baseModel = baseModel;
-    const baseTable = table ?? (baseModel as any).arelTable;
-    this._baseAlias = baseTable.name ?? (baseModel as any).tableName;
+    this._baseModel = base;
+    table ??= (base as any).arelTable;
+    this._baseAlias = String(table!.name ?? (base as any).tableName);
     this._aliasTracker = new AliasTracker(
       this._baseTableAliasLength(),
       new Map([[this._baseAlias, 1]]),
@@ -205,7 +205,7 @@ export class JoinDependency {
     // to construct each node's provisional join, so it is set first.
     this._joinType = joinType ?? Nodes.OuterJoin;
     const tree = JoinDependency.makeTree(associations ?? []);
-    this._joinRoot = new JoinBase(baseModel, baseTable, this.build(tree, baseModel));
+    this._joinRoot = new JoinBase(base, table as Table, this.build(tree, base));
     this._assignPaths(this._joinRoot, null);
   }
 
