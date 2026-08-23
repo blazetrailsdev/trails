@@ -1140,6 +1140,55 @@ export class Time {
   }
 
   /**
+   * Ruby `Time#+(numeric)` (`ruby/time.c` `time_plus`), the receiver moved
+   * forward by that many SECONDS. `time_add` takes the argument through
+   * `num_exact` — an Integer, a Float or a Rational, exactly as `Time.at`'s
+   * seconds do — and `TZMODE_COPY` hands the answer the receiver's own zone,
+   * so `(Time.utc(2020, 1, 1) + 1).utc?` is true and a time built at an offset
+   * keeps that offset.
+   *
+   * A `Time` argument is `TypeError: time + time?` (`time_plus`), the one
+   * shape `Time#-` accepts and this does not.
+   */
+  plus(offset: number | bigint | Rational | Time): Time {
+    if (offset instanceof Time) {
+      throw new TypeError("time + time?");
+    }
+    return this.#timeAdd(offset, 1);
+  }
+
+  /**
+   * Ruby `Time#-` (`ruby/time.c` `time_minus`). Against another `Time` it is
+   * the Float number of seconds between them — `rb_time_unmagnify_to_float` of
+   * the difference — and against a numeric it is `time_add` with `sign` `-1`,
+   * the mirror of {@link Time#plus}.
+   */
+  minus(offset: number | bigint | Rational | Time): Time | number {
+    if (offset instanceof Time) {
+      return (
+        Number(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds) / 1_000_000_000
+      );
+    }
+    return this.#timeAdd(offset, -1);
+  }
+
+  /**
+   * MRI's `time_add` (`ruby/time.c`): the epoch moved by `offset` seconds in
+   * `sign`'s direction, under the receiver's zone (`TZMODE_COPY`). The seat is
+   * the instant rather than the wall clock, so the answer is right across a DST
+   * boundary, and the nanosecond floor is `Time.at`'s.
+   */
+  #timeAdd(offset: number | bigint | Rational, sign: 1 | -1): Time {
+    const timew = numExact(offset).mul(1_000_000_000 * sign);
+    const nanoseconds =
+      timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
+    return Time.#atInstant(
+      Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
+      this.#timeZoneId ?? this.#utcOffset,
+    );
+  }
+
+  /**
    * Ruby `Time#getutc` (`ruby/time.c` `time_getutc`), the same instant in UTC.
    * `lib/time.rb`'s `httpdate` reaches it as `dup.utc`, an in-place conversion
    * of a copy; trails' `Time` is immutable, so the copy is the answer here.

@@ -241,9 +241,7 @@ export class TimeWithZone {
         time.toPlainDateTime().add({ seconds: offset }),
       );
     }
-    return Time.at(
-      new Rational(time.toTime().toInstant().epochNanoseconds, 1_000_000_000n).add(offset),
-    ).getutc();
+    return time.plus(offset);
   }
 
   /**
