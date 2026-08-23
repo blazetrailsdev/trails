@@ -14,13 +14,10 @@ import { PrimaryKey, type PrimaryKeyInstance, type PrimaryKeyRecord } from "./pr
  *
  * Ruby's `@primary_key`, the ivar seeded from the class at `init_internals`
  * (core.rb:846) — read off the record's own slot, in the order the class
- * declares. A record built before its schema reflected has no seat and reads
- * through to the class; see `primaryKeyOf` in primary-key.ts.
+ * declares.
  */
 function primaryKeyOf(record: object): string[] {
-  const seated = (record as { _primaryKey?: string[] })._primaryKey;
-  if (seated !== undefined) return seated;
-  return (record.constructor as any).primaryKey as string[];
+  return (record as { _primaryKey: string[] })._primaryKey;
 }
 
 /**

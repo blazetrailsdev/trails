@@ -23,8 +23,8 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CI_YML = path.join(REPO_ROOT, ".github/workflows/ci.yml");
 
-// Roots holding non-package test files. packages/ is excluded: those suites
-// are covered by the per-package jobs, whose filters are whole directories.
+// Roots holding non-package test files. packages/ has its own walk below,
+// which checks a whole package directory rather than each file.
 const TOOLING_ROOTS = ["scripts", "eslint", "vendor"];
 
 // Suites that deliberately do not run in CI yet. Every entry needs a reason
@@ -115,6 +115,20 @@ function ciVitestFilters(yml: string): string[] {
     }
   }
   return filters;
+}
+
+/**
+ * Packages whose suite CI runs from inside the package, via
+ * `pnpm --filter <name> exec vitest run`. Those filters are package-relative,
+ * so {@link ciVitestFilters} skips them; the package is still covered.
+ */
+function ciPackageFilterDirs(yml: string): string[] {
+  const dirs: string[] = [];
+  for (const line of yml.split("\n")) {
+    const match = line.match(/--filter\s+(?:@[\w-]+\/)?([\w.-]+)\s+exec\s+vitest\s+run/);
+    if (match) dirs.push(`packages/${match[1]}`);
+  }
+  return dirs;
 }
 
 /** The `unit-tests:` job block, sliced out at the next job at the same indent. */
@@ -461,6 +475,28 @@ describe("CI runs every tooling test suite", () => {
       .map((f) => f.split(path.sep).join("/"))
       .filter((f) => !(f in KNOWN_UNRUN))
       .filter((f) => !filters.some((filter) => f.startsWith(filter)));
+    expect(uncovered).toEqual([]);
+  });
+
+  // The package half of the same defect: packages/date held 13 files and 362
+  // tests that no ci.yml job ran — the change filters named the package, so a
+  // date change woke the Unit Tests job, which then ran no date test.
+  it("covers each package test suite with a ci.yml vitest filter", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const filters = [...ciVitestFilters(yml), ...ciPackageFilterDirs(yml)];
+
+    const packagesDir = path.join(REPO_ROOT, "packages");
+    const entries = await readdir(packagesDir, { withFileTypes: true });
+    const uncovered: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) continue;
+      const files = await collectTestFiles(path.join(packagesDir, entry.name), []);
+      if (files.length === 0) continue;
+      const dir = `packages/${entry.name}`;
+      if (!filters.some((filter) => dir.startsWith(filter.replace(/\/$/, "")))) {
+        uncovered.push(dir);
+      }
+    }
     expect(uncovered).toEqual([]);
   });
 

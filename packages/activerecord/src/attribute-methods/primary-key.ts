@@ -151,17 +151,9 @@ export class PrimaryKey {
   }
 }
 
-/**
- * Ruby's readers read the record's `@primary_key` ivar, seeded from the class
- * at `init_internals` (core.rb:846). trails seats the same slot there, but only
- * once the class can answer for real: schema reflection is async here, so a
- * record built before its columns hash arrives has no seat and reads through to
- * the class, which resolves the real key as soon as it lands.
- */
+/** Ruby's `@primary_key`, seeded from the class at `init_internals` (core.rb:846). */
 function primaryKeyOf(record: object): string | string[] {
-  const seated = (record as { _primaryKey?: string | string[] })._primaryKey;
-  if (seated !== undefined) return seated;
-  return (record.constructor as any).primaryKey;
+  return (record as { _primaryKey: string | string[] })._primaryKey;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,29 +192,6 @@ function cachedSchemaCacheFor(
   if (host._adapter?.internalSchemaCache) return host._adapter.internalSchemaCache;
   const pool = host.connectionPool?.();
   return pool?.activeConnection?.internalSchemaCache ?? pool?.poolConfig?.schemaCache ?? undefined;
-}
-
-/**
- * Whether the class can answer `primary_key` for real yet — an explicitly
- * configured key, or one the schema cache has already reflected.
- *
- * Ruby's `init_internals` seats `@primary_key` from the class unconditionally
- * (core.rb:846) because `get_primary_key` is synchronous there. trails reflects
- * the schema asynchronously, so `getPrimaryKey` answers the "id" convention
- * until the cache is warm; seating that would latch it for the record's
- * lifetime. `initInternals` guards Rails' assignment with this,
- * and `primaryKeyOf` reads through to the class while it is false.
- * @internal
- */
-export function isPrimaryKeySettled(this: PrimaryKeyHost): boolean {
-  if (this._primaryKey !== undefined) return true;
-  try {
-    const tableName = this.tableName;
-    if (tableName == null) return false;
-    return cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName) !== undefined;
-  } catch {
-    return false;
-  }
 }
 
 /**

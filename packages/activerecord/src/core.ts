@@ -39,7 +39,6 @@ import type { PrettyPrinter } from "./pretty-print.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
-import { isPrimaryKeySettled } from "./attribute-methods/primary-key.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError, runAllCallbacks } from "@blazetrails/activemodel";
@@ -856,14 +855,6 @@ export function arelTable(this: CoreHost): Table {
  * already assigned; the flag is raised here instead, at the first seat that
  * runs before the assignment and in Rails' own order.
  *
- * `@primary_key = klass.primary_key` (core.rb:846) is seated below, but behind
- * `isPrimaryKeySettled`: schema reflection is asynchronous, so a record
- * constructed before its schema loads would latch a placeholder key for its
- * whole life. While the slot is unseated, `primaryKeyOf`
- * (attribute-methods/primary-key.ts) reads through to the class. Dropping the
- * guard and seating unconditionally is tracked separately (RFC 0115
- * `drop-the-primary-key-seat-guard-once-schema-reflection-is-warm`).
- *
  * @internal
  */
 export function initInternals(
@@ -890,9 +881,7 @@ export function initInternals(
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
   const klass = this.constructor as any;
-  // core.rb:846 — `@primary_key = klass.primary_key`, guarded because trails
-  // resolves the schema asynchronously; see `isPrimaryKeySettled`.
-  if (isPrimaryKeySettled.call(klass)) this._primaryKey = klass.primaryKey;
+  this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
 
