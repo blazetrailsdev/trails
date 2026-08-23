@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import bcrypt from "bcryptjs";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 
@@ -22,6 +23,15 @@ function createUserClass(opts: { validations?: boolean } = {}) {
   }
   hasSecurePassword(User, "password", opts);
   return User;
+}
+
+// Simulate loading an existing user from the DB (secure_password_test.rb:18-21).
+function existingUser() {
+  const User = createUserClass();
+  const u = new User();
+  (u as any).password_digest = bcrypt.hashSync("password", 4);
+  u.changesApplied();
+  return u;
 }
 
 describe("SecurePasswordTest", () => {
@@ -189,33 +199,36 @@ describe("SecurePasswordTest", () => {
     expect(await u.isValid()).toBe(false);
   });
 
-  it("updating an existing user with validation and a correct password challenge", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect((u as any).authenticate("secret")).toBe(u);
+  it("updating an existing user with validation and a correct password challenge", async () => {
+    const u = existingUser();
+    (u as any).password = "new password";
+    (u as any).passwordChallenge = "password";
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("updating an existing user with validation and a nil password challenge", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect((u as any).authenticate(null)).toBe(false);
-    expect((u as any).authenticate(undefined)).toBe(false);
+  it("updating an existing user with validation and a nil password challenge", async () => {
+    const u = existingUser();
+    (u as any).password = "new password";
+    (u as any).passwordChallenge = null;
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("updating an existing user with validation and a blank password challenge", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect((u as any).authenticate("")).toBe(false);
+  it("updating an existing user with validation and a blank password challenge", async () => {
+    const u = existingUser();
+    (u as any).password = "new password";
+    (u as any).passwordChallenge = "";
+    expect(await u.isValid()).toBe(false);
+    expect(u.errors.count).toBe(1);
+    expect(u.errors.messagesFor("passwordChallenge")).toEqual(["is invalid"]);
   });
 
-  it("updating an existing user with validation and an incorrect password challenge", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect((u as any).authenticate("wrong")).toBe(false);
+  it("updating an existing user with validation and an incorrect password challenge", async () => {
+    const u = existingUser();
+    (u as any).password = "new password";
+    (u as any).passwordChallenge = "new password";
+    expect(await u.isValid()).toBe(false);
+    expect(u.errors.count).toBe(1);
+    expect(u.errors.messagesFor("passwordChallenge")).toEqual(["is invalid"]);
   });
 
   it("updating a user without dirty tracking and a correct password challenge", () => {

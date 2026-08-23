@@ -56,10 +56,10 @@ export function hasSecurePassword(
     });
 
     modelClass.validate((record: Model) => {
-      const challenge = publicSend(record, challengeAttr) as string | null;
-      if (challenge != null) {
+      const challenge = publicSend(record, challengeAttr);
+      if (challenge != null && challenge !== false) {
         const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
-        if (isBlank(digestWas) || !bcrypt.compareSync(challenge, digestWas as string)) {
+        if (isBlank(digestWas) || !bcrypt.compareSync(String(challenge), digestWas as string)) {
           record.errors.add(challengeAttr);
         }
       }
@@ -175,11 +175,10 @@ export class InstanceMethodsOnActivation extends Module {
 
       Object.defineProperty(mod, `${attribute}Challenge`, {
         get(this: Model) {
-          return challengeIvar.get(this) ?? null;
+          return challengeIvar.has(this) ? challengeIvar.get(this) : null;
         },
         set(this: Model, value: unknown) {
-          const str = value == null ? null : String(value);
-          challengeIvar.set(this, isBlank(str) ? null : str);
+          challengeIvar.set(this, value);
         },
         configurable: true,
       });
