@@ -64,6 +64,13 @@ export class Aes256Gcm {
     return { deterministic: this.deterministic };
   }
 
+  /**
+   * @missingRailsCall order:generateIv,constructor — PERMANENT: Rails builds
+   *   `OpenSSL::Cipher.new` before `generate_iv` (aes256_gcm.rb:38-43) only so
+   *   `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv`
+   *   takes the IV as a constructor argument, so the IV must be produced first
+   *   and the two calls necessarily swap order.
+   */
   encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
@@ -163,7 +170,14 @@ export class Aes256Gcm {
     return getCrypto().randomBytes(IV_LENGTH);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall new — PERMANENT: `OpenSSL::Digest::SHA256.new`
+   *   (aes256_gcm.rb:95) names the digest as an object; Node's
+   *   `createHmac("sha256", key)` names it as a string argument, so there is no
+   *   constructor call to make.
+   */
   private generateDeterministicIv(clearText: Buffer): Buffer {
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     return getCrypto()

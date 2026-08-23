@@ -31,6 +31,20 @@ export function validatesAssociated(
 }
 
 export class AssociatedValidator extends EachValidator {
+  /**
+   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106): `.any?` on
+   *   the rejected list (`associated.rb:9`) — folded into the same ordered async
+   *   loop as `reject`; see the `reject` tag below.
+   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
+   *   `options.merge(value: value)` (`associated.rb:10`) — a non-mutating Hash
+   *   merge is an object spread in TS.
+   * @missingRailsCall reject — PERMANENT: Verified per-site (RFC 0106):
+   *   `Array(value).reject { |a| valid_object?(a, context) }`
+   *   (`associated.rb:9`) — `valid_object?` is async since RFC 0063 and JS has
+   *   no async-predicate `reject`, so the reject/any? pair is one ordered loop
+   *   over the same predicate (which also preserves Rails' sequential `valid?`
+   *   semantics).
+   */
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
     const values = kernelArray(value);

@@ -85,6 +85,13 @@ export interface CastTypeLookup {
 const QUOTED_COLUMN_NAMES = new Map<string, string>();
 const QUOTED_TABLE_NAMES = new Map<string, string>();
 
+/**
+ * @missingRailsCall extract_schema_qualified_name — PERMANENT: Per-site verified
+ *   (RFC 0106 wave 4b): postgresql/quoting.rb's `quote_table_name` memoizes
+ *   `Utils.extract_schema_qualified_name(name.to_s).quoted`; trails'
+ *   quoteTableName splits and quotes the schema/table pair inline — the
+ *   Utils::Name object it would allocate is used for nothing else on this path.
+ */
 export function quoteTableName(name: string): string {
   let quoted = QUOTED_TABLE_NAMES.get(name);
   if (quoted === undefined) {
@@ -153,6 +160,13 @@ export function quotedBinary(
   return bytes ? `'${escapeBytea(bytes)}'` : `'${escapeBytea(value as string)}'`;
 }
 
+/**
+ * @missingRailsCall check_int_in_range — PERMANENT: Equivalent (RFC 0072
+ *   activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is a
+ *   bare alias — `export const checkIntInRange = checkIntegerRange` — so the
+ *   routed call is the alias target and the extractor never sees the alias name.
+ *   Nothing to converge.
+ */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value instanceof XmlData) {
     return `xml '${quoteString(value.toString())}'`;

@@ -632,6 +632,10 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * the underlying relation handles SQL LIMIT (or, if the walker
    * produced a loaded-chain DJAR, that DJAR's own override slices
    * in-memory).
+   *
+   * @missingRailsCall take — PERMANENT: Verified per-site (RFC 0106):
+   *   `records.take(value)` (`disable_joins_association_relation.rb:14`) —
+   *   `Array#take` is `slice(0, n)` in JS, which emits no `take` callee.
    */
   // @ts-expect-error — deliberate Rails-fidelity deviation in loaded-chain mode: returns Array, not Relation
   override limit(value: number | null): Relation<T> | Promise<T[]> {
@@ -657,6 +661,13 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    */
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
+  /**
+   * @missingRailsCall limit — PERMANENT: Verified per-site (RFC 0106):
+   *   `records.limit(limit).first` (`disable_joins_association_relation.rb:18`)
+   *   — in loaded-chain mode `records` is already an Array, so the slice is in
+   *   memory; the deferred-chain arm routes through `findNthWithLimit` so
+   *   Relation#first's ORDER BY is applied before the LIMIT.
+   */
   override async first(limit?: number): Promise<T | T[] | null> {
     if (this._chainWalker) {
       // Rails: disable_joins routes `first` through Relation#first →

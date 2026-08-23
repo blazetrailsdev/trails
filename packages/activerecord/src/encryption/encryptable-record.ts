@@ -163,7 +163,23 @@ export class EncryptableRecord {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall encrypted_attribute? — PERMANENT: Rails' reader lives in
+   *   an anonymous `Module.new` that is `include`d so its body can call
+   *   `super()` (encryptable_record.rb:110-118), and the `encrypted_attribute?`
+   *   guard only exists to decide between that `super()` value and the original
+   *   column; TS has no ancestor chain to `super()` into from a mixin, so trails
+   *   redefines the prototype accessor to read the original attribute directly
+   *   and the guard has nothing to guard.
+   * @missingRailsCall include — PERMANENT: Rails mixes the overriding
+   *   reader/writer in with `include(Module.new { ... })`
+   *   (encryptable_record.rb:110-123) so the generated methods can `super()`
+   *   into the attribute methods; TS has no ancestor chain, so trails defines
+   *   the accessor pair on the prototype with `Object.defineProperty` and there
+   *   is no module to include.
+   */
   static overrideAccessorsToPreserveOriginal(
     modelClass: any,
     name: string,

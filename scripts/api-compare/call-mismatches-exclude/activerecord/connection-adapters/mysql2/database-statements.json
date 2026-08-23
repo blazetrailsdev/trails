@@ -10,19 +10,5 @@
       "ref:toA"
     ],
     "reason": "mysql2/database_statements.rb:119 `ActiveRecord::Result.new(fields, raw_result.to_a)` leaves column types to the adapter's type map, which is keyed by the MySQL type name the C driver exposes on the result. node's mysql2 surfaces per-field type metadata only on the raw result, so `buildColumnTypes(rawResult.fields, ...)` resolves them here and passes them as Result's third (optional) argument."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "execute_batch",
-    "call": "raw_execute",
-    "reason": "Per-site verified (RFC 0106 wave 4b): mysql2/database_statements.rb's `execute_batch` calls `raw_execute(combine_multi_statements(statements), name, batch: true)`; trails routes the batch through `internalExecute` so the multi-statement flag and the retry/materialize kwargs travel with it — see project note `_inQueryTransformers leaks off preprocessQuery` for why the batch path must not re-enter rawExecute directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "select_all",
-    "call": "unprepared_statement",
-    "reason": "Per-site verified (RFC 0106 wave 4b): mysql2/database_statements.rb's `select_all` wraps the super call in `unprepared_statement { }` when the arel is not preparable; trails' Mysql2 select_all delegates to the abstract implementation, which owns the unprepared-statement guard (abstract/database-statements.ts), so the block is applied one level up."
   }
 ]

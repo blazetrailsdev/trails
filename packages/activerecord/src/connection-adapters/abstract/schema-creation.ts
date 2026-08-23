@@ -134,6 +134,19 @@ export class SchemaCreation {
   // query (postgresql/quoting.rb:195); Rails' accept is sync only because Ruby
   // blocks on the query. Visitors that can reach quoteDefaultExpression are
   // async; the leaf visitors that cannot (indexes, FKs, constraints) stay sync.
+  /**
+   * @missingRailsCall last — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_creation.rb:12 builds the visitor name with
+   *   `o.class.name.split('::').last` and `send`s it; TypeScript has no `send`,
+   *   so trails' accept (schema-creation.ts:137-148) dispatches through an
+   *   explicit `instanceof` chain and never splits a class name.
+   * @missingRailsCall split — PERMANENT: Name-collision false positive (story
+   *   relation-delegation-rails-named-methods): exposing the `delegate ... to:
+   *   :records` set under Rails names made `split`/`reverse`/`rindex` recognized
+   *   ported method names, so this unrelated call to String#split /
+   *   Array#reverse / String#rindex on a non-Relation receiver is flagged by the
+   *   name-based wide call-set check.
+   */
   async accept(o: Definition): Promise<string> {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
     if (o instanceof AlterTable) return this.visitAlterTable(o);
@@ -526,7 +539,14 @@ export class SchemaCreation {
     return sql;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall merge — PERMANENT: Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails schema_creation.rb:146-148 is
+   *   `o.options.merge(column: o)`; trails schema-creation.ts:579-581 uses
+   *   object spread `{...o.options, column: o}`.
+   */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
     return { ...o.options, column: o };
   }

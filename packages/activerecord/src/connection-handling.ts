@@ -688,6 +688,18 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name);
 }
 
+/**
+ * @missingRailsCall call — PERMANENT: Rails defaults the argument through
+ *   `DEFAULT_ENV.call` (connection_handling.rb:51); the port's `configOrEnv ===
+ *   undefined` arm routes to `autoConnect` (connection-handling.ts:770), which
+ *   resolves the environment itself.
+ * @missingRailsCall connection_handler — PERMANENT: Verified per-site (RFC
+ *   0106): `connection_handler.establish_connection(...)`
+ *   (`connection_handling.rb:53`) — the TS `establishConnection` resolves the
+ *   adapter class asynchronously first and makes the handler call from the
+ *   helper it delegates to, so the call is outside the method the comparator
+ *   scopes to.
+ */
 export async function establishConnection(
   modelClass: typeof Base,
   configOrEnv?:

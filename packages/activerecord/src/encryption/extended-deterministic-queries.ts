@@ -31,6 +31,13 @@ export class ExtendedDeterministicQueries {
    * Call this once during app boot when
    * `Configurable.config.extendQueries` is true (Rails'
    * `config.active_record.encryption.extend_queries`).
+   *
+   * @missingRailsCall include — PERMANENT:
+   *   `ActiveRecord::Base.include(CoreQueries)`
+   *   (extended_deterministic_queries.rb:28) works because Ruby's ancestor chain
+   *   lets the module's `find_by` `super` into Base's; TS has no such chain, so
+   *   trails installs all three patches through the one `prepend()` shim that
+   *   hands the wrapped method its `super_`.
    */
   static installSupport(targets: {
     Relation: {
@@ -112,6 +119,12 @@ export class ExtendedDeterministicQueries {
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
  */
 export class EncryptedQuery {
+  /**
+   * @missingRailsCall empty? — PERMANENT:
+   *   `owner.deterministic_encrypted_attributes&.empty?`
+   *   (extended_deterministic_queries.rb:45) on a Set — the faithful port is
+   *   `!encryptedAttrs?.size`, a property read with no call form.
+   */
   static processArguments(
     owner: any,
     args: unknown[],
@@ -215,6 +228,12 @@ export class RelationQueries {
     return originalExists.call(this, ...EncryptedQuery.processArguments(this, args, true));
   }
 
+  /**
+   * @missingRailsCall any? — PERMANENT:
+   *   `model.deterministic_encrypted_attributes&.any?`
+   *   (extended_deterministic_queries.rb:104) takes no block, so it is a size
+   *   test on a Set — `!encryptedAttrs?.size` reads `.size` and emits no call.
+   */
   static scopeForCreate(
     this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
