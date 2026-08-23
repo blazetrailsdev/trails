@@ -35,6 +35,8 @@ import {
   Model,
   Type,
   type AttributeOptions,
+  type CallbackConditions,
+  type CallbackObject,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
@@ -4183,6 +4185,95 @@ export class Base extends Model {
     return _currentTransactionPublic();
   }
 
+  // The twelve save/create/update/destroy macros are GENERATED below the class
+  // body by `Base.defineModelCallbacks("save", "create", "update", "destroy")`,
+  // mirroring ActiveRecord::Callbacks' `included do define_model_callbacks
+  // :save, :create, :update, :destroy end`
+  // (activerecord/lib/active_record/callbacks.rb:416). Ruby's
+  // `define_singleton_method` (activemodel/lib/active_model/callbacks.rb:130,
+  // :137, :144) makes each generated name visible to every later call;
+  // TypeScript cannot see a static defined at runtime, so each carries a
+  // type-only `declare` here. No implementation lives in this class body.
+  declare static beforeSave: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeCreate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeUpdate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeDestroy: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterSave: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterCreate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterUpdate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterDestroy: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundSave: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundCreate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundUpdate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundDestroy: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
   static beforeCommit = _beforeCommit;
 
   /**
@@ -4589,6 +4680,12 @@ extend(Base, CounterCache.ClassMethods);
     },
   });
 }
+// Mirrors ActiveRecord::Callbacks' `included do ... end`
+// (activerecord/lib/active_record/callbacks.rb:416). The `:initialize`, `:find`
+// and `:touch` events on the line above it (callbacks.rb:415) are still
+// hand-written on `Model`.
+Base.defineModelCallbacks("save", "create", "update", "destroy");
+
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
-import { afterCreate, resetCallbacks } from "../callbacks.js";
+import { resetCallbacks } from "../callbacks.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";
@@ -83,7 +83,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const assoc = assocOf(author);
 
     await resetCallbacks(Post, "create", async () => {
-      afterCreate(Post, async () => {
+      Post.afterCreate(async () => {
         await assoc.loadTarget();
       });
 

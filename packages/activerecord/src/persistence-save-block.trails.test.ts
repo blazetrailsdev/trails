@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { afterCreate, afterUpdate, resetCallbacks } from "./callbacks.js";
+import { resetCallbacks } from "./callbacks.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 
@@ -42,7 +42,7 @@ describe("save block threading (trails)", () => {
   it("save yields the block after the INSERT and before after_create", async () => {
     const seen: string[] = [];
     await resetCallbacks(Post, "create", async () => {
-      afterCreate(Post, () => {
+      Post.afterCreate(() => {
         seen.push("after_create");
       });
 
@@ -63,7 +63,7 @@ describe("save block threading (trails)", () => {
   it("save! yields the block after the INSERT and before after_create", async () => {
     const seen: string[] = [];
     await resetCallbacks(Post, "create", async () => {
-      afterCreate(Post, () => {
+      Post.afterCreate(() => {
         seen.push("after_create");
       });
 
@@ -81,7 +81,7 @@ describe("save block threading (trails)", () => {
     const post = await Post.create({ title: "updatable", body: "body" });
 
     await resetCallbacks(Post, "update", async () => {
-      afterUpdate(Post, () => {
+      Post.afterUpdate(() => {
         seen.push("after_update");
       });
 
@@ -100,7 +100,7 @@ describe("save block threading (trails)", () => {
     const author = await Author.find(authors("david").id);
 
     await resetCallbacks(Post, "create", async () => {
-      afterCreate(Post, () => {
+      Post.afterCreate(() => {
         seen.push("after_create");
       });
 
@@ -125,7 +125,7 @@ describe("save block threading (trails)", () => {
     const author = await Author.find(authors("david").id);
 
     await resetCallbacks(Post, "create", async () => {
-      afterCreate(Post, async () => {
+      Post.afterCreate(async () => {
         await author.posts.load();
       });
 
