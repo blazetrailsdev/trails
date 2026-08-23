@@ -383,6 +383,8 @@ describe("Time", () => {
         Time.new("2000-12-31 23:59:59.567").nsec,
       );
       expect(Time.new("2000-12-31 23:59:59.56789", { precision: 20 }).nsec).toBe(567890000);
+      // A negative `precision` truncates nothing, as `nil` does.
+      expect(Time.new("2000-12-31 23:59:59.56789", { precision: -1 }).nsec).toBe(567890000);
       // `precision:` acts on nothing but the string form.
       expect(Time.new(2020, 1, 1, 0, 0, 0.56789, null, { precision: 3 }).nsec).toBe(567890000);
     });

@@ -349,10 +349,11 @@ function parseFixedDigits(str: string, ptr: number, n: number): number | null {
  * more, fixed two-digit month/day/hour/min/sec fields, and every one of MRI's
  * own messages at the step that raises it.
  *
- * `precision` is the sub-second digits kept: it truncates the parsed fraction
- * before it is carried, and a fraction it truncates away entirely is MRI's
- * `subsecond expected after dot:` — `Time.new("2000-12-31 23:59:59.5",
- * precision: 0)` raises rather than answering a whole second.
+ * `precision` is the sub-second digits kept: a non-negative one truncates the
+ * parsed fraction before it is carried, and a fraction it truncates away
+ * entirely is MRI's `subsecond expected after dot:` — `Time.new("2000-12-31
+ * 23:59:59.5", precision: 0)` raises rather than answering a whole second. A
+ * negative `precision` keeps the whole fraction, the answer `nil` gets.
  *
  * The zone is handed back as the substring the string spells, so
  * {@link utcOffsetArgument} — the same reader the seventh positional goes
@@ -442,7 +443,10 @@ function timeInitParse(
         ptr++;
         let fracDigits = 0;
         while (isDigit(str[ptr + fracDigits])) fracDigits++;
-        const frac = str.slice(ptr, ptr + fracDigits).slice(0, Math.max(precision, 0));
+        const parsedFrac = str.slice(ptr, ptr + fracDigits);
+        // MRI truncates only for a non-negative `precision`; a negative one
+        // keeps the whole fraction, as `nil` does.
+        const frac = precision < 0 ? parsedFrac : parsedFrac.slice(0, precision);
         ptr += fracDigits;
         if (frac.length === 0) {
           throw new ArgumentError(
