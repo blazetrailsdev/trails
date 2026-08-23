@@ -32,7 +32,9 @@ type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
  * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
  * name. Pass `{ only: ["before"] }` as the last argument to limit which
  * timing types are created (defaults to all three); every other option is
- * forwarded to `defineCallbacks`, as Rails does.
+ * forwarded to `defineCallbacks`, as Rails does — including the default
+ * `scope: [:kind, :name]` (callbacks.rb:113), which makes an object callback
+ * registered by `beforeSave` dispatch to `beforeSave` rather than `before`.
  *
  * Mirrors: ActiveModel::Callbacks.define_model_callbacks
  * (activemodel/lib/active_model/callbacks.rb:109-127)
@@ -44,46 +46,35 @@ export function defineModelCallbacks(
   ...rest: [...string[], DefineModelCallbacksOptions]
 ): void;
 export function defineModelCallbacks(this: object, ...args: unknown[]): void {
-  // `options = callbacks.extract_options!` (callbacks.rb:110).
   const [callbacks, extracted] = extractOptionsBang(args);
-  // `{ skip_after_callbacks_if_terminated: true, scope: [:kind, :name],
-  //    only: [:before, :around, :after] }.merge!(options)` (callbacks.rb:111-115).
-  // `scope` is the chain's dispatch scope, so an object callback registered by
-  // `before_save` calls `beforeSave` rather than a bare `before`
-  // (activesupport/lib/active_support/callbacks.rb, `current_scopes`).
-  const options: DefineModelCallbacksOptions = {
+  let options = extracted as DefineModelCallbacksOptions;
+  options = {
     skipAfterCallbacksIfTerminated: true,
     scope: ["kind", "name"],
     only: ["before", "around", "after"],
-    ...(extracted as DefineModelCallbacksOptions),
+    ...options,
   };
 
-  // `types = Array(options.delete(:only))` (callbacks.rb:117).
   const types = kernelArray(options.only);
   delete options.only;
 
   const klass = this as { prototype?: object };
 
   for (const callback of callbacks as string[]) {
-    // `define_callbacks(callback, options)` (callbacks.rb:120) — the chain
-    // lives on the prototype, which is where trails' instances resolve it.
+    // `define_callbacks` registers on the prototype, where trails' instances
+    // resolve the chain; Ruby's `self` here is the class itself.
     if (klass.prototype) asDefineCallbacks(klass.prototype, callback, options);
 
-    // `send("_define_#{type}_model_callback", self, callback)`
-    // (callbacks.rb:122-126) — driven by `types`, in the caller's order.
     for (const type of types) {
-      _defineModelCallbackByType[type]?.(this, callback);
+      _defineModelCallbackByType[type](this, callback);
     }
   }
 }
 
 /**
- * The `send("_define_#{type}_model_callback", ...)` dispatch table
- * (callbacks.rb:125). TypeScript has no `send`, and the three targets are
- * module-private functions rather than members of `this`, so the interpolated
- * method name resolves through this map.
- * @noRailsEquivalent PERMANENT: stands in for Ruby's `send` on an interpolated
- *   private method name; no new surface (it is not exported).
+ * @noRailsEquivalent PERMANENT: stands in for `send("_define_#{type}_model_callback", ...)`
+ *   (callbacks.rb:125) — TS has no `send`, and the three targets are
+ *   module-private functions, not members of `this`. Not exported.
  */
 const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
   {

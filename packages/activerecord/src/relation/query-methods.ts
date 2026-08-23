@@ -1958,14 +1958,11 @@ function excludingWithCallee(callee: "excluding" | "without") {
     }
 
     // Rails `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1586).
-    // `Relation#ids` is the seam that decides per relation whether a query runs:
-    // it returns the already-materialized `records.map(&:id)` when the relation
-    // is `loaded?` — including a `load_async` relation, whose parked
-    // `@future_result` it drains (relation.rb:1149, calculations.rb:373) — and
-    // selects the ids otherwise. trails cannot run that select synchronously, so
-    // EVERY relation argument is deferred uniformly: `excludingBang` records a
-    // marker that the load pipeline materializes through `Relation#ids`,
-    // preserving Rails' per-relation decision instead of second-guessing it here.
+    // `Relation#ids` is the seam that decides per relation whether a query runs
+    // (calculations.rb:373), draining a parked `@future_result` on the `loaded?`
+    // arm. trails cannot run that select synchronously, so every relation
+    // argument is deferred uniformly and the load pipeline materializes it
+    // through `Relation#ids` rather than second-guessing the decision here.
     const combined: unknown[] = [...records, ...relations];
     return excludingBang.call(this.spawn(), combined);
   };

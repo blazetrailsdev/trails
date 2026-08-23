@@ -195,11 +195,9 @@ export class Batches {
     } else if (this.loaded) {
       generator = async function* () {
         await ensureValidOptions();
-        // Rails' `if loaded?` arm of `in_batches` batches the relation's own
-        // `records` in memory. That read goes through the `records` seam, which
-        // drains a parked `@future_result` (relation.rb:1149), so a
-        // `load_async` relation batches its scheduled rows rather than
-        // re-querying — hence the await, and hence `loaded?` alone as the guard.
+        // Rails' `if loaded?` arm batches the relation's own `records` in
+        // memory; that read drains a parked `@future_result` (relation.rb:1149),
+        // which is why the branch is taken inside the async generator.
         const loadedBatches = await batchOnLoadedRelation({
           relation: self,
           start,
