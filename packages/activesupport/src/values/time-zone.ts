@@ -725,8 +725,9 @@ export class Timezone {
    * `TZInfo::Timezone#now` (`tzinfo/timezone.rb`) — `utc_to_local(Time.now.utc)`,
    * which `TimeZone#today` (time_zone.rb:521-523) calls `to_date` on. As of
    * tzinfo 2 the result is a local time carrying the observed UTC offset rather
-   * than a zone, so the offset is what the `zone` argument gets. `Time.now`
-   * reaches the same {@link currentTime} `TimeZone#timeNow` does, so a time
+   * than a zone (the note at time_zone.rb:540-541), so the offset is what the
+   * `zone` argument gets, and the sub-second is carried as the `Rational` MRI's
+   * `Time` holds it as. `Time.now` reaches the same {@link currentTime} `TimeZone#timeNow` does, so a time
    * travelled to moves the date here as MRI's stubbed `Time.now` moves it there.
    */
   now(): Time {
@@ -737,7 +738,13 @@ export class Timezone {
       local.day,
       local.hour,
       local.minute,
-      local.second,
+      new Rational(
+        BigInt(local.second) * 1_000_000_000n +
+          BigInt(local.nanosecond) +
+          BigInt(local.microsecond) * 1_000n +
+          BigInt(local.millisecond) * 1_000_000n,
+        1_000_000_000n,
+      ),
       Number(local.offsetNanoseconds) / 1_000_000_000,
     );
   }
