@@ -55,8 +55,15 @@ export function middleOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 12 });
 }
 
+/**
+ * @missingRailsArgs change — PERMANENT: time/calculations.rb:256-263 passes
+ * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
+ * `Rational()` is a Kernel function where TS spells the construction
+ * `new Rational(...)`, which the extractor records as `ref:constructor` rather
+ * than `ref:Rational`.
+ */
 export function endOfDay(date: Date): Temporal.Instant {
-  return change(date, { hour: 23, min: 59, sec: 59, usec: 999999999 / 1000 });
+  return change(date, { hour: 23, min: 59, sec: 59, usec: new Rational(999999999, 1000) });
 }
 
 // Rails' `alias`es on the day boundaries — time/calculations.rb:241-243,
@@ -80,8 +87,15 @@ export function beginningOfHour(date: Date): Temporal.Instant {
   return change(date, { min: 0 });
 }
 
+/**
+ * @missingRailsArgs change — PERMANENT: time/calculations.rb:273-279 passes
+ * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
+ * `Rational()` is a Kernel function where TS spells the construction
+ * `new Rational(...)`, which the extractor records as `ref:constructor` rather
+ * than `ref:Rational`.
+ */
 export function endOfHour(date: Date): Temporal.Instant {
-  return change(date, { min: 59, sec: 59, usec: 999999999 / 1000 });
+  return change(date, { min: 59, sec: 59, usec: new Rational(999999999, 1000) });
 }
 
 // time/calculations.rb:270, 281.
@@ -96,8 +110,15 @@ export function beginningOfMinute(date: Date): Temporal.Instant {
   return change(date, { sec: 0 });
 }
 
+/**
+ * @missingRailsArgs change — PERMANENT: time/calculations.rb:289-294 passes
+ * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
+ * `Rational()` is a Kernel function where TS spells the construction
+ * `new Rational(...)`, which the extractor records as `ref:constructor` rather
+ * than `ref:Rational`.
+ */
 export function endOfMinute(date: Date): Temporal.Instant {
-  return change(date, { sec: 59, usec: 999999999 / 1000 });
+  return change(date, { sec: 59, usec: new Rational(999999999, 1000) });
 }
 
 // time/calculations.rb:286, 295.
@@ -415,7 +436,8 @@ interface ChangeOptions {
   hour?: number;
   min?: number;
   sec?: number;
-  usec?: number;
+  /** Ruby passes a `Rational` here (`Rational(999999999, 1000)`), as well as an Integer. */
+  usec?: number | Rational;
   nsec?: number;
   /** Ruby's `:offset` takes either a `"+HH:MM"` String or a seconds Integer. */
   offset?: string | number;
@@ -456,11 +478,13 @@ export function change(
   const newDay = options.day ?? self.day;
   const newHour = options.hour ?? self.hour;
   const newMin = options.min ?? (options.hour !== undefined ? 0 : self.minute);
-  let newSec =
-    options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second);
+  let newSec = new Rational(
+    options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second),
+    1,
+  );
   const newOffset = options.offset ?? null;
 
-  let newUsec: number;
+  let newUsec: Rational;
   const newNsec = options.nsec;
   if (newNsec !== undefined) {
     if (options.usec !== undefined) {
@@ -472,21 +496,27 @@ export function change(
           .join(", ")}}`,
       );
     }
-    newUsec = newNsec / 1000;
+    newUsec = new Rational(newNsec, 1000);
   } else {
+    const usec = options.usec;
     newUsec =
-      options.usec ??
-      (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
-        ? 0
-        : nsec / 1000);
+      usec !== undefined
+        ? usec instanceof Rational
+          ? usec
+          : new Rational(usec, 1)
+        : options.hour !== undefined || options.min !== undefined || options.sec !== undefined
+          ? new Rational(0, 1)
+          : new Rational(nsec, 1000);
   }
 
-  if (newUsec >= 1000000) throw new ArgumentError("argument out of range");
+  if (newUsec.cmp(1000000) >= 0) throw new ArgumentError("argument out of range");
 
-  newSec += newUsec / 1_000_000;
+  // `Rational(new_usec, 1000000)` (time/calculations.rb:141) — `Rational()` of a
+  // Rational over an Integer is that Rational divided by it, which `quo` spells.
+  newSec = newSec.add(newUsec.quo(1_000_000));
 
-  const secFloor = Math.floor(newSec);
-  const newNsecOfSec = Math.round((newSec - secFloor) * 1_000_000_000);
+  const secFloor = newSec.div(1);
+  const newNsecOfSec = newSec.add(-secFloor).mul(1_000_000_000).toI();
   const newComponents = {
     year: newYear,
     month: newMonth,
@@ -498,16 +528,6 @@ export function change(
     microsecond: Math.floor(newNsecOfSec / 1_000) % 1_000,
     nanosecond: newNsecOfSec % 1_000,
   };
-
-  const newSecRational = new Rational(
-    BigInt(newComponents.second) * 1_000_000_000n +
-      BigInt(
-        newComponents.millisecond * 1_000_000 +
-          newComponents.microsecond * 1_000 +
-          newComponents.nanosecond,
-      ),
-    1_000_000_000n,
-  );
 
   // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag; a
   // JS `Date` carries none and is never `utc?`, even under `TZ=UTC`.
@@ -528,7 +548,7 @@ export function change(
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
     // the same fixed-offset zone with the String form only.
     if (date instanceof RubyTime) {
-      return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSecRational, newOffset);
+      return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSec, newOffset);
     }
     const timeZone =
       typeof newOffset === "number"
@@ -541,7 +561,7 @@ export function change(
   if (isUtc) {
     // `elsif utc?` (time/calculations.rb:147-148).
     if (date instanceof RubyTime) {
-      return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSecRational);
+      return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
     }
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
@@ -590,7 +610,7 @@ export function change(
     // reversed component order, `isdst` picking the occurrence of a wall clock a
     // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
     const newTime = RubyTime.local(
-      newSecRational,
+      newSec,
       newMin,
       newHour,
       newDay,
@@ -614,7 +634,7 @@ export function change(
     newDay,
     newHour,
     newMin,
-    newSecRational,
+    newSec,
     (date as RubyTime).utcOffset,
   );
 }

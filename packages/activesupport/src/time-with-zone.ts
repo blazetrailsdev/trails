@@ -154,6 +154,12 @@ export class TimeWithZone {
   private readonly _timeZone: TimeZone;
   /** `@period` — memoized by {@link period}. */
   private _period?: TimezonePeriod;
+  /** `@to_time_with_timezone` — memoized by {@link toTime}'s `:zone` arm. */
+  private _toTimeWithTimezone?: Time;
+  /** `@to_time_with_instance_offset` — memoized by {@link toTime}'s offset arm. */
+  private _toTimeWithInstanceOffset?: Time;
+  /** `@to_time_with_system_offset` — memoized by {@link toTime}'s system arm. */
+  private _toTimeWithSystemOffset?: Time;
 
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#initialize`
@@ -563,16 +569,15 @@ export class TimeWithZone {
    * Rails hands `getlocal` the `TimeZone` object itself for the `:zone` arm,
    * which `::Time` reads through `utc_to_local`; `@blazetrails/date`'s `Time`
    * seats a zone by its IANA identifier, which is the same zone spelled the way
-   * that constructor takes it. The three `@to_time_with_*` memos Rails keeps are
-   * not carried — the value is recomputed rather than cached.
+   * that constructor takes it.
    */
   toTime(): Time {
     if (this.preserveTimezone() === ":zone") {
-      return this.getlocal(this.timeZone.tzinfo.identifier);
+      return (this._toTimeWithTimezone ??= this.getlocal(this.timeZone.tzinfo.identifier));
     } else if (this.preserveTimezone()) {
-      return this.getlocal(this.utcOffset);
+      return (this._toTimeWithInstanceOffset ??= this.getlocal(this.utcOffset));
     } else {
-      return this.getlocal();
+      return (this._toTimeWithSystemOffset ??= this.getlocal());
     }
   }
 
