@@ -97,6 +97,11 @@ export interface ArtifactMismatch {
    *  alone; absent, every declaration of the name in the file is reconciled,
    *  as before this was keyed. */
   tsClass?: string;
+  /** The file the declaration is written in, when it is not `tsFile` — a class
+   *  re-exported from the Rails-matched file but declared in a collaborator.
+   *  The row still KEYS on `tsFile` (baseline path, reason lookup); this only
+   *  says which file to open and tag. */
+  declFile?: string;
   missing: string[];
 }
 
@@ -107,6 +112,8 @@ export interface SuppressedCall {
   tsName: string;
   /** See `ArtifactMismatch.tsClass`. */
   tsClass?: string;
+  /** See `ArtifactMismatch.declFile`. */
+  declFile?: string;
   call: string;
 }
 
@@ -275,6 +282,11 @@ export interface MethodExpectation {
   rubyNames: string[];
   /** The declaration's TS name, since the map key is class-qualified. */
   tsName: string;
+  /** The artifact's `tsFile` for these rows — the baseline/reason key, which is
+   *  NOT the file the expectation is grouped under when the declaration lives in
+   *  a collaborator (see `ArtifactMismatch.declFile`). Absent for expectations
+   *  built by hand in tests, where the two are the same. */
+  tsFile?: string;
   calls: Set<string>;
 }
 
@@ -283,10 +295,11 @@ export interface MethodExpectation {
 function firstCuratedReason(
   rubyNames: string[],
   call: string,
-  reasonFor: (rubyName: string, call: string) => string,
+  reasonFor: (rubyName: string, call: string, tsFile?: string) => string,
+  tsFile?: string,
 ): string {
   for (const rubyName of rubyNames) {
-    const reason = reasonFor(rubyName, call);
+    const reason = reasonFor(rubyName, call, tsFile);
     if (justifies(reason.trim())) return reason;
   }
   return DEFAULT_TAG_REASON;
@@ -405,7 +418,7 @@ export function reconcileFileText(
   fileName: string,
   text: string,
   expectations: Map<string, MethodExpectation>,
-  reasonFor: (rubyName: string, call: string) => string,
+  reasonFor: (rubyName: string, call: string, tsFile?: string) => string,
   onlyCall?: ReadonlySet<string>,
   staleTags?: ReadonlySet<string>,
 ): {
@@ -422,7 +435,7 @@ export function reconcileFileText(
    *  `main` drops them from the split baseline in the same operation (RFC
    *  0083). A tag still carrying the seeded placeholder justifies nothing and
    *  keeps its row: it does not suppress either (see `justifies`). */
-  tagged: { rubyName: string; call: string }[];
+  tagged: { rubyName: string; call: string; tsFile?: string }[];
   /** Expectation names never seen on a declaration this file can tag
    *  (prototype-patched methods, a name declared only in another file, …) —
    *  reported, never silently dropped. */
@@ -436,7 +449,7 @@ export function reconcileFileText(
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
   const preserved: { tsName: string; entry: TagEntry }[] = [];
-  const tagged: { rubyName: string; call: string }[] = [];
+  const tagged: { rubyName: string; call: string; tsFile?: string }[] = [];
   const seen = new Set<string>();
   const skipped: string[] = [];
 
@@ -494,7 +507,8 @@ export function reconcileFileText(
       const r = reconcile(
         entries,
         expected,
-        (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
+        (c) =>
+          exp ? firstCuratedReason(exp.rubyNames, c, reasonFor, exp.tsFile) : DEFAULT_TAG_REASON,
         onlyCall,
       );
       if (!exp) {
@@ -508,7 +522,8 @@ export function reconcileFileText(
       if (exp) {
         for (const e of [...r.kept, ...r.added]) {
           if (!justifies(e.reason)) continue;
-          for (const rubyName of exp.rubyNames) tagged.push({ rubyName, call: e.call });
+          for (const rubyName of exp.rubyNames)
+            tagged.push({ rubyName, call: e.call, tsFile: exp.tsFile });
         }
       }
       for (const d of r.dropped) {
@@ -557,27 +572,32 @@ export function buildExpectations(
   const byFile = new Map<string, Map<string, MethodExpectation>>();
   const expectationFor = (
     tsFile: string,
+    declFile: string | undefined,
     tsName: string,
     tsClass: string | undefined,
     rubyName: string,
   ) => {
-    const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
+    // Grouped under the file the declaration is WRITTEN in, which is the file
+    // the migrator opens; `tsFile` rides along as the baseline/reason key.
+    const file = declFile ?? tsFile;
+    const fileMap = byFile.get(file) ?? byFile.set(file, new Map()).get(file)!;
     const key = expectationKey(tsClass ?? ANY_CLASS, tsName);
     const exp =
-      fileMap.get(key) ?? fileMap.set(key, { rubyNames: [], tsName, calls: new Set() }).get(key)!;
+      fileMap.get(key) ??
+      fileMap.set(key, { rubyNames: [], tsName, tsFile, calls: new Set() }).get(key)!;
     if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
     return exp;
   };
   for (const m of artifact.mismatches) {
     if (m.package !== pkg) continue;
     if (onlyFile && m.tsFile !== onlyFile) continue;
-    const exp = expectationFor(m.tsFile, m.tsName, m.tsClass, m.rubyName);
+    const exp = expectationFor(m.tsFile, m.declFile, m.tsName, m.tsClass, m.rubyName);
     for (const missing of m.missing) exp.calls.add(callOf(missing));
   }
   for (const c of artifact.suppressed ?? []) {
     if (c.package !== pkg) continue;
     if (onlyFile && c.tsFile !== onlyFile) continue;
-    expectationFor(c.tsFile, c.tsName, c.tsClass, c.rubyName).calls.add(c.call);
+    expectationFor(c.tsFile, c.declFile, c.tsName, c.tsClass, c.rubyName).calls.add(c.call);
   }
   return byFile;
 }
@@ -683,8 +703,9 @@ async function main(argv: string[]): Promise<number> {
         path.relative(ROOT_DIR, abs),
         text,
         expectations,
-        (rubyName, call) =>
-          reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
+        (rubyName, call, keyFile = tsFile) =>
+          reasons.get(keyOf({ package: pkg, tsFile: keyFile, rubyName, call })) ??
+          DEFAULT_TAG_REASON,
         onlyCall.size > 0 ? onlyCall : undefined,
         staleByFile.get(tsFile),
       );
@@ -701,7 +722,10 @@ async function main(argv: string[]): Promise<number> {
       skipped: fileSkipped,
     } = reconciled;
     skipped += fileSkipped.length;
-    for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
+    for (const t of tagged)
+      migrated.add(
+        keyOf({ package: pkg, tsFile: t.tsFile ?? tsFile, rubyName: t.rubyName, call: t.call }),
+      );
     for (const h of harvested) {
       console.log(
         `DROPPED ${TAG} on ${tsFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +

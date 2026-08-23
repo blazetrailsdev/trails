@@ -273,6 +273,11 @@ export abstract class Store {
   protected coder: CacheCoder;
   protected coderSupportsCompression: boolean;
 
+  /**
+   * @missingRailsCall delete — PERMANENT: `@options.delete(:coder)`
+   *   (cache.rb:301) is the JS `delete` operator here, a statement rather than a
+   *   call the extractor can see.
+   */
   constructor(options?: StoreOptions) {
     this.options = options ? this.validateOptions(Store.normalizeOptions({ ...options })) : {};
 
@@ -676,7 +681,14 @@ export abstract class Store {
     return keys.filter((k) => this.deleteEntry(k, options)).length;
   }
 
-  /** Mirrors Rails `Cache::Store#merged_options` (cache.rb:861–888). */
+  /**
+   * Mirrors Rails `Cache::Store#merged_options` (cache.rb:861–888).
+   *
+   * @missingRailsCall merge — PERMANENT: cache.rb:883
+   *   `options.merge(call_options)` — Ruby Hash#merge returns a new hash, which
+   *   JS object spread (`{ ...this.options, ...call }`) is; trails has no Hash
+   *   object to call `merge` on.
+   */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 
@@ -774,6 +786,11 @@ export abstract class Store {
    * `delete_matched` to its own keys. A `^`-anchored source has the anchor moved
    * in front of the prefix; an unanchored source is matched anywhere after the
    * prefix (`.*`).
+   *
+   * @missingRailsCall call — PERMANENT: cache.rb:780
+   *   `options[:namespace].is_a?(Proc) ? options[:namespace].call : ...` — a
+   *   Ruby Proc is invoked through `#call`; the JS callable it ports to is
+   *   invoked as `ns()`, so there is no `call` to make.
    */
   protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
     // Same per-call override semantics as namespaceKey below: Rails'
@@ -826,7 +843,15 @@ export abstract class Store {
     return String(toParam(expanded) ?? "");
   }
 
-  /** Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991). */
+  /**
+   * Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991).
+   *
+   * @missingRailsCall try — PERMANENT: cache.rb:991
+   *   `options[:version].try(:to_param)` — Ruby's `to_param` is an Object
+   *   core_ext method every receiver responds to, so `try` guards only nil;
+   *   trails ports `to_param` as the free function `toParam`, so the guard is
+   *   the explicit `!= null` check and there is no method to `try`.
+   */
   protected normalizeVersion(key: unknown, options?: StoreOptions): string | undefined {
     // Ruby's `||` falls through on nil AND false, so a `to_param` that answers
     // false takes `expanded_version`, where `??` alone would keep "false".

@@ -1018,6 +1018,8 @@ export interface SuppressedCall {
   tsName: string;
   /** See `CallMismatch.tsClass`. */
   tsClass?: string;
+  /** See `CallMismatch.declFile`. */
+  declFile?: string;
   call: string;
   /** The tag's reason, carried so the report can group the receipts by the
    *  permanence claim it opens with (RFC 0099). `""` when the artifact the
@@ -1542,6 +1544,13 @@ interface CallMismatch {
    *  that name resolve to one (see `resolveTsOwner`). `parity:api:build` mints
    *  the tag on that declaration alone. */
   tsClass?: string;
+  /** The file the declaration actually LIVES in, when it is not `tsFile` — a
+   *  class re-exported from the Rails-matched file but declared in a collaborator
+   *  (`cache.ts` re-exports `Store`, declared in `cache/store.ts`). The row keys
+   *  on `tsFile` as it always has; this only tells `parity:api:build` which file
+   *  to open, which is why those rows used to report "no body-bearing
+   *  declaration". */
+  declFile?: string;
   missing: string[];
 }
 
@@ -2628,6 +2637,11 @@ export function main() {
     const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
+    // (recorded file → tsName → owner → the file the declaration is written in),
+    // for the members a re-exported class contributes to the Rails-matched file
+    // while living in a collaborator (`cache.ts` re-exports `Store`, declared in
+    // `cache/store.ts`). Only recorded when the two differ.
+    const tsDeclFileByFileName = new Map<string, Map<string, Map<string, string>>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
@@ -2807,6 +2821,13 @@ export function main() {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
         tsSkeletonByFileName.set(file, byName);
+      }
+      if (scope === "package" && m.file !== undefined && m.file !== file) {
+        const byName = tsDeclFileByFileName.get(file) ?? new Map<string, Map<string, string>>();
+        const byOwner = byName.get(m.name) ?? new Map<string, string>();
+        byOwner.set(owner, m.file);
+        byName.set(m.name, byOwner);
+        tsDeclFileByFileName.set(file, byName);
       }
       if (m.calls !== undefined) {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
@@ -3403,6 +3424,11 @@ export function main() {
             ),
           );
         }
+        const declFile = tsDeclFileByFileName
+          .get(tsFile)
+          ?.get(tsName)
+          ?.get(tsClass ?? "");
+        const declFileField = declFile === undefined ? {} : { declFile };
         const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
         let flagged = [...missing, ...ordered];
         if (tags !== undefined && tags.size > 0) {
@@ -3411,11 +3437,19 @@ export function main() {
           const applied = applyCallTags(flagged, tags, used);
           flagged = applied.kept;
           for (const s of applied.suppressed) {
-            suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, ...s });
+            suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, ...declFileField, ...s });
           }
         }
         if (flagged.length === 0) return;
-        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, tsClass, missing: flagged });
+        callMismatches.push({
+          rubyFile,
+          tsFile,
+          rubyName,
+          tsName,
+          tsClass,
+          ...declFileField,
+          missing: flagged,
+        });
       };
 
       // Advisory call-argument check (RFC 0095), on the pair checkCalls

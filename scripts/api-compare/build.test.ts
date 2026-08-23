@@ -555,9 +555,43 @@ describe("buildExpectations", () => {
     expect([...calls].sort()).toEqual(["each", "first"]);
   });
 
+  it("groups a declFile row under the file the declaration is written in", () => {
+    const declared = {
+      packages: ["activesupport"],
+      mismatches: [
+        {
+          package: "activesupport",
+          tsFile: "cache.ts",
+          declFile: "cache/store.ts",
+          rubyName: "key_matcher",
+          tsName: "keyMatcher",
+          tsClass: "Store",
+          missing: ["call → call"],
+        },
+      ],
+    };
+    const byFile = buildExpectations(declared, "activesupport");
+    expect(byFile.has("cache.ts")).toBe(false);
+    const exp = byFile.get("cache/store.ts")!.get(expectationKey("Store", "keyMatcher"))!;
+    expect([...exp.calls]).toEqual(["call"]);
+    // The baseline/reason key stays the artifact's tsFile.
+    expect(exp.tsFile).toBe("cache.ts");
+  });
+
   it("ignores other packages and honours the --file filter", () => {
     expect(buildExpectations(artifact, "other").has("insert-manager.ts")).toBe(false);
     expect(buildExpectations(artifact, "arel", "elsewhere.ts").size).toBe(0);
+  });
+
+  it("reports a declFile expectation's tsFile with each tag it migrates", () => {
+    const exp = new Map([
+      [
+        expectationKey(ANY_CLASS, "bar"),
+        { rubyNames: ["bar"], tsName: "bar", tsFile: "cache.ts", calls: new Set(["save"]) },
+      ],
+    ]);
+    const { tagged } = reconcileFileText("cache/store.ts", FILE, exp, () => "PERMANENT: x");
+    expect(tagged).toEqual([{ rubyName: "bar", call: "save", tsFile: "cache.ts" }]);
   });
 
   it("leaves a placeholder-reasoned row in the baseline — it justifies nothing", () => {
