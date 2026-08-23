@@ -69,8 +69,6 @@ function asDate(instant: Temporal.Instant): Date {
 
 function withEnvTz<T>(tz: string, fn: () => T): T {
   vi.stubEnv("TZ", tz);
-  // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
-  // to drop it, exactly as `tzset` does.
   resetLocalTimeZoneId();
   try {
     return fn();

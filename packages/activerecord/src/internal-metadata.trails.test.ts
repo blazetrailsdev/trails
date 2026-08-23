@@ -34,8 +34,6 @@ const FIXED_LOCAL = "2026-07-25 19:25:21.123";
 describe("InternalMetadata#currentTime", () => {
   beforeAll(() => {
     vi.stubEnv("TZ", "America/New_York");
-    // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
-    // to drop it, exactly as `tzset` does.
     resetLocalTimeZoneId();
     vi.useFakeTimers();
     vi.setSystemTime(new Date(FIXED_INSTANT));
