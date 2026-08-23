@@ -787,11 +787,11 @@ export class CollectionAssociation extends Association {
    * (collection_association.rb:251), against the baseline captured before the
    * in-memory half of `replace` mutated `target`.
    *
+   * Rails inlines this as the transaction's block; it is a named private
+   * helper here only because the block is async while `replace` is not (a JS
+   * property setter cannot await, RFC 0068). It retires with that split.
+   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE — Rails inlines this as the transaction's
-   * block; it is a named private helper here only because the block is async
-   * while `replace` is not (a JS property setter cannot await, RFC 0068). It
-   * retires with that split.
    */
   protected async replaceRecordsInTransaction(pending: ReplacePlan): Promise<void> {
     // If the association wasn't loaded at assignment time, fetch the persisted
