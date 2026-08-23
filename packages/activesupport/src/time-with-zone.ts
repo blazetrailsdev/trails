@@ -521,7 +521,7 @@ export class TimeWithZone {
     return this.utc();
   }
 
-  /** `alias_method :getgm, :utc` (time_with_zone.rb:66). */
+  /** `alias_method :getgm, :utc` (time_with_zone.rb:67). */
   getgm(): Time {
     return this.utc();
   }
