@@ -855,15 +855,6 @@ export function arelTable(this: CoreHost): Table {
  * a placeholder key for its whole life. Converging that slot is tracked
  * separately (RFC 0115 `seat-the-per-instance-primary-key-slot`).
  *
- * `klass.define_attribute_methods` (core.rb:849) is likewise absent, and
- * CONVERGEABLE rather than permanent: Rails can force the class's attribute
- * methods to exist by construction time because `attribute_types` loads the
- * schema synchronously. trails' schema load is async, so the methods are
- * generated when the columns hash arrives (`applyColumnsHash`) instead; a call
- * here would be either a no-op or a synchronous schema read that does not
- * exist. (No `@missingRailsCall` tag: `parity:api:calls` does not flag the
- * omission, and a tag it cannot see reads as stale to the gate.)
- *
  * @internal
  */
 export function initInternals(
@@ -891,6 +882,7 @@ export function initInternals(
   const klass = this.constructor as any;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
+  klass.defineAttributeMethods();
 }
 
 /**
