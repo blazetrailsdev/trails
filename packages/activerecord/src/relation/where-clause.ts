@@ -8,22 +8,27 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Nodes, fetchAttribute } from "@blazetrails/arel";
+import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 export class WhereClause {
-  private _predicates: Nodes.Node[];
+  // Rails' predicates array holds raw Strings alongside Arel nodes —
+  // `build_where_clause`'s sanitize_sql arm stores the bare String
+  // (query_methods.rb:1627) and this class handles it at where_clause.rb:160,
+  // 167, 190 and 203.
+  private _predicates: (Nodes.Node | string)[];
 
   /** @internal */
-  get predicates(): Nodes.Node[] {
+  get predicates(): (Nodes.Node | string)[] {
     return this._predicates;
   }
 
   /** @internal */
-  set predicates(value: Nodes.Node[]) {
+  set predicates(value: (Nodes.Node | string)[]) {
     this._predicates = value;
   }
 
-  constructor(predicates: Nodes.Node[] = []) {
+  constructor(predicates: (Nodes.Node | string)[] = []) {
     this._predicates = predicates;
   }
 
@@ -132,7 +137,12 @@ export class WhereClause {
     return (
       other instanceof WhereClause &&
       this.predicates.length === other.predicates.length &&
-      this.predicates.every((predicate, i) => predicate.eql(other.predicates[i]))
+      this.predicates.every((predicate, i) => {
+        const otherPredicate = other.predicates[i];
+        return typeof predicate === "string" || typeof otherPredicate === "string"
+          ? predicate === otherPredicate
+          : predicate.eql(otherPredicate);
+      })
     );
   }
 
@@ -174,7 +184,9 @@ export class WhereClause {
   }
 
   /** @internal */
-  private exceptPredicates(columns: (string | Nodes.Attribute | Nodes.Node)[]): Nodes.Node[] {
+  private exceptPredicates(
+    columns: (string | Nodes.Attribute | Nodes.Node)[],
+  ): (Nodes.Node | string)[] {
     // Rails: separate Attribute objects from string column names.
     // Attributes compared via eql() (table-qualified), strings by name only.
     const attrNodes: Nodes.Attribute[] = [];
@@ -211,18 +223,26 @@ export class WhereClause {
    *  manager paths build their WHERE list from it directly. */
   predicatesWithWrappedSqlLiterals(): Nodes.Node[] {
     return this.nonEmptyPredicates().map((node) => {
-      if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
+      if (node instanceof Nodes.SqlLiteral || typeof node === "string") return wrapSqlLiteral(node);
       return node;
     });
   }
 
-  /** @internal */
-  private nonEmptyPredicates(): Nodes.Node[] {
-    return this.predicates.filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""));
+  /**
+   * @internal
+   * Rails' `predicates - ARRAY_WITH_EMPTY_STRING` (where_clause.rb:197-200)
+   * drops a SqlLiteral("") too, because SqlLiteral subclasses String in Ruby.
+   */
+  private nonEmptyPredicates(): (Nodes.Node | string)[] {
+    return this.predicates.filter(
+      (n) => n !== "" && !(n instanceof Nodes.SqlLiteral && n.value === ""),
+    );
   }
 
   /** @internal */
-  private eachAttributes(fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node) => void): void {
+  private eachAttributes(
+    fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node | string) => void,
+  ): void {
     for (const node of this.predicates) {
       let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
@@ -237,8 +257,8 @@ export class WhereClause {
   }
 
   /** @internal */
-  protected referencedColumns(): Record<string, Nodes.Node> {
-    const hash: Record<string, Nodes.Node> = {};
+  protected referencedColumns(): Record<string, Nodes.Node | string> {
+    const hash: Record<string, Nodes.Node | string> = {};
     this.eachAttributes((attr, node) => {
       const key =
         attr instanceof Nodes.Attribute
@@ -251,14 +271,27 @@ export class WhereClause {
 }
 
 /** @internal */
-function invertPredicate(node: Nodes.Node): Nodes.Node {
+function invertPredicate(node: Nodes.Node | string | null | undefined): Nodes.Node {
+  if (node == null) {
+    throw new ArgumentError("Invalid argument for .where.not(), got nil.");
+  }
+  if (typeof node === "string") {
+    return new Nodes.Not(new Nodes.SqlLiteral(node));
+  }
   return node.invert();
 }
 
-function subtractNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
-  const result: Nodes.Node[] = [];
+function subtractNodes(
+  a: (Nodes.Node | string)[],
+  b: (Nodes.Node | string)[],
+): (Nodes.Node | string)[] {
+  const result: (Nodes.Node | string)[] = [];
   for (const node of a) {
-    if (!b.some((other) => node.eql(other))) {
+    if (
+      !b.some((other) =>
+        typeof node === "string" || typeof other === "string" ? node === other : node.eql(other),
+      )
+    ) {
       result.push(node);
     }
   }
@@ -268,7 +301,7 @@ function subtractNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
 // Mirrors Rails: `node.left if equality_node?(node) && node.left.is_a?(Arel::Predications)`.
 // Returns the left-hand expression of an equality predicate when it is a
 // non-Attribute Arel node (a NamedFunction, etc.), else null.
-function predicationLeft(node: Nodes.Node): Nodes.Node | null {
+function predicationLeft(node: Nodes.Node | string): Nodes.Node | null {
   const isEquality = typeof (node as any).isEquality === "function" && (node as any).isEquality();
   if (!isEquality) return null;
   const left = (node as any).left;
@@ -277,14 +310,12 @@ function predicationLeft(node: Nodes.Node): Nodes.Node | null {
 }
 
 /** @internal */
-function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node[] {
+function equalities(predicates: (Nodes.Node | string)[], equalityOnly: boolean): Nodes.Node[] {
   const result: Nodes.Node[] = [];
   for (const node of predicates) {
-    const matches = equalityOnly
-      ? node instanceof Nodes.Equality
-      : typeof (node as any).isEquality === "function" && (node as any).isEquality();
+    const matches = equalityOnly ? node instanceof Nodes.Equality : isEqualityNode(node);
     if (matches) {
-      result.push(node);
+      result.push(node as Nodes.Node);
     } else if (node instanceof Nodes.And) {
       result.push(...equalities((node as any).children, equalityOnly));
     }
@@ -314,10 +345,19 @@ function extractNodeValue(node: unknown): unknown {
   return node;
 }
 
-function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
-  const result = [...a];
+function unionNodes(
+  a: (Nodes.Node | string)[],
+  b: (Nodes.Node | string)[],
+): (Nodes.Node | string)[] {
+  const result: (Nodes.Node | string)[] = [...a];
   for (const node of b) {
-    if (!result.some((existing) => existing.eql(node))) {
+    if (
+      !result.some((existing) =>
+        typeof existing === "string" || typeof node === "string"
+          ? existing === node
+          : existing.eql(node),
+      )
+    ) {
       result.push(node);
     }
   }
@@ -325,17 +365,20 @@ function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
 }
 
 /** @internal */
-function predicates(wc: WhereClause): Nodes.Node[] {
+function predicates(wc: WhereClause): (Nodes.Node | string)[] {
   return wc.predicates;
 }
 
 /** @internal */
-function wrapSqlLiteral(node: Nodes.SqlLiteral): Nodes.Node {
+function wrapSqlLiteral(node: Nodes.SqlLiteral | string): Nodes.Node {
+  if (typeof node === "string") {
+    node = sql(node);
+  }
   return new Nodes.Grouping(node);
 }
 
 /** @internal */
-function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
+function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
   fetchAttribute(node, (attr: Nodes.Node) => {
     if (!(attr instanceof Nodes.Attribute)) return true;
@@ -350,7 +393,9 @@ function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
 }
 
 /** @internal */
-function isEqualityNode(node: Nodes.Node): boolean {
+function isEqualityNode(node: Nodes.Node | string): boolean {
+  // Rails' `!node.is_a?(String) && node.equality?` (where_clause.rb:159-161).
+  if (typeof node === "string") return false;
   if (node instanceof Nodes.Equality) return true;
   if (typeof (node as any).isEquality === "function") return (node as any).isEquality();
   return false;
