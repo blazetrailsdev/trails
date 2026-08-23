@@ -6,12 +6,16 @@ import {
   runAfterCallbacksOnProto,
   Model,
   type AttributeSet,
-  type CallbackConditions,
   type CallbackObject,
 } from "@blazetrails/activemodel";
 import {
   IsolatedExecutionState,
+  defineCallbacks,
+  extractOptionsBang,
+  included,
+  kernelArray,
   peekCallbackChain as asPeekCallbackChain,
+  type FilterListEntry,
 } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";
 import { Rollback } from "./errors.js";
@@ -173,6 +177,17 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
+/**
+ * Mirrors: ActiveRecord::Transactions' `included do ... end` (transactions.rb:10-14).
+ */
+export const InstanceMethods = {
+  [included](base: typeof Model): void {
+    for (const name of ["commit", "rollback", "before_commit"]) {
+      defineCallbacks(base.prototype, name, { scope: ["kind", "name"] });
+    }
+  },
+};
+
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
 export function beforeCommit<T extends typeof Base>(
   this: T,
@@ -271,29 +286,32 @@ export function afterRollback<T extends typeof Model>(
 export function setCallback<T extends typeof Model>(
   this: T,
   name: string,
-  timing: "before" | "after" | "around",
-  fn: TransactionCallbackFilter<typeof Model>,
-  options?: Record<string, unknown>,
+  // Ruby's `*filter_list` is untyped; the element type stays open here so the
+  // seven `before_commit`/`after_commit`/… macros above can forward their own
+  // `TransactionCallbackFilter<T>` through it.
+  ...filterList: FilterListEntry<any>[]
 ): void {
-  let filterList = options;
-  if ((name === "commit" || name === "rollback") && options?.on !== undefined) {
-    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+  const [rest, extracted] = extractOptionsBang(filterList);
+  const options = { ...extracted } as Record<string, unknown>;
+
+  if ((name === "commit" || name === "rollback") && options.on !== undefined) {
+    const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
-    const { on: _on, if: existingIf, ...rest } = options;
-    filterList = {
-      ...rest,
-      if: [
-        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
-        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
-      ],
-    };
+    options.if = [
+      (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+      ...kernelArray(options.if),
+    ];
+    // Rails leaves `:on` in the Hash it forwards to `super`, where Ruby's
+    // Callback simply ignores an unknown key; trails' `assertValidKeys` guard
+    // rejects it, so it comes off here.
+    delete options.on;
   }
-  (Model.setCallback as CallbackFn).call(
+
+  (Model.setCallback as (this: T, name: string, ...args: unknown[]) => void).call(
     this,
     name,
-    timing,
-    fn,
-    filterList as CallbackConditions | undefined,
+    ...rest,
+    options,
   );
 }
 

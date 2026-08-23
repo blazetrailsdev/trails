@@ -435,7 +435,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   // `ActiveSupport::Callbacks::ClassMethods`.
   it("setCallback registers a function for arbitrary event + timing", async () => {
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     Thing.setCallback("save", "before", () => log.push("before"));
     Thing.setCallback("save", "after", () => log.push("after"));
     await new Thing().runCallbacks("save", () => log.push("block"));
@@ -444,24 +448,41 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
   it("skipCallback removes a previously registered callback by reference", async () => {
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     const cb = () => log.push("skipped-callback");
     Thing.setCallback("save", "before", cb);
     Thing.setCallback("save", "before", () => log.push("kept"));
 
-    expect(Thing.skipCallback("save", "before", cb)).toBe(true);
+    Thing.skipCallback("save", "before", cb);
     await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["kept", "block"]);
   });
 
-  it("skipCallback returns false on miss (Rails raises unless :raise => false)", () => {
-    class Thing extends Model {}
-    expect(Thing.skipCallback("save", "before", () => undefined)).toBe(false);
+  it("skipCallback raises on miss unless raise: false", () => {
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
+    expect(() => Thing.skipCallback("save", "before", () => undefined)).toThrow(
+      /^Before save callback .* has not been defined$/,
+    );
+    expect(() =>
+      Thing.skipCallback("save", "before", () => undefined, { raise: false }),
+    ).not.toThrow();
   });
 
   it("resetCallbacks clears all callbacks for an event", async () => {
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save", "update");
+      }
+    }
     Thing.setCallback("save", "before", () => log.push("before"));
     Thing.setCallback("save", "after", () => log.push("after"));
     Thing.setCallback("update", "before", () => log.push("update-before"));
@@ -474,7 +495,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
   it("setCallback on subclass does not leak up to parent (copy-on-first-write)", async () => {
     const log: string[] = [];
-    class Parent extends Model {}
+    class Parent extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     class Child extends Parent {}
     Child.setCallback("save", "before", () => log.push("child"));
     await new Parent().runCallbacks("save", () => log.push("parent-block"));
@@ -485,9 +510,13 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
   it("skipCallback miss does NOT isolate subclass from future parent callbacks", async () => {
     const log: string[] = [];
-    class Parent extends Model {}
+    class Parent extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     class Child extends Parent {}
-    expect(Child.skipCallback("save", "before", () => undefined)).toBe(false);
+    Child.skipCallback("save", "before", () => undefined, { raise: false });
     Parent.setCallback("save", "before", () => log.push("from-parent"));
     await new Child().runCallbacks("save", () => log.push("child-block"));
     expect(log).toEqual(["from-parent", "child-block"]);
@@ -500,7 +529,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     // `register` internally resolves to a bound method, `skip` must
     // match the original object reference.
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     const obj = {
       beforeSave() {
         log.push("obj-before");
@@ -509,7 +542,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     Thing.setCallback("save", "before", obj);
     Thing.setCallback("save", "before", () => log.push("fn-kept"));
 
-    expect(Thing.skipCallback("save", "before", obj)).toBe(true);
+    Thing.skipCallback("save", "before", obj);
     await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["fn-kept", "block"]);
   });
@@ -529,7 +562,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     (Thing as unknown as { beforeShip: (o: object) => void }).beforeShip(obj);
     (Thing as unknown as { beforeShip: (fn: () => void) => void }).beforeShip(() => log.push("fn"));
 
-    expect(Thing.skipCallback("ship", "before", obj)).toBe(true);
+    Thing.skipCallback("ship", "before", obj);
     await new Thing().runCallbacks("ship", () => log.push("block"));
     expect(log).toEqual(["fn", "block"]);
   });
@@ -546,7 +579,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
   it("resetCallbacks clears CallbackObject-registered callbacks too", async () => {
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     const obj = {
       beforeSave() {
         log.push("obj-before");
@@ -560,9 +597,36 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     expect(log).toEqual(["block-after-reset"]);
   });
 
+  it("skipCallback with if: skips the callback conditionally at run time", async () => {
+    const log: string[] = [];
+    class Writer extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.defineModelCallbacks("save");
+      }
+    }
+    const savingMessage = (): void => {
+      log.push("saving...");
+    };
+    Writer.setCallback("save", "before", savingMessage);
+    Writer.skipCallback("save", "before", savingMessage, {
+      if: (record: Writer) => (record._readAttribute("age") as number) > 18,
+    });
+
+    await new Writer({ age: 20 }).runCallbacks("save", () => log.push("saved"));
+    expect(log).toEqual(["saved"]);
+
+    await new Writer({ age: 17 }).runCallbacks("save", () => log.push("saved"));
+    expect(log).toEqual(["saved", "saving...", "saved"]);
+  });
+
   it("setCallback respects prepend: true (runs before earlier-registered)", async () => {
     const log: string[] = [];
-    class Thing extends Model {}
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("save");
+      }
+    }
     Thing.setCallback("save", "before", () => log.push("registered-first"));
     Thing.setCallback("save", "before", () => log.push("prepended"), { prepend: true });
     await new Thing().runCallbacks("save", () => log.push("block"));

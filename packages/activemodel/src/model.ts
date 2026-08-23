@@ -16,7 +16,11 @@ import {
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
+  Callbacks as ASCallbacks,
+  defineCallbacks,
   resetCallbacks as asResetCallbacks,
+  type CallbackKind,
+  type FilterListEntry,
   extend,
   include,
   prepend,
@@ -45,14 +49,10 @@ import {
 } from "./dirty.js";
 import {
   CallbackFn,
-  AroundCallbackFn,
-  type CallbackObject,
   CallbackConditions,
   type RunCallbacksOptions,
   defineModelCallbacks,
   _registerCallbackOnProto,
-  hasCallbackOnProto,
-  skipCallbackOnProto,
   runAllCallbacks,
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
@@ -792,108 +792,22 @@ export class Model {
     options?: ValidationCallbackOptions,
   ) => void;
 
-  // ---------------------------------------------------------------------------
-  // Generic callback registration — Rails `set_callback` / `skip_callback` /
-  // `reset_callbacks` from `ActiveSupport::Callbacks::ClassMethods`
-  // (activesupport/lib/active_support/callbacks.rb:737-820). Exposes the
-  // canonical event-agnostic form so plugin authors can register callbacks
-  // for any event without needing a per-event convenience helper (beforeSave,
-  // afterCreate, etc.).
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Register a callback for `event` with `timing` (`"before" | "after" |
-   * "around"`). Mirrors Rails `set_callback(event, timing, filter, options)`
-   * (activesupport/lib/active_support/callbacks.rb:737-749). `filter` may be
-   * a function (most common in TS) or a method-object that our existing
-   * `_registerCallbackOnProto` accepts; `options` covers the usual Rails
-   * conditionals (`if`, `unless`, `prepend`). `on` is only valid for
-   * transactional callbacks (`commit` / `rollback`) — any other event
-   * raises if `on` is set, matching the existing per-event helpers.
-   */
-  static setCallback<T extends typeof Model>(
+  // The `ActiveSupport::Callbacks::ClassMethods` half (callbacks.rb:733-820),
+  // which Rails gets from `include ActiveSupport::Callbacks`; mixed on by the
+  // `extend(Model, Callbacks.ClassMethods)` at the bottom of this file and
+  // declared here only for their types. Ruby's `set_callback(name, *filter_list)`
+  // puts the timing, the filter and the trailing options Hash in `filter_list`.
+  declare static setCallback: <T extends typeof Model>(
     this: T,
-    event: string,
-    timing: "before" | "after",
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    options?: CallbackConditions<InstanceType<T>>,
-  ): void;
-  static setCallback<T extends typeof Model>(
+    name: string,
+    ...filterList: FilterListEntry<InstanceType<T>>[]
+  ) => void;
+  declare static skipCallback: <T extends typeof Model>(
     this: T,
-    event: string,
-    timing: "around",
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    options?: CallbackConditions<InstanceType<T>>,
-  ): void;
-  static setCallback<T extends typeof Model>(
-    this: T,
-    event: string,
-    timing: "before" | "after" | "around",
-    fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
-    options?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      timing,
-      event,
-      fn,
-      options as CallbackConditions | undefined,
-    );
-  }
-
-  /**
-   * Remove a previously-registered callback. Mirrors Rails
-   * `skip_callback(event, timing, filter)`
-   * (activesupport/lib/active_support/callbacks.rb:786-808). Identity
-   * comparison on `fn` — callers pass the same reference they registered.
-   * Returns `true` if a matching entry was removed; Rails raises when no
-   * match unless `raise: false`, we return boolean so the caller can
-   * decide.
-   *
-   * Note: Rails also lets `skip_callback(..., if: cond)` *conditionally*
-   * skip at run time (it rewrites the chain entry rather than deleting
-   * it). Ours only supports unconditional removal; for conditional
-   * skipping, re-`setCallback` the same filter wrapped in your own
-   * condition check.
-   */
-  static skipCallback<T extends typeof Model>(
-    this: T,
-    event: string,
-    timing: "before" | "after",
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-  ): boolean;
-  static skipCallback<T extends typeof Model>(
-    this: T,
-    event: string,
-    timing: "around",
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
-  ): boolean;
-  static skipCallback<T extends typeof Model>(
-    this: T,
-    event: string,
-    timing: "before" | "after" | "around",
-    fn: CallbackFn | AroundCallbackFn | CallbackObject,
-  ): boolean {
-    if (!hasCallbackOnProto(this.prototype, event, timing, fn)) return false;
-    return skipCallbackOnProto(this.prototype, event, timing, fn);
-  }
-
-  /**
-   * Clear every callback registered for `event` on this class. Mirrors
-   * Rails `reset_callbacks(name)`
-   * (activesupport/lib/active_support/callbacks.rb:811-821).
-   */
-  static resetCallbacks<T extends typeof Model>(this: T, event: string): void {
-    asResetCallbacks(this.prototype, event);
-  }
+    name: string,
+    ...filterList: FilterListEntry<InstanceType<T>>[]
+  ) => void;
+  declare static resetCallbacks: (name: string) => void;
 
   private static _ensureOwnValidators(): void {
     // Copy-on-first-write dup. Rails' `inherited(base)` hook
@@ -1903,9 +1817,14 @@ export class Model {
       .map((m) => this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m)));
   }
 
-  runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown {
-    return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
-  }
+  // `run_callbacks` (callbacks.rb:96-104), mixed on by the
+  // `include(Model, Callbacks.InstanceMethods)` at the bottom of this file.
+  declare runCallbacks: (
+    name: string,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+    type?: CallbackKind,
+  ) => unknown;
 }
 
 // Rails' `included do` block (attribute_methods.rb:70-73).
@@ -1970,9 +1889,18 @@ Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: fal
 Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
 Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
 
+// Ruby `include ActiveSupport::Callbacks` (callbacks.rb:733 ClassMethods, :96
+// run_callbacks), which every ActiveModel callback module includes.
+extend(Model, ASCallbacks.ClassMethods);
+include(Model, ASCallbacks.InstanceMethods);
+
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
-// (validations/callbacks.rb:32).
+// (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
+defineCallbacks(Model.prototype, "validation", {
+  skipAfterCallbacksIfTerminated: true,
+  scope: ["kind", "name"],
+});
 
 include(Model, ToJsonWithActiveSupportEncoder);
 
