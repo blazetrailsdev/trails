@@ -1803,6 +1803,27 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 
+  describe("initialize_dup", () => {
+    // validations.rb:310-313. `test_dup_validity_is_independent` cannot see the
+    // difference — every `valid?` clears the errors first. MRI-verified.
+    class DupTopic extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
+      }
+    }
+
+    it("gives the copy its own empty Errors", async () => {
+      const topic = new DupTopic();
+      expect(await topic.isValid()).toBe(false);
+      expect(topic.errors.empty).toBe(false);
+
+      const duped = topic.dup();
+      expect(duped.errors).not.toBe(topic.errors);
+      expect(duped.errors.empty).toBe(true);
+    });
+  });
+
   describe("Errors#generateMessage", () => {
     it("generate_message works without i18n_scope", () => {
       class User extends Model {

@@ -173,15 +173,15 @@ describe("DupTest", () => {
   });
 
   it("dup runs after_initialize against the duped attributes", async () => {
-    // Rails Core#initialize_dup sets @attributes before _run_initialize_callbacks,
-    // so the dup's after_initialize observes the duped attribute set. Topic's
-    // set_email_address hook writes a default only when author_email_address is
-    // unset on the (new) record — with the duped attributes in place, its write
-    // lands on the dup. The third fixture topic has no author_email_address.
+    // core.rb:550-556 sets @attributes before _run_initialize_callbacks and
+    // `@new_record = true` after them, so the hook sees the duped attributes on
+    // a record that still reports `persisted?` and Topic#set_email_address
+    // (topic.rb:117-121) writes nothing. MRI-verified on the vendored Rails.
     const topic = await Topic.find(3);
     expect(topic.author_email_address).toBeFalsy();
     const duped = topic.dup();
-    expect(duped.author_email_address).toBe("test@test.com");
+    expect(duped.title).toBe(topic.title);
+    expect(duped.author_email_address).toBeFalsy();
   });
 
   it("dup validity is independent", async () => {

@@ -33,6 +33,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
+  warmSchemaCacheBeforeFirstTest,
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
@@ -578,6 +579,8 @@ export function fixtures(
   // escape hatch the view/signed-id suites used before converging here.
   if (useTransactionalTests !== false) {
     withTransactionalFixtures(getConnection, { usesTransaction });
+  } else {
+    warmSchemaCacheBeforeFirstTest(getConnection);
   }
 
   return useFixtures(fixturesOrNames as FixtureMap, getConnection);
