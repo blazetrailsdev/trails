@@ -747,8 +747,9 @@ export default defineConfig(
 
   // ── no-freeform-comments, activerecord/associations: swept a slice at a
   //    time. The implementation files are done; the test files under the same
-  //    tree are still outstanding, so they are ignored here rather than
-  //    holding the rule off the whole tree until they land. ──
+  //    tree are still outstanding (story
+  //    strip-freeform-comments-ar-associations-tests), so they are ignored here
+  //    rather than holding the rule off the whole tree until they land. ──
   {
     files: ["packages/activerecord/src/associations/**/*.ts"],
     ignores: ["packages/activerecord/src/associations/**/*.test.ts"],
