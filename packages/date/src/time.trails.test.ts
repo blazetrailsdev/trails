@@ -365,4 +365,64 @@ describe("Time", () => {
       expect(eastern.zone).toBe("EST");
     });
   });
+  describe("Time.new given a String", () => {
+    it("parses MRI's `time_init_parse` grammar", () => {
+      const t = Time.new("2000-12-31 23:59:59.56789");
+      expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2000-12-31 23:59:59");
+      expect(t.nsec).toBe(567890000);
+      expect(Time.new("2020-01-01T01:02:03Z").isUtc()).toBe(true);
+      expect(Time.new("2020-01-01 01:02:03 +05:00").utcOffset).toBe(18000);
+      expect(Time.new("2020-01-01 01:02:03+0530").utcOffset).toBe(19800);
+      expect(Time.new("2020-01-01 01:02:03A").utcOffset).toBe(3600);
+      expect(Time.new("2020").strftime("%Y-%m-%d %H:%M:%S")).toBe("2020-01-01 00:00:00");
+      expect(Time.new("-05000-01-01 01:02:03").year).toBe(-5000);
+    });
+
+    it("truncates the sub-second to `precision:` digits", () => {
+      expect(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }).nsec).toBe(
+        Time.new("2000-12-31 23:59:59.567").nsec,
+      );
+      expect(Time.new("2000-12-31 23:59:59.56789", { precision: 20 }).nsec).toBe(567890000);
+      // `precision:` acts on nothing but the string form.
+      expect(Time.new(2020, 1, 1, 0, 0, 0.56789, null, { precision: 3 }).nsec).toBe(567890000);
+    });
+
+    it("takes `in:` for a string that spells no zone of its own", () => {
+      expect(Time.new("2020-01-01 00:00:00", { in: "+05:00" }).utcOffset).toBe(18000);
+      // MRI does NOT collide the two: the zone the string spells wins.
+      expect(Time.new("2020-01-01 00:00:00+01:00", { in: "+05:00" }).utcOffset).toBe(3600);
+    });
+
+    it("raises MRI's own message at the step that stopped the parse", () => {
+      expect(() => Time.new("garbage")).toThrow(new ArgumentError('can\'t parse: "garbage"'));
+      expect(() => Time.new("202-01-01T01:02:03")).toThrow(
+        new ArgumentError("year must be 4 or more digits: 202"),
+      );
+      expect(() => Time.new("2020-1-01 01:02:03")).toThrow(
+        new ArgumentError("two digits mon is expected after `-': -1-01 01:02"),
+      );
+      expect(() => Time.new("2020-01-0")).toThrow(
+        new ArgumentError("two digits mday is expected after `-': -0"),
+      );
+      expect(() => Time.new("2020-01-01")).toThrow(new ArgumentError("no time information"));
+      expect(() => Time.new("2020-01-01 1:02:03")).toThrow(
+        new ArgumentError("two digits hour is expected:  1:02:03"),
+      );
+      expect(() => Time.new("2020-01-01T01")).toThrow(new ArgumentError("missing min part: 01"));
+      expect(() => Time.new("2020-01-01T01:02")).toThrow(
+        new ArgumentError("missing sec part: 01:02"),
+      );
+      expect(() => Time.new("2020-01-01T01:02:")).toThrow(
+        new ArgumentError("two digits sec is expected after `:': :"),
+      );
+      expect(() => Time.new("2000-12-31 23:59:59.5", { precision: 0 })).toThrow(
+        new ArgumentError("subsecond expected after dot: 23:59:59.5"),
+      );
+      expect(() => Time.new("2020-01-01T01:02:03+05:0")).toThrow(
+        new ArgumentError(
+          '"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset: +05:0',
+        ),
+      );
+    });
+  });
 });

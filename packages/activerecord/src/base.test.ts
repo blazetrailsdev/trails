@@ -1942,13 +1942,11 @@ describe("BasicsTest", () => {
     }
     const log: string[] = [];
     const savedLogger = Base.logger;
-    // Logger stub has no debug/info handlers — benchmark should no-op for those levels
-    Base.logger = {
-      debug: undefined,
-      info: undefined,
-      warn: (msg: string) => log.push(msg),
-      error: (msg: string) => log.push(msg),
-    };
+    // Rails: `ActiveSupport::Logger.new(log)` with `level = Logger::WARN`, so
+    // the debug line is filtered by level rather than by a missing method.
+    const logger = new Logger({ write: (s: string) => log.push(s) });
+    logger.level = Logger.WARN;
+    Base.logger = logger as any;
     try {
       await Base.benchmark("Debug Topic Count", { level: "debug" }, () => Topic.count());
       await Base.benchmark("Warn Topic Count", { level: "warn" }, () => Topic.count());

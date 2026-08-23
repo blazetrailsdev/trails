@@ -121,30 +121,6 @@ export function descendants(modelClass: typeof Base): (typeof Base)[] {
 }
 
 /**
- * Hierarchical half of Rails' `descends_from_active_record?`: the `self == Base`
- * / abstract-superclass recursion / `superclass == Base` structure, with the
- * inheritance-column-presence test left to the caller. Splitting it out lets
- * {@link isFinderNeedsTypeCondition} memoize the stable structural answer without
- * caching a transient cold-schema column miss.
- *
- * Independent of the explicit `inheritanceColumn` sentinel that
- * {@link isStiSubclass} keys off — that sentinel still gates the
- * registry-resolved row-dispatch paths.
- *
- * @internal
- */
-function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
-  // Rails: `self == Base` → false.
-  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
-  const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
-  if (!parent || parent === Function.prototype || typeof parent.name !== "string") return true;
-  // Rails: `elsif superclass.abstract_class?` → recurse through the abstract chain.
-  if (parent.abstractClass) return descendsFromActiveRecordByHierarchy(parent);
-  // Rails else branch begins with `superclass == Base`.
-  return Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
-}
-
-/**
  * Check if a model descends directly from ActiveRecord::Base — i.e. it is a
  * hierarchy root rather than a concrete STI subclass.
  *
@@ -162,15 +138,20 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  */
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
-  // Rails' first arm, `if self == Base` → false, returns before the column
-  // test — Base has no table, so asking it for `columns_hash` raises.
+  // Rails: `if self == Base` → false. Detected via the `_isActiveRecordBase`
+  // own-property sentinel on Base.
   if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
-  if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  const columnsHash = modelClass.columnsHash();
-  const inheritCol = modelClass.inheritanceColumn;
+  const superclass = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  // Above Base there is no superclass to ask; Ruby never reaches here.
+  if (!superclass || superclass === Function.prototype || typeof superclass.name !== "string")
+    return true;
+  // Rails: `elsif superclass.abstract_class?` → recurse.
+  if (superclass.abstractClass) return isDescendsFromActiveRecord.call(superclass);
+  // Rails: `else superclass == Base || !columns_hash.include?(inheritance_column)`.
+  if (Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase")) return true;
   // Ruby `columns_hash.include?(inheritance_column)` is false for the nil
   // `inheritance_column` of an STI-disabled model, so no separate arm.
-  return !Object.keys(columnsHash).includes(inheritCol as string);
+  return !Object.keys(modelClass.columnsHash()).includes(modelClass.inheritanceColumn as string);
 }
 
 /**
@@ -690,21 +671,11 @@ export function defineDynamicSelectReaders(record: Base): void {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#finder_needs_type_condition?
  */
 export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
-  if (Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
-    return (modelClass as any)._finderNeedsTypeCondition === true;
+  // Rails: `:true == (@finder_needs_type_condition ||= descends_from_active_record? ? :false : :true)`.
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
+    (modelClass as any)._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();
   }
-  // Rails: `descends_from_active_record? ? :false : :true`, memoized.
-  if (!modelClass.isDescendsFromActiveRecord()) {
-    (modelClass as any)._finderNeedsTypeCondition = true;
-    return true;
-  }
-  // `descends` is true. Memoize only the stable reasons (a hierarchy root, or STI
-  // explicitly disabled); a non-root model that descends only because its `type`
-  // column hasn't reflected yet must recompute once schema warms.
-  if (descendsFromActiveRecordByHierarchy(modelClass) || modelClass.inheritanceColumn === null) {
-    (modelClass as any)._finderNeedsTypeCondition = false;
-  }
-  return false;
+  return (modelClass as any)._finderNeedsTypeCondition === true;
 }
 
 // The primary abstract class is stored in the canonical `ar-config.ts` module

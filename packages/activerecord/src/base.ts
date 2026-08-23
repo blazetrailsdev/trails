@@ -177,6 +177,7 @@ import {
   extend,
   classAttribute,
   benchmark as benchmarkable,
+  type BenchmarkLogger,
   runLoadHooks,
   isBlank as _isBlankValue,
   type PrependMethod,
@@ -1640,35 +1641,18 @@ export class Base extends Model {
   }
 
   // -- Logger --
-  static _logger: {
-    debug?: (...args: any[]) => void;
-    info?: (...args: any[]) => void;
-    warn?: (...args: any[]) => void;
-    error?: (...args: any[]) => void;
-  } | null = null;
+  static _logger: BenchmarkLogger | null = null;
 
   /**
    * Set or get the logger for SQL and lifecycle events.
    *
    * Mirrors: ActiveRecord::Base.logger
    */
-  static get logger(): {
-    debug?: (...args: any[]) => void;
-    info?: (...args: any[]) => void;
-    warn?: (...args: any[]) => void;
-    error?: (...args: any[]) => void;
-  } | null {
+  static get logger(): BenchmarkLogger | null {
     return this._logger;
   }
 
-  static set logger(
-    log: {
-      debug?: (...args: any[]) => void;
-      info?: (...args: any[]) => void;
-      warn?: (...args: any[]) => void;
-      error?: (...args: any[]) => void;
-    } | null,
-  ) {
+  static set logger(log: BenchmarkLogger | null) {
     this._logger = log;
   }
 

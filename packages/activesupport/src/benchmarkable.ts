@@ -8,11 +8,11 @@
 import { assertValidKeys } from "./hash-utils.js";
 
 export interface BenchmarkLogger {
-  debug?(message: string): void;
-  info?(message: string): void;
-  warn?(message: string): void;
-  error?(message: string): void;
-  fatal?(message: string): void;
+  debug(message: string): void;
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+  fatal(message: string): void;
   silence?(tempLevel?: number, fn?: () => void): void;
 }
 
@@ -71,10 +71,7 @@ export function benchmark<T>(
     const start = monotonicNow();
     const finish = (): T | Promise<Awaited<T>> => {
       const ms = monotonicNow() - start;
-      const write = (logger as Record<string, unknown>)[options.level!];
-      if (typeof write === "function") {
-        (write as (msg: string) => void).call(logger, `${message} (${ms.toFixed(1)}ms)`);
-      }
+      logger[options.level!](`${message} (${ms.toFixed(1)}ms)`);
       return result as Awaited<T>;
     };
 
