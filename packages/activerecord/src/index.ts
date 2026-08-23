@@ -120,7 +120,8 @@ export { ActiveRecord, isSchemaCacheIgnoredTable } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export type { EnumMacroOptions } from "./enum.js";
 export { registerSubclass, findStiClass } from "./inheritance.js";
-// hasSecurePassword requires node:crypto — use subpath: @blazetrails/activerecord/secure-password
+// hasSecurePassword is ActiveModel's (secure_password.rb:7, `include
+// ActiveModel::SecurePassword`) — use subpath: @blazetrails/activerecord/secure-password
 // CounterCache, ReadonlyAttributes, Timestamp, Locking::Pessimistic, and
 // Translation are consumed via the Base mixins — class methods like
 // `User.incrementCounter(...)`, `User.touchAll(...)`, `User.attrReadonly(...)`,

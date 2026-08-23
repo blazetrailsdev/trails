@@ -867,11 +867,16 @@ export class TimeWithZone {
     if (options.weeks) day += options.weeks * 7;
     if (options.days) day += options.days;
 
+    // `TimeZone#local` builds its wall clock with `Time.utc`, which raises on a
+    // day outside the month rather than rolling over the way `Date.UTC` does —
+    // so carry the accumulated days into the calendar here.
+    const rolled = Temporal.PlainDate.from({ year, month, day: 1 }).add({ days: day - 1 });
+
     // Reconstruct the local time, then convert to UTC
     const newLocal = this._timeZone.local(
-      year,
-      month,
-      day,
+      rolled.year,
+      rolled.month,
+      rolled.day,
       l.hour,
       l.minute,
       l.second,

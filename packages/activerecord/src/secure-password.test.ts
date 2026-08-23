@@ -2,8 +2,9 @@
  * Port of vendor/rails/activerecord/test/cases/secure_password_test.rb
  * Test names match the Rails counterpart.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
+import { SecurePassword } from "@blazetrails/activemodel";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -31,26 +32,23 @@ describe("SecurePasswordTest", () => {
     await User.loadSchema();
   });
 
-  // Our hasSecurePassword does not retain the plaintext on the instance after
-  // save (Rails keeps `@password`), so the cleartext is held in a local to feed
-  // authenticate_by — the assertions compare records by id, matching Rails' `==`.
-  const PASSWORD = "abc123";
-  const RECOVERY = "123abc";
-
+  let originalMinCost: boolean;
   let user: User;
   beforeEach(async () => {
-    // Rails: User.create(password:, recovery_password:). Our mass-assignment
-    // does not route the virtual `password` / `recovery_password` writers, so
-    // assign them explicitly before save.
-    user = new User();
-    (user as any).password = PASSWORD;
-    (user as any).recovery_password = RECOVERY;
-    await user.save();
+    // Speed up tests
+    originalMinCost = SecurePassword.minCost;
+    SecurePassword.minCost = true;
+
+    user = await User.create({ password: "abc123", recovery_password: "123abc" });
+  });
+
+  afterEach(() => {
+    SecurePassword.minCost = originalMinCost;
   });
 
   it("authenticate_by authenticates when password is correct", async () => {
     expect(
-      (await (User as any).authenticateBy({ token: user.token, password: PASSWORD }))?.id,
+      (await (User as any).authenticateBy({ token: user.token, password: user.password }))?.id,
     ).toBe(user.id);
   });
 
@@ -62,8 +60,8 @@ describe("SecurePasswordTest", () => {
     // Warm-up both the found (verify) and not-found (decoy hash) paths so the
     // first timed sample doesn't eat crypto/JIT init cost and the DB connection
     // is established.
-    await (User as any).authenticateBy({ token: user.token, password: PASSWORD });
-    await (User as any).authenticateBy({ token: "wrong", password: PASSWORD });
+    await (User as any).authenticateBy({ token: user.token, password: user.password });
+    await (User as any).authenticateBy({ token: "wrong", password: user.password });
 
     // Port of Rails' averaged + retried timing check
     // (activerecord/test/cases/secure_password_test.rb): Rails sums 1000
@@ -90,7 +88,7 @@ describe("SecurePasswordTest", () => {
       for (let i = 0; i < SAMPLES; i++) {
         const t0 = performance.now();
         expect(
-          (await (User as any).authenticateBy({ token: user.token, password: PASSWORD }))?.id,
+          (await (User as any).authenticateBy({ token: user.token, password: user.password }))?.id,
         ).toBe(user.id);
         foundCorrectMs = Math.min(foundCorrectMs, performance.now() - t0);
 
@@ -102,7 +100,7 @@ describe("SecurePasswordTest", () => {
 
         const t2 = performance.now();
         expect(
-          await (User as any).authenticateBy({ token: "wrong", password: PASSWORD }),
+          await (User as any).authenticateBy({ token: "wrong", password: user.password }),
         ).toBeNull();
         notFoundMs = Math.min(notFoundMs, performance.now() - t2);
       }
@@ -130,7 +128,7 @@ describe("SecurePasswordTest", () => {
         await (User as any).authenticateBy({
           token: user.token,
           auth_token: user.auth_token,
-          password: PASSWORD,
+          password: user.password,
         })
       )?.id,
     ).toBe(user.id);
@@ -138,7 +136,7 @@ describe("SecurePasswordTest", () => {
       await (User as any).authenticateBy({
         token: user.token,
         auth_token: "wrong",
-        password: PASSWORD,
+        password: user.password,
       }),
     ).toBeNull();
   });
@@ -148,15 +146,15 @@ describe("SecurePasswordTest", () => {
       (
         await (User as any).authenticateBy({
           token: user.token,
-          password: PASSWORD,
-          recovery_password: RECOVERY,
+          password: user.password,
+          recovery_password: user.recovery_password,
         })
       )?.id,
     ).toBe(user.id);
     expect(
       await (User as any).authenticateBy({
         token: user.token,
-        password: PASSWORD,
+        password: user.password,
         recovery_password: "wrong",
       }),
     ).toBeNull();
@@ -167,21 +165,21 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by requires at least one attribute", async () => {
-    await expect((User as any).authenticateBy({ password: PASSWORD })).rejects.toThrow();
+    await expect((User as any).authenticateBy({ password: user.password })).rejects.toThrow();
   });
 
   it("authenticate_by accepts any object that implements to_h", async () => {
     expect(
       (
         await (User as any).authenticateBy({
-          toH: () => ({ token: user.token, password: PASSWORD }),
+          toH: () => ({ token: user.token, password: user.password }),
         })
       )?.id,
     ).toBe(user.id);
 
     expect(
       await (User as any).authenticateBy({
-        toH: () => ({ token: "wrong", password: PASSWORD }),
+        toH: () => ({ token: "wrong", password: user.password }),
       }),
     ).toBeNull();
   });

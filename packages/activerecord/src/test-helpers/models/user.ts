@@ -26,7 +26,9 @@ export class User extends Base {
     ((name: "rentedRoom") => Promise<Room | null>);
   declare auth_token: string;
   declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
+  declare password: string | null;
   declare password_digest: string;
+  declare recovery_password: string | null;
   declare recovery_password_digest: string;
   declare token: string;
   declare updated_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
@@ -48,7 +50,7 @@ export class User extends Base {
   }
 }
 
-hasSecurePassword(User, { validations: false });
+hasSecurePassword(User, "password", { validations: false });
 hasSecurePassword(User, "recovery_password", { validations: false });
 User.hasSecureToken();
 User.hasSecureToken("auth_token", { length: 36 });

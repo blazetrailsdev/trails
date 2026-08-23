@@ -76,13 +76,9 @@ describe("TimeZoneTest", () => {
   it("local to utc", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     // standard offset -0500
-    expect(zone.localToUtc(new Date(Date.UTC(2000, 0, 1)))).toEqual(
-      new Date(Date.UTC(2000, 0, 1, 5)),
-    );
+    expect(zone.localToUtc(Time.utc(2000, 1, 1)).toS()).toBe(Time.utc(2000, 1, 1, 5).toS());
     // dst offset -0400
-    expect(zone.localToUtc(new Date(Date.UTC(2000, 6, 1)))).toEqual(
-      new Date(Date.UTC(2000, 6, 1, 4)),
-    );
+    expect(zone.localToUtc(Time.utc(2000, 7, 1)).toS()).toBe(Time.utc(2000, 7, 1, 4).toS());
   });
 
   it("period for local", () => {

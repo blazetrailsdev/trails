@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { CodeGenerator, include, uninclude, Module } from "@blazetrails/activesupport";
+import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
   aliasesByAttributeName,
@@ -313,28 +313,16 @@ export function dangerousAttributeMethods(): Set<string> {
  * ancestry does.
  *
  * Rails runs this from `inherited`, so the ivar is always empty and the
- * `include` is the class's only generated-methods entry. In trails a class body
- * can reach ActiveModel's lazy `generated_attribute_methods`
- * (attribute_methods.rb:400-402) first, which seats a bare `Module` and
- * includes it. Replacing that one means taking its carrier back out of the
- * prototype chain: `include()` splices a fresh carrier per call, so the stale
- * one would keep answering every method it defines after an `undef_method` on
- * the replacement. Its methods carry over, leaving the single module Ruby has.
+ * `include` is the class's only generated-methods entry. trails has no
+ * `inherited` hook, so the seeding is driven from the AR-owned entry points a
+ * class body has to pass through to generate anything — `Base.attribute`
+ * (base.ts) and `aliasAttribute` below — which get there before ActiveModel's
+ * lazy `generated_attribute_methods` (attribute_methods.rb:400-402) can seat a
+ * bare `Module`. So this never replaces an already-included module.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
-    ? this._generatedAttributeMethods
-    : undefined;
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._generatedAttributeMethods.ownerName = this.name;
-  if (previous instanceof Module) {
-    this._generatedAttributeMethods.moduleEval((mod) => {
-      for (const name of previous.instanceMethods()) {
-        Object.defineProperty(mod, name, previous.instanceMethod(name)!);
-      }
-    });
-    uninclude(this as unknown as new (...args: unknown[]) => unknown, previous);
-  }
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
@@ -356,6 +344,9 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
  * parent).
  */
 export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
   amAliasAttribute.call(this as never, newName, oldName);
 
   if (
@@ -465,15 +456,10 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // here the first time a class generates its methods, gated on an *own*
   // `_generatedAttributeMethods` so each subclass initializes exactly once.
   // Rails runs it from `included do` (attribute_methods.rb:10-11), before any
-  // class body can reach `generated_attribute_methods`; here a class-body
-  // `alias_attribute` gets there first and ActiveModel builds a bare `Module`
-  // under the same ivar name (attribute_methods.rb:400-402), so the gate also
-  // checks the class — Rails' AR override is what names the module
-  // (`const_set`), and it is the one this class must end up with.
-  if (
-    !Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods") ||
-    !(this._generatedAttributeMethods instanceof GeneratedAttributeMethods)
-  ) {
+  // class body can reach `generated_attribute_methods`; the AR-owned entry
+  // points a class body passes through (`Base.attribute`, `aliasAttribute`) do
+  // the same here, so by this point the module is usually already seated.
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
   // Rails' @attribute_methods_generated is a per-class ivar (nil for every
@@ -524,6 +510,13 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
+  // Rails' superclass already holds the module its `inherited` hook seeded
+  // (attribute_methods.rb:265-272); seed it here for the same reason
+  // `aliasAttribute` does, since a parent class reached this way may never have
+  // declared an attribute of its own.
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
   // Rails: `superclass.generate_alias_attributes unless superclass == Base`.
   const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
   if (
