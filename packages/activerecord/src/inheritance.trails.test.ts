@@ -58,3 +58,23 @@ describe("ensure_proper_type on an unreflected subclass", () => {
     expect(new ColdClient({}).type).toBe("ColdClient");
   });
 });
+
+describe("descends_from_active_record? on a cold model", () => {
+  // No `fixtures` here on purpose: the cold window is the one where nothing has
+  // leased a connection yet, so there is no warm `columns_hash` to read.
+
+  // The cold twin of "a virtual type attribute is not an inheritance column":
+  // Rails' `columns_hash.include?(inheritance_column)` (inheritance.rb:82-88)
+  // loads the schema when the columns are not reflected yet, rather than
+  // answering from `attribute_types` — which counts the virtual `type` and
+  // misreads the model as an STI subclass.
+  it("a virtual type attribute on an unreflected model is not an inheritance column", () => {
+    class ColdVirtualTypeAuthor extends Author {
+      static {
+        this.attribute("type", "string", { virtual: true } as never);
+      }
+    }
+
+    expect(ColdVirtualTypeAuthor.isDescendsFromActiveRecord()).toBe(true);
+  });
+});

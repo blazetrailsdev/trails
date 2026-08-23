@@ -7,7 +7,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
-import { cachedColumnsHash } from "./model-schema.js";
 import {
   camelize,
   constantize,
@@ -160,28 +159,12 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  * paths.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
- *
- * @missingRailsCall columns_hash — PERMANENT: Language shortcoming: Ruby's `columns_hash`
- * loads the schema on first touch, and this predicate is reachable from inside
- * that load (the relation `define_attribute_methods` builds asks it), so
- * calling `columnsHash()` re-enters `load_schema` — which memoizes only on the
- * way out (`model_schema.rb:534-545`) and so recurses without bound. The
- * already-reflected columns are read out of the schema cache instead, which is
- * the same `@columns_hash` Rails would have answered from.
  */
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
-  // Story: descends-from-active-record-cold-window-reads-attribute-types (RFC
-  // 0078) — an unreflected model, and every abstract class (trails reflects
-  // none), still answers from `attribute_types`, which counts a virtual `type`
-  // where `columns_hash` would not. Closing that window means removing the
-  // re-entry named above, not changing the reader.
-  const columnsHash = cachedColumnsHash(modelClass);
+  const columnsHash = modelClass.columnsHash();
   const inheritCol = modelClass.inheritanceColumn;
-  if (columnsHash === undefined) {
-    return inheritCol === null || !Object.keys(modelClass.attributeTypes()).includes(inheritCol);
-  }
   // Ruby `columns_hash.include?(inheritance_column)` is false for the nil
   // `inheritance_column` of an STI-disabled model, so no separate arm.
   return !Object.keys(columnsHash).includes(inheritCol as string);
