@@ -232,8 +232,8 @@ export class TimeWithZone {
    * (time_with_zone.rb:562-568). Ruby's `Date` advances in DAYS, so its arm
    * spells the offset as the day fraction `Rational(offset, SECONDS_PER_DAY)`;
    * a wall clock carrying that date advances by the seconds that fraction
-   * names. The `else` arm is Ruby's `time + offset`, spelled through `Time.at`
-   * because trails' `Time` does not port `Time#+`.
+   * names. The `else` arm is Ruby's `time + offset` (:567) directly, over
+   * `Time#plus`.
    */
   private _incorporateUtcOffset(time: Time | Temporal.PlainDate, offset: number): Time {
     if (time instanceof Temporal.PlainDate) {
