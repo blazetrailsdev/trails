@@ -30,6 +30,7 @@ import * as DateExt from "./date/calculations.js";
 import { isFuture, isPast } from "./date-and-time/calculations.js";
 import { isBlank } from "./object/blank.js";
 import { assertNothingRaised, assertNotPredicate, assertPredicate } from "../testing/assertions.js";
+import { Object as ObjectExt } from "./object/acts-like.js";
 import { setZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
 
@@ -61,9 +62,7 @@ function range(r: { start: Temporal.Instant; end: Temporal.Instant }): Temporal.
 
 describe("DateExtBehaviorTest", () => {
   it("date acts like date", () => {
-    // Rails sends `acts_like_date?`, the duck-type marker `Date` defines; the
-    // port has no such marker, so the predicate is the class check it stands for.
-    assertPredicate(new Date(), (date) => date instanceof Date);
+    assertPredicate(RubyDate.parse("2005-02-21"), (date) => ObjectExt.actsLike(date, "date"));
   });
 
   it("blank?", () => {

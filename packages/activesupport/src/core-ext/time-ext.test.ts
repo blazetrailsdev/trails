@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { ArgumentError } from "../hash-utils.js";
+import { Object as ObjectExt } from "./object/acts-like.js";
 import {
   nextDay,
   prevDay,
@@ -658,9 +659,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("acts like time", () => {
-    const t = new Date();
-    expect(t instanceof Date).toBe(true);
-    expect(typeof t.getHours()).toBe("number");
+    expect(ObjectExt.actsLike(RubyTime.now(), "time")).toBe(true);
   });
 
   it("formatted offset with utc", () => {

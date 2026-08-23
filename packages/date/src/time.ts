@@ -1021,6 +1021,22 @@ export class Time {
   httpdate(): string {
     return this.getutc().strftime("%a, %d %b %Y %T GMT");
   }
+
+  /**
+   * ActiveSupport `Time#acts_like_time?`
+   * (`active_support/core_ext/time/acts_like.rb:5-8`), the marker Rails hangs on
+   * a reopened `::Time` so `Object#acts_like?` finds it with `respond_to?`. This
+   * class is trails' `::Time`, so the reopening ports literally here and
+   * `Object.actsLike` answers the `:time` arm for it through `respond_to?`,
+   * exactly as Ruby does — no predicate arm stands in.
+   *
+   * @noRailsEquivalent PERMANENT — Rails defines it in activesupport, which
+   * cannot reopen this package's class; the marker lives on the class itself
+   * instead (RFC 0098, `time-with-zone-residue-structural-blockers`).
+   */
+  actsLikeTime(): boolean {
+    return true;
+  }
 }
 
 Time.prototype.iso8601 = Time.prototype.xmlschema;
