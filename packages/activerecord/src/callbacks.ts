@@ -9,6 +9,7 @@
  */
 
 import type { Base } from "./base.js";
+import { included } from "@blazetrails/activesupport";
 import {
   _registerCallbackOnProto,
   runAllCallbacks,
@@ -73,6 +74,20 @@ export function afterValidation<T extends ModelCtor>(
 ): void {
   registerCallback(modelClass, "after", "validation", fn, options);
 }
+
+/**
+ * Mirrors: ActiveRecord::Callbacks' `included do ... end` (callbacks.rb:412-417).
+ * `define_model_callbacks :save, :create, :update, :destroy` (callbacks.rb:416)
+ * generates `before_save` … `around_destroy` on the including class
+ * (activemodel/lib/active_model/callbacks.rb:109-127); the `:initialize`,
+ * `:find` and `:touch` events of callbacks.rb:415 are still hand-written on
+ * `Model`.
+ */
+export const InstanceMethods = {
+  [included](base: ModelCtor): void {
+    base.defineModelCallbacks("save", "create", "update", "destroy");
+  },
+};
 
 /** @internal */
 type SyncOnly<R> = R extends PromiseLike<unknown> ? never : R;

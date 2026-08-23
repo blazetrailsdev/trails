@@ -126,6 +126,7 @@ import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
+  InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
   runAllCallbacks as cbRunAll,
@@ -4185,15 +4186,15 @@ export class Base extends Model {
     return _currentTransactionPublic();
   }
 
-  // The twelve save/create/update/destroy macros are GENERATED below the class
-  // body by `Base.defineModelCallbacks("save", "create", "update", "destroy")`,
-  // mirroring ActiveRecord::Callbacks' `included do define_model_callbacks
-  // :save, :create, :update, :destroy end`
-  // (activerecord/lib/active_record/callbacks.rb:416). Ruby's
-  // `define_singleton_method` (activemodel/lib/active_model/callbacks.rb:130,
-  // :137, :144) makes each generated name visible to every later call;
-  // TypeScript cannot see a static defined at runtime, so each carries a
-  // type-only `declare` here. No implementation lives in this class body.
+  /**
+   * Mirrors: ActiveRecord::Callbacks.before_save — one of the twelve macros
+   * `define_model_callbacks :save, :create, :update, :destroy`
+   * (callbacks.rb:416) generates through `define_singleton_method`
+   * (activemodel/lib/active_model/callbacks.rb:130, :137, :144). The generation
+   * runs in {@link InstanceMethods}' `included` hook; these are the type-only
+   * halves TypeScript needs because it cannot see a static defined at runtime,
+   * and carry no implementation.
+   */
   declare static beforeSave: <T extends typeof Base>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
@@ -4680,15 +4681,10 @@ extend(Base, CounterCache.ClassMethods);
     },
   });
 }
-// Mirrors ActiveRecord::Callbacks' `included do ... end`
-// (activerecord/lib/active_record/callbacks.rb:416). The `:initialize`, `:find`
-// and `:touch` events on the line above it (callbacks.rb:415) are still
-// hand-written on `Model`.
-Base.defineModelCallbacks("save", "create", "update", "destroy");
-
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
+include(Base, CallbacksInstanceMethods);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
 extend(Base, {
