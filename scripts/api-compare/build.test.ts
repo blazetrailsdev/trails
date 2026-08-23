@@ -15,6 +15,8 @@ import {
   fileModuleName,
   groupByDeclFile,
   lowerMarksForDropped,
+  migrationSummary,
+  scopedRows,
   staleTagKey,
 } from "./build.js";
 import { serializeBaseline } from "./baseline-json.js";
@@ -782,5 +784,48 @@ describe("fileModuleName", () => {
     expect(fileModuleName("aggregations.ts")).toBe("Aggregations");
     expect(fileModuleName("secure-password.ts")).toBe("SecurePassword");
     expect(fileModuleName("connection-adapters/sqlite3/quoting.ts")).toBe("Quoting");
+  });
+});
+
+describe("migrationSummary", () => {
+  const row = (kind: "calls" | "args", call: string) => ({
+    package: "activesupport",
+    tsFile: "encrypted-file.ts",
+    rubyName: "encryptor",
+    call,
+    reason: DEFAULT_TAG_REASON,
+    ...(kind === "args" ? { kind: "args" as const, rubyArgs: ["a"] } : {}),
+  });
+
+  it("names the args-kind rows a call-SET dry run leaves behind", () => {
+    const lines = migrationSummary([row("args", "new"), row("args", "chomp")], 0, true);
+    expect(lines[0]).toContain("0 of 2 baseline entr(ies) in scope would migrate");
+    expect(lines[1]).toContain('2 of those row(s) are kind: "args"');
+    expect(lines[1]).toContain("LIVE rows, not stale ones");
+    expect(lines[1]).toContain("pnpm parity:api:calls:args");
+  });
+
+  it("says nothing extra when every row in scope is call-set kind", () => {
+    expect(migrationSummary([row("calls", "new")], 1, false)).toHaveLength(1);
+  });
+});
+
+describe("scopedRows", () => {
+  const row = (pkg: string, tsFile: string) => ({
+    package: pkg,
+    tsFile,
+    rubyName: "encryptor",
+    call: "new",
+    reason: DEFAULT_TAG_REASON,
+  });
+
+  it("keeps only the rows of the package and, when given, the file under build", () => {
+    const baseline = [
+      row("activesupport", "encrypted-file.ts"),
+      row("activesupport", "message-encryptor.ts"),
+      row("activerecord", "encrypted-file.ts"),
+    ];
+    expect(scopedRows(baseline, "activesupport")).toHaveLength(2);
+    expect(scopedRows(baseline, "activesupport", "encrypted-file.ts")).toEqual([baseline[0]]);
   });
 });

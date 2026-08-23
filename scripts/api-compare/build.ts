@@ -32,6 +32,11 @@
  * Usage:
  *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--call <ruby_call>] [--dry-run]
  *
+ * `--dry-run` reports what would move WITHOUT touching a file, and names the
+ * `kind: "args"` rows in scope it will never move — those belong to the
+ * call-ARGUMENT dimension (`pnpm parity:api:calls:args`), and a bare `0` for a
+ * shard full of them reads as "stale rows, delete the shard" (RFC 0106).
+ *
  * `--call` (repeatable) migrates one cluster of Ruby calls and leaves every
  * other flagged call baselined, so a source file whose curated rows mix a
  * permanent cluster with unrelated tracked debt migrates the cluster alone.
@@ -45,7 +50,13 @@ import * as path from "path";
 import * as ts from "typescript";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
-import { type ExcludeEntry, callOf, keyOf, missingScope } from "./call-mismatch-baseline.js";
+import {
+  type ExcludeEntry,
+  callOf,
+  keyOf,
+  missingScope,
+  rowsOfKind,
+} from "./call-mismatch-baseline.js";
 import {
   MARK_DIR,
   loadSplitBaseline,
@@ -675,6 +686,61 @@ export async function lowerMarksForDropped(
   return { marks: next, moved: moved.sort() };
 }
 
+/**
+ * The baseline rows in this run's scope, both dimensions, so the run can say
+ * how many of them it did not migrate.
+ *
+ * `call-mismatches-exclude/` shards hold both dimensions (RFC 0095): a
+ * `kind: "args"` row is the call-ARGUMENT gate's, and this migrator only ever
+ * mints `@missingRailsCall` receipts. Reporting a bare `0 rows would migrate`
+ * for a shard whose remaining rows are all args-kind reads as "these rows are
+ * stale and exclude nothing" — a misreading that cost a full story cycle
+ * (RFC 0106; the rows deleted on that evidence were live, and their deletion
+ * red `parity:api:calls:args` with two NEW rows).
+ */
+export function scopedRows(
+  baseline: readonly ExcludeEntry[],
+  pkg: string,
+  onlyFile?: string,
+): ExcludeEntry[] {
+  return baseline.filter(
+    (e) => e.package === pkg && (onlyFile === undefined || e.tsFile === onlyFile),
+  );
+}
+
+/**
+ * What this run did to the baseline rows in its scope.
+ *
+ * The second line is the RFC 0106 fix: this migrator mints `@missingRailsCall`
+ * receipts, so it never migrates a `kind: "args"` row, and a shard whose
+ * remaining rows are all args-kind used to report a bare `0 rows would migrate`
+ * — indistinguishable from "these rows are stale and exclude nothing". Deleting
+ * such a shard on that reading reds `parity:api:calls:args` with the rows it
+ * was excluding.
+ */
+export function migrationSummary(
+  inScope: readonly ExcludeEntry[],
+  dropped: number,
+  dryRun: boolean,
+): string[] {
+  const lines = [
+    `parity:api:build: ${dropped} of ${inScope.length} baseline entr(ies) in scope ` +
+      `${dryRun ? "would migrate" : "migrated"} to @missingRailsCall tags and ` +
+      `${dryRun ? "would be" : "were"} dropped from ` +
+      `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
+  ];
+  const argsRows = rowsOfKind([...inScope], "args");
+  if (argsRows.length > 0) {
+    lines.push(
+      `parity:api:build: ${argsRows.length} of those row(s) are kind: "args" and ` +
+        `${dryRun ? "would" : "did"} NOT migrate — this is the call-SET migrator. They are ` +
+        "LIVE rows, not stale ones: the call-ARGUMENT dimension converges with " +
+        "`@missingRailsArgs` receipts (see `pnpm parity:api:calls:args`).",
+    );
+  }
+  return lines;
+}
+
 async function main(argv: string[]): Promise<number> {
   const pkgIdx = argv.indexOf("--package");
   const pkg = pkgIdx !== -1 ? argv[pkgIdx + 1] : undefined;
@@ -698,8 +764,12 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const baseline = await loadSplitBaseline(BASELINE_DIR);
+  // Call-SET rows only: `keyOf` does not carry `kind`, so an args-kind row
+  // sharing a key would otherwise donate its reason to a `@missingRailsCall`
+  // receipt and then be dropped from the shard by the migration below.
+  const callRows = rowsOfKind(baseline, "calls");
   const reasons = new Map<string, string>();
-  for (const e of baseline) {
+  for (const e of callRows) {
     reasons.set(keyOf(e), e.reason);
   }
 
@@ -804,8 +874,10 @@ async function main(argv: string[]): Promise<number> {
     if (dryRun) console.log(`would update ${path.relative(ROOT_DIR, abs)}`);
     else await fs.writeFile(abs, texts.get(abs)!);
   }
-  const remaining = baseline.filter((e) => !migrated.has(keyOf(e)));
-  const droppedEntries = baseline.filter((e) => migrated.has(keyOf(e)));
+  const remaining = baseline.filter(
+    (e) => (e.kind ?? "calls") !== "calls" || !migrated.has(keyOf(e)),
+  );
+  const droppedEntries = callRows.filter((e) => migrated.has(keyOf(e)));
   const dropped = droppedEntries.length;
   if (dropped > 0 && !dryRun) {
     await writeSplitBaseline(remaining, BASELINE_DIR);
@@ -817,11 +889,13 @@ async function main(argv: string[]): Promise<number> {
     );
     for (const rel of moved) console.log(`  - ${rel}`);
   }
-  console.log(
-    `parity:api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
-      `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
-      `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
-  );
+  for (const line of migrationSummary(
+    scopedRows(baseline, pkg, onlyFile),
+    dropped,
+    dryRun,
+  )) {
+    console.log(line);
+  }
   console.log(
     `parity:api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`,
   );
