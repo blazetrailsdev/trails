@@ -1,7 +1,7 @@
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { beforeValidation } from "../../callbacks.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { ActiveRecord } from "../../ar-config.js";
@@ -96,7 +96,7 @@ export class BelongsTo extends SingularAssociation {
     // Rails only registers after_update in add_counter_cache_callbacks.
     // Create/destroy counter handling is done by updateCounterCaches()
     // in associations.ts (called from Base#_createOrUpdate and _destroyRow).
-    afterUpdate(model, async (record: any) => {
+    model.afterUpdate(async (record: any) => {
       const assoc = record.association(name);
       if (assoc.isSavedChangeToTarget()) {
         await assoc.incrementCounters();
@@ -248,7 +248,7 @@ export class BelongsTo extends SingularAssociation {
       // .saved_change_to_target?`. The `if: :saved_changes?` skips no-op saves;
       // the inner guard skips the case where the target was swapped (the
       // counter-cache update on the *new* target already carries the touch).
-      afterUpdate(model, async (record: any) => {
+      model.afterUpdate(async (record: any) => {
         if (typeof record.isSavedChanges === "function" && !record.isSavedChanges()) return;
         const assoc =
           typeof record.association === "function" ? record.association(name) : undefined;
@@ -258,9 +258,9 @@ export class BelongsTo extends SingularAssociation {
         await makeCallback("savedChanges")(record);
       });
     } else {
-      afterCreate(model, makeCallback("savedChanges"));
-      afterUpdate(model, makeCallback("savedChanges"));
-      afterDestroy(model, async (record: any) => {
+      model.afterCreate(makeCallback("savedChanges"));
+      model.afterUpdate(makeCallback("savedChanges"));
+      model.afterDestroy(async (record: any) => {
         if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
           await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);
         }
@@ -306,7 +306,7 @@ export class BelongsTo extends SingularAssociation {
 
   static override addDestroyCallbacks(model: any, reflection: any): void {
     const name = reflection.name;
-    afterDestroy(model, (record: any) => {
+    model.afterDestroy((record: any) => {
       return record.association(name).handleDependency();
     });
   }

@@ -35,6 +35,8 @@ import {
   Model,
   Type,
   type AttributeOptions,
+  type CallbackConditions,
+  type CallbackObject,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
@@ -124,6 +126,7 @@ import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
+  InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
   runAllCallbacks as cbRunAll,
@@ -4183,6 +4186,95 @@ export class Base extends Model {
     return _currentTransactionPublic();
   }
 
+  /**
+   * Mirrors: ActiveRecord::Callbacks.before_save — one of the twelve macros
+   * `define_model_callbacks :save, :create, :update, :destroy`
+   * (callbacks.rb:416) generates through `define_singleton_method`
+   * (activemodel/lib/active_model/callbacks.rb:130, :137, :144). The generation
+   * runs in {@link InstanceMethods}' `included` hook; these are the type-only
+   * halves TypeScript needs because it cannot see a static defined at runtime,
+   * and carry no implementation.
+   */
+  declare static beforeSave: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeCreate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeUpdate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static beforeDestroy: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterSave: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterCreate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterUpdate: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterDestroy: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundSave: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundCreate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundUpdate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static aroundDestroy: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
   static beforeCommit = _beforeCommit;
 
   /**
@@ -4592,6 +4684,7 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
+include(Base, CallbacksInstanceMethods);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
 extend(Base, {

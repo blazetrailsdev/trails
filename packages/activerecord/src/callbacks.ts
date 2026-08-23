@@ -9,6 +9,7 @@
  */
 
 import type { Base } from "./base.js";
+import { included } from "@blazetrails/activesupport";
 import {
   _registerCallbackOnProto,
   runAllCallbacks,
@@ -75,108 +76,18 @@ export function afterValidation<T extends ModelCtor>(
 }
 
 /**
- * Register a before_save callback.
- *
- * Mirrors: ActiveRecord::Callbacks.before_save
+ * Mirrors: ActiveRecord::Callbacks' `included do ... end` (callbacks.rb:412-417).
+ * `define_model_callbacks :save, :create, :update, :destroy` (callbacks.rb:416)
+ * generates `before_save` … `around_destroy` on the including class
+ * (activemodel/lib/active_model/callbacks.rb:109-127); the `:initialize`,
+ * `:find` and `:touch` events of callbacks.rb:415 are still hand-written on
+ * `Model`.
  */
-export function beforeSave<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "before", "save", fn, options);
-}
-
-/**
- * Register an after_save callback.
- *
- * Mirrors: ActiveRecord::Callbacks.after_save
- */
-export function afterSave<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "save", fn, options);
-}
-
-/**
- * Register a before_create callback.
- *
- * Mirrors: ActiveRecord::Callbacks.before_create
- */
-export function beforeCreate<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "before", "create", fn, options);
-}
-
-/**
- * Register an after_create callback.
- *
- * Mirrors: ActiveRecord::Callbacks.after_create
- */
-export function afterCreate<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "create", fn, options);
-}
-
-/**
- * Register a before_update callback.
- *
- * Mirrors: ActiveRecord::Callbacks.before_update
- */
-export function beforeUpdate<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "before", "update", fn, options);
-}
-
-/**
- * Register an after_update callback.
- *
- * Mirrors: ActiveRecord::Callbacks.after_update
- */
-export function afterUpdate<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "update", fn, options);
-}
-
-/**
- * Register a before_destroy callback.
- *
- * Mirrors: ActiveRecord::Callbacks.before_destroy
- */
-export function beforeDestroy<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "before", "destroy", fn, options);
-}
-
-/**
- * Register an after_destroy callback.
- *
- * Mirrors: ActiveRecord::Callbacks.after_destroy
- */
-export function afterDestroy<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "destroy", fn, options);
-}
+export const InstanceMethods = {
+  [included](base: ModelCtor): void {
+    base.defineModelCallbacks("save", "create", "update", "destroy");
+  },
+};
 
 /** @internal */
 type SyncOnly<R> = R extends PromiseLike<unknown> ? never : R;

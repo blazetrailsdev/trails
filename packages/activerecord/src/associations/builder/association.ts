@@ -9,7 +9,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertValidKeys, throwAbort } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
-import { beforeDestroy } from "../../callbacks.js";
 
 /**
  * Minimal instance shape for model instances that host association accessors.
@@ -258,7 +257,7 @@ export class Association {
 
   static addDestroyCallbacks(model: any, reflection: any): void {
     const name = reflection.name ?? reflection;
-    beforeDestroy(model, async (record: any) => {
+    model.beforeDestroy(async (record: any) => {
       // Rails' handle_dependency throws :abort to halt the owner's destroy when
       // a dependent can't be removed (has_one_association.rb:34, etc.). Our
       // handleDependency signals that with a `false` return; translate it to the

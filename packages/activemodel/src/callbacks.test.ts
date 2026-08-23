@@ -2,12 +2,37 @@ import { describe, it, expect } from "vitest";
 import { throwAbort, withOptions } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import {
+  type CallbackConditions,
   _registerCallbackOnProto,
   skipCallbackOnProto,
   runAllCallbacks,
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
 } from "./callbacks.js";
+
+/**
+ * `define_model_callbacks` generates its macros with `define_singleton_method`
+ * (activemodel/lib/active_model/callbacks.rb:130, :137, :144), so the names
+ * exist only once the macro has run and TypeScript cannot see them on the
+ * class. `generated()` is the single place this suite crosses that gap: it
+ * names the shape those methods have rather than reaching for a cast at each
+ * call site.
+ */
+interface GeneratedModelCallbacks {
+  beforeSave(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
+  afterSave(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
+  aroundSave(fn: GeneratedAroundCallback | object, conditions?: CallbackConditions): void;
+  beforeCreate(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
+  afterCreate(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
+  aroundCreate(fn: GeneratedAroundCallback | object, conditions?: CallbackConditions): void;
+}
+
+type GeneratedCallback = (record: Model) => unknown;
+type GeneratedAroundCallback = (record: Model, proceed: () => void | Promise<void>) => unknown;
+
+function generated(klass: typeof Model): GeneratedModelCallbacks {
+  return klass as unknown as GeneratedModelCallbacks;
+}
 
 describe("CallbacksTest", () => {
   it("after callbacks are not executed if the block returns false", async () => {
@@ -31,15 +56,15 @@ describe("CallbacksTest", () => {
       valid: boolean;
       static {
         this.defineModelCallbacks("create");
-        this.beforeCreate((m: any) => {
+        generated(this).beforeCreate((m: any) => {
           m.callbacks.push("before_create");
         });
-        this.aroundCreate(new CallbackValidator());
-        this.afterCreate((m: any) => {
+        generated(this).aroundCreate(new CallbackValidator());
+        generated(this).afterCreate((m: any) => {
           m.callbacks.push("after_create");
           return false;
         });
-        this.afterCreate((m: any) => {
+        generated(this).afterCreate((m: any) => {
           m.callbacks.push("final_callback");
         });
       }
@@ -97,11 +122,12 @@ describe("CallbacksTest", () => {
     const log: string[] = [];
     class Person extends Model {
       static {
+        this.defineModelCallbacks("create");
         this.attribute("name", "string");
-        this.afterCreate(() => {
+        generated(this).afterCreate(() => {
           log.push("first");
         });
-        this.afterCreate(() => {
+        generated(this).afterCreate(() => {
           log.push("second");
         });
       }
@@ -115,15 +141,16 @@ describe("CallbacksTest", () => {
     const order: string[] = [];
     class Person extends Model {
       static {
-        this.beforeSave(() => {
+        this.defineModelCallbacks("save");
+        generated(this).beforeSave(() => {
           order.push("before_save");
         });
-        this.aroundSave(async (_r, proceed) => {
+        generated(this).aroundSave(async (_r, proceed) => {
           order.push("around_before");
           await proceed();
           order.push("around_after");
         });
-        this.afterSave(() => {
+        generated(this).afterSave(() => {
           order.push("after_save");
         });
       }
@@ -138,17 +165,18 @@ describe("CallbacksTest", () => {
     const order: string[] = [];
     class Person extends Model {
       static {
-        this.beforeSave(() => {
+        this.defineModelCallbacks("save");
+        generated(this).beforeSave(() => {
           order.push("first");
         });
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("halt");
           throwAbort();
         });
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("never");
         });
-        this.afterSave(() => {
+        generated(this).afterSave(() => {
           order.push("after");
         });
       }
@@ -167,10 +195,11 @@ describe("CallbacksTest", () => {
     const order: string[] = [];
     class Person extends Model {
       static {
-        this.beforeCreate(() => {
+        this.defineModelCallbacks("create");
+        generated(this).beforeCreate(() => {
           order.push("before_create");
         });
-        this.afterCreate(() => {
+        generated(this).afterCreate(() => {
           order.push("after_create");
         });
       }
@@ -185,10 +214,11 @@ describe("CallbacksTest", () => {
     const order: string[] = [];
     class Person extends Model {
       static {
-        this.afterCreate(() => {
+        this.defineModelCallbacks("create");
+        generated(this).afterCreate(() => {
           order.push("first_after");
         });
-        this.afterCreate(() => {
+        generated(this).afterCreate(() => {
           order.push("second_after");
         });
       }
@@ -318,8 +348,9 @@ describe("CallbacksTest", () => {
     };
     class Person extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.aroundSave(wrapper);
+        generated(this).aroundSave(wrapper);
       }
     }
     const p = new Person({ name: "test" });
@@ -724,11 +755,12 @@ describe("Callbacks", () => {
     const order: string[] = [];
     class Ordered extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("before");
         });
-        this.afterSave(() => {
+        generated(this).afterSave(() => {
           order.push("after");
         });
       }
@@ -744,8 +776,9 @@ describe("Callbacks", () => {
     const order: string[] = [];
     class Around extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.aroundSave(async (_record, proceed) => {
+        generated(this).aroundSave(async (_record, proceed) => {
           order.push("around_before");
           await proceed();
           order.push("around_after");
@@ -763,12 +796,13 @@ describe("Callbacks", () => {
     const order: string[] = [];
     class Halting extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("before");
           throwAbort();
         });
-        this.afterSave(() => {
+        generated(this).afterSave(() => {
           order.push("after");
         });
       }
@@ -800,15 +834,16 @@ describe("Callbacks", () => {
     const order: string[] = [];
     class Full extends Model {
       static {
-        this.beforeSave(() => {
+        this.defineModelCallbacks("save");
+        generated(this).beforeSave(() => {
           order.push("before_save");
         });
-        this.aroundSave(async (_r, proceed) => {
+        generated(this).aroundSave(async (_r, proceed) => {
           order.push("around_before");
           await proceed();
           order.push("around_after");
         });
-        this.afterSave(() => {
+        generated(this).afterSave(() => {
           order.push("after_save");
         });
       }
@@ -857,15 +892,16 @@ describe("Callbacks (extended)", () => {
     const order: string[] = [];
     class Parent extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("parent_before");
         });
       }
     }
     class Child extends Parent {
       static {
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           order.push("child_before");
         });
       }
@@ -884,8 +920,9 @@ describe("Callbacks (extended)", () => {
     const childOrder: string[] = [];
     class Parent extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           parentOrder.push("parent");
           childOrder.push("parent");
         });
@@ -893,7 +930,7 @@ describe("Callbacks (extended)", () => {
     }
     class Child extends Parent {
       static {
-        this.beforeSave(() => {
+        generated(this).beforeSave(() => {
           childOrder.push("child");
         });
       }
@@ -983,14 +1020,15 @@ describe("callbacks with prepend option", () => {
   it("prepend: true puts callback first in the chain", async () => {
     class User extends Model {
       static {
+        this.defineModelCallbacks("save");
         this.attribute("name", "string");
       }
     }
     const order: string[] = [];
-    User.beforeSave(() => {
+    generated(User).beforeSave(() => {
       order.push("first");
     });
-    User.beforeSave(
+    generated(User).beforeSave(
       () => {
         order.push("prepended");
       },

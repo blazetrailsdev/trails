@@ -17,6 +17,7 @@ import {
   type CallbackKind,
   type CallbackObject as ASCallbackObject,
   type RunCallbacksOptions as ASRunCallbacksOptions,
+  assertValidKeys,
   defineCallbacks as asDefineCallbacks,
   skipCallback as asSkipCallback,
   getCallbackChains as asGetCallbackChains,
@@ -159,6 +160,7 @@ export function _defineBeforeModelCallback(klass: CallbackHost, event: string): 
       fnOrObject: CallbackFn | CallbackObject | string,
       conditions?: CallbackConditions,
     ) {
+      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
       _registerCallbackOnProto(this.prototype, "before", event, fnOrObject, conditions);
     },
     writable: true,
@@ -179,6 +181,7 @@ export function _defineAroundModelCallback(klass: CallbackHost, event: string): 
       fnOrObject: AroundCallbackFn | CallbackObject | string,
       conditions?: CallbackConditions,
     ) {
+      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
       _registerCallbackOnProto(this.prototype, "around", event, fnOrObject, conditions);
     },
     writable: true,
@@ -197,6 +200,7 @@ export function _defineAfterModelCallback(klass: CallbackHost, event: string): v
       fnOrObject: CallbackFn | CallbackObject | string,
       conditions?: CallbackConditions,
     ) {
+      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
       _registerCallbackOnProto(this.prototype, "after", event, fnOrObject, conditions);
     },
     writable: true,
