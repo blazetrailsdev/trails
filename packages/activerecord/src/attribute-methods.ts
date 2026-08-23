@@ -311,17 +311,17 @@ export function dangerousAttributeMethods(): Set<string> {
  * wires this attribute-methods entry point as the single static (see base.ts),
  * so the super call reaches `generatedAssociationMethods` just as Rails' method
  * ancestry does.
+ *
+ * Rails runs this from `inherited`, so the ivar is always empty and the
+ * `include` is the class's only generated-methods entry. In trails a class body
+ * can reach ActiveModel's lazy `generated_attribute_methods`
+ * (attribute_methods.rb:400-402) first, which seats a bare `Module` and
+ * includes it. Replacing that one means taking its carrier back out of the
+ * prototype chain: `include()` splices a fresh carrier per call, so the stale
+ * one would keep answering every method it defines after an `undef_method` on
+ * the replacement. Its methods carry over, leaving the single module Ruby has.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  // Rails runs this from `inherited`, so the ivar is always empty here and the
-  // `include` below is the class's only generated-methods entry. In trails a
-  // class body can reach ActiveModel's lazy `generated_attribute_methods`
-  // (attribute_methods.rb:400-402) first, which seats a bare `Module` and
-  // includes it; replacing it means taking its carrier back out of the
-  // prototype chain — `include()` splices a fresh one per call, so leaving it
-  // there would keep answering every method it defines after an
-  // `undef_method` on the replacement. Its methods carry over, as they would
-  // in Ruby where there is only ever the one module.
   const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
     ? this._generatedAttributeMethods
     : undefined;

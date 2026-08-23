@@ -393,10 +393,8 @@ describe("AttributeMethodsTest (trails)", () => {
 
     (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
 
-    // Read through the existing record: Rails asserts `method_defined?` goes
-    // false (attribute_methods_test.rb:1098-1117), and constructing again would
-    // regenerate — `init_internals` calls `define_attribute_methods`
-    // (core.rb:849).
+    // Read through the existing record: constructing again would regenerate,
+    // since `init_internals` calls `define_attribute_methods` (core.rb:849).
     expect(employee.nameChanged).toBeUndefined();
   });
 
@@ -406,10 +404,9 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    // `initInternals` generates at construction (core.rb:849), over the bare
-    // module ActiveModel's lazy `generated_attribute_methods` seated for the
-    // class-body `attribute` call — one carrier must answer `nameChanged`, or
-    // `undefineAttributeMethods` clears only one of them.
+    // Construction generates (core.rb:849) over the bare module ActiveModel
+    // seated for the class-body `attribute` call; two carriers would leave
+    // `undefineAttributeMethods` clearing only one of them.
     new Employee({});
 
     let carriers = 0;
