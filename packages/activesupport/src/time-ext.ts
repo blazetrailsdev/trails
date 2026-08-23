@@ -478,10 +478,6 @@ export function change(
   const newDay = options.day ?? self.day;
   const newHour = options.hour ?? self.hour;
   const newMin = options.min ?? (options.hour !== undefined ? 0 : self.minute);
-  // Ruby's `new_sec` is a Rational from the moment the microseconds fold in
-  // (`new_sec += Rational(new_usec, 1000000)`, time/calculations.rb:141), and
-  // every terminal arm passes that one local; seeding it as a Rational here is
-  // the same value at every step.
   let newSec = new Rational(
     options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second),
     1,
@@ -515,13 +511,10 @@ export function change(
 
   if (newUsec.cmp(1000000) >= 0) throw new ArgumentError("argument out of range");
 
-  // `new_sec += Rational(new_usec, 1000000)` (time/calculations.rb:141) —
-  // `Rational()` of a Rational over an Integer is that Rational divided by it,
-  // which `quo` spells.
+  // `Rational(new_usec, 1000000)` (time/calculations.rb:141) — `Rational()` of a
+  // Rational over an Integer is that Rational divided by it, which `quo` spells.
   newSec = newSec.add(newUsec.quo(1_000_000));
 
-  // The `Temporal` arms below take the wall clock as components rather than as
-  // a seconds Rational, so they read `new_sec`'s whole and fractional halves.
   const secFloor = newSec.div(1);
   const newNsecOfSec = newSec.add(-secFloor).mul(1_000_000_000).toI();
   const newComponents = {
