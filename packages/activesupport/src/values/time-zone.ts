@@ -12,7 +12,7 @@
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Temporal, Date as RubyDate, Rational, Time } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Rational, Time, tzdataIsdst } from "@blazetrails/date";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -657,19 +657,12 @@ export class Timezone {
     return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
   }
 
-  /** `TZInfo::Timezone#dst?`. */
+  /**
+   * `TZInfo::Timezone#dst?`, which reads `TimezonePeriod#dst?` — the tzdata
+   * `isdst` bit (tzinfo `timezone_offset.rb`), vendored by `tzdataIsdst`.
+   */
   isDst(time: Date | Temporal.Instant): boolean {
-    // Compare offset at this date vs January (standard time for Northern hemisphere)
-    // and July (standard time for Southern hemisphere). If current offset differs
-    // from the minimum offset, DST is in effect.
-    const d = toDate(time);
-    const jan = new Date(d.getFullYear(), 0, 1);
-    const jul = new Date(d.getFullYear(), 6, 1);
-    const janOffset = getZoneInfo(this.identifier, jan).utcOffsetSeconds;
-    const julOffset = getZoneInfo(this.identifier, jul).utcOffsetSeconds;
-    const currentOffset = getZoneInfo(this.identifier, d).utcOffsetSeconds;
-    const standardOffset = Math.min(janOffset, julOffset);
-    return currentOffset !== standardOffset;
+    return tzdataIsdst(this.identifier, Math.floor(toDate(time).getTime() / 1000));
   }
 
   /** `TZInfo::Timezone#period_for_utc`. */

@@ -8,6 +8,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
+import { tzdataIsdst } from "./tzdata-isdst.js";
 import {
   ArgumentError,
   Date,
@@ -200,9 +201,7 @@ function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
   const abbreviations = zoneAbbreviations(zoned.timeZoneId);
   if (abbreviations !== undefined) {
     if (abbreviations.length === 1) return abbreviations[0];
-    const january = Number(zoned.with({ month: 1, day: 1 }).offsetNanoseconds);
-    const july = Number(zoned.with({ month: 7, day: 1 }).offsetNanoseconds);
-    return Number(zoned.offsetNanoseconds) > Math.min(january, july)
+    return tzdataIsdst(zoned.timeZoneId, Math.floor(zoned.epochMilliseconds / 1000))
       ? abbreviations[1]
       : abbreviations[0];
   }
@@ -977,16 +976,14 @@ export class Time {
   /**
    * Ruby `Time#isdst` (`ruby/time.c` `time_isdst`), true when the receiver's
    * zone is observing daylight saving. A time built from an offset has no zone
-   * to ask and MRI answers `false`. The standard offset is the smaller of the
-   * zone's January and July offsets, the reading {@link zone} takes for its
-   * abbreviation, so a negative-DST zone falls out the same way.
+   * to ask and MRI answers `false`. MRI reads `tm.tm_isdst` off the zone's
+   * tzdata transition record, which {@link tzdataIsdst} vendors — a negative-DST
+   * zone (`Europe/Dublin`, whose summer is tzdata's standard offset) still
+   * carries tzdata's bit, `true` in summer.
    */
   get isdst(): boolean {
     if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
-    const zoned = this.#instant.toZonedDateTimeISO(this.#timeZoneId);
-    const january = Number(zoned.with({ month: 1, day: 1 }).offsetNanoseconds);
-    const july = Number(zoned.with({ month: 7, day: 1 }).offsetNanoseconds);
-    return Number(zoned.offsetNanoseconds) > Math.min(january, july);
+    return tzdataIsdst(this.#timeZoneId, Math.floor(this.#instant.epochMilliseconds / 1000));
   }
 
   /** Ruby `Time#dst?`, the `isdst` alias (`ruby/time.c` `time_isdst`). */
