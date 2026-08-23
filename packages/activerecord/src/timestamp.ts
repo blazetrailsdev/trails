@@ -283,7 +283,7 @@ interface TimestampInstanceHost {
   readAttribute?(name: string): unknown;
   _readAttribute?(name: string): unknown;
   _writeAttribute?(name: string, val: unknown): void;
-  willSaveChangeToAttribute?(name: string): boolean;
+  isWillSaveChangeToAttribute?(name: string): boolean;
   clearAttributeChange?(name: string): void;
   hasChangesToSave?: boolean;
   id?: unknown;
@@ -503,7 +503,7 @@ export async function recordUpdateTimestamps<T>(
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
     const currentTime = currentTimeFromProperTimezone();
     for (const column of timestampAttributesForUpdateInModel.call(this.constructor)) {
-      if (!this.willSaveChangeToAttribute?.(column)) {
+      if (!this.isWillSaveChangeToAttribute?.(column)) {
         this._writeAttribute?.(column, currentTime);
       }
     }

@@ -1028,14 +1028,14 @@ describe("DirtyTest", () => {
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
     const person = (await Person.create({ first_name: "Sean" })) as Rec;
 
-    expect(person.savedChangeToAttribute("first_name")).toBe(true);
-    expect(person.savedChangeToAttribute("gender")).toBe(false);
-    expect(person.savedChangeToAttribute("first_name", { from: null, to: "Sean" })).toBe(true);
-    expect(person.savedChangeToAttribute("first_name", { from: null })).toBe(true);
-    expect(person.savedChangeToAttribute("first_name", { to: "Sean" })).toBe(true);
-    expect(person.savedChangeToAttribute("first_name", { from: "Jim", to: "Sean" })).toBe(false);
-    expect(person.savedChangeToAttribute("first_name", { from: "Jim" })).toBe(false);
-    expect(person.savedChangeToAttribute("first_name", { to: "Jim" })).toBe(false);
+    expect(person.isSavedChangeToAttribute("first_name")).toBe(true);
+    expect(person.isSavedChangeToAttribute("gender")).toBe(false);
+    expect(person.isSavedChangeToAttribute("first_name", { from: null, to: "Sean" })).toBe(true);
+    expect(person.isSavedChangeToAttribute("first_name", { from: null })).toBe(true);
+    expect(person.isSavedChangeToAttribute("first_name", { to: "Sean" })).toBe(true);
+    expect(person.isSavedChangeToAttribute("first_name", { from: "Jim", to: "Sean" })).toBe(false);
+    expect(person.isSavedChangeToAttribute("first_name", { from: "Jim" })).toBe(false);
+    expect(person.isSavedChangeToAttribute("first_name", { to: "Jim" })).toBe(false);
   });
 
   it("saved_change_to_attribute returns the change that occurred in the last save", async () => {

@@ -16,8 +16,9 @@ interface Generated {
   changesApplied(): void;
   readonly nameInDatabase: unknown;
   readonly nameBeforeLastSave: unknown;
-  savedChangeToName(): boolean;
-  willSaveChangeToName(): boolean;
+  isSavedChangeToName(): boolean;
+  readonly savedChangeToName: [unknown, unknown] | null;
+  isWillSaveChangeToName(): boolean;
 }
 
 describe("DirtyGeneratedMethods", () => {
@@ -47,11 +48,20 @@ describe("DirtyGeneratedMethods", () => {
     const p = Person.new({}) as unknown as Generated;
     p.changesApplied();
     p.name = "Bob";
-    expect(p.willSaveChangeToName()).toBe(true);
-    expect(p.savedChangeToName()).toBe(false);
+    expect(p.isWillSaveChangeToName()).toBe(true);
+    expect(p.isSavedChangeToName()).toBe(false);
     p.changesApplied();
-    expect(p.willSaveChangeToName()).toBe(false);
-    expect(p.savedChangeToName()).toBe(true);
+    expect(p.isWillSaveChangeToName()).toBe(false);
+    expect(p.isSavedChangeToName()).toBe(true);
+  });
+
+  it("savedChangeTo<Attr> returns the last save's [old, new] pair", () => {
+    const p = Person.new({ name: "Alice" }) as unknown as Generated;
+    p.changesApplied();
+    expect(p.savedChangeToName).toEqual([null, "Alice"]);
+    p.name = "Bob";
+    p.changesApplied();
+    expect(p.savedChangeToName).toEqual(["Alice", "Bob"]);
   });
 });
 
@@ -74,8 +84,8 @@ describe("willSaveChangeToAttribute", () => {
     const w = new Widget({ name: "Test", size: 5 });
     w.changesApplied();
     w.writeAttribute("name", "Changed");
-    expect(w.willSaveChangeToAttribute("name")).toBe(true);
-    expect(w.willSaveChangeToAttribute("size")).toBe(false);
+    expect(w.isWillSaveChangeToAttribute("name")).toBe(true);
+    expect(w.isWillSaveChangeToAttribute("size")).toBe(false);
   });
 
   it("attributeChangeToBeSaved returns [old, new]", () => {
@@ -100,8 +110,8 @@ describe("willSaveChangeToAttribute", () => {
     const u = new User({ name: "Alice" });
     u.changesApplied();
     u.writeAttribute("name", "Bob");
-    expect(u.willSaveChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(u.willSaveChangeToAttribute("name", { from: "Wrong" })).toBe(false);
+    expect(u.isWillSaveChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.isWillSaveChangeToAttribute("name", { from: "Wrong" })).toBe(false);
   });
 });
 
@@ -143,8 +153,8 @@ describe("attributeInDatabase / attributeBeforeLastSave", () => {
     u.changesApplied();
     u.writeAttribute("name", "Bob");
     u.changesApplied();
-    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Wrong" })).toBe(false);
-    expect(u.savedChangeToAttribute("name", { from: "Wrong", to: "Bob" })).toBe(false);
+    expect(u.isSavedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.isSavedChangeToAttribute("name", { from: "Alice", to: "Wrong" })).toBe(false);
+    expect(u.isSavedChangeToAttribute("name", { from: "Wrong", to: "Bob" })).toBe(false);
   });
 });

@@ -169,8 +169,8 @@ describe("StoreTest", () => {
 
     await john.save();
     expect((john as any).partner_nameChange()).toBeNull();
-    expect((john as any).savedChangeToPartner_name()).toBe(true);
-    expect((john as any).savedChangeToPartner_nameValues()).toEqual(["Dallas", "Lena"]);
+    expect((john as any).isSavedChangeToPartner_name()).toBe(true);
+    expect((john as any).savedChangeToPartner_name()).toEqual(["Dallas", "Lena"]);
     expect((john as any).partner_nameBeforeLastSave()).toBe("Dallas");
   });
 
@@ -181,8 +181,8 @@ describe("StoreTest", () => {
 
     await john.save();
     expect((john as any).enableFriendRequestsChange()).toBeNull();
-    expect((john as any).savedChangeToEnableFriendRequests()).toBe(true);
-    expect((john as any).savedChangeToEnableFriendRequestsValues()).toEqual([null, true]);
+    expect((john as any).isSavedChangeToEnableFriendRequests()).toBe(true);
+    expect((john as any).savedChangeToEnableFriendRequests()).toEqual([null, true]);
     (john as any).enableFriendRequests = false;
     await john.save();
     expect((john as any).enableFriendRequestsBeforeLastSave()).toBe(true);

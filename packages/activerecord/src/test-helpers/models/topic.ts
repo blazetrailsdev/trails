@@ -175,7 +175,7 @@ export class Topic extends Base {
 
   /** @internal */
   private setEmailAddress() {
-    if (!this.isPersisted() && !this.willSaveChangeToAttribute("author_email_address")) {
+    if (!this.isPersisted() && !this.isWillSaveChangeToAttribute("author_email_address")) {
       this.writeAttribute("author_email_address", "test@test.com");
     }
   }

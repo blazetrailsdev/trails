@@ -390,20 +390,21 @@ export function storeAccessor(
       const [prevStore] = this.changes[storeAttribute] ?? [undefined];
       return dig(prevStore, key) ?? null;
     });
-    // Matches `Base`'s `savedChangeToAttribute(name)` predicate shape; the value
-    // form is exposed as `savedChangeTo<X>Values()`.
-    define(`savedChangeTo${cap}`, function (this) {
-      if (!this.savedChangeToAttribute?.(storeAttribute)) return false;
+    // store.rb:164-175 — `saved_change_to_#{accessor_key}?` and
+    // `saved_change_to_#{accessor_key}`, the predicate/array pair the `?`
+    // separates in Ruby and the `is*` prefix separates here.
+    define(`isSavedChangeTo${cap}`, function (this) {
+      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return false;
       const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
       return dig(prevStore, key) !== dig(newStore, key);
     });
-    define(`savedChangeTo${cap}Values`, function (this) {
-      if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
+    define(`savedChangeTo${cap}`, function (this) {
+      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
       const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
       return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
     });
     define(`${accessorKey}BeforeLastSave`, function (this) {
-      if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
+      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
       const [prevStore] = this.savedChanges?.[storeAttribute] ?? [undefined];
       return dig(prevStore, key) ?? null;
     });
@@ -422,7 +423,7 @@ export function storeAccessor(
 
 interface StoreDirtyHost {
   attributeChanged(name: string): boolean;
-  savedChangeToAttribute(name: string): boolean;
+  isSavedChangeToAttribute(name: string): boolean;
   changes: Record<string, [unknown, unknown]>;
   savedChanges: Record<string, [unknown, unknown]>;
 }

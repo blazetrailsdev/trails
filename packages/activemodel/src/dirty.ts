@@ -2,6 +2,12 @@ import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { attributeMissing as attributeMissingDispatch } from "./attribute-methods.js";
 
+/** Rails' `**options` on `AttributeMutationTracker#changed?` (attribute_mutation_tracker.rb:44). */
+export interface DirtyOptions {
+  from?: unknown;
+  to?: unknown;
+}
+
 /**
  * Dirty mixin contract — tracks attribute changes on a model.
  *
@@ -17,9 +23,9 @@ export interface Dirty {
   readonly previousChanges: Record<string, [unknown, unknown]>;
   readonly mutationsFromDatabase: Record<string, [unknown, unknown]>;
   readonly mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
-  attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
+  attributeChanged(name: string, options?: DirtyOptions): boolean;
   attributeWas(name: string): unknown;
-  attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
+  attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean;
   attributePreviouslyWas(name: string): unknown;
   restoreAttributes(attrNames?: string[]): void;
   changesApplied(): void;
@@ -175,9 +181,43 @@ export class DirtyTracker {
     return this._hasInPlaceMutableChange();
   }
 
-  attributeChanged(name: string): boolean {
-    if (this._changedAttributes.has(name)) return true;
-    return this._isInPlaceMutableChange(name);
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed?
+   * (attribute_mutation_tracker.rb:44-48) over `mutations_from_database` —
+   * `attribute_changed?` conjoined with the `from:`/`to:` comparisons.
+   */
+  attributeChanged(name: string, options?: DirtyOptions): boolean {
+    return this.isChanged(this.mutationsFromDatabase, name, options);
+  }
+
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed?
+   * (attribute_mutation_tracker.rb:44-48) over `mutations_before_last_save`.
+   */
+  attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean {
+    return this.isChanged(this.mutationsBeforeLastSave, name, options);
+  }
+
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed?
+   * (attribute_mutation_tracker.rb:44-48) — the one body every
+   * `attribute_changed?` / `attribute_previously_changed?` /
+   * `saved_change_to_attribute?` / `will_save_change_to_attribute?` reader
+   * delegates to.
+   *
+   * @missingRailsArgs changed? — CONVERGEABLE: Rails picks the change set by picking one of its two tracker INSTANCES (`mutations_from_database` / `mutations_before_last_save`); trails has a single DirtyTracker holding both sets, so the set Ruby chose by receiver is a leading argument here. It converges when DirtyTracker splits into two AttributeMutationTracker instances (story `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers` owns that split).
+   */
+  isChanged(
+    changes: Record<string, [unknown, unknown]>,
+    name: string,
+    options?: DirtyOptions,
+  ): boolean {
+    if (!Object.hasOwn(changes, name)) return false;
+    if (!options) return true;
+    const change = changes[name];
+    if ("from" in options && change[0] !== options.from) return false;
+    if ("to" in options && change[1] !== options.to) return false;
+    return true;
   }
 
   attributeWas(name: string): unknown {
