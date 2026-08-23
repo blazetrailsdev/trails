@@ -31,7 +31,7 @@ interface XmlNode {
 }
 
 interface XmlDocument {
-  readonly errors: ReadonlyArray<{ message: string }>;
+  readonly errors: ReadonlyArray<Error>;
   readonly root: XmlNode;
   dispose(): void;
 }
@@ -131,7 +131,7 @@ export function parse(data: string | StringIO | null | undefined): XmlHash {
     const doc = nokogiri!.parseXml(data);
     try {
       if (doc.errors.length > 0) {
-        throw new Error(doc.errors[0].message);
+        throw doc.errors[0];
       }
       return { [doc.root.name]: nodeToHash(doc.root) };
     } finally {

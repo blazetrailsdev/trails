@@ -297,9 +297,13 @@ describe("HashExtTest", () => {
  * catches only the package being absent; `import()` signals that as
  * `ERR_MODULE_NOT_FOUND` naming the specifier.
  */
-async function runWithGem(gemName: string, block: () => void): Promise<void> {
+async function runWithGem(
+  gemName: string,
+  block: (gem: Record<string, any>) => void,
+): Promise<void> {
+  let gem: Record<string, any>;
   try {
-    await import(/* @vite-ignore */ gemName);
+    gem = await import(/* @vite-ignore */ gemName);
   } catch (e) {
     if (
       !(
@@ -312,8 +316,12 @@ async function runWithGem(gemName: string, block: () => void): Promise<void> {
     }
     return;
   }
-  block();
+  // Ruby reads `Nokogiri::XML::SyntaxError` off the constant the `require`
+  // installed; ESM has no such ambient constant, so the module is yielded.
+  block(gem);
 }
+
+let nokogiriSyntaxError: (new (...args: any[]) => Error) | undefined;
 
 function hashToXmlTests(engine: string): void {
   describe("HashToXmlTest", () => {
@@ -414,17 +422,13 @@ function hashToXmlTests(engine: string): void {
 
     it("expansion count is limited", async () => {
       // hash_ext_test.rb:1023-1032 switches on `XmlMini.backend.name`; a trails
-      // backend is the module namespace object, not a named constant. The
-      // Nokogiri arm is `Error`, not Ruby's `Nokogiri::XML::SyntaxError`,
-      // because `@blazetrails/nokogiri` carries no counterpart for
-      // `raise doc.errors.first` (nokogiri.rb:27) to raise — tracked by
-      // `nokogiri-backend-raises-syntax-error`.
+      // backend is the module namespace object, not a named constant.
       const backend = XmlMini.backend();
       const expected =
         backend === XmlMini_REXML
           ? RuntimeError
           : backend === XmlMini_Nokogiri
-            ? Error
+            ? nokogiriSyntaxError
             : backend === XmlMini_NokogiriSAX
               ? RuntimeError
               : undefined;
@@ -457,7 +461,8 @@ function hashToXmlTests(engine: string): void {
 
 hashToXmlTests("REXML");
 
-await runWithGem("@blazetrails/nokogiri", () => {
+await runWithGem("@blazetrails/nokogiri", (Nokogiri) => {
+  nokogiriSyntaxError = Nokogiri.XML.SyntaxError;
   hashToXmlTests("Nokogiri");
   hashToXmlTests("NokogiriSAX");
 });
