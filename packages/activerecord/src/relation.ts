@@ -1984,15 +1984,36 @@ export class Relation<T extends Base> {
   ): Relation<T> {
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethodBangs.joinsBang.call(rel as any, jd as any);
-    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+    if (
+      this.hasLimitOrOffset &&
+      !(
+        this.usingLimitableReflections(jd.reflections as never) &&
+        this.usingLimitableReflections(
+          QueryMethodBangs.constructJoinDependency.call(
+            this as any,
+            _qm.selectAssociationList
+              .call(this as any, this.joinsValues, null)
+              .concat(
+                _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
+              ) as AssociationSpec[],
+            null,
+          ).reflections as never,
+        )
+      )
+    ) {
       if (Array.isArray(basePk)) {
         // Rails `where!(**Array(primary_key).zip(limited_ids.transpose).to_h)`
         // (schema_statements.rb:1448) — a per-column `IN`, not a tuple `IN`.
-        // Only the materialized form exists for a composite key: the inline
-        // subquery fallback has no single column to nest under.
-        const tuples = (limitedIds ?? []) as unknown[][];
+        // The synchronous fallback keeps that per-column shape too: each column
+        // gets its own single-column DISTINCT subquery, since a multi-column
+        // subquery is not a valid `IN` operand.
+        const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
-          rel = rel.where(this.table.get(column).in(tuples.map((tuple) => tuple[i]) as never));
+          const ids =
+            tuples !== undefined
+              ? tuples.map((tuple) => tuple[i])
+              : this._limitedDistinctRelation(jd, column).arel();
+          rel = rel.where(this.table.get(column).in(ids as never));
         });
       } else {
         const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).arel();
@@ -2013,11 +2034,12 @@ export class Relation<T extends Base> {
    * forces the distinct-parent-id rewrite even when every eager reflection is
    * singular.
    *
-   * Rails spells this guard inline in `apply_join_dependency`, and so does
-   * {@link applyJoinDependency}. This copy serves only the SYNCHRONOUS eager
-   * paths that cannot route through it — `toSql` and the deferred distinct-PK
-   * predicate cluster — pending the sync/async collapse tracked by
-   * `converge-relation-subquery-distinct-pk-materialization`.
+   * Rails spells this guard inline in `apply_join_dependency`, and so do both
+   * trails mirrors of that method — {@link applyJoinDependency} and
+   * `_applyEagerJoinDependency`. This copy has one caller left, the trails-only
+   * deferred distinct-PK predicate cluster, which asks the question WITHOUT
+   * applying the join dependency; it retires with that cluster in the sync/async
+   * collapse tracked by `converge-sync-eager-builders-async-to-sql`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
@@ -2156,12 +2178,6 @@ export class Relation<T extends Base> {
    * OUTER JOINs), or null when this relation has no resolvable eager loading.
    * Shared by `toSql` (string path) and the set-operation operand
    * builder, which composes it into the compound's single collector.
-   *
-   * Also null for the one composite-PK case left after
-   * `distinct_relation_for_primary_key` took over the async path: this builder is
-   * synchronous, so it substitutes an inline `pk IN (SELECT DISTINCT …)` for the
-   * executed limited-ids query, and a composite key has no single column to nest
-   * that under. The plain arel is closer than a broken per-column `IN ()`.
    */
   private _buildEagerOperandManager(): SelectManager | null {
     const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
@@ -2175,14 +2191,6 @@ export class Relation<T extends Base> {
       Nodes.OuterJoin,
     );
     if (jd.nodes.length === 0) return null;
-
-    if (
-      Array.isArray(basePk) &&
-      this.hasLimitOrOffset &&
-      !this._eagerJoinDependencyIsLimitable(jd)
-    ) {
-      return null;
-    }
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
