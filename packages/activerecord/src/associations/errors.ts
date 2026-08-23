@@ -532,9 +532,6 @@ export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;
 
   constructor(association: string) {
-    // The key that raised, derived here rather than passed in so the message
-    // can never name a key that differs from the one mass assignment matched
-    // (attribute-assignment.ts singularizes the same way).
     const idsName = `${singularize(association)}Ids`;
     super(
       `Cannot assign collection association \`${association}\` ids by mass assignment: ` +

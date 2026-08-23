@@ -65,9 +65,6 @@ export interface AliasMap {
 }
 
 function getModelColumns(modelClass: any): string[] {
-  // columnsHash() triggers loadSchema() which populates _attributeDefinitions
-  // from the schema cache before columnNames() reads them. Guard with try/catch
-  // in case the model is abstract or has no adapter configured yet.
   let ch: Record<string, unknown> | undefined;
   if (typeof modelClass.columnsHash === "function") {
     try {
@@ -76,11 +73,7 @@ function getModelColumns(modelClass: any): string[] {
       ch = undefined;
     }
   }
-  // No columnNames() fallback: it would throw exactly like the caught
-  // columnsHash() above (abstract / no table).
   const cols: string[] = ch ? Object.keys(ch) : [];
-  // A falsy primaryKey ("" / null) marks a no-primary-key model — there is no
-  // PK column to fold into the SELECT list, so leave the columns as-is.
   const pk = modelClass.primaryKey;
   if (Array.isArray(pk)) {
     for (const k of pk) {
@@ -682,8 +675,6 @@ export class JoinDependency {
       // (join_dependency.rb:55-56): a Symbol and the equivalent String key the
       // same node, so a Symbol — spelled `":comments"` — drops its colon here.
       const name = associations.startsWith(":") ? associations.slice(1) : associations;
-      // Dotted strings ("comments.author") are a trails affordance: split them
-      // into nested levels so the builder joins each segment in turn.
       let cur = hash;
       for (const part of name.split(".")) {
         cur = cur[part] ??= Object.create(null);
@@ -743,8 +734,6 @@ export class JoinDependency {
     const aliases = this.aliases();
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
-    // The base table's aliased (column, alias) pairs — all columns normally, or
-    // just the primary key under an explicit select (`applyColumnAliases`).
     const baseAliasCols = aliases.columnsForNode(joinRoot);
 
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
@@ -763,9 +752,6 @@ export class JoinDependency {
         if (!/^t\d+_r\d+$/.test(key)) parentAttrs[key] = row[key];
       }
 
-      // The base key is read out of the aliased row exactly as the child keys are
-      // in `construct` (raw `row[aliases.columnAlias(node, col)]`), reusing the
-      // values already pulled into parentAttrs — one accessor, never the cast value.
       const parentKey = this._keyFor(basePkCols.map((c) => parentAttrs[c]));
       let parent = parents.get(parentKey);
       if (!parent) {
@@ -780,11 +766,6 @@ export class JoinDependency {
     }
 
     const parentList = [...parents.values()];
-    // Reverse index: each parent record → the RAW aliased dedup key it was
-    // stored under (the same `_keyFor` key `_collectAssociations` uses). The
-    // eager inverse-cache loop must look `associations` up by this raw key, not
-    // by re-reading the instantiated record's (deserialized) PK, which can
-    // diverge from the raw row value on adapters that deserialize PK columns.
     const parentKeys = new Map<any, unknown>();
     for (const [key, parent] of parents) parentKeys.set(parent, key);
     return {

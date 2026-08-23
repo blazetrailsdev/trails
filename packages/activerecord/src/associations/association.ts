@@ -358,7 +358,6 @@ export class Association {
   scope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    // Branch 1: disable_joins — delegate to DisableJoinsAssociationScope.
     if (this.disableJoins) {
       const djas = getDjasScopeBuilder();
       if (!djas)
@@ -375,14 +374,10 @@ export class Association {
       const reflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
       return djas({ owner: this.owner, reflection, klass } as never);
     }
-    // Branch 2: klass.current_scope.proxy_association == self.
-    // Fires when CollectionProxy.scoping sets an AssociationRelation as
-    // klass.currentScope; not yet implemented, so this is unreachable.
     const currentScope = (klass as any).currentScope();
     if (currentScope && currentScope.proxyAssociation === this) {
       return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
     }
-    // Branches 3 + 4.
     const associationScope = this.associationScope();
     const scope = klass.globalCurrentScope();
     const targetScope = this.targetScope();
@@ -409,10 +404,6 @@ export class Association {
   associationScope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    // Same relaxed staleness rule as `loadTarget` — reset the cached scope
-    // when the target went stale, including the nil-target-then-FK-set case
-    // (`_staleState == null && target == null`), so the reload re-derives the
-    // scope from the now-populated foreign key.
     if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
       this.resetScope();
     }
@@ -654,9 +645,6 @@ export class Association {
       // execute block — only freshly loaded records, never cached ones.
       if (result !== null) this.setStrictLoading(result as Base);
       if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
-      // Deliberately the bare ivar write, not `setTarget`: this is the loader
-      // storing what it just fetched, not a caller replacing the target, so it
-      // must not trip `setTarget`'s in-flight guard.
       this._writeTargetStore(result);
     }
   }
@@ -669,8 +657,6 @@ export class Association {
   async asyncLoadTarget(): Promise<Base | Base[] | null> {
     const result = await this.loadTarget();
     this._loadedViaAsync = true;
-    // Share the loaded target with the dotted collection proxy if it already
-    // exists (e.g. firm.clients was accessed before the async load completed).
     const name = this.reflection.name;
     const proxy = this.owner._collectionProxies.get(name) as
       | { loaded?: boolean; proxyAssociation?: Association }
@@ -750,8 +736,6 @@ export class Association {
   get reader(): Base | Base[] | null | Promise<Base | Base[] | null> {
     return this.target;
   }
-
-  // --- Protected / hook methods for subclasses ---
 
   protected staleState(): unknown {
     return undefined;
@@ -869,9 +853,6 @@ export class Association {
       if (!inverseName) return null;
       const recordAny = record as any;
       if (typeof recordAny.association !== "function") return null;
-      // `invertible_for?` establishes the inverse exists on the OWNER's side,
-      // which for a polymorphic belongs_to is a different class than the
-      // record's — so `record.association` can still raise here.
       try {
         return recordAny.association(inverseName);
       } catch {

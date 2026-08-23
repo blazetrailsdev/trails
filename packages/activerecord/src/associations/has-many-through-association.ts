@@ -564,10 +564,6 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
   const proxy = throughProxy(this);
   if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
 
-  // When the through is a singular (has_one/belongs_to) association that's already
-  // loaded, reuse the existing through record. For singular throughs there is only
-  // one possible join row, so the loaded target is always the right one — building
-  // a fresh record would wire FK on the new target to null instead of the real PK.
   const existingTarget = proxy.loaded ? proxy.target : undefined;
   if (existingTarget && !Array.isArray(existingTarget)) {
     cache.set(record, existingTarget);
@@ -588,14 +584,11 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
 
 /** @internal */
 function throughScope(this: HasManyThroughAssociation): unknown {
-  // through_scope is set externally by the association's concat/insert path.
-  // Return the memoized scope if it was set; otherwise null.
   return (this as any)._throughScope ?? null;
 }
 
 /** @internal */
 function throughScopeAttributes(this: HasManyThroughAssociation): Record<string, unknown> {
-  // Extract WHERE conditions from the through scope for the through model's table.
   const throughName = this.reflection.options.through;
   if (!throughName) return {};
   const throughAssoc = (this.owner as any).association?.(throughName);
@@ -616,7 +609,6 @@ function throughScopeAttributes(this: HasManyThroughAssociation): Record<string,
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = throughAssoc.klass?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
-  // Exclude the FK columns and the STI inheritance column.
   const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
   const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
   for (const key of [String(throughFk), inheritanceCol]) {
@@ -848,11 +840,6 @@ function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | nu
   } | null;
   if (!tr?.name) return null;
   const isCollection = tr.isCollection?.() ?? tr.macro === "hasMany";
-  // A collection through (has_many) keeps its canonical in-memory target on the
-  // user-facing CollectionProxy (RFC 0022); build / include / delete must use
-  // it. A singular through (has_many :posts through: a belongs_to/has_one
-  // :author) has no collection proxy — read the OO holder, exposing the same
-  // `build`/`loaded`/`target` surface so the singular-reuse branch still fires.
   if (isCollection) {
     return collectionProxyFor(assoc.owner, tr.name) as unknown as ThroughTargetStore;
   }

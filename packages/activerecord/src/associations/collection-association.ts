@@ -87,7 +87,6 @@ export class CollectionAssociation extends Association {
     }
 
     if (record === null) {
-      // It's not possible to remove the record from the inverse association.
     } else if (Array.isArray(record)) {
       super.target = record;
     } else {
@@ -172,7 +171,6 @@ export class CollectionAssociation extends Association {
     ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
     }
-    // The guard above refuses every arm that owes I/O, so nothing is pending.
     this.replace(records) as Base[];
   }
 
@@ -548,10 +546,7 @@ export class CollectionAssociation extends Association {
         ? "deleteAll"
         : dependent
           ? dependent
-          : // Rails' `options[:dependent] == :destroy` arm. Canonical trails
-            // models spell `:delete_all` as `"delete"`, which is the same delete
-            // strategy, so it collapses here too rather than falling through to
-            // nullify.
+          : // Rails: `options[:dependent] == :destroy` (collection_association.rb:157).
             optionDep === "destroy" || optionDep === "delete"
             ? "deleteAll"
             : optionDep;
@@ -692,11 +687,6 @@ export class CollectionAssociation extends Association {
    * rest of it continues off that promise where there is one.
    */
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
-    // The writer path (`firm.clients = [...]`, `firm.client_ids = [...]`, mass
-    // assignment) mutates `target` directly rather than going through
-    // `setTarget`, so it needs the in-flight guard applied here too —
-    // otherwise the ordinary user-facing assignment stays silently clobberable
-    // while only the raw `association(name).setTarget(...)` call is protected.
     this.raiseIfLoadInFlight();
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
@@ -782,8 +772,6 @@ export class CollectionAssociation extends Association {
       return this.target;
     };
     if (this.findTargetNeeded()) {
-      // Every collection subclass overrides `findTarget` to return `Base[]`;
-      // the cast only narrows the singular-shaped base signature.
       return Promise.resolve(this.findTarget()).then((findTarget) => {
         this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
         return loaded();
@@ -953,8 +941,6 @@ export class CollectionAssociation extends Association {
     }
   }
 
-  // --- Protected helpers ---
-
   /**
    * Mirrors `ForeignAssociation#set_owner_attributes` (foreign_association.rb:22),
    * which zips `Array(reflection.join_primary_key)` — the child FK columns —
@@ -1003,8 +989,6 @@ export class CollectionAssociation extends Association {
       }
     }
   }
-
-  // --- Private helpers ---
 
   private foreignKeyColumns(): string[] {
     return ownerForeignKeyColumns(
@@ -1087,8 +1071,6 @@ export class CollectionAssociation extends Association {
   ): Promise<Base[]> | Base[] {
     const isId = (r: Base | number | string | bigint): r is number | string | bigint =>
       typeof r === "number" || typeof r === "string" || typeof r === "bigint";
-    // Records passed as records need no lookup at all, so this stays inline —
-    // the arm `delete_or_destroy` takes for a new owner.
     if (!records.some(isId)) return records as Base[];
     const ids = records.map((r) => (isId(r) ? r : (r as any).id));
     if (this.reflection.options.through) {
@@ -1186,13 +1168,11 @@ export class CollectionAssociation extends Association {
   protected async nullifyAllRecords(): Promise<number> {
     const nullAttrs = this.computeNullifiedOwnerAttributes();
 
-    // Prefer scope-based bulk update (hits DB even if target isn't loaded)
     const rel = this.scope();
     if (rel && typeof rel.updateAll === "function") {
       return rel.updateAll(nullAttrs);
     }
 
-    // Fallback: load and update individually
     await this.loadTarget();
     for (const record of this.target) {
       for (const [attr, val] of Object.entries(nullAttrs)) {
@@ -1223,10 +1203,6 @@ export class CollectionAssociation extends Association {
         : (record as any)[key],
     );
     if (values.some((v) => v == null)) return record;
-    // BigInt PKs (int8 default under PG bigserial) can't go through
-    // JSON.stringify ("Do not know how to serialize a BigInt"); fold to their
-    // decimal string. Both merged lists read PKs from the same source, so the
-    // identity key stays deterministic.
     const ids = values.map((v) => (typeof v === "bigint" ? v.toString() : v));
     return JSON.stringify(ids.length === 1 ? ids[0] : ids);
   }
@@ -1266,10 +1242,6 @@ export class CollectionAssociation extends Association {
   mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
     if (memory.length === 0) return persisted;
 
-    // `memory.delete(record)` is Array#delete over AR `==` — id equality for a
-    // persisted record, object identity for a new one. `recordIdentity`
-    // returns exactly that: the id key, or the record itself when the PK is
-    // nil. Insertion order is the memory order the `reject` tail below reads.
     const memoryByIdentity = new Map<string | Base, Base>();
     for (const record of memory) memoryByIdentity.set(this.recordIdentity(record), record);
 
@@ -1388,9 +1360,6 @@ export class CollectionAssociation extends Association {
       this._wasLoaded = true;
       if (block) {
         const yield_ = block();
-        // Only a block that actually owes I/O defers the rest; a synchronous
-        // yield (a new-record owner's `concat_records`, whose `insert_record`
-        // never runs) finishes inline, under the sync `ensure` below.
         if (isThenable(yield_)) {
           yielded = true;
           return yield_.then(afterYield).finally(() => {
@@ -1444,9 +1413,6 @@ export function concatRecordsLoop(
     // but the insert inside `addRecord` is gated on the current `result` to match
     // Ruby's `result &&= insert_record(...)` short-circuit.
     const inserted = addRecord(records[i], result);
-    // The first record whose add owes I/O turns the whole loop asynchronous;
-    // everything before it has already run inline (a new-record owner never
-    // reaches `insert_record`, so the loop stays synchronous end to end).
     if (isThenable(inserted)) {
       const rest = records.slice(i + 1);
       return inserted.then(async (first) => {

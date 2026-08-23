@@ -236,10 +236,6 @@ export class HasManyAssociation extends CollectionAssociation {
    * `_buildAssociationInstance`.
    */
   protected override async findTarget(): Promise<Base[]> {
-    // Every caller assigns the returned records into this holder itself, so the
-    // loader's tail writeback into the same holder is redundant — and, because
-    // it lands mid-await, clobbers any reassignment made while the query was in
-    // flight. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
       const records = await findTarget(
@@ -391,9 +387,6 @@ export class HasManyAssociation extends CollectionAssociation {
       count = await (this as unknown as CollectionAssociation).scope().count("all");
     }
 
-    // If there's nothing in the database, @target should only contain new
-    // records or be an empty array. This is a documented side-effect of
-    // the method that may avoid an extra SELECT.
     if (count === 0) {
       selectBang((this as unknown as CollectionAssociation).target, (record) =>
         record.isNewRecord(),
@@ -505,10 +498,6 @@ function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] 
  * @internal
  */
 function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, null> {
-  // Resolve the rich reflection so foreignKey expansion (composite PKs,
-  // primaryKey overrides, polymorphic foreignType) matches what the
-  // association itself uses. Fall back to the CollectionAssociation's
-  // own FK column derivation, then to the simple options-based shape.
   const ctor = assoc.owner.constructor as {
     name: string;
     _reflectOnAssociation?: (n: string) => {
@@ -584,16 +573,7 @@ async function findTarget(
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
-  // Check cached (inverse_of) first, then preloaded — skip when a scope
-  // override is provided (the scope has been mutated; the cache would return
-  // stale/incorrect data for the diverged query).
   if (!queryExecutor) {
-    // Honor an instance-cache hit (a directly-seeded or inverse-seeded
-    // collection target), but ignore the association's *own* seat — its
-    // collection proxy or the association object the proxy reads through:
-    // its in-memory built/pushed records are not a complete collection and must
-    // still be merged with a DB query (this loader runs inside that proxy's
-    // load path, where `proxy.loaded` is false by construction).
     const cache = record._associationCache(assocName);
     if (
       cache &&
@@ -620,24 +600,11 @@ async function findTarget(
     strictLoadingViolationBang({ owner: ctor, reflection });
   }
 
-  // Scope-override path: CollectionProxy passes this when its Relation state
-  // has been mutated (whereBang / orderBang / ...). The executor runs the
-  // mutated scope directly; cache lookup and scope rebuild are bypassed.
   if (queryExecutor) return queryExecutor();
 
-  // Handle through associations. Routes through AssociationScope's
-  // JOIN-based path for the simple shape (see
-  // _canRouteThroughViaAssociationScope); everything else stays on the
-  // 2-step loadHasManyThrough.
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
     const reflThrough = ctorEarly._reflectOnAssociation?.(assocName);
-    // Nested-through shapes flatten their whole `reflection.chain` into the
-    // JOIN-based AssociationScope path below, sharing its inverse-wiring and
-    // null-FK short-circuit. An unsaved owner resolves its through step from
-    // the in-memory association target (e.g. `post.author = mary` before save),
-    // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
-    // those on the 2-step loader.
     if (!_routeThroughViaAssociationScope(record, reflThrough, options)) {
       const { _buildAssociationInstance } = await import("./instance-methods.js");
       const through = _buildAssociationInstance.call(record, {
@@ -648,7 +615,6 @@ async function findTarget(
       }) as unknown as { loadHasManyThrough(): Promise<Base[]> };
       return through.loadHasManyThrough();
     }
-    // Fall through into the AssociationScope path below.
   }
 
   const ctor = record.constructor as typeof Base;
@@ -755,10 +721,6 @@ export function scope(
       });
     }
   }
-  // Null-FK short-circuit: read the SAME columns the eventual query
-  // reads. For non-through, reflection.joinForeignKey is the owner-
-  // side activeRecordPrimaryKey for hasMany. For through reflections the
-  // owner-side column is on `_ownerChainReflection` (chain.last).
   const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
@@ -789,7 +751,6 @@ export function scope(
     rel = baseRelation.merge(built);
     rel = applyAssociationScope(rel, assocDef.scope, record, reflection.scope);
   } else {
-    // Inline fallback: no reflection (lower-level test helpers).
     if (Array.isArray(foreignKey)) {
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
@@ -797,7 +758,6 @@ export function scope(
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
         routeThroughCheckValidity(ctor, assocName);
-        // No reflection registered (lower-level test helper) — minimal guard.
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,

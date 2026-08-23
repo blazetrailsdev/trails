@@ -178,10 +178,6 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     }
     const firstFk = (firstItem as { joinForeignKey: string | string[] }).joinForeignKey;
     const firstFkCols = keyColumns(firstFk, "joinForeignKey");
-    // Single-column shape stays `[v1, v2, ...]` (one value per join
-    // candidate). Composite shape becomes `[[v1a, v1b], ...]` (one
-    // tuple per join candidate). The owner contributes exactly one
-    // tuple as the chain seed.
     const seedTuple = readTuple(owner, firstFkCols);
     const initialIds: JoinIds = firstFkCols.length === 1 ? [seedTuple[0]] : [seedTuple];
     let acc: [ChainEntry, boolean, JoinIds] = [firstItem, false, initialIds];
@@ -204,8 +200,6 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         "joinPrimaryKey",
       );
       const records = this._addConstraintsDj(reflection, keyCols, joinIds, owner, ordered);
-      // Pluck single column → `[v, v, ...]`; pluck multiple →
-      // `[[v1a, v1b], ...]`. Forward as-is into the next iteration.
       const recordIds = (await (
         records as { pluck: (...cols: string[]) => Promise<unknown[]> }
       ).pluck(...foreignKeyCols)) as JoinIds;
@@ -262,17 +256,6 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         [keyCols[0]]: joinIds,
       });
     } else {
-      // Composite key: route through `Relation#where(cols, tuples)`,
-      // which delegates to `PredicateBuilder.buildComposite`. That
-      // helper handles null-component filtering (SQL tuple-equality
-      // semantics), arity validation, single-column degeneracy → IN,
-      // and bind-param emission via QueryAttribute. Empty/all-filtered
-      // tuples become `Relation#none()`. No DJAS-local scaffolding.
-      // Defense in depth: the chain walk constructs `joinIds` from
-      // `pluck(...cols)` with `cols.length > 1`, which yields an
-      // array of tuples. A bug upstream that hands us a flat list
-      // (or mismatched arity) would otherwise surface deep inside
-      // PredicateBuilder with a less actionable trace.
       const arity = keyCols.length;
       const tuples = joinIds.map((t, i) => {
         if (!Array.isArray(t)) {
@@ -346,21 +329,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     const finalOrd = scope as { orderValues?: unknown[] };
     const finalOrders = (finalOrd.orderValues?.length ?? 0) > 0 ? [1] : [];
     if (finalOrders.length === 0 && ordered) {
-      // If PredicateBuilder.buildComposite short-circuited to
-      // `Relation#none()` (empty tuples / all-null components), the
-      // scope is already a never-match. Skip the wrap: the fresh DJAR
-      // would only copy `whereClause.predicates` and lose `_isNone`,
-      // causing a full-table SELECT instead of an empty result.
       if ((scope as { _isNone: boolean })._isNone) return scope;
-      // Loaded-chain wrap: DJAR loads via SQL, then re-groups by the
-      // join key and re-emits in `ids` order so callers see the
-      // through-table ordering (SQL `IN(...)` / composite OR-of-AND
-      // don't preserve list order). Both single-column and composite
-      // keys are supported — DJAR serializes tuples for Map identity
-      // so `[1, 100]` buckets collide as expected.
-      // Branch over key arity so we hit DJAR's correlated overloads.
-      // At this point `joinIds` is already shape-matched to `keyCols`
-      // by the single-vs-composite branches in `_addConstraintsDj`.
       const Ctor = disableJoinsAssociationRelationClassFor(klass);
       const split =
         keyCols.length === 1

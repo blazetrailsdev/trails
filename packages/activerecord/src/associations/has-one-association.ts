@@ -337,7 +337,6 @@ export class HasOneAssociation extends SingularAssociation {
         // leave the association unloaded: `load_target` calls `loaded!`
         // unconditionally (association.rb:192), as does the `loadTarget()`.
         if (!this.target && !record) return;
-        // `hasChangesToSave` is a getter, read (not called) per #4900.
         const assigningAnotherRecord = !sameRecord(this.target, record);
         if (assigningAnotherRecord || record?.hasChangesToSave === true) {
           // Rails: `save &&= owner.persisted?` (:66).
@@ -564,10 +563,6 @@ export class HasOneAssociation extends SingularAssociation {
   private setOwnerAttributes(record: Base): void {
     if (this.reflection.options.through) return;
 
-    // `join_primary_key` / `join_foreign_key` / `type` live on the rich
-    // reflection, which the Association is not constructed with — it is
-    // resolved off the owner's class, the lookup the `type` read below has
-    // always used.
     const ctor = (this.owner as any).constructor;
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) as {
       joinPrimaryKey?: (klass?: typeof Base) => string | string[];
@@ -747,8 +742,6 @@ async function preloadDestroyInverseBelongsTo(
       continue;
     }
     if (JSON.stringify(Array.isArray(fk) ? fk : [fk]) !== ownFk) continue;
-    // The owner must actually be an instance of the belongs_to's target class,
-    // so we don't query an unrelated association that happens to share the FK.
     if (klass && !(owner instanceof (klass as any))) continue;
     try {
       await (target as any).association(ref.name).loadTarget();
@@ -784,10 +777,6 @@ function transactionIf(
  * @internal
  */
 function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null> {
-  // Resolve the rich reflection so foreignKey expansion (composite PKs,
-  // primaryKey overrides, polymorphic foreignType) matches what the
-  // association itself uses. Fall back to the HasOneAssociation's own
-  // foreignKeyColumns() derivation, then to options-based defaults.
   const ctor = assoc.owner.constructor as {
     name: string;
     _reflectOnAssociation?: (n: string) => {

@@ -76,19 +76,6 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     record: Base | null,
     { force = false }: { force?: boolean } = {},
   ): void {
-    // Write the polymorphic type column FIRST so that the dynamic
-    // `this.klass` resolves via the _type column before
-    // `super.replaceKeys` derives composite foreign-key names via
-    // `foreignKeyNames() → associationPrimaryKeys(null)`.
-    //
-    // Note: `replaceKeys` is called from both `replace(record)` (writer
-    // path) and `inversedFrom(record)` (inverse-wiring path). On the
-    // writer path, `setInverseInstance` runs in `replace()` before
-    // `replaceKeys`, so a missing-inverse raise leaves owner state
-    // untouched. On the `inversedFrom` path no inverse validation runs
-    // at all — the caller has already resolved the inverse pair — so
-    // the ordering inside `replaceKeys` is independent of that
-    // atomicity guarantee.
     const typeCol = this.foreignTypeName();
     // Rails: writes record.class.polymorphic_name, which is the Ruby class
     // name (including "::" for namespaced classes). JS class names can't
@@ -136,10 +123,6 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       const recordPk = (klass as any).primaryKey;
       if (recordPk) return inferCompositePrimaryKey(recordPk);
     }
-    // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime
-    // from the _type column. Preserve the base class's klass-fallback for
-    // scope() / counter-cache paths that hit `associationPrimaryKeys(null)`
-    // once the _type column is set.
     const pk = (this.klass as any)?.primaryKey;
     if (pk) return inferCompositePrimaryKey(pk);
     const targetPk = (this.target as any)?.constructor?.primaryKey;
@@ -197,22 +180,10 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       name: string;
       _registryKeys?: string[];
     };
-    // Cannot delegate to the static `polymorphicName(ctor)`: that derives the
-    // full name from `moduleName`/`_demodulizedName`, but some polymorphic
-    // targets are registered only under a `::`-qualified registry key with no
-    // matching `moduleName` (JS flattens `Access::NoticeMessage` to the bare
-    // `AccessNoticeMessage` class name). The registry key is the authoritative
-    // full name here; the static would return the un-namespaced JS name.
     const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
     let name: string;
     if (matching.length > 0) {
       const existing = this.readForeignType();
-      // Delegated-type round-trip: a *_type already stored that matches one of
-      // this class's registry keys is a caller-configured type string — return
-      // it verbatim, which is correct regardless of `storeFullClassName` (it is
-      // the exact key the model is registered under, full `::` or bare). Fresh
-      // writes (the case the store-full-sti-class tests exercise) have
-      // `existing === null` and fall through to the demodulize path below.
       if (existing && matching.includes(existing)) return existing;
       name = matching.reduce((best, k) =>
         (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,

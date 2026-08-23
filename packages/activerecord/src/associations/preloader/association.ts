@@ -161,9 +161,7 @@ export class Association {
       try {
         const association = (owners[0] as any).association(this.reflection.name);
         association.setInverseInstance(record);
-      } catch {
-        // Ignore if association doesn't exist
-      }
+      } catch {}
     }
   }
 
@@ -212,16 +210,12 @@ export class Association {
         const owner = owners[i];
         try {
           const association = (owner as any).association(this.reflection.name);
-          // Loader writeback, not an assignment — must not trip the
-          // in-flight guard (see Association#_setTargetFromLoader).
           association._setTargetFromLoader(record);
           association._loadedFromPreload = true;
           if (i === 0) {
             association.setInverseInstance(record);
           }
-        } catch {
-          // Ignore
-        }
+        } catch {}
       }
     }
   }
@@ -551,10 +545,6 @@ export class LoaderRecords {
       keysToLoad.delete(key);
     }
 
-    // Shared query across loaders: resolve each record's owning loader inside
-    // the instantiation block so the inverse is wired before find/initialize
-    // callbacks. setInverse is a no-op for a loader whose ownersByKey lacks the
-    // record's key, so wiring every loader leaves only the matching one active.
     const loaded = await this.loaderQuery.loadRecordsForKeys([...keysToLoad], (record) => {
       for (const loader of this.loaders) {
         loader.setInverse(record);

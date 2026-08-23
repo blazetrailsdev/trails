@@ -83,10 +83,6 @@ type ScopeBuilder = {
 };
 
 export class ReflectionProxy {
-  // AbstractReflection rather than AssociationReflection because chain
-  // entries can be ThroughReflection / PolymorphicReflection wrappers;
-  // ReflectionProxy only reads structural fields (joinPrimaryKey/Fk,
-  // type, klass, name, scope, scopeFor) that all chain entries provide.
   readonly reflection: AbstractReflection;
   readonly aliasedTable: unknown;
 
@@ -104,12 +100,6 @@ export class ReflectionProxy {
     return null;
   }
 
-  // SimpleDelegator-style forwarding of the attributes AssociationScope
-  // reads. Kept explicit instead of a runtime Proxy so TypeScript sees
-  // the shape. The `_r` getter centralizes the cast — these fields are
-  // present on every chain entry shape (AssociationReflection,
-  // ThroughReflection, PolymorphicReflection) but not declared on the
-  // AbstractReflection base.
   private get _r(): {
     joinPrimaryKey(klass?: typeof Base): string | string[];
     joinForeignKey: string | string[];
@@ -436,7 +426,6 @@ export class AssociationScope {
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message.
       routeThroughCheckValidity(owner.constructor as typeof Base, name);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
@@ -508,8 +497,6 @@ export class AssociationScope {
           return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
         });
       } else {
-        // Fallback for the legacy single-call path where no tracker
-        // is provided — bare table name, same behavior as before.
         aliasedTable = klass?.tableName ?? "";
       }
       chain.push(new ReflectionProxy(refl, aliasedTable));
@@ -547,9 +534,6 @@ export class AssociationScope {
     const joinPks = Array.isArray(rJoinPk) ? rJoinPk : [rJoinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     if (joinPks.length !== joinFks.length) {
-      // Unwrap ReflectionProxy so activeRecord/name come from the
-      // underlying reflection rather than reading "<unknown>" off the
-      // proxy (which doesn't forward activeRecord).
       const base =
         (reflection as { reflection?: { name?: string; activeRecord?: { name?: string } } })
           .reflection ?? (reflection as { name?: string; activeRecord?: { name?: string } });
@@ -559,7 +543,6 @@ export class AssociationScope {
       // single raise site) so the error carries the Rails-faithful message.
       const ownerClass = base.activeRecord as unknown as typeof Base | undefined;
       if (ownerClass) routeThroughCheckValidity(ownerClass, name);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
@@ -587,8 +570,6 @@ export class AssociationScope {
         tableName = "";
       }
     }
-    // nextReflection may be a ReflectionProxy (with aliasedTable) or a
-    // raw reflection; resolve its table name the same way.
     const aliased = nr.aliasedTable;
     const foreignTableName =
       typeof aliased === "string"
@@ -702,15 +683,6 @@ export class AssociationScope {
     const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 0; i--) {
       const reflection = chain[i];
-      // Iterate `reflection.constraints()` rather than special-casing
-      // PolymorphicReflection via instanceof. For ordinary
-      // AssociationReflection / ReflectionProxy entries `constraints()`
-      // returns `chain.flatMap(scopes)` — for non-through chain entries that's
-      // just `[self.scope].compact`. For PolymorphicReflection (sourceType
-      // wrapper) `constraints()` ALSO returns the `source_type_scope` lambda
-      // (`where(foreign_type: source_type)`). Iterating handles both cases
-      // without an instanceof check, avoiding a value-import cycle
-      // (reflection → associations → association-scope → reflection).
       const constraints =
         (
           reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }

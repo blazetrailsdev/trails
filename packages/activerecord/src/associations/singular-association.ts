@@ -80,10 +80,6 @@ export class SingularAssociation extends Association {
     // the new target, so a passed block can mutate persisted attributes
     // (e.g. `build_bulb { |b| b.color = ... }`).
     const record = this.buildRecord(attributes, block);
-    // `set_new_record` → `replace(record, false)` runs `load_target` on EVERY
-    // build, so a persisted owner whose target has never been loaded still
-    // discovers (and displaces) the row in the DB. The load has to precede
-    // `setNewRecord`, which overwrites the target and marks it loaded.
     const setNewRecord = (): Base | null | Promise<Base | null> => {
       // Rails removes before promoting: `remove_target!`
       // (has_one_association.rb:69), then `self.target = record` (:84). That
@@ -188,28 +184,17 @@ export class SingularAssociation extends Association {
       return this.target;
     }
 
-    // An in-memory target (set via build / internal assignment paths
-    // like Preloader::Association#associate_records_from_unscoped,
-    // which can bind `association.target` without calling
-    // `loadedBang()`) is already resolved — no DB load would run, so
-    // strict loading should not fire. Mark it loaded to short-circuit
-    // future reads.
     if (this.target != null) {
       this.loadedBang();
       return this.target;
     }
 
-    // Sync resolution via preloaded / cached associations. `doFindTarget`
-    // returns `undefined` if nothing is cached, or the (possibly null)
-    // preloaded value if it is. A null from a preloaded key is a
-    // legitimate "nil association" — no query needed, no throw.
     const cached = this.doFindTarget();
     if (cached !== undefined) {
       this.target = cached as Base | null;
       return this.target;
     }
 
-    // A DB load would be required to answer.
     if (this.findTargetNeeded()) {
       if (this.isViolatesStrictLoading()) {
         const ctor = this.owner.constructor as typeof Base;
@@ -330,7 +315,6 @@ export class SingularAssociation extends Association {
             this as unknown as { loadHasOneThrough(): Promise<Base | null> }
           ).loadHasOneThrough();
         }
-        // Otherwise fall through to the scope path below.
       }
 
       let targetModel: typeof Base;
@@ -354,11 +338,6 @@ export class SingularAssociation extends Association {
         _validateHasOnePolymorphicKeys(owner, assocName, options);
       }
 
-      // Null-key short-circuit: read the SAME columns the eventual query reads, or
-      // a mismatch silently returns null where a real query would have found the
-      // row. That is `joinForeignKey` on the owner-side chain reflection for both
-      // macros — the owner's FK for belongs_to, its activeRecordPrimaryKey for
-      // has_one.
       const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
       const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
         ? ownerSideReflection.joinForeignKey

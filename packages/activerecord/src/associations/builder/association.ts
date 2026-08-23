@@ -229,13 +229,9 @@ export class Association {
     });
   }
 
-  static defineValidations(_model: any, _reflection: any): void {
-    // noop in base — BelongsTo and HasOne override
-  }
+  static defineValidations(_model: any, _reflection: any): void {}
 
-  static defineChangeTrackingMethods(_model: any, _reflection: any): void {
-    // noop in base — BelongsTo overrides
-  }
+  static defineChangeTrackingMethods(_model: any, _reflection: any): void {}
 
   static validDependentOptions(): string[] {
     throw new Error("NotImplementedError");

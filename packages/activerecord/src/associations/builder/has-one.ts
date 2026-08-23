@@ -72,10 +72,6 @@ export class HasOne extends SingularAssociation {
           // owns the removal and returns the promise to `await`.
           return assoc.loadTargetForBuild().then(() => assoc.build(...args));
         }
-        // An already-loaded target still gets `remove_target!` (FK nullified /
-        // destroyed per `:dependent`), so `build` returns a Promise for that
-        // case only — a new-record / no-target build keeps its synchronous
-        // return, the shape the STI-build tests assert.
         return assoc.build(...args);
       },
       writable: true,

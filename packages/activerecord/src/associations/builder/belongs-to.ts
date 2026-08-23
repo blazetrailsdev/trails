@@ -145,8 +145,6 @@ export class BelongsTo extends SingularAssociation {
   ): Promise<void> {
     const fkColumns = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
 
-    // Fill missing old FK parts from current attributes for composite keys —
-    // unchanged columns have the same old/new value.
     const oldFkValues = fkColumns.map((col) => {
       const change = changes[col] as [unknown, unknown] | undefined;
       if (change) return change[0];
