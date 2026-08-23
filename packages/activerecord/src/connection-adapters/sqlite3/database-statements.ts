@@ -224,8 +224,6 @@ export function acquireStatementLock(host: {
   const tail = ahead ? ahead.then(() => mine) : mine;
   host._statementLock = tail;
   const drain = (): void => {
-    // Only the last queued caller clears the tail; a later arrival has already
-    // published its own and must keep waiting on this one.
     if (host._statementLock === tail) host._statementLock = null;
     release();
   };

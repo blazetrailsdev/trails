@@ -77,8 +77,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
     if (!this.connection) return {};
     const opts = await this.connection.tableOptions(tableName);
-    // Populate tableCollationCache when the table has an explicit COLLATE clause so
-    // schemaCollation can suppress per-column collation that matches the table default.
     if (Object.hasOwn(opts, "collation")) {
       this.tableCollationCache[tableName] = opts["collation"];
     } else {
@@ -193,7 +191,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     // bigint reflects with limit 8 but Rails suppresses it (column.bigint?); detect off sqlType
     // since the cast map reports type:"integer".
     if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
-    // int(N) reflects with limit 4 (the native default); suppress so dumps stay clean.
     if (column.type === "integer" && column.limit === 4) return undefined;
     // Mirrors Rails schema_limit: suppress limit when it equals the native default
     // (string varchar(255), float 24, emulated boolean tinyint(1)).
@@ -217,7 +214,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaScale(column: MysqlColumn): string | undefined {
-    // Scale only applies to decimal; suppress the numeric_scale the cast map fills for integers.
     if (column.type !== "decimal") return undefined;
     return super.schemaScale(column);
   }
@@ -225,7 +221,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
-    // super.table (abstract) populates primaryKeyOrderCache via @connection.primaryKeys.
     await super.table(tableName, stream);
   }
 

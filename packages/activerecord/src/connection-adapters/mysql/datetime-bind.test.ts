@@ -21,8 +21,6 @@ describe("MySQL datetime bind formatting", () => {
   });
 
   it("zero-pads years below 1000", () => {
-    // Realistic case: year 44 CE — ensure 4-digit year, not 2-digit (MySQL
-    // 2-digit-year rules would misinterpret "44-01-01 00:00:00")
     const instant = Temporal.Instant.from("0044-01-01T00:00:00Z");
     expect(bind(instant) as string).toMatch(/^0044-/);
   });

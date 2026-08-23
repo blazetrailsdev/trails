@@ -95,7 +95,7 @@ export class PgTextDecoderArray {
           }
           i++;
         }
-        i++; // closing quote
+        i++;
         elements.push(val);
       } else if (
         inner.substring(i, i + 4).toUpperCase() === "NULL" &&
@@ -209,8 +209,6 @@ export class Array extends ValueType<unknown> {
         value = this.pgDecoder.decode(value);
       } catch (error) {
         if (!(error instanceof TypeError)) throw error;
-        // malformed array string is treated as [], will raise in PG 2.0 gem
-        // this keeps a consistent implementation
         value = [];
       }
     }

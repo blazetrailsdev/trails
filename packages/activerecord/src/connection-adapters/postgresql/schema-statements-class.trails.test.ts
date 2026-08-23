@@ -7,8 +7,6 @@ import { Table as PgTable } from "./schema-definitions.js";
 import { Name } from "./utils.js";
 import { Result } from "../../result.js";
 
-// The bodies under test are prototype methods on the adapter, so give the fake
-// adapter that prototype and call them the way production does.
 function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
   // `Object.setPrototypeOf` skips the AbstractAdapter constructor, which is what
   // seats `@config` (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it
@@ -33,8 +31,6 @@ function makeAdapter(options: FakeOptions = {}) {
     quote: (v: unknown) => `'${String(v).replace(/'/g, "''")}'`,
     quoteColumnName: (n: string) => `"${n}"`,
     quoteLiteral: (v: unknown) => `'${String(v).replace(/'/g, "''")}'`,
-    // The real adapter quotes each dot-separated part; the tests below rely on
-    // a schema-qualified name surviving as `"a"."b"`.
     quoteTableName: (n: string) =>
       n
         .split(".")

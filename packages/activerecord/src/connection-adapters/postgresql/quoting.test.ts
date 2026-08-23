@@ -27,10 +27,6 @@ import {
   unescapeBytea,
 } from "./quoting.js";
 
-// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// PG's quotedDate so date/time values reach the BC-suffixing override, and its
-// quotedBinary so binary values reach the bytea-hex override — a real adapter
-// host carries both.
 const HOST = quotingHost({ quotedDate, quotedBinary });
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
@@ -57,9 +53,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
-    // node-postgres natively binds Buffer as bytea (hex literal in text mode).
-    // Returning a Buffer preserves bytes 128–255 that the prior
-    // `{ value: value.toString(), format: 1 }` shape corrupted via UTF-8 decode.
     const cast = typeCast(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])));
     expect(Buffer.isBuffer(cast)).toBe(true);
     expect(Array.from(cast as Buffer)).toEqual([0xde, 0xad, 0xbe, 0xef]);
@@ -76,9 +69,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes arrays through the encoder's delimiter, not a hardcoded comma", async () => {
-    // box[] uses a `;` element delimiter; routing quote/typeCast through
-    // encodeArray (which calls the OID encoder) keeps it type-correct rather
-    // than diverging on a hardcoded `,`.
     const boxArray = new ArrayData(new PgTextEncoderArray({ name: "box[]", delimiter: ";" }), [
       "(1,1),(0,0)",
       "(2,2),(1,1)",
@@ -143,9 +133,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes a binary default produced by BinaryType#serialize", async () => {
-    // Guards the real quoteDefaultExpression path: whatever the type map's
-    // serialize emits must still reach PG's bytea form.
-    // `array` must be present: the serialize branch is gated on `"array" in column`.
     const column = { sqlType: "bytea", array: false };
     const typeMap = { lookupCastTypeFromColumn: () => new BinaryType() };
     expect(await quoteDefaultExpression.call(HOST, "ab", column, typeMap)).toBe("'\\x6162'");
@@ -174,11 +161,9 @@ describe("PostgreSQL quoting", () => {
     expect(await quoteDefaultExpression.call(HOST, "uuid_generate_v4()", column)).toBe(
       "uuid_generate_v4()",
     );
-    // A non-function string default on a uuid column is still quoted.
     expect(
       await quoteDefaultExpression.call(HOST, "11111111-1111-1111-1111-111111111111", column),
     ).toBe("'11111111-1111-1111-1111-111111111111'");
-    // The branch is uuid-only — the same string on a text column is quoted.
     expect(
       await quoteDefaultExpression.call(HOST, "gen_random_uuid()", {
         type: "text",
@@ -194,7 +179,6 @@ describe("PostgreSQL quoting", () => {
         return null;
       },
     };
-    // A plain string value should still round-trip normally
     expect(await quoteDefaultExpression.call(HOST, "hello", column, nullTypeMap)).toBe("'hello'");
   });
 
@@ -253,9 +237,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescapes legacy octal bytea with escaped backslashes", () => {
-    // PG::Connection.unescape_bytea handles the pre-9.0 octal format: \NNN
-    // for bytes and \\ for a literal backslash. Parsed byte-by-byte so
-    // high bytes aren't UTF-8 re-encoded.
     expect(unescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
   });
 
@@ -278,8 +259,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotedBinary hexes an ArrayBuffer view like MySQL/SQLite do", () => {
-    // Routed through the shared toBytes: a DataView (non-Uint8Array view) hexes
-    // its own bytes rather than raising inside escapeBytea's Buffer.from.
     const buffer = new Uint8Array([0x1f, 0x8b]).buffer;
     expect(quotedBinary(new DataView(buffer))).toBe("'\\x1f8b'");
   });
@@ -290,8 +269,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quote(Uint8Array) emits a bytea hex literal via quotedBinary", () => {
-    // byte 0x8b (> 0x7f) must not be corrupted to the UTF-8 replacement
-    // character sequence EF BF BD — regression for the String(buffer) path
     expect(quote(new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
   });
 
@@ -300,9 +277,6 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quote(non-Uint8Array ArrayBuffer view) normalizes to bytes via quotedBinary", () => {
-    // Views other than Uint8Array reach the inherited abstract quote, which
-    // normalizes them to bytes and self-dispatches to the adapter's
-    // quotedBinary rather than raising `can't quote Int8Array`.
     expect(quote(new Int8Array([0x1f, 0x8b - 0x100]))).toBe("'\\x1f8b'");
     expect(quote(new DataView(new Uint8Array([0x1f, 0x8b]).buffer))).toBe("'\\x1f8b'");
   });
@@ -376,14 +350,12 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quoted_date caps fractional seconds at microseconds (drops nanos)", () => {
-    // Nil-precision nanosecond value must not reach the PG wire as 7–9 digits.
     expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"))).toBe(
       "2026-04-26 14:23:55.123456",
     );
   });
 
   it("quoted_date suffixes BC for an Instant with proleptic year <= 0", () => {
-    // 44 BC = ISO year -43; usec 0 → no fractional field.
     const instant = Temporal.Instant.from("-000043-03-15T12:34:56Z");
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
     expect(quotedDate(instant)).toBe("0044-03-15 12:34:56 BC");

@@ -11,9 +11,6 @@ export interface ReferentialIntegrity {
   checkAllForeignKeysValidBang(): Promise<void>;
 }
 
-// Host for the *Sql helpers: quoting dispatches through the adapter instance
-// (`this.quoteTableName`) so a sub-adapter can override it polymorphically,
-// rather than binding to the dialect's freestanding quoteTableName.
 interface ReferentialIntegritySqlHost {
   quoteTableName(name: string): string;
 }
@@ -32,8 +29,6 @@ export function enableReferentialIntegritySql(
   return tables.map((t) => `ALTER TABLE ${this.quoteTableName(t)} ENABLE TRIGGER ALL`);
 }
 
-// Host for the instance methods: the adapter supplies its transaction/execute
-// machinery and table listing, plus the `*Sql` host (`quoteTableName`).
 interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
   execute(sql: string): Promise<unknown>;
   tables(): Promise<string[]>;

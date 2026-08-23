@@ -170,8 +170,6 @@ function canonicalizeIpv6(value: string): string {
     // as-is and canonicalize only the 6-group hex prefix. Both PG and Ruby
     // IPAddr#to_s use mixed notation for IPv4-mapped addresses.
     ipv4Tail = value.slice(lastColon + 1);
-    // Substitute "0:0" for the IPv4 tail so the :: expansion logic always sees
-    // 8 groups; the last two placeholder groups are discarded via slice(0, 6) below.
     head = value.slice(0, lastColon + 1) + "0:0";
   }
 
@@ -198,7 +196,6 @@ function canonicalizeIpv6(value: string): string {
     ipv4Tail = `${g6 >> 8}.${g6 & 0xff}.${g7 >> 8}.${g7 & 0xff}`;
   }
 
-  // Apply RFC 5952 to the hex prefix only (6 groups when IPv4 tail, 8 otherwise).
   const activeGroups = ipv4Tail ? groups.slice(0, 6) : groups;
 
   let bestStart = -1;
@@ -229,8 +226,6 @@ function canonicalizeIpv6(value: string): string {
   }
 
   if (ipv4Tail) {
-    // "::ffff" + ":" + "192.168.0.1" → "::ffff:192.168.0.1"
-    // "::" (all-zero prefix) + "192.168.0.1" → "::192.168.0.1"
     return hexResult.endsWith("::") ? hexResult + ipv4Tail : hexResult + ":" + ipv4Tail;
   }
   return hexResult;
@@ -258,8 +253,6 @@ function isIpv6(value: string): boolean {
   if (doubleColons && doubleColons.length > 1) return false;
   if (value === "::") return true;
 
-  // Split the trailing IPv4 tail (e.g. ::ffff:192.168.0.1) out of the
-  // hextet sequence. It counts as 2 hextets toward the 8-group total.
   const parts = value.split(":");
   const last = parts[parts.length - 1];
   let ipv4Tail = false;
@@ -275,7 +268,6 @@ function isIpv6(value: string): boolean {
     const leftParts = left === "" ? [] : left.split(":");
     let rightParts = right === "" ? [] : right.split(":");
     if (ipv4Tail) {
-      // IPv4 tail already counted as two placeholder hextets above.
       rightParts = rightParts.slice(0, -1).concat(["0", "0"]);
     }
     if (

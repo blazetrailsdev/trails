@@ -55,8 +55,6 @@ export class Column extends BaseColumn {
     this.serial = options.serial ?? false;
     this.oid = sqlTypeMetadata.oid ?? null;
     this.fmod = sqlTypeMetadata.fmod ?? null;
-    // Use the raw sqlTypeMetadata.sqlType (not `this.sqlType`) so the check
-    // runs against the unstripped string — our sqlType getter strips "[]".
     this.array = options.array ?? sqlTypeMetadata.sqlType?.endsWith("[]") ?? false;
     this.identity = options.identity ?? null;
     this.generated = options.generated ?? null;

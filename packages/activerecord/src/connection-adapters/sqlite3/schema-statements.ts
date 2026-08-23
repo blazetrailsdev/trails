@@ -129,9 +129,6 @@ export async function indexes(
     // PK/UNIQUE-backed indexes (origin "pk"/"u") are kept, matching Rails.
     if (idx.name.startsWith("sqlite_")) continue;
 
-    // Locate the index SQL across the main/attached schema and the temp
-    // schema (temp-table indexes live only in sqlite_temp_master), so their
-    // WHERE clauses are not silently dropped.
     const indexSql = (await adapter.queryValue(
       `SELECT sql FROM ${sqliteMaster} WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
@@ -143,8 +140,6 @@ export async function indexes(
     let where = match?.groups?.where;
     if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
 
-    // index_info takes the bare index name; the schema qualifier, if any,
-    // comes before the PRAGMA keyword — same shape as above.
     const cols = (
       await adapter.internalExecQuery(
         `PRAGMA ${pragmaPrefix}index_info(${adapter.quote(idx.name)})`,
@@ -156,8 +151,6 @@ export async function indexes(
     const orders: Record<string, string> = {};
     let columns: string[] | string;
     if (columnNames.some((name) => name == null)) {
-      // Expression index: index_info has no column names, so fall back to
-      // the parenthesized expressions captured from the index SQL.
       columns = expressions ?? "";
     } else {
       columns = columnNames as string[];
@@ -359,7 +352,6 @@ export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (single) return single[1].replace(/''/g, "'");
   const double = /^"([^|]*)"$/m.exec(dfltValue);
   if (double) return double[1].replace(/""/g, '"');
-  // Numeric types
   if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
   // Binary columns — unanchored `x'(.*)'` mirrors Rails (sqlite3_adapter.rb:535).
   // Rails unpacks via `[ $1 ].pack("H*")`. SQLite's `PRAGMA table_info`

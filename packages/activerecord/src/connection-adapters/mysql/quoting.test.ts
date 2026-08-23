@@ -13,9 +13,6 @@ import {
 import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
-// `quote` / `typeCast` self-send onto their receiver; bind
-// the adapter prototype so date/time values reach MySQL's quotedDate override
-// and booleans reach its unquotedTrue/unquotedFalse.
 const HOST = Object.create(AbstractMysqlAdapter.prototype) as QuotingDispatchHost;
 // Rails' MySQL adapter defines no `quote` (mysql/quoting.rb); MySQL value
 // quoting is the inherited abstract `quote` plus the overrides it self-sends.
@@ -144,14 +141,10 @@ describe("MySQL quoting — quotedBinary", () => {
   });
 
   it("formats an ArrayBuffer as hex literal", () => {
-    // Shares the toBytes union with the PG/SQLite overrides rather than relying
-    // on Buffer.from(arraybuffer, "binary") silently ignoring the encoding arg.
     expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer)).toBe("x'deadbeef'");
   });
 
   it("formats a byte-offset view over a larger buffer", () => {
-    // Buffer.from(bytes.buffer, ...) must honour byteOffset/byteLength — a
-    // subarray view would otherwise hex the whole backing buffer.
     expect(quotedBinary(new Uint8Array([0x00, 0xde, 0xad, 0x00]).subarray(1, 3))).toBe("x'dead'");
   });
 

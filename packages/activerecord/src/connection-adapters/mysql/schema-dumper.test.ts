@@ -252,9 +252,6 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({}),
-        // MySQL escapes single quotes inside string literals in generation_expression,
-        // e.g. a JSON path. The `\\'` below is a literal backslash-quote, exactly what
-        // the engine reports for json_extract(`profile`,_utf8mb4'$.email').
         internalExecQuery: async () =>
           Result.fromRowHashes([
             { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
@@ -262,7 +259,6 @@ describe("MySQL::SchemaDumper", () => {
         quote: (v) => `'${String(v)}'`,
       };
       await (d as any).populateVirtualExpressionCache("t");
-      // \' collapses to ', then JSON.stringify re-quotes the whole expression.
       expect(d.virtualExpressionCache["t"]!["c"]).toBe(
         JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"),
       );

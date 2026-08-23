@@ -120,7 +120,6 @@ export async function returningColumnValues(
   if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
     return result.rows[0] as unknown[] | undefined;
   }
-  // Falls back to abstract base behavior (last_inserted_id path)
   return undefined;
 }
 

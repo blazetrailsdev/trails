@@ -4,8 +4,6 @@ import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 
-// The bodies under test are prototype methods on the adapter, so give the fake
-// adapter that prototype and call them the way production does.
 function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
   // `Object.setPrototypeOf` skips the AbstractAdapter constructor, which is what
   // seats `@config` (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it
@@ -181,9 +179,6 @@ describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
   });
 
   it("with ifNotExists is a no-op when a composite FK already exists", async () => {
-    // A composite `column: [...]` must match the existing FK by value, not by
-    // array identity — the guard routes through foreignKeyExists -> isDefinedFor
-    // for an element-wise compare, so the duplicate ADD CONSTRAINT is skipped.
     const executed: string[] = [];
     const adapter = {
       adapterName: "postgres" as const,

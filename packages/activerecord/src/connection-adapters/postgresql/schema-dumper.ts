@@ -12,9 +12,6 @@ import type {
 import type { ColumnInfo, IndexInfo } from "../../schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
-  // Per-table constraint cache populated by filterIndexesForDump and consumed
-  // by exclusionConstraintsInCreate / uniqueConstraintsInCreate to avoid
-  // fetching the same constraint lists twice per table.
   private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
   private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;
   /**
@@ -128,13 +125,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaType(column: ColumnInfo): string {
-    // Use sqlType to detect bigint (works with both real Column objects and
-    // plain ColumnInfo from AdapterSchemaSource, which has no isBigint() method).
     const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
     if (column.isSerial) return isBigSql ? "bigserial" : "serial";
     if (isBigSql || column.type === "bigint") return "bigint";
     const semantic = column.type ?? undefined;
-    // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output.
     if (semantic === "big_integer") return "bigint";
     // OID::BitVarying.type() returns Rails-style "bit_varying"; map to DSL "bitVarying".
     if (semantic === "bit_varying") return "bitVarying";
@@ -216,8 +210,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     indexes: IndexInfo[],
   ): Promise<IndexInfo[]> {
     const adapter = this.pgAdapter();
-    // Fetch and cache both constraint lists so gatherInlineConstraints can
-    // reuse them without a second DB round-trip.
     const excl: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
       ? await adapter.exclusionConstraints(tableName)
       : [];
@@ -243,7 +235,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   override async table(tableName: string, stream: string[]): Promise<void> {
     await super.table(tableName, stream);
-    // Remove the trailing blank pushed by super.table so constraints land before it.
     if (stream[stream.length - 1] === "") stream.pop();
     await this.exclusionConstraintsInCreate(tableName, stream);
     await this.uniqueConstraintsInCreate(tableName, stream);

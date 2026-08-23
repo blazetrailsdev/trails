@@ -55,7 +55,6 @@ export function temporalTypeCast(field: Field, next: NextFn): unknown {
     }
     case "DATE":
     case "NEWDATE": {
-      // NEWDATE is the MySQL protocol's internal DATE-only wire type.
       const raw = field.string();
       if (raw === null) return null;
       return parseMysqlDate(raw);

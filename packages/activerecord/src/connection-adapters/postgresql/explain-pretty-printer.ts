@@ -30,8 +30,6 @@ export class ExplainPrettyPrinter {
     const header = result.columns[0];
     const lines = result.rows.map((row) => String(row[0]));
 
-    // We add 2 because there's one char of padding at both sides, note
-    // the extra hyphens in the example above.
     const width = Math.max(...[header, ...lines].map((line) => line.length)) + 2;
 
     const pp: string[] = [];

@@ -65,16 +65,16 @@ export interface Mysql2RawResult {
  * @internal
  */
 const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
-  0: "decimal", // DECIMAL
-  246: "decimal", // NEWDECIMAL
-  4: "float", // FLOAT
-  5: "double", // DOUBLE
-  1: "tinyint", // TINY
-  2: "smallint", // SHORT
-  9: "mediumint", // INT24
-  3: "int", // LONG
-  8: "bigint", // LONGLONG
-  13: "year", // YEAR
+  0: "decimal",
+  246: "decimal",
+  4: "float",
+  5: "double",
+  1: "tinyint",
+  2: "smallint",
+  9: "mediumint",
+  3: "int",
+  8: "bigint",
+  13: "year",
 };
 
 /**
@@ -98,18 +98,12 @@ export function buildColumnTypes(
     if (code == null) continue;
     let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
     if (sqlType == null) continue;
-    // Honor a decimal column's scale so cast truncates to the right places
-    // (precision 65 is MySQL's DECIMAL maximum — the scale is what matters).
-    // `decimals === 0` (a `DECIMAL(n,0)`) is intentionally left to the bare
-    // `decimal` lookup: it still builds a BigDecimal, just without an explicit
-    // scale, so no truncation is needed.
     if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
       sqlType = `decimal(65,${f.decimals})`;
     }
     const type = lookupCastType(sqlType);
     columnTypes ??= {};
     columnTypes[i] = type;
-    // Guard a column literally named "1" from colliding with integer index 1.
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }
   return columnTypes;
@@ -314,7 +308,6 @@ export async function performQuery(
   let rawResult: unknown;
   let rawFields: mysql.FieldPacket[] | undefined;
   if (!hasBinds) {
-    // Avoid #affected_rows when result exists — sidesteps gem 0.5.6 GVL race (brianmario/mysql2#1383).
     [rawResult, rawFields] = (await rawConnection.query({
       sql,
       rowsAsArray: true,

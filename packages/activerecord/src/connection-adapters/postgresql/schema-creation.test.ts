@@ -132,8 +132,6 @@ describe("PostgreSQL SchemaCreation", () => {
     // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
     // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
     const col = new Column("id", null, { sqlType: "uuid", type: "uuid" });
-    // The shared stub fakes quoteDefaultExpression; this branch lives in
-    // the real one, so wire that in.
     const host = s();
     host.adapter.quoteDefaultExpression = (v: unknown, c: unknown) =>
       quoteDefaultExpression.call(null as never, v, c as never);
@@ -159,9 +157,6 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(
       await s().addColumnOptionsBang("n", { as: "a||b", stored: true, column: col }),
     ).toContain("STORED");
-    // async wrapper: the visitor surface is Promise-returning, but the
-    // VIRTUAL guard (_pgGeneratedClause) currently throws synchronously —
-    // rejects.toThrow covers both shapes.
     await expect(async () =>
       s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col }),
     ).rejects.toThrow("VIRTUAL");

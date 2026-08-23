@@ -91,7 +91,6 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
 
   it("skips array registration when element OID is not in the store", () => {
     const store = new TestStore();
-    // The base type map keys scalar types by name (e.g. "numeric"), not by OID.
     store.registerType("numeric", integerSubtype);
 
     // Process only the array row (element OID 1700 not yet keyed in the store).
@@ -101,8 +100,6 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     ]);
     expect(store.lookup(1231)).not.toBeInstanceOf(OidArray);
 
-    // When the element row aliases OID 1700 → "numeric" first (the by-typname
-    // pass of the eager full load), the array row resolves its subtype.
     store.aliasType(1700, "numeric");
     new TypeMapInitializer(store).run([
       row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),

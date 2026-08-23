@@ -135,10 +135,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
-  // ---------------------------------------------------------------------------
-  // Indexes
-  // ---------------------------------------------------------------------------
-
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     const scope = this.quotedScope(tableName);
 
@@ -196,7 +192,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
         } else {
           const names = await this.columnNamesFromColumnNumbers(oid, indkey);
 
-          // prevent INCLUDE columns from being matched
           columns = names.filter((c) => !includeColumns.includes(c));
 
           // add info on sort order (only desc order is explicitly specified, asc is the default)
@@ -254,10 +249,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
-  // ---------------------------------------------------------------------------
-  // Tables / views
-  // ---------------------------------------------------------------------------
-
   // Mirrors Rails #tables (data_source_sql type: "BASE TABLE" → relkind
   // IN ('r','p')). pg_tables would omit partitioned tables (relkind 'p').
   async tables(): Promise<string[]> {
@@ -314,7 +305,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (!name) return false;
     const [schema, table] = this.extractSchemaQualifiedName(name);
     if (schema) {
-      // $1=schema, $2=table, $3..=relkinds
       const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
       const rows = (
         await this.internalExecQuery(
@@ -329,11 +319,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       ).toArray();
       return rows.length > 0;
     }
-    // $1=table, $2..=relkinds. Bind `table` (the unquoted identifier
-    // returned by extractSchemaQualifiedName), not the raw `name`
-    // argument — otherwise a quoted input like `"widgets"` gets
-    // compared against `relname = '"widgets"'` in pg_class, which
-    // never matches (the catalog stores names unquoted).
     const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
     const rows = (
       await this.internalExecQuery(
@@ -462,10 +447,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }));
   }
 
-  // ---------------------------------------------------------------------------
-  // Schema management
-  // ---------------------------------------------------------------------------
-
   async schemaNames(): Promise<string[]> {
     const names = await this.queryValues(
       `SELECT nspname
@@ -510,10 +491,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   async currentSchema(): Promise<string> {
     return (await this.queryValue("SELECT current_schema", "SCHEMA")) as string;
   }
-
-  // ---------------------------------------------------------------------------
-  // Database management
-  // ---------------------------------------------------------------------------
 
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
     const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
@@ -584,10 +561,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     )) as string;
   }
 
-  // ---------------------------------------------------------------------------
-  // Session settings
-  // ---------------------------------------------------------------------------
-
   async schemaSearchPath(): Promise<string> {
     if (this._schemaSearchPathMemo == null) {
       this._schemaSearchPathMemo = (await this.queryValue("SHOW search_path", "SCHEMA")) as string;
@@ -612,10 +585,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   private quoteSchemaName(name: string): string {
     return pgQuoteColumnName(name);
   }
-
-  // ---------------------------------------------------------------------------
-  // Columns / types
-  // ---------------------------------------------------------------------------
 
   override async columns(tableName: string): Promise<Column[]> {
     const [schema, table] = this.extractSchemaQualifiedName(tableName);
@@ -830,10 +799,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return array && type !== "primary_key" ? `${sql}[]` : sql;
   }
 
-  // ---------------------------------------------------------------------------
-  // Alter table
-  // ---------------------------------------------------------------------------
-
   /**
    * Mirrors: PostgreSQL::SchemaStatements#change_column
    * (postgresql/schema_statements.rb:467-471) — clear the statement cache,
@@ -994,10 +959,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Foreign keys / constraints
-  // ---------------------------------------------------------------------------
-
   /** @internal */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = this.createAlterTable(tableName) as PgAlterTable;
@@ -1157,9 +1118,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       options as Record<string, unknown>,
     );
     const at = this.createAlterTable(fromTable);
-    // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
-    // (now converged): it applies table_name_prefix/suffix and re-runs
-    // foreign_key_options idempotently (column/name already filled above).
     at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
     await this.execute(await this.schemaCreation.accept(at));
   }
@@ -1462,10 +1420,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return result;
   }
 
-  // ---------------------------------------------------------------------------
-  // Enum types
-  // ---------------------------------------------------------------------------
-
   // Mirrors: PostgreSQLAdapter#enum_types (postgresql_adapter.rb:518)
   // Returns an array of [fullName, values] pairs for all enum types visible on the search path
   // (current_schemas(false) — all schemas in search_path, not just the current one).
@@ -1601,10 +1555,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.reloadTypeMap();
   }
 
-  // ---------------------------------------------------------------------------
-  // Range types
-  // ---------------------------------------------------------------------------
-
   async createRange(
     name: string,
     options: { subtype: string; subtypeDiff?: string },
@@ -1663,10 +1613,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.reloadTypeMap();
   }
 
-  // ---------------------------------------------------------------------------
-  // Sequences & primary keys
-  // ---------------------------------------------------------------------------
-
   override async primaryKey(tableName: string): Promise<string | string[] | null> {
     const [schema, table] = this.extractSchemaQualifiedName(tableName);
 
@@ -1684,11 +1630,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       tableCondition = `t.oid = to_regclass(quote_ident($1))`;
     }
 
-    // Order by the column's position within the index key array so
-    // composite PKs come back in declaration order, not the
-    // non-deterministic order pg_attribute happens to yield rows.
-    // `array_position(i.indkey, a.attnum)` gives each column's
-    // 1-based position inside the index definition.
     const rows = (
       await this.internalExecQuery(
         `SELECT a.attname
@@ -1733,8 +1674,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     try {
       const quotedTable = this.quote(this.quoteTableName(tableName));
 
-      // First try looking for a sequence with a dependency on the
-      // given table's primary key.
       let result = (
         await this.query(
           `SELECT attr.attname, nsp.nspname, seq.relname

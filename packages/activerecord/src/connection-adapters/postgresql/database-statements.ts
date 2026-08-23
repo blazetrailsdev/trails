@@ -190,7 +190,6 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
               { sql, binds, cause: error },
             );
           } else {
-            // outside of transactions we can simply flush this query and retry
             await this._statements.delete(this.sqlKey(sql));
             continue;
           }
@@ -200,9 +199,6 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
     }
   } else if (binds == null || binds.length === 0) {
     this._commandSettled = false;
-    // `async_exec` on a PG::Result carries both row views; node-pg needs the
-    // config form to be told which one, so a caller that asked for positional
-    // rows gets it here too. Without one this stays the bare simple-query call.
     raw = await query(rawConnection, rowMode ? { text: sql, rowMode } : sql);
   } else {
     this._commandSettled = false;
