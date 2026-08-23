@@ -398,17 +398,24 @@ export function initWithAttributes(
   this._attributes = attributes;
 }
 
+/**
+ * Mirrors `ActiveRecord::Core#init_attributes` (core.rb:563-573) — the base of
+ * the `init_attributes` chain `ActiveModel::Dirty` overrides
+ * (dirty.rb:253-262). Deep-dups the source's attribute set and resets the
+ * primary key(s); the copy that `initialize_dup` installs is what it returns.
+ */
 export function initAttributes(
   this: CoreRecord & { _attributes: any; constructor: { primaryKey?: string | string[] } },
-): void {
-  const pk = this.constructor.primaryKey;
-  if (!pk || !this._attributes) return;
-  const keys = Array.isArray(pk) ? pk : [pk];
-  for (const key of keys) {
-    if (typeof this._attributes.reset === "function") {
-      this._attributes.reset(key);
-    }
+  _other: unknown,
+): any {
+  const attrs = this._attributes.deepDup();
+  const primaryKey = this.constructor.primaryKey;
+  if (Array.isArray(primaryKey)) {
+    for (const key of primaryKey) attrs.reset(key);
+  } else if (primaryKey != null) {
+    attrs.reset(primaryKey);
   }
+  return attrs;
 }
 
 type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
@@ -901,14 +908,22 @@ export function initInternals(
 }
 
 /**
- * Mirrors `ActiveRecord::Core#initialize_dup` (core.rb:550-562). The
- * `init_attributes(other)` half and the dirty-baseline rebind are performed by
- * `dup` (persistence.ts) before the chain is entered, because the duplicate is
- * built by `new ctor({})` rather than Ruby's `Object#dup`; what remains here is
- * Rails' order — the initialize callbacks run against the duped attributes, the
- * new-record state is reset, and only then does `super` unwind through
+ * Mirrors `ActiveRecord::Core#initialize_dup` (core.rb:550-562): the duped
+ * attribute set is installed, the initialize callbacks run against it, the
+ * new-record state is reset, and `super` unwinds through
  * Locking::Optimistic (optimistic.rb:72-75) and Timestamp (timestamp.rb:50-53),
  * so the hook still observes the source's `lock_version` / timestamps.
+ *
+ * `@attributes = init_attributes(other)` is spelled before `super_` for the
+ * same reason `super_` is spelled first below: trails reaches ActiveModel's
+ * links DOWN the prototype chain where Ruby reaches them UP the ancestors, so
+ * the links Ruby runs BEFORE this body have to be entered from inside it. In
+ * Ruby they observe the source's `@attributes` and Core replaces it afterwards;
+ * here they observe the replacement — the same set Ruby leaves behind, since
+ * `Attributes#initialize_dup`'s deep-dup of the source is discarded by that
+ * replacement (attributes.rb:111-114, core.rb:551). `init_attributes` is sent to
+ * `this`, so the `ActiveModel::Dirty` override prepended over
+ * {@link initAttributes} (dirty.rb:253-262) is the one that answers.
  *
  * As with {@link initInternals}, Ruby reaches ActiveModel's links from above and
  * trails from below; `super_` is the receiver-bound link `prepend()` hands the
@@ -918,6 +933,7 @@ export function initInternals(
  */
 export function initializeDup(
   this: CoreRecord & {
+    _attributes: any;
     _newRecord: boolean;
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
@@ -932,6 +948,9 @@ export function initializeDup(
   // validations.rb:310, dirty.rb:248) all sit ABOVE Core in the MRO and have
   // already replaced `@errors` and the mutation trackers by the time Core runs
   // the initialize callbacks.
+  this._attributes = (
+    this as unknown as { initAttributes(other: unknown): unknown }
+  ).initAttributes(other);
   super_(other);
   // `initialize` is registered `only: :after`, so this fires just the
   // after_initialize chain. strict:"sync" guarantees synchronous completion —

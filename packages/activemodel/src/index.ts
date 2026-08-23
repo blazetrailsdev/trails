@@ -68,6 +68,7 @@ export type { Mutable } from "./type/helpers/mutable.js";
 export { ModelName } from "./naming.js";
 export type { ModelLike } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
+export { initAttributes as dirtyInitAttributes } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
 export {
   _registerCallbackOnProto,

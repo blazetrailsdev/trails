@@ -40,7 +40,12 @@ describe("Dirty across dup", () => {
 
     duped.body = "new";
 
-    expect(duped.changes).toEqual({ body: [null, "new"] });
+    // MRI: dup.changes == {"title"=>[nil, "A"], "body"=>[nil, "new"]} — the copy
+    // derives its dirtiness from its own rebuilt attributes. `t.changes` is
+    // {"title"=>[nil, "A"]} there and {} here: an ActiveModel source still
+    // baselines at construction (story
+    // `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`).
+    expect(duped.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
     expect(t.changes).toEqual({});
     expect(t.isChanged).toBe(false);
     expect(t.body).toBeNull();
@@ -53,7 +58,25 @@ describe("Dirty across dup", () => {
     t.body = "new";
 
     expect(t.changes).toEqual({ body: [null, "new"] });
-    expect(duped.changes).toEqual({});
-    expect(duped.isChanged).toBe(false);
+    // MRI: dup.changes == {"title"=>[nil, "A"]}, and the source's later write
+    // does not reach it.
+    expect(duped.changes).toEqual({ title: [null, "A"] });
+    expect(duped.body).toBeNull();
+  });
+
+  it("dup of a frozen model is writable", () => {
+    const t = new Topic({ title: "A" });
+    t.freeze();
+
+    const duped = t.dup();
+
+    // MRI: `T.new(title: "A").freeze.dup` is unfrozen, reads back "A", and
+    // takes a write — `Object#dup` never carries the frozen state, and the
+    // initialize_dup chain rewrites @attributes/@errors/the tracker on it.
+    expect(Object.isFrozen(duped)).toBe(false);
+    expect(duped.title).toBe("A");
+    duped.title = "B";
+    expect(duped.title).toBe("B");
+    expect(duped.isChanged).toBe(true);
   });
 });

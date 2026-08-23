@@ -1172,22 +1172,15 @@ export class Model {
    * Rails computes nothing here: `write_from_user` builds a `FromUser` whose
    * `@value` stays uncomputed, so `has_been_read?` is false after a write and
    * `accessed_fields` is empty on a freshly built record
-   * (attribute_methods_test.rb:1308). trails' dirty tracker is eager, so it
-   * needs the cast value now; it comes from `type_cast` (attribute.rb:100-103,
-   * what `value` memoizes) rather than through `fetchValue`, whose memo is what
-   * marks the attribute read. Story compute-record-dirtiness-lazily retires the
-   * eagerness.
+   * (attribute_methods_test.rb:1308). The write is recorded against the
+   * tracker without casting: the cast reaches `type.changed?` from
+   * `Attribute#changed?` (attribute.rb:155-160) when someone asks.
    *
    * @internal
    */
   _writeAttribute(name: string, value: unknown): void {
     this._attributes.writeFromUser(name, value);
-    const attribute = this._attributes.getAttribute(name);
-    const newValue = attribute.typeCast(attribute.valueBeforeTypeCast);
-    // Route through type.isChanged so numeric semantics (equal_nan?,
-    // number_to_non_number?) are respected — mirrors the Rails path where dirty
-    // tracking ultimately delegates to type.changed? (attribute.rb:155-160).
-    this._dirty.attributeWritten(name, newValue, value, attribute.type);
+    this._dirty.attributeWritten(name);
   }
 
   /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
@@ -1416,16 +1409,27 @@ export class Model {
   /**
    * Mirrors Ruby's `Object#dup`: allocate, copy the ivars, dispatch
    * `initialize_dup`; like Ruby `dup` it does NOT re-enter the constructor, and
-   * the copy is unfrozen even from a frozen source. Rails splits the hook across
-   * three modules chained by `super` — `Attributes#initialize_dup` deep-dups
-   * `@attributes` (attributes.rb:111-114), `Validations#initialize_dup` replaces
-   * `@errors` (validations.rb:310-313), `Dirty#initialize_dup` rebuilds the
-   * mutation trackers (dirty.rb:248-251). All three are links in the
-   * {@link initializeDup} chain, so `dup` only allocates and dispatches.
+   * the copy is unfrozen even from a frozen source — the descriptors are copied
+   * writable and configurable, both so a frozen source yields a mutable copy and
+   * so an own accessor property (the alias reader ActiveRecord installs for a
+   * select alias, where Ruby answers through `method_missing`) arrives as an
+   * accessor rather than a flattened snapshot of the source's value. Rails
+   * splits the hook across three modules chained by `super` —
+   * `Attributes#initialize_dup` deep-dups `@attributes` (attributes.rb:111-114),
+   * `Validations#initialize_dup` replaces `@errors` (validations.rb:310-313),
+   * `Dirty#initialize_dup` rebuilds the mutation trackers (dirty.rb:248-251).
+   * All three are links in the {@link initializeDup} chain, so `dup` only
+   * allocates and dispatches.
    */
   dup(): this {
     const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
-    Object.assign(duped, this);
+    const descriptors = Object.getOwnPropertyDescriptors(this);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key as string];
+      descriptor.configurable = true;
+      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
+    }
+    Object.defineProperties(duped, descriptors);
     duped.initializeDup(this);
     return duped;
   }

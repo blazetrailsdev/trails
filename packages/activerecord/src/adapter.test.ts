@@ -563,9 +563,6 @@ describe("AdapterForeignKeyTest", () => {
         this.tableName = "fk_test_has_fk";
       }
     }
-    // Ruby loads the schema on first attribute access; trails' `loadSchema` is
-    // sync and answers only from a cache no query has warmed for this table.
-    await KlassHasFk.ensureSchemaLoaded();
     const hasFk = new KlassHasFk();
     (hasFk as unknown as { fk_id: number }).fk_id = 1231231231;
     const error = await hasFk.save({ validate: false }).catch((e) => e);

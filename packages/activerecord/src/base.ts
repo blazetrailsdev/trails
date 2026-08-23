@@ -134,6 +134,7 @@ import {
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   type DirtyOptions,
+  dirtyInitAttributes,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
@@ -731,15 +732,15 @@ function _extractAssociationAttrs(
 }
 
 /**
- * Re-mark constructor-assigned attributes as dirty against their schema
- * defaults, so `new Model(attrs).changes` matches Rails — a new record built
- * by assignment is dirty against column defaults (`Topic.new(title: "x")` →
+ * Queue the constructor-assigned attributes for dirtiness derivation, so
+ * `new Model(attrs).changes` matches Rails — a new record built by assignment
+ * is dirty against column defaults (`Topic.new(title: "x")` →
  * `{ title: [nil, "x"] }`, `Topic.new` → `{}`). The Model constructor snapshots
- * a clean baseline; this restores the new-record dirtiness Rails gets for free
- * because assignment produces `FromUser`-over-default attributes whose
- * `changed?` is true. Reuses the same `reinstateNewRecordChanges` pass the
- * create path runs (callbacks.ts `_createRecord`), but keeps the primary key in
- * scope: an explicitly assigned `id` IS dirty at construction in Rails.
+ * a clean baseline; this hands the tracker the new-record dirtiness Rails gets
+ * for free because assignment produces `FromUser`-over-default attributes whose
+ * `changed?` is true — derived, as in Rails, by the first read that asks
+ * (`DirtyTracker#deferNewRecordChanges`). Keeps the primary key in scope: an
+ * explicitly assigned `id` IS dirty at construction in Rails.
  *
  * Called only from the `!wasSuppressed` constructor branches (where the inline
  * `after_initialize` fires), so the dirty state is established before
@@ -754,11 +755,11 @@ function _extractAssociationAttrs(
  * @internal
  */
 function _reinstateConstructorDirtiness(
-  record: { _dirty: { reinstateNewRecordChanges: (...args: any[]) => void }; _attributes: unknown },
+  record: { _dirty: { deferNewRecordChanges: (...args: any[]) => void }; _attributes: unknown },
   ctor: { _defaultAttributes?: () => unknown },
 ): void {
   if (typeof ctor._defaultAttributes !== "function") return;
-  record._dirty.reinstateNewRecordChanges(record._attributes);
+  record._dirty.deferNewRecordChanges(record._attributes);
 }
 
 /**
@@ -4549,7 +4550,6 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
   updateColumns(attrs: Record<string, unknown>): Promise<boolean>;
-  dup(): this;
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
@@ -4777,7 +4777,6 @@ include(Base, {
   updateAttributeBang: _Persistence.updateAttributeBang,
   updateColumn: _Persistence.updateColumn,
   updateColumns: _Persistence.updateColumns,
-  dup: _Persistence.dup,
   clone: _Persistence.clone,
   becomes: _Persistence.becomes,
   becomesBang: _Persistence.becomesBang,
@@ -5007,6 +5006,13 @@ include(Base, {
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });
+
+// `ActiveModel::Dirty#init_attributes` (dirty.rb:253-262) sits ABOVE
+// `ActiveRecord::Core#init_attributes` (core.rb:563-573) in AR::Base's
+// ancestors and opens with `super`, so it is prepended over the Core body the
+// `include` above just installed — the same ancestry, with `super_` bound to
+// Core's.
+prepend(Base.prototype, { initAttributes: dirtyInitAttributes as PrependMethod });
 
 // Rails layers create_or_update / _create_record / _update_record by include
 // order (base.rb:299-316): Timestamp sits above Callbacks, so its body runs

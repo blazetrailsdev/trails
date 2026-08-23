@@ -1,4 +1,3 @@
-import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { attributeMissing as attributeMissingDispatch } from "./attribute-methods.js";
 
@@ -39,6 +38,43 @@ export interface Dirty {
 }
 
 /**
+ * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
+ * (activemodel/lib/active_model/dirty.rb:248-251): give the copy its own tracker,
+ * so writing to one no longer marks the other dirty. Rails nils the ivar and lets
+ * it rebuild from the deep-dup'd `@attributes`, which reproduces the source's
+ * `changes` on the copy; {@link DirtyTracker.deepDup} is that rebuild, since a
+ * fresh empty tracker would instead wipe pending changes. Ruby's `super` is
+ * `super_()`, the receiver-bound link `prepend()` hands the module.
+ *
+ * @internal Rails-private helper.
+ */
+/**
+ * Mirrors `ActiveModel::Dirty#init_attributes` (dirty.rb:253-262): rebuild a
+ * persisted source's duped attributes as `FromUser`-over-default, so the copy
+ * is dirty against the class defaults the way a freshly assigned record is.
+ * An unsaved source keeps what `super` returned. Ruby's `super` is `super_()`,
+ * the receiver-bound link `prepend()` hands the module — here the real
+ * `ActiveRecord::Core#init_attributes` (core.rb:563-573), which sits below this
+ * module in the ancestors.
+ *
+ * @internal Rails-private helper.
+ */
+export function initAttributes(
+  this: { constructor: { _defaultAttributes?: () => AttributeSet } },
+  super_: (other: unknown) => AttributeSet,
+  other: unknown,
+): AttributeSet {
+  const attrs = super_(other);
+  const klass = this.constructor;
+  if ((other as { isPersisted(): boolean }).isPersisted() && klass._defaultAttributes) {
+    return klass
+      ._defaultAttributes()
+      .map((attr) => attr.withValueFromUser(attrs.fetchValue(attr.name)));
+  }
+  return attrs;
+}
+
+/**
  * Per-instance reset hook for dirty-tracking state. Mirrors Rails
  * `ActiveModel::Dirty#init_internals`
  * (activemodel/lib/active_model/dirty.rb:372-376):
@@ -76,22 +112,6 @@ export function attributePreviousChange(
 }
 
 /**
- * Mirrors: ActiveModel::Dirty#attribute_will_change!
- *
- * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
- * an attribute as changed for in-place mutations (e.g. array push) where
- * the object reference stays the same but the content has changed.
- *
- * @internal Rails-private helper.
- */
-export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
-  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
-  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
-  // Record-shaped reader over it, not the tracker itself.
-  return this._dirty.forceChange(attrName);
-}
-
-/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
@@ -117,6 +137,21 @@ export class DirtyTracker {
   private _forcedNames: Set<string> = new Set();
   /** Live AttributeSet reference — set on first snapshot, used to detect changedInPlace(). */
   private _attrs: AttributeSet | null = null;
+  /**
+   * Attribute names whose dirtiness has not been derived from the `Attribute`
+   * graph yet. Rails never carries such a set: `Attribute#changed?`
+   * (attribute.rb:139-141) runs when someone asks, so a new record's dirtiness
+   * costs nothing until it is read. This tracker records changes instead of
+   * deriving them, so "ask later" is spelled as a queue drained by
+   * {@link _deriveChanges} on the first read.
+   */
+  private _pendingNames: Set<string> = new Set();
+  /**
+   * Names written since the last derivation. Same deferral, different baseline:
+   * a written attribute is compared against the tracker's snapshot original,
+   * which is what every non-new-record read already diffs against.
+   */
+  private _pendingWrites: Set<string> = new Set();
 
   initAttributes(
     attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
@@ -128,25 +163,25 @@ export class DirtyTracker {
    * An independent tracker carrying this one's state, with `_attrs` repointed at
    * the duplicate's own AttributeSet.
    *
-   * @noRailsEquivalent CONVERGEABLE — story
-   * `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`
-   * shares this root cause; making `DirtyTracker` derive from the AttributeSet
-   * retires this method with it. Rails' `initialize_dup` just nils
-   * `@mutations_from_database` and lets it rebuild from the already-deep-dup'd
-   * `@attributes`, so the copy reports the source's `changes` yet is a distinct
-   * object. This tracker snapshots eagerly and derives changes from recorded
-   * writes, so it cannot rebuild that way; copying reaches the same two properties.
-   * MRI-verified: `dup.changes` and `dup.previous_changes` equal the source's, and
-   * writes to the copy do not leak back.
+   * @noRailsEquivalent CONVERGEABLE — Rails' `initialize_dup` just nils
+   * `@mutations_from_database` and lets `mutations_from_database`
+   * (dirty.rb:379-386) rebuild it from the copy's own `@attributes`. This
+   * tracker also holds `mutations_before_last_save`, which Ruby's `Object#dup`
+   * carries over rather than nils, so a null-and-rebuild would lose it; the
+   * rebuild is spelled as this method until the split into two
+   * `AttributeMutationTracker`s (story
+   * `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`).
+   * The rebuild queues every name rather than carrying this tracker's recorded
+   * answers, which were derived against the source's attributes and not the
+   * `FromUser`-over-default ones `init_attributes` leaves behind.
    */
   deepDup(attrs: AttributeSet): DirtyTracker {
     const copy = new DirtyTracker();
-    copy._originalAttributes = new Map(this._originalAttributes);
-    copy._originalHas = new Set(this._originalHas);
-    copy._changedAttributes = new Map(this._changedAttributes);
+    copy._originalAttributes = attrs.snapshotValues();
+    copy._originalHas = new Set(copy._originalAttributes.keys());
     copy._previousChanges = new Map(this._previousChanges);
-    copy._forcedNames = new Set(this._forcedNames);
     copy._attrs = attrs;
+    copy._pendingNames = new Set(attrs.keys());
     return copy;
   }
 
@@ -159,6 +194,7 @@ export class DirtyTracker {
   changesApplied(
     currentAttributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
   ): void {
+    this._deriveChanges();
     const snapshot = new Map(this._changedAttributes);
     this._attrs?.forEach((attr, name) => {
       if (!snapshot.has(name) && attr.type.isMutable() && attr.changedInPlace()) {
@@ -177,6 +213,7 @@ export class DirtyTracker {
   }
 
   get changed(): boolean {
+    this._deriveChanges();
     if (this._changedAttributes.size > 0) return true;
     return this._hasInPlaceMutableChange();
   }
@@ -221,6 +258,7 @@ export class DirtyTracker {
   }
 
   attributeWas(name: string): unknown {
+    this._deriveChanges();
     const change = this._changedAttributes.get(name);
     if (change) return change[0];
     if (this._isInPlaceMutableChange(name)) {
@@ -248,6 +286,7 @@ export class DirtyTracker {
    * `changed_attributes` — see `changedAttributes` for the name->old-value map.
    */
   get changedAttributeNames(): string[] {
+    this._deriveChanges();
     const names = Array.from(this._changedAttributes.keys());
     this._attrs?.forEach((attr, name) => {
       if (!this._changedAttributes.has(name) && attr.type.isMutable() && attr.changedInPlace()) {
@@ -264,6 +303,7 @@ export class DirtyTracker {
    * -> `mutations_from_database.changed_values`, a name->original-value hash.
    */
   get changedAttributes(): Record<string, unknown> {
+    this._deriveChanges();
     const result: Record<string, unknown> = {};
     for (const [name, change] of this._changedAttributes) {
       result[name] = change[0];
@@ -277,6 +317,7 @@ export class DirtyTracker {
   }
 
   get changes(): Record<string, [unknown, unknown]> {
+    this._deriveChanges();
     const result: Record<string, [unknown, unknown]> = {};
     for (const [k, v] of this._changedAttributes) {
       result[k] = v;
@@ -397,6 +438,7 @@ export class DirtyTracker {
 
   /** @internal */
   attributeChange(name: string): [unknown, unknown] | null {
+    this._deriveChanges();
     const explicit = this._changedAttributes.get(name);
     if (explicit) return explicit;
     if (this._isInPlaceMutableChange(name)) {
@@ -425,12 +467,20 @@ export class DirtyTracker {
   private _deleteChange(name: string): void {
     this._changedAttributes.delete(name);
     this._forcedNames.delete(name);
+    this._pendingNames.delete(name);
+    this._pendingWrites.delete(name);
   }
 
-  /** @internal Clear all change entries and forced-dirty markers together. */
+  /**
+   * @internal Clear all change entries, forced-dirty markers and queued
+   * derivations together — a queued derivation is a pending change like any
+   * other, and must not resurface after a clear.
+   */
   private _clearChanges(): void {
     this._changedAttributes.clear();
     this._forcedNames.clear();
+    this._pendingNames.clear();
+    this._pendingWrites.clear();
   }
 
   /**
@@ -514,63 +564,116 @@ export class DirtyTracker {
   }
 
   /**
-   * After the Base constructor snapshots, re-mark attributes that differ from
-   * their database column default as dirty so they appear in `saved_changes` /
-   * `previous_changes` after INSERT (and so partial inserts persist them).
+   * Queue every attribute of a freshly built record for dirtiness derivation,
+   * to be answered from the `Attribute` graph the first time someone asks.
    *
-   * Called only for new records, immediately before after_initialize.
+   * Rails needs no queue: `changed?` walks `@attributes` on demand
+   * (attribute_mutation_tracker.rb:44-48 → attribute.rb:139-141), so a new
+   * record's dirtiness is computed by the read that wants it and never at
+   * construction. This tracker records changes as they happen, so the
+   * new-record case — where the changes happened inside `Attribute` rather than
+   * through {@link attributeWritten} — is queued here and drained by
+   * {@link _deriveChanges}.
    *
    * @internal
    */
-  reinstateNewRecordChanges(attributes: AttributeSet, skipNames?: ReadonlySet<string>): void {
+  deferNewRecordChanges(attributes: AttributeSet, skipNames?: ReadonlySet<string>): void {
+    this._attrs = attributes;
     for (const name of attributes.keys()) {
       if (skipNames?.has(name)) continue;
-      const attr = attributes.getAttribute(name);
-      // Rails marks a new record's attribute dirty when it differs from the
-      // *database column default* (Attribute#original_value), not the model's
-      // declared default. A user-provided `attribute :x, default: ...` whose
-      // value equals the model default but differs from the column default is
-      // therefore still dirty, so under partial_inserts it is persisted rather
-      // than dropped (the DB would otherwise store its own column default).
-      // Attribute#changed? already compares value against original_value — for a
-      // UserProvidedDefault that original_value is the column default — so defer
-      // to it instead of comparing against the model-default snapshot.
-      attr.withoutMarkingRead(() => {
-        if (attr.isChanged()) {
-          const wasValue = attr.originalValue ?? null;
-          this._originalAttributes.set(name, wasValue);
-          this._originalHas.add(name);
-          this._changedAttributes.set(name, [wasValue, attr.value ?? null]);
-        }
-      });
+      this._pendingNames.add(name);
     }
   }
 
   /**
-   * Type-aware write notification. Compares `newValue` against the snapshot
-   * original using `type.isChanged(original, newValue, rawValue)` so numeric
-   * semantics (equal_nan?, number_to_non_number?) are respected. Replaces the
-   * raw `attributeWillChange` call from `_writeAttribute`.
+   * Drain the queue: for each pending name, ask the `Attribute` whether it is
+   * changed and record the answer.
+   *
+   * Rails marks an attribute dirty when it differs from the *database column
+   * default* (`Attribute#original_value`), not the model's declared default. A
+   * user-provided `attribute :x, default: ...` whose value equals the model
+   * default but differs from the column default is therefore still dirty, so
+   * under partial_inserts it is persisted rather than dropped (the DB would
+   * otherwise store its own column default). `Attribute#changed?` already
+   * compares value against original_value — for a UserProvidedDefault that
+   * original_value is the column default — so defer to it.
+   *
+   * As in Rails, asking flips the attribute's `has_been_read?`
+   * (attribute.rb:100-103): the ask IS a read, which is why `accessed_fields`
+   * stays empty until something asks. A name the tracker already answered keeps
+   * that answer, because Rails' `changed?` is
+   * `forced_changes.include?(attr) || attributes[attr].changed?`
+   * (attribute_mutation_tracker.rb:78-79).
+   */
+  private _deriveChanges(): void {
+    if (this._pendingWrites.size > 0) this._deriveWrites();
+    if (this._pendingNames.size === 0) return;
+    const attributes = this._attrs;
+    const pending = this._pendingNames;
+    this._pendingNames = new Set();
+    if (!attributes) return;
+    for (const name of pending) {
+      if (this._changedAttributes.has(name)) continue;
+      if (!attributes.has(name)) continue;
+      const attr = attributes.getAttribute(name);
+      if (attr.isChanged()) {
+        const wasValue = attr.originalValue ?? null;
+        this._originalAttributes.set(name, wasValue);
+        this._originalHas.add(name);
+        this._changedAttributes.set(name, [wasValue, attr.value ?? null]);
+      }
+    }
+  }
+
+  /**
+   * Drain the write queue. Same comparison the write used to make inline —
+   * `type.changed?` against the snapshot original — now reached where Rails
+   * reaches it, from `Attribute#changed?` (attribute.rb:155-160) at ask time,
+   * with the cast value read off the `Attribute` instead of computed early.
+   */
+  private _deriveWrites(): void {
+    const pending = this._pendingWrites;
+    this._pendingWrites = new Set();
+    const attributes = this._attrs;
+    for (const name of pending) {
+      if (!attributes?.has(name)) {
+        this._changedAttributes.delete(name);
+        continue;
+      }
+      const attr = attributes.getAttribute(name);
+      const newValue = attr.value;
+      if (!this._originalHas.has(name)) {
+        this._changedAttributes.set(name, [undefined, newValue]);
+        continue;
+      }
+      const original = resolveValue(this._originalAttributes.get(name));
+      if (
+        attr.type.isChanged(original, newValue, attr.valueBeforeTypeCast) ||
+        this._forcedNames.has(name)
+      ) {
+        const existingFrom = this._forcedNames.has(name)
+          ? this._changedAttributes.get(name)?.[0]
+          : undefined;
+        this._changedAttributes.set(name, [
+          existingFrom !== undefined ? existingFrom : original,
+          newValue,
+        ]);
+      } else {
+        this._changedAttributes.delete(name);
+      }
+    }
+  }
+
+  /**
+   * Write notification. Queues the name for derivation instead of answering
+   * now: the comparison Rails makes is `type.changed?` reached through
+   * `Attribute#changed?` (attribute.rb:155-160), and reaching it here would
+   * cast — and mark the attribute read — at write time.
    *
    * @internal
    */
-  attributeWritten(name: string, newValue: unknown, rawValue: unknown, type: Type): void {
-    if (!this._originalHas.has(name)) {
-      this._changedAttributes.set(name, [undefined, newValue]);
-      return;
-    }
-    const original = resolveValue(this._originalAttributes.get(name));
-    if (type.isChanged(original, newValue, rawValue) || this._forcedNames.has(name)) {
-      const existingFrom = this._forcedNames.has(name)
-        ? this._changedAttributes.get(name)?.[0]
-        : undefined;
-      this._changedAttributes.set(name, [
-        existingFrom !== undefined ? existingFrom : original,
-        newValue,
-      ]);
-    } else {
-      this._deleteChange(name);
-    }
+  attributeWritten(name: string): void {
+    this._pendingWrites.add(name);
   }
 
   /**
@@ -584,11 +687,15 @@ export class DirtyTracker {
    * pre-TX value as the "was" baseline, so `mutationsFromDatabase` reflects
    * `[preTx, postTx]` for each changed attribute.
    *
-   * Call after `snapshot(preTxAttrs)` + `clearChangesInformation()`.
+   * Call after `snapshot(preTxAttrs)` + `clearChangesInformation()`, which
+   * leave the tracker bound to the pre-TX set; this rebinds it to the live one,
+   * which is what every later read and derivation has to ask.
    *
    * @internal
    */
   redetectChanges(currentAttributes: AttributeSet): void {
+    this._deriveChanges();
+    this._attrs = currentAttributes;
     for (const name of currentAttributes.keys()) {
       const attr = currentAttributes.getAttribute(name);
       const currentValue = attr.value;
@@ -607,6 +714,7 @@ export class DirtyTracker {
     set(name: string, value: unknown): void;
     delete?(name: string): boolean;
   }): void {
+    this._deriveChanges();
     for (const [name] of this._changedAttributes) {
       this._restoreOne(attributes, name);
     }
@@ -654,6 +762,22 @@ export class DirtyTracker {
 }
 
 /**
+ * Mirrors: ActiveModel::Dirty#attribute_will_change!
+ *
+ * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
+ * an attribute as changed for in-place mutations (e.g. array push) where
+ * the object reference stays the same but the content has changed.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
+  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
+  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
+  // Record-shaped reader over it, not the tracker itself.
+  return this._dirty.forceChange(attrName);
+}
+
+/**
  * Mirrors: ActiveModel::Dirty#restore_attribute!
  *
  * Dispatch target for `restore_*!` per-attribute methods. Restores the
@@ -665,17 +789,6 @@ export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string):
   this._dirty.restoreAttribute(this._attributes, attrName);
 }
 
-/**
- * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
- * (activemodel/lib/active_model/dirty.rb:248-251): give the copy its own tracker,
- * so writing to one no longer marks the other dirty. Rails nils the ivar and lets
- * it rebuild from the deep-dup'd `@attributes`, which reproduces the source's
- * `changes` on the copy; {@link DirtyTracker.deepDup} is that rebuild, since a
- * fresh empty tracker would instead wipe pending changes. Ruby's `super` is
- * `super_()`, the receiver-bound link `prepend()` hands the module.
- *
- * @internal Rails-private helper.
- */
 export function initializeDup(
   this: DirtyDupHost,
   super_: (other: unknown) => void,

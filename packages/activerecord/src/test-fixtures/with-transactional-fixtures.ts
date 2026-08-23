@@ -42,15 +42,15 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
 }
 
 /**
- * Eagerly warm the per-connection `SchemaCache` for every table once, after
- * the suite's schema setup has run. A synchronous `columnsHash()` /
- * `columnNames()` on a connected, table-backed model then takes the warm,
- * DB-sourced branch without a prior `await ensureSchemaLoaded()`.
+ * Eagerly warm the pool's `SchemaCache` for every table once, after the suite's
+ * schema setup has run. A synchronous `columnsHash()` / `columnNames()` on a
+ * connected, table-backed model then takes the warm, DB-sourced branch without
+ * a prior `await ensureSchemaLoaded()`.
  *
  * Mirrors Rails' persistent, pool-scoped schema cache: `SchemaCache#add_all`
- * reflects every data source up front. Best-effort — a no-op for raw adapters
- * without a pool, and reflection failures are swallowed (the cache simply
- * stays cold for that table, falling back to the synthesized branch).
+ * reflects every data source up front, once. Best-effort — a no-op for raw
+ * adapters without a pool, and reflection failures are swallowed (the cache
+ * simply stays cold for that table, falling back to the synthesized branch).
  *
  * @internal
  */
@@ -63,6 +63,32 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
   } catch {
     // best-effort warm
   }
+}
+
+/**
+ * Register the once-per-file eager warm as a `beforeEach` guard.
+ *
+ * It cannot run in a `beforeAll`: callers register their schema-setup
+ * `beforeAll` *after* calling the helper, so the schema does not yet exist when
+ * ours would fire. Shared with the non-transactional path (`fixtures(...,
+ * { useTransactionalTests: false })`), which skips
+ * {@link withTransactionalFixtures} entirely and would otherwise leave the
+ * cache cold — a model whose only declaration is `tableName` then reflects no
+ * columns at all, because the sync `load_schema` can only answer from the cache
+ * (`model-schema.ts` `loadSchemaFromCacheSync`), where Ruby loads lazily on
+ * first attribute access.
+ *
+ * @internal
+ */
+export function warmSchemaCacheBeforeFirstTest(
+  getAdapter: () => TransactionalFixturesAdapter,
+): void {
+  let warmed = false;
+  beforeEach(async () => {
+    if (warmed) return;
+    warmed = true;
+    await eagerWarmSchemaCache(getAdapter());
+  });
 }
 
 /**
@@ -219,10 +245,7 @@ export function withTransactionalFixtures(
 ): void {
   const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction: usesTransactionNames = [] } =
     options;
-  // Eager warm runs lazily before the first test rather than in this helper's
-  // beforeAll: callers register their schema-setup beforeAll *after* calling
-  // the helper, so the schema does not yet exist when our beforeAll fires.
-  let warmed = false;
+  if (eagerWarm) warmSchemaCacheBeforeFirstTest(getAdapter);
   // Tracks whether we opened an outer transaction for the current test.
   // Tests in usesTransaction run without a wrapping transaction (Rails parity:
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
@@ -230,12 +253,6 @@ export function withTransactionalFixtures(
 
   beforeEach(async (ctx: TaskContext) => {
     const adapter = getAdapter();
-    if (eagerWarm && !warmed) {
-      // Warm once, before the first test reads. By now the caller's
-      // schema-setup beforeAll has run, so every table exists.
-      warmed = true;
-      await eagerWarmSchemaCache(adapter);
-    }
     // Mirrors Rails test_fixtures.rb:108-110:
     //   def run_in_transaction?
     //     use_transactional_tests && !self.class.uses_transaction?(name)
