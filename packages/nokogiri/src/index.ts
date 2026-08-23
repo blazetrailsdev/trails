@@ -10,5 +10,5 @@ export const SAX = { Document: SaxDocument, Parser: SaxParser };
 export { parseXml, SaxDocument, SaxParser };
 export type { XmlNode, XmlDocument };
 export type { AttrNode } from "./xml/node.js";
-export { SyntaxError };
+export type { SyntaxError };
 export type { Readable } from "./readable.js";
