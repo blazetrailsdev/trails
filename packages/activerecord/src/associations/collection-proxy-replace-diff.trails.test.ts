@@ -45,6 +45,27 @@ describe("collection replace diffs instead of clearing", () => {
     expect(author.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
   });
 
+  // Rails' one `load_target` at the top of `replace` is the baseline the diff
+  // runs against whether or not the collection was already loaded
+  // (collection_association.rb:244). trails used to reach the persisted arm
+  // with an in-memory stand-in and re-read the real baseline off `scope()` in a
+  // second method; this pins the diff an UNLOADED persisted collection produces.
+  it("diffs an unloaded persisted collection against the loaded baseline", async () => {
+    const author = await Author.find(authors("david").id);
+    const all = await Post.where({ author_id: author.id });
+    expect(all.length).toBeGreaterThan(1);
+    const [dropped, ...kept] = all;
+
+    const fresh = await Author.find(authors("david").id);
+    fresh.postLog = [];
+    await fresh.postsWithCallbacks.replace(kept);
+
+    expect(fresh.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
+    expect((await Post.where({ author_id: author.id })).map((p) => Number(p.id))).toEqual(
+      kept.map((p) => Number(p.id)),
+    );
+  });
+
   it("adds only the records the new target gained", async () => {
     const author = await Author.find(authors("david").id);
     const current = await author.postsWithCallbacks;

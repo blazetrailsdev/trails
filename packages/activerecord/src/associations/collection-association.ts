@@ -172,9 +172,7 @@ export class CollectionAssociation extends Association {
     ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
     }
-    // The guard above refuses every arm `replace` would owe I/O on, so its
-    // `Promise | Base[]` return is a plain array here and nothing is left to
-    // await — see `replace` for why it is not `async`.
+    // The guard above refuses every arm that owes I/O, so nothing is pending.
     this.replace(records) as Base[];
   }
 
