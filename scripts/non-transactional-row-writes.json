@@ -2,7 +2,6 @@
   "packages/activerecord/src/adapters/postgresql/postgresql-adapter-perform-query.trails.test.ts",
   "packages/activerecord/src/adapters/sqlite3/sqlite3-adapter-perform-query.trails.test.ts",
   "packages/activerecord/src/connection-adapters/connection-handlers-sharding-db.test.ts",
-  "packages/activerecord/src/encryption/encryption-schemes.test.ts",
   "packages/activerecord/src/invertible-migration.test.ts",
   "packages/activerecord/src/migration/columns.test.ts",
   "packages/activerecord/src/migration/rename-table.test.ts",
