@@ -4,8 +4,6 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3StatementPoolTest", () => {
-  // Track every adapter created so a failing assertion can't leak an
-  // open SQLite handle into later tests.
   const openAdapters: SQLite3Adapter[] = [];
   const track = (adapter: SQLite3Adapter): SQLite3Adapter => {
     openAdapters.push(adapter);
@@ -15,9 +13,7 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     while (openAdapters.length) {
       try {
         openAdapters.pop()!.disconnectBang();
-      } catch {
-        // best-effort cleanup
-      }
+      } catch {}
     }
   });
 

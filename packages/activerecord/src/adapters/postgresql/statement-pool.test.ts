@@ -105,9 +105,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       // `test_prepared_statements_do_not_get_stuck_on_query_interruption`
       // in activerecord/test/cases/adapters/postgresql/statement_pool_test.rb.
       await expect(adapter.execute("SELECT 1 / $1::int", [0])).rejects.toThrow();
-      // The adapter still serves queries with the same SQL shape after
-      // the error — no pool poisoning, no duplicate-prepared-statement
-      // error on reuse.
       const rows = await adapter.execute("SELECT 1 / $1::int", [1]);
       expect(rows[0]).toBeDefined();
     });
@@ -174,8 +171,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);
       } finally {
-        // pg.Pool keeps sockets/timers alive — close to avoid Vitest
-        // hangs / flakiness from leaked handles.
         await adapter2.close();
       }
     });
@@ -189,9 +184,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(pool.length).toBe(2);
         await adapter.clearCacheBang();
         expect(pool.length).toBe(0);
-        // Pool itself remains attached — counter continues from where
-        // it left off so we never collide with a still-PREPAREd name
-        // on this session after the server DEALLOCATEs complete.
         expect(adapter._statementPoolForTest()).toBe(pool);
       } finally {
         await adapter.rollback();
@@ -210,40 +202,24 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pool = adapter._statementPoolForTest()!;
       expect(pool.length).toBe(2);
       await adapter.rollback();
-      // Same pool object survives the rollback (session-scoped lifetime).
       expect(adapter._statementPoolForTest()).toBe(pool);
       await adapter.clearCacheBang();
       expect(pool.length).toBe(0);
     });
 
     it("tags the released client and runs DEALLOCATE ALL on its next checkout", async () => {
-      // With the dual-pool collapse there is no per-txn "release" —
-      // the same persistent connection survives commit/rollback, so
-      // the WeakMap-based DEALLOCATE-ALL drain path is no longer
-      // exercised. Tag/drain still applies across reconnect: after
-      // clearCacheBang runs with the connection torn down, the next
-      // _acquireFreshClient runs DEALLOCATE ALL before user code.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       await adapter.rollback();
       await adapter.reconnect();
-      // Re-pop a statement into the pool's history, then tear down
-      // the live connection and trigger the reset-branch of
-      // clearCacheBang so the drain flag is set.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [2]);
       await adapter.rollback();
-      // Simulate the failed-session window by detaching the live
-      // connection before clearCacheBang.
       const conn = adapter._rawConnectionForTest();
-      // Driving the reset path by force-clearing _rawConnection.
       adapter._rawConnection = null;
       await adapter.clearCacheBang();
       expect(adapter._needsDeallocateAllForTest()).toBe(true);
-      // Restore so the afterEach close() doesn't double-end.
-      // Restoring _rawConnection for cleanup.
       adapter._rawConnection = conn;
-      // The next acquire runs DEALLOCATE ALL before any user query.
       expect(conn).not.toBeNull();
       const observed: string[] = [];
       const live = conn!;
@@ -262,10 +238,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
-      // Original repro covered the dual-client after_rollback race
-      // (failed client vs new-txn client). With one persistent
-      // connection there is only one pool: clearCacheBang clears it
-      // regardless of whether a new txn has been opened.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       const failedPool = adapter._statementPoolForTest()!;
@@ -275,7 +247,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execute("SELECT $1::int", [2]);
         const newTxnPool = adapter._statementPoolForTest()!;
-        // Same pool object — session-scoped lifetime.
         expect(newTxnPool).toBe(failedPool);
         expect(newTxnPool.length).toBeGreaterThan(0);
         await adapter.clearCacheBang();

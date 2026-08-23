@@ -49,15 +49,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("integer types", async () => {
-      // Verify that int2, int4, and int8 columns all come back through
-      // the pg driver as numbers, int8 narrowing to a bigint past the
-      // safe-integer range.
       await adapter.executeMutation(`INSERT INTO "pg_int_types" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT * FROM "pg_int_types"`);
       expect(typeof rows[0].small).toBe("number");
       expect(typeof rows[0].medium).toBe("number");
-      // The default is one past Number.MAX_SAFE_INTEGER, so the connection's
-      // int8 parser keeps it a bigint rather than truncating it onto a float.
       expect(typeof rows[0].big).toBe("bigint");
       expect(rows[0].big).toBe(9007199254740993n);
     });
@@ -74,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQL bigint round-trip", () => {
-    const BIG = 2n ** 62n; // well above Number.MAX_SAFE_INTEGER
+    const BIG = 2n ** 62n;
 
     beforeEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS "bigint_rt"`);
@@ -91,7 +86,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("preserves exact value above Number.MAX_SAFE_INTEGER", async () => {
-      const unsafe = 9007199254740993n; // Number.MAX_SAFE_INTEGER + 2
+      const unsafe = 9007199254740993n;
       await adapter.executeMutation(`INSERT INTO "bigint_rt" ("score") VALUES ($1)`, [unsafe]);
       const rows = await adapter.execute(`SELECT "score" FROM "bigint_rt"`);
       const type = new BigIntegerType({ limit: 8 });

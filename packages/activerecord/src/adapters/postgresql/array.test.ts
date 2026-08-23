@@ -95,7 +95,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArraySerialized extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -117,7 +116,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -141,7 +139,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -159,16 +156,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("schema dump with shorthand", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
-      // TS migration format: t.type("name", { opts })
       expect(output).toMatch(/t\.string\("tags",/);
       expect(output).toMatch(/limit: 255/);
       expect(output).toMatch(/t\.integer\("ratings",/);
-      // decimals column: checks presence of each option (order-independent)
       expect(output).toMatch(/t\.decimal\("decimals",/);
       expect(output).toMatch(/precision: 10/);
       expect(output).toMatch(/scale: 2/);
       expect(output).toMatch(/default: \[\]/);
-      // all array columns must carry array: true
       const lines = output.split("\n");
       const tagsLine = lines.find((l) => l.includes('"tags"'))!;
       const ratingsLine = lines.find((l) => l.includes('"ratings"'))!;
@@ -178,10 +172,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(decimalsLine).toMatch(/array: true/);
     });
     it("schema dump renders non-empty array defaults via the element type", async () => {
-      // Regression: newColumnFromField stores the raw PG array literal, so the
-      // dumper must run each element through the element cast type's
-      // deserialize + typeCastForSchema (integers bare, booleans true/false from
-      // PG's t/f, decimals quoted) rather than emitting raw strings.
       await adapter.exec(`DROP TABLE IF EXISTS pg_array_defaults`);
       await adapter.exec(`
         CREATE TABLE pg_array_defaults (
@@ -246,7 +236,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -322,7 +311,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -343,7 +331,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -403,7 +390,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -416,7 +402,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -431,7 +416,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -502,7 +486,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -526,7 +509,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           static tableName = "pg_arrays";
           static timeZoneAwareAttributes = true;
           static {
-            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
             this.attribute("id", "integer");
           }
         }
@@ -554,7 +536,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -571,7 +552,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -588,7 +568,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -606,7 +585,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -628,7 +606,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
           this.validatesUniqueness("tags");
         }
@@ -661,7 +638,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }
@@ -688,11 +664,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   // `PostgresqlArrayTest` → Rails parity:test mapping.
   describe("array datetime inline-quoting (trails)", () => {
     it("inlines a proleptic-year datetime[] element as a quoted_date BC literal", async () => {
-      // Regression guard for the inline INSERT path (base.ts create → adapter
-      // `quote` → encode_array → type_cast → quoted_date). A proleptic year <= 0
-      // only round-trips through the " BC" literal; the pre-fix ISO fallthrough
-      // (`{-000042-03-15T...Z}`) is not valid PG array input, so this pins the
-      // routing rather than a form PG happens to also accept (ISO datetimes do).
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
@@ -700,7 +671,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await PgArrays.loadSchema();
-      // Temporal proleptic year -42 == 43 BC.
       const bc = Temporal.Instant.from("-000042-03-15T12:34:56.123456Z");
       const record = await (PgArrays as any).create({ datetimes: [bc] });
       await record.reload();

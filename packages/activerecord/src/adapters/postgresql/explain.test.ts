@@ -14,9 +14,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// EXPLAIN tests build their own ad-hoc `ex_*` tables via raw DDL. The outer
-// transaction wrapping each test rolls back those tables (PG DDL is
-// transactional).
 fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -25,9 +22,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = Base.connection as PostgreSQLAdapter;
   });
   afterAll(async () => {
-    // The `ex_*`/`op_*` tables are built in-test and rolled back by the
-    // transactional fixtures; this static IF EXISTS drop balances
-    // require-table-teardown by name.
     await adapter.exec(
       `DROP TABLE IF EXISTS ex_relations, ex_authors, ex_books, ex_explain, op_authors, op_posts CASCADE`,
     );
@@ -39,11 +33,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("Relation#explain on PG captures the SELECT via sql.active_record", async () => {
-      // End-to-end check: the whole ExplainRegistry + ExplainSubscriber
-      // pipeline only works on PG if `execQuery` (the real SELECT path)
-      // emits `sql.active_record`. Without that, `Relation#explain`
-      // silently falls back to `toSql()` and reports zero collected
-      // queries.
       class ExRelation extends Base {
         static {
           this.attribute("id", "integer");
@@ -97,7 +86,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_explain" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "ex_explain" ("name") VALUES ('test')`);
       const result = await adapter.explain(`SELECT * FROM "ex_explain"`);
-      // Plan output varies but should contain the table name
       expect(result).toContain("ex_explain");
     });
 
@@ -118,12 +106,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("explain executes with FORMAT JSON and returns JSON plan", async () => {
       const result = await adapter.explain("SELECT 1", [], ["FORMAT JSON"]);
-      // The prior stringifier rendered pg-auto-parsed plans as "[object Object]".
       expect(result).not.toContain("[object Object]");
       // Rails wraps JSON output in the "QUERY PLAN" header block; JSON.parse(result) would fail.
       expect(result).toContain("QUERY PLAN");
-      // Extract the JSON array from within the pp() block (pp() adds one leading space per line),
-      // strip that indent, then parse to confirm the full JSON pipeline is intact.
       const jsonMatch = result.match(/\[[\s\S]*\]/);
       expect(jsonMatch).not.toBeNull();
       const parsed = JSON.parse(jsonMatch![0].replace(/^ /gm, "")) as unknown[];

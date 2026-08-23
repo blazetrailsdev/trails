@@ -72,7 +72,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: create_table(TABLE_NAME, temporary: true) — must not produce TEMPORARY UNLOGGED
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, { temporary: true }, () => {});
-      // Temporary tables are already unlogged (relpersistence = 't')
       const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;
       expect(rows[0]["relpersistence"]).toBe(TEMPORARY);
     });

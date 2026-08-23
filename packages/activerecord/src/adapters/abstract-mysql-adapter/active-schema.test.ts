@@ -14,14 +14,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("ActiveSchemaTest", () => {
-    // The stub-mode assertions never execute, but the `with_real_execute` block
-    // in "add index" runs real DDL against the canonical `people` table. Seed it
-    // via the fixtures framework so its lifecycle (and teardown) is owned by the
-    // canonical-schema machinery rather than a destructive create/drop here.
-    // "add index" opts out of transactional fixtures: its real addIndex/
-    // removeIndex DDL must not run while the leased connection holds a fixture
-    // transaction on `people` (MySQL DDL implicitly commits and would strand
-    // that state).
     fixtures(["people"], {
       usesTransaction: ["add index"],
     });

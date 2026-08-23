@@ -41,7 +41,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       ]);
       const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
       expect(rows).toHaveLength(1);
-      // adapter.execute returns raw strings for json/jsonb — Json#deserialize owns parsing
       expect(JSON.parse(rows[0].settings as string)).toEqual(obj);
     });
 
@@ -88,7 +87,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         class JsonStringCast extends Base {
           static {
             this.tableName = "json_string_cast";
-            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
             this.attribute("id", "integer");
           }
         }

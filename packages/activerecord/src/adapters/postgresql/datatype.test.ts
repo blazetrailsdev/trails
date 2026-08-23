@@ -24,8 +24,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterAll(async () => {
-    // `ex` is created in-test and rolled back by withTransactionalFixtures;
-    // this static IF EXISTS drop balances require-table-teardown.
     await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
     await adapter.close();
   });
@@ -46,7 +44,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_times";
       static {
         this.adapter = a;
-        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
         this.attribute("id", "integer");
         this.attribute("time_interval", "string");
         this.attribute("scaled_time_interval", "interval");
@@ -70,7 +67,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_oids";
       static {
         this.adapter = a;
-        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
         this.attribute("id", "integer");
       }
     }
@@ -87,7 +83,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const first = await (M as any).find(1);
       expect((M as any).columnForAttribute("time_interval").type).toBe("interval");
       expect((M as any).columnForAttribute("scaled_time_interval").type).toBe("interval");
-      // Touch the loaded record so the find is exercised end-to-end.
       expect(first).toBeDefined();
     });
 

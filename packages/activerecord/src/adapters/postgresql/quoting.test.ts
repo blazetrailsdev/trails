@@ -19,9 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     try {
       await adapter.exec(`DROP TABLE IF EXISTS "quoting_test" CASCADE`);
       await adapter.exec(`DROP TABLE IF EXISTS "table with spaces" CASCADE`);
-    } catch {
-      // ignore
-    }
+    } catch {}
     await adapter.close();
   });
 
@@ -122,11 +120,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     // unmatched parity:test entry.
 
     it("quote bit string", () => {
-      // binary path
       expect(adapter.quote(new Bit().serialize("01")!)).toBe("B'01'");
-      // hex path
       expect(adapter.quote(new Bit().serialize("FF")!)).toBe("X'FF'");
-      // neither binary nor hex → null
       const type = new Bit();
       const value = "'); SELECT * FROM users; /*\n01\n*/--";
       const serialized = type.serialize(value);
@@ -142,9 +137,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raise when int is wider than 64bit", async () => {
-      const tooBig = BigInt("9223372036854775808"); // MAX_INT64 + 1
+      const tooBig = BigInt("9223372036854775808");
       expect(() => adapter.quote(tooBig)).toThrow(IntegerOutOf64BitRange);
-      const tooSmall = BigInt("-9223372036854775809"); // MIN_INT64 - 1
+      const tooSmall = BigInt("-9223372036854775809");
       expect(() => adapter.quote(tooSmall)).toThrow(IntegerOutOf64BitRange);
     });
 

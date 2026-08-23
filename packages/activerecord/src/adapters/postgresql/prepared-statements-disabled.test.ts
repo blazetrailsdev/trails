@@ -12,11 +12,6 @@ import { Developer } from "../../test-helpers/models/developer.js";
 import { Computer } from "../../test-helpers/models/computer.js";
 import { developerFixtureData } from "../../test-helpers/fixtures/developers.js";
 
-// `developerFixtureData.david` carries the `sharedComputers: ["laptop"]` HABTM
-// association label, which the fixture loader materializes into a
-// `computers_developers` join row. Register Computer at module load so the
-// `sharedComputers` reflection resolves when the loader writes that join row —
-// without it the join target is unresolved and the seed insert fails.
 registerModel(Computer);
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -26,8 +21,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     // the `sharedComputers` label materializes) come from the template clone.
     const { developers } = fixtures({ developers: [Developer, developerFixtureData] });
 
-    // `preparedStatements` lives on AbstractAdapter but isn't on the
-    // `DatabaseAdapter` interface that `connection` is typed as.
     const ps = (a: unknown) => a as { preparedStatements: boolean };
 
     // Mirrors Rails' setup/teardown swap to the
@@ -47,9 +40,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       const david = developers("david");
 
-      const last = await Developer.where({ name: "David" }).last(); // With Binds
+      const last = await Developer.where({ name: "David" }).last();
       expect(last?.id).toBe(david.id);
-      expect(await Developer.count()).toBeGreaterThan(0); // Without Binds
+      expect(await Developer.count()).toBeGreaterThan(0);
     });
   });
 });

@@ -14,7 +14,6 @@ describeIfSqlite("SQLite3CreateFolder", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sqlite-create-folder-"));
     let conn: BetterSQLite3Adapter | undefined;
     try {
-      // The `db` subdirectory does not exist yet — the adapter must create it.
       conn = new BetterSQLite3Adapter({
         database: path.join(dir, "db", "foo.sqlite3"),
       });

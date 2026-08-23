@@ -13,10 +13,6 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
-// better-sqlite3 doesn't set SQLITE_OPEN_URI, so this URI is opened as a
-// *literal on-disk filename* in the process cwd rather than a shared-cache
-// in-memory DB (see sqlite-template.ts). That materializes a junk file named
-// `file::memory:?cache=shared` next to the repo, so afterEach unlinks it.
 const SHARED_CACHE_DB = "file::memory:?cache=shared";
 
 const openAdapters: SQLite3Adapter[] = [];
@@ -24,17 +20,13 @@ afterEach(async () => {
   while (openAdapters.length) {
     try {
       await openAdapters.pop()!.close();
-    } catch {
-      // best-effort
-    }
+    } catch {}
   }
   const fs = await getFsAsync();
   for (const suffix of ["", "-wal", "-shm"]) {
     try {
       await fs.unlink!(SHARED_CACHE_DB + suffix);
-    } catch {
-      // never created / already gone — nothing to do.
-    }
+    } catch {}
   }
 });
 
@@ -84,7 +76,6 @@ describeIfSqlite("SQLite3TransactionTest", () => {
   });
 
   it.skip("opens a `read_uncommitted` transaction", async () => {
-    // PERMANENT-SKIP: driver-limit (see scripts/api-compare/unported-files.ts) — single-process-sqlite
     const conn1 = withConn({ sharedCache: true });
     await conn1.exec(`CREATE TABLE IF NOT EXISTS "zines" ("id" INTEGER PRIMARY KEY, "title" TEXT)`);
     await conn1.beginDbTransaction();
@@ -130,7 +121,6 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     expect(readUncommitted(conn)).toBe(true);
     await conn.commitDbTransaction();
     await conn.resetIsolationLevel();
-    // restored to previous value (ON)
     expect(readUncommitted(conn)).toBe(true);
   });
 });

@@ -140,7 +140,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
       const output = await dumpTable(adapter, "mysql_table_options");
       expect(output).toMatch(/createTable\("mysql_table_options",\s*\{[^}]*charset:\s*"utf8mb4"/);
-      // Bare ENGINE=InnoDB is stripped by parseTableOptions — it must not appear in options:
       expect(output).not.toMatch(/options:\s*"ENGINE=InnoDB"(?!\s*ROW_FORMAT)/);
     });
   });

@@ -39,8 +39,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginIsolatedDbTransaction("serializable");
         await other.beginIsolatedDbTransaction("serializable");
-        // Both read the same set, then write based on it — the second writer
-        // raises serialization_failure.
         await adapter.execute(`SELECT sum(value) FROM ${SAMPLES}`);
         await other.execute(`SELECT sum(value) FROM ${SAMPLES}`);
         await other.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
@@ -69,14 +67,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
         const pid = (rows[0] as { pid: number }).pid;
         const start = Date.now();
-        // Handler attached at creation so the canceled query is never
-        // momentarily unhandled (vitest fails on unhandled rejections).
         let slowError: unknown;
         const slow = adapter.execute("SELECT pg_sleep(10)").catch((e) => {
           slowError = e;
         });
         await new Promise<void>((r) => setTimeout(r, 500));
-        // Assert the cancel landed, else a no-op leaves `slow` pending to timeout.
         const sent = await other.execute("SELECT pg_cancel_backend(?) AS ok", [pid]);
         expect((sent[0] as { ok: boolean }).ok).toBe(true);
         await slow;
@@ -94,7 +89,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         await adapter.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
         await other.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 2`);
-        // Each now waits on the row the other holds — deadlock; PG aborts one.
         const [r1, r2] = await Promise.allSettled([
           adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
           other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
@@ -143,8 +137,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           });
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
-          // Under vitest's 5s default testTimeout, so a stuck poll fails the
-          // `waiting` assertion instead of dying as an opaque test timeout.
           const deadline = Date.now() + 3000;
           let waiting = false;
           while (Date.now() < deadline) {

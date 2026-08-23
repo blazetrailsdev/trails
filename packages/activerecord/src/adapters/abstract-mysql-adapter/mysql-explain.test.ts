@@ -10,9 +10,6 @@ import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 import { registerModel } from "../../index.js";
 
-// The outer `describeIfMysqlAdapter` beforeAll reads `Base.connection` before the
-// nested MySQLExplainTest `fixtures()` establishes it, so the handler wiring has
-// to be laid at file scope here — it is NOT redundant with the nested call.
 fixtures({}, { useTransactionalTests: false });
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -41,7 +38,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     beforeAll(async () => {
       const ver = await adapter.databaseVersion;
       const supportsAnalyze = isMariaDb && ver.compare("10.1.0") >= 0;
-      // `version <= "10.0"` expressed as `Version("10.0") >= version`.
       const supportsExplainAnalyze = isMariaDb
         ? new Version("10.0").compare(String(ver)) >= 0
         : ver.compare("6.0") >= 0;
@@ -86,14 +82,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    // trails-only: the ExplainRegistry → ExplainSubscriber → adapter.explain
-    // pipeline only works on MySQL if execute() emits sql.active_record.
-    // Without that, Relation#explain silently falls back to toSql() (which
-    // keeps Arel's double-quoted identifiers) rather than the payload SQL the
-    // driver saw (post-`mysqlQuote` → backticks). Asserting backticks (and the
-    // absence of double quotes) is what discriminates the two paths; a plain
-    // "contains the table name" assertion would pass either way. Uses the
-    // canonical authors/posts fixtures rather than a bespoke table.
     it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
       const plan = await Author.where({ id: authors("david").id }).explain();
       expect(plan).toContain("`authors`");
@@ -110,7 +98,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     // the absence of double quotes), proves the capture path was used.
     it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
       const relation = Author.where({ id: authors("david").id });
-      await relation; // prime the load cache
+      await relation;
       const plan = await relation.explain();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);
@@ -122,10 +110,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         .preload(":posts")
         .explain();
       const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
-      // The fallback path emits exactly one block (toSql() of the outer
-      // relation only, no preload query). Requiring ≥ 2 blocks proves the
-      // preload query was captured through sql.active_record, not substituted
-      // from toSql(). Both blocks carry backtick-quoted identifiers.
       expect(blocks.length).toBeGreaterThanOrEqual(2);
       expect(plan).toContain("`authors`");
       expect(plan).toContain("`posts`");
@@ -145,7 +129,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("buildExplainClause joins its flags space-separated", async () => {
       const clause = await adapter.buildExplainClause(["analyze", "format=json"]);
-      // MariaDB >= 10.1 drops the EXPLAIN prefix for ANALYZE (analyze_without_explain?).
       const analyzeWithoutExplain =
         isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
       expect(clause).toBe(

@@ -42,7 +42,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_infinities";
       static {
         this.adapter = a;
-        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
         this.attribute("id", "integer");
       }
     }
@@ -131,7 +130,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           static timeZoneAwareAttributes = true;
           static {
             this.adapter = a;
-            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
             this.attribute("id", "integer");
           }
         }
@@ -151,7 +149,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         // has no BigDecimal type; `Number.POSITIVE_INFINITY` (covered above) is the
         // only infinity literal, so that input-type variant has no TS counterpart.
       } finally {
-        // setting time_zone_aware_attributes causes the types to change.
         setZone(null);
       }
     });

@@ -61,9 +61,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it.skipIf(isMariaDb)(
       "no automatic reconnection after timeout",
       async () => {
-        // Stays self-built: connectionLimit:1 is what pins the wait_timeout to
-        // the connection under test, and the server-side disconnect it provokes
-        // must not land on the shared leased connection.
         const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
         try {
           await singleConn.execute("SET SESSION wait_timeout=1");
@@ -77,10 +74,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       10_000,
     );
     it("successful reconnection after timeout with manual reconnect", async () => {
-      // Stays self-built: connectionLimit:1 so SET SESSION wait_timeout and the
-      // sleep share the same physical connection — otherwise a second pool
-      // connection with the default wait_timeout could be used for the later
-      // execute() — and the provoked disconnect must not hit the leased one.
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
         await singleConn.execute("SET SESSION wait_timeout=1");
@@ -97,16 +90,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     }, 10_000);
     it("successful reconnection after timeout with verify", async () => {
-      // Stays self-built: connectionLimit:1 so the session wait_timeout applies
-      // to the same connection that active() and verifyBang() will use, and
-      // the provoked server-side disconnect must not hit the leased one.
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
         await singleConn.execute("SET SESSION wait_timeout=1");
         expect(await singleConn.active()).toBe(true);
         await new Promise((r) => setTimeout(r, 2000));
-        // With connectionLimit:1 the pool has no spare slot to create a fresh
-        // connection, so getConnection() returns the dead socket and ping() fails.
         expect(await singleConn.active()).toBe(false);
         // active is false → verifyBang calls reconnectBang(). Await it (async in
         // trails, unlike Rails' synchronous verify!) before probing again.
@@ -148,7 +136,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(await adapter.active()).toBe(true);
       adapter.discardBang();
       expect(await adapter.active()).toBe(false);
-      // discardBang abandons the socket without closing it; free the fd.
       socket?.destroy?.();
     });
 
@@ -157,8 +144,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const raw = adapter._clientForTest();
       expect(raw).not.toBeNull();
       const endSpy = vi.spyOn(raw as { end: () => Promise<void> }, "end");
-      // Capture the socket: discardBang abandons it (unref'd, listeners
-      // stripped) without end()ing, so destroy it directly to free the fd.
       const socket = (
         raw as unknown as {
           stream?: { destroy?: () => void };
@@ -177,7 +162,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("wait timeout as string", async () => {
-      // Stays self-built: the `waitTimeout` config key is the assertion.
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
       try {
         const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
@@ -189,8 +173,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("wait timeout as url", async () => {
       const url = new URL(MYSQL_TEST_URL);
       url.searchParams.set("wait_timeout", "60");
-      // Stays self-built: an alternate config (wait_timeout in the URL) is the
-      // assertion.
       const testAdapter = new Mysql2Adapter(url.toString());
       try {
         const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
@@ -215,7 +197,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(String(rows[0].v)).toMatch(/STRICT_ALL_TABLES/);
     });
     it("mysql strict mode disabled", async () => {
-      // Stays self-built: a deliberately non-strict adapter.
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: false });
       try {
         const rows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
@@ -225,7 +206,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("mysql strict mode specified default", async () => {
-      // Stays self-built: `strict: "default"` is the config under test.
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: "default" });
       try {
         const globalRows = await testAdapter.execute("SELECT @@GLOBAL.sql_mode AS v");
@@ -236,8 +216,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("mysql sql mode variable overrides strict mode", async () => {
-      // Stays self-built: a `variables:` override must not leak onto the shared
-      // leased connection.
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         variables: { sql_mode: "ansi" },
@@ -274,8 +252,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("mysql set session variable", async () => {
-      // Stays self-built: a `variables:` override must not leak onto the shared
-      // leased connection.
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         variables: { default_week_format: 3 },
@@ -288,8 +264,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("mysql set session variable to default", async () => {
-      // Stays self-built: a `variables:` override must not leak onto the shared
-      // leased connection.
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         variables: { default_week_format: "default" },
@@ -419,7 +393,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     afterEach(() => vi.restoreAllMocks());
 
     it("maps ER_BAD_DB_ERROR (1049) to NoDatabaseError", async () => {
-      // Stays self-built: the config names a database that does not exist.
       const a = new Mysql2Adapter("mysql://root@localhost/no_such_db");
       stubCreateConnection(makeDriverError(1049));
       try {
@@ -430,7 +403,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_ACCESS_DENIED_ERROR (1045) to DatabaseConnectionError", async () => {
-      // Stays self-built: the config names a user that cannot authenticate.
       const a = new Mysql2Adapter({ host: "localhost", user: "baduser", database: "test" });
       stubCreateConnection(makeDriverError(1045));
       try {
@@ -443,7 +415,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_ACCESS_DENIED_ERROR via URI to DatabaseConnectionError with parsed username", async () => {
-      // Stays self-built: the URI carries the bad username the error must name.
       const a = new Mysql2Adapter("mysql://myuser:pw@localhost/test");
       stubCreateConnection(makeDriverError(1045));
       try {
@@ -456,7 +427,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_CONN_HOST_ERROR (2003) to DatabaseConnectionError with hostname", async () => {
-      // Stays self-built: the URI carries the unreachable host the error must name.
       const a = new Mysql2Adapter("mysql://root@myhost.example.com/test");
       stubCreateConnection(makeDriverError(2003));
       try {
@@ -469,8 +439,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps unknown errno to ConnectionNotEstablished", async () => {
-      // Stays self-built: the stubbed createConnection is only reached by an
-      // adapter that has not connected yet — the leased one already has.
       const a = new Mysql2Adapter(MYSQL_TEST_URL);
       stubCreateConnection(makeDriverError(9999, "something went wrong"));
       try {

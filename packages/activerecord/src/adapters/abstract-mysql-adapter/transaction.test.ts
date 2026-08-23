@@ -85,11 +85,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         return Number(rows[0]["n"]);
       };
 
-      // Stays self-built: the point is an INSERT from a *different* connection
-      // being (in)visible inside this connection's transaction.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
-        // 1. Default (REPEATABLE READ): INSERT by another connection is not visible
         await adapter.transaction(async () => {
           await adapter.materializeTransactions();
           await assertNoDifference(sampleCount, null, () =>
@@ -97,7 +94,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           );
         });
 
-        // 2. READ COMMITTED: INSERT by another connection is visible mid-transaction
         await adapter.transaction({ isolation: "read_committed" }, async () => {
           await adapter.materializeTransactions();
           await assertDifference(sampleCount, +1, null, () =>
@@ -105,7 +101,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           );
         });
 
-        // 3. Retry preserves isolation: fail the first BEGIN, verify READ COMMITTED survives the retry
         let firstBeginFailed = false;
         const origInternalExecute = (adapter as any).internalExecute.bind(adapter);
         (adapter as any).internalExecute = async (sql: string, ...args: any[]) => {

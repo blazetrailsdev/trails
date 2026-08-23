@@ -37,10 +37,8 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   it("schema load", async () => {
-    // Verify the virtual table was created and is recognized
     expect(await adapter.virtualTableExists("searchables")).toBe(true);
 
-    // Re-create via createVirtualTable (mirrors Schema.define creating the table)
     await adapter.createVirtualTable("emails", "fts5", ["content", "meta UNINDEXED"]);
     expect(await adapter.virtualTableExists("emails")).toBe(true);
   });

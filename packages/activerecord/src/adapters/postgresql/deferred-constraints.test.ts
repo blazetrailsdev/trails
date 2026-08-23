@@ -33,7 +33,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           // INSERT must succeed — FK is deferred (mirrors Rails assert_nothing_raised).
           // If it throws the error propagates through finally and the test fails correctly.
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
-          // set_constraints(:immediate) triggers the deferred FK check → raises.
           await expect(adapter.setConstraints("immediate")).rejects.toThrow(InvalidForeignKey);
         } finally {
           await adapter.rollback().catch(() => {});
@@ -61,7 +60,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.setConstraints("deferred", fkName);
           // INSERT must succeed (mirrors Rails assert_nothing_raised).
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
-          // set_constraints(:immediate, @fk) triggers FK check → raises.
           await expect(adapter.setConstraints("immediate", fkName)).rejects.toThrow(
             InvalidForeignKey,
           );
@@ -99,7 +97,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
           // INSERT must succeed (mirrors Rails assert_nothing_raised).
           await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
-          // set_constraints(:immediate, ...) triggers FK checks → raises.
           await expect(adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2")).rejects.toThrow(
             InvalidForeignKey,
           );
@@ -130,17 +127,14 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_s_fk1",
           deferrable: "immediate",
         });
-        // FK2 is deferrable — can be set to deferred.
         await adapter.addForeignKey("dc_s_ch", "dc_s_p2", {
           column: "p2_id",
           name: "dc_s_fk2",
           deferrable: "immediate",
         });
-        // Defer only fk2; fk1 (deferrable, not listed) stays at INITIALLY IMMEDIATE.
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred", "dc_s_fk2");
-          // fk1 is deferrable but not listed — stays INITIALLY IMMEDIATE → raises immediately.
           await expect(
             adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`),
           ).rejects.toThrow(InvalidForeignKey);

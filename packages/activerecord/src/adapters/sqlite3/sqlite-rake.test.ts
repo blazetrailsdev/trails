@@ -173,8 +173,6 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("checks db dir is absolute", async () => {
-    // `isAbsolute` is optional on the PathAdapter seam (a VFS need not model
-    // the distinction), so the spy target is narrowed to the arm that has it.
     const pathAdapter = activesupport.getPath() as { isAbsolute(p: string): boolean };
     const isAbsolute = vi.spyOn(pathAdapter, "isAbsolute").mockReturnValue(false);
     vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
@@ -315,9 +313,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });
@@ -399,9 +395,7 @@ describeIfSqlite("SqliteStructureLoadTest", () => {
     for (const file of created) {
       try {
         fs.unlinkSync(file);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     created.length = 0;
   });

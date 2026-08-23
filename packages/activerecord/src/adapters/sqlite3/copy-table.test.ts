@@ -65,9 +65,7 @@ async function testCopyTable(
 
   try {
     await conn.dropTable(to);
-  } catch {
-    // rescue nil
-  }
+  } catch {}
 }
 
 // -- Rails test class: copy_table_test.rb (ActiveRecord::SQLite3TestCase) --
@@ -186,9 +184,7 @@ describeIfSqlite("CopyTableTest", () => {
     } finally {
       try {
         await conn.dropTable("virtual_columns");
-      } catch {
-        // rescue nil
-      }
+      } catch {}
     }
   });
 });

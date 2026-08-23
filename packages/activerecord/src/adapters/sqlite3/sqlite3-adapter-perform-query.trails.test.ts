@@ -33,8 +33,6 @@ afterEach(async () => {
 
 describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("execute runs a non-row-returning statement and returns no rows", async () => {
-    // `.all()` throws on a statement with no result columns, so this is the
-    // `column_count.zero?` branch that lets DDL flow through `execute`.
     await expect(adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`)).resolves.toEqual([]);
     await expect(adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)).resolves.toEqual([]);
   });
@@ -84,15 +82,11 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
 
-    // sqlite3_changes() is advanced only by DML, so the DDL below leaves the
-    // UPDATE's count standing where a RunResult would report 0.
     await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
     expect(adapter.affectedRows()).toBe(2);
   });
 
   it("execute returns the rows an INSERT ... RETURNING produces", async () => {
-    // `stmt.column_count.zero?` alone — no write predicate — so a RETURNING
-    // write comes back as rows with row_count = 1.
     await expect(
       adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id", "nick"`),
     ).resolves.toEqual([{ id: 1, nick: "a" }]);
@@ -104,16 +98,11 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     await adapter.executeMutation(`BEGIN`);
     expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
-    // BEGIN/COMMIT take the run branch but are not writes, so they don't touch
-    // the count — the last write's value survives them.
     await adapter.executeMutation(`COMMIT`);
     expect(adapter.affectedRows()).toBe(2);
   });
 
   it("executeMutation returns the inserted id for INSERT ... RETURNING", async () => {
-    // A RETURNING write takes the `.all()` branch (nonzero column count), so
-    // the id comes from `last_insert_rowid()` read under the statement lock —
-    // atomically with the insert.
     const id = await adapter.executeMutation(
       `INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`,
     );
@@ -127,17 +116,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("returns distinct insert ids for concurrent inserts", async () => {
-    // The statement and its `last_insert_rowid()` readback are serialized by
-    // the FIFO statement lock — so inserts issued concurrently (interleaving
-    // at await points) each get their own id. The id is returned from
-    // performQuery as a local rather than re-read from the shared
-    // this._lastInsertRowid, which a concurrent insert would overwrite before
-    // the post-await continuation reads it. NOTE: a race is timing-dependent —
-    // bare inserts interleave too little to reproduce it reliably here (the
-    // regression that motivated this reached CI through model `.create`, whose
-    // callbacks add denser interleaving; HasManyThroughAssociationsTest "should
-    // respect table alias" is the reliable guard). This is a smoke test of the
-    // happy path.
     const n = 25;
     const ids = await Promise.all(
       Array.from({ length: n }, (_, i) =>
@@ -149,9 +127,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("serializes statements queued on one connection", async () => {
-    // The statement and its `changes()` / `last_insert_rowid()` readbacks are
-    // one critical section, so no second caller may be inside while another
-    // holds it — and arrival order is service order.
     const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
     let inside = 0;
     let arrivals = 0;
@@ -160,8 +135,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await Promise.all(
       Array.from({ length: 25 }, async (_unused, i) => {
         for (let stagger = 0; stagger < i % 4; stagger++) await Promise.resolve();
-        // The queue tail is published synchronously on entry, so the number
-        // taken here is this caller's place in it.
         const arrival = arrivals++;
         const release = await acquireStatementLock(host);
         inside += 1;
@@ -177,9 +150,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("does not let a late statement barge ahead of one already queued", async () => {
-    // The release window is where a check-then-set lock loses its queue: the
-    // waiter is still parked in the microtask queue when a caller arriving in
-    // the same synchronous turn observes a free lock and claims it first.
     const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
     const served: string[] = [];
 
@@ -247,7 +217,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
 
     closing.disconnectBang();
-    // Asked while the close is still queued behind the statement.
     const answered = closing.active();
 
     release();
@@ -289,8 +258,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("dirties the current transaction for a write routed through execute", async () => {
-    // Dirtying hangs off the primitive rather than executeMutation, so a write
-    // reaching the connection through execute marks the transaction too.
     await adapter.transaction(async () => {
       await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
       expect(adapter.currentTransaction().isDirty()).toBe(true);

@@ -20,9 +20,6 @@ describe("SqliteAdapter", () => {
     await pool.disconnect();
   });
 
-  // TS-only coverage for the alter_table rebuild: a typeless column has BLOB
-  // affinity, and both the throwaway "a"-prefixed buffer and the rebuilt table
-  // have to keep the declared type empty or the affinity silently becomes TEXT.
   describe("alterTable", () => {
     it("round-trips a typeless (BLOB affinity) column", async () => {
       await adapter.exec(

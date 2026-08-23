@@ -19,8 +19,6 @@ describeIfSqlite("SQLite3CollationTest", () => {
     await adapter.createTable("collation_table_sqlite3", { force: true }, (t) => {
       t.string("string_nocase", { collation: "NOCASE" });
       t.text("text_rtrim", { collation: "RTRIM" });
-      // The decimal column might interfere with collation parsing.
-      // Thus, add this column type and some other string column afterwards.
       t.decimal("decimal_col", { precision: 6, scale: 2 });
       t.string("string_after_decimal_nocase", { collation: "NOCASE" });
     });

@@ -47,9 +47,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     adapter = await leaseMysqlAdapter();
   });
   afterEach(() => {
-    // Restore any console / logger spies installed by the warning-handler
-    // tests so a throw before the inner mockRestore() can't leak the stub
-    // into subsequent suites.
     vi.restoreAllMocks();
   });
 
@@ -178,11 +175,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     }
   });
 
-  // The FK type-mismatch tests ride the canonical tables (engines, old_cars —
-  // integer PK, cars — bigint PK, subscribers — varchar `nick`, people —
-  // bigint PK). rebuildCanonicalTables restores each to its canonical shape;
-  // FK checks are disabled for the pre-drop so a leftover engines→people FK
-  // (from the multiple-fks test) can't block dropping its parent table.
   beforeEach(async () => {
     await adapter.executeMutation("SET FOREIGN_KEY_CHECKS=0");
     for (const t of ["foos", "engines", "old_cars", "cars", "subscribers", "people"]) {
@@ -197,8 +189,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("errors for bigint fks on integer pk table in alter table", async () => {
-    // add_reference defaults old_car_id to :bigint; old_cars.id is INT — the
-    // add_foreign_key then trips the type mismatch.
     const error = await adapter
       .addReference("engines", "old_car")
       .then(() => adapter.addForeignKey("engines", "old_cars"))
@@ -222,9 +212,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     "errors for multiple fks on mismatched types for pk table in alter table",
     async () => {
       const error = await adapter
-        // Add a matching FK first (person_id is :bigint, people.id is bigint).
         .addReference("engines", "person", { foreignKey: true })
-        // Then the mismatched one: old_car_id is :bigint but old_cars.id is INT.
         .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
         .then(() => null)
         .catch((e) => e);
@@ -240,7 +228,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   );
 
   it("errors for bigint fks on integer pk table in create table", async () => {
-    // foos.old_car_id is BIGINT but old_cars.id is INT
     const error = await adapter
       .executeMutation(
         `
@@ -268,7 +255,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("errors for integer fks on bigint pk table in create table", async () => {
-    // foos.car_id is INT but cars.id is BIGINT
     const error = await adapter
       .executeMutation(
         `
@@ -296,7 +282,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("errors for bigint fks on string pk table in create table", async () => {
-    // foos.subscriber_id is BIGINT but subscribers.nick is VARCHAR
     const error = await adapter
       .executeMutation(
         `
@@ -342,7 +327,6 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("statement timeout error codes", () => {
-    // ER_QUERY_TIMEOUT and ER_FILSORT_ABORT both map to StatementTimeout.
     for (const errno of [
       AbstractMysqlAdapter.ER_QUERY_TIMEOUT,
       AbstractMysqlAdapter.ER_FILSORT_ABORT,
@@ -387,16 +371,12 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
       vi.spyOn(console, "warn").mockImplementation(() => {});
       await withDbWarningsAction("log", async () => {
-        // `id > (0+'foo')` triggers a "Truncated incorrect DOUBLE value" warning;
-        // under db_warnings_action=:log that warning is logged, not raised, and
-        // must not corrupt the affected-row count returned by executeMutation.
         const affected = await adapter.executeMutation(
           `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
         );
         expect(affected).toBe(1);
       });
     } finally {
-      // Restore on the still-pinned connection before rollback releases it.
       await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});

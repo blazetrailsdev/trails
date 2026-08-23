@@ -17,8 +17,6 @@ import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { ConnectionFailed } from "../../errors.js";
 
-// The retry-loop seams `withRawConnection` drives are not on the public adapter
-// surface; narrow to just the two the fault injection needs.
 interface RetryLoopSeams {
   reconnect(): void | Promise<void>;
   rawConnectionForBlock(): Promise<unknown>;
@@ -38,8 +36,6 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
   it("createSavepoint dirties the current (parent) transaction frame", async () => {
     const tm = adapter.transactionManager;
     await tm.withinNewTransaction({}, async () => {
-      // BEGIN is emitted with materializeTransactions:false, so the frame is
-      // materialized but clean.
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
       await adapter.createSavepoint("sp1");
@@ -64,29 +60,18 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
     });
   });
 
-  // The savepoint statement is issued through the retry-enabled `internalExecute`
-  // leaf (allowRetry:true) so `withRawConnection`'s reconnect loop actually
-  // engages — createSavepoint/rollbackToSavepoint pass allowRetry:false, but they
-  // share the exact same `internalExecute` finally under test here. A SAVEPOINT
-  // (not RELEASE/ROLLBACK) is retried because the outer BEGIN is still clean, so
-  // reconnect restores it and the retry lands on a live transaction.
   it("a savepoint reconnecting mid-flight dirties the parent; a materialize:false op does not", async () => {
     const tm = adapter.transactionManager;
     await tm.withinNewTransaction({}, async () => {
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
 
-      // Fault the first raw connection acquisition per op with a retryable
-      // ConnectionFailed, so `withRawConnection` reconnects (restoring the
-      // still-clean outer BEGIN) and retries the SAVEPOINT.
       const seams = adapter as unknown as RetryLoopSeams;
       const reconnect = vi.spyOn(seams, "reconnect");
       const rawForBlock = vi
         .spyOn(seams, "rawConnectionForBlock")
         .mockRejectedValueOnce(new ConnectionFailed("server closed the connection unexpectedly"));
 
-      // materialize:false — the withRawConnection loop's own (suppressed) finally
-      // must NOT dirty the parent on the reconnect path.
       await adapter.internalExecute('SAVEPOINT "sp_clean"', "TRANSACTION", [], {
         materializeTransactions: false,
         allowRetry: true,
@@ -94,8 +79,6 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
       expect(reconnect).toHaveBeenCalledTimes(1);
       expect(tm.isRestorable()).toBe(true);
 
-      // materialize:true (the savepoint default) — the relocated internalExecute
-      // finally dirties the parent on the very same reconnect path.
       rawForBlock.mockRejectedValueOnce(
         new ConnectionFailed("server closed the connection unexpectedly"),
       );

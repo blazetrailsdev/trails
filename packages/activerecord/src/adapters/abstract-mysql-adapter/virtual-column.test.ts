@@ -65,9 +65,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("schema dumping", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter as any, "virtual_columns");
-      // A non-stored generated column dumps without `stored: true`; a STORED one with it.
-      // Function casing/backtick follow MySQL's normalized GENERATION_EXPRESSION (UPPER→upper,
-      // OCTET_LENGTH→length); the JSON-path single quotes round-trip after the `\'`→`'` unescape.
       expect(output).toMatch(
         /t\.virtual\("upper_name", \{ type: "string", as: "(?:upper|ucase)\(`?name`?\)" \}\);/i,
       );

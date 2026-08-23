@@ -426,11 +426,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     getFs().rmSync(filename, { force: true });
   });
 
-  // This test actually runs a dump so we can ensure all the arguments are parsed correctly.
-  // All other tests in this class just mock the call (using assert_called_with) to make the tests quicker.
   it("structure dump", async () => {
-    // The only case here that shells out for real, so the class-wide
-    // `Kernel.system` double comes back off.
     spawnSync.mockRestore();
     expect(getFs().readFileSync(filename, "utf8")).toEqual("");
 
