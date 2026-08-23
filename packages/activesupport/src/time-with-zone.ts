@@ -520,28 +520,18 @@ export class TimeWithZone {
   }
 
   /**
-   * Returns the local wall-clock time as a Temporal.PlainDateTime.
-   * If `utcOffsetOverride` is provided (in seconds), the result is the wall-clock
-   * time at that offset from UTC.
-   *
-   * @missingRailsCall getlocal — PERMANENT: `utc.getlocal(utc_offset)`
-   *   (time_with_zone.rb:83-85) is Ruby `Time#getlocal`; trails' `utc()` answers
-   *   a `Temporal.Instant`, which has no `getlocal` — the shifted wall clock is
-   *   built with `toZonedDateTimeISO("UTC").toPlainDateTime()`, and `getlocal`
-   *   is the alias of THIS method, not a call it can make.
+   * Mirrors: `ActiveSupport::TimeWithZone#localtime(utc_offset = nil)`
+   * (time_with_zone.rb:83-85) — `utc.getlocal(utc_offset)`, a `::Time` at the
+   * given offset or zone, or in the system zone when none is given. trails'
+   * `utc` answers the instant rather than the `::Time` Rails' does, so the
+   * `::Time` `getlocal` is called on is seated from that instant here.
    */
-  localtime(utcOffsetOverride?: number): Temporal.PlainDateTime {
-    if (utcOffsetOverride !== undefined) {
-      const shifted = Temporal.Instant.fromEpochMilliseconds(
-        Math.trunc(this._epochMs + utcOffsetOverride * 1000),
-      );
-      return shifted.toZonedDateTimeISO("UTC").toPlainDateTime();
-    }
-    return this._zoned.toPlainDateTime();
+  localtime(utcOffset: string | number | null = null): Time {
+    return Time.at(new Rational(this.utc().epochNanoseconds, 1_000_000_000n)).getlocal(utcOffset);
   }
 
-  /** Alias for localtime() */
-  getlocal(utcOffset?: number): Temporal.PlainDateTime {
+  /** `alias_method :getlocal, :localtime` (time_with_zone.rb:86). */
+  getlocal(utcOffset: string | number | null = null): Time {
     return this.localtime(utcOffset);
   }
 
@@ -551,12 +541,21 @@ export class TimeWithZone {
   }
 
   /**
-   * Mirrors: `ActiveSupport::TimeWithZone#to_time` (time_with_zone.rb:493-501),
-   * which answers a `::Time` — `getlocal`, the same instant in the system zone,
-   * for the default `preserve_timezone`.
+   * Mirrors: `ActiveSupport::TimeWithZone#to_time` (time_with_zone.rb:493-501).
+   * Rails hands `getlocal` the `TimeZone` object itself for the `:zone` arm,
+   * which `::Time` reads through `utc_to_local`; `@blazetrails/date`'s `Time`
+   * seats a zone by its IANA identifier, which is the same zone spelled the way
+   * that constructor takes it. The three `@to_time_with_*` memos Rails keeps are
+   * not carried — the value is recomputed rather than cached.
    */
   toTime(): Time {
-    return Time.at(new Rational(this.utc().epochNanoseconds, 1_000_000_000n));
+    if (this.preserveTimezone() === ":zone") {
+      return this.getlocal(this.timeZone.tzinfo.identifier);
+    } else if (this.preserveTimezone()) {
+      return this.getlocal(this.utcOffset);
+    } else {
+      return this.getlocal();
+    }
   }
 
   /** Unix timestamp in seconds */

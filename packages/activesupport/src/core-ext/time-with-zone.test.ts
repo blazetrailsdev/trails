@@ -4,7 +4,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
@@ -88,7 +88,7 @@ describe("TimeWithZoneTest", () => {
   it("localtime", () => {
     const twz = maketwz();
     const local = twz.localtime();
-    expect(local).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(local).toBeInstanceOf(RubyTime);
   });
 
   it("localtime with offset", () => {
@@ -96,12 +96,12 @@ describe("TimeWithZoneTest", () => {
     // -7h offset → wall-clock 1999-12-31 17:00:00.
     const twz = maketwz();
     const local = twz.localtime(-7 * 3600);
-    expect(local).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(local).toBeInstanceOf(RubyTime);
     expect(local.year).toBe(1999);
     expect(local.month).toBe(12);
     expect(local.day).toBe(31);
     expect(local.hour).toBe(17);
-    expect(local.minute).toBe(0);
+    expect(local.min).toBe(0);
     // getlocal alias mirrors localtime
     const aliased = twz.getlocal(-7 * 3600);
     expect(aliased.toString()).toBe(local.toString());
