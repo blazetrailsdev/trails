@@ -131,6 +131,13 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
+  /**
+   * @missingRailsCall load — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_cache.rb:228-242 dispatches to `Marshal.load` or `YAML.unsafe_load`
+   *   by extension; trails dumps and loads the cache as JSON
+   *   (schema-cache.ts:134-146), so neither Ruby deserializer has a counterpart
+   *   to call.
+   */
   static _loadFrom(filename: string): SchemaCache | null {
     try {
       const fs = getFs();
@@ -145,7 +152,14 @@ export class SchemaCache {
     }
   }
 
-  /** @internal Mirrors SchemaCache.read in Rails: transparently gunzips .gz files. */
+  /**
+   * @internal Mirrors SchemaCache.read in Rails: transparently gunzips .gz files.
+   *
+   * @missingRailsCall open — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_cache.rb:246 is `Zlib::GzipReader.open(filename) { |gz| ... }`;
+   *   trails reads the bytes and calls the pure `Gzip.decompress`
+   *   (schema-cache.ts:149-156) — there is no reader object to open.
+   */
   static read<T>(filename: string, callback: (data: string) => T): T {
     const fs = getFs();
     if (filename.endsWith(".gz")) {
@@ -613,6 +627,12 @@ export class SchemaCache {
    * `primaryKey: true` alongside `primary_keys: { table: null }`, and the derive
    * step must not resurface the bogus flag. Mirrors Rails treating `@primary_keys`
    * as authoritative while deriving `columns_hash` (schema_cache.rb).
+   *
+   * @missingRailsCall deep_deduplicate — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with
+   *   Ruby's `-@`; JS has no string-interning primitive and identical string
+   *   literals are already shared, so trails derives `columnsHash` only
+   *   (schema-cache.ts:617-627).
    */
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columnsHash.clear();
@@ -836,6 +856,13 @@ export class SchemaReflection {
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
+  /**
+   * @missingRailsCall load_cache — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+   *   schema_cache.rb:79-89 may `load_cache(nil)` inline; trails' `isCached` is
+   *   synchronous while `loadCache` is promise-returning, so the load is
+   *   performed by `ensureSyncCache()` from the already-resolved dump
+   *   (schema-cache.ts:839-842).
+   */
   isCached(tableName: string): boolean {
     this.ensureSyncCache();
     return this._cache?.isCached(tableName) ?? false;
@@ -1072,6 +1099,10 @@ export function deepDeduplicate<T>(value: T): T {
  * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#open (private)
  *
  * @internal
+ *
+ * @missingRailsCall new — PERMANENT: Per-site verified (RFC 0106 wave 4b):
+ *   schema_cache.rb:466 is `Zlib::GzipWriter.new file`; trails compresses with
+ *   the pure `Gzip.compress` and writes the result, so no writer is allocated.
  */
 export function open(
   filename: string,

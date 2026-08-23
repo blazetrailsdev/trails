@@ -367,6 +367,23 @@ write.
    a baseline allowlist to defer it. The tag is a receipt, not absolution — it
    says "known extra surface, not yet removed", and someone will come back for
    it.
+
+   **`arel` is gated**, by the RFC 0117 extra-surface ratchet:
+
+   ```bash
+   pnpm parity:api:extra:gate   # fails on ANY increase in arel's novel/total
+   ```
+
+   It reads the committed marks in `scripts/api-compare/extra-surface-mark.json`
+   and is **only-shrink**, like the two call gates: a new public arel name with
+   no Ruby counterpart turns it red, and the fix is to remove the name — never
+   to raise the mark. **Converged something?** The mark then sits above the
+   measurement; narrow it with `pnpm parity:api:extra:tighten`, which writes each
+   dimension DOWN and never up. There is **no reseed**, for the same reason the
+   call baselines forbid one. Other packages are still measured and ungated;
+   widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
+   mechanical step.
+
 4. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
    `blazetrails/rails-file-structure-method-order` enforces Rails source order
    for class members and top-level functions and is autofixable, but it needs

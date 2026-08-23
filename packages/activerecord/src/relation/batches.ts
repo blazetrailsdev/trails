@@ -290,11 +290,11 @@ export class Batches {
 /**
  * @internal
  *
- * @missingRailsCall size — PERMANENT: Per-entry verified (RFC 0072 batching
- *   cluster): Rails batches.rb:306-312 compares `Array(start).size !=
- *   cursor.size`; trails relation/batches.ts spells the same arity check with
- *   `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of
- *   `Array()`/`#size`. Equivalent, not an omission.
+ * @missingRailsCall size — PERMANENT: batches.rb:306-312 compares
+ *   `Array(start).size != cursor.size`. `Array()` here is Ruby's `Kernel#Array`,
+ *   which this file imports as `kernelArray as Array` (line 7) — so the TS reads
+ *   identically and `#size` is its `.length`. The global `Array` is spelled
+ *   `globalThis.Array` everywhere in this file for exactly that reason.
  */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,

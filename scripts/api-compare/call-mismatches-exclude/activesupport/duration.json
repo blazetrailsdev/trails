@@ -2,13 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
-    "rubyName": "initialize",
-    "call": "reject!",
-    "reason": "Ruby `Hash#reject!` prunes the zero-valued entries of `@parts` in place; the TS constructor omits them while building the parts object, so there is no receiver to reject from. Surfaced by the DescendantsTracker `reject!` port making the name resolvable, not by a change in this file."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "duration.ts",
     "rubyName": "iso8601",
     "call": "new",
     "reason": "Rails builds the string via ISO8601Serializer.new(self, precision:) (duration.rb:474); trails inlines the serializer in iso8601 (the `serialize` half of the same call is already baselined above)."

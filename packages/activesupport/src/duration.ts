@@ -104,6 +104,13 @@ export class Duration {
 
   // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
   // (duration.rb:280-287).
+  /**
+   * @missingRailsCall reject! — PERMANENT: Ruby `Hash#reject!` prunes the zero-valued
+   *   entries of `@parts` in place; the TS constructor omits them while building
+   *   the parts object, so there is no receiver to reject from. Surfaced by the
+   *   DescendantsTracker `reject!` port making the name resolvable, not by a
+   *   change in this file.
+   */
   constructor(value: number, parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
     this.value = value;
     this.parts = {

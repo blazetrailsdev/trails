@@ -46,8 +46,8 @@ export {
 
 // The wiring entry points used by `Base.encrypts` are re-exported here
 // so the subpath is the canonical encryption surface.
+export { encrypts } from "./encryptable-record.js";
 export {
-  encrypts,
   applyPendingEncryptions,
   isEncryptedAttribute,
   keyLength,

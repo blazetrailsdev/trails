@@ -4,7 +4,7 @@
     "tsFile": "values/time-zone.ts",
     "rubyName": "at",
     "call": "utc",
-    "reason": "`Time.at(*args).utc` (time_zone.rb:379-381). trails' `at` reaches the same instant through `Time#getutc` (packages/date time.ts:783) — ruby/time's own `utc`/`getutc` pair — because the ported `Time` is immutable and carries no in-place `utc`. Pre-existing: surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was ported and `utc` entered the population."
+    "reason": "`Time.at(*args).utc` (time_zone.rb:379-381). trails' `at` reaches the same instant through `Time#getutc` (packages/date time.ts:783) \u2014 ruby/time's own `utc`/`getutc` pair \u2014 because the ported `Time` is immutable and carries no in-place `utc`. Pre-existing: surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was ported and `utc` entered the population."
   },
   {
     "package": "activesupport",

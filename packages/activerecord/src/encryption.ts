@@ -29,8 +29,8 @@ import {
   ciphertextFor,
   decrypt,
   encrypt,
-  encryptAttribute,
   encryptedAttribute,
+  encrypts,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -63,39 +63,6 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
 interface PendingEncryption {
   name: string;
   scheme: Scheme;
-}
-
-/**
- * Declare one or more attributes as encrypted on a model class.
- *
- * Routes each attribute through the shared `EncryptableRecord.encryptAttribute`
- * (single declaration path, mirroring Rails' single `encrypts`), which builds
- * its scheme with `scheme_for` (encryptable_record.rb:69-76) — the one scheme
- * constructor, as in Rails. A legacy `{ encrypt, decrypt }` encryptor rides the
- * `encryptor:` option and is adapted where `Scheme` reads it.
- *
- * The actual type wrapping is deferred (Rails' `decorate_attributes` /
- * PendingDecorator) — `encryptAttribute` pushes the durable decorator once at
- * declaration time; the wrapped type materializes on `_defaultAttributes`
- * replay and is read through `typeForAttribute`.
- */
-export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): void {
-  let options: EncryptsOptions = {};
-  const names: string[] = [];
-
-  for (const arg of args) {
-    if (typeof arg === "string") {
-      names.push(arg);
-    } else if (arg && typeof arg === "object") {
-      options = arg;
-    }
-  }
-
-  klass.encryptedAttributes ??= new Set<string>();
-
-  for (const name of names) {
-    encryptAttribute.call(klass, name, options);
-  }
 }
 
 /**
@@ -248,7 +215,7 @@ export function resetDefaultContext(): void {
 // up without statically importing this module (which would drag zlib/crypto
 // into browser bundles via the configurable → config → zlib chain).
 registerEncryptionHooks({
-  encrypts,
+  encrypts: (klass: any, ...args: unknown[]) => encrypts.call(klass, ...args),
   applyPendingEncryptions,
   requireOriginalColumnsAfterReflection: (klass: any, columnNames: string[]) =>
     EncryptableRecord.requireOriginalColumnsAfterReflection(klass, columnNames),
