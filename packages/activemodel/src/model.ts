@@ -792,21 +792,26 @@ export class Model {
     options?: ValidationCallbackOptions,
   ) => void;
 
-  // The `ActiveSupport::Callbacks::ClassMethods` half (callbacks.rb:733-820),
-  // which Rails gets from `include ActiveSupport::Callbacks`; mixed on by the
-  // `extend(Model, Callbacks.ClassMethods)` at the bottom of this file and
-  // declared here only for their types. Ruby's `set_callback(name, *filter_list)`
-  // puts the timing, the filter and the trailing options Hash in `filter_list`.
+  /**
+   * Mirrors: ActiveSupport::Callbacks::ClassMethods#set_callback (callbacks.rb:737-749).
+   *
+   * The `ActiveSupport::Callbacks::ClassMethods` half, mixed on by the
+   * `extend(Model, Callbacks.ClassMethods)` at the bottom of this file and
+   * declared here only for its type. Ruby's `set_callback(name, *filter_list)`
+   * puts the timing, the filter and the trailing options Hash in `filter_list`.
+   */
   declare static setCallback: <T extends typeof Model>(
     this: T,
     name: string,
     ...filterList: FilterListEntry<InstanceType<T>>[]
   ) => void;
+  /** Mirrors: ActiveSupport::Callbacks::ClassMethods#skip_callback (callbacks.rb:786-808). */
   declare static skipCallback: <T extends typeof Model>(
     this: T,
     name: string,
     ...filterList: FilterListEntry<InstanceType<T>>[]
   ) => void;
+  /** Mirrors: ActiveSupport::Callbacks::ClassMethods#reset_callbacks (callbacks.rb:811-821). */
   declare static resetCallbacks: (name: string) => void;
 
   private static _ensureOwnValidators(): void {
@@ -1817,8 +1822,12 @@ export class Model {
       .map((m) => this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m)));
   }
 
-  // `run_callbacks` (callbacks.rb:96-104), mixed on by the
-  // `include(Model, Callbacks.InstanceMethods)` at the bottom of this file.
+  /**
+   * Mirrors: ActiveSupport::Callbacks#run_callbacks (callbacks.rb:96-104).
+   *
+   * Mixed on by the `include(Model, Callbacks.InstanceMethods)` at the bottom
+   * of this file; declared here only for its type.
+   */
   declare runCallbacks: (
     name: string,
     block?: () => unknown,
