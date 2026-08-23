@@ -116,7 +116,7 @@
   "packages/activerecord/src/connection-adapters/abstract/connection-pool/queue.trails.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/database-statements.trails.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-creation.trails.test.ts",
-  "packages/activerecord/src/connection-adapters/abstract/schema-definitions.test.ts",
+  "packages/activerecord/src/connection-adapters/abstract/schema-definitions.trails.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-dumper.trails.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-statements-on-adapter.trails.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-statements-privates.trails.test.ts",
