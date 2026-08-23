@@ -478,6 +478,13 @@ export class Association {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFromQueries(this.owner);
+      // `_explicitTarget` has no Rails analog — see `setInverseInstance`. It is
+      // raised here for the same reason, and only where `inversedFromQueries`
+      // actually took the write: an inverse it declined (`inversable?` false)
+      // must keep reading back as unset.
+      if (!inverse.isCollection() && inverse.target === this.owner) {
+        inverse._explicitTarget = true;
+      }
     }
     return record;
   }

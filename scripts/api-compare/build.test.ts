@@ -352,7 +352,7 @@ describe("reconcileFileText", () => {
       new Map(),
       () => "PERMANENT: x",
       undefined,
-      new Set([staleTagKey("bar", "logger")]),
+      new Set([staleTagKey("Foo", "bar", "logger")]),
     );
     expect(r.text!).not.toContain("@missingRailsCall logger");
     expect(r.text!).toContain("@missingRailsCall with_raw_connection — PERMANENT: escapes inline.");
@@ -360,6 +360,37 @@ describe("reconcileFileText", () => {
     expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([
       ["quoteString", "with_raw_connection"],
     ]);
+  });
+
+  it("does not retire a same-named sibling declaration's tag", () => {
+    // Two declarations of one name reachable from a single row-file: the
+    // stale key must name the OWNING class, or retiring `Store#bar` deletes
+    // the top-level `bar`'s reviewed receipt (RFC 0106).
+    const src = [
+      "export class Store {",
+      "  /**",
+      "   * @missingRailsCall logger — PERMANENT: no logger yet.",
+      "   */",
+      "  bar(): void {}",
+      "}",
+      "",
+      "/**",
+      " * @missingRailsCall logger — PERMANENT: reviewed elsewhere.",
+      " */",
+      "export function bar(): void {}",
+    ].join("\n");
+    const r = reconcileFileText(
+      "foo.ts",
+      src,
+      new Map(),
+      () => "PERMANENT: x",
+      undefined,
+      new Set([staleTagKey("Store", "bar", "logger")]),
+    );
+    expect(r.text!).toContain("@missingRailsCall logger — PERMANENT: reviewed elsewhere.");
+    expect(r.text!).not.toContain("@missingRailsCall logger — PERMANENT: no logger yet.");
+    expect(r.harvested.map((h) => [h.tsName, h.entry.call])).toEqual([["bar", "logger"]]);
+    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([["bar", "logger"]]);
   });
 
   it("is idempotent: a second run produces zero edits", () => {

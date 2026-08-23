@@ -1911,7 +1911,13 @@ describe("staleCallTags", () => {
       [callTagKey("relation.ts", "Relation", "load"), new Set(["synchronize"])],
     ]);
     expect(staleCallTags(tags, used)).toEqual([
-      { tsFile: "relation.ts", tsName: "load", call: "reload" },
+      {
+        tsFile: "relation.ts",
+        tsClass: "Relation",
+        tsDeclFile: undefined,
+        tsName: "load",
+        call: "reload",
+      },
     ]);
   });
 
@@ -1943,7 +1949,37 @@ describe("staleCallTags", () => {
     ]);
     const used = new Map([[callTagKey("core.ts", "Core", "load"), new Set<string>()]]);
     expect(staleCallTags(twoFiles, used)).toEqual([
-      { tsFile: "core.ts", tsName: "load", call: "synchronize" },
+      {
+        tsFile: "core.ts",
+        tsClass: "Core",
+        tsDeclFile: undefined,
+        tsName: "load",
+        call: "synchronize",
+      },
+    ]);
+  });
+
+  it("carries the declaring file when the class was split into a subdirectory", () => {
+    const declFiles = new Map([
+      ["cache.ts", new Map([["read", new Map([["Store", "cache/store.ts"]])]])],
+    ]);
+    const split = new Map([
+      [
+        "cache.ts",
+        new Map([
+          ["read", new Map([["Store", new Map([["instrument", "PERMANENT — receipt."]])]])],
+        ]),
+      ],
+    ]);
+    const used = new Map([[callTagKey("cache.ts", "Store", "read"), new Set<string>()]]);
+    expect(staleCallTags(split, used, declFiles)).toEqual([
+      {
+        tsFile: "cache.ts",
+        tsClass: "Store",
+        tsDeclFile: "cache/store.ts",
+        tsName: "read",
+        call: "instrument",
+      },
     ]);
   });
 
@@ -2011,7 +2047,13 @@ describe("staleCallTags", () => {
       [callTagKey("inflector.ts", "Inflector", "safeConstantize"), new Set(["match?"])],
     ]);
     expect(staleCallTags(topLevel, used)).toEqual([
-      { tsFile: "inflector.ts", tsName: "safeConstantize", call: "const_regexp" },
+      {
+        tsFile: "inflector.ts",
+        tsClass: "",
+        tsDeclFile: undefined,
+        tsName: "safeConstantize",
+        call: "const_regexp",
+      },
     ]);
   });
 });

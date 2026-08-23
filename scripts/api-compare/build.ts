@@ -124,6 +124,12 @@ export interface SuppressedCall {
 export interface StaleTag {
   package: string;
   tsFile: string;
+  /** The declaring class (`""` for a top-level function) — see
+   *  compare.ts `StaleCallTag.tsClass`. Absent on an artifact written before
+   *  RFC 0106 keyed staleness by owner. */
+  tsClass?: string;
+  /** See `ArtifactMismatch.tsDeclFile`. */
+  tsDeclFile?: string;
   tsName: string;
   call: string;
 }
@@ -404,11 +410,14 @@ export function collectDeclarations(sf: ts.SourceFile): TaggableDecl[] {
 
 /** Reconcile every named function/method in one source file's text. Returns
  *  the new text (or null if unchanged) plus harvested non-placeholder drops. */
-/** Key for one stale-tag row within a file: the tag sits on a (tsName, call)
- *  site, NOT on the class-qualified expectation key `buildExpectations` builds
- *  — `staleCallTags` records no class. */
-export function staleTagKey(tsName: string, call: string): string {
-  return `${tsName}\u0000${call}`;
+/** Key for one stale-tag row within a declaring file: the class-qualified
+ *  (tsClass, tsName, call) site compare.ts reported it for. The class is what
+ *  keeps two declarations of one name reachable from a single row-file — a
+ *  top-level `foo` beside a `Store#foo` split into a subdirectory module, or
+ *  two classes in one file — from sharing a retirement key and deleting each
+ *  other's reviewed receipts (RFC 0106). */
+export function staleTagKey(tsClass: string, tsName: string, call: string): string {
+  return `${tsClass}\u0000${tsName}\u0000${call}`;
 }
 
 export function reconcileFileText(
@@ -499,7 +508,9 @@ export function reconcileFileText(
       const expected =
         exp?.calls ??
         new Set<string>(
-          entries.filter((e) => !staleTags?.has(staleTagKey(name, e.call))).map((e) => e.call),
+          entries
+            .filter((e) => !staleTags?.has(staleTagKey(owner, name, e.call)))
+            .map((e) => e.call),
         );
       const r = reconcile(
         entries,
@@ -510,7 +521,7 @@ export function reconcileFileText(
       if (!exp) {
         preserved.push(
           ...entries
-            .filter((entry) => !staleTags?.has(staleTagKey(name, entry.call)))
+            .filter((entry) => !staleTags?.has(staleTagKey(owner, name, entry.call)))
             .map((entry) => ({ tsName: name, entry })),
         );
       }
@@ -687,12 +698,18 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const byFile = buildExpectations(artifact, pkg, onlyFile);
-  const staleByFile = new Map<string, Set<string>>();
+  // Grouped by DECLARING file, not by the row's `tsFile`: one row-file can
+  // group several declaring files, and handing each of them the row-file's
+  // whole stale set would retire a tag in a file compare.ts never reported it
+  // for.
+  const staleByDeclFile = new Map<string, Set<string>>();
   for (const t of artifact.staleTags ?? []) {
     if (t.package !== pkg) continue;
     if (onlyFile && t.tsFile !== onlyFile) continue;
-    const set = staleByFile.get(t.tsFile) ?? staleByFile.set(t.tsFile, new Set()).get(t.tsFile)!;
-    set.add(staleTagKey(t.tsName, t.call));
+    const declFile = t.tsDeclFile ?? t.tsFile;
+    const set =
+      staleByDeclFile.get(declFile) ?? staleByDeclFile.set(declFile, new Set()).get(declFile)!;
+    set.add(staleTagKey(t.tsClass ?? "", t.tsName, t.call));
     // A file whose only business this run is a stale tag has no expectation to
     // put it in `byFile`, and would otherwise never be opened.
     if (!byFile.has(t.tsFile)) byFile.set(t.tsFile, new Map());
@@ -729,7 +746,7 @@ async function main(argv: string[]): Promise<number> {
           (rubyName, call) =>
             reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
           onlyCall.size > 0 ? onlyCall : undefined,
-          staleByFile.get(tsFile),
+          staleByDeclFile.get(declFile),
         );
       } catch (err) {
         console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);

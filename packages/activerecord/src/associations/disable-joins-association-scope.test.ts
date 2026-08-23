@@ -208,4 +208,29 @@ describe("DisableJoinsAssociationScope", () => {
     const loaded = await djar;
     expect(loaded.map((p: any) => p.title)).toEqual(["p2", "p1"]);
   });
+
+  it("the id-order regroup is visible through records() and load()", async () => {
+    const post1 = await DjsPost.create({ djs_author_id: 2, title: "p1" });
+    const post2 = await DjsPost.create({ djs_author_id: 2, title: "p2" });
+    const seed = () => {
+      const djar = new DisableJoinsAssociationRelation(DjsPost, "id", [post2.id, post1.id]);
+      (djar as any).whereClause.predicates.push(
+        ...(DjsPost as any).where({ id: [post1.id, post2.id] }).whereClause.predicates,
+      );
+      return djar;
+    };
+
+    const viaRecords = seed();
+    expect((await viaRecords.records()).map((p: any) => p.title)).toEqual(["p2", "p1"]);
+    expect(viaRecords.isLoaded).toBe(true);
+
+    const viaLoad = seed();
+    await viaLoad.load();
+    expect(viaLoad.isLoaded).toBe(true);
+    expect((await viaLoad.records()).map((p: any) => p.title)).toEqual(["p2", "p1"]);
+
+    const viaToArray = seed();
+    expect((await viaToArray).map((p: any) => p.title)).toEqual(["p2", "p1"]);
+    expect(viaToArray.isLoaded).toBe(true);
+  });
 });
