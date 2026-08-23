@@ -2165,5 +2165,5 @@ const invokedAsScript =
   typeof process !== "undefined" &&
   Array.isArray(process.argv) &&
   typeof process.argv[1] === "string" &&
-  process.argv[1].endsWith("extra-surface.ts");
+  path.basename(process.argv[1]) === "extra-surface.ts";
 if (invokedAsScript) void main();

@@ -290,11 +290,11 @@ export class Batches {
 /**
  * @internal
  *
- * @missingRailsCall size — PERMANENT: Per-entry verified (RFC 0072 batching
- *   cluster): Rails batches.rb:306-312 compares `Array(start).size !=
- *   cursor.size`; trails relation/batches.ts spells the same arity check with
- *   `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of
- *   `Array()`/`#size`. Equivalent, not an omission.
+ * @missingRailsCall size — PERMANENT: batches.rb:306-312 compares
+ *   `Array(start).size != cursor.size`. `Array()` here is Ruby's `Kernel#Array`,
+ *   which this file imports as `kernelArray as Array` (line 7) — so the TS reads
+ *   identically and `#size` is its `.length`. The global `Array` is spelled
+ *   `globalThis.Array` everywhere in this file for exactly that reason.
  */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
@@ -466,13 +466,14 @@ export function batchOnLoadedRelation(opts: {
 /**
  * @internal
  *
- * @missingRailsCall slice — PERMANENT: Verified per-site (RFC 0106):
- *   `record.attributes.slice(*cursor).values` (batches.rb:409) — Ruby
- *   `Hash#slice`, whose TS spelling over the attributes object is a `map` of the
- *   cursor names, not a call.
+ * @missingRailsCall slice — PERMANENT: `record.attributes.slice(*cursor).values`
+ *   (batches.rb:408-409) — Ruby `Hash#slice` keeps only the keys it finds and
+ *   `#values` reads them in cursor order, which over a JS object is a `filter`
+ *   by key membership and a `map`, not a call.
  */
 export function recordCursorValues(record: any, cursor: string[]): unknown[] {
-  return cursor.map((column) => record.readAttribute?.(column) ?? record[column]);
+  const attributes = record.attributes;
+  return cursor.filter((column) => column in attributes).map((column) => attributes[column]);
 }
 
 /** @internal */

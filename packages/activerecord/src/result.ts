@@ -220,6 +220,18 @@ export class Result {
     return this;
   }
 
+  /**
+   * @missingRailsCall first — PERMANENT: result.rb:170 `type_overrides.first` indexes an
+   *   Array; the faithful TS is `overridesArray[0]`, an index form with no call
+   *   name (RFC 0092 positional-idiom-analogues).
+   * @missingRailsCall new — PERMANENT: result.rb:186 `Array.new(values.size) { |i| ... }`
+   *   builds a same-length Array from each row; the faithful TS is
+   *   `row.map((value, i) => ...)` — one allocation, same order, no `new`.
+   * @missingRailsCall one? — PERMANENT: result.rb:166 `columns.one?` is a size test on a
+   *   plain Array; the faithful TS is `this.columns.length === 1`, a property
+   *   form with no call name (RFC 0092 positional-idiom-analogues routes these
+   *   to a reason).
+   */
   castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
     const overridesArray = Array.isArray(typeOverrides) ? typeOverrides : null;
 
@@ -295,6 +307,11 @@ function emptyAsync(): Complete {
  * Mirrors: ActiveRecord::Result#column_type (private)
  *
  * @internal
+ *
+ * @missingRailsCall fetch — PERMANENT: Newly comparable (RFC 0072 arity sweep): Rails
+ *   expresses the override/index/name lookup as nested `Hash#fetch` blocks; JS
+ *   objects have no fetch-with-default, so the port uses `in` checks in the same
+ *   order. Equivalent.
  */
 export function columnType(
   result: Result,

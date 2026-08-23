@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
+import { recordCursorValues } from "./relation/batches.js";
 import { Post } from "./test-helpers/models/post.js";
 
 describe("BatchEnumerator (trails)", () => {
@@ -50,5 +51,16 @@ describe("BatchEnumerator (trails)", () => {
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
     );
+  });
+
+  it("recordCursorValues reads the attribute even when it is null", async () => {
+    const post = (await Post.first())!;
+    post.writeAttribute("type", null);
+    // A record carries same-named properties beside its attributes; Rails'
+    // `record.attributes.slice(*cursor).values` (batches.rb:408-409) never
+    // consults them, so a null attribute stays null.
+    Object.defineProperty(post, "unrelated", { value: "from the property" });
+    expect(recordCursorValues(post, ["type"])).toEqual([null]);
+    expect(recordCursorValues(post, ["unrelated"])).toEqual([]);
   });
 });
