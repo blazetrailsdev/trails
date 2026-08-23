@@ -290,57 +290,24 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
 
   /**
    * Mirrors: ActiveRecord::AssociationRelation#exec_queries
-   * (association_relation.rb:43-49) — propagate inverse_of / per-record
-   * strict-loading onto the fetched records. Rails' body
-   * calls `set_inverse_instance_from_queries` and `set_strict_loading`,
-   * propagating the owner's strict-loading mode onto each record.
-   * Without the inverse wiring, a record loaded via
-   * `blog.posts.where(...)` wouldn't cache `post.blog = blog` on the
-   * way back, so accessing the inverse would re-query.
+   * (association_relation.rb:43-49) — `super` with a per-record block that runs
+   * `set_inverse_instance_from_queries` and `set_strict_loading`, both before
+   * `preload_associations` (relation.rb:1413-1414). trails' per-record seam is
+   * `_instantiateBlock`; the previous block is restored afterwards so a later
+   * `reload()` does not re-wrap it.
+   *
+   * `@association` is reached through the owner rather than off
+   * `this._association`, which is the JS-Proxy-wrapped CollectionProxy whose
+   * unknown-property trap raises a strict-loading violation.
    */
   protected override async execQueries(): Promise<T[]> {
-    // Rails' body yields a single per-record block that runs
-    // `set_inverse_instance_from_queries` AND `set_strict_loading`, both BEFORE
-    // `preload_associations` (association_relation.rb:43-49,
-    // relation.rb:1413-1414). We mirror that single block here — trails'
-    // per-record seam is `_instantiateBlock`. Wiring the inverse after the load
-    // would overwrite a nested preload: e.g.
-    // `author.posts.includes(author: :first_posts)` preloads `first_posts` onto
-    // a freshly-loaded author, then a post-load inverse pass would replace
-    // `post.author` with the bare owner, losing the preloaded `first_posts`.
-    //
-    // Resolve the OO association off the owner (NOT `this._association`, which
-    // is the JS-Proxy-wrapped CollectionProxy whose unknown-property trap raises
-    // a strict-loading violation), so both calls land on the same `@association`
-    // Rails names.
-    const association = (
-      this._association.owner as unknown as {
-        association?: (name: string) => {
-          setInverseInstanceFromQueries?: (record: unknown) => unknown;
-          setStrictLoading?: (record: unknown) => unknown;
-        };
-      }
-    ).association?.(this._association.reflection.name);
-    const setInverseInstanceFromQueries =
-      typeof association?.setInverseInstanceFromQueries === "function"
-        ? association.setInverseInstanceFromQueries.bind(association)
-        : null;
-    const setStrictLoading =
-      typeof association?.setStrictLoading === "function"
-        ? association.setStrictLoading.bind(association)
-        : null;
-
-    // Restore the prior block after the load rather than leaving the wrapper in
-    // place: a later `reload()` / repeated load on the same relation must
-    // not re-wrap and re-run the wiring N times.
+    const association = this._association.owner.association(this._association.reflection.name);
     const prevBlock = this._instantiateBlock;
-    if (setInverseInstanceFromQueries || setStrictLoading) {
-      this._instantiateBlock = (record: T): void => {
-        if (prevBlock) prevBlock(record);
-        if (setInverseInstanceFromQueries) setInverseInstanceFromQueries(record);
-        if (setStrictLoading) setStrictLoading(record);
-      };
-    }
+    this._instantiateBlock = (record: T): void => {
+      if (prevBlock) prevBlock(record);
+      association.setInverseInstanceFromQueries(record);
+      association.setStrictLoading(record);
+    };
 
     try {
       return await super.execQueries();

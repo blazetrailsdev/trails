@@ -552,35 +552,35 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
 
   /**
    * Deferred-chain mode is a trails-only arm: the chain walk replaces the
-   * single SELECT Rails' `DisableJoinsAssociationScope` has already
-   * finished by the time it builds the relation, so it stands in for
-   * `exec_queries`' query. Routes through `_walkOnce()` so the walk
-   * (including intermediate plucks) is shared with any earlier `ids()`
-   * call. The chained query state on `this` (wheres / orders / limit /
-   * etc.) composes via `_composeChainedState` so chains like
-   * `DJAS.scope(...).where({title: 'foo'})` actually filter the walker's
-   * result.
+   * single SELECT Rails' `DisableJoinsAssociationScope` has already finished
+   * by the time it builds the relation, so it stands in for `exec_queries`'
+   * query. It routes through `_walkOnce()` so the walk (including intermediate
+   * plucks) is shared with any earlier `ids()` call, and the chained query
+   * state on `this` (wheres / orders / limit / etc.) composes via
+   * `_composeChainedState` so `DJAS.scope(...).where({title: 'foo'})` filters
+   * the walker's result.
+   *
+   * A limit/offset composed onto a walked scope that is ITSELF a loaded-chain
+   * DJAR is applied in memory, after the id-order regroup, because that is
+   * where Rails' `limit` / `first` overrides apply it
+   * (disable_joins_association_relation.rb:13-24); as SQL it would slice the
+   * wrong rows before the regroup. `merged` is a fresh spawn, so clearing the
+   * values on it is local to this load.
    */
   protected override async execQueries(): Promise<T[]> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
-      // A limit/offset chained onto the deferred DJAR composes onto the walked
-      // scope; when that scope is itself a loaded-chain DJAR, Rails applies it
-      // through the `limit` / `first` overrides — in memory, AFTER the id-order
-      // regroup (disable_joins_association_relation.rb:13-24) — not as a SQL
-      // LIMIT that would slice the wrong rows before it. `merged` is a fresh
-      // spawn, so clearing the values on it is local to this load.
       if (merged instanceof DisableJoinsAssociationRelation && !merged._chainWalker) {
-        const window = merged as unknown as {
+        const bounds = merged as unknown as {
           limitValue?: number | null;
           offsetValue?: number | null;
         };
-        const limitVal = window.limitValue ?? null;
-        const offsetVal = window.offsetValue ?? null;
+        const limitVal = bounds.limitValue ?? null;
+        const offsetVal = bounds.offsetValue ?? null;
         if (limitVal !== null || offsetVal !== null) {
-          window.limitValue = null;
-          window.offsetValue = null;
+          bounds.limitValue = null;
+          bounds.offsetValue = null;
           const ordered = (await Relation.prototype.toArray.call(merged)) as T[];
           const start = offsetVal ?? 0;
           return ordered.slice(start, limitVal == null ? undefined : start + limitVal);
@@ -596,11 +596,12 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * (disable_joins_association_relation.rb:26-38) — load, then group the
    * records by `key` and re-emit them in `ids` order, because SQL
    * `IN(...)` does not preserve the id list's order.
+   *
+   * Deferred-chain mode carries no id list of its own — the ordering comes from
+   * the walked scope — so the regroup has nothing to do there.
    */
   override async load(): Promise<LoadedRelation<this>> {
     await super.load();
-    // Deferred-chain mode carries no id list of its own — the ordering
-    // comes from the walked scope — so the regroup has nothing to do.
     if (this._chainWalker) return stripThenable(this);
     const records = this._records;
 
@@ -623,9 +624,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       // computed once at construction, so the reorder avoids re-running
       // JSON.stringify per tuple on every load.
       for (const k of this._storedKeyStrings!) {
+        // A missing bucket is `records.compact!` (:36) — an id with no loaded row.
         const bucket = recordsById.get(k);
-        // `records.compact!` (disable_joins_association_relation.rb:36) —
-        // an id with no loaded row contributes nothing.
         if (bucket) ordered.push(...bucket);
       }
     } else {
