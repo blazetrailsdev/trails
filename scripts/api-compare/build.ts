@@ -613,13 +613,19 @@ export function buildExpectations(
  * baseline reason lives; the declaration can sit elsewhere when trails split a
  * Rails class into a subdirectory module (see `ArtifactMismatch.tsDeclFile`).
  * The row's own file is always a group, so a run whose only business there is a
- * stale tag still opens it.
+ * stale tag still opens it. `extraDeclFiles` groups the declaring files a
+ * stale-tag row names but no expectation reaches — a stale-only tag on a split
+ * declaration would otherwise never have its file opened.
  */
 export function groupByDeclFile(
   tsFile: string,
   expectations: ReadonlyMap<string, MethodExpectation>,
+  extraDeclFiles: Iterable<string> = [],
 ): Map<string, Map<string, MethodExpectation>> {
   const byDecl = new Map<string, Map<string, MethodExpectation>>([[tsFile, new Map()]]);
+  for (const file of extraDeclFiles) {
+    if (!byDecl.has(file)) byDecl.set(file, new Map());
+  }
   for (const [key, exp] of expectations) {
     const file = exp.declFile ?? tsFile;
     const group = byDecl.get(file) ?? byDecl.set(file, new Map()).get(file)!;
@@ -703,6 +709,7 @@ async function main(argv: string[]): Promise<number> {
   // whole stale set would retire a tag in a file compare.ts never reported it
   // for.
   const staleByDeclFile = new Map<string, Set<string>>();
+  const staleDeclFilesByFile = new Map<string, Set<string>>();
   for (const t of artifact.staleTags ?? []) {
     if (t.package !== pkg) continue;
     if (onlyFile && t.tsFile !== onlyFile) continue;
@@ -711,8 +718,13 @@ async function main(argv: string[]): Promise<number> {
       staleByDeclFile.get(declFile) ?? staleByDeclFile.set(declFile, new Set()).get(declFile)!;
     set.add(staleTagKey(t.tsClass ?? "", t.tsName, t.call));
     // A file whose only business this run is a stale tag has no expectation to
-    // put it in `byFile`, and would otherwise never be opened.
+    // put it in `byFile` (nor its declaring file in `groupByDeclFile`), and
+    // would otherwise never be opened.
     if (!byFile.has(t.tsFile)) byFile.set(t.tsFile, new Map());
+    const files =
+      staleDeclFilesByFile.get(t.tsFile) ??
+      staleDeclFilesByFile.set(t.tsFile, new Set()).get(t.tsFile)!;
+    files.add(declFile);
   }
 
   let skipped = 0;
@@ -724,7 +736,9 @@ async function main(argv: string[]): Promise<number> {
   const texts = new Map<string, string>();
   const rewritten = new Set<string>();
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {
-    for (const [declFile, group] of [...groupByDeclFile(tsFile, expectations).entries()].sort()) {
+    for (const [declFile, group] of [
+      ...groupByDeclFile(tsFile, expectations, staleDeclFilesByFile.get(tsFile) ?? []).entries(),
+    ].sort()) {
       const abs = path.join(srcDir, declFile);
       let text = texts.get(abs);
       if (text === undefined) {

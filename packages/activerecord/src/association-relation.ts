@@ -292,9 +292,10 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Mirrors: ActiveRecord::AssociationRelation#exec_queries
    * (association_relation.rb:43-49) — `super` with a per-record block that runs
    * `set_inverse_instance_from_queries` and `set_strict_loading`, both before
-   * `preload_associations` (relation.rb:1413-1414). trails' per-record seam is
-   * `_instantiateBlock`; the previous block is restored afterwards so a later
-   * `reload()` does not re-wrap it.
+   * `preload_associations` (relation.rb:1413-1414) and only then `yield`s to the
+   * caller's block (association_relation.rb:47). trails' per-record seam is
+   * `_instantiateBlock`, so the block already there is that `yield` and runs
+   * last; it is restored afterwards so a later `reload()` does not re-wrap it.
    *
    * `@association` is reached through the owner rather than off
    * `this._association`, which is the JS-Proxy-wrapped CollectionProxy whose
@@ -304,9 +305,9 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const association = this._association.owner.association(this._association.reflection.name);
     const prevBlock = this._instantiateBlock;
     this._instantiateBlock = (record: T): void => {
-      if (prevBlock) prevBlock(record);
       association.setInverseInstanceFromQueries(record);
       association.setStrictLoading(record);
+      if (prevBlock) prevBlock(record);
     };
 
     try {

@@ -674,6 +674,16 @@ describe("buildExpectations / groupByDeclFile for a class split into a subdirect
   it("always groups the row's own file, so a stale-tag-only run still opens it", () => {
     expect([...groupByDeclFile("cache.ts", new Map()).keys()]).toEqual(["cache.ts"]);
   });
+
+  it("groups a declaring file named only by a stale tag, so its file is opened too", () => {
+    // A stale-only run over a split declaration: no expectation reaches
+    // `cache/store.ts`, so without the extra group the tag's own file is never
+    // read and the stale tag survives.
+    expect([...groupByDeclFile("cache.ts", new Map(), ["cache/store.ts"]).keys()].sort()).toEqual([
+      "cache.ts",
+      "cache/store.ts",
+    ]);
+  });
 });
 
 describe("reconcileFileText with two Ruby names on one TS method", () => {
