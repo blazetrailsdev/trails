@@ -1767,6 +1767,9 @@ export function internalExecute(
  * query_transformers, is `internal_execute`'s step
  * (abstract/database_statements.rb:589-591).
  *
+ * The positional arguments below are `raw_execute`'s own defaults
+ * (abstract/database_statements.rb:552).
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#execute_batch
  * (abstract/database_statements.rb:594-598)
  * @internal
@@ -1781,8 +1784,6 @@ export async function executeBatch(
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   for (const statement of statements) {
-    // The positional defaults here are `raw_execute`'s own
-    // (abstract/database_statements.rb:552).
     await (this as any).rawExecute(
       statement,
       name,

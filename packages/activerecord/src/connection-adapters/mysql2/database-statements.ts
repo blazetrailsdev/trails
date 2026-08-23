@@ -166,6 +166,20 @@ export async function selectAll(
   return this.internalExecQuery(sql, name, binds);
 }
 
+/** @internal */
+interface ExecuteBatchHost extends MaxAllowedPacketHost {
+  rawExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    prepare?: boolean,
+    async?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+    batch?: boolean,
+  ): Promise<unknown>;
+}
+
 /**
  * Combines statements via `combineMultiStatements` then hands each combined
  * block to `raw_execute` with `batch: true`.
@@ -176,23 +190,15 @@ export async function selectAll(
  * (abstract/database_statements.rb:589-591) — so the `_inQueryTransformers`
  * suppression flag this used to need is gone with it.
  *
+ * The positional arguments below are `raw_execute`'s own defaults
+ * (abstract/database_statements.rb:552).
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch
  * (mysql2/database_statements.rb:17-21)
  * @internal
  */
 export async function executeBatch(
-  this: MaxAllowedPacketHost & {
-    rawExecute(
-      sql: string,
-      name?: string | null,
-      binds?: unknown[],
-      prepare?: boolean,
-      async?: boolean,
-      allowRetry?: boolean,
-      materializeTransactions?: boolean,
-      batch?: boolean,
-    ): Promise<unknown>;
-  },
+  this: ExecuteBatchHost,
   statements: string[],
   name: string | null = null,
   {
@@ -201,8 +207,6 @@ export async function executeBatch(
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   for (const statement of await combineMultiStatements.call(this, statements)) {
-    // The positional defaults here are `raw_execute`'s own
-    // (abstract/database_statements.rb:552).
     await this.rawExecute(
       statement,
       name,
