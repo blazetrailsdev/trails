@@ -1,7 +1,12 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
-import { Attribute, AttributeSetBuilder, YAMLEncoder, type Type } from "@blazetrails/activemodel";
+import {
+  AttributeSet,
+  AttributeSetBuilder,
+  YAMLEncoder,
+  type Type,
+} from "@blazetrails/activemodel";
 import {
   isBaseClass,
   baseClass,
@@ -558,7 +563,7 @@ export interface SchemaHost {
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
   _attributeDefinitions: Map<string, any>;
-  _defaultAttributes(): { deepDup(): { toHash(): Record<string, unknown> } };
+  _defaultAttributes(): AttributeSet;
   _columnsHash?: Record<string, unknown>;
   _columns?: any[];
   _returningColumnsForInsertCache?: string[];
@@ -700,27 +705,23 @@ export function nextSequenceValue(this: SchemaHost): number | null {
 }
 
 /**
- * Rails: builds an AttributeSet::Builder with defaults from attribute
- * definitions, excluding PK columns from defaults.
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#attributes_builder
+ * (model_schema.rb:420-424):
+ *
+ *   @attributes_builder ||= begin
+ *     defaults = _default_attributes.except(*(column_names - [primary_key]))
+ *     ActiveModel::AttributeSet::Builder.new(attribute_types, defaults)
+ *   end
  */
 export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
   const ownBuilder = ownSchemaMemo(this, "_attributesBuilder");
   if (ownBuilder) return ownBuilder;
 
-  const pk = this.primaryKey;
-  const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
-  const attributeTypes = new Map<string, any>();
-  const defaults = new Map<string, Attribute>();
-  for (const [name, def] of this._attributeDefinitions) {
-    const type = def.type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
-    attributeTypes.set(name, type);
-    if (!pkSet.has(name) && def.defaultValue !== undefined) {
-      const val = typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-      defaults.set(name, Attribute.withCastValue(name, val, type));
-    }
-  }
-
-  const builder = new AttributeSetBuilder(attributeTypes, defaults);
+  const primaryKey = this.primaryKey;
+  const defaults = this._defaultAttributes().except(
+    ...columnNames.call(this as unknown as typeof Base).filter((name) => name !== primaryKey),
+  );
+  const builder = new AttributeSetBuilder(new Map(Object.entries(this.attributeTypes())), defaults);
   this._attributesBuilder = builder;
   return builder;
 }
@@ -990,6 +991,11 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
   const reflected = loadSchemaFromCacheSync(this);
   if (reflected) {
     this._schemaLoaded = true;
+    // `_default_attributes # Precompute to cache DB-dependent attribute types`
+    // (model_schema.rb:596). It runs after `_schemaLoaded` is stamped, not
+    // before: the flag is trails' marker that `@columns_hash` is settled, and
+    // `_defaultAttributes` re-enters `columnsHash()` while it is unset.
+    this._defaultAttributes();
     defineAttributeMethodsAfterLoad(this);
     return;
   }
@@ -1038,6 +1044,7 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
   }
   if (!pkStillMissing) {
     this._schemaLoaded = true;
+    this._defaultAttributes();
     defineAttributeMethodsAfterLoad(this);
   }
 }
@@ -1075,12 +1082,13 @@ function getColumnsHash(host: SchemaHost): Record<string, unknown> {
 }
 
 /**
- * `load_schema!`'s body (model_schema.rb:587-597): stash the reflected
- * `columns_hash` minus `ignored_columns`, then precompute `_default_attributes`
- * so the DB-dependent attribute types are cached. Nothing is registered against
- * a class-level attribute registry — a column lives in `columns_hash` and a
- * user declaration in the pending-modification queue, and the two only ever
- * meet inside `_default_attributes` (attributes.rb:241-252).
+ * `load_schema!`'s `@columns_hash = columns_hash.except(*ignored_columns)`
+ * (model_schema.rb:592-594); the `_default_attributes` precompute that follows
+ * it (:596) is in `loadSchemaBangAnchor`, which owns both arms of the load.
+ * Nothing is registered against a class-level attribute registry — a column
+ * lives in `columns_hash` and a user declaration in the pending-modification
+ * queue, and the two only ever meet inside `_default_attributes`
+ * (attributes.rb:241-252).
  *
  * `host` is always the class the load was triggered on: every class reflects
  * its OWN `table_name` (model_schema.rb:587-597).
@@ -1315,6 +1323,12 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
 export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
   const host = this;
   if (ownSchemaMemo(host, "_virtualAttributesReconciled")) return;
+  // The registry holds user `attribute()` declarations only, so a class that
+  // declared none has nothing to classify. Bail before resolving a connection:
+  // `reflect: true` (the write path) otherwise reaches `reflectionAdapter`'s
+  // `leaseConnectionSync`, which is a permanent checkout on every save of a
+  // purely schema-backed model.
+  if (host._attributeDefinitions.size === 0) return;
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
