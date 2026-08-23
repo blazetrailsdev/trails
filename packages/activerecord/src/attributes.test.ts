@@ -578,7 +578,7 @@ describe("DefineAttributeTest", () => {
     }
     expect(Post._defaultAttributes().getAttribute("score")).toBeInstanceOf(UserProvidedDefault);
     // Ruby `_default_attributes.fetch(name.to_s) { nil }` — no prior attribute.
-    expect((Post._defaultAttributes().getAttribute("score") as any).originalAttribute).toBeNull();
+    expect(Post._defaultAttributes().getAttribute("score").getOriginalAttribute()).toBeNull();
   });
 
   it("define_attribute writes into the memoized _defaultAttributes", () => {
