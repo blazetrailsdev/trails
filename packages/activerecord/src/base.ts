@@ -4898,11 +4898,8 @@ prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMeth
 // initialize callbacks and resets the new-record state, then `super` unwinds
 // through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
 // (timestamp.rb:50-53), whose clears therefore run AFTER the callbacks have seen
-// the source's `lock_version` / timestamps. Wired in base.rb include order, so
-// Associations (associations.rb:69, base.rb:317) empties the association cache
-// first and Inheritance (inheritance.rb:343, base.rb:303) re-asserts the STI
-// type column last, after Core has fired the initialize callbacks.
-// Aggregations' link (aggregations.rb:6)
+// the source's `lock_version` / timestamps, and above/below them Associations
+// (base.rb:317) and Inheritance (base.rb:303). Aggregations' link (aggregations.rb:6)
 // is prepended above these by `includeAggregations` on composed_of models only.
 // `dup` (persistence.ts) enters the chain once the duped attributes and dirty
 // baseline are in place.

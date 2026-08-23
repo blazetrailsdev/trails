@@ -76,12 +76,14 @@ describe("descends_from_active_record? on a cold model", () => {
   });
 });
 
+/**
+ * `Inheritance#initialize_dup` (inheritance.rb:343-346) calls `super` and then
+ * `ensure_proper_type`, so the copy's inheritance column is written from the
+ * class rather than merely inherited from the deep-dup'd attributes.
+ */
 describe("initialize_dup ensure_proper_type", () => {
   fixtures(["companies"]);
 
-  // inheritance.rb:343-346 — `Inheritance#initialize_dup` calls `super` and then
-  // `ensure_proper_type`, so the copy's type column is (re)written from the
-  // class rather than merely inherited from the deep-dup'd attributes.
   it("rewrites the inheritance column on the copy", async () => {
     const client = await Client.create({ name: "Acme" });
     client.writeAttribute("type", "Company");

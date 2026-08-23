@@ -449,6 +449,12 @@ export class Model {
    * The key check runs only under `args.all?(Symbol)` — a block validator may carry
    * validator-ish keys. An unknown method name is a `send`-dispatched callback
    * filter, so it raises `NoMethodError` at validation time, not registration time.
+   *
+   * `on:` merges into `:if` (validations.rb:170-172) and `except_on:` into
+   * `:unless` as an intersection of `Array(except_on)` with
+   * `Array(o.validation_context)` (:174-182), so a nil context never intersects
+   * and the validator still runs; the result goes straight to `set_callback`
+   * (:184).
    */
   static validate<T extends ValidatableRecord = ValidatableRecord>(
     methodOrFn: string | ((record: T) => unknown),
@@ -484,7 +490,6 @@ export class Model {
         `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
       );
     };
-    // validations.rb:170-172 — `options.merge(if: [predicate_for_validation_context(options[:on]), *options[:if]])`.
     let ifConds = kernelArray(options.if as CallbackConditions["if"]);
     let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
 
@@ -493,9 +498,6 @@ export class Model {
       ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
     }
 
-    // validations.rb:174-182 — an `unless:` intersecting `Array(except_on)` with
-    // `Array(o.validation_context)`, so a nil context never intersects and the
-    // validator still runs.
     if (options.exceptOn !== undefined) {
       const exceptOn = kernelArray(options.exceptOn);
       unlessConds = [
@@ -509,7 +511,6 @@ export class Model {
       ];
     }
 
-    // validations.rb:184 — `set_callback(:validate, *args, options, &block)`.
     _registerCallbackOnProto(this.prototype, "before", "validate", fn, {
       ...(ifConds.length > 0 ? { if: ifConds } : {}),
       ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
@@ -522,8 +523,10 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations.validates_each —
    * `validates_with BlockValidator, _merge_attributes(attr_names), &block`
-   * (activemodel/lib/active_model/validations.rb:161). `_merge_attributes`
+   * (activemodel/lib/active_model/validations.rb:190-192). `_merge_attributes`
    * flattens, so a nested `[:title, :content]` contributes its members again.
+   * `validates_with` registers through `validate(validator, options)`
+   * (with.rb:103), which is where the `on:` / `except_on:` merge happens.
    */
   static validatesEach<T extends ValidatableRecord = ValidatableRecord>(
     attrNames: Array<string | string[]>,
@@ -535,8 +538,6 @@ export class Model {
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
     );
     this._registerValidator(validator);
-    // validations.rb:190-192 forwards to `validates_with`, whose `validate(validator,
-    // options)` (with.rb:103) is where the `on:` / `except_on:` merge happens.
     this.validate((record: ValidatableRecord) => validator.validate(record), options);
   }
 
@@ -544,7 +545,9 @@ export class Model {
    * Validates using a custom validator class instance.
    * The validator must implement validate(record).
    *
-   * Mirrors: ActiveModel::Validations.validates_with
+   * Mirrors: ActiveModel::Validations.validates_with (with.rb:88-105), whose
+   * per-class `validate(validator, options)` (with.rb:103) is what applies the
+   * `on:` / `except_on:` merge.
    */
   static validatesWith(
     ...args: Array<
@@ -648,8 +651,6 @@ export class Model {
         callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
       }
 
-      // with.rb:103 — `validate(validator, options)`; the `on:` / `except_on:`
-      // merge lives in `validate`.
       this.validate(callbackFn as (record: ValidatableRecord) => unknown, {
         if: ifOpt,
         unless: unlessOpt,
