@@ -26,10 +26,13 @@ export interface ReplacePlan {
   originalTarget: Base[];
   wasLoaded: boolean;
   /**
-   * The new-owner arm's own DB work, when it had any. That arm is I/O-free —
-   * a new owner's `concat` never inserts and `remove_records` skips
-   * `delete_records` — except when the records being REMOVED are persisted,
-   * which Rails deletes in a transaction (`delete_or_destroy`, :393-397).
+   * The DB work `replace` has already started and cannot await: on the
+   * persisted arm the `transaction { replace_records(...) }` it opened
+   * (collection_association.rb:251), and on the new-owner arm that arm's own
+   * work when it had any — it is I/O-free (a new owner's `concat` never
+   * inserts and `remove_records` skips `delete_records`) except when the
+   * records being REMOVED are persisted, which Rails deletes in a transaction
+   * (`delete_or_destroy`, :393-397).
    */
   pending?: Promise<unknown>;
 }
@@ -141,7 +144,7 @@ export class CollectionAssociation extends Association {
    */
   async writer(records: Base[]): Promise<void> {
     const plan = this.replace(records);
-    if (plan) await this.persistReplacePlan(plan);
+    if (plan?.pending) await plan.pending;
   }
 
   /**
@@ -338,7 +341,7 @@ export class CollectionAssociation extends Association {
       // persisted-owner half to the plan the sync `replace` returns (the
       // awaitable `writer` does the same two steps).
       const plan = this.replace(records);
-      if (plan) await this.persistReplacePlan(plan);
+      if (plan?.pending) await plan.pending;
     }
   }
 
@@ -709,11 +712,13 @@ export class CollectionAssociation extends Association {
    * first `save()` autosaves the target.
    *
    * For a *persisted* owner Rails additionally runs the diffed deletes +
-   * inserts in a transaction; that DB work cannot happen here (this is
-   * synchronous, and reached from the property setter), so it is returned as a
-   * plan for the awaitable {@link writer} to execute via
-   * {@link persistReplacePlan}. Returns `null` when there is nothing to
-   * persist.
+   * inserts in a transaction (`transaction { replace_records(...) }`,
+   * collection_association.rb:251) — opened here, on Rails' arm and under
+   * Rails' `other_array != original_target` guard. The DB work inside it
+   * cannot be awaited here (this is synchronous, and reached from mass
+   * assignment), so the open transaction's promise rides out on the returned
+   * plan for the awaitable {@link writer} to await. Returns `null` when there
+   * is nothing to persist.
    */
   replace(otherArray: Base[]): ReplacePlan | null {
     // The writer path (`firm.clients = [...]`, `firm.client_ids = [...]`, mass
@@ -746,7 +751,7 @@ export class CollectionAssociation extends Association {
       }
     } else {
       // Persisted owner: `load_target` here is DB I/O this synchronous body
-      // cannot run, so the in-memory baseline stands in and `persistReplacePlan`
+      // cannot run, so the in-memory baseline stands in and `replaceRecordsInTransaction`
       // re-reads the real `original_target` before diffing. Rails also calls
       // replace_common_records_in_memory before diffing; for a new owner it
       // skips it (replace_records leaves common records untouched), so it lives
@@ -761,36 +766,34 @@ export class CollectionAssociation extends Association {
         for (const r of this.difference(otherArray, this.target)) {
           this.setOwnerAttributes(r);
           // `skipCallbacks` because this add is only the in-memory placeholder
-          // for the deferred `replace_records`: `persistReplacePlan` restores
+          // for the deferred `replace_records`: `replaceRecordsInTransaction` restores
           // `originalTarget` and re-runs the Rails body, whose `concat` fires
           // `before_add`/`after_add` for real. Firing them here too would
           // double them for every gained record.
           this.addToTarget(r, { skipCallbacks: true });
         }
         this.loadedBang();
-        return { newTarget: [...otherArray], originalTarget, wasLoaded };
+        const plan: ReplacePlan = { newTarget: [...otherArray], originalTarget, wasLoaded };
+        plan.pending = this.transaction(() => this.replaceRecordsInTransaction(plan));
+        return plan;
       }
     }
     return null;
   }
 
   /**
-   * Run the persisted-owner half of {@link replace}: the diffed deletes +
-   * inserts, in a transaction (Rails' `replace_records`,
-   * collection_association.rb:242). Awaited inline by {@link writer} — the
-   * in-memory `replace` above has already mutated `target`, so this restores
-   * the captured baseline for the duration of the diff.
+   * The body of the transaction {@link replace} opens on Rails' persisted-owner
+   * arm: `replace_records(other_array, original_target)`
+   * (collection_association.rb:251), against the baseline captured before the
+   * in-memory half of `replace` mutated `target`.
    *
-   * @noRailsEquivalent CONVERGEABLE — the awaitable half of `replace`
-   * (collection_association.rb:242), split off because a JS property setter
-   * cannot await (RFC 0068). Public rather than protected because
-   * `CollectionProxy#replace` (collection_proxy.rb:391-393) delegates here from
-   * outside the class, spelling the same two steps `writer`
-   * (collection_association.rb:46-48) does; it retires with the split.
+   * Rails inlines this as the transaction's block; it is a named private
+   * helper here only because the block is async while `replace` is not (a JS
+   * property setter cannot await, RFC 0068). It retires with that split.
+   *
+   * @internal
    */
-  async persistReplacePlan(pending: ReplacePlan): Promise<void> {
-    if (pending.pending) await pending.pending;
-    if (this.owner.isNewRecord()) return;
+  protected async replaceRecordsInTransaction(pending: ReplacePlan): Promise<void> {
     // If the association wasn't loaded at assignment time, fetch the persisted
     // baseline directly rather than via findTarget, to avoid the loadedBang short-circuit
     // and without mutating this.target (mirrors Rails' load_target in replace).
@@ -803,16 +806,14 @@ export class CollectionAssociation extends Association {
       pending.originalTarget = [...dbRecords];
     }
     const currentTarget = this.target;
-    await this.transaction(async () => {
-      // replaceRecords diffs against assoc.target; restore originalTarget so
-      // it sees the real DB state rather than the already-updated in-memory target
-      this._targetStore = [...pending.originalTarget];
-      try {
-        await replaceRecords(this, pending.newTarget, pending.originalTarget);
-      } finally {
-        this._targetStore = currentTarget;
-      }
-    });
+    // replaceRecords diffs against assoc.target; restore originalTarget so
+    // it sees the real DB state rather than the already-updated in-memory target
+    this._targetStore = [...pending.originalTarget];
+    try {
+      await replaceRecords(this, pending.newTarget, pending.originalTarget);
+    } finally {
+      this._targetStore = currentTarget;
+    }
   }
 
   /**
@@ -1596,7 +1597,7 @@ export function includesRecord(records: Base[], record: Base): boolean {
  * (collection_association.rb:414-424).
  *
  * `Promise<Base[]> | Base[]` because both arms of `replace` reach it: the
- * persisted one from the awaitable {@link CollectionAssociation.persistReplacePlan},
+ * persisted one from the awaitable {@link CollectionAssociation.replaceRecordsInTransaction},
  * the new-owner one from the synchronous `replace` body, where `delete` and
  * `concat` are I/O-free and this runs inline start to finish.
  *
