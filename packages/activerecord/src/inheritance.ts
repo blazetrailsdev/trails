@@ -162,6 +162,9 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  */
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
+  // Rails' first arm, `if self == Base` → false, returns before the column
+  // test — Base has no table, so asking it for `columns_hash` raises.
+  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
   const columnsHash = modelClass.columnsHash();
   const inheritCol = modelClass.inheritanceColumn;
