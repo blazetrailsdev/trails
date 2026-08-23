@@ -429,16 +429,10 @@ export function change(date: Date, options: ChangeOptions): Temporal.Instant;
 /**
  * A `::Time` receiver answers a `::Time`, as `change` does in Ruby, and takes
  * the same four terminal arms the Ruby body does — `:offset`, `utc?`, `zone`
- * and the trailing `utc_offset` one.
- *
- * The third arm, `elsif zone.respond_to?(:utc_to_local)`
- * (time/calculations.rb:148-171), is unreachable here: it selects a receiver
- * whose `zone` is a `TZInfo` zone OBJECT, and `@blazetrails/date`'s `Time#zone`
- * answers the tzdata abbreviation String and nothing else
- * (`packages/date/src/time.ts`, `Time#zone`), so `respond_to?(:utc_to_local)`
- * is false for every trails `::Time`. Its second-occurrence correction is not
- * lost with it — `::Time.local`'s own `isdst` argument makes the same choice on
- * the `elsif zone` arm below.
+ * and the trailing `utc_offset` one. The `zone.respond_to?(:utc_to_local)` arm
+ * (time/calculations.rb:148-171) selects a receiver whose `zone` is a `TZInfo`
+ * zone OBJECT, which no trails `::Time` is; its second-occurrence correction is
+ * not lost with it, because `::Time.local`'s `isdst` makes the same choice.
  */
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
@@ -515,10 +509,8 @@ export function change(
     1_000_000_000n,
   );
 
-  // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag, set
-  // by `Time.utc`; a `Temporal.ZonedDateTime` answers it by its zone; a JS
-  // `Date` carries no such flag and reads back in the system zone, so it stays
-  // off that arm even under `TZ=UTC`.
+  // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag; a
+  // JS `Date` carries none and is never `utc?`, even under `TZ=UTC`.
   const isUtc =
     date instanceof RubyTime
       ? date.isUtc()
@@ -526,10 +518,8 @@ export function change(
         ? false
         : date.timeZoneId === "UTC";
 
-  // `zone` (time/calculations.rb:149, :172) — a `::Time`'s tzdata abbreviation,
-  // `nil` when it was built from an offset. A JS `Date` carries only the
-  // system's local zone; a `Temporal.ZonedDateTime` is the receiver Rails reads
-  // through `utc_to_local`, the arm between the two.
+  // `zone` (time/calculations.rb:172) — a `::Time`'s tzdata abbreviation, `nil`
+  // when it was built from an offset; a JS `Date`'s is the system's.
   const zone =
     date instanceof RubyTime ? date.zone : date instanceof Date ? Temporal.Now.timeZoneId() : null;
 
@@ -556,10 +546,8 @@ export function change(
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
-  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:148-171).
-  // Only a `Temporal.ZonedDateTime` reaches it: `@blazetrails/date`'s
-  // `Time#zone` answers the tzdata abbreviation String and nothing else, so
-  // `respond_to?(:utc_to_local)` is false for every trails `::Time`.
+  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:148-171) —
+  // only a `Temporal.ZonedDateTime` carries a zone object to reach it.
   if (date instanceof Temporal.ZonedDateTime) {
     let newTime = Temporal.ZonedDateTime.from(
       { timeZone: date.timeZoneId, ...newComponents },
@@ -599,10 +587,8 @@ export function change(
 
   if (zone !== null) {
     // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
-    // reversed component order, with the receiver's `isdst` picking the
-    // occurrence of a wall clock a DST fall-back repeats. A JS `Date` has no
-    // `isdst` flag of its own to hand over, and carries milliseconds and
-    // nothing finer, so the answer is read back at its own resolution.
+    // reversed component order, `isdst` picking the occurrence of a wall clock a
+    // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
     const newTime = RubyTime.local(
       newSecRational,
       newMin,

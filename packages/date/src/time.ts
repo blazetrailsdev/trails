@@ -723,13 +723,11 @@ export class Time {
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? nowTimeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
-    // A wall clock a DST fall-back repeats names two instants, and MRI's
-    // `find_time_t` (`time.c`) settles on the STANDARD-time one when `isdst` is
-    // `nil`: under `TZ=America/New_York`, `Time.local(2005, 10, 30, 1, 0, 0)` is
-    // `-0500` and its `isdst` is false. `Temporal`'s default `"compatible"`
-    // picks the earlier occurrence instead, so the later one is asked for by
-    // name. For the "spring forward" gap the two agree — MRI rolls
-    // `2005-04-03 02:30` forward to `03:30 -0400`, and so does `"later"`.
+    // MRI's `find_time_t` (`time.c`) settles a wall clock a DST fall-back
+    // repeats on the STANDARD-time occurrence when `isdst` is `nil`:
+    // `TZ=America/New_York Time.local(2005, 10, 30, 1, 0, 0)` is `-0500`, where
+    // `Temporal`'s default `"compatible"` picks the earlier one. For the
+    // "spring forward" gap the two agree.
     const disambiguation = { disambiguation: "later" } as const;
     this.#utcOffsetMemo =
       typeof utcOffset === "number"
@@ -827,12 +825,10 @@ export class Time {
 
   /**
    * Ruby `Time#isdst` (`ruby/time.c` `time_isdst`), true when the receiver's
-   * zone is observing daylight saving. A time built from an offset rather than
-   * a zone has no zone to ask, and MRI answers `false` — `Time.new(2008, 7, 1,
-   * 0, 0, 0, "-04:00").isdst` is false where the same instant in
-   * `America/New_York` is true. The standard offset is the smaller of the
-   * zone's January and July offsets, the same reading {@link zone} takes for
-   * its abbreviation, so a negative-DST zone falls out the same way.
+   * zone is observing daylight saving. A time built from an offset has no zone
+   * to ask and MRI answers `false`. The standard offset is the smaller of the
+   * zone's January and July offsets, the reading {@link zone} takes for its
+   * abbreviation, so a negative-DST zone falls out the same way.
    */
   get isdst(): boolean {
     if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
