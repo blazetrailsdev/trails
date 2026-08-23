@@ -17,8 +17,6 @@ async function readSource(path: string): Promise<string> {
 }
 
 function stripComments(source: string): string {
-  // Line-based on purpose: a `/* ... */` sweep would swallow the config's
-  // glob strings ("packages/*/dx-tests/**") along with the code between them.
   return source
     .split("\n")
     .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))

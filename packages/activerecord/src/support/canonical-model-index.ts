@@ -1,13 +1,6 @@
 import { Base } from "../base.js";
 import { _setCanonicalModelAutoloadIndex } from "../associations.js";
 import { qualifiedName } from "../inheritance.js";
-// The canonical models barrel eagerly evaluates encrypted models
-// (`EncryptedTrafficLight.encrypts(...)`, `EncryptedPost`'s eager key provider,
-// etc.) at module load, which requires the encryption namespace to be
-// registered AND a key config present. This side-effect import registers +
-// configures the standard test keys, and MUST precede the barrel import — it
-// lives in its own module because ESM hoists sibling `import`s ahead of any
-// top-level statement, so an inline config call would run too late.
 import "./canonical-model-index-encryption-setup.js";
 import * as canonicalModels from "../test-helpers/models/index.js";
 

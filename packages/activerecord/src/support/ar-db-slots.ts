@@ -31,8 +31,6 @@
 import { getOs } from "@blazetrails/activesupport";
 import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 
-// Spare slots beyond the worker count. One is enough to cover a single
-// recycle overlap; two leaves margin for back-to-back recycles.
 const SLOT_HEADROOM = 2;
 
 export { DEFAULT_FORKS };

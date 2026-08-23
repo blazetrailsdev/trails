@@ -2,15 +2,11 @@ import { describe, expect, it } from "vitest";
 import { adapterType } from "../test-adapter.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "./supports.js";
 
-// Same lane-gated probe supports.ts itself uses — avoids a MySQL connection
-// attempt on the pg/sqlite lanes.
 const mysqlProbe =
   adapterType === "mysql"
     ? await import("./mysql-server-version.js")
     : { supportsExpressionIndex: false, supportsJson: false };
 
-// Assertions are computed from `adapterType` so they hold on every CI lane
-// (sqlite / postgres / mysql:8), not just the default sqlite run.
 describe("adapterSupports", () => {
   it("is true for capabilities available on every backend", () => {
     expect(adapterSupports("savepoints")).toBe(true);
@@ -20,16 +16,11 @@ describe("adapterSupports", () => {
   it("reflects the active adapter for backend-specific capabilities", () => {
     expect(adapterSupports("comments")).toBe(adapterType !== "sqlite");
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
-    // json: `!mariadb? && >= 5.7.8` — true off the mysql lane, live-probed on it.
     expect(adapterSupports("json")).toBe(adapterType !== "mysql" || mysqlProbe.supportsJson);
-    // expression_index: PG + SQLite always; the MySQL family follows the live
-    // server (MySQL ≥ 8.0.13 true, MariaDB false) via the mysql test-helper probe.
     expect(adapterSupports("expression_index")).toBe(
       adapterType !== "mysql" || mysqlProbe.supportsExpressionIndex,
     );
-    // advisory_locks: PG + MySQL, not SQLite (mirrors the old skipIf(=== sqlite)).
     expect(adapterSupports("advisory_locks")).toBe(adapterType !== "sqlite");
-    // exclusion/unique constraints: PG only (mirrors skipIf(!== postgres)).
     expect(adapterSupports("exclusion_constraints")).toBe(adapterType === "postgres");
     expect(adapterSupports("unique_constraints")).toBe(adapterType === "postgres");
   });
@@ -39,12 +30,9 @@ describe("adapterSupports", () => {
   });
 
   it("treats a comma-joined key as a conjunction (all features must hold)", () => {
-    // insert_on_duplicate_update is supported everywhere; insert_conflict_target
-    // is the binding constraint (not on mysql), so the conjunction tracks it.
     expect(adapterSupports("insert_conflict_target,insert_on_duplicate_update")).toBe(
       adapterType !== "mysql",
     );
-    // exclusion_constraints is postgres-only → conjunction false off postgres.
     expect(adapterSupports("json,exclusion_constraints")).toBe(adapterType === "postgres");
   });
 
@@ -53,9 +41,6 @@ describe("adapterSupports", () => {
   });
 });
 
-// Smoke: the gate wrappers register without throwing and skip when unsupported.
-// `comments` is unsupported on the sqlite lane (suite skipped there); on
-// PG/MySQL these execute as real assertions.
 describeIfSupports("comments", "comments-gated suite", () => {
   it("runs only where comments are supported", () => {
     expect(adapterSupports("comments")).toBe(true);

@@ -144,9 +144,6 @@ export interface ServerSettings {
  */
 export const SLOT_ENV = "AR_DB_SLOT";
 
-// A malformed slot must never silently degrade to the shared base database —
-// that is precisely the cross-worker collision slots exist to prevent, and it
-// would surface later as an unrelated DDL or fixture failure.
 function slotNumber(read: EnvReader): number {
   const slot = intSetting(read, SLOT_ENV, 1);
   if (slot < 1) {
@@ -159,9 +156,6 @@ function slotNumber(read: EnvReader): number {
 function applySlot(database: string, read: EnvReader): string {
   const slot = slotNumber(read);
   const runToken = present(read, RUN_TOKEN_ENV);
-  // No run token means `globalSetup` provisioned nothing — a bare adapter
-  // script or a harness-less connection. There is no per-run database to point
-  // at, so the historical shared-base-plus-`_N` naming stands.
   if (runToken === undefined) return slot > 1 ? `${database}_${slot}` : database;
   return slotDatabaseName(database, runToken, slot);
 }
@@ -373,7 +367,6 @@ export function settingsUrl(scheme: "postgres" | "mysql", settings: ServerSettin
   const auth = credentials(settings);
 
   if (scheme === "postgres") {
-    // libpq treats a leading "/" in PGHOST as a socket directory, not a host.
     if (host.startsWith("/")) {
       const params = new URLSearchParams({ host, port: String(port) });
       return `postgres://${auth}/${database}?${params.toString()}`;

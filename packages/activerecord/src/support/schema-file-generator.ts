@@ -52,18 +52,12 @@ function foreignKeysOf(t: TableSchema): ForeignKeySpec[] {
   return isWrapped(t) ? ((t as { foreignKeys?: ForeignKeySpec[] }).foreignKeys ?? []) : [];
 }
 
-// `integer` and `big_integer` both map to an auto-increment serial/identity PK
-// when declared `primaryKey: ["col"]`. Keep in sync with schema-types.ts's
-// isIntegerSpec / serialIdType.
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
   const type = typeof spec === "string" ? spec : spec.type;
   return type === "integer" || type === "big_integer";
 }
 
-// The `id: { type }` value preserving the declared INTEGER width per adapter:
-// PG `serial`/`bigserial`, MySQL `integer`/`bigint`, SQLite always `integer`
-// (only `INTEGER PRIMARY KEY` aliases the rowid).
 function serialIdType(spec: ColumnSpec | undefined, adapterName?: string): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
@@ -117,15 +111,8 @@ function generateCode(
     `export default async function defineSchema(ctx: DatabaseAdapter): Promise<void> {`,
   ];
 
-  // PG/MySQL: loadSchema runs on a shared database that other workers may already
-  // have connected to, so we can't DROP DATABASE. Use force:"cascade" per-table
-  // drop+recreate instead — safe for concurrent workers on a shared DB.
   const needsForce = adapterName === "postgres" || adapterName === "mysql2";
 
-  // A referencing table must go before the table it points at: PG/MySQL below
-  // drop+recreate each table in declaration order, and a live child FK blocks
-  // (MySQL) or cascades away (PG) the parent's drop. Dropping every FK-carrying
-  // table up front keeps the per-table `force: "cascade"` recreate safe.
   if (needsForce) {
     for (const [tableName, tableSpec] of Object.entries(schema)) {
       if (foreignKeysOf(tableSpec).length === 0) continue;
@@ -176,10 +163,6 @@ function generateCode(
     } else {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts}, (t) => {`);
       for (const [colName, colSpec] of colEntries) {
-        // Emit the single-column integer PK inline at its declared offset.
-        // Preserve the declared INTEGER width per adapter (serialIdType); the
-        // default `primary_key` type widens to BIGINT on MySQL and breaks
-        // integer FK references. Keep in sync with schema-types.ts.
         if (colName === serialPkName) {
           lines.push(
             `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(serialIdType(colSpec, adapterName))}, { primaryKey: true });`,
@@ -201,14 +184,6 @@ function generateCode(
     // characters, e.g. "(lower(external_id))") is gated below.
     for (const index of indexesOf(tableSpec)) {
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
-      // Expression-index gate. The generator has no live adapter, so the caller
-      // threads in `supportsExpressionIndex` (resolved from the DB version) to
-      // match `emitTableIndexes`' runtime `supportsExpressionIndex(adapter)`
-      // check (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB). When the flag is
-      // omitted, fall back to the coarse `adapterName === "mysql2"` skip — a
-      // last resort for a caller with no live connection. Live callers
-      // (test-setup-dy.ts, template-global-setup.ts) must thread the flag, or
-      // a MySQL-8 worker rebuild strips the canonical expression indexes.
       const dropExpression =
         supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql2";
       if (isExpression && dropExpression) continue;

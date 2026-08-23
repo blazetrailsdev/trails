@@ -2,10 +2,6 @@ import mysql from "mysql2/promise";
 import { Version } from "../connection-adapters/abstract-adapter.js";
 import { mysqlUrl } from "./config.js";
 
-// A *serialization* of the MySQL sub-settings, not an env var of its own. Only
-// for tests that build a *second*, differently configured adapter, where the
-// config is itself under test and must not leak onto the shared leased
-// connection. Everything else rides leaseMysqlAdapter (MySQL test-helper).
 export const MYSQL_TEST_URL = mysqlUrl();
 
 let mariaDb = false;
@@ -37,8 +33,6 @@ export const isMariaDb = mariaDb;
 /** Raw VERSION() string from the connected MySQL/MariaDB server (empty when unavailable). */
 export const mysqlVersion = mysqlVersionStr;
 
-// Parse the dotted version out of the raw VERSION() string the same way
-// AbstractMysqlAdapter#version_string does (strips the MariaDB 5.5.5- prefix).
 function parseMysqlVersion(full: string): Version | null {
   const m = full.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
   return m ? new Version(m[1], full) : null;

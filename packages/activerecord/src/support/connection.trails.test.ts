@@ -62,13 +62,10 @@ describe("connect", () => {
     vi.stubEnv("ARCONN", "mysql2");
     const [arunit, arunit2, withoutPrepared] = (await testConfigurationHashes())
       .configurationHashes;
-    // config.example.yml:5,25 — the two entries differ in collation, and only
-    // arunit carries the time_zone variable.
     expect(arunit.configurationHash.collation).toBe("utf8mb4_unicode_ci");
     expect(arunit2.configurationHash.collation).toBe("utf8mb4_general_ci");
     expect(arunit.configurationHash.variables).toEqual({ time_zone: "+00:00" });
     expect(arunit2.configurationHash.variables).toBeUndefined();
-    // mysql2 omits the third entry, so expand_config synthesizes it.
     expect(withoutPrepared.configurationHash.collation).toBeUndefined();
     expect(withoutPrepared.adapter).toBe("mysql2");
   });
@@ -161,9 +158,6 @@ describe("connect", () => {
     ]);
   });
 
-  // `config.example.yml:85` names one fixed file, reused across runs; nothing
-  // about the running process (a run token, a worker slot, a tmpdir) may enter
-  // the name.
   it("names the same configured database on every call", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("AR_TEST_WORKER_DB", "");

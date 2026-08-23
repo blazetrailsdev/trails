@@ -13,12 +13,6 @@ import {
   rebuildCanonicalTables,
 } from "./canonical-table-rebuild.js";
 
-// Runs on SQLite regardless of the ambient ARCONN adapter (it constructs its own
-// in-memory adapters).
-
-// `selectAll` returns a `Result` whose rows are positional arrays; `toArray()`
-// maps them to hash rows via the column index, so `r.type`/`r.name`/`r.sql`
-// resolve to real values.
 async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
   const res = await adapter.selectAll(
     "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name, type, sql",
@@ -37,8 +31,6 @@ describe("rebuildCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
-      // Simulate a sibling file drifting `topics` to a reduced shape on the
-      // shared DB, then rebuild it back to canonical.
       await adapter.executeMutation("DROP TABLE topics");
       await adapter.executeMutation("CREATE TABLE topics (id integer PRIMARY KEY, title varchar)");
       expect(await dumpSchema(adapter)).not.toBe(canonical);
@@ -57,8 +49,6 @@ describe("rebuildCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
-      // Naming only the FK target must still restore the child: MySQL refuses to
-      // drop a table a live foreign key points at.
       await rebuildCanonicalTables(adapter, ["fk_test_has_pk"]);
       const dump = await dumpSchema(adapter);
       expect(dump).toBe(canonical);
@@ -76,10 +66,6 @@ describe("rebuildCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
-      // A test-added FK from a table outside the rebuild set: no drop order can
-      // work around it, so the rebuild has to drop the constraint itself.
-      // `authors` declares no FK of its own, so nothing about the rebuilt set
-      // hints that an inbound FK might exist — the rebuild has to go looking.
       await sqlite.addForeignKey("lessons_students", "authors", { column: "lesson_id" });
       expect(await sqlite.foreignKeys("lessons_students")).toHaveLength(1);
 
@@ -106,8 +92,6 @@ describe("rebuildCanonicalTables", () => {
 });
 
 describe("fkSafeDropPlan", () => {
-  // Stands in for the live database: `fks` maps a table to the tables it
-  // references, as `foreignKeys` would report them.
   function host(tables: string[], fks: Record<string, string[]> = {}): FkSafeDropPlanHost {
     return {
       tables: async () => tables,
@@ -117,8 +101,6 @@ describe("fkSafeDropPlan", () => {
   }
 
   test("drops a referencing table before its target", async () => {
-    // Registry order: lessons_students (referencer) is registered *before*
-    // students (target), so reversing registry order would drop students first.
     const { order } = await fkSafeDropPlan(
       host(["lessons_students", "students"], { lessons_students: ["students"] }),
       ["lessons_students", "students"],
@@ -166,8 +148,6 @@ describe("fkSafeDropPlan", () => {
   });
 
   test("reports a foreign key reaching in from outside the dropped set", async () => {
-    // `outside` is not being dropped, so no order among a/b can help: PG and
-    // MySQL refuse to drop `a` while its constraint is live.
     const plan = await fkSafeDropPlan(host(["a", "b", "outside"], { outside: ["a"], b: ["a"] }), [
       "a",
       "b",
@@ -219,8 +199,6 @@ describe("fkSafeDropPlan", () => {
       ["a", "b"],
       { scanInbound: true },
     );
-    // Only the dropped set is introspected per-table; `outside` is never
-    // touched individually — that is the whole point of the bulk lookup.
     expect(calls).toEqual(["a", "b"]);
     expect(bulk).toEqual([["a", "b"]]);
     expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
@@ -246,8 +224,6 @@ describe("fkSafeDropPlan", () => {
 });
 
 describe("bulkInboundFkHost", () => {
-  // Stands in for a live adapter: records the SQL it is handed and replays
-  // `rows` as the catalog result.
   function fakeAdapter(adapterName: string, rows: Record<string, unknown>[] = []) {
     const queries: string[] = [];
     const adapter = {
@@ -273,8 +249,6 @@ describe("bulkInboundFkHost", () => {
     await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors", "topics"]);
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain("pg_constraint");
-    // Matched by resolved OID, not by name: `relname IN (...)` would also match
-    // a same-named table in another search-path schema.
     expect(queries[0]).toContain("c.confrelid IN (to_regclass('authors'), to_regclass('topics'))");
   });
 
@@ -284,7 +258,6 @@ describe("bulkInboundFkHost", () => {
       to_table: "authors",
       name: "fk_rails_13f362e4f5",
     };
-    // MySQL's key_column_usage reports one row per constrained column.
     const { adapter } = fakeAdapter("mysql2", [row, { ...row }]);
     const blockers = await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors"]);
     expect(blockers).toEqual([
@@ -299,7 +272,6 @@ describe("bulkInboundFkHost", () => {
   });
 });
 
-// Read the live table-name set from sqlite_master.
 async function tableNames(adapter: AbstractAdapter): Promise<Set<string>> {
   const res = await adapter.selectAll("SELECT name FROM sqlite_master WHERE type = 'table'");
   return new Set(res.pluck("name").map((name) => String(name)));
@@ -313,8 +285,6 @@ describe("ensureCanonicalTables", () => {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
 
-      // Drop one table; ensure recreates just it (drop-free for the survivors)
-      // and restores it to its full canonical shape.
       await adapter.executeMutation("DROP TABLE topics");
       expect(await tableNames(adapter)).not.toContain("topics");
 
@@ -331,8 +301,6 @@ describe("ensureCanonicalTables", () => {
     const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
-      // A drifted `topics` must survive: ensure creates nothing (all present)
-      // and — unlike rebuildCanonicalTables — never drops to restore shape.
       await adapter.executeMutation("DROP TABLE topics");
       await adapter.executeMutation("CREATE TABLE topics (id integer PRIMARY KEY, title varchar)");
       const drifted = await dumpSchema(adapter);

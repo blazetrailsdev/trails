@@ -2,10 +2,6 @@ import { describe } from "vitest";
 import pg from "pg";
 import { postgresUrl } from "./config.js";
 
-// A *serialization* of the PG sub-settings (PGHOST/PGPORT/PGUSER/PGPASSWORD/
-// PGDATABASE), not an env var of its own: these suites probe the server
-// directly via describeIfPg regardless of ARCONN, so they need a URL to hand
-// the driver, but they no longer source one from the environment.
 export const PG_TEST_URL = postgresUrl();
 
 async function checkPg(): Promise<{

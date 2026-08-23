@@ -148,7 +148,6 @@ describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
     const slot = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
     expect(workerDb).toContain(`-${slot}.sqlite`);
 
-    // Also distinct from the shared template — workers write to their own clone.
     expect(workerDb).not.toBe(process.env[TEMPLATE_PATH_ENV]);
   });
 

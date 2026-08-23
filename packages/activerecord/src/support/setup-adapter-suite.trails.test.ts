@@ -20,8 +20,6 @@ describe("setupAdapterSuite — schema + transactional rollback", () => {
 
   const a = (): RawAdapter => suite.adapter as unknown as RawAdapter;
 
-  // Sibling tests prove transactional rollback: if the first test's INSERT
-  // weren't rolled back, the second would see two rows after its own INSERT.
   it("first insert is rolled back between tests", async () => {
     await a().exec(`INSERT INTO widgets (id, name) VALUES (1, 'alpha')`);
     const rows = await a().execute(`SELECT * FROM widgets`);
@@ -41,9 +39,6 @@ describe("setupAdapterSuite — schema + transactional rollback", () => {
 });
 
 describe("setupAdapterSuite — close() and teardown semantics", () => {
-  // Shared observability across two sibling describes so we can assert the
-  // helper's afterAll ran (vitest runs afterAll in LIFO order, so a parent
-  // describe's afterAll fires after every child's).
   const defaultCloseSpy = vi.fn(async () => {});
   const defaultTeardown = vi.fn(async () => {});
   const optOutCloseSpy = vi.fn(async () => {});
@@ -88,7 +83,6 @@ describe("setupAdapterSuite — close() and teardown semantics", () => {
     });
   });
 
-  // Runs AFTER both inner describes' afterAlls (vitest LIFO).
   afterAll(async () => {
     expect(defaultTeardown).toHaveBeenCalledTimes(1);
     expect(defaultCloseSpy).toHaveBeenCalledTimes(1);

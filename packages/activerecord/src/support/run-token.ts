@@ -40,15 +40,6 @@ export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
  */
 export const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
 
-// `r<base36 millis><base36 random>`, the random half fixed-width so the two
-// halves split without a separator — every character base36 produces is itself
-// a legal separator candidate, so there is no safe one to pick.
-//
-// The leading millis is not decoration: a database name is all the stale sweep
-// has to go on — unlike a temp file, a PostgreSQL database carries no mtime to
-// compare against the cutoff. The `r` prefix is what keeps a legacy unstamped
-// leftover like `activerecord_unittest_2_arunit2` from parsing as a run token
-// whose "start time" is the epoch, which would make the sweep drop it.
 const RANDOM_LENGTH = 6;
 const TOKEN_PATTERN = "r[0-9a-z]+";
 

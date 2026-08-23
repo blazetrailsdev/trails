@@ -16,10 +16,6 @@ const BASE = "activerecord_unittest";
 
 describe("run token", () => {
   it("carries the run start time so a name alone can be aged out", () => {
-    // Regression: an earlier spelling split the two halves on a literal "x",
-    // which `Date.now().toString(36)` itself contains for most of any given
-    // day — the parsed start time was then garbage, and the stale sweep would
-    // happily drop a concurrent run's live databases.
     const before = Date.now();
     const startedAt = runTokenStartedAt(newRunToken());
     expect(startedAt).not.toBeNull();
@@ -58,9 +54,6 @@ describe("slot database names", () => {
 });
 
 describe("drop targets", () => {
-  // The regression this whole story exists to prevent: globalSetup used to
-  // DROP `activerecord_unittest_2..N` unconditionally, so a second run wiped
-  // the first run's databases out from under its live workers.
   it("never targets a database belonging to a different run token", () => {
     const mine = "raaa000001";
     const theirs = "rbbb000002";
@@ -83,11 +76,6 @@ describe("drop targets", () => {
     ]);
   });
 
-  // The arunit2 sibling carries the run's token like every other database the
-  // run mints, but with a `2` on the base. An earlier spelling put the `2` on
-  // the token instead (`<base>_<token>2_<slot>`), so the sibling read as
-  // belonging to token `<token>2`: invisible to its own run's teardown, and
-  // droppable by a concurrent run's stale sweep once `<token>2` aged out.
   it("keeps the arunit2 sibling of a slot database under its own run token", () => {
     const mine = newRunToken();
     const theirs = newRunToken();

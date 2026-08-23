@@ -155,11 +155,6 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3_mem: {
     adapter: "sqlite3",
     lane: "sqlite",
-    // `config.example.yml:93-99` — both entries are their own `:memory:` database,
-    // carrying `adapter` and `database` and nothing else.
-    // Exercised by ci.yml's `sqlite-mem-tests` job — the only lane where
-    // `inMemoryDb()` is true, and so the only thing keeping the
-    // `skipIf(inMemoryDb())` guards from rotting.
     build: async () => ({
       arunit: { adapter: "sqlite3", database: ":memory:" },
       arunit2: { adapter: "sqlite3", database: ":memory:" },
@@ -168,8 +163,6 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   postgresql: {
     adapter: "postgresql",
     lane: "postgres",
-    // `config.example.yml:74-81` — all three entries carry `min_messages`, and
-    // only `arunit_without_prepared_statements` turns prepared statements off.
     build: async () => {
       const shared = serverHash("postgresql", postgresSettings());
       return {

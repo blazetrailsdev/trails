@@ -17,8 +17,6 @@ describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
     const adapter = Base.connection;
 
-    // The canonical half is already on this worker's DB, so only the
-    // adapter-specific arm is replayed here.
     await loadAdapterSpecificSchema(adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
     const laid = (await adapter.tables()).filter((name) => !bookkeeping.has(name));
@@ -34,10 +32,6 @@ describe("boot-laid table snapshot", () => {
     const adapter = Base.connection;
     await adapter.executeMutation(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
 
-    // `test-setup-dy.ts`'s boot order, replayed: the database is emptied of
-    // everything that is not canonical, then the schema is laid — here only its
-    // adapter-specific arm, the canonical half already being on this worker's
-    // DB — then the snapshot.
     await resetTestTables(adapter);
     await loadAdapterSpecificSchema(adapter);
     await recordBootLaidTables(adapter);

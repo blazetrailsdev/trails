@@ -1,10 +1,3 @@
-// Residual schema-type vocabulary left after RFC 0059 phase 4 deleted the
-// `defineSchema` DSL (PR #4587). This file no longer defines or emits any
-// schema — it holds only the `ColumnSpec` / `Schema` / `IndexSpec` type family
-// and the small pure helpers (`COLUMN_TYPE_MAP_*`, `serialIdType`, `columnsOf`,
-// `supportsExpressionIndex`, `isWrappedSchema`) that `canonical-schema.ts` and
-// the `TEST_SCHEMA` importers still consume.
-
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 export type PrimitiveColumnSpec =
@@ -147,21 +140,6 @@ const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes", "foreignKeys"]
 
 /** @internal */
 export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
-  // The wrapper and the legacy `Record<colName, ColumnSpec>` shape both
-  // permit a key called `columns`, so discrimination needs an unambiguous
-  // signal. We use the presence of `primaryKey` — the wrapper's sole
-  // purpose is to set a table-level PK, so making it required also
-  // collapses the only ambiguity: a legacy single-column table
-  // `{ columns: { type: "string" } }` is structurally identical to a
-  // wrapper with one column named `type`, but it cannot have `primaryKey`,
-  // so it stays unambiguously legacy.
-  //
-  // Rule:
-  //   1. `columns` is present and an object map.
-  //   2. At least one of `primaryKey` / `indexes` / `foreignKeys` is present
-  //      (the disambiguator from the legacy shape).
-  //   3. Any present `primaryKey` / `indexes` / `foreignKeys` is wrapper-shaped.
-  //   4. No other top-level keys.
   if (!table || typeof table !== "object") return false;
   const candidate = (table as { columns?: unknown }).columns;
   if (!candidate || typeof candidate !== "object") return false;
@@ -171,8 +149,6 @@ export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema
   if (!hasPk && !hasIndexes && !hasForeignKeys) return false;
   if (hasPk) {
     const pk = (table as { primaryKey?: unknown }).primaryKey;
-    // Validate primaryKey is the wrapper-shaped value; otherwise this is a
-    // legacy table that happens to have a column called `primaryKey`.
     if (pk !== false && !Array.isArray(pk)) return false;
     if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
   }
@@ -242,8 +218,6 @@ export const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
   time: "time",
   binary: "binary",
   json: "json",
-  // PG-only types — passed straight through to PostgreSQLAdapter#typeToSql,
-  // which routes them via NATIVE_DATABASE_TYPES.
   citext: "citext",
   hstore: "hstore",
   uuid: "uuid",
@@ -251,20 +225,6 @@ export const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
   oid: "oid",
 };
 
-// MySQL/MariaDB accepts native DATETIME/DATE/TIME/JSON columns. AR serializes
-// Temporal.PlainTime values for TIME columns, so time attributes round-trip
-// with the correct type. Without native TIME, an introspected TIME-as-VARCHAR
-// resolves to StringType and multiparameter time assignment yields a raw string
-// (same problem that "date: string" caused before PR #4141 fixed it for DATE).
-// json maps to the native MySQL JSON column: mysql2 emits `json` via
-// MysqlSchemaCreation#typeToSql and registers `json` -> JsonType in its type
-// map (abstract-mysql-adapter.ts), so introspected canonical json columns
-// (e.g. admin_users.json_options) resolve to JsonType and round-trip on
-// mysql:8 — the same StringType deviation that afflicted DATE/TIME. `binary`
-// routes through the native BLOB mapping so encrypted binary attributes
-// round-trip (BinaryData-wrapped ciphertext needs a binary column). PG-only
-// types are deliberately absent — this map is keyed by `PrimitiveColumnSpec`,
-// which excludes them.
 /** @internal */
 export const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   string: "string",
@@ -281,12 +241,6 @@ export const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   json: "json",
 };
 
-// SQLite has type affinity rules but accepts native datetime/date/time/json
-// type names — they store as TEXT/BLOB under the hood while preserving the
-// declared type for schema reflection (so the type registry resolves to
-// SQLite3DateTime/DateType/TimeType/JsonType on load). datetime/date/time/
-// json all now inherit the native names from COLUMN_TYPE_MAP_MYSQL; `binary`
-// inherits the BLOB mapping likewise.
 /** @internal */
 export const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_MYSQL,

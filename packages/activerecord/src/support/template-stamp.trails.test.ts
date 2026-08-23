@@ -51,16 +51,8 @@ describe.skipIf(!sqliteActive)("sqlite template stamp", () => {
 
 describe.skipIf(!runToken)("boot fast path stamp", () => {
   it("leaves the database stamped for the next worker recycled onto it", async () => {
-    // Replays `test-setup-dy.ts`'s fast-path arm verbatim. `resetTestTables`
-    // drops `ar_internal_metadata` along with the other bookkeeping tables, so
-    // without the re-stamp that arm ends with, the stamp is single-use per
-    // database and every recycled worker pays the full purge+reload. Running
-    // the arm here is safe: it is the same reset the suite runs at worker boot,
-    // and it re-lays the adapter-specific tables it drops.
     const connection = await Base.leaseConnection();
     await resetTestTables(connection);
-    // The hazard the re-stamp answers, asserted rather than assumed: the reset
-    // takes the stamp with it, so the arm is not self-sustaining without it.
     expect(await canonicalSchemaUpToDate(connection)).toBe(false);
 
     await loadAdapterSpecificSchema(connection);
@@ -71,10 +63,6 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
 
 describe.skipIf(!runToken)("adapter-specific tables snapshot", () => {
   it("records the carried-forward set, not what the live database happens to hold", async () => {
-    // The fast path skips the adapter-specific arm when the snapshot is intact,
-    // so the snapshot must not shrink to whatever a test file left behind. A
-    // re-stamp that took a fresh snapshot here would drop `defaults` from the
-    // recorded set for every later file, with nothing left to re-lay it.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
     expect(before, "boot must have recorded a snapshot").not.toBeNull();
@@ -112,8 +100,6 @@ describe.skipIf(!runToken)("snapshot value width", () => {
   });
 
   it("a shrinking snapshot does not read back the chunks it no longer uses", async () => {
-    // The chunk rows a wider snapshot wrote survive the narrower one that
-    // replaces it, so the count row — written last — is what bounds the read.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
     try {
