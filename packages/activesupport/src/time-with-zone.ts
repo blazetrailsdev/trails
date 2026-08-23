@@ -13,7 +13,7 @@ import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
-import { Rational, Time, cCivilToJd, strftime } from "@blazetrails/date";
+import { Rational, Time } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import {
@@ -650,41 +650,13 @@ export class TimeWithZone {
    * so that zone information is correct.
    *
    * `getlocal(utc_offset)` answers a `::Time` at the receiver's offset, whose
-   * `strftime` is the `date` gem's C formatter — ported at
-   * `packages/date/src/date.ts`. That `::Time` was built from an offset rather
-   * than a zone, so its own `zone` is `nil` and any `%Z` the gsub left behind
-   * prints empty, as in Ruby.
-   *
-   * @missingRailsCall getlocal — PERMANENT: Rails formats through
-   *   `getlocal(utc_offset).strftime(format)` (time_with_zone.rb:225-228), where
-   *   the receiver is a `::Time` whose `strftime` is the date gem's C formatter.
-   *   trails' `getlocal` answers a `Temporal.PlainDateTime`, which carries no
-   *   `strftime`, so the same date-gem formatter (`@blazetrails/date`'s
-   *   `strftime`) is called directly with the local fields it would have read
-   *   off that `::Time`.
+   * `strftime` is the `date` gem's C formatter. That `::Time` was built from an
+   * offset rather than a zone, so its own `zone` is `nil` and any `%Z` the gsub
+   * left behind prints empty, as in Ruby.
    */
   strftime(format: string): string {
     format = format.replace(/((?:^|[^%])(?:%%)*)%Z/g, `$1${this.zone}`);
-    const l = this._local();
-    return strftime(
-      {
-        year: l.year,
-        jd: cCivilToJd(l.year, l.month, l.day),
-        nth: 0n,
-        gregorianP: true,
-        mon: l.month,
-        day: l.day,
-        wday: this.wday,
-        yday: this.yday,
-        hour: l.hour,
-        min: l.minute,
-        sec: l.second,
-        nsec: new Rational(this.nsec, 1),
-        zone: "",
-        utcOffset: this.utcOffset,
-      },
-      format,
-    );
+    return this.getlocal(this.utcOffset).strftime(format);
   }
 
   /**
