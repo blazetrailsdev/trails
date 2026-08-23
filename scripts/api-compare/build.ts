@@ -690,6 +690,10 @@ export async function lowerMarksForDropped(
  * The baseline rows in this run's scope, BOTH dimensions, so the run can say
  * how many of them it did not migrate.
  *
+ * The scope is exactly what the run acted on: `--package`, `--file`, and the
+ * repeatable `--call` cluster. Counting a row `--call` excluded would restate
+ * the misreading this summary exists to prevent, one narrowing down.
+ *
  * `call-mismatches-exclude/` shards hold both dimensions (RFC 0095): a
  * `kind: "args"` row is the call-ARGUMENT gate's, and this migrator only ever
  * mints `@missingRailsCall` receipts. Reporting a bare `0 rows would migrate`
@@ -702,9 +706,13 @@ export function scopedRows(
   baseline: readonly ExcludeEntry[],
   pkg: string,
   onlyFile?: string,
+  onlyCall?: ReadonlySet<string>,
 ): ExcludeEntry[] {
   return baseline.filter(
-    (e) => e.package === pkg && (onlyFile === undefined || e.tsFile === onlyFile),
+    (e) =>
+      e.package === pkg &&
+      (onlyFile === undefined || e.tsFile === onlyFile) &&
+      (onlyCall === undefined || onlyCall.has(e.call)),
   );
 }
 
@@ -886,7 +894,11 @@ async function main(argv: string[]): Promise<number> {
     );
     for (const rel of moved) console.log(`  - ${rel}`);
   }
-  for (const line of migrationSummary(scopedRows(baseline, pkg, onlyFile), dropped, dryRun)) {
+  for (const line of migrationSummary(
+    scopedRows(baseline, pkg, onlyFile, onlyCall.size > 0 ? onlyCall : undefined),
+    dropped,
+    dryRun,
+  )) {
     console.log(line);
   }
   console.log(

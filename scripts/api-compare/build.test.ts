@@ -811,11 +811,11 @@ describe("migrationSummary", () => {
 });
 
 describe("scopedRows", () => {
-  const row = (pkg: string, tsFile: string) => ({
+  const row = (pkg: string, tsFile: string, call = "new") => ({
     package: pkg,
     tsFile,
     rubyName: "encryptor",
-    call: "new",
+    call,
     reason: DEFAULT_TAG_REASON,
   });
 
@@ -827,5 +827,15 @@ describe("scopedRows", () => {
     ];
     expect(scopedRows(baseline, "activesupport")).toHaveLength(2);
     expect(scopedRows(baseline, "activesupport", "encrypted-file.ts")).toEqual([baseline[0]]);
+  });
+
+  it("narrows to the requested --call cluster so the summary counts only what ran", () => {
+    const baseline = [
+      row("activesupport", "encrypted-file.ts", "new"),
+      row("activesupport", "encrypted-file.ts", "chomp"),
+    ];
+    expect(scopedRows(baseline, "activesupport", "encrypted-file.ts", new Set(["new"]))).toEqual([
+      baseline[0],
+    ]);
   });
 });
