@@ -476,12 +476,6 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
  * `decorate_attributes` block (encryptable_record.rb:85-88).
  *
  * @internal
- *
- * @missingRailsCall order:constructor,schemeFor — PERMANENT: Rails calls
- *   `scheme_for` then `EncryptedAttributeType.new` inside the
- *   `decorate_attributes` block (encryptable_record.rb:88-91); trails builds the
- *   pending decorator first and hangs `schemeFor` off a lazy `scheme` getter on
- *   it, so the constructor is recorded ahead of `schemeFor`.
  */
 export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
   const modelClass = this;
