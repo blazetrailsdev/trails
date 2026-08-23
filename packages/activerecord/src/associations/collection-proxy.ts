@@ -307,8 +307,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Self-referential alias so AssociationRelation#toArray can be called
-   * with `this` = CollectionProxy via `.call(this)`. AR#toArray reads
+   * Self-referential alias so AssociationRelation#execQueries can be called
+   * with `this` = CollectionProxy via `.call(this)`. AR#execQueries reads
    * `this._association.owner` and `this._association.reflection`; both are
    * already exposed as getters on CollectionProxy, so returning `this`
    * satisfies the contract without extra indirection.

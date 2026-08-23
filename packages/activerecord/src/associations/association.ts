@@ -474,10 +474,22 @@ export class Association {
     return record;
   }
 
+  /**
+   * Mirrors: Association#set_inverse_instance_from_queries
+   * (association.rb:139-144).
+   *
+   * `_explicitTarget` has no Rails analog — see {@link setInverseInstance}. It
+   * is raised here for the same reason, and only where `inversedFromQueries`
+   * actually took the write: an inverse it declined (`inversable?` false) must
+   * keep reading back as unset.
+   */
   setInverseInstanceFromQueries(record: Base): Base {
     const inverse = this.inverseAssociationFor(record);
     if (inverse) {
       inverse.inversedFromQueries(this.owner);
+      if (!inverse.isCollection() && inverse.target === this.owner) {
+        inverse._explicitTarget = true;
+      }
     }
     return record;
   }

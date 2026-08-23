@@ -1484,6 +1484,10 @@ export function usedForAnyOwner(
 export function staleCallTags(
   tagsByFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
   used: Map<string, Set<string>>,
+  declFileByFileNameOwner: ReadonlyMap<
+    string,
+    ReadonlyMap<string, ReadonlyMap<string, string>>
+  > = new Map(),
 ): StaleCallTag[] {
   const out: StaleCallTag[] = [];
   for (const [tsFile, byName] of tagsByFileName) {
@@ -1495,14 +1499,18 @@ export function staleCallTags(
           used.get(callTagKey(tsFile, tsClass, tsName)) ??
           used.get(callTagKey(tsFile, "*", tsName));
         if (hit === undefined) continue;
+        const tsDeclFile = declFileFor(declFileByFileNameOwner, tsFile, tsName, tsClass);
         for (const call of calls.keys()) {
-          if (!hit.has(call)) out.push({ tsFile, tsName, call });
+          if (!hit.has(call)) out.push({ tsFile, tsClass, tsDeclFile, tsName, call });
         }
       }
     }
   }
   return out.sort((a, b) =>
-    `${a.tsFile} ${a.tsName} ${a.call}` < `${b.tsFile} ${b.tsName} ${b.call}` ? -1 : 1,
+    `${a.tsFile} ${a.tsClass} ${a.tsName} ${a.call}` <
+    `${b.tsFile} ${b.tsClass} ${b.tsName} ${b.call}`
+      ? -1
+      : 1,
   );
 }
 
@@ -1513,6 +1521,16 @@ export function staleCallTags(
  *  "no longer flagged" would be unknowable rather than true. */
 export interface StaleCallTag {
   tsFile: string;
+  /** The class that declares the tagged member (`""` for a top-level
+   *  function) — the `callTagKey` identity the suppression side is keyed by.
+   *  Without it two declarations of one name reachable from `tsFile` share a
+   *  retirement key, so retiring a stale tag on one deletes the reviewed
+   *  receipt on the other (RFC 0106). */
+  tsClass: string;
+  /** The file the declaration actually lives in, when trails split the Rails
+   *  class into a subdirectory module and it differs from `tsFile`. See
+   *  `CallMismatch.tsDeclFile`. */
+  tsDeclFile?: string;
   tsName: string;
   call: string;
 }
@@ -4097,7 +4115,11 @@ export function main() {
         compared: callsCompared,
         mismatched: callMismatches.length,
         mismatches: callMismatches,
-        staleTags: staleCallTags(tsMissingCallTagsByFileName, callTagsUsed),
+        staleTags: staleCallTags(
+          tsMissingCallTagsByFileName,
+          callTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
         suppressed: suppressedCalls,
         skeletons: callSkeletons,
       },
@@ -4106,7 +4128,11 @@ export function main() {
         mismatched: callArgMismatches.length,
         skipped: callArgsSkipped,
         mismatches: callArgMismatches,
-        staleTags: staleCallTags(tsMissingArgTagsByFileName, argTagsUsed),
+        staleTags: staleCallTags(
+          tsMissingArgTagsByFileName,
+          argTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
         suppressed: suppressedArgCalls,
       },
       bodyHashes: bodyHashRecords,

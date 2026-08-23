@@ -1,4 +1,4 @@
-import { Relation } from "./relation.js";
+import { Relation, type LoadedRelation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import {
@@ -6,6 +6,7 @@ import {
   wrapWithScopeProxy,
 } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
+import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 import type { Nodes } from "@blazetrails/arel";
 
@@ -33,14 +34,14 @@ interface TrustedClonePayload<T extends Base> {
  *   1. **Loaded-chain mode** (Rails' `DisableJoinsAssociationRelation`,
  *      `activerecord/lib/active_record/disable_joins_association_relation.rb`):
  *      constructed with `(klass, key, ids)` after the chain walk is
- *      complete. `toArray()` loads via Relation, then groups by `key`
+ *      complete. `load()` loads via Relation, then groups by `key`
  *      and re-emits in `ids` order so callers see join-table ordering
  *      (SQL `IN(...)` doesn't preserve list order). `limit` / `first`
  *      slice the loaded array in-memory rather than appending SQL
  *      LIMIT (matches Rails' deliberate deviation).
  *
  *   2. **Deferred-chain mode**: constructed with a `chainWalker`
- *      callback that performs the async chain walk on first `toArray()`
+ *      callback that performs the async chain walk on first load
  *      and returns the final scope (which itself may be a loaded-chain
  *      DJAR for the ordered-upstream wrap case). Lets `DJAS.scope()`
  *      return a `Relation` synchronously instead of `Promise<{ relation }>` —
@@ -549,65 +550,82 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return wrapWithScopeProxy(rel);
   }
 
-  override async toArray(): Promise<T[]> {
+  /**
+   * Deferred-chain mode is a trails-only arm: the chain walk replaces the
+   * single SELECT Rails' `DisableJoinsAssociationScope` has already finished
+   * by the time it builds the relation, so it stands in for `exec_queries`'
+   * query. It routes through `_walkOnce()` so the walk (including intermediate
+   * plucks) is shared with any earlier `ids()` call, and the chained query
+   * state on `this` (wheres / orders / limit / etc.) composes via
+   * `_composeChainedState` so `DJAS.scope(...).where({title: 'foo'})` filters
+   * the walker's result.
+   *
+   * A limit/offset composed onto a walked scope that is ITSELF a loaded-chain
+   * DJAR is applied in memory, after the id-order regroup, because that is
+   * where Rails' `limit` / `first` overrides apply it
+   * (disable_joins_association_relation.rb:13-24); as SQL it would slice the
+   * wrong rows before the regroup. `merged` is a fresh spawn, so clearing the
+   * values on it is local to this load.
+   */
+  protected override async execQueries(): Promise<T[]> {
     if (this._chainWalker) {
-      // Routes through `_walkOnce()` so the chain walk (including
-      // intermediate plucks) is shared with any earlier `ids()` call.
-      // The chained query state on `this` (wheres / orders / limit /
-      // etc.) composes via `_composeChainedState` so chains like
-      // `DJAS.scope(...).where({title: 'foo'})` actually filter the
-      // walker's result.
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
+      if (merged instanceof DisableJoinsAssociationRelation && !merged._chainWalker) {
+        const bounds = merged as unknown as {
+          limitValue?: number | null;
+          offsetValue?: number | null;
+        };
+        const limitVal = bounds.limitValue ?? null;
+        const offsetVal = bounds.offsetValue ?? null;
+        if (limitVal !== null || offsetVal !== null) {
+          bounds.limitValue = null;
+          bounds.offsetValue = null;
+          const ordered = (await Relation.prototype.toArray.call(merged)) as T[];
+          const start = offsetVal ?? 0;
+          return ordered.slice(start, limitVal == null ? undefined : start + limitVal);
+        }
+      }
       return merged.toArray();
     }
-    // Loaded-chain mode: load via Relation, then group by `key` and
-    // re-emit in `ids` order so the caller sees join-table ordering
-    // (Rails' `load` override).
-    //
-    // Build a clone with `limitValue` / `offsetValue` cleared and
-    // load through that — never mutate `this`. Reason: deferred-mode
-    // composition (via `_composeChainedState`'s `merge`) can copy a
-    // chained `.limit(n)` / offset onto this loaded-chain DJAR.
-    // Letting the SQL path apply LIMIT before the IN-list reorder
-    // would slice the WRONG rows. Rails matches by overriding
-    // `limit`/`first` to load + take in memory; we do the same.
-    // Cloning (rather than mutating `this` across the await) keeps
-    // concurrent `toSql()` / `ids()` / second `toArray()` calls
-    // observing the original configured state.
-    type LimitOffset = { limitValue?: number | null; offsetValue?: number | null };
-    const self = this as unknown as LimitOffset & {
-      clone: () => DisableJoinsAssociationRelation<T>;
-    };
-    const limitVal = self.limitValue ?? null;
-    const offsetVal = self.offsetValue ?? null;
-    const loadClone = self.clone() as unknown as LimitOffset;
-    loadClone.limitValue = null;
-    loadClone.offsetValue = null;
-    // Call Relation's toArray directly on the clone — going through
-    // DJAR.toArray would re-enter the deferred/loaded branching and
-    // recurse forever for the loaded-chain mode.
-    const records = (await Relation.prototype.toArray.call(loadClone)) as T[];
-    const byKey = new Map<unknown, T[]>();
+    return super.execQueries();
+  }
+
+  /**
+   * Mirrors: ActiveRecord::DisableJoinsAssociationRelation#load
+   * (disable_joins_association_relation.rb:26-38) — load, then group the
+   * records by `key` and re-emit them in `ids` order, because SQL
+   * `IN(...)` does not preserve the id list's order.
+   *
+   * Deferred-chain mode carries no id list of its own — the ordering comes from
+   * the walked scope — so the regroup has nothing to do there.
+   */
+  override async load(): Promise<LoadedRelation<this>> {
+    await super.load();
+    if (this._chainWalker) return stripThenable(this);
+    const records = this._records;
+
+    const recordsById = new Map<unknown, T[]>();
     const keyCols = Array.isArray(this.key) ? this.key : [this.key];
     const composite = this._composite;
-    for (const r of records) {
+    for (const record of records) {
       const raw = composite
-        ? keyCols.map((c) => r._readAttribute(c))
-        : r._readAttribute(keyCols[0]);
+        ? keyCols.map((c) => record._readAttribute(c))
+        : record._readAttribute(keyCols[0]);
       const k = serializeKey(raw, composite);
-      const bucket = byKey.get(k);
-      if (bucket) bucket.push(r);
-      else byKey.set(k, [r]);
+      const bucket = recordsById.get(k);
+      if (bucket) bucket.push(record);
+      else recordsById.set(k, [record]);
     }
+
     const ordered: T[] = [];
     if (composite) {
       // Walk `_storedKeyStrings` directly — the serialized forms were
       // computed once at construction, so the reorder avoids re-running
-      // JSON.stringify per tuple on every `toArray()` call.
-      const keyStrings = this._storedKeyStrings!;
-      for (const k of keyStrings) {
-        const bucket = byKey.get(k);
+      // JSON.stringify per tuple on every load.
+      for (const k of this._storedKeyStrings!) {
+        // A missing bucket is `records.compact!` (:36) — an id with no loaded row.
+        const bucket = recordsById.get(k);
         if (bucket) ordered.push(...bucket);
       }
     } else {
@@ -615,13 +633,13 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
         // Normalize the looked-up id the same way `serializeKey` normalized the
         // record-side key, so a number FK from the upstream pluck matches a
         // BigInt PK on the loaded record (and vice versa).
-        const bucket = byKey.get(normalizeAssociationKey(id));
+        const bucket = recordsById.get(normalizeAssociationKey(id));
         if (bucket) ordered.push(...bucket);
       }
     }
-    const start = offsetVal ?? 0;
-    const end = limitVal == null ? undefined : start + limitVal;
-    return start === 0 && end === undefined ? ordered : ordered.slice(start, end);
+
+    this._records = ordered;
+    return stripThenable(this);
   }
 
   /**

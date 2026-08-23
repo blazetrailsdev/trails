@@ -1046,7 +1046,7 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1403-1421).
    */
-  private async execQueries(): Promise<T[]> {
+  protected async execQueries(): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
