@@ -261,7 +261,7 @@ export function setCallback<T extends typeof Model>(
   this: T,
   name: string,
   timing: "before" | "after" | "around",
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: Record<string, unknown>,
 ): void {
   let filterList = options;

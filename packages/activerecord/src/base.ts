@@ -4320,7 +4320,7 @@ export class Base extends Model {
     this: T,
     event: string,
     timing: "before" | "after" | "around",
-    fn: (...args: any[]) => any,
+    fn: ((...args: any[]) => any) | string,
     options?: Record<string, unknown>,
   ): void {
     _txSetCallback.call(this, event, timing, fn, options);

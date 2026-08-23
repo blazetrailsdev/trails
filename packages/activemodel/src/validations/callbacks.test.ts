@@ -61,16 +61,22 @@ class DogValidatorWithOnMultipleCondition extends Dog {
 describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called", async () => {
     const order: string[] = [];
+    // Rails' `DogWithMethodCallbacks` registers by method NAME —
+    // `before_validation :set_before_validation_marker` (callbacks_test.rb:17-18),
+    // the Symbol filter this test's name is about. A Ruby Symbol is a
+    // colon-prefixed string in trails.
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.beforeValidation(() => {
-          order.push("before_validation");
-        });
-        this.afterValidation(() => {
-          order.push("after_validation");
-        });
+        this.beforeValidation(":setBeforeValidationMarker");
+        this.afterValidation(":setAfterValidationMarker");
+      }
+      setBeforeValidationMarker(): void {
+        order.push("before_validation");
+      }
+      setAfterValidationMarker(): void {
+        order.push("after_validation");
       }
     }
     const p = new Person({ name: "Alice" });
@@ -221,31 +227,25 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("before validation does not mutate the if options array", () => {
-    // Rails guards that registering with `if:` + `on:` doesn't mutate the
-    // caller's options (old Rails appended the on-predicate into the `:if`
-    // array). trails' `CallbackConditions.if` is a single callable, not a
-    // Rails-style array of conditions, so there is no array to append to; the
-    // faithful analogue is asserting the passed options object is untouched —
-    // the on→if translation builds a fresh conditions object instead.
-    const opts = { if: (_r: any) => true, on: "create" as const };
+    const opts: Array<(r: any) => boolean> = [];
     class CreateDog extends Dog {
       static {
-        this.beforeValidation(() => {}, opts);
+        this.beforeValidation(() => {}, { if: opts, on: "create" });
       }
     }
     void CreateDog;
-    expect(opts).toEqual({ if: opts.if, on: "create" });
+    expect(opts).toEqual([]);
   });
 
   it("after validation does not mutate the if options array", () => {
-    const opts = { if: (_r: any) => true, on: "create" as const };
+    const opts: Array<(r: any) => boolean> = [];
     class CreateDog extends Dog {
       static {
-        this.afterValidation(() => {}, opts);
+        this.afterValidation(() => {}, { if: opts, on: "create" });
       }
     }
     void CreateDog;
-    expect(opts).toEqual({ if: opts.if, on: "create" });
+    expect(opts).toEqual([]);
   });
 
   it("before validation and after validation callbacks should be called with proc", async () => {

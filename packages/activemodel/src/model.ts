@@ -785,7 +785,10 @@ export class Model {
     this: T,
     event: string,
     timing: "before" | "after",
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void;
   static setCallback<T extends typeof Model>(
@@ -794,14 +797,15 @@ export class Model {
     timing: "around",
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void;
   static setCallback<T extends typeof Model>(
     this: T,
     event: string,
     timing: "before" | "after" | "around",
-    fn: CallbackFn | AroundCallbackFn | CallbackObject,
+    fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void {
     _registerCallbackOnProto(

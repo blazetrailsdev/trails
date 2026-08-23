@@ -20,7 +20,7 @@ export const ClassMethods = {
   /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#before_validation (callbacks.rb:55-61). */
   beforeValidation(
     this: SetCallbackHost,
-    fn: CallbackFn | CallbackObject,
+    fn: CallbackFn | CallbackObject | string,
     options: ValidationCallbackOptions = {},
   ): void {
     setOptionsForCallback(options);
@@ -31,7 +31,7 @@ export const ClassMethods = {
   /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#after_validation (callbacks.rb:88-96). */
   afterValidation(
     this: SetCallbackHost,
-    fn: CallbackFn | CallbackObject,
+    fn: CallbackFn | CallbackObject | string,
     options: ValidationCallbackOptions = {},
   ): void {
     options = { ...options };
@@ -48,7 +48,7 @@ interface SetCallbackHost {
   setCallback(
     event: string,
     timing: "before" | "after",
-    fn: CallbackFn | CallbackObject,
+    fn: CallbackFn | CallbackObject | string,
     options?: CallbackConditions,
   ): void;
 }
