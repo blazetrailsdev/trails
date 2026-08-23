@@ -28,8 +28,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLActiveSchemaTest", () => {
-    // `add_index_options` introspects the canonical `people` table when a bare
-    // column name is passed as `:where`; seed it through the fixtures framework.
     fixtures(["people"]);
 
     it("create database with encoding", async () => {

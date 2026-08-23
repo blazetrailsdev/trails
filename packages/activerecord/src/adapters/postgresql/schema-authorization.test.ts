@@ -49,7 +49,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.execute(`DROP USER IF EXISTS ${u}`);
         } catch {}
       }
-      // Do not close: `adapter` is the shared pooled Base.connection now.
     });
 
     it("schema invisible", async () => {
@@ -89,7 +88,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("sequence schema caching", async () => {
       const SchemaThing = makeSchemaThingModel();
-      // Load schema once via user1's session (where schema_things is visible)
       await adapter.sessionAuth(USERS[0]);
       await SchemaThing.loadSchema();
       await adapter.sessionAuth("default");

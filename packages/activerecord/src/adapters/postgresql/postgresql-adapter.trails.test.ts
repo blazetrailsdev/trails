@@ -67,12 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     try {
-      await adapter.exec(
-        // The `ex_%` sweep below cannot reach these two: `test_no_returning` is
-        // TEMP, so it lives in pg_temp rather than the `public` schema the sweep
-        // filters on, and `abba` carries no `ex_` prefix.
-        `DROP TABLE IF EXISTS abba, test_no_returning CASCADE`,
-      );
+      await adapter.exec(`DROP TABLE IF EXISTS abba, test_no_returning CASCADE`);
 
       const tables = await adapter.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,
@@ -301,8 +296,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.beginDbTransaction();
-        // A genuinely concurrent chain: its `withRawConnection` holds the
-        // connection lock for the query's whole life, so nothing is abandoned.
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
         await other.lock.synchronize(() => other.rollbackDbTransaction());
@@ -342,7 +335,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.execute("SELECT 1 AS n");
-        // Fired from OUTSIDE the lock, as a pool reap/checkin is.
         setTimeout(() => other.resetBang(), 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
@@ -374,14 +366,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         await (
           other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
         )._cancelAnyRunningQuery();
-        // `block` puts the cancelled command back off the wire before the
-        // cancel returns; its error reaching this `catch` is a further
-        // microtask hop behind that, so await the query before reading it.
         await sleep;
         expect(sleepError).toBeInstanceOf(QueryCanceled);
-        // The cancel aborted the transaction, so end it before probing — a
-        // leaked cancel shows up as QueryCanceled on one of these two, not as
-        // the 25P02 an aborted transaction block answers with.
         await other.rollbackDbTransaction();
         await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
       } finally {
@@ -413,9 +399,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           _cancelAnyRunningQuery(): Promise<void>;
           _blockUntilCommandSettles(client: unknown): Promise<void>;
         };
-        // Spy the INSTANCE, not the prototype: the adapter reads the method off
-        // `this`, and a prototype spy would be shadowed by nothing here but is
-        // shared with every other adapter in the worker.
         const blockUntilCommandSettles = internals._blockUntilCommandSettles.bind(other);
         let releaseBlock!: () => void;
         const blocked = new Promise<void>((r) => (releaseBlock = r));
@@ -469,9 +452,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         // `reset_column_information`'s shape (model_schema.rb:523-524): a sync
         // caller that drops the returned chain.
         void other.clearCacheBang();
-        // The DEALLOCATE is dispatched from a microtask off the pool's chain,
-        // so let the turn end before sampling — a read in the same tick sees
-        // the wire before it has anything on it.
         await new Promise<void>((r) => setTimeout(r, 0));
         const status = await other.lock.synchronize(() => other.transactionStatus);
         expect(status).toBe(PQTRANS_INTRANS);
@@ -1662,18 +1642,13 @@ describeIfPg("PostgreSQLAdapter#active", () => {
         typeMap: { has(oid: number): boolean };
       };
       const getOidTypeSpy = vi.spyOn(adapter, "getOidType");
-      // A live, non-preloaded OID: the pg_type row for `pg_type` itself.
       const rows = await adapter.execute("SELECT 'regprocedure'::regtype::oid AS oid");
       const oid = Number((rows[0] as { oid: number | string }).oid);
       getOidTypeSpy.mockClear();
 
       await adapter.loadAdditionalTypes([oid]);
 
-      // The pg_type query resolved no column types of its own — the cycle's
-      // first edge is gone, so no depth of recursion is possible.
       expect(getOidTypeSpy).not.toHaveBeenCalled();
-      // And no poisoning fallback was registered for an OID pg_type never
-      // returned (see lookupCastTypeFromColumn).
       expect(internals.typeMap.has(987654321)).toBe(false);
     } finally {
       await adapter.close();

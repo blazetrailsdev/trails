@@ -78,7 +78,6 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("type cast bigdecimal", async () => {
-    // SQLite stores large decimals as REAL; we verify round-trip fidelity
     await adapter.exec(`CREATE TABLE "bd_test" ("id" INTEGER PRIMARY KEY, "amount" REAL)`);
     await adapter.executeMutation(`INSERT INTO "bd_test" ("amount") VALUES (?)`, [123456.789]);
     const rows = await adapter.execute(`SELECT "amount" FROM "bd_test"`);
@@ -135,7 +134,6 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
   it("quote float nan", async () => {
     await adapter.exec(`CREATE TABLE "nan_test" ("id" INTEGER PRIMARY KEY, "val" REAL)`);
-    // SQLite stores NaN as NULL when passed through binds
     await adapter.executeMutation(`INSERT INTO "nan_test" ("val") VALUES (?)`, [NaN]);
     const rows = await adapter.execute(`SELECT "val" FROM "nan_test"`);
     expect(rows[0].val).toBeNull();

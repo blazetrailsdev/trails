@@ -50,9 +50,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await conn.execute(`SELECT * FROM ${BITS} LIMIT 1`);
     }
 
-    // Serializable parent on each connection, dirty each, savepoint on
-    // `adapter`, commit a conflicting write on `other` — the next write inside
-    // `adapter`'s savepoint raises SerializationFailure.
     async function serializationConflict(): Promise<PostgreSQLAdapter> {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       await other.beginIsolatedDbTransaction("serializable");
@@ -67,7 +64,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       return other;
     }
 
-    // Deadlock two savepoint-scoped writes; true iff one aborted (Deadlocked).
     async function nestedDeadlock(other: PostgreSQLAdapter): Promise<boolean> {
       await adapter.beginDbTransaction();
       await other.beginDbTransaction();
@@ -85,8 +81,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       return errs.length === 1 && errs[0].reason instanceof Deadlocked;
     }
 
-    // After the doomed txn is rolled back, the connection is reusable: a fresh
-    // transaction commits and persists (fails if state was left stuck).
     async function assertConnectionRecovers(): Promise<void> {
       await adapter.beginDbTransaction();
       await adapter.execute(`UPDATE ${SAMPLES} SET value = 7 WHERE id = 2`);

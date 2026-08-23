@@ -36,8 +36,6 @@ function extendProgrammerMistake(adapter: PostgreSQLAdapter): void {
   };
 }
 
-// disable_referential_integrity maps over `tables()`; a dummy table guarantees
-// the generated SQL is non-empty so the patched execute fires.
 async function withDummyTable(adapter: PostgreSQLAdapter, fn: () => Promise<void>): Promise<void> {
   await adapter.execute(`CREATE TABLE IF NOT EXISTS "referential_integrity_dummy" ("id" SERIAL)`);
   try {
@@ -59,16 +57,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    // Schema-scoped tables created in-test are torn down with their schema via
-    // DROP SCHEMA CASCADE; these static IF EXISTS drops balance
-    // require-table-teardown by name.
     try {
       await adapter.execute(
         `DROP TABLE IF EXISTS referential_integrity_test_schema.nodes, referential_integrity_violation_test.parents, referential_integrity_violation_test.children, referential_integrity_tx_test.nodes CASCADE`,
       );
-    } catch {
-      // ignore cleanup errors
-    }
+    } catch {}
     await adapter.close();
   });
 
@@ -170,7 +163,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         `);
         expect(Number(rows[0].count)).toBe(1);
 
-        // Should not throw when all FK constraints are valid
         await expect(adapter.checkAllForeignKeysValidBang()).resolves.toBeUndefined();
       } finally {
         await adapter.execute(`DROP SCHEMA IF EXISTS referential_integrity_test_schema CASCADE`);
@@ -191,11 +183,9 @@ describeIfPg("PostgreSQLAdapter", () => {
           )
         `);
 
-        // Insert a child row that references a non-existent parent.
         await adapter.execute(
           `INSERT INTO referential_integrity_violation_test.children (parent_id) VALUES (9999)`,
         );
-        // Add the FK constraint NOT VALID so it can be created despite the bad row.
         await adapter.execute(`
           ALTER TABLE referential_integrity_violation_test.children
             ADD CONSTRAINT fk_children_parent
@@ -204,11 +194,8 @@ describeIfPg("PostgreSQLAdapter", () => {
             NOT VALID
         `);
 
-        // checkAllForeignKeysValidBang re-validates every FK — should raise.
         await expect(adapter.checkAllForeignKeysValidBang()).rejects.toThrow();
 
-        // When called inside a transaction the savepoint is rolled back on
-        // failure, leaving the outer transaction still usable.
         await adapter.beginTransaction();
         try {
           await expect(adapter.checkAllForeignKeysValidBang()).rejects.toThrow();
@@ -232,11 +219,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await adapter.beginTransaction();
         try {
-          // Inside a transaction the method uses a SAVEPOINT, so the
-          // surrounding transaction stays usable after the check.
           await expect(adapter.checkAllForeignKeysValidBang()).resolves.toBeUndefined();
 
-          // Transaction should still be live — a query should succeed.
           const result = await adapter.execute("SELECT 1 AS n");
           expect(result[0].n).toBe(1);
         } finally {

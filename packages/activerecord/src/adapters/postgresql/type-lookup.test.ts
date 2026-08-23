@@ -10,7 +10,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    // Populate the type map with array/range OIDs from pg_type.
     await adapter.loadAdditionalTypes();
   });
   afterEach(async () => {
@@ -41,7 +40,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("range types correctly respect registration of subtypes", () => {
-      // Same precision rationale as "array types" above.
       const bigNum = 3_000_000_000;
       const intRange = adapter.typeMap.lookup(3904, -1, "int4range");
       const bigintRange = adapter.typeMap.lookup(3926, -1, "int8range");

@@ -6,8 +6,6 @@ import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
-// Opt into the canonical-model autoload index so `Author.has_many :posts`
-// resolves `Post` by name on first reference.
 import "../../support/canonical-model-index.js";
 
 // -- Rails test class: explain_test.rb (ActiveRecord::SQLite3TestCase) --

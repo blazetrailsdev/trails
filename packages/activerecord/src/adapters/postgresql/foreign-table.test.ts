@@ -108,9 +108,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "does not have a primary key", async () => {
-      // loadSchema warms the schema cache's primary-key entry; a foreign table
-      // has no PK constraint, so introspection yields null and primary_key
-      // resolves to null rather than the "id" convention.
       await ForeignProfessor.loadSchema();
       expect(ForeignProfessor.primaryKey).toBeNull();
     });

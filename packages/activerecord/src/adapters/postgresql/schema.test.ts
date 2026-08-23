@@ -109,8 +109,6 @@ async function setupSchemas(adapter: PostgreSQLAdapter) {
 }
 
 async function teardownSchemas(adapter: PostgreSQLAdapter) {
-  // The `music.*` tables are dropped with the `music` schema below; this static
-  // IF EXISTS drop balances require-table-teardown by name.
   await adapter.exec(`DROP TABLE IF EXISTS music.songs, music.albums, music.albums_songs CASCADE`);
   await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true });
   await adapter.dropSchema(SCHEMA_NAME, { ifExists: true });
@@ -188,11 +186,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column exists honors search path", async () => {
-      // Regression for columns-pg-honor-search-path (RFC 0023): columnExists
-      // must resolve the column list through the active search_path, not a
-      // hardcoded table_schema = 'public'. A table living only on a non-public
-      // schema that is on the search_path passes tableExists, so columnExists
-      // must stay consistent and report its columns too.
       await adapter.setSchemaSearchPath(SCHEMA_NAME);
       expect(await adapter.tableExists(TABLE_NAME)).toBe(true);
       expect(await adapter.columnExists(TABLE_NAME, "name")).toBe(true);
@@ -313,8 +306,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         altered = true;
         await adapter.execQuery(`select * from ${tbl} where id = $1`, "sql", [1]);
       } finally {
-        // We are not using DROP COLUMN IF EXISTS because that syntax is only
-        // supported by pg 9.X
         if (altered) {
           await adapter.execQuery(`alter table ${tbl} drop column zomg`, "sql", []);
         }
@@ -604,10 +595,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("prepared statements with multiple schemas", async () => {
       const Thing5 = makeThing5Model();
-      // Load schema within a transaction to pin all queries to one connection.
-      // Without this, the pool may route `columns("things")` to a fresh
-      // connection without the search path set, returning 0 columns and causing
-      // DEFAULT VALUES inserts that silently drop all attributes.
       try {
         await adapter.beginTransaction();
         await adapter.setSchemaSearchPath(SCHEMA_NAME);
@@ -698,9 +685,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("my_schema");
     });
     afterEach(async () => {
-      // Tables created in-test live in my_schema/my_other_schema and are dropped
-      // with those schemas; this static IF EXISTS drop balances
-      // require-table-teardown by name.
       await adapter.exec(`DROP TABLE IF EXISTS my_schema.wagons, my_other_schema.wagons CASCADE`);
       await adapter.dropSchema("my_other_schema", { ifExists: true });
       await adapter.dropSchema("my_schema", { ifExists: true });
@@ -934,8 +918,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("my.schema");
     });
     afterEach(async () => {
-      // The in-test table lives in the dotted "my.schema" schema and is dropped
-      // with it; this static IF EXISTS drop balances require-table-teardown by name.
       await adapter.exec(`DROP TABLE IF EXISTS "my.schema" CASCADE`);
       await adapter.dropSchema("my.schema", { ifExists: true });
     });
@@ -956,7 +938,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       class Article extends Base {
         static {
           this.tableName = '"my.schema".articles';
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
         }
       }

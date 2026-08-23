@@ -33,8 +33,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         "INSERT INTO `test_bulbs` (name, color) VALUES ('Jimmy', 'blue')",
       );
 
-      // Stays self-built: "in different threads" is the test — the concurrent
-      // INSERT has to run on a connection other than the one issuing the DELETE.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         const [deleteResult] = await Promise.all([

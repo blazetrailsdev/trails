@@ -30,8 +30,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(checkConstraints.length).toBe(1);
 
       const expression = checkConstraints[0].expression;
-      // MariaDB stores the expression unescaped; MySQL prefixes the string
-      // literal with its connection charset introducer (_utf8mb4).
       const expected = isMariaDb
         ? "`name` <> 'forbidden_string'"
         : "`name` <> _utf8mb4'forbidden_string'";

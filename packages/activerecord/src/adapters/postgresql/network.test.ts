@@ -13,7 +13,6 @@ import type { TableDefinition as PgTableDefinition } from "../../connection-adap
 class PostgresqlNetworkAddress extends Base {
   static {
     this.tableName = "postgresql_network_addresses";
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
   }
 }

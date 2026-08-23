@@ -106,7 +106,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action handles when warning_count does not match returned warnings", async () => {
       await withDbWarningsAction("raise", async () => {
-        // Force warning_count to 1 even though SHOW WARNINGS will return [].
         vi.spyOn(
           adapter as unknown as { warningCount: () => Promise<number> },
           "warningCount",

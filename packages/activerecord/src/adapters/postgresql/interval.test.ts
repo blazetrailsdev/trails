@@ -14,7 +14,6 @@ import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql
 class IntervalDataType extends Base {
   static {
     this.tableName = "interval_data_types";
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
     this.attribute("legacy_term", "string");
   }

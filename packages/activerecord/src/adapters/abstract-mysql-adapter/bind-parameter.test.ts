@@ -34,9 +34,7 @@ describeIfMysqlAdapter("AbstractMySQLAdapter", () => {
     afterEach(async () => {
       try {
         await adapter.exec("DROP TABLE IF EXISTS `bind_param_items`");
-      } catch {
-        // ignore
-      }
+      } catch {}
     });
 
     it("create question marks", async () => {

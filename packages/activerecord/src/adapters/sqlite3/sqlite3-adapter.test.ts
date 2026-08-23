@@ -32,10 +32,6 @@ async function createExampleTable(): Promise<void> {
 }
 
 afterEach(async () => {
-  // Static teardown for the tables built in-test via raw CREATE TABLE (mostly on
-  // throwaway :memory: adapters that are discarded on close). SQLite has no
-  // multi-table DROP, so one IF EXISTS statement per name; this balances
-  // require-table-teardown and is behavior-neutral on the fresh per-test adapter.
   await adapter.exec(
     `DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS typed; DROP TABLE IF EXISTS no_pk; DROP TABLE IF EXISTS bin_esc; DROP TABLE IF EXISTS enc_test; DROP TABLE IF EXISTS def_vals; DROP TABLE IF EXISTS strict_items; DROP TABLE IF EXISTS custom_pk_src; DROP TABLE IF EXISTS custom_pk_dest; DROP TABLE IF EXISTS cpk_src; DROP TABLE IF EXISTS cpk_dest; DROP TABLE IF EXISTS custom_pk; DROP TABLE IF EXISTS change_pk; DROP TABLE IF EXISTS barcodes; DROP TABLE IF EXISTS test; DROP TABLE IF EXISTS testings; DROP TABLE IF EXISTS rowid_test; DROP TABLE IF EXISTS rowid_lower; DROP TABLE IF EXISTS text_pk; DROP TABLE IF EXISTS mixed_case; DROP TABLE IF EXISTS auto_inc; DROP TABLE IF EXISTS cpk; DROP TABLE IF EXISTS ex; DROP TABLE IF EXISTS json_defs`,
   );
@@ -88,7 +84,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("connect with url", async () => {
-    // better-sqlite3 doesn't use URLs, but we can open a :memory: db
     const a = new BetterSQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     await a.close();
@@ -168,7 +163,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("connection no db", async () => {
-    // Attempting to open a non-existent file in readonly mode throws
     const os = await import("os");
     const path = await import("path");
     expect(
@@ -180,14 +174,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("bad timeout", async () => {
-    // better-sqlite3 accepts timeout option; a negative value is accepted but harmless
     const a = new BetterSQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     await a.close();
   });
 
   it("nil timeout", async () => {
-    // No timeout specified — default constructor works fine
     const a = new BetterSQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     await a.close();
@@ -205,8 +197,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("default pragmas", async () => {
-    // Our adapter sets journal_mode=WAL and foreign_keys=ON by default
-    // For in-memory databases, journal_mode reports "memory" (WAL only applies to file DBs)
     const jm = await adapter.execute(`PRAGMA journal_mode`);
     expect(["wal", "memory"]).toContain(jm[0].journal_mode);
     const fk = await adapter.execute(`PRAGMA foreign_keys`);
@@ -214,25 +204,19 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("overriding default foreign keys pragma", async () => {
-    // Verify FK pragma is ON by default
     const fk = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk[0].foreign_keys).toBe(1);
-    // Can turn it off
     await adapter.execute(`PRAGMA foreign_keys = OFF`);
     const fk2 = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk2[0].foreign_keys).toBe(0);
-    // Restore
     await adapter.execute(`PRAGMA foreign_keys = ON`);
   });
 
   it("overriding default journal mode pragma", async () => {
-    // In-memory databases always report "memory" for journal_mode
-    // Test that pragma call doesn't throw
     const jm = await adapter.execute(`PRAGMA journal_mode`);
     expect(jm[0].journal_mode).toBeDefined();
     await adapter.execute(`PRAGMA journal_mode = DELETE`);
     const jm2 = await adapter.execute(`PRAGMA journal_mode`);
-    // In-memory DB ignores journal_mode changes, stays "memory"
     expect(jm2[0].journal_mode).toBeDefined();
   });
 
@@ -250,8 +234,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("overriding default mmap size pragma", async () => {
-    // mmap_size pragma returns empty on in-memory databases,
-    // so just verify the pragma call doesn't reject
     await adapter.execute(`PRAGMA mmap_size = 0`);
   });
 
@@ -264,11 +246,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("setting new pragma", async () => {
     await adapter.execute(`PRAGMA temp_store = MEMORY`);
     const rows = await adapter.execute(`PRAGMA temp_store`);
-    expect(rows[0].temp_store).toBe(2); // MEMORY = 2
+    expect(rows[0].temp_store).toBe(2);
   });
 
   it("setting invalid pragma", async () => {
-    // SQLite silently ignores unknown pragmas — no rejection
     await adapter.execute(`PRAGMA not_a_real_pragma`);
   });
 
@@ -307,7 +288,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const original = Buffer.from("hello world");
     const copy = Buffer.from(original);
     await adapter.executeMutation(`INSERT INTO "enc_test" ("data") VALUES (?)`, [copy]);
-    // Original buffer should not have been mutated
     expect(original).toEqual(Buffer.from("hello world"));
   });
 
@@ -615,7 +595,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('b')`);
     await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'b'`);
     const id = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('c')`);
-    // AUTOINCREMENT ensures IDs are never reused
     expect(id).toBe(3);
   });
 
@@ -639,7 +618,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("db is readonly when readonly option is true", async () => {
-    // Create a file-based db first, then open it readonly
     const fs = await import("fs");
     const path = await import("path");
     const os = await import("os");
@@ -671,7 +649,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default", async () => {
-    // Default class config is false — new connections are non-strict.
     expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
     const conn = new BetterSQLite3Adapter(":memory:");
     expect(conn._strictStrings).toBe(false);
@@ -682,7 +659,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     //   so this assertion is omitted — DQS cannot be re-enabled via PRAGMA here.
     await conn.close();
 
-    // Setting the class config propagates to new connections.
     SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:");
@@ -698,7 +674,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default and true in database yml", async () => {
-    // Explicit strict: true in options always enables strict mode.
     const conn = new BetterSQLite3Adapter(":memory:", { strict: true });
     try {
       expect(conn._strictStrings).toBe(true);
@@ -710,7 +685,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await conn.close();
     }
 
-    // Explicit strict: true also overrides the class config (still strict).
     SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: true });
@@ -729,7 +703,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default and false in database yml", async () => {
-    // Explicit strict: false in options disables strict mode.
     const conn = new BetterSQLite3Adapter(":memory:", { strict: false });
     try {
       expect(conn._strictStrings).toBe(false);
@@ -740,7 +713,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await conn.close();
     }
 
-    // Explicit strict: false overrides strictStringsByDefault = true.
     SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: false });
@@ -848,7 +820,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.exec(`CREATE TABLE "mixed_case" ("id" Integer PRIMARY KEY, "name" TEXT)`);
     const cols = await adapter.execute(`PRAGMA table_info("mixed_case")`);
     const idCol = cols.find((c: any) => c.name === "id");
-    // SQLite normalizes type names to uppercase
     expect((idCol as any).type.toUpperCase()).toBe("INTEGER");
     expect(idCol!.pk).toBe(1);
   });
@@ -868,7 +839,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       `CREATE TABLE "cpk" ("id1" INTEGER, "id2" INTEGER, "name" TEXT, PRIMARY KEY ("id1", "id2"))`,
     );
     const cols = await adapter.execute(`PRAGMA table_info("cpk")`);
-    // Composite PK - neither column is a single rowid alias
     const pkCols = cols.filter((c: any) => c.pk > 0);
     expect(pkCols).toHaveLength(2);
   });

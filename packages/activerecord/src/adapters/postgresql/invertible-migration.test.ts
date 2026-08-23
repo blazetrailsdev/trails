@@ -70,15 +70,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       const m = new CreateEnumMig();
       await m.execMigration(adapter, "up");
-      // Add an actual enum-typed column so reversal must drop the table before
-      // dropping the enum type (otherwise DROP TYPE fails with dependency error)
       await adapter.execute(
         `ALTER TABLE enums ADD COLUMN best_color color NOT NULL DEFAULT 'blue'`,
       );
       const enumsBefore = await adapter.enumTypes();
       expect(enumsBefore.some(([name]) => name === "color")).toBe(true);
 
-      // Down: drops table first (containing enum column), then drops enum type
       await m.execMigration(adapter, "down");
       const enumsAfter = await adapter.enumTypes();
       expect(enumsAfter.some(([name]) => name === "color")).toBe(false);

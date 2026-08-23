@@ -35,10 +35,6 @@ import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-a
 import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 import { Result } from "../../result.js";
 
-// Fabricated-error translate_exception checks. These don't touch a live
-// MySQL server (they feed Object.assign(new Error(...), { errno/code })
-// straight into translateException), so they live outside describeIfMysqlAdapter
-// to keep coverage on dev machines without MySQL installed.
 describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   let adapter: Mysql2Adapter;
   beforeEach(() => {
@@ -55,8 +51,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     // touching a real DB, preserving the `active ⟹ isConnected` invariant.
     expect(await adapter.active()).toBe(false);
     expect(adapter.isConnected()).toBe(false);
-    // Stays self-built: a *never-connected* adapter is exactly what this
-    // asserts on — the leased connection is live by construction.
     const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
     expect(await fresh.active()).toBe(false);
     expect(fresh.isConnected()).toBe(false);
@@ -159,13 +153,10 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
   // it has no never-connected window to cover; this guards trails' lazy-connect.
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
-      // Stays self-built: the never-connected → connected → disconnected walk
-      // is the assertion, and disconnectBang() must not hit the leased pool.
       const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);
-        // First query still connects lazily (verifyBang's _ensureClient net).
         await fresh.execQuery("SELECT 1");
         expect(await fresh.active()).toBe(true);
         expect(fresh.isConnected()).toBe(true);
@@ -223,14 +214,6 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     });
 
     it("translates ER_DATA_TOO_LONG to ValueTooLong", async () => {
-      // sql_mode is session-scoped, and our mysql2-adapter's pool checks
-      // out / releases a connection per call — so a plain SET SESSION
-      // wouldn't carry over to the CREATE + INSERT below. Pin a single
-      // pool connection via beginTransaction so all three statements
-      // run on the same session. (DDL in MySQL auto-commits, so the
-      // table persists even though we roll back the transaction.)
-      // Session variables aren't transactional, so rollback() won't revert the
-      // SET SESSION below — capture and restore sql_mode explicitly.
       const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
       await adapter.beginTransaction();
       try {

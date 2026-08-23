@@ -62,7 +62,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     class PostgresqlRangesCls extends Base {
       static tableName = "postgresql_ranges";
       static {
-        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
         this.attribute("id", "integer");
       }
     }
@@ -81,7 +80,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       static timeZoneAwareAttributes = true;
       static timeZoneAwareTypes = [...Base.timeZoneAwareTypes, "tsrange", "tstzrange"];
       static {
-        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
         this.attribute("id", "integer");
       }
     }
@@ -104,7 +102,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range = parseRange(rows[0].int4_range as string, toInt)!;
       expect(range).toBeInstanceOf(Range);
       expect(range.begin).toBe(1);
-      // PG normalizes [1,10] to [1,11) for discrete integer ranges
       expect(range.end).toBe(11);
       expect(range.excludeEnd).toBe(true);
     });
@@ -545,7 +542,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const fromInstant = Temporal.Instant.from(fromStr);
       const toInstant = Temporal.Instant.from(toStr);
 
-      // [exclusive, inclusive, endless, beginless]
       const ranges = [
         new Range(fromStr, toStr, true),
         new Range(fromStr, toStr, false),
@@ -866,7 +862,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       setZone(tz);
       const timeString = "2017-09-26T07:30:59.132451-07:00";
       const instant = Temporal.Instant.from(timeString);
-      // Confirm the instant has sub-millisecond precision (µs component = 451 µs)
       expect(instant.toString()).toContain(".132451");
 
       const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
@@ -882,7 +877,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range2 = r.ts_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      // µs precision round-trips through PostgreSQL tsrange
       expect((range2.begin as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
         instant.toString(),
       );
@@ -907,7 +901,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       expect(((r.num_range as Range).begin as BigDecimal).toString("F")).toBe("0.5");
       expect(((r.num_range as Range).end as BigDecimal).toString("F")).toBe("1.0");
-      // [0.5,0.5) is empty in numrange → null on reload
       r.num_range = new Range("0.5", "0.5", true);
       await r.saveBang();
       await r.reload();
@@ -934,7 +927,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = r.date_range as Range;
       expect((result.begin as Temporal.PlainDate).toString()).toBe("2012-02-03");
       expect((result.end as Temporal.PlainDate).toString()).toBe("2012-02-10");
-      // [2012-02-03,2012-02-03) is empty → null on reload
       r.date_range = new Range("2012-02-03", "2012-02-03", true);
       await r.saveBang();
       await r.reload();
@@ -958,7 +950,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       expect((r.int4_range as Range).begin).toBe(6);
       expect((r.int4_range as Range).end).toBe(10);
-      // [3,3) is empty in int4range → null on reload
       r.int4_range = new Range(3, 3, true);
       await r.saveBang();
       await r.reload();
@@ -984,7 +975,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       expect((r.int8_range as Range).begin).toBe(60000);
       expect((r.int8_range as Range).end).toBe(10000000);
-      // [39999,39999) is empty in int8range → null on reload
       r.int8_range = new Range(39999, 39999, true);
       await r.saveBang();
       await r.reload();
@@ -1024,8 +1014,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("ranges correctly escape input", async () => {
       const range = new Range("-1,2]'\"; DROP TABLE postgresql_ranges; --", "a", false);
       await PostgresqlRanges.create({});
-      // SQL injection is prevented — the update either succeeds (value stored) or
-      // raises a type error, but the table must still exist afterwards.
       await PostgresqlRanges.updateAll({ int8_range: range }).catch(() => {});
       await expect(PostgresqlRanges.first()).resolves.not.toBeNull();
     });

@@ -32,14 +32,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       static _tableName = "unsigned_types";
     }
     UnsignedType.adapter = adapter;
-    // Reflect the real columns (PK included) up front so the post-INSERT
-    // write-back (`_performInsert` → `_writeAttribute("id", insertedId)`)
-    // targets a reflected `id` attribute under strict `writeFromUser`, without
-    // the internal-write bridge. Explicit warming (as in mysql-boolean's
-    // `BooleanType.loadSchema()`) keeps the reflected `unsigned` metadata the
-    // range-check assertions rely on — declaring `id` via `attribute()` would
-    // instead suppress DB reflection (ensureSchemaLoaded bails on a concrete
-    // user attr), hiding the unsigned columns.
     await UnsignedType.loadSchema();
     return UnsignedType;
   }

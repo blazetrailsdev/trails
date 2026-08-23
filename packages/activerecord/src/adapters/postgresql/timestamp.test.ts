@@ -164,7 +164,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
           await adapter.reconnect();
-          // make sure to use a non-UTC time zone
           await adapter.execute(`SET time zone 'America/Jamaica'`);
           class PostgresqlTimestampWithZone extends Base {
             static _tableName = "postgresql_timestamp_with_zones";
@@ -334,14 +333,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // sentinels (the timestamp OID round-trips them as "infinity" / "-infinity").
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
-        // Declare `name` so mass-assignment dispatches its setter: the sibling
-        // `load infinity and beyond` Dev above shares the `ts_infinity_dev`
-        // schema-cache slot but its table has no `name` column, so reflection
-        // alone can leave `name` out of the attribute set — and construction now
-        // raises UnknownAttributeError for an unmodeled key. `updated_at` reflects
-        // from the timestamp column (keeping its infinity-capable OID decoder).
         static {
-          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
           this.attribute("id", "integer");
           this.attribute("name", "string");
         }

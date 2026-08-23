@@ -743,6 +743,7 @@ export default defineConfig(
       "packages/activerecord/src/connection-adapters/mysql2/**/*.ts",
       "packages/activerecord/src/connection-adapters/postgresql/**/*.ts",
       "packages/activerecord/src/connection-adapters/sqlite3/**/*.ts",
+      "packages/activerecord/src/adapters/**/*.ts",
     ],
     rules: {
       "blazetrails/no-freeform-comments": "error",

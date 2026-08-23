@@ -63,9 +63,6 @@ function connectionWithoutInsertReturning(): PostgreSQLAdapter {
   return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, insertReturning: false });
 }
 
-// Run `fn` with `ext` guaranteed disabled; restore the pre-state (enabled
-// or disabled) on exit even if `fn` throws before tearing down whatever it
-// created.
 async function withExtensionDisabled(
   adapter: PostgreSQLAdapter,
   ext: string,
@@ -84,9 +81,6 @@ async function withExtensionDisabled(
   }
 }
 
-// Same as withExtensionDisabled but inverted: `ext` is guaranteed enabled
-// inside `fn` and its pre-state (enabled or disabled) is restored on exit
-// even if `fn` throws before touching the extension itself.
 async function withExtensionEnabled(
   adapter: PostgreSQLAdapter,
   ext: string,
@@ -120,15 +114,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     PostgreSQLAdapter.dbWarningsAction = savedWarningsAction;
     PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
     vi.restoreAllMocks();
-    // A test that never queried this adapter cannot have created `ex`/`ex2`,
-    // and making the hook connect just to issue the DROP times its 30 s budget
-    // out under load.
     if (adapter.isConnected()) {
       try {
         await adapter.exec(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);
-      } catch {
-        // ignore cleanup errors
-      }
+      } catch {}
     }
     await adapter.close();
   });
@@ -214,7 +203,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((error as ConnectionFailed).message).toBe("Could not determine PostgreSQL version");
       versionSpy.mockRestore();
 
-      // Can reconnect after a bad connection.
       await adapter.reconnectBang();
       expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
     });
@@ -408,7 +396,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`create table ex(id serial primary key)`);
       await adapter.exec(`create table ex2(id serial primary key)`);
       try {
-        // classid, objid, objsubid, refclassid, refobjid, refobjsubid, deptype
         const correctDependRecord = [
           "'pg_class'::regclass",
           "'ex_id_seq'::regclass",
@@ -418,8 +405,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           "1",
           "'a'",
         ];
-        // A spurious dependency whose classid is pg_attrdef rather than pg_class —
-        // a "collision" that the correct query must ignore when resolving ex's sequence.
         const collisionDependRecord = [
           "'pg_attrdef'::regclass",
           "'ex2_id_seq'::regclass",
@@ -450,7 +435,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("table alias length", async () => {
-      // assert_nothing_raised — the call must not throw.
       let raised = false;
       try {
         (adapter as unknown as { tableAliasLength(): number }).tableAliasLength();
@@ -613,7 +597,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((error as Error).message).toMatch(/could not create unique index/);
         expect((error as RecordNotUnique).connectionPool).toBe(adapter.pool);
 
-        // A failed CONCURRENTLY unique index is left behind but marked invalid.
         expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
         expect(
           await adapter.indexExists("ex", "number", { name: "invalid_index", valid: true }),
@@ -696,12 +679,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raise error when cannot translate exception", async () => {
-      // execute(null) propagates TypeError unchanged (pg rejects null text; not a DatabaseError).
       await expect(adapter.execute(null as never)).rejects.toBeInstanceOf(TypeError);
     });
 
     it("translate no connection exception to not established", async () => {
-      // Open the connection and capture its backend pid.
       const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
       const pid = (pidRows[0] as { pid: number }).pid;
       // Terminate this backend from a separate connection. After the single
@@ -740,21 +721,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("only reload type map once for every unrecognized type", async () => {
-      // Eagerly initialize so the spy captures only unrecognized-type reloads,
-      // not the first-connection type-map bootstrap.
       await adapter.execQuery("SELECT 1");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes");
       try {
-        // First encounter of an unrecognized OID reloads the type map.
         await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
         const afterFirst = loadSpy.mock.calls.length;
         expect(afterFirst).toBeGreaterThan(0);
-        // Same unrecognized OID again — a fallback type is already registered,
-        // so no further reload.
         await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
         expect(loadSpy.mock.calls.length).toBe(afterFirst);
-        // A different unrecognized type reloads the map again.
         await adapter.execQuery("SELECT NULL::anyarray");
         expect(loadSpy.mock.calls.length).toBeGreaterThan(afterFirst);
       } finally {
@@ -766,8 +741,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("only warn on first encounter of unrecognized oid", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        // execQuery goes through getOidType which triggers the dedup logic.
-        // execute() bypasses OID resolution so it cannot trigger the warn.
         await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
         await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
         await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
@@ -807,8 +780,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`CREATE DOMAIN example_type AS integer`);
       const internalExecQuerySpy = vi.spyOn(adapter, "internalExecQuery");
       try {
-        // canPerformCaseInsensitiveComparisonFor does the pg_proc lookup via
-        // internalExecQuery. Spy on it to verify the cache prevents a second DB round-trip.
         const col = { sqlType: "example_type" };
         await adapter.canPerformCaseInsensitiveComparisonFor(col);
         const callsAfterFirst = internalExecQuerySpy.mock.calls.length;
@@ -923,7 +894,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("does not raise notice level warnings", async () => {
       PostgreSQLAdapter.dbWarningsAction = "raise";
-      // DROP TABLE IF EXISTS fires a NOTICE (not WARNING) — must not raise
       await expect(
         adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
       ).resolves.toBeDefined();

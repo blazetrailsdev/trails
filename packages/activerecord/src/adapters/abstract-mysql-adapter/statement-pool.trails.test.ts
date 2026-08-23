@@ -23,11 +23,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     adapter.preparedStatements = true;
   });
   afterEach(() => {
-    // preparedStatements is an adapter-wide setting and the statement pool
-    // itself is per-connection state, both of which now outlive a single test
-    // on the shared leased connection. Restore the setting and drop the pool
-    // (disconnectBang is reconnectable — the next query re-establishes) so each
-    // test starts from the clean slate it asserts on.
     adapter.preparedStatements = originalPreparedStatements;
     adapter.disconnectBang();
   });
@@ -68,9 +63,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("statementLimit = 0 is unsupported and raises on the first prepare", async () => {
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
-      // The outer beforeEach opts the *leased* adapter into prepared
-      // statements; this one is built locally and defaults to off, so without
-      // this the prepared path is never taken and the pool is never reached.
       adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
@@ -103,8 +95,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("dealloc does not raise on inactive connection", async () => {
-      // Stays self-built: close() permanently kills the adapter, which would
-      // poison the leased connection for every later test in this worker.
       const closable = new Mysql2Adapter(MYSQL_TEST_URL);
       closable.preparedStatements = true;
       await closable.beginDbTransaction();
@@ -116,16 +106,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {
-      // Stays self-built: reading a differently configured statementLimit off
-      // the config hash is the assertion.
       const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
       expect(configured.buildStatementPool().maxSize).toBe(7);
       await configured.close();
     });
 
     it("reads preparedStatements from the config hash", async () => {
-      // Stays self-built: a differently configured preparedStatements is the
-      // assertion.
       const configured = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         preparedStatements: false,
@@ -134,8 +120,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await configured.close();
     });
 
-    // Self-built by construction: these assert what the constructor does with
-    // a non-boolean config value.
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
       // abstract_adapter.rb:159 pipes the config through
       // `type_cast_config_to_boolean`, which maps the string `"false"` to
@@ -166,8 +150,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);
       } finally {
-        // mysql2 pool keeps open handles — close to avoid leaked
-        // sockets / Vitest hangs.
         await adapter2.close();
       }
     });
@@ -181,8 +163,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(pool.length).toBe(2);
         adapter.clearCacheBang();
         expect(pool.length).toBe(0);
-        // Pool stays attached; counter continues so we never reissue
-        // a name that's still PREPAREd on this session post-dealloc.
         expect(adapter._statementPoolForTest()).toBe(pool);
       } finally {
         await adapter.rollback();

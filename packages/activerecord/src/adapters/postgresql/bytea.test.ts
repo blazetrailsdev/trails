@@ -14,7 +14,6 @@ import { Column as PgColumn } from "../../connection-adapters/postgresql/column.
 class ByteaDataType extends Base {
   static {
     this.tableName = "bytea_data_type";
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
   }
 }
@@ -196,8 +195,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: obj.reload; assert_equal "hello world", obj.serialized
       await obj.reload();
       expect(obj.serialized).toBe("hello world");
-      // Non-ASCII: TextEncoder encodes as UTF-8 multi-byte; the bridge must
-      // decode as UTF-8 (not latin1) to recover the original string.
       obj.serialized = "héllo";
       await obj.saveBang();
       await obj.reload();

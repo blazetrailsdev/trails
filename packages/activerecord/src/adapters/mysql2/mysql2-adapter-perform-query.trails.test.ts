@@ -37,8 +37,6 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
-    // mysql2 returns a ResultSetHeader (no rows array) for DDL and a bare
-    // INSERT, so both flow through the public `execute` and come back as [].
     await expect(adapter.execute(`CREATE TABLE pq_ddl (id integer)`)).resolves.toEqual([]);
     await adapter.execute(`DROP TABLE pq_ddl`);
     await expect(adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`)).resolves.toEqual([]);
@@ -54,16 +52,12 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
     await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
     await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('c')`);
 
-    // The count comes from _affectedRowsBeforeWarnings, recorded by
-    // perform_query and read back via the affectedRows port.
     expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
     expect(await adapter.executeMutation(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
     expect(await adapter.executeMutation(`DELETE FROM pq`)).toBe(3);
   });
 
   it("executeMutation returns the driver insert id for a bare INSERT", async () => {
-    // MySQL 8 has no INSERT ... RETURNING; the id comes from the driver's
-    // insertId on the ResultSetHeader.
     const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
     expect(id).toBe(1);
     const second = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);

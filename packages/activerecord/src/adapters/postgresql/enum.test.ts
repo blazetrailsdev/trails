@@ -14,7 +14,6 @@ import type { Table as PgTable } from "../../connection-adapters/postgresql/sche
 class PostgresqlEnum extends Base {
   static {
     this.tableName = "postgresql_enums";
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
     this.enum(
       "current_mood",
@@ -76,8 +75,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
-    // Schema-scoped tables created in-test are torn down with their temp schema;
-    // these static IF EXISTS drops balance require-table-teardown by name.
     await adapter.exec(
       `DROP TABLE IF EXISTS postgresql_enums_in_other_schema, test_schema, postgresql_enums_in_test_schema CASCADE`,
     );
@@ -85,7 +82,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "feeling" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
-    // test_schema is managed by withTestSchema — no DROP here
     await adapter.setSchemaSearchPath(defaultSearchPath);
     adapter.internalSchemaCache?.clear();
     void PostgresqlEnum.resetColumnInformation();
@@ -121,9 +117,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("enum mapping", async () => {
       await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const enumRecord = await PostgresqlEnum.first();
-      // prefer enumRecord.current_mood when string-enum getter is ported (enum.ts:509)
       expect((enumRecord as any).readAttribute("current_mood")).toBe("sad");
-      // prefer enumRecord.current_mood = "happy" when string-enum setter is ported
       (enumRecord as any).writeAttribute("current_mood", "happy");
       const saved = await enumRecord!.save();
       expect(saved).toBeTruthy();
@@ -297,10 +291,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // `SchemaDumper.dump` walks every table on the search_path. On the shared
-    // worker DB (hundreds of accumulated tables under parallel forks) a full
-    // dump legitimately runs past the 5s default and the abort would leak this
-    // test's `test_schema` search_path into the next test — so allow more time.
     it("schema dump scoped to schemas", { timeout: 60_000 }, async () => {
       await adapter.dropSchema("other_schema", { ifExists: true });
       await adapter.createSchema("other_schema");
@@ -339,9 +329,6 @@ describeIfPg("PostgreSQLAdapter", () => {
             await Schema.define(adapter, async (schema) => {
               await schema.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
               await schema.createEnum("public.mood", ["sad", "ok", "happy"]);
-              // Torn down by `dropSchema("test_schema", {})` in the outer
-              // finally — the table lives in the non-default schema; the
-              // suite afterEach also drops it by name for the lint rule.
               await schema.createTable(
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },

@@ -30,11 +30,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        // This file skips the global adapter reset (handler suite), so the
-        // canonical `engines` table must be restored to its original (no-index)
-        // shape even if a step above failed partway. The FK must be dropped
-        // before the index it depends on. Cover both the pre- and post-rename
-        // index names idempotently.
         await adapter.removeForeignKey("engines", { name: "fk_engines_cars", ifExists: true });
         await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
         await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
@@ -58,7 +53,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await adapter.dropTable(tableName, { ifExists: true });
         await internalMetadata.createTable();
         expect(await adapter.columnExists(tableName, "key")).toBeTruthy();
-        // Restore environment entry so other tests don't see a missing metadata row
         await internalMetadata.createTableAndSetFlags("test");
       });
     });

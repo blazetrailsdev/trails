@@ -30,7 +30,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
     await adapter.dropTable("big_items", { ifExists: true });
   });
 
-  const BIG = 2n ** 62n; // 4611686018427387904 — well above Number.MAX_SAFE_INTEGER
+  const BIG = 2n ** 62n;
 
   it("returns bigint for BIGINT column", async () => {
     await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
@@ -43,7 +43,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   });
 
   it("preserves exact value above Number.MAX_SAFE_INTEGER", async () => {
-    const unsafe = 9007199254740993n; // Number.MAX_SAFE_INTEGER + 2
+    const unsafe = 9007199254740993n;
     await adapter.executeMutation(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, [
       unsafe,
       0,
@@ -58,18 +58,10 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
       42,
     ]);
     const rows = await adapter.execute(`SELECT "score", "count" FROM "big_items"`);
-    // safeIntegers is enabled on this statement (BIGINT column present), so the
-    // driver hands the INTEGER column back as a bigint too; the adapter narrows
-    // that spill at the row boundary (_narrowSpilledBigInts), and
-    // IntegerType.cast accepts either spelling — the type-layer contract holds
-    // whichever side normalizes.
     expect(intType.cast(rows[0].count)).toBe(42);
   });
 
   it("BooleanType.cast handles 0n/1n from safeIntegers mode correctly", async () => {
-    // SQLite stores booleans as INTEGER 0/1. With safeIntegers enabled (triggered
-    // by the BIGINT column), the driver returns 0n/1n instead of 0/1.
-    // BooleanType.FALSE_VALUES includes 0n so cast(0n) → false, cast(1n) → true.
     await adapter.executeMutation(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, [
       BIG,
       0,

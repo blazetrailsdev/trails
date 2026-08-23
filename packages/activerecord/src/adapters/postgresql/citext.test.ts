@@ -15,7 +15,6 @@ import type { Column as PgColumn } from "../../connection-adapters/postgresql/co
 class Citext extends Base {
   static {
     this.tableName = "citexts";
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
   }
   declare cival: string;
@@ -73,7 +72,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       } finally {
         void Citext.resetColumnInformation();
       }
-      // Verify the rollback: "username" column must not exist after rollback
       const colsAfter = await connection.columns("citexts");
       expect(colsAfter.find((c) => c.name === "username")).toBeUndefined();
     });

@@ -184,7 +184,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("set session variable nil", async () => {
-    // null means skip SET — value stays at server default, same as a connection with no variables config.
     const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
     const a = new PostgreSQLAdapter({
       connectionString: PG_TEST_URL,
@@ -199,7 +198,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("set session variable default", async () => {
-    // "default" issues SET SESSION key TO DEFAULT — resets to compile default, same as no config.
     const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
     const a = new PostgreSQLAdapter({
       connectionString: PG_TEST_URL,
@@ -263,7 +261,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("disconnectBang closes the persistent connection", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
-    // Force lazy connect so we exercise the close path.
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     try {
@@ -273,8 +270,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
       expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
     } finally {
-      // disconnectBang fires conn.end() fire-and-forget; await it here
-      // so the test exits cleanly without leaving an open socket.
       await conn?.end().catch(() => {});
     }
   });
@@ -284,9 +279,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     const endSpy = conn ? vi.spyOn(conn, "end") : null;
-    // Grab the underlying socket up front: after discardBang abandons it
-    // (listeners stripped, unref'd) the client can no longer be cleanly
-    // end()ed, so the test destroys the raw socket directly to free the fd.
     const socket = (conn as unknown as { connection?: { stream?: { destroy?: () => void } } })
       ?.connection?.stream;
     try {

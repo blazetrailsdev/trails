@@ -3,15 +3,8 @@ import { arunitDatabaseNames } from "../../support/arunit2-config.js";
 import { mysqlSettings } from "../../support/config.js";
 import { Base } from "../../base.js";
 
-// `dbWarningsAction` is a single global setting on the base adapter, so the
-// shared helper toggles it for every adapter (including MySQL). Re-exported
-// here so MySQL adapter tests can keep importing it from this module.
 export { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 
-// The adapter gate and the live-server version probe live under `support/`
-// alongside `describe-if-pg` / `describe-if-sqlite`, so suites outside this
-// tree never import gate glue from an adapter's test-helper. Re-exported for
-// the MySQL suites that already sit here.
 export { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 export {
   MYSQL_TEST_URL,

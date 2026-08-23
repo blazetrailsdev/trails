@@ -11,9 +11,6 @@ import {
 import { Base } from "../../base.js";
 import { rebuildCanonicalTables } from "../../support/canonical-table-rebuild.js";
 
-// Both suites below drop/recreate canonical tables (`posts`; `students` /
-// `lessons_students` / `topics`) in the shape their assertions need, so each
-// puts them back on the leased connection before handing the worker on.
 async function restoreCanonicalTables(names: readonly string[]): Promise<void> {
   const adapter = await leaseMysqlAdapter();
   await rebuildCanonicalTables(adapter, names);
@@ -49,7 +46,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         }>;
         const col = (name: string) => cols.find((c) => c.name === name)!;
 
-        // MySQL floats are precision 0..24, MySQL doubles are precision 25..53
         expect(col("float_no_limit").limit).toBe(24);
         expect(col("float_short").limit).toBe(24);
         expect(col("float_long").limit).toBe(53);
