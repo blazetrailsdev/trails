@@ -19,8 +19,6 @@ import {
   Callbacks as ASCallbacks,
   defineCallbacks,
   resetCallbacks as asResetCallbacks,
-  type CallbackKind,
-  type FilterListEntry,
   extend,
   include,
   prepend,
@@ -50,7 +48,6 @@ import {
 import {
   CallbackFn,
   CallbackConditions,
-  type RunCallbacksOptions,
   defineModelCallbacks,
   _registerCallbackOnProto,
   runAllCallbacks,
@@ -793,26 +790,14 @@ export class Model {
   ) => void;
 
   /**
-   * Mirrors: ActiveSupport::Callbacks::ClassMethods#set_callback (callbacks.rb:737-749).
-   *
-   * The `ActiveSupport::Callbacks::ClassMethods` half, mixed on by the
-   * `extend(Model, Callbacks.ClassMethods)` at the bottom of this file and
-   * declared here only for its type. Ruby's `set_callback(name, *filter_list)`
-   * puts the timing, the filter and the trailing options Hash in `filter_list`.
+   * The `ActiveSupport::Callbacks::ClassMethods` half (callbacks.rb:733-820),
+   * which Rails gets from `include ActiveSupport::Callbacks` (callbacks.rb:66-69);
+   * mixed on by the `extend(Model, Callbacks.ClassMethods)` at the bottom of
+   * this file, and typed from that module object rather than restated here.
    */
-  declare static setCallback: <T extends typeof Model>(
-    this: T,
-    name: string,
-    ...filterList: FilterListEntry<InstanceType<T>>[]
-  ) => void;
-  /** Mirrors: ActiveSupport::Callbacks::ClassMethods#skip_callback (callbacks.rb:786-808). */
-  declare static skipCallback: <T extends typeof Model>(
-    this: T,
-    name: string,
-    ...filterList: FilterListEntry<InstanceType<T>>[]
-  ) => void;
-  /** Mirrors: ActiveSupport::Callbacks::ClassMethods#reset_callbacks (callbacks.rb:811-821). */
-  declare static resetCallbacks: (name: string) => void;
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
+  declare static resetCallbacks: Extended<typeof ASCallbacks.ClassMethods>["resetCallbacks"];
 
   private static _ensureOwnValidators(): void {
     // Copy-on-first-write dup. Rails' `inherited(base)` hook
@@ -1823,17 +1808,10 @@ export class Model {
   }
 
   /**
-   * Mirrors: ActiveSupport::Callbacks#run_callbacks (callbacks.rb:96-104).
-   *
-   * Mixed on by the `include(Model, Callbacks.InstanceMethods)` at the bottom
-   * of this file; declared here only for its type.
+   * `run_callbacks` (callbacks.rb:96-104), mixed on by the
+   * `include(Model, Callbacks.InstanceMethods)` at the bottom of this file.
    */
-  declare runCallbacks: (
-    name: string,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-    type?: CallbackKind,
-  ) => unknown;
+  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
 // Rails' `included do` block (attribute_methods.rb:70-73).

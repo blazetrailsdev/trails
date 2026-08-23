@@ -1594,7 +1594,11 @@ export namespace Callbacks {
    */
   export const ClassMethods = {
     /** Mirrors: ActiveSupport::Callbacks::ClassMethods#set_callback (callbacks.rb:737-749). */
-    setCallback(this: { prototype: object }, name: string, ...filterList: FilterListEntry[]): void {
+    setCallback(
+      this: { prototype: object },
+      name: string,
+      ...filterList: FilterListEntry<any>[]
+    ): void {
       Callbacks.setCallback(this.prototype, name, ...filterList);
     },
 
@@ -1602,7 +1606,7 @@ export namespace Callbacks {
     skipCallback(
       this: { prototype: object },
       name: string,
-      ...filterList: FilterListEntry[]
+      ...filterList: FilterListEntry<any>[]
     ): void {
       Callbacks.skipCallback(this.prototype, name, ...filterList);
     },
