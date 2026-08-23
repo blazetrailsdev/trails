@@ -67,10 +67,13 @@ export class DeferredDistinctPkNotIn extends Nodes.NotIn {
  * `records + relations.flat_map(&:ids)` array:
  * `predicate_builder[primary_key, records].invert`. `relations.flat_map(&:ids)`
  * runs a separate `SELECT <pk>` query per relation, producing a literal id
- * array. trails' query builder is synchronous and cannot run `Relation#ids` at
- * `.excluding()`-build time, so we record one marker carrying both the already-
- * known `literalIds` (scalar/loaded record ids) and the still-unloaded
- * `innerRelations`. The load pipeline (`_materializeDeferredDistinctPkPredicates`)
+ * array — except for a `loaded?` relation, whose `ids` runs no query
+ * (calculations.rb:373-380) and which `excluding` therefore flattens eagerly,
+ * where Rails flattens. trails' query builder is synchronous and cannot run the
+ * id-select at `.excluding()`-build time, so the relations that DO need one — an
+ * un-loaded relation, or a `scheduled?` one whose parked rows must be drained —
+ * are recorded in one marker carrying both the already-known `literalIds`
+ * (scalar/loaded record ids) and those `innerRelations`. The load pipeline (`_materializeDeferredDistinctPkPredicates`)
  * awaits every `innerRelations[i].ids()`, concatenates them after `literalIds`,
  * and substitutes a single literal `attribute.notIn([...ids])` before compile —
  * preserving Rails' one-predicate shape, not an `AND` of separate `NOT IN`s.
