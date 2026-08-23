@@ -341,18 +341,6 @@ describe("ExplainTest", () => {
     expect(rendered).toBe('[[nil, "raw"], [nil, 42]]');
   });
 
-  it("rejects multiple hash options (Rails extract_options! semantics)", () => {
-    expect(() => Car.all().explain({ format: "json" }, { format: "xml" } as never)).toThrow(
-      /at most one option hash/,
-    );
-  });
-
-  it("rejects a non-trailing hash option", () => {
-    expect(() => Car.all().explain({ format: "json" } as never, "analyze")).toThrow(
-      /last argument/,
-    );
-  });
-
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
     // Two parallel explain() calls must not trample each other's
     // collected queries. Without async-context isolation a global

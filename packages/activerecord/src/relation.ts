@@ -140,30 +140,6 @@ function takeLimit(limitValue: number | string | null): number {
   return Math.min(limitValue, 11);
 }
 
-function validateExplainOptions(options: ExplainOption[]): void {
-  let seenHash = false;
-  for (let i = 0; i < options.length; i++) {
-    const o = options[i];
-    if (typeof o === "string") {
-      if (seenHash) {
-        throw new Error(
-          "EXPLAIN option hash must be the last argument (Rails' extract_options! semantics)",
-        );
-      }
-      continue;
-    }
-    if (!o || typeof o !== "object") {
-      throw new TypeError(
-        `EXPLAIN option must be a string flag or an options hash; got ${String(o)}`,
-      );
-    }
-    if (seenHash) {
-      throw new Error("EXPLAIN accepts at most one option hash");
-    }
-    seenHash = true;
-  }
-}
-
 /**
  * Relation — the lazy, chainable query interface.
  *
@@ -1236,19 +1212,16 @@ export class Relation<T extends Base> {
    * COUNT query and `await .explain()` (the proxy's `inspect`) explains the main
    * SELECT plus every query run as a side effect of it (eager loads, preloads).
    *
-   * `options` is a mix of flag strings and an optional trailing keyword
-   * hash, and what each adapter does with them is the adapter's own
-   * `build_explain_clause`. PG joins them and upcases the result
-   * (`postgresql/database_statements.rb:96-100`), so it takes flag strings
-   * only — `FORMAT JSON` is one of them, exactly as Rails' own
+   * `options` are the Symbols/Strings Rails hands to the adapter's own
+   * `build_explain_clause`, which upcases and joins them — `", "` on PG
+   * (`postgresql/database_statements.rb:96-100`), `" "` on MySQL
+   * (`mysql/database_statements.rb:36-46`) — and validates nothing; SQLite
+   * ignores them entirely. A Hash among them would render as its own
+   * stringification, the garbage Ruby's `Array#join` produces, so a format is
+   * asked for as one more flag, exactly as Rails' own
    * `test_explain_with_options_as_strings` passes it
-   * (`postgresql/explain_test.rb:29-33`) — and a keyword hash there renders
-   * as its own stringification, the same garbage Ruby's `Array#join` would
-   * produce. MySQL's body does read the hash
-   * (`mysql/database_statements.rb:36-46`); SQLite ignores options entirely.
-   * Ruby's `extract_options!` allows at most one trailing Hash; we enforce
-   * the same shape here so MySQL's order-sensitive SQL
-   * (`EXPLAIN FORMAT=JSON ANALYZE` is invalid) can't be produced by accident.
+   * (`postgresql/explain_test.rb:29-33`). Each flag is therefore spelled the
+   * way that adapter's EXPLAIN spells it, in the order it receives them.
    * Examples:
    *
    *     await Post.all().explain("analyze", "verbose")
@@ -1257,13 +1230,12 @@ export class Relation<T extends Base> {
    *     await Post.all().explain("analyze", "format json")
    *     // → EXPLAIN (ANALYZE, FORMAT JSON) SELECT …        (PG)
    *
-   *     await Post.all().explain("analyze", { format: "json" })
+   *     await Post.all().explain("analyze", "format=json")
    *     // → EXPLAIN ANALYZE FORMAT=JSON SELECT …           (MySQL)
    *
    * Mirrors: ActiveRecord::Relation#explain
    */
   explain(...options: ExplainOption[]): ExplainProxy<T> {
-    validateExplainOptions(options);
     return new ExplainProxy(this, options);
   }
 

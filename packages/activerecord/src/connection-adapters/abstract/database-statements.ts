@@ -54,16 +54,16 @@ function baseClass(): typeof Base {
 }
 
 /**
- * A single entry in `Relation#explain`'s options list. Either a bare
- * flag name (`"analyze"`, `"verbose"`) or a keyword hash (`{ format:
- * "json" }`) — mirrors Rails' `explain(*options)` where options can
- * be a mix of Symbols and a single Hash. Each adapter decides which
- * flags / keys it supports and throws on unknown ones.
+ * A single entry in `Relation#explain`'s options list: a Ruby Symbol or String
+ * flag (`":analyze"`, `"verbose"`). Rails' adapters render the list with a bare
+ * `options.join` (`mysql/database_statements.rb:39`,
+ * `postgresql/database_statements.rb:99`), so a Hash there would render as
+ * `{:format=>"json"}.to_s.upcase` — a format is asked for as one more flag.
  *
  * Mirrors: the `options` array shape used by Rails'
  * `ActiveRecord::Relation#explain` and its adapter `build_explain_clause`.
  */
-export type ExplainOption = string | { format: string };
+export type ExplainOption = string;
 
 /**
  * Host interface for DatabaseStatements mixin methods that need adapter context.

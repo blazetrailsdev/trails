@@ -303,6 +303,36 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
 }
 
 /**
+ * MRI's `rb_scan_args_kw` splits the keyword hash off an argument list before
+ * binding the positionals, so `Time.new`'s keywords may follow any number of
+ * them — `Time.new(2020, 1, 1, in: "+05:00")` is a three-positional call, not a
+ * fourth positional. `Rational` is the one object a positional itself takes
+ * (`sec`), so it is not a keyword hash.
+ */
+function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
+  return typeof arg === "object" && arg !== null && !(arg instanceof Rational);
+}
+
+/** The defaults `Time.new`'s positionals fall back to once a keyword hash is
+ *  lifted out of the slot one of them would have bound. */
+const TIME_NEW_DEFAULTS = [undefined, 1, 1, 0, 0, 0, null];
+
+/**
+ * The keywords MRI's `Time.new` takes beside its positionals (`time.c`
+ * `time_s_init`): `in:` names the zone — the keyword spelling of the older
+ * seventh positional — and `precision:` the sub-second digits kept off a
+ * STRING argument.
+ *
+ * @noRailsEquivalent PERMANENT — the trails spelling of Ruby kwargs on a Ruby
+ * core method. Rails never defines `::Time`, so there is no Rails counterpart
+ * for the keyword bag either.
+ */
+export interface TimeNewOptions {
+  in?: string | number | null;
+  precision?: number | null;
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
  * class, only reopens it in `core_ext/time/*.rb`, so there is no Rails
  * counterpart for a port to converge on. trails carries only the members a
@@ -357,27 +387,86 @@ export class Time {
     return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
   }
 
-  /** Ruby `Time.now`, the current time in the local zone. */
-  static now(): Time {
-    return Time.#atInstant(Temporal.Now.instant());
+  /**
+   * Ruby `Time.now(in: nil)` (`timev.rb` `Time.now`), the current time — in the
+   * zone `in:` names, or the local one. MRI takes no `precision:` here:
+   * `Time.now(precision: 3)` is `ArgumentError: unknown keyword: :precision`,
+   * because the keyword only trims the sub-second a STRING argument spells and
+   * `now` takes none.
+   */
+  static now({ in: inZone = null }: { in?: string | number | null } = {}): Time {
+    return Time.#atInstant(Temporal.Now.instant(), inZone);
   }
 
   /**
    * Ruby `Time.new(year = nil, month = nil, day = nil, hour = nil, min = nil,
-   * sec = nil)` (`time.c` `time_s_init`): with no arguments it answers the
-   * current time in the local zone, and with them it lands on the same seat
-   * `Time.local` does. MRI's `in:` zone keyword is not carried.
+   * sec = nil, zone = nil, in: nil, precision: nil)` (`time.c` `time_s_init`):
+   * with no arguments it answers the current time in the local zone, and with
+   * them it lands on the same seat `Time.local` does. `in:` is the keyword
+   * spelling of the seventh positional's zone; both routes reach the
+   * constructor's `zone`, and giving both is MRI's `ArgumentError: timezone
+   * argument given as positional and keyword arguments`.
+   *
+   * `precision:` trims the sub-second of the STRING form —
+   * `Time.new("2000-12-31 23:59:59.56789", precision: 3)` is
+   * `Time.new("2000-12-31 23:59:59.567")` — and MRI applies it to nothing else:
+   * `Time.new(2020, 1, 1, 0, 0, 0.56789, precision: 3).nsec` is `567890000`,
+   * the untrimmed value. trails does not port the string form yet, so the
+   * keyword is taken and, as in MRI without a string, changes nothing. Taking
+   * it is what `travel_to`'s `Time.new` stub reads: it forwards to the original
+   * method whenever it is handed anything at all (`time_helpers.rb:180-187`),
+   * so `Time.new(precision: 3)` answers the real current time, not the
+   * travelled one.
+   *
+   * The keywords are spelled as a trailing object and, as in MRI, may follow
+   * any number of positionals — `Time.new({ precision: 3 })`,
+   * `Time.new(2020, 1, 1, { in: "+05:00" })` — because `rb_scan_args_kw` lifts
+   * the hash out before the positionals bind (see {@link isTimeNewOptions}).
+   *
+   * The no-argument path reads the clock straight rather than through
+   * {@link Time.now}, as `time_s_init` does: `travel_to` stubs both, and going
+   * through `Time.now` let its stub answer a `Time.new` call the `Time.new`
+   * stub had just forwarded to the original method.
    */
   static new(
-    year?: number | string,
-    month: number | string | null = 1,
-    day: number | string | null = 1,
-    hour: number | string | null = 0,
-    min: number | string | null = 0,
-    sec: number | string | Rational | null = 0,
+    year?: number | string | TimeNewOptions,
+    month: number | string | TimeNewOptions | null = 1,
+    day: number | string | TimeNewOptions | null = 1,
+    hour: number | string | TimeNewOptions | null = 0,
+    min: number | string | TimeNewOptions | null = 0,
+    sec: number | string | Rational | TimeNewOptions | null = 0,
+    zone: string | number | TimeNewOptions | null = null,
+    options: TimeNewOptions = {},
   ): Time {
-    if (year === undefined) return Time.now();
-    return Time.mktime(year, month, day, hour, min, sec);
+    const given = [year, month, day, hour, min, sec, zone];
+    const kwargsAt = given.findIndex(isTimeNewOptions);
+    if (kwargsAt !== -1) {
+      options = given[kwargsAt] as TimeNewOptions;
+      given[kwargsAt] = TIME_NEW_DEFAULTS[kwargsAt];
+    }
+    [year, month, day, hour, min, sec, zone] = given as [
+      typeof year,
+      typeof month,
+      typeof day,
+      typeof hour,
+      typeof min,
+      typeof sec,
+      typeof zone,
+    ];
+    const { in: inZone = null } = options;
+    if (zone != null && inZone != null) {
+      throw new ArgumentError("timezone argument given as positional and keyword arguments");
+    }
+    if (year === undefined) return Time.#atInstant(Temporal.Now.instant(), inZone);
+    return new Time(
+      year as number | string,
+      month as number | string | null,
+      day as number | string | null,
+      hour as number | string | null,
+      min as number | string | null,
+      sec as number | string | Rational | null,
+      (zone as string | number | null) ?? inZone,
+    );
   }
 
   /**

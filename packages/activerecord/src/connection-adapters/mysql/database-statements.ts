@@ -71,7 +71,7 @@ export async function buildExplainClause(
   options: ExplainOption[] = [],
 ): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  const clause = `EXPLAIN ${options.map((o) => (typeof o === "string" ? o.toUpperCase() : `FORMAT=${(o as { format: string }).format.toUpperCase()}`)).join(" ")}`;
+  const clause = `EXPLAIN ${options.join(" ").toUpperCase()}`;
   if ((await isAnalyzeWithoutExplain.call(this)) && clause.includes("ANALYZE")) {
     return clause.replace("EXPLAIN ", "");
   }

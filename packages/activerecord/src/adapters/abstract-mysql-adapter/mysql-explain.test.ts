@@ -138,13 +138,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   // members of the MySQLExplainTest class. These exercise the adapter directly
   // (no DB rows), so they need no fixtures.
   describe("explain helpers (trails-only)", () => {
-    it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", async () => {
-      const clause = await adapter.buildExplainClause([{ format: "json" }]);
+    it("buildExplainClause renders a format flag without parens", async () => {
+      const clause = await adapter.buildExplainClause(["format=json"]);
       expect(clause).toBe("EXPLAIN FORMAT=JSON");
     });
 
-    it("buildExplainClause combines string flag and format hash space-separated", async () => {
-      const clause = await adapter.buildExplainClause(["analyze", { format: "json" }]);
+    it("buildExplainClause joins its flags space-separated", async () => {
+      const clause = await adapter.buildExplainClause(["analyze", "format=json"]);
       // MariaDB >= 10.1 drops the EXPLAIN prefix for ANALYZE (analyze_without_explain?).
       const analyzeWithoutExplain =
         isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
@@ -153,8 +153,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       );
     });
 
-    it("explain executes with { format: 'json' } and returns JSON plan", async () => {
-      const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
+    it("explain executes with a format flag and returns JSON plan", async () => {
+      const result = await adapter.explain("SELECT 1", [], ["format=json"]);
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
     });

@@ -42,6 +42,42 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 ");
   });
 
+  it("Time.new takes the zone as MRI's `in:` keyword", () => {
+    // MRI 3.3:
+    //   Time.new(2020, 1, 1, in: "+05:00").to_s       #=> "2020-01-01 00:00:00 +0500"
+    //   Time.new(2020, 1, 1, in: "+05:00").utc_offset #=> 18000
+    //   Time.now(in: "+05:00").utc_offset             #=> 18000
+    //   Time.new(2020, 1, in: "+05:00").to_s          #=> "2020-01-01 00:00:00 +0500"
+    //   Time.new(2020, 1, 1, 5, in: "+05:00").to_s    #=> "2020-01-01 05:00:00 +0500"
+    expect(Time.new(2020, 1, 1, { in: "+05:00" }).toS()).toBe("2020-01-01 00:00:00 +0500");
+    expect(Time.new(2020, 1, 1, { in: "+05:00" }).utcOffset).toBe(18000);
+    expect(Time.new(2020, 1, 1, 0, 0, 0, { in: "+05:00" }).utcOffset).toBe(18000);
+    expect(Time.now({ in: "+05:00" }).utcOffset).toBe(18000);
+    expect(Time.new(2020, 1, { in: "+05:00" }).toS()).toBe("2020-01-01 00:00:00 +0500");
+    expect(Time.new(2020, 1, 1, 5, { in: "+05:00" }).toS()).toBe("2020-01-01 05:00:00 +0500");
+  });
+
+  it("Time.new takes the zone as MRI's seventh positional", () => {
+    // MRI 3.3:
+    //   Time.new(2020, 1, 1, 0, 0, 0, "+05:00").utc_offset #=> 18000
+    //   Time.new(2020, 1, 1, 0, 0, 0, 3600).utc_offset     #=> 3600
+    //   Time.new(2020, 1, 1, 0, 0, 0, "+05:00", in: "+06:00")
+    //     #=> ArgumentError: timezone argument given as positional and keyword arguments
+    expect(Time.new(2020, 1, 1, 0, 0, 0, "+05:00").utcOffset).toBe(18000);
+    expect(Time.new(2020, 1, 1, 0, 0, 0, 3600).utcOffset).toBe(3600);
+    expect(() => Time.new(2020, 1, 1, 0, 0, 0, "+05:00", { in: "+06:00" })).toThrow(
+      "timezone argument given as positional and keyword arguments",
+    );
+  });
+
+  it("Time.new takes MRI's `precision:` keyword, which trims only a string argument", () => {
+    // MRI 3.3 applies `precision:` to the STRING form alone:
+    //   Time.new(2020, 1, 1, 0, 0, 0.56789, precision: 3).nsec #=> 567890000
+    // and `Time.new(precision: 3)` is just the current time.
+    expect(Time.new(2020, 1, 1, 0, 0, 0.56789, { precision: 3 }).nsec).toBe(567890000);
+    expect(Time.new({ precision: 3 })).toBeInstanceOf(Time);
+  });
+
   it("Time.new takes an offset in seconds, as Rails passes", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, 3600).utcOffset).toBe(3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, 0).strftime("%z %Z")).toBe("+0000 ");
