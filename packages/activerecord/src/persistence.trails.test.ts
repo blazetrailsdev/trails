@@ -273,8 +273,6 @@ describe("PersistenceTest (trails)", () => {
       static isPrefetchPrimaryKey(): boolean {
         return true;
       }
-      // A String sequence value is what separates `with_cast_value` from a
-      // bare write; Rails' `next_sequence_value` is untyped.
       static nextSequenceValue(): number {
         return "654321" as unknown as number;
       }
