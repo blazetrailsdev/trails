@@ -165,7 +165,7 @@ type CallbackOptions = {
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
 export function beforeCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined);
@@ -175,7 +175,7 @@ export function beforeCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
 export function afterCommit<T extends typeof Model>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(
@@ -188,7 +188,7 @@ export function afterCommit<T extends typeof Model>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
 export function afterSaveCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -201,7 +201,7 @@ export function afterSaveCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
 export function afterCreateCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -214,7 +214,7 @@ export function afterCreateCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
 export function afterUpdateCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -227,7 +227,7 @@ export function afterUpdateCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
 export function afterDestroyCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -240,7 +240,7 @@ export function afterDestroyCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
 export function afterRollback<T extends typeof Model>(
   this: T,
-  fn: CallbackFn,
+  fn: CallbackFn | string,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(

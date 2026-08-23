@@ -4194,19 +4194,28 @@ export class Base extends Model {
    */
   declare static afterInitialize: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterFind: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterTouch: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
@@ -4221,49 +4230,73 @@ export class Base extends Model {
    */
   declare static beforeSave: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static beforeCreate: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static beforeUpdate: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static beforeDestroy: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterSave: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterCreate: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterUpdate: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
   declare static afterDestroy: <T extends typeof Base>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
@@ -4271,7 +4304,8 @@ export class Base extends Model {
     this: T,
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
@@ -4279,7 +4313,8 @@ export class Base extends Model {
     this: T,
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
@@ -4287,7 +4322,8 @@ export class Base extends Model {
     this: T,
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
@@ -4295,7 +4331,8 @@ export class Base extends Model {
     this: T,
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 
