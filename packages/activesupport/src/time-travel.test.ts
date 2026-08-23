@@ -32,8 +32,6 @@ describe("TimeTravelTest", () => {
     let inside: Date | null = null;
     travel(1000, {}, () => {
       inside = currentTime();
-      // `precision:` acts only on the STRING form, so this arm answers the same
-      // instant travelled or not (`time_travel_test.rb:55`).
       expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toBe(
         instantOf(Time.new("2000-12-31 23:59:59.567")),
       );

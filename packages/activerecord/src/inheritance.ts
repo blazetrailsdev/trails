@@ -138,16 +138,13 @@ export function descendants(modelClass: typeof Base): (typeof Base)[] {
  */
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
-  // Rails: `if self == Base` → false. Detected via the `_isActiveRecordBase`
-  // own-property sentinel on Base.
+  // `self == Base` is read off the `_isActiveRecordBase` own-property sentinel.
   if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
   const superclass = Object.getPrototypeOf(modelClass) as typeof Base | null;
-  // Above Base there is no superclass to ask; Ruby never reaches here.
+  // Above Base there is no `superclass` to ask; Ruby never reaches here.
   if (!superclass || superclass === Function.prototype || typeof superclass.name !== "string")
     return true;
-  // Rails: `elsif superclass.abstract_class?` → recurse.
   if (superclass.abstractClass) return isDescendsFromActiveRecord.call(superclass);
-  // Rails: `else superclass == Base || !columns_hash.include?(inheritance_column)`.
   if (Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase")) return true;
   // Ruby `columns_hash.include?(inheritance_column)` is false for the nil
   // `inheritance_column` of an STI-disabled model, so no separate arm.
@@ -671,7 +668,6 @@ export function defineDynamicSelectReaders(record: Base): void {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#finder_needs_type_condition?
  */
 export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
-  // Rails: `:true == (@finder_needs_type_condition ||= descends_from_active_record? ? :false : :true)`.
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
     (modelClass as any)._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();
   }

@@ -24,8 +24,6 @@ import {
 } from "./test-helpers.js";
 import { fixtures } from "../test-fixtures.js";
 
-// Rails' counterpart is an `ActiveRecord::EncryptionTestCase`, so it inherits
-// `use_transactional_tests` — each case starts from an empty table.
 fixtures([]);
 
 class TestEncryptor implements EncryptorLike {
@@ -67,8 +65,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   let savedSupportUnencryptedData: boolean;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
 
-  // Lay the canonical tables once: DDL inside the per-test transaction would
-  // auto-commit on MariaDB and break the wrap.
+  // Laid once: DDL inside the per-test transaction auto-commits on MariaDB.
   beforeAll(async () => {
     await freshAdapter();
   });

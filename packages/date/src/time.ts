@@ -358,7 +358,10 @@ function parseFixedDigits(str: string, ptr: number, n: number): number | null {
  * {@link utcOffsetArgument} — the same reader the seventh positional goes
  * through — takes it and raises the same message on a malformed one.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `::Time`; see the class comment.
+ * A `mon` the string does not spell leaves the field at MRI's own `-1`
+ * sentinel, which is what separates a bare year — `Time.new("2020")`, the 1st
+ * of January — from a date whose time part is missing altogether, MRI's
+ * `no time information`.
  */
 function timeInitParse(
   str: string,
@@ -375,12 +378,11 @@ function timeInitParse(
   }
   const year = Number(`${sign}${str.slice(ptr, ptr + digits)}`);
   ptr += digits;
-  let mon = 1;
-  let mday = 1;
+  let mon = -1;
+  let mday = -1;
   let hour = 0;
   let min = 0;
   let sec: number | Rational = 0;
-  let dated = false;
   if (str[ptr] === "-") {
     const dash = ptr++;
     const parsed = parseFixedDigits(str, ptr, 2);
@@ -389,7 +391,6 @@ function timeInitParse(
     }
     mon = parsed;
     ptr += 2;
-    dated = true;
     if (str[ptr] === "-") {
       const mdayDash = ptr++;
       const parsedMday = parseFixedDigits(str, ptr, 2);
@@ -402,9 +403,7 @@ function timeInitParse(
   }
   let zone: string | null = null;
   if (ptr === end) {
-    // A date with no time part at all is MRI's `no time information`; a bare
-    // year is not — it lands on the 1st of January.
-    if (dated) throw new ArgumentError("no time information");
+    if (mon !== -1) throw new ArgumentError("no time information");
   } else {
     const sep = ptr;
     if (str[ptr] === "T") ptr++;
@@ -456,7 +455,7 @@ function timeInitParse(
     }
     if (ptr < end) zone = str.slice(ptr);
   }
-  return [year, mon, mday, hour, min, sec, zone];
+  return [year, mon === -1 ? 1 : mon, mday === -1 ? 1 : mday, hour, min, sec, zone];
 }
 
 /**
@@ -553,9 +552,11 @@ export class Time {
    * `Time.new("2000-12-31 23:59:59.56789", precision: 3)` is
    * `Time.new("2000-12-31 23:59:59.567")` — and MRI applies it to nothing else:
    * `Time.new(2020, 1, 1, 0, 0, 0.56789, precision: 3).nsec` is `567890000`,
-   * the untrimmed value. The string is parsed by {@link timeInitParse}, and a
-   * zone the string itself spells wins over `in:` rather than colliding with
-   * it. Taking the keyword at all is also what `travel_to`'s `Time.new` stub
+   * the untrimmed value. MRI takes the string form on
+   * `nil.equal?(mon) && String === year` — no second positional — and parses it
+   * with {@link timeInitParse}; a zone the string itself spells wins over `in:`
+   * rather than colliding with it. The keyword defaults to 9 digits, the whole
+   * sub-second. Taking the keyword at all is also what `travel_to`'s `Time.new` stub
    * reads: it forwards to the original method whenever it is handed anything
    * at all (`time_helpers.rb:180-187`), so `Time.new(precision: 3)` answers the
    * real current time, not the travelled one.
@@ -600,9 +601,6 @@ export class Time {
       throw new ArgumentError("timezone argument given as positional and keyword arguments");
     }
     if (year === undefined) return Time.#atInstant(Temporal.Now.instant(), inZone);
-    // MRI: `if nil.equal?(mon) and String === year` — the STRING form, and the
-    // only place `precision:` acts (`timev.rb` `Time#initialize`). A zone the
-    // string itself spells wins over `in:`, as it does in MRI.
     if (typeof year === "string" && month === undefined) {
       const [y, mon, mday, hour, min, sec, zoneStr] = timeInitParse(year, options.precision ?? 9);
       return new Time(y, mon, mday, hour, min, sec, zoneStr ?? inZone);

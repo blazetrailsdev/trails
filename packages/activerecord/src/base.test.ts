@@ -1942,11 +1942,10 @@ describe("BasicsTest", () => {
     }
     const log: string[] = [];
     const savedLogger = Base.logger;
-    // Rails: `ActiveSupport::Logger.new(log)` with `level = Logger::WARN`, so
-    // the debug line is filtered by level rather than by a missing method.
+    // Rails filters the debug line by level, not by a missing method.
     const logger = new Logger({ write: (s: string) => log.push(s) });
     logger.level = Logger.WARN;
-    Base.logger = logger as any;
+    Base.logger = logger;
     try {
       await Base.benchmark("Debug Topic Count", { level: "debug" }, () => Topic.count());
       await Base.benchmark("Warn Topic Count", { level: "warn" }, () => Topic.count());
