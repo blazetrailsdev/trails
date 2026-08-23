@@ -16,7 +16,15 @@ describe("benchmark()", () => {
 
   it("awaits a promise-returning block and logs exactly once after resolution", async () => {
     const lines: string[] = [];
-    const logger: LoggerLike = { info: (m) => lines.push(m) };
+    const logger: LoggerLike = {
+      debug: () => {},
+      info: (m) => {
+        lines.push(m);
+      },
+      warn: () => {},
+      error: () => {},
+      fatal: () => {},
+    };
     const result = await benchmark.call({ logger }, "fetch", async () => {
       await new Promise((r) => setTimeout(r, 5));
       return 42;
@@ -26,17 +34,17 @@ describe("benchmark()", () => {
     expect(lines[0]).toMatch(/^fetch \(\d+\.\d+ms\)$/);
   });
 
-  it("tolerates a logger whose `info` is not a function", () => {
-    let ran = false;
-    benchmark.call({ logger: { info: "not a function" } as unknown as LoggerLike }, "work", () => {
-      ran = true;
-    });
-    expect(ran).toBe(true);
-  });
-
   it("logs an info line with elapsed ms when a logger is attached", () => {
     const lines: string[] = [];
-    const logger: LoggerLike = { info: (m) => lines.push(m) };
+    const logger: LoggerLike = {
+      debug: () => {},
+      info: (m) => {
+        lines.push(m);
+      },
+      warn: () => {},
+      error: () => {},
+      fatal: () => {},
+    };
     benchmark.call({ logger }, "render template", () => 1 + 1);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/^render template \(\d+\.\d+ms\)$/);

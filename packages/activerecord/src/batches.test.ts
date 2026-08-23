@@ -126,11 +126,18 @@ describe("EachTest", () => {
 
   it("warn if order scope is set", async () => {
     const previousLogger = Base.logger;
-    Base.logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const logger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      fatal: vi.fn(),
+    };
+    Base.logger = logger;
     try {
       for await (const _post of Post.order("title").findEach({})) {
       }
-      expect(Base.logger.warn).toHaveBeenCalledWith(Batches.ORDER_IGNORE_MESSAGE);
+      expect(logger.warn).toHaveBeenCalledWith(Batches.ORDER_IGNORE_MESSAGE);
     } finally {
       Base.logger = previousLogger;
     }

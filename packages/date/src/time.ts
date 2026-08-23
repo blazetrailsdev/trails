@@ -106,7 +106,9 @@ function utcOffsetArgument(zone: string | number): "UTC" | number {
     const hours = code <= 73 ? code - 64 : code <= 77 ? code - 65 : 77 - code;
     return hours * 3600;
   }
-  throw new ArgumentError('"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset');
+  throw new ArgumentError(
+    `"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset: ${zone}`,
+  );
 }
 
 /**
@@ -314,8 +316,151 @@ function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
 }
 
 /** The defaults `Time.new`'s positionals fall back to once a keyword hash is
- *  lifted out of the slot one of them would have bound. */
-const TIME_NEW_DEFAULTS = [undefined, 1, 1, 0, 0, 0, null];
+ *  lifted out of the slot one of them would have bound. The `mon` slot falls
+ *  back to `undefined` rather than to `1`, because an absent `mon` is what
+ *  MRI's `nil.equal?(mon) && String === year` reads to take the STRING form. */
+const TIME_NEW_DEFAULTS = [undefined, undefined, 1, 0, 0, 0, null];
+
+/**
+ * The tail MRI's `time_init_parse` prints in a parse error — the separator it
+ * stopped at plus ten characters, its `%.*s` width.
+ */
+function rest(str: string, ptr: number): string {
+  return str.slice(ptr, ptr + 11);
+}
+
+function isDigit(ch: string | undefined): boolean {
+  return ch !== undefined && ch >= "0" && ch <= "9";
+}
+
+/**
+ * The fixed-width integer field MRI's `time_init_parse` reads with its
+ * `parse_int(..., width, ...)`: exactly `n` digits, or nothing.
+ */
+function parseFixedDigits(str: string, ptr: number, n: number): number | null {
+  for (let i = 0; i < n; i++) if (!isDigit(str[ptr + i])) return null;
+  return Number(str.slice(ptr, ptr + n));
+}
+
+/**
+ * MRI's `time_init_parse` (`time.c`), the parser behind the STRING form of
+ * `Time.new` — `Time.new("2000-12-31 23:59:59.56789")`. The grammar is
+ * `[+-]YYYY[-MM[-DD]][ T]hh:mm:ss[.frac][ zone]`, with a year of four digits or
+ * more, fixed two-digit month/day/hour/min/sec fields, and every one of MRI's
+ * own messages at the step that raises it.
+ *
+ * `precision` is the sub-second digits kept: a non-negative one truncates the
+ * parsed fraction before it is carried, and a fraction it truncates away
+ * entirely is MRI's `subsecond expected after dot:` — `Time.new("2000-12-31
+ * 23:59:59.5", precision: 0)` raises rather than answering a whole second. A
+ * negative `precision` keeps the whole fraction, the answer `nil` gets.
+ *
+ * The zone is handed back as the substring the string spells, so
+ * {@link utcOffsetArgument} — the same reader the seventh positional goes
+ * through — takes it and raises the same message on a malformed one.
+ *
+ * A `mon` the string does not spell leaves the field at MRI's own `-1`
+ * sentinel, which is what separates a bare year — `Time.new("2020")`, the 1st
+ * of January — from a date whose time part is missing altogether, MRI's
+ * `no time information`.
+ */
+function timeInitParse(
+  str: string,
+  precision: number,
+): [number, number, number, number, number, number | Rational, string | null] {
+  const end = str.length;
+  let ptr = 0;
+  const sign = str[ptr] === "-" || str[ptr] === "+" ? str[ptr++] : "";
+  let digits = 0;
+  while (isDigit(str[ptr + digits])) digits++;
+  if (digits === 0) throw new ArgumentError(`can't parse: ${JSON.stringify(str)}`);
+  if (digits < 4) {
+    throw new ArgumentError(`year must be 4 or more digits: ${str.slice(ptr, ptr + digits)}`);
+  }
+  const year = Number(`${sign}${str.slice(ptr, ptr + digits)}`);
+  ptr += digits;
+  let mon = -1;
+  let mday = -1;
+  let hour = 0;
+  let min = 0;
+  let sec: number | Rational = 0;
+  if (str[ptr] === "-") {
+    const dash = ptr++;
+    const parsed = parseFixedDigits(str, ptr, 2);
+    if (parsed === null) {
+      throw new ArgumentError(`two digits mon is expected after \`-': ${rest(str, dash)}`);
+    }
+    mon = parsed;
+    ptr += 2;
+    if (str[ptr] === "-") {
+      const mdayDash = ptr++;
+      const parsedMday = parseFixedDigits(str, ptr, 2);
+      if (parsedMday === null) {
+        throw new ArgumentError(`two digits mday is expected after \`-': ${rest(str, mdayDash)}`);
+      }
+      mday = parsedMday;
+      ptr += 2;
+    }
+  }
+  let zone: string | null = null;
+  if (ptr === end) {
+    if (mon !== -1) throw new ArgumentError("no time information");
+  } else {
+    const sep = ptr;
+    if (str[ptr] === "T") ptr++;
+    else while (str[ptr] === " ") ptr++;
+    if (ptr === end) {
+      if (str[sep] !== "T") throw new ArgumentError(`can't parse: ${JSON.stringify(str)}`);
+    } else if (isDigit(str[ptr])) {
+      const timeStart = ptr;
+      const parsedHour = parseFixedDigits(str, ptr, 2);
+      if (parsedHour === null) {
+        throw new ArgumentError(`two digits hour is expected: ${rest(str, sep)}`);
+      }
+      hour = parsedHour;
+      ptr += 2;
+      if (str[ptr] !== ":") {
+        throw new ArgumentError(`missing min part: ${str.slice(timeStart, timeStart + 10)}`);
+      }
+      let colon = ptr++;
+      const parsedMin = parseFixedDigits(str, ptr, 2);
+      if (parsedMin === null) {
+        throw new ArgumentError(`two digits min is expected after \`:': ${rest(str, colon)}`);
+      }
+      min = parsedMin;
+      ptr += 2;
+      if (str[ptr] !== ":") {
+        throw new ArgumentError(`missing sec part: ${str.slice(timeStart, timeStart + 10)}`);
+      }
+      colon = ptr++;
+      const parsedSec = parseFixedDigits(str, ptr, 2);
+      if (parsedSec === null) {
+        throw new ArgumentError(`two digits sec is expected after \`:': ${rest(str, colon)}`);
+      }
+      sec = parsedSec;
+      ptr += 2;
+      if (str[ptr] === ".") {
+        ptr++;
+        let fracDigits = 0;
+        while (isDigit(str[ptr + fracDigits])) fracDigits++;
+        const parsedFrac = str.slice(ptr, ptr + fracDigits);
+        // MRI truncates only for a non-negative `precision`; a negative one
+        // keeps the whole fraction, as `nil` does.
+        const frac = precision < 0 ? parsedFrac : parsedFrac.slice(0, precision);
+        ptr += fracDigits;
+        if (frac.length === 0) {
+          throw new ArgumentError(
+            `subsecond expected after dot: ${str.slice(timeStart, Math.min(ptr, timeStart + 10))}`,
+          );
+        }
+        sec = new Rational(parsedSec, 1).add(new Rational(Number(frac), 10 ** frac.length));
+      }
+      while (str[ptr] === " ") ptr++;
+    }
+    if (ptr < end) zone = str.slice(ptr);
+  }
+  return [year, mon === -1 ? 1 : mon, mday === -1 ? 1 : mday, hour, min, sec, zone];
+}
 
 /**
  * The keywords MRI's `Time.new` takes beside its positionals (`time.c`
@@ -411,12 +556,14 @@ export class Time {
    * `Time.new("2000-12-31 23:59:59.56789", precision: 3)` is
    * `Time.new("2000-12-31 23:59:59.567")` — and MRI applies it to nothing else:
    * `Time.new(2020, 1, 1, 0, 0, 0.56789, precision: 3).nsec` is `567890000`,
-   * the untrimmed value. trails does not port the string form yet, so the
-   * keyword is taken and, as in MRI without a string, changes nothing. Taking
-   * it is what `travel_to`'s `Time.new` stub reads: it forwards to the original
-   * method whenever it is handed anything at all (`time_helpers.rb:180-187`),
-   * so `Time.new(precision: 3)` answers the real current time, not the
-   * travelled one.
+   * the untrimmed value. MRI takes the string form on
+   * `nil.equal?(mon) && String === year` — no second positional — and parses it
+   * with {@link timeInitParse}; a zone the string itself spells wins over `in:`
+   * rather than colliding with it. The keyword defaults to 9 digits, the whole
+   * sub-second. Taking the keyword at all is also what `travel_to`'s `Time.new` stub
+   * reads: it forwards to the original method whenever it is handed anything
+   * at all (`time_helpers.rb:180-187`), so `Time.new(precision: 3)` answers the
+   * real current time, not the travelled one.
    *
    * The keywords are spelled as a trailing object and, as in MRI, may follow
    * any number of positionals — `Time.new({ precision: 3 })`,
@@ -430,7 +577,7 @@ export class Time {
    */
   static new(
     year?: number | string | TimeNewOptions,
-    month: number | string | TimeNewOptions | null = 1,
+    month: number | string | TimeNewOptions | null | undefined = undefined,
     day: number | string | TimeNewOptions | null = 1,
     hour: number | string | TimeNewOptions | null = 0,
     min: number | string | TimeNewOptions | null = 0,
@@ -458,6 +605,10 @@ export class Time {
       throw new ArgumentError("timezone argument given as positional and keyword arguments");
     }
     if (year === undefined) return Time.#atInstant(Temporal.Now.instant(), inZone);
+    if (typeof year === "string" && month === undefined) {
+      const [y, mon, mday, hour, min, sec, zoneStr] = timeInitParse(year, options.precision ?? 9);
+      return new Time(y, mon, mday, hour, min, sec, zoneStr ?? inZone);
+    }
     return new Time(
       year as number | string,
       month as number | string | null,

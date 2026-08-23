@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
@@ -22,6 +22,9 @@ import {
   makeKeyProvider,
   withoutEncryption,
 } from "./test-helpers.js";
+import { fixtures } from "../test-fixtures.js";
+
+fixtures([]);
 
 class TestEncryptor implements EncryptorLike {
   constructor(private readonly map: Record<string, string>) {}
@@ -61,6 +64,11 @@ function makeType(
 describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   let savedSupportUnencryptedData: boolean;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  // Laid once: DDL inside the per-test transaction auto-commits on MariaDB.
+  beforeAll(async () => {
+    await freshAdapter();
+  });
 
   beforeEach(() => {
     savedSupportUnencryptedData = Configurable.config.supportUnencryptedData;
@@ -426,11 +434,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         }
       } as any;
       new encryptedAuthorClass();
-      // No transactional fixtures in this file: an earlier case in the suite
-      // leaves a row with the same deterministic ciphertext behind, which would
-      // make the find_by hit ambiguous.
-      await encryptedAuthorClass.deleteAll();
-
       const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
       const found = await encryptedAuthorClass.findBy({ name: "STEPHEN KING" });
       expect(found).not.toBeNull();
