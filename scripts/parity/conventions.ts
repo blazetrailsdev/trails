@@ -887,19 +887,24 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`acts_like_date?` / `acts_like_time?` (core_ext/date_time/acts_like.rb:8-14) " +
       "and `Time#acts_like_time?` (core_ext/time/acts_like.rb:6-8) " +
       "are marker methods: Ruby reopens the class to hang an empty predicate on " +
-      "it so `Object#acts_like?` can find it with `respond_to?`. trails' " +
-      "receivers for those two arms are `Temporal.PlainDate` / " +
-      "`Temporal.PlainDateTime` / `Temporal.ZonedDateTime` / `Temporal.Instant`, " +
-      "a JS `Date`, and `@blazetrails/date`'s `Time` — none of them a class the " +
-      "port may reopen, so there is no reopening to define a marker in. RFC 0098 " +
-      "(`time-with-zone-residue-structural-blockers`) settled where the markers " +
-      "live instead: `@blazetrails/date` owns them, as the `actsLikeDate` / " +
-      "`actsLikeTime` predicates over its own value types " +
-      "(packages/date/src/acts-like.ts), which `Object.actsLike` calls " +
-      "(core-ext/object/acts-like.ts:20-30). Installing them on the `Temporal` " +
-      "polyfill prototypes at import time was rejected as a global side effect " +
-      "on a third-party package, and that choice costs the Rails file path for " +
-      "these members — which is what this entry records. Scoped to the three " +
+      "it so `Object#acts_like?` can find it with `respond_to?`. Two things " +
+      "follow, and they differ by receiver. (1) `Time#acts_like_time?` IS " +
+      "ported, as a real marker method: trails' `::Time` is a class the port " +
+      "owns (packages/date/src/time.ts), so the reopening ports literally and " +
+      "`Object.actsLike` answers its `:time` arm through `respond_to?` exactly " +
+      "as Ruby does. It is skipped HERE only because activesupport cannot " +
+      "reopen another package's class, so the member lands at that class rather " +
+      "than at this Rails path. (2) The remaining receivers — " +
+      "`Temporal.PlainDate` / `PlainDateTime` / `ZonedDateTime` / `Instant` and " +
+      "a JS `Date` — are built-ins the port does not monkey-patch, so there is " +
+      "no reopening to define a marker in at all, and RFC 0098 " +
+      "(`time-with-zone-residue-structural-blockers`) settled that " +
+      "`@blazetrails/date` answers for them with the `actsLikeDate` / " +
+      "`actsLikeTime` predicates (packages/date/src/acts-like.ts) that " +
+      "`Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing " +
+      "markers on the `Temporal` polyfill prototypes at import time was rejected " +
+      "as a global side effect on a third-party package; the cost recorded there " +
+      "is the Rails file path for these members. Scoped to the three " +
       "acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a " +
       "trails-owned class and IS ported (time-with-zone.ts:955).",
     names: ["acts_like_date?", "acts_like_time?"],

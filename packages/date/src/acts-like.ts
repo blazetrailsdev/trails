@@ -23,8 +23,6 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 
-import { Time } from "./time.js";
-
 /**
  * Ruby `Date#acts_like_date?` (`core_ext/date/acts_like.rb:7`) and
  * `DateTime#acts_like_date?` (`core_ext/date_time/acts_like.rb:7`), answered on
@@ -47,9 +45,12 @@ export function actsLikeDate(self: unknown): boolean {
 /**
  * Ruby `Time#acts_like_time?` (`core_ext/time/acts_like.rb:7`) and
  * `DateTime#acts_like_time?` (`core_ext/date_time/acts_like.rb:12`), answered
- * on behalf of the values this package owns the mapping for: {@link Time},
- * which `Time.now` returns; the `Temporal` values `DateTime.parse` returns; and
- * the JS `Date` trails' boundaries carry a Ruby `Time` in.
+ * answered on behalf of the receivers that cannot carry a marker method of
+ * their own: the `Temporal` values `DateTime.parse` returns, and the JS `Date`
+ * trails' boundaries carry a Ruby `Time` in. This package's own `Time` is not
+ * among them — it is a class trails owns, so it carries the real marker
+ * (`time.ts`, `Time#actsLikeTime`) and `Object#acts_like?` finds it with
+ * `respond_to?` as Ruby does.
  *
  * @noRailsEquivalent PERMANENT — Rails spells this as a marker method on
  * reopened `Time`/`DateTime`; the values are `Temporal`'s, which TypeScript
@@ -57,7 +58,6 @@ export function actsLikeDate(self: unknown): boolean {
  */
 export function actsLikeTime(self: unknown): boolean {
   return (
-    self instanceof Time ||
     // boundary: a JS `Date` is one of the Ruby-`Time`-shaped values this answers for.
     self instanceof globalThis.Date ||
     self instanceof Temporal.Instant ||
