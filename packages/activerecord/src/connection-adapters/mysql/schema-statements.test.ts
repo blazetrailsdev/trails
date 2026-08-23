@@ -34,9 +34,6 @@ import { Result } from "../../result.js";
 const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
   Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
 
-// Minimal ForeignKeysHost: foreignKeys() reads via internalExecQuery, quotes the
-// table name, and maps referential actions. We stub internalExecQuery to return the
-// information_schema rows MySQL would yield (1 row per FK column).
 function fkHost(rows: Record<string, unknown>[]) {
   return mysqlAdapterHost({
     internalExecQuery: async () => Result.fromRowHashes(rows),
@@ -108,8 +105,6 @@ describe("MySQL::SchemaStatements", () => {
     expect(createTableDefinition.call(conn as never, "users").name).toBe("users");
   });
 
-  // Stands in for the adapter that `default_type` / `new_column_from_field`
-  // reach `create_table_info` and `lookup_cast_type` through on `self`.
   const reflectionHost = (
     createTableInfo: string | null = null,
     lookupCastType?: MysqlColumnReflectionHost["lookupCastType"],
@@ -506,8 +501,6 @@ describe("MySQL::SchemaStatements", () => {
     expect(fks[0].toTable).toBe("roc`kets");
   });
 
-  // Minimal host: indexes() reads via internalExecQuery and quotes the table
-  // name. Stub internalExecQuery to return the `SHOW KEYS FROM` rows MySQL yields.
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
     Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
       internalExecQuery: async () => Result.fromRowHashes(rows),
@@ -592,8 +585,6 @@ describe("MySQL::SchemaStatements", () => {
         Collation: "D",
       },
     ]).indexes("pages");
-    // Expression columns pass through their parenthesized form; plain columns
-    // are quoted with prefix length and DESC order baked in.
     expect(idx[0].columns).toBe("(lower(`title`)), `position`(4) DESC");
     expect(idx[0].orders).toEqual({});
     expect(idx[0].lengths).toEqual({});
@@ -649,13 +640,10 @@ describe("parseMysqlName", () => {
   });
 
   it("permits whitespace inside a backtick-quoted identifier", () => {
-    // MySQL allows whitespace only inside backtick-quoted identifiers.
     expect(parseMysqlName("`not a real table`")).toEqual({ table: "not a real table" });
   });
 
   it("rejects three-part identifiers instead of silently truncating", () => {
-    // The prior regex tokenizer silently kept the first two parts of "a.b.c",
-    // pointing introspection at a different table.
     expect(() => parseMysqlName("a.b.c")).toThrow(/Invalid MySQL identifier/);
   });
 
@@ -673,8 +661,6 @@ describe("parseMysqlName", () => {
   });
 
   it("rejects empty quoted identifiers that unquote to an empty string", () => {
-    // ``, `a`.``, ``.widgets all lex fine but unquote to "" — which would
-    // break COALESCE(?, database()) and scan the wrong catalog.
     expect(() => parseMysqlName("``")).toThrow(/Invalid MySQL identifier/);
     expect(() => parseMysqlName("``.widgets")).toThrow(/Invalid MySQL identifier/);
     expect(() => parseMysqlName("`db`.``")).toThrow(/Invalid MySQL identifier/);

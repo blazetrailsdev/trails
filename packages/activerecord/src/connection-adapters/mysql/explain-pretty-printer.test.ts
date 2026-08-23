@@ -13,8 +13,8 @@ describe("MySQL::ExplainPrettyPrinter", () => {
 
   it("computeColumnWidths returns max width per column", () => {
     const widths = (printer as any).computeColumnWidths(result);
-    expect(widths[0]).toBe(2); // "id" (2) >= "1","2"
-    expect(widths[1]).toBe(11); // "select_type"
+    expect(widths[0]).toBe(2);
+    expect(widths[1]).toBe(11);
   });
 
   it("computeColumnWidths counts NULL as 4 chars", () => {

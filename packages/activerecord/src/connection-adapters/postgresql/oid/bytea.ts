@@ -24,8 +24,6 @@ export class Bytea extends BinaryType {
   override deserialize(value: unknown): unknown {
     if (value == null) return null;
     if (value instanceof BinaryData) return value.bytes;
-    // Buffer in Node is already a Uint8Array — return it directly instead
-    // of allocating a copy via Uint8Array.from.
     if (typeof value === "string") return unescapeBytea(value);
     return super.deserialize(value);
   }

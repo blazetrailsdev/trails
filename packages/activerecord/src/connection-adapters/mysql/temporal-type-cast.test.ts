@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { temporalTypeCast } from "./temporal-type-cast.js";
 
-// mysql2's createTypecastField sets field.type to the string name, not a numeric OID.
 function field(type: string, value: string | null) {
   return { type, string: () => value };
 }

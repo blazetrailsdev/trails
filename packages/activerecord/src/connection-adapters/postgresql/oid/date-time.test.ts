@@ -35,14 +35,11 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("serialize returns the cast Instant (quoting renders the SQL literal)", () => {
-    // value_for_database is now the cast Temporal.Instant; the adapter's
-    // quoted_date renders the SQL literal (incl. the " BC" suffix) downstream.
     const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
     expect(type.serialize(instant)).toBe(instant);
   });
 
   it("quoted_date converts BC Temporal.Instant to PG BC format", () => {
-    // 44 BC = ISO year -43; round-trip via castValue to create the Instant
     const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
     expect(quotedDate(instant)).toBe("0044-01-01 00:00:00 BC");

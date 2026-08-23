@@ -116,17 +116,14 @@ describe("getTypeParser — int8 (OID 20)", () => {
 
 describe("getTypeParser — unknown OIDs", () => {
   it("delegates non-temporal OIDs to pg built-ins (always returns a function)", () => {
-    expect(typeof getTypeParser(23, "text")).toBe("function"); // int4
-    expect(typeof getTypeParser(25, "text")).toBe("function"); // text
+    expect(typeof getTypeParser(23, "text")).toBe("function");
+    expect(typeof getTypeParser(25, "text")).toBe("function");
   });
 });
 
 describe("global pg type registry is unaffected", () => {
   it("pg.types still returns its default Date parser for timestamptz", () => {
-    // Calling getTypeParser from our module must NOT mutate pg.types.
-    // The global parser for OID 1184 should still be pg's built-in one.
     const globalParser = pg.types.getTypeParser(OID_TIMESTAMPTZ, "text");
-    // pg's built-in parser returns a Date or string, not a Temporal.Instant.
     const result = (globalParser as (v: string) => unknown)("2026-04-26 14:23:55+00");
     expect(result).not.toBeInstanceOf(Temporal.Instant);
   });

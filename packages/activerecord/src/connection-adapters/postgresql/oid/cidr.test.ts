@@ -37,21 +37,16 @@ describe("PostgreSQL::OID::Cidr", () => {
 
   it("canonicalizes IPv6 to RFC 5952 form on cast (matches Ruby IPAddr#to_s)", () => {
     const type = new Cidr();
-    // Lowercase hex + leading-zero stripping.
     expect(type.castValue("2001:DB8::1")?.address).toBe("2001:db8::1");
     expect(type.castValue("2001:0DB8:0000:0000:0000:0000:0000:0001")?.address).toBe("2001:db8::1");
-    // Longest run of zeros compressed; leftmost run wins on ties.
     expect(type.castValue("2001:db8:0:0:1:0:0:1")?.address).toBe("2001:db8::1:0:0:1");
-    // Edge cases.
     expect(type.castValue("::1")?.address).toBe("::1");
     expect(type.castValue("::")?.address).toBe("::");
     expect(type.castValue("0:0:0:0:0:0:0:0")?.address).toBe("::");
     // IPv4-tailed forms are kept in mixed notation (PG + Ruby IPAddr#to_s behavior).
     expect(type.castValue("::ffff:192.168.0.1")?.address).toBe("::ffff:192.168.0.1");
-    // Pure-hex IPv4-mapped forms are also normalized to mixed notation.
     expect(type.castValue("::ffff:c0a8:1")?.address).toBe("::ffff:192.168.0.1");
     expect(type.castValue("0:0:0:0:0:ffff:c0a8:1")?.address).toBe("::ffff:192.168.0.1");
-    // Single zero groups are not compressed (RFC 5952: run must be ≥ 2).
     expect(type.castValue("2001:db8:0:1:1:1:1:1")?.address).toBe("2001:db8:0:1:1:1:1:1");
   });
 
@@ -60,14 +55,11 @@ describe("PostgreSQL::OID::Cidr", () => {
     const a = type.castValue("2001:DB8::1");
     const b = type.castValue("2001:0db8:0000:0000:0000:0000:0000:0001");
     expect(type.isChanged(a, b)).toBe(false);
-    // Different prefix is still a change.
     const c = type.castValue("2001:db8::1/64");
     expect(type.isChanged(a, c)).toBe(true);
-    // IPv4-tailed: compressed and expanded forms are the same address.
     const d = type.castValue("0:0:0:0:0:ffff:192.168.0.1");
     const e = type.castValue("::ffff:192.168.0.1");
     expect(type.isChanged(d, e)).toBe(false);
-    // Pure-hex IPv4-mapped: canonical form equals mixed-notation form.
     const f = type.castValue("::ffff:c0a8:1");
     expect(type.isChanged(e, f)).toBe(false);
   });

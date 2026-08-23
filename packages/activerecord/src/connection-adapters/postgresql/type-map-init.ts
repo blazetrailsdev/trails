@@ -150,10 +150,6 @@ export function registerClassWithPrecision(
  *   mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic.
  */
 class PgInteger8 extends BigIntegerType {
-  // Re-establish the 8-byte bound that BigIntegerType drops (max_value =
-  // Infinity). IntegerType's isInRange/isSerializable already compare in BigInt
-  // space, so 2^63 is correctly detected out of range (float64 cannot
-  // distinguish 2^63 from 2^63-1).
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
   }
@@ -187,11 +183,8 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.aliasType("char", "varchar");
   m.aliasType("name", "varchar");
   m.aliasType("bpchar", "varchar");
-  // Register fixed OIDs for internal PG string-like types so columns() can
-  // resolve their semantic type without a pg_type round-trip. OIDs are
-  // stable built-ins that don't vary across PG versions.
-  m.registerType(18, new StringType()); // "char" — single internal byte
-  m.registerType(19, new StringType()); // name   — 63-byte identifier type
+  m.registerType(18, new StringType());
+  m.registerType(19, new StringType());
   m.registerType("bool", new BooleanType());
   registerClassWithLimit(m, "bit", Bit);
   registerClassWithLimit(m, "varbit", BitVarying);
@@ -257,8 +250,6 @@ export function initializeInstanceTypeMap(
   defaultTimezone: "utc" | "local" = "utc",
 ): void {
   initializeTypeMap(m);
-  // TODO: activemodel Type classes don't yet honor `timezone` — these
-  // options are ignored until TimeType / Timestamp are extended.
   registerClassWithPrecision(m, "time", TimeType, { timezone: defaultTimezone });
   registerClassWithPrecision(m, "timestamp", Timestamp, { timezone: defaultTimezone });
   registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);

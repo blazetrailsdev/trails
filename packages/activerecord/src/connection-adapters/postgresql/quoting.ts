@@ -176,8 +176,6 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (value.isHex()) return `X'${value.toString()}'`;
     return null as unknown as string;
   }
-  // rb: `when Numeric then value.finite? ? super : "'#{value}'"` — the
-  // non-finite literal is interpolated raw, not escaped.
   if (typeof value === "number" && !Number.isFinite(value)) {
     return `'${String(value)}'`;
   }
@@ -249,10 +247,6 @@ export async function quoteDefaultExpression(
         serialized = new OidArray(subtype).serialize(value);
       }
     } else if (column.array === true) {
-      // Non-array values on an array column (e.g. a raw `"{}"` literal)
-      // must pass through to quote() unchanged — the lookup here returns
-      // the element subtype, whose serialize would coerce the string
-      // (Integer#serialize("{}") → NaN) and break the literal default.
       serialized = value;
     } else if (castType?.serialize) {
       serialized = castType.serialize(value);
@@ -335,19 +329,13 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
 }
 
 export function escapeBytea(value: Buffer | Uint8Array | string): string {
-  // Treat string inputs as raw byte sequences ("binary") so callers passing
-  // pre-encoded binary strings don't get UTF-8 re-encoded.
   const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
   return `\\x${buffer.toString("hex")}`;
 }
 
 export function unescapeBytea(value: string): Buffer {
-  // Matches PG::Connection.unescape_bytea's contract: this is intentionally
-  // not the inverse of escapeBytea for every possible input representation.
   if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
 
-  // Legacy octal escape format: \NNN octet triples and \\ backslash. Parse
-  // byte-by-byte so high bytes aren't UTF-8 re-encoded by Buffer.from.
   const bytes: number[] = [];
   for (let i = 0; i < value.length; i++) {
     const ch = value[i];
@@ -361,9 +349,6 @@ export function unescapeBytea(value: string): Buffer {
       const octal = value.slice(i + 1, i + 4);
       if (/^[0-7]{3}$/.test(octal)) {
         const byte = parseInt(octal, 8);
-        // Bytea octal escapes are byte-sized (0o000..0o377). \400–\777 isn't
-        // valid PG output; treat those as a literal backslash + digits
-        // instead of quietly overflowing.
         if (byte <= 0o377) {
           bytes.push(byte);
           i += 3;
@@ -469,9 +454,6 @@ export function quotedDate(
     return formatInstantForSqlPostgres(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSqlPostgres(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSqlPostgres(value);
-  // PlainTime carries no date/year — no BC bias applies. The abstract formatter
-  // handles it (and `quoted_time` strips the date prefix off the PlainDateTime
-  // form callers route through here).
   return abstractQuotedDate(value);
 }
 

@@ -51,10 +51,6 @@ export class DateTime extends DateTimeType {
       if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
         try {
-          // BC dates may have offset (timestamptz) or not (timestamp). Both
-          // return Instant — parsePostgresTimestampAsInstant interprets naive
-          // values in defaultSqlTimezone() (UTC by default, host-local when
-          // ActiveRecord.default_timezone === "local").
           const hasOffset = /[-+]\d{2}(?::\d{2})?$/.test(value.slice(0, -3).trimEnd());
           return hasOffset ? parsePostgresInstant(value) : parsePostgresTimestampAsInstant(value);
         } catch {
@@ -73,11 +69,6 @@ export class DateTime extends DateTimeType {
    * `quoted_date` / bind layer, matching Rails where the adapter does the quoting.
    */
   override serialize(value: unknown): unknown {
-    // Cast first so the PG infinity *strings* ("infinity" / "-infinity") and
-    // the numeric ±Infinity sentinels both resolve to the sentinel before the
-    // wire-literal mapping — otherwise the string forms fall through to the
-    // base serialize, which hands back the raw ±Infinity number instead of the
-    // "infinity"/"-infinity" wire literal PG expects.
     const cast = this.cast(value);
     if (cast === DateInfinity) return "infinity";
     if (cast === DateNegativeInfinity) return "-infinity";

@@ -105,22 +105,17 @@ describe("PostgreSQL::OID::Range", () => {
 
     it("formats a value as a string via String()", () => {
       const type = new RangeType(passthroughSubtype, "int4range");
-      // inspect() falls through to String(value) for non-primitive, non-Temporal objects.
       expect(typeof type.typeCastForSchema(new Range(1, 10))).toBe("string");
     });
 
     it("formats a Temporal.Instant value via inspect()", () => {
       const type = new RangeType(passthroughSubtype, "tstzrange");
       const instant = Temporal.Instant.from("2026-04-28T00:00:00Z");
-      // inspect() is called with the Instant directly when passed as the
-      // top-level value to typeCastForSchema.
       expect(type.typeCastForSchema(instant)).toContain("2026-04-28");
     });
 
     it("throws on Date passed directly to typeCastForSchema / inspect()", () => {
       const type = new RangeType(passthroughSubtype, "tsrange");
-      // inspect() receives the Date directly here (not as a Range bound),
-      // exercising the Date guard added in this PR.
       expect(() => type.typeCastForSchema(new Date())).toThrow(TypeError);
       expect(() => type.typeCastForSchema(new Date())).toThrow(/Temporal/);
     });

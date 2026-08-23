@@ -52,7 +52,6 @@ describe("disableReferentialIntegrity", () => {
         executed.push(sql);
         return [];
       },
-      // A later call would report the mutated set; disable/enable must ignore it.
       tables: async () => current,
       transaction: async (fn) => fn(),
     };

@@ -296,11 +296,6 @@ export class TableDefinition extends AbstractTableDefinition {
       type = options.type as ColumnType;
     }
     const def = super.newColumnDefinition(name, type, options);
-    // Record the physical storage type for datetime-family columns so the
-    // schema dumper can re-derive the dumped type against the live
-    // datetime_type (mirrors what re-introspecting the column would yield).
-    // `:datetime` resolves to whatever datetime_type is aliased to at creation
-    // time; `:timestamp` / `:timestamptz` are stored as-written.
     const t = def.type as string;
     if (t === "datetime") {
       def.datetimePhysicalType = pgDatetimeConfig.datetimeType;

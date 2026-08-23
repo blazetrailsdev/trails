@@ -739,6 +739,10 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/relation/**/*.ts",
+      "packages/activerecord/src/connection-adapters/mysql/**/*.ts",
+      "packages/activerecord/src/connection-adapters/mysql2/**/*.ts",
+      "packages/activerecord/src/connection-adapters/postgresql/**/*.ts",
+      "packages/activerecord/src/connection-adapters/sqlite3/**/*.ts",
     ],
     rules: {
       "blazetrails/no-freeform-comments": "error",

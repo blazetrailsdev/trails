@@ -84,7 +84,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     for (const r of rows) {
       const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
       if (currentIndex !== keyName) {
-        if (keyName === "PRIMARY") continue; // skip the primary key
+        if (keyName === "PRIMARY") continue;
         currentIndex = keyName;
 
         const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
@@ -339,8 +339,6 @@ export function createTableDefinition(
  */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  // Optional so a caller that has no type map still reflects columns through
-  // `fetch_type_metadata`'s modifier-stripping fallback.
   lookupCastType?(sqlType: string): {
     name: string;
     limit?: number | null;
@@ -401,7 +399,6 @@ export async function newColumnFromField(
   } else if (meta.type === "text" && def?.startsWith("'")) {
     def = def.slice(1, -1).replace(/\\'/g, "'");
   } else if (def != null && /^\d/.test(def)) {
-    // Its a number so we can skip the query to check if it is a function
   } else if (def != null && (await defaultType.call(this, tableName, fieldName)) === "function") {
     [def, defFn] = [null, def];
   }
@@ -438,15 +435,12 @@ export function fetchTypeMetadata(
 
   if (lookupCastType) {
     const castType = lookupCastType(sqlType);
-    // Use .name (plain string property on ActiveModel Type).
     const raw = castType.name.toLowerCase();
     baseType = /^timestamp/.test(raw) ? "datetime" : raw;
     limit = castType.limit ?? null;
     precision = castType.precision ?? null;
     scale = castType.scale ?? null;
   } else {
-    // Fallback: strip (N) modifiers, then take first whitespace token to drop
-    // trailing modifiers like "unsigned" or "zerofill".
     baseType = sqlType
       .replace(/\(.*\).*$/, "")
       .trim()
@@ -461,7 +455,6 @@ export function fetchTypeMetadata(
 
 /** @internal */
 export function extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined {
-  // RESTRICT is MySQL's default; omit it so FK definitions stay clean.
   if (specifier === "RESTRICT") return undefined;
   switch (specifier) {
     case "CASCADE":
@@ -602,10 +595,6 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
   const unquote = (s: string): string =>
     s.startsWith("`") && s.endsWith("`") ? s.slice(1, -1).replace(/``/g, "`") : s;
 
-  // Parse a single identifier token starting at `start`. Returns the
-  // raw token (with backticks kept, to preserve quote distinctness)
-  // and the index of the next unconsumed character. Throws on empty
-  // or unterminated tokens.
   const parsePart = (start: number): { part: string; nextIndex: number } => {
     if (start >= input.length) invalid();
     if (input[start] === "`") {
@@ -624,29 +613,18 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
         part += input[i];
         i += 1;
       }
-      invalid(); // unterminated
+      invalid();
     }
     let i = start;
-    // Stop at `.`, the start of a quoted token, or any whitespace.
-    // MySQL only permits whitespace inside *backtick-quoted*
-    // identifiers; an unquoted "db .widgets" would therefore be
-    // invalid. Treating whitespace as a token boundary (rather than
-    // part of the name) lets the extra-content check downstream
-    // reject the input cleanly.
     while (i < input.length && input[i] !== "." && input[i] !== "`" && !/\s/.test(input[i])) {
       i += 1;
     }
-    if (i === start) invalid(); // empty
+    if (i === start) invalid();
     return { part: input.slice(start, i), nextIndex: i };
   };
 
   if (input.length === 0) invalid();
 
-  // unquote + re-validate non-empty: a quoted token like "``" lexes
-  // fine in parsePart (backticks match, body is empty) but unquotes
-  // to "", which would break COALESCE(?, database()) and make the
-  // introspection call silently scan the wrong catalog. Centralize
-  // the empty-check here so both bare and quoted forms are covered.
   const checkNonEmpty = (part: string): string => {
     const s = unquote(part);
     if (s.length === 0) invalid();
@@ -659,7 +637,7 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
   }
   if (input[first.nextIndex] !== ".") invalid();
   const second = parsePart(first.nextIndex + 1);
-  if (second.nextIndex !== input.length) invalid(); // extra content
+  if (second.nextIndex !== input.length) invalid();
   return { schema: checkNonEmpty(first.part), table: checkNonEmpty(second.part) };
 }
 

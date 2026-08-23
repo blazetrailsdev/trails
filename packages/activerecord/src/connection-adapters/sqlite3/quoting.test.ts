@@ -23,12 +23,6 @@ import {
   typeCast as typeCastFn,
 } from "./quoting.js";
 
-// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// SQLite's quotedDate / quotedTime so date/time literals keep the 2000-01-01
-// prefix on times, and quotedBinary so binary self-dispatch reaches SQLite's
-// `x'..'` hex form, and the boolean pair so the inherited abstract boolean arm
-// self-dispatches back to SQLite's 1/0 — the same overrides
-// SQLite3Adapter supplies.
 const HOST = quotingHost({
   quotedDate,
   quotedTime,
@@ -382,10 +376,8 @@ describe("SQLite3::Quoting", () => {
       );
       const rows = await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].ts as string;
-      // SQLite3DateTime converts the offset-less UTC string → Temporal.Instant.
       const cast = new SQLite3DateTime().cast(raw);
       expect(cast).toBeInstanceOf(Temporal.Instant);
-      // Microsecond precision is preserved end-to-end.
       expect((cast as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
     });
 
@@ -397,8 +389,8 @@ describe("SQLite3::Quoting", () => {
       const cast = new SQLite3DateTime().cast(raw) as Temporal.Instant;
       expect(cast).toBeInstanceOf(Temporal.Instant);
       const zdt = cast.toZonedDateTimeISO("UTC");
-      expect(zdt.microsecond).toBe(654321 % 1000); // 321 µs
-      expect(zdt.millisecond).toBe(Math.floor(654321 / 1000)); // 654 ms
+      expect(zdt.microsecond).toBe(654321 % 1000);
+      expect(zdt.millisecond).toBe(Math.floor(654321 / 1000));
     });
 
     it("Temporal.PlainDate survives INSERT → SELECT", async () => {
@@ -415,9 +407,6 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("Temporal.PlainTime with microseconds survives INSERT → SELECT", async () => {
-      // SQLite stores time with the '2000-01-01' sentinel date prefix.
-      // TimeType#cast handles the full '2000-01-01 HH:MM:SS.ffffff' string via
-      // extractTimePortion(), so no manual stripping is needed.
       const time = Temporal.PlainTime.from("14:23:55.654321");
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
       const rows = await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`);

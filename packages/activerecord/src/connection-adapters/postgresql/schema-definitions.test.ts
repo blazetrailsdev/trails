@@ -414,7 +414,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     td.string("message");
     td.uniqueConstraint("message", { name: "unique_msg" });
     const sql = await toSql(td);
-    // Constraint must appear inside the column list, before the trailing WITH clause
     const constraintPos = sql.indexOf('CONSTRAINT "unique_msg"');
     const withPos = sql.indexOf("WITH (");
     expect(constraintPos).toBeGreaterThan(0);
@@ -458,7 +457,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(sql).toContain('"path" ltree');
     expect(sql).toContain('"doc" tsvector');
     expect(sql).toContain('"payload" xml');
-    // BIT / BIT VARYING come from the pgColumn helpers verbatim (already uppercase).
     expect(sql).toContain('"flags" BIT(8)');
     expect(sql).toContain('"flex" BIT VARYING(16)');
     expect(sql).toContain('"price" money');
@@ -467,13 +465,11 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 
   it("emits PG-specific long-tail column SQL types lowercase when adapter provides typeToSql", async () => {
-    // Stub adapter mirrors PostgreSQLAdapter.NATIVE_DATABASE_TYPES lowercase
-    // output — verifies that the visitor delegates to the adapter's typeToSql.
     const stubAdapter = {
       quoteColumnName: (s: string) => `"${s}"`,
       quoteTableName: (s: string) => `"${s}"`,
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
-      typeToSql: (type: string) => type, // returns lowercase verbatim (mirrors PG native types)
+      typeToSql: (type: string) => type,
       validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
       // `SchemaCreation` delegates its capability probes to `@conn`
       // (abstract/schema_creation.rb:16-21); answer as PostgreSQLAdapter does.
@@ -585,7 +581,6 @@ describeIfPostgresqlAdapter("TableDefinition#validColumnDefinitionOptions", () =
     for (const key of ["array", "using", "castAs", "as", "type", "enumType", "stored"]) {
       expect(opts).toContain(key);
     }
-    // Abstract OPTION_NAMES carry through via super.
     expect(opts).toContain("collation");
     expect(opts).toContain("ifNotExists");
   });

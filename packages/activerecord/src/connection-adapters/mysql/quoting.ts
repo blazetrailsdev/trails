@@ -139,7 +139,6 @@ export function castBoundValue(value: unknown): unknown {
 // Rails MySQL COLUMN_NAME supports: integers, `backtick`, "double-quoted", \w identifiers,
 // with up to 2 qualifier prefixes (schema.table.col) and recursive function args.
 export function columnNameMatcher(): RegExp {
-  // id: integer literal, backtick-quoted, double-quoted, or plain \w identifier
   const id =
     String.raw`(?:\d+|` +
     "`" +
@@ -152,7 +151,6 @@ export function columnNameMatcher(): RegExp {
   // Rails uses \w+\((?:|\g<2>)\) — 0 or 1 arg (no comma-separated multi-arg).
   // fnCall2: function with 0 or 1 plain col/star arg (deepest level)
   const fnCall2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
-  // fnCall1: function with 0 or 1 arg (which can itself be a function)
   const fnCall1 = String.raw`\w+\(\s*(?:\*|${col}|${fnCall2})?\s*\)`;
   const expr = String.raw`(?:${col}|${fnCall1})`;
   const aliased = String.raw`${expr}(?:(?:\s+AS)?\s+${id})?`;
@@ -209,8 +207,6 @@ export function quotedDate(
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) {
-    // Abstract quotedDate normalises a bare time onto 2000-01-01; mirror that so
-    // direct quotedDate(time) calls match the abstract helper's shape.
     const dt = new Temporal.PlainDateTime(
       2000,
       1,

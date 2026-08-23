@@ -46,7 +46,6 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("returns bigserial for a serial bigint column", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
-      // serial bigint → bigserial
       expect(dumper.schemaType(col)).toBe("bigserial");
     });
 
@@ -64,7 +63,6 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("returns semantic type for non-serial non-bigint columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      // sqlType = "character varying", but sqlTypeMetadata.type = "string" (semantic)
       const col = makeColumn({ sqlType: "character varying", type: "string" });
       expect(dumper.schemaType(col)).toBe("string");
     });
@@ -181,7 +179,6 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("adds enum_type for enum columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      // isEnum checks sqlTypeMetadata.type === "enum"
       const col = new Column("status", null, { sqlType: "mood", type: "enum" }, true, {});
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["enum_type"]).toBe(JSON.stringify("mood"));

@@ -99,8 +99,6 @@ export function quoteString(value: string): string {
  * `quoted_false` (rb:75-78) back onto SQLite's overrides.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  // rb: `when Numeric then value.finite? ? super : "'#{value}'"` — the
-  // non-finite literal is interpolated raw, not escaped.
   if (typeof value === "number" && !Number.isFinite(value)) return `'${String(value)}'`;
   return abstractQuote.call(this, value);
 }
@@ -246,8 +244,6 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
 // regex patterns, so we use a function-based matcher that walks balanced
 // parentheses to arbitrary depth.
 
-// SQL keywords that should never appear inside function arguments
-// in a column name context — prevents subquery injection.
 const DANGEROUS_KEYWORDS =
   /\b(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|INTO|FROM|WHERE|EXEC|EXECUTE)\b/i;
 
@@ -262,8 +258,6 @@ function skipBalancedParens(s: string, pos: number): number {
     i++;
   }
   if (depth !== 0) return -1;
-  // Strip string literals before checking for dangerous keywords
-  // so that IFNULL(name, 'from') is not rejected.
   const contents = s.slice(start, i - 1).replace(/'[^']*'/g, "");
   if (DANGEROUS_KEYWORDS.test(contents)) return -1;
   return i;
@@ -275,7 +269,7 @@ function skipQuotedIdentifier(s: string, pos: number): number {
   while (i < s.length) {
     if (s[i] === '"') {
       if (s[i + 1] === '"') {
-        i += 2; // escaped ""
+        i += 2;
       } else {
         return i + 1;
       }
@@ -283,12 +277,11 @@ function skipQuotedIdentifier(s: string, pos: number): number {
       i++;
     }
   }
-  return -1; // unclosed quote
+  return -1;
 }
 
 function matchColumnExpr(s: string, pos: number): number {
   let i = pos;
-  // optional table qualifier: word. or "word".
   if (s[i] === '"') {
     const end = skipQuotedIdentifier(s, i);
     if (end === -1) return -1;
@@ -301,24 +294,19 @@ function matchColumnExpr(s: string, pos: number): number {
     const m = s.slice(i).match(/^\w+/);
     if (!m) return -1;
     if (s[i + m[0].length] === ".") {
-      // table.column — consume qualifier
       i += m[0].length + 1;
     } else if (s[i + m[0].length] === "(") {
-      // function call: word(...)
       return skipBalancedParens(s, i + m[0].length);
     } else {
-      // just a column name
       return i + m[0].length;
     }
   }
-  // column name after qualifier: word or "word", or function call: word(...)
   if (s[i] === '"') {
     return skipQuotedIdentifier(s, i);
   }
   const nameMatch = s.slice(i).match(/^\w+/);
   if (!nameMatch) return -1;
   i += nameMatch[0].length;
-  // function call with balanced parens
   if (s[i] === "(") {
     const end = skipBalancedParens(s, i);
     if (end === -1) return -1;
@@ -349,23 +337,22 @@ function matchColumnList(s: string, allowOrder: boolean): boolean {
         i = skipWhitespace(s, i + 2);
         hasAs = true;
       }
-      // Try to consume an alias identifier (not a keyword or comma)
       const peek = s.slice(i);
       if (peek[0] === '"') {
         const end = skipQuotedIdentifier(s, i);
         if (end !== -1) {
           i = skipWhitespace(s, end);
         } else if (hasAs) {
-          return false; // AS without valid alias
+          return false;
         }
       } else {
         const alias = peek.match(/^\w+/);
         if (alias && !/^(?:ASC|DESC|COLLATE|NULLS|,)\b/i.test(alias[0])) {
           i = skipWhitespace(s, i + alias[0].length);
         } else if (hasAs) {
-          return false; // AS without valid alias
+          return false;
         } else {
-          i = saved; // no alias found, backtrack
+          i = saved;
         }
       }
     }
