@@ -211,15 +211,15 @@ Rails puts class-level configuration in the class body directly.
 Trails puts the equivalent in a `static {}` initializer block.
 
 ```ts
-import { Model } from "@blazetrails/activemodel";
+import { Base } from "@blazetrails/activerecord";
 
-class Post extends Model {
+class Post extends Base {
   declare title: string;
 
   static {
     Post.attribute("title", "string");
     Post.validates("title", { presence: true });
-    Post.beforeSave((record: Post) => {
+    Post.beforeSave((record) => {
       record.title = record.title.trim();
     });
   }
