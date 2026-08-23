@@ -1988,11 +1988,16 @@ export class Relation<T extends Base> {
       if (Array.isArray(basePk)) {
         // Rails `where!(**Array(primary_key).zip(limited_ids.transpose).to_h)`
         // (schema_statements.rb:1448) — a per-column `IN`, not a tuple `IN`.
-        // Only the materialized form exists for a composite key: the inline
-        // subquery fallback has no single column to nest under.
-        const tuples = (limitedIds ?? []) as unknown[][];
+        // The synchronous fallback keeps that per-column shape too: each column
+        // gets its own single-column DISTINCT subquery, since a multi-column
+        // subquery is not a valid `IN` operand.
+        const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
-          rel = rel.where(this.table.get(column).in(tuples.map((tuple) => tuple[i]) as never));
+          const ids =
+            tuples !== undefined
+              ? tuples.map((tuple) => tuple[i])
+              : this._limitedDistinctRelation(jd, column).arel();
+          rel = rel.where(this.table.get(column).in(ids as never));
         });
       } else {
         const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).arel();
@@ -2156,12 +2161,6 @@ export class Relation<T extends Base> {
    * OUTER JOINs), or null when this relation has no resolvable eager loading.
    * Shared by `toSql` (string path) and the set-operation operand
    * builder, which composes it into the compound's single collector.
-   *
-   * Also null for the one composite-PK case left after
-   * `distinct_relation_for_primary_key` took over the async path: this builder is
-   * synchronous, so it substitutes an inline `pk IN (SELECT DISTINCT …)` for the
-   * executed limited-ids query, and a composite key has no single column to nest
-   * that under. The plain arel is closer than a broken per-column `IN ()`.
    */
   private _buildEagerOperandManager(): SelectManager | null {
     const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
@@ -2175,14 +2174,6 @@ export class Relation<T extends Base> {
       Nodes.OuterJoin,
     );
     if (jd.nodes.length === 0) return null;
-
-    if (
-      Array.isArray(basePk) &&
-      this.hasLimitOrOffset &&
-      !this._eagerJoinDependencyIsLimitable(jd)
-    ) {
-      return null;
-    }
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
