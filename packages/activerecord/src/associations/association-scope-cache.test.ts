@@ -73,7 +73,7 @@ describe("Association scope cache", () => {
 
   it("disable_joins associations route through the dedicated DJAS loader, not Association.scope()", async () => {
     // Loaders detect `disable_joins: true` early and route to
-    // `_loadThroughViaDisableJoinsScope` (which calls DJAS directly,
+    // `Association#scope`'s `disable_joins` branch (which calls DJAS directly,
     // returning a deferred-chain DJAR). They never call
     // `Association.scope()` for disable-joins reflections,
     // so the JOIN-based cache contract doesn't apply — DJAS owns

@@ -1,7 +1,7 @@
 /**
  * DJAS routing gate widening (task #12).
  *
- * `_canRouteThroughViaDisableJoinsAssociationScope` in associations.ts
+ * `Association#scope`'s `disable_joins` branch (association.rb:300-306)
  * used to bail out on `options.sourceType` and on
  * `sourceReflection.isPolymorphic()` — those shapes fell back to the
  * JOIN-based AssociationScope path, defeating `disable_joins: true`.
