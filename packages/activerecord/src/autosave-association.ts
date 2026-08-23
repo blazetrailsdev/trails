@@ -22,10 +22,6 @@ function _guardKey(association: unknown): string {
   return String(association);
 }
 
-// ---------------------------------------------------------------------------
-// Host interface — what `this` must provide for all this-typed functions
-// ---------------------------------------------------------------------------
-
 interface AutosaveAssociationHost {
   [key: symbol]: unknown;
   _markedForDestruction: boolean;
@@ -44,10 +40,6 @@ interface AutosaveAssociationHost {
   };
   constructor: { primaryKey?: string | string[]; name: string };
 }
-
-// ---------------------------------------------------------------------------
-// Module object — included into Base via include(Base, AutosaveAssociation)
-// ---------------------------------------------------------------------------
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
@@ -117,10 +109,6 @@ export const AutosaveAssociation = {
   saveBelongsToAssociation,
 };
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
 function _setValidatingBelongsToFor(record: any, association: unknown, value: boolean): void {
   let map = record[VALIDATING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
   if (!map) {
@@ -152,10 +140,6 @@ function _setAutosavingBelongsToFor(record: any, association: unknown, value: bo
     if (map.size === 0) delete record[AUTOSAVING_BELONGS_TO_FOR];
   }
 }
-
-// ---------------------------------------------------------------------------
-// Standalone exports (used by other modules, called via dynamic import)
-// ---------------------------------------------------------------------------
 
 export function isDestroyable(record: Base): boolean {
   return !record.isNewRecord() && record.markedForDestruction();
@@ -215,10 +199,6 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Validate & autosave (called from Base.isValid and Base.save)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Save callbacks, registered per association by
 // `addAutosaveAssociationCallbacks` (autosave_association.rb:171-206).
 // HABTM reflections route into `saveCollectionAssociation` as a hasMany-typed
@@ -249,11 +229,8 @@ export async function saveCollectionAssociation(
   }
   const autosave = reflection.options?.autosave;
 
-  // By saving the instance variable in a local variable,
-  // we make the whole callback re-entrant.
   const newRecordBeforeSave = !!(this as any)._newRecordBeforeSave;
 
-  // reconstruct the scope now that we know the owner's id
   association.resetScope();
 
   let records: Base[] | null = associatedRecordsToValidateOrSave.call(
@@ -327,18 +304,6 @@ export async function saveHasOneAssociation(
     await association.persistReplace();
   }
 
-  // A has_one *through* suppresses its through-proxy's independent autosave by
-  // planting a sentinel `_pendingReplace` on the (plain has_one) proxy: over an
-  // UNLOADED pre-existing join row the through builds a fresh join record in
-  // memory so `owner.through` reads present it synchronously, but that record
-  // must NOT be inserted here — the through's own `persistReplace` reconciles
-  // the existing DB row via `load_target` + `update`, and persisting it here
-  // would duplicate that row. A plain `HasOneAssociation` never sets
-  // `_pendingReplace` itself (its displacement removal runs inline, via
-  // `detachDisplacedTarget`), and the through association itself clears its marker
-  // in the `persistReplace` above, so a truthy marker on a non-through
-  // association is unambiguously that suppression sentinel. Skip
-  // the end-record persistence; the through owns the join row.
   if (association?._pendingReplace && !isThrough) {
     return true;
   }
@@ -888,7 +853,6 @@ export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) =
         clear();
         throw e;
       }
-      // Keep the guard set until async work settles to prevent re-entrant autosave cycles.
       if (result != null && typeof result.then === "function") {
         return result.then(
           (v: any) => {

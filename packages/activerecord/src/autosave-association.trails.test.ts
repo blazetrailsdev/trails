@@ -157,16 +157,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     registerModel("WidgetOwner", WidgetOwner);
 
     const owner = await WidgetOwner.create({ name: "Alice" });
-    // Create a persisted, unchanged widget with a blank status
     const widget = await Widget.create({ name: "", author_id: owner.id });
     cacheAssoc(owner, "widgets", [widget]);
 
-    // Default context: widget is unchanged → skipped → owner is valid
     const defaultValid = await owner.isValid();
     expect(defaultValid).toBe(true);
 
-    // Custom context "publish": unchanged widget must be validated too, and its
-    // presence validator fires → owner is invalid
     const publishValid = await owner.isValid("publish" as any);
     expect(publishValid).toBe(false);
   });
@@ -196,7 +192,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("DefaultBelongsToAuthor", Author);
     registerModel("DefaultBelongsToPost", Post);
-    // No `autosave:` option — exercises the default-on registration path.
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
       className: "DefaultBelongsToAuthor",
@@ -237,8 +232,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("ZipParent", Parent);
     registerModel("ZipChild", Child);
-    // PK ["id"] (scalar) zipped against FK ["parent_id", "group"] →
-    // pairs [("id", "parent_id")]; the trailing "group" FK is dropped.
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: "id",
       foreignKey: ["parent_id", "group"],
@@ -256,8 +249,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await child.save();
     expect(parent.isNewRecord()).toBe(false);
     expect(child.parent_id).toBe(parent.id);
-    // Trailing FK "group" was dropped from the zip; the existing
-    // owner value must survive untouched (no overwrite to undefined/null).
     expect(child.group).toBe("us-west");
   });
 
@@ -294,16 +285,13 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       className: "DefaultAutosaveAuthor",
     });
 
-    const author = new Author({}); // name missing — validation fails
+    const author = new Author({});
     const post = new Post({ name: "ok" });
     cacheAssoc(post, "author", author);
     const saved = await post.save();
-    // Owner save succeeds — default branch swallows child failure.
     expect(saved).toBe(true);
     expect(post.isNewRecord()).toBe(false);
-    // Child remained unsaved because record.save(validate: true) failed.
     expect(author.isNewRecord()).toBe(true);
-    // Owner.errors stays clean — propagateErrors is gated on autosave.
     expect(post.errors.size).toBe(0);
   });
 
@@ -332,8 +320,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("LongPkParent", Parent);
     registerModel("LongPkChild", Child);
-    // Explicit composite PK ["id", "name"] zipped against scalar FK
-    // ["author_id"] → only ("id", "author_id") pairs; ("name", nil) drops.
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: ["id", "name"],
       foreignKey: "author_id",
@@ -347,8 +333,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await child.save();
     expect(parent.isNewRecord()).toBe(false);
     expect(child.author_id).toBe(parent.id);
-    // The dropped ("name", nil) pair didn't attempt to write — no throw,
-    // no spurious column write.
   });
 });
 
@@ -422,8 +406,6 @@ describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
     registerModel("AssociationValidDoomedBird", DoomedBird);
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
-    // `name` is `validates presence` on Bird, so this child is invalid — and
-    // `birds` is autosave through `accepts_nested_attributes_for`.
     const doomed = new DoomedBird({ name: "" });
     pirate.association("birds").setTarget([doomed] as any);
 

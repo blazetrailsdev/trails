@@ -134,7 +134,6 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    // Limit retention asserted on the reflected column (see RFC 0043 note above).
     expect(
       (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
         .overloaded_string_with_limit.limit,
@@ -312,7 +311,6 @@ describe("CustomPropertiesTest", () => {
 
     expect((new Klass() as any).counter).toBe(1);
 
-    // column_defaults will increment the counter since the proc is called
     void Klass.columnDefaults;
 
     expect((new Klass() as any).counter).toBe(3);
@@ -382,7 +380,7 @@ describe("CustomPropertiesTest", () => {
     }
 
     class Child extends Parent {}
-    new Child(); // force a schema load
+    new Child();
 
     Parent.attribute("foo", typeRegistry.lookup("value"));
 
@@ -655,13 +653,10 @@ describe("DefaultAttributesTest", () => {
   it("attribute() overriding only type preserves the schema default", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {}
-    // Schema reflection gives score a default of 5
     Post.defineAttribute("score", intType, { default: 5, userProvidedDefault: false });
-    // User overrides type to string without specifying a default
     Post.attribute("score", "string");
 
     const defaults = Post._defaultAttributes();
-    // Type changed to string, but schema default (5) is preserved
     expect(defaults.getAttribute("score").type.name).toBe("string");
     expect(defaults.getAttribute("score").value).toBe("5");
   });
@@ -707,7 +702,6 @@ describe("DefineAttributeSTITest", () => {
       }
     }
     Post.defineAttribute("id", strType);
-    // Base.prototype.id (the CPK-aware getter) must still be used, not a plain accessor
     const ownDesc = Object.getOwnPropertyDescriptor(Post.prototype, "id");
     expect(ownDesc).toBeUndefined();
   });
@@ -722,15 +716,12 @@ describe("ResetDefaultAttributesCascadeTest", () => {
     }
     class SpecialPost extends (Post as any) {}
 
-    // Prime the subclass cache via AR's _defaultAttributes path
     const before = (SpecialPost as any)._defaultAttributes();
     expect(before.keys()).toContain("title");
     expect(before.keys()).not.toContain("score");
 
-    // Add attribute to superclass at runtime
     Post.attribute("score", "integer", { default: 0 });
 
-    // Subclass cache must be invalidated and rebuilt with the new attribute
     const after = (SpecialPost as any)._defaultAttributes();
     expect(after.keys()).toContain("score");
     expect(after.getAttribute("score").value).toBe(0);

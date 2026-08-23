@@ -150,7 +150,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     ship.name = "Pearl Changed";
     cacheAssoc(pirate, "ship", ship);
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
-    // Destruction should be rolled back — ship still exists
     const reloaded = await Ship.find(ship.id);
     expect(reloaded).toBeTruthy();
   });
@@ -234,7 +233,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     pirate.catchphrase = "Changed Catchphrase";
     cacheAssoc(ship, "pirate", pirate);
     await expect(ship.save()).rejects.toThrow("Oh noes!");
-    // Destruction should be rolled back — pirate still exists
     const reloaded = await Pirate.find(pirate.id);
     expect(reloaded).toBeTruthy();
   });
@@ -315,7 +313,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const b2 = await Bird.create({ name: "birds_1", pirate_id: pirate.id });
     b1.markForDestruction();
     b2.markForDestruction();
-    // Override the second bird's destroy to raise after super
     const origDestroy = b2.destroy.bind(b2);
     (b2 as any).destroy = async () => {
       await origDestroy();
@@ -323,7 +320,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     };
     cacheAssoc(pirate, "birds", [b1, b2]);
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
-    // Both destructions should be rolled back
     const remaining = await Bird.where({ pirate_id: pirate.id });
     expect(remaining.length).toBe(2);
   });
@@ -457,8 +453,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const parrot = await Parrot.create({ name: "Polly" });
     const proxy = association(pirate, "parrots");
     await proxy.push(parrot);
-    // Parrot is persisted and unchanged; autosave validation should only consider
-    // associated records that have actually been changed
     cacheAssoc(pirate, "parrots", [parrot]);
     expect(await pirate.isValid()).toBe(true);
   });
@@ -471,7 +465,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     for (const p of await proxy) p.markForDestruction();
     expect(await pirate.save()).toBe(true);
 
-    // The join record is already gone — saving again issues no queries.
     await assertNoQueries(false, async () => {
       expect(await pirate.save()).toBe(true);
     });
@@ -880,7 +873,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     }
     registerModel("CpkOrderPk", CpkOrderPk);
     registerModel("CpkBookFk", CpkBookFk);
-    // has_one with single-column FK on CPK parent (like OrderWithPrimaryKeyAssociatedBook)
     const order = new CpkOrderPk({ id: [5, 7], status: "open" });
     const book = new CpkBookFk({ signature: "My Book" });
     cacheAssoc(order, "cpkBookFk", book);
@@ -888,7 +880,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(saved).toBe(true);
     expect(order.isNewRecord()).toBe(false);
     expect(book.isNewRecord()).toBe(false);
-    // autosave propagates the "id" component of the composite PK into book.order_id
     expect(book.order_id).toBe(7);
   });
   it("assign ids for through a belongs to", async () => {
@@ -1015,7 +1006,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
 
   it("should save parent but not invalid child", async () => {
-    // Without autosave: invalid has_one child does not block parent save
     class PFirm extends Base {
       declare name: string | null;
       declare pAccount: PAccount | null;
@@ -1413,7 +1403,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    // No changes — save should succeed without infinite loop
     cacheAssoc(pirate, "ship", ship);
     const saved = await pirate.save();
     expect(saved).toBe(true);
@@ -1444,7 +1433,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should automatically validate the associated model", async () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" }); // invalid
+    const ship = new Ship({ name: "" });
     cacheAssoc(pirate, "ship", ship);
     const saved = await pirate.save();
     expect(saved).toBe(false);
@@ -1553,9 +1542,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
         this.validates("catchphrase", { presence: true });
-        // The FK derived from the association name would be `deep_pirate_id`;
-        // the real `ships` column is `pirate_id`. The bridge used to swallow
-        // the phantom write; strict _writeAttribute surfaces it.
         this.hasOne("deepShip", { autosave: true, foreignKey: "pirate_id" });
       }
     }
@@ -1577,13 +1563,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
     const saved = await pirate.save({ validate: false });
     expect(saved).toBe(true);
-    // Reload and verify all empty strings were persisted (validations bypassed at every depth)
     const reloadedPirate = await DeepPirate.find(pirate.id as number);
     expect(reloadedPirate.catchphrase).toBe("");
     const reloadedShip = await DeepShip.find(ship.id as number);
     expect(reloadedShip.name).toBe("");
-    // Parts must also be saved with blank names — a regression where has_many autosave
-    // doesn't propagate validate:false would leave them with their original names.
     const reloadedPart1 = await DeepPart.find(part1.id as number);
     const reloadedPart2 = await DeepPart.find(part2.id as number);
     expect(reloadedPart1.name).toBe("");
@@ -1592,7 +1575,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" }); // invalid — presence required
+    const ship = new Ship({ name: "" });
     cacheAssoc(pirate, "ship", ship);
     await expect(pirate.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -1617,12 +1600,11 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should rollback any changes if an exception occurred while saving", async () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "" }); // invalid — presence required
+    const ship = new Ship({ name: "" });
     pirate.catchphrase = "Changed";
     cacheAssoc(pirate, "ship", ship);
     const saved = await pirate.save();
     expect(saved).toBe(false);
-    // Parent's update should be rolled back
     const reloaded = await Pirate.find(pirate.id);
     expect(reloaded.catchphrase).toBe("Yarr");
   });
@@ -1635,10 +1617,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("mark for destruction is ignored without autosave true", async () => {
-    // `ShipWithoutNestedAttributes has_many :parts` is declared without
-    // autosave, so `mark_for_destruction` is ignored: the part is still
-    // validated as an ordinary new child and its blank name invalidates the
-    // ship. Only an autosave association skips validating a marked child.
     const ship = new ShipWithoutNestedAttributes({ name: "The Black Flag" });
     const part = ship.parts.build();
     part.markForDestruction();
@@ -1708,8 +1686,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     expect(chef._readAttribute("employable_type")).toBe("SwapCakeDesigner");
     expect(chef._readAttribute("employable_id")).toBe(cake.id);
 
-    // Reassign chef to drink — polymorphic type column flips even when
-    // employable_id may collide. autosave on drink should re-persist the chef.
     chef._writeAttribute("employable_type", "SwapDrinkDesigner");
     cacheAssoc(drink, "chef", chef);
     await drink.save();
@@ -1768,7 +1744,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("should save parent but not invalid child", async () => {
     const { Author, Post } = makeModels();
-    const author = new Author({ name: "" }); // invalid
+    const author = new Author({ name: "" });
     const post = new Post({ name: "Hello" });
     cacheAssoc(post, "author", author);
     const saved = await post.save();
@@ -1949,7 +1925,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const { Author, Post } = makeModels();
     const author = await Author.create({ name: "Valid" });
     const post = await Post.create({ name: "Test", author_id: author.id });
-    // Author is persisted and not cached — should not be validated
     const saved = await post.save();
     expect(saved).toBe(true);
   });
@@ -2011,7 +1986,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     expect(saved).toBe(true);
     expect(order.isNewRecord()).toBe(false);
     expect(book.isNewRecord()).toBe(false);
-    // autosave should have propagated composite FK from order PK to book
     expect(book.shop_id).toBe(1);
     expect(book.order_id).toBe(2);
   });
@@ -2071,7 +2045,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("should automatically validate the associated model", async () => {
     const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "" }); // invalid
+    const pirate = new Pirate({ catchphrase: "" });
     const ship = new Ship({ name: "Pearl" });
     cacheAssoc(ship, "pirate", pirate);
     const saved = await ship.save();
@@ -2125,7 +2099,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.catchphrase = ""; // invalid — presence required
+    pirate.catchphrase = "";
     cacheAssoc(ship, "pirate", pirate);
     await expect(ship.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -2153,7 +2127,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    pirate.catchphrase = ""; // invalid — presence required
+    pirate.catchphrase = "";
     ship.name = "Changed";
     cacheAssoc(ship, "pirate", pirate);
     const saved = await ship.save();
@@ -2499,7 +2473,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       static {
         this._tableName = "people";
         this.attribute("first_name", "string");
-        // :create-only validation — should not fire when context is :update
         this.validate(
           function (record: any) {
             if (record.first_name !== "cool") {
@@ -2529,13 +2502,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     registerModel("ContextReference", ContextReference);
 
     const person = await ContextPerson.create({ first_name: "cool" });
-    // Change to "nah" — still valid because on:create validator doesn't run in :update context
     person.first_name = "nah";
     expect(await person.isValid()).toBe(true);
 
-    // autosave through reference should also be valid —
-    // autosave uses the owner's _validationContext (nil → not custom) so person is validated
-    // in its default :update context, where the :create-only validator is skipped.
     const ref = new ContextReference({ person });
     cacheAssoc(ref, "person", person);
     const valid = await ref.isValid();
@@ -2699,7 +2668,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("Profile", Profile);
     registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
-    // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
     const reflection = (DuplicateCallbackProfileUser as any)._reflectOnAssociation("profile");
     addAutosaveAssociationCallbacks.call(DuplicateCallbackProfileUser, reflection);
 
@@ -2825,17 +2793,15 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("DupCbParrot", DupCbParrot);
     registerModel("DupCbPirate", DupCbPirate);
-    // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
     const reflection = (DupCbPirate as any)._reflectOnAssociation("parrots");
     expect(reflection).toBeDefined();
     addAutosaveAssociationCallbacks.call(DupCbPirate, reflection);
 
     const pirate = await DupCbPirate.create({ catchphrase: "Arrr" });
     const parrot = await DupCbParrot.create({ name: "Polly" });
-    saveCount = 0; // reset after create (create triggers beforeSave)
+    saveCount = 0;
     const proxy = association(pirate, "parrots");
     await proxy.push(parrot);
-    // Make parrot dirty so autosave saves it
     parrot.name = "Polly Updated";
     pirate.catchphrase = "trigger";
     await pirate.save();
@@ -2843,9 +2809,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("cyclic autosaves do not add multiple validations", async () => {
-    // ShipWithoutNestedAttributes: has_many :prisoners (no autosave), two presence validators.
-    // Prisoner: belongs_to :ship (autosave: true). Cyclic: prisoner.valid? calls ship.valid? again.
-    // _ensureNoDuplicateErrors (after_validation) deduplicates to exactly 1 error for :name.
     class ShipCyclic extends Base {
       declare name: string | null;
       declare prisoners: AssociationProxy<PrisonerCyclic>;
@@ -2882,7 +2845,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
     const ship = new ShipCyclic({ name: "" });
     const prisoner = new PrisonerCyclic({});
-    // Wire cached associations so _loadedAssociation finds them without a DB hit.
     cacheAssoc(ship, "prisoners", [prisoner]);
     cacheAssoc(prisoner, "ship", ship);
 
@@ -3010,10 +2972,6 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     cacheAssoc(ship, "parts", [part]);
     await pirate.save();
     part.name = "changed";
-    // Extra records in the DB that are absent from the already-loaded
-    // collections. `valid?` calls `nested_records_changed_for_autosave?`,
-    // which must consult the loaded target only — never reload — so these
-    // extras are not pulled in.
     await Ship.create({ name: "Black Rock", pirate_id: pirate.id });
     await Part.create({ name: "Stern", ship_id: ship.id });
     await assertNoQueries(false, async () => {
@@ -3314,9 +3272,6 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     cacheAssoc(ship, "part", part);
     await pirate.save();
     part.name = "changed";
-    // Extra record in the DB absent from the already-loaded singular
-    // associations. `valid?` must consult the loaded target only — never
-    // reload — so this extra is not pulled in.
     await Part.create({ name: "Stern", ship_id: ship.id });
     await assertNoQueries(false, async () => {
       await pirate.isValid();
@@ -3515,9 +3470,6 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   fixtures([]);
 
-  // Dynamic import so esbuild doesn't rename the bespoke same-named classes
-  // declared inside the describe.skip blocks above (Author/Book) — see the
-  // canonical-import esbuild class-rename gotcha.
   let AuthorM: typeof Base;
   let BookM: typeof Base;
   let PublishedBookM: typeof Base;
@@ -3700,7 +3652,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     const org = await HotOrg.create({ name: "Org" });
     const member = await HotMember.create({ name: "M" });
     await HotDetail.create({ company_id: org.id, developer_id: member.id });
-    // Cache the through target — even cached, has_one_through should not autosave
     cacheAssoc(member, "hotOrg", org);
     org.name = "Modified";
     const saved = await member.save();
@@ -4446,7 +4397,7 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(RIArticle);
     const article = await RIArticle.create({ name: "test" });
     const tag = await RITag.create({ name: "valid", author_id: article.id });
-    tag.name = ""; // invalid — presence required
+    tag.name = "";
     cacheAssoc(article, "riTags", [tag]);
     await expect(article.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -4553,7 +4504,6 @@ describe("ChangedForAutosaveTest", () => {
     a.association("b").setTarget(b as any);
     b.association("a").setTarget(a as any);
 
-    // Should not stack overflow
     expect(a.changedForAutosave()).toBe(false);
     expect(b.changedForAutosave()).toBe(false);
   });
@@ -4561,10 +4511,6 @@ describe("ChangedForAutosaveTest", () => {
 
 describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   fixtures([]);
-  // When a class has queryConstraints and the has_one uses an explicit composite FK,
-  // assoc.options.foreignKey is the composite array. The reflection normalizes it
-  // into options.queryConstraints internally. computePrimaryKey(reflection) therefore
-  // hits branch 2 and returns queryConstraintsList — pairing with the composite FK.
   it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
     class QcOwner extends Base {
       declare tree_id: number | null;
@@ -4600,30 +4546,17 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     }
     registerModel("QcOwner", QcOwner);
     registerModel("QcChild", QcChild);
-    // Explicit composite FK — assoc.options.foreignKey = ["tree_id","parent_id"].
-    // The old scalar-guard skipped computePrimaryKey → used ctor.primaryKey = "id" → mismatch.
-    // The fixed code calls computePrimaryKey(reflection) which, via branch 2 (reflection
-    // normalizes array FK into queryConstraints), returns queryConstraintsList = ["tree_id","id"].
     const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ name: "Doc" });
     owner.association("qcChild").setTarget(child as any);
     const saved = await owner.save();
     expect(saved).toBe(true);
     expect(child.isNewRecord()).toBe(false);
-    // PK ["tree_id","id"] zipped with FK ["tree_id","parent_id"]:
-    // child.tree_id ← owner.tree_id = 5, child.parent_id ← owner.id = 11
     expect(child.tree_id).toBe(5);
     expect(child.parent_id).toBe(11);
   });
 
   it("does not collapse QC-derived PK array via the 'id' rule for scalar FK", async () => {
-    // Guard against the bug where the composite_primary_key? collapse was applied to QC
-    // arrays. If QC list is ["tree_id","id"] and FK is scalar "tree_id", the old code
-    // would collapse to "id" and assign owner.id into child.tree_id — wrong.
-    // With the fix (gate on Array.isArray(ctor.primaryKey)), QC arrays are not collapsed;
-    // instead the composite/scalar mismatch path is reached. In a properly configured
-    // association both FK and PK would be composite, so no-mismatch is the happy path.
-    // This test confirms the collapse does NOT fire for QC-derived PK arrays.
     class QcNoCollapse extends Base {
       declare tree_id: number | null;
       declare name: string | null;
@@ -4635,7 +4568,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tree_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        // QC list — ctor.primaryKey remains scalar "id"
         (this as any)._queryConstraintsList = ["tree_id", "id"];
         (this as any)._hasQueryConstraints = true;
         this.hasOne("qcNoCollapseChild", {
@@ -4659,23 +4591,16 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     }
     registerModel("QcNoCollapse", QcNoCollapse);
     registerModel("QcNoCollapseChild", QcNoCollapseChild);
-    // Explicit composite FK — reflection normalizes array FK to queryConstraints.
-    // computePrimaryKey branch 2 returns QC list ["tree_id","id"].
-    // Array PK + array FK → composite pairing (no "id" collapse).
     const owner = new QcNoCollapse({ tree_id: 9, id: 77, name: "v" });
     const child = new QcNoCollapseChild({ name: "l" });
     owner.association("qcNoCollapseChild").setTarget(child as any);
     const saved = await owner.save();
     expect(saved).toBe(true);
     expect(child.isNewRecord()).toBe(false);
-    // PK ["tree_id","id"] paired with FK ["tree_id","parent_id"]:
-    // child.tree_id ← owner.tree_id = 9, child.parent_id ← owner.id = 77
     expect(child.tree_id).toBe(9);
     expect(child.parent_id).toBe(77);
   });
 
-  // When a class has queryConstraints and the has_one uses a scalar FK,
-  // computePrimaryKey collapses the QC list to a scalar PK via the "id" rule.
   it("uses queryConstraintsList as PK when class has_query_constraints? and scalar FK", async () => {
     class QcTenant extends Base {
       declare tree_id: number | null;
@@ -4688,7 +4613,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tree_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        // Simulate a model with query_constraints [:tree_id, :id]
         (this as any)._queryConstraintsList = ["tree_id", "id"];
         (this as any)._hasQueryConstraints = true;
         this.hasOne("qcTenantRecord", {
@@ -4712,15 +4636,12 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     }
     registerModel("QcTenant", QcTenant);
     registerModel("QcTenantRecord", QcTenantRecord);
-    // Scalar FK "parent_id". computePrimaryKey (scalar-FK branch) returns QC list ["tree_id","id"].
-    // The scalar-FK collapse applies: includes("id") → "id" → rec.parent_id = tenant.id = 42.
     const tenant = new QcTenant({ tree_id: 7, id: 42, name: "Acme" });
     const rec = new QcTenantRecord({ name: "hello" });
     tenant.association("qcTenantRecord").setTarget(rec as any);
     const saved = await tenant.save();
     expect(saved).toBe(true);
     expect(rec.isNewRecord()).toBe(false);
-    // computePrimaryKey → QC list ["tree_id","id"] → scalar collapse "id" → rec.parent_id = 42
     expect(rec.parent_id).toBe(42);
   });
 });

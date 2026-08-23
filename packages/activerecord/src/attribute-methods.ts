@@ -23,16 +23,12 @@ import {
   initializeGeneratedModules as _coreInitializeGeneratedModules,
 } from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
-// toKey/id: inline to avoid a circular dependency (primary-key.ts imports
-// dangerousAttributeMethods from this file)
 import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, loadSchema } from "./model-schema.js";
 import {
   serializableHash as _serializableHash,
   attributeNamesForSerialization as _attrNamesForSerialization,
 } from "./serialization.js";
-// defineAttributeMethods is implemented here since AM doesn't expose it as a
-// static on Model.
 
 /**
  * The AttributeMethods module interface.
@@ -628,8 +624,6 @@ export function isInstanceMethodAlreadyImplemented(
   if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
     return _amInstanceMethodAlreadyImplemented.call(this as any, methodName);
   } else {
-    // If ThisClass < ... < SomeSuperClass < ... < Base and SomeSuperClass
-    // defines its own attribute method, then we don't want to override that.
     const base = frameworkBase(this);
     const defined =
       base != null &&
@@ -963,9 +957,6 @@ import {
   attributeCameFromUser as _attributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { queryCastAttribute as _queryCastAttribute } from "./attribute-methods/query.js";
-// primary-key.ts imports dangerousAttributeMethods from this file, so we cannot
-// import from it here (cycle). These 5 delegates are inlined the same way
-// toKey/id are inlined above (see comment near line 12).
 import {
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   savedChangeToAttribute as _savedChangeToAttribute,

@@ -18,8 +18,6 @@ import {
 } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
-// Re-export the slot's setter so the package entry and other internal
-// callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -236,20 +234,12 @@ export interface ReflectionLike {
  * @internal
  */
 class ModelRegistry extends Map<string, typeof Base> {
-  // Write-through runs here, not at each caller, so a direct
-  // `modelRegistry.set` (the HABTM join model) or `.delete` (the PG schema
-  // helper) cannot leave the registry and the constant table disagreeing.
-  // `registerModelConstant` is the single path that binds a model class to a
-  // name; this must not write the constant table itself.
   override set(name: string, model: typeof Base): this {
     registerModelConstant(name, model);
     return super.set(name, model);
   }
 
   override delete(name: string): boolean {
-    // The constant table is wider than the registry, so the name may since have
-    // been rebound (e.g. by registerSubclass) to a class this registry entry
-    // knows nothing about — only drop the constant when it is still ours.
     const model = super.get(name);
     const deleted = super.delete(name);
     if (deleted) unregisterConstant(name, model);
@@ -377,12 +367,6 @@ export function registerModel(
   if (Array.isArray(nameOrModel)) {
     for (const m of nameOrModel) {
       registerModel(m);
-      // STI subclass: its direct prototype is another AR model, not the
-      // framework `Base` (a base model's prototype is `Base` directly). We
-      // locate `Base` by walking the chain for the class that *owns*
-      // `_isActiveRecordBase` — `Base` declares it; every subclass inherits it —
-      // rather than importing the `Base` value (that would create an
-      // associations.ts ⇄ base.ts module-init cycle).
       const proto = Object.getPrototypeOf(m) as typeof Base;
       if (proto && proto !== Function.prototype && proto !== frameworkBase(m)) {
         registerSubclass(m);
@@ -394,8 +378,6 @@ export function registerModel(
     if (!model) throw new Error("registerModel(name, model) requires a model class");
     assertActiveRecordBase(model);
     modelRegistry.set(nameOrModel, model);
-    // Attach registry key so callers that resolve a class back to the names it
-    // was registered under (reflection's `computeClass`) can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
     model._registryKeys = keys;
@@ -452,11 +434,6 @@ export function autoloadModel(name: string): void {
   // keyed unprefixed, so strip here too or `compute_class("::#{class_name}")`
   // (reflection.rb:427) can never fault one in.
   const bare = name.replace(/^::/, "");
-  // Gate on the *registry*, not the constant table. `registerSubclass`
-  // (inheritance.ts) and the adapter setter write constants without going
-  // through `registerModel`, so an STI subclass can be constantize-able while
-  // still absent from `modelRegistry` — which the join planner reads directly.
-  // Gating on `safeConstantize` would skip the fault-in and leave it absent.
   if (modelRegistry.has(bare)) return;
   const autoloaded = canonicalModelAutoloadIndex?.get(bare);
   if (autoloaded) registerModel(autoloaded);
@@ -483,8 +460,6 @@ export function resolveAssocClass(
     ) => { klass?: typeof Base; isPolymorphic?: () => boolean } | null;
   };
   const refl = ctor._reflectOnAssociation?.(assocName);
-  // Skip .klass for polymorphic associations — it throws by design.
-  // All other errors (e.g. not-an-AR-subclass) must propagate.
   if (refl && !refl.isPolymorphic?.()) {
     const richKlass = refl.klass;
     if (richKlass) return richKlass;
@@ -527,8 +502,6 @@ export function _resolveInverseName(
   options: AssociationOptions,
 ): string | null {
   if (options.inverseOf === false) return null;
-  // Explicit inverseOf wins everywhere, including polymorphic belongs_to
-  // (where automatic detection can't pick a target).
   if (typeof options.inverseOf === "string") return options.inverseOf;
   if (options.polymorphic) return null;
   const refl = ownerCtor._reflectOnAssociation?.(assocName);
@@ -590,15 +563,9 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     // For has_one the FK lives on the target, so `inversedFrom` is equivalent
     // to `setTarget` (assign + loadedBang) with no owner FK write.
     assoc.inversedFrom(target);
-    // Flag as an explicit assignment so the inner loaders' short-circuit
-    // (`_loadedSingularTarget`) distinguishes it from a memoized query load.
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
-  // Undeclared inverse name (an inverse reached via automatic-inverse wiring
-  // whose reflection isn't a declared singular association): cache the value on
-  // a minimal loaded holder keyed by the name for ad-hoc inverses. Surfaced
-  // through `Base#_associationCache`.
   const existing = record._associationInstances.get(assocName) as
     | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
     | undefined;
@@ -640,9 +607,6 @@ export function _loadedSingularTarget(
   const instance = record._associationInstances.get(assocName) as
     | { isLoaded(): boolean; _explicitTarget?: boolean; target?: Base | null }
     | undefined;
-  // Only an *explicit* set/seed short-circuits — a prior query load on the
-  // holder must re-query (matches the old `_cachedAssociations` write-shadow,
-  // which never recorded query loads).
   if (instance?.isLoaded() && instance._explicitTarget) {
     return { value: instance.target ?? null };
   }
@@ -871,10 +835,7 @@ export class Associations {
           writable: false,
         })[HABTM_WRAPPED_NAMES];
     const prevDestroyAssociations = self.prototype.destroyAssociations;
-    if (ownWrappedNames.has(name)) {
-      // Skip wrapper layering on redeclaration — the existing chain already
-      // handles this association.
-    } else {
+    if (!ownWrappedNames.has(name)) {
       ownWrappedNames.add(name);
       self.prototype.destroyAssociations = async function (this: {
         association(n: string): { handleDependency(): Promise<void>; reset?(): void };
@@ -951,12 +912,6 @@ export function _canRouteThroughViaAssociationScope(
 ): boolean {
   if (!reflection) return false;
   if (options.disableJoins) return false;
-  // Only ThroughReflection has a real distinct sourceReflection.
-  // AssociationReflection.sourceReflection returns `this` (line 793 in
-  // reflection.ts), which means HABTM and other non-through reflections
-  // would falsely match. Gate explicitly on isThroughReflection so HABTM's
-  // anonymous-join-model machinery (with its own load path) keeps using
-  // the existing 2-step loaders.
   if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection()) {
     return false;
   }
@@ -971,10 +926,6 @@ export function _canRouteThroughViaAssociationScope(
   // per-step poly guards below target the chain-length-2 direct-source
   // shape and don't apply to the flattened multi-step walk.
   if (typeof reflection.isNested === "function" && reflection.isNested()) return true;
-  // Polymorphic has_many / has_one source (rare): the chain walker
-  // would need inversion machinery not present in PR 3c. Polymorphic
-  // belongsTo source WITH sourceType is routed — the chain head resolves
-  // its own runtime klass, so the sourceType class's PK drives the JOIN.
   if (
     typeof src.isPolymorphic === "function" &&
     src.isPolymorphic() &&
@@ -982,10 +933,6 @@ export function _canRouteThroughViaAssociationScope(
   ) {
     return false;
   }
-  // Polymorphic belongsTo source requires sourceType to resolve the
-  // target class. Without sourceType the JOIN can't pick a single
-  // target table — fall back to the 2-step loader which handles that
-  // by grouping through records by type.
   if (typeof src.isPolymorphic === "function" && src.isPolymorphic() && !options.sourceType) {
     return false;
   }
@@ -1136,11 +1083,6 @@ export function _builtAssociationScope(
     try {
       instance = assocFn.call(record, assocName) as typeof instance;
     } catch (e) {
-      // Only swallow the "association not registered" case (low-level
-      // test fixtures that bypass `Associations.hasMany.call`). Real
-      // bugs in instance construction must surface — otherwise the
-      // fresh-build fallback would silently mask them and callers
-      // would see mysterious behavior changes.
       if (e instanceof AssociationNotFoundError) {
         instance = undefined;
       } else {
@@ -1185,9 +1127,6 @@ export function _skipSingularStatementCache(
   targetModel: typeof Base,
   options: AssociationOptions,
 ): boolean {
-  // `reflection.has_scope?` — a caller-supplied `scope:` lambda (or the
-  // reflection's own macro-time scope) is instance-dependent (it receives the
-  // owner), so the compiled SQL can't be shared.
   if (reflection.scope) return true;
   const refl = reflection as {
     hasScope?(): boolean;
@@ -1211,7 +1150,6 @@ export function _skipSingularStatementCache(
   ) {
     return true;
   }
-  // `source_reflection.active_record.default_scopes.any?` (through chains).
   if ((refl.sourceReflection?.activeRecord?.defaultScopes?.length ?? 0) > 0) return true;
   return false;
 }
@@ -1236,11 +1174,6 @@ export async function _loadSingularViaStatementCache(
   reflection: ReflectionLike,
   targetModel: typeof Base,
 ): Promise<Base | null> {
-  // Materialize the Association instance (as `_builtAssociationScope` does on
-  // the take() path) for its `targetScope()` — see `baseScope` below, which
-  // needs it to carry a through association's join-model STI condition. Only
-  // the "not registered" case is swallowed; real construction bugs must
-  // surface.
   let instance: { targetScope?: () => unknown } | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
@@ -1349,7 +1282,6 @@ export function _findTargetReachable(
   options: AssociationOptions,
   kind: "belongsTo" | "foreign",
 ): boolean {
-  // belongs_to requires foreign_key_present? regardless of new/persisted state.
   if (kind === "belongsTo") {
     return _associationForeignKeyPresent(record, assocName, options, kind);
   }
@@ -1449,12 +1381,6 @@ export function _inlinePolymorphicKeys(
     (options.queryConstraints || hasQueryConstraints.call(ctor as any))
   ) {
     const qc = options.queryConstraints ?? queryConstraintsList.call(ctor as any);
-    // Mirror deriveFkQueryConstraints (reflection.ts) faithfully — including its
-    // ArgumentError raises for the underivable query_constraints shapes: a list
-    // with >2 attributes, a list missing the owner's scalar primary key (or a
-    // composite owner PK), and a list whose keys can't be interpreted against
-    // the owner PK. The inline (no-reflection) path is no excuse to silently
-    // scalar-collapse those configs.
     if (qc) {
       const ownerPk = ctor.primaryKey;
 
@@ -1496,11 +1422,6 @@ export function _inlinePolymorphicKeys(
       );
     }
   }
-  // Scalar path — identical to the pre-fix inline behavior
-  // (`Array.isArray(primaryKey) ? "id" : primaryKey`): a scalar polymorphic FK
-  // pairs with a single owner key. `_inlineOwnerKey` can return the
-  // query_constraints array, which a scalar FK can't zip against, so collapse
-  // here rather than delegating.
   const scalarOwnerKey = Array.isArray(primaryKey) ? "id" : primaryKey;
   return { fkCols: [scalarFk], ownerKeyCols: [scalarOwnerKey] };
 }
@@ -1531,7 +1452,6 @@ export function association<T extends Base = Base>(
 ): AssociationProxy<T> {
   const existing = record._collectionProxies.get(assocName) as AssociationProxy<T> | undefined;
   if (existing) {
-    // Hydrate from preloaded data if proxy was cached before preloading ran
     if (!existing.loaded) {
       const preloaded = _preloadedHolderTarget(record, assocName)?.value;
       if (preloaded != null) {
@@ -1548,10 +1468,6 @@ export function association<T extends Base = Base>(
 
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = ctor._associations ?? [];
-  // Most-derived override wins (subclass appends after the cloned parent
-  // entry), aligning with `_reflections`' keyed override semantics. Covered by
-  // has-one-associations.test.ts "nullification on association change" (a
-  // DependentFirm whose `account` override must beat the inherited Company one).
   const assocDef = associations
     .slice()
     .reverse()
@@ -1561,15 +1477,6 @@ export function association<T extends Base = Base>(
   }
   validateThroughReflection(ctor, assocName);
   if (!_CollectionProxyCtor) {
-    // Deliberate constraint: `associations.ts`, `relation.ts`,
-    // `collection-proxy.ts`, and `base.ts` form a mandatory mutual
-    // dependency — CP `extends Relation`, Relation/Base call back
-    // into the association wiring, and attempting to value-import CP
-    // at this module's top would observe a partial module during
-    // init. The package entry (`@blazetrails/activerecord`) loads CP
-    // explicitly and triggers self-registration; deep-importing
-    // `associations.js` bypasses that. See the collection-proxy-slot
-    // module for the load-order details.
     throw new Error(
       "CollectionProxy not registered. Either import '@blazetrails/activerecord' " +
         "once (the package entry loads CollectionProxy eagerly), or, if you are " +
@@ -1579,8 +1486,6 @@ export function association<T extends Base = Base>(
         "`association()` call.",
     );
   }
-  // Route through the CollectionProxy per-model subclass carrier (its `_create`
-  // factory) so generated relation methods resolve as real methods on the proxy.
   const proxy = (
     _CollectionProxyCtor as unknown as {
       _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
@@ -1594,9 +1499,6 @@ export function association<T extends Base = Base>(
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);
-  // Record the JS Proxy wrapper on the underlying instance so methods that
-  // return `self` (push / concat / append) hand back the same object callers
-  // hold — `this` inside a method is the raw target, not the wrapper.
   (proxy as any)._proxySelf = wrapped;
   record._collectionProxies.set(assocName, wrapped);
   return wrapped;
@@ -1630,11 +1532,6 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (Reflect.has(target, prop) && !preferSyncRecordDelegate) return value;
       if (value !== undefined && !preferSyncRecordDelegate) return value;
 
-      // Numeric indexing — `proxy[0]`, `proxy[1]` read the loaded target
-      // via the public `target` accessor. Matches array semantics; same
-      // constraint as the other array-likeness on CollectionProxy: reads
-      // whatever's loaded. `await proxy` (or `await proxy.load()`) hydrates
-      // `_target` first if you need a fresh load.
       if (typeof prop === "string" && NUMERIC_INDEX_PATTERN.test(prop)) {
         return target.target[Number(prop)];
       }
@@ -1808,17 +1705,10 @@ export function associationInstanceGet(this: Base, name: string): unknown {
       | { isLoaded?(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
       | undefined;
     if (inst?.isLoaded?.()) return inst;
-    // In-memory built records (no preload, no DB load). Surface them on the
-    // Association instance's `target` by the bare ivar write (not `target=`,
-    // which flips `loadedBang`) so the Association stays unloaded — matching
-    // the `@_was_loaded` ephemeral flag semantics above.
     if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
       inst._writeTargetStore?.(proxy.target);
       return inst;
     }
-    // Association-side build (`record.association(name).build(...)`) populates
-    // `existing.target` directly while `loaded` stays false. Treat that as
-    // cached too.
     if (existingHasBuiltRecords && inst && inst === existing) {
       return inst;
     }

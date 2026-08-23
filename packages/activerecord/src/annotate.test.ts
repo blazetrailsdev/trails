@@ -25,9 +25,6 @@ describe("AnnotateTest", () => {
   });
 
   it("annotate is sanitized", async () => {
-    // Each annotation is routed through `sanitize_as_sql_comment`, so embedded
-    // `*/` / `/*` are spaced apart and can never break out of the wrapping
-    // comment.
     await assertQueriesMatch(
       /SELECT .* FROM .* \/\* \* \/foo\/ \* \*\//i,
       undefined,

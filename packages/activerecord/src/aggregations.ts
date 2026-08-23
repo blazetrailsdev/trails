@@ -8,10 +8,6 @@ import { assertValidKeys, camelize, constantize, prepend } from "@blazetrails/ac
  * Mirrors: ActiveRecord::Aggregations
  */
 
-// ---------------------------------------------------------------------------
-// Cache accessors
-// ---------------------------------------------------------------------------
-
 export function getAggregationCache(record: Base): Map<string, unknown> {
   const self = record as any;
   if (!self._aggregationCache) self._aggregationCache = new Map<string, unknown>();
@@ -25,10 +21,6 @@ export function clearAggregationCache(record: Base): void {
     (self._aggregationCache as Map<string, unknown>).clear();
   }
 }
-
-// ---------------------------------------------------------------------------
-// ClassMethods
-// ---------------------------------------------------------------------------
 
 interface ComposedOfOptions {
   /**
@@ -246,10 +238,6 @@ function writerMethod(
     configurable: true,
   });
 }
-
-// ---------------------------------------------------------------------------
-// Instance methods
-// ---------------------------------------------------------------------------
 
 /**
  * Give the dup an independent shallow copy of the source's aggregation cache.

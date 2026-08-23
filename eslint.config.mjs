@@ -740,6 +740,9 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/relation/**/*.ts",
       "packages/activerecord/src/support/**/*.ts",
+      // activerecord/src root files, swept alphabetically one slice per PR
+      // (story strip-freeform-comments-ar-root-b onward for the rest).
+      "packages/activerecord/src/a*.ts",
       "packages/activerecord/src/connection-adapters/mysql/**/*.ts",
       "packages/activerecord/src/connection-adapters/mysql2/**/*.ts",
       "packages/activerecord/src/connection-adapters/postgresql/**/*.ts",
