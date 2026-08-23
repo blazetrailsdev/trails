@@ -601,7 +601,7 @@ export class Time {
         boolean | null,
         null,
       ];
-      return Time.#mktimeIsdst(Time.#mktime(year, month, day, hour, min, sec, undefined), isdst);
+      return Time.#mktimeIsdst(Time.mktime(year, month, day, hour, min, sec), isdst);
     }
     const [year, month, day, hour, min, sec, usec] = args as [
       number | string,
@@ -612,26 +612,14 @@ export class Time {
       (number | string | Rational | null)?,
       number?,
     ];
-    return Time.#mktime(year, month ?? 1, day ?? 1, hour ?? 0, min ?? 0, sec ?? 0, usec);
-  }
-
-  static #mktime(
-    year: number | string,
-    month: number | string | null,
-    day: number | string | null,
-    hour: number | string | null,
-    min: number | string | null,
-    sec: number | string | Rational | null,
-    usec: number | undefined,
-  ): Time {
     return new Time(
       year,
-      month,
-      day,
-      hour,
-      min,
+      month ?? 1,
+      day ?? 1,
+      hour ?? 0,
+      min ?? 0,
       usec === undefined
-        ? sec
+        ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             new Rational(Math.round(usec * 1_000), 1_000_000_000),
           ),
