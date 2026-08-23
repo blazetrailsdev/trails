@@ -64,13 +64,14 @@ const NO_DEFAULT = Symbol("NO_DEFAULT");
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
 
 /**
- * `ActiveRecord::Attributes::ClassMethods#define_default_attribute`
- * (attributes.rb:277-291), deferred onto the pending-modification queue.
+ * `define_default_attribute`'s body (attributes.rb:277-291), carried on the
+ * pending-modification queue so it replays with the rest of it.
  *
- * Rails runs that body eagerly against `_default_attributes` because nothing
- * rebuilds the set behind it; trails rebuilds it from `columns_hash` plus the
- * queue on every `reset_default_attributes`, so the same three arms have to
- * replay with the rest of the queue rather than being written once.
+ * Rails writes the result straight into `_default_attributes` because nothing
+ * rebuilds that set behind it; trails rebuilds it from `columns_hash` plus the
+ * queue on every `reset_default_attributes`, so an eager write is dropped by
+ * the next rebuild. Deferring is the only shape that survives, and it keeps
+ * the three arms and their order exactly as Rails writes them.
  */
 class PendingDefinedDefault implements PendingModification {
   constructor(
@@ -127,21 +128,13 @@ export function defineAttribute(
     ...(options.limit != null ? { limit: options.limit } : {}),
   });
 
-  // Rails' `define_attribute` writes `define_default_attribute`'s result
-  // straight into the already-materialized `_default_attributes`
-  // (attributes.rb:232-238). trails rebuilds that set from `columns_hash` plus
-  // the pending queue on every reset, so the same body is queued instead of
-  // written — see PendingDefinedDefault.
-  pendingAttributeModifications
-    .call(this)
-    .push(
-      new PendingDefinedDefault(
-        name,
-        defaultValue === NO_DEFAULT ? NO_DEFAULT_PROVIDED : (resolvedDefault ?? null),
-        castType,
-        userProvidedDefault,
-      ),
-    );
+  defineDefaultAttribute.call(
+    this,
+    name,
+    defaultValue === NO_DEFAULT ? NO_DEFAULT_PROVIDED : (resolvedDefault ?? null),
+    castType,
+    userProvidedDefault,
+  );
 
   amResetDefaultAttributes(this);
   // A newly declared attribute may be virtual (no DB column); force the next
@@ -270,6 +263,23 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
  */
 function reloadSchemaFromCache(this: AnyClass): void {
   amResetDefaultAttributes(this);
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#define_default_attribute
+ * (attributes.rb:277-291).
+ */
+function defineDefaultAttribute(
+  this: AnyClass,
+  name: string,
+  value: unknown,
+  type: Type,
+  fromUser: boolean,
+): void {
+  pendingAttributeModifications
+    .call(this)
+    .push(new PendingDefinedDefault(name, value, type, fromUser));
 }
 
 /**
