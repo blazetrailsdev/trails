@@ -60,14 +60,11 @@ describe("ensure_proper_type on an unreflected subclass", () => {
 });
 
 describe("descends_from_active_record? on a cold model", () => {
-  // No `fixtures` here on purpose: the cold window is the one where nothing has
-  // leased a connection yet, so there is no warm `columns_hash` to read.
-
-  // The cold twin of "a virtual type attribute is not an inheritance column":
-  // Rails' `columns_hash.include?(inheritance_column)` (inheritance.rb:82-88)
-  // loads the schema when the columns are not reflected yet, rather than
-  // answering from `attribute_types` — which counts the virtual `type` and
-  // misreads the model as an STI subclass.
+  // No `fixtures` on purpose: the cold window is the one where nothing has
+  // leased a connection, so there is no warm `columns_hash` to read and Rails'
+  // `columns_hash.include?(inheritance_column)` (inheritance.rb:82-88) has to
+  // load the schema rather than answer from `attribute_types`, which counts the
+  // virtual `type` and misreads the model as an STI subclass.
   it("a virtual type attribute on an unreflected model is not an inheritance column", () => {
     class ColdVirtualTypeAuthor extends Author {
       static {
