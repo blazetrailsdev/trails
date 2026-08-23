@@ -36,8 +36,8 @@
  *
  * `--kind args` runs the same reconcile over the OTHER dimension (the unreviewed
  * high-water marks count call-SET seeds only, so an args migration lowers none;
- * `keyOf` carries no `rubyArgs`, so one call's several args rows share a key and
- * the reason that can mint wins over a seeded sibling): it reads
+ * a tag suppresses by Ruby call NAME, so a call is migratable only when every
+ * args row sharing its `keyOf` is curated — see {@link argReasons}): it reads
  * output/call-arg-mismatches.json, mints `@missingRailsArgs <ruby_call> —
  * <reason>` receipts from the `kind: "args"` rows of the SAME shards, and drops
  * those rows (RFC 0106). The tag family's extra discipline applies — a reason
@@ -683,6 +683,34 @@ export function buildArgExpectations(
   return byFile;
 }
 
+/**
+ * The reason each `keyOf` may mint a `@missingRailsArgs` receipt from — the
+ * grain a tag actually acts at, which is COARSER than the grain the args
+ * baseline is keyed at.
+ *
+ * `shardKeyOf` keys an args row by `rubyArgs` as well (call-args-baseline.ts),
+ * because one call in one method can be wrong two ways at two sites. A tag
+ * cannot be: compare.ts suppresses by Ruby call NAME for the whole method
+ * (`argTags?.has(ruby.name)`, compare.ts:3573), so minting one receipt stops
+ * every site of that call flagging and every sibling row goes stale with it.
+ *
+ * So a call is migratable only when EVERY row sharing its `keyOf` is curated.
+ * One reviewed reason must not buy suppression for a sibling site whose own
+ * argument shape nobody has looked at — that is the seeded-placeholder rule
+ * (RFC 0083) read at the grain the suppression really has. A key with any
+ * unreviewed sibling maps to the placeholder, so it is left baselined and
+ * reported exactly as a wholly-unreviewed one is.
+ */
+export function argReasons(rows: readonly ExcludeEntry[]): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const e of rows) {
+    const key = keyOf(e);
+    if (!justifiesArgs(e.reason)) reasons.set(key, DEFAULT_TAG_REASON);
+    else if (!reasons.has(key)) reasons.set(key, e.reason);
+  }
+  return reasons;
+}
+
 /** A reason a `@missingRailsArgs` receipt may carry: argued prose (never a
  *  seed) that also opens with a permanence token, which is the extra discipline
  *  `@missingRailsArgs` enforces and `@missingRailsCall` does not (RFC 0099).
@@ -861,11 +889,8 @@ async function main(argv: string[]): Promise<number> {
   const baseline = await loadSplitBaseline(BASELINE_DIR);
   const kindRows = rowsOfKind(baseline, kind);
   const justifiesFor = kind === "args" ? justifiesArgs : justifies;
-  const reasons = new Map<string, string>();
-  for (const e of kindRows) {
-    if (reasons.has(keyOf(e)) && !justifiesFor(e.reason)) continue;
-    reasons.set(keyOf(e), e.reason);
-  }
+  const reasons =
+    kind === "args" ? argReasons(kindRows) : new Map(kindRows.map((e) => [keyOf(e), e.reason]));
 
   const byFile =
     kind === "args"

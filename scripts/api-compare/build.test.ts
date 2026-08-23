@@ -18,12 +18,14 @@ import {
   migrationSummary,
   scopedRows,
   staleTagKey,
+  argReasons,
   buildArgExpectations,
   justifiesArgs,
 } from "./build.js";
 import type { CallArgArtifact } from "./call-args-baseline.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { serializeBaseline } from "./baseline-json.js";
+import { keyOf } from "./call-mismatch-baseline.js";
 import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 /** One expectation under {@link ANY_CLASS} — the key a `tsClass`-less artifact
@@ -960,6 +962,29 @@ describe("@missingRailsArgs receipts (--kind args)", () => {
     const byFile = buildArgExpectations(artifact, "activerecord");
     const exp = byFile.get("foo.ts")!.get(expectationKey(ANY_CLASS, "bar"))!;
     expect([...exp.calls].sort()).toEqual(["freeze", "new"]);
+  });
+
+  it("refuses a call whose sibling args row is still unreviewed", () => {
+    // A tag suppresses by call NAME for the whole method (compare.ts:3573), so
+    // minting from the curated row would also bless the site nobody reviewed —
+    // and drop its row with the rest.
+    const row = (rubyArgs: string[], reason: string) => ({
+      package: "activerecord",
+      tsFile: "foo.ts",
+      rubyName: "bar",
+      call: "freeze",
+      kind: "args" as const,
+      rubyArgs,
+      reason,
+    });
+    const curated = row(["true"], "PERMANENT: a JS Map has no initial_capacity");
+    expect(argReasons([curated]).get(keyOf(curated))).toBe(curated.reason);
+    for (const rows of [
+      [curated, row(["ref:stmt"], DEFAULT_TAG_REASON)],
+      [row(["ref:stmt"], DEFAULT_TAG_REASON), curated],
+    ]) {
+      expect(argReasons(rows).get(keyOf(curated))).toBe(DEFAULT_TAG_REASON);
+    }
   });
 
   it("migrationSummary names the args tag and drops the call-set caveat", () => {
