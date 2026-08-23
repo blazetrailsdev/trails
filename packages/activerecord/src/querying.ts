@@ -154,14 +154,16 @@ export function _loadFromSql<T extends typeof Base>(
     );
   }
 
+  const messageBus = Notifications.instrumenter;
+
   const payload = { record_count: resultSet.length, class_name: this.name };
 
-  return Notifications.instrument("instantiation.active_record", payload, () => {
+  return messageBus.instrument("instantiation.active_record", payload, () => {
     // The reject above (querying.rb:76-78) removed every known attribute name,
     // so `instantiate`'s third argument — trails' `overrideTypes`, not Rails'
     // additional types — cannot override a schema cast type here. `toArray()`
     // stands in for `indexed_rows`: `_instantiate` reads an attribute hash.
-    if (resultSet.includesColumn(this.inheritanceColumn as string)) {
+    if (resultSet.includesColumn(this.inheritanceColumn)) {
       return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
     } else {
       // Instantiate a homogeneous set

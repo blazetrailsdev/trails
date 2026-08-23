@@ -116,8 +116,8 @@ export function defineDelegatedTypeMethods(
 ): void {
   // delegated_type.rb:237-239
   const primaryKey = options.primaryKey ?? "id";
-  const foreignType = options.foreignType ?? `${role}_type`;
-  const foreignKey = options.foreignKey ?? `${role}_id`;
+  const roleType = options.foreignType ?? `${role}_type`;
+  const roleId = options.foreignKey ?? `${role}_id`;
 
   // Class method: Entry.entryableTypes → ["Message", "Comment"]
   // Mirrors Rails' define_singleton_method("#{role}_types") { types.map(&:to_s) }
@@ -133,7 +133,7 @@ export function defineDelegatedTypeMethods(
   // — the constantized model class for the current foreign_type.
   Object.defineProperty(modelClass.prototype, `${role}Class`, {
     get(this: Base) {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
       autoloadModel(typeName);
       return constantize(typeName) as typeof Base;
@@ -150,7 +150,7 @@ export function defineDelegatedTypeMethods(
   // lookup that an unsaved/unregistered foreign_type would make throw.
   Object.defineProperty(modelClass.prototype, `${role}Name`, {
     get(this: Base) {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
       // Rails: model_name.singular == name.underscore.tr("/", "_").
       // "Access::NoticeMessage" → "access/notice_message" → "access_notice_message".
@@ -166,9 +166,9 @@ export function defineDelegatedTypeMethods(
   // Rails: define_method "build_#{role}" { |*params| public_send("#{role}=", public_send("#{role}_class").new(*params)) }
   Object.defineProperty(modelClass.prototype, `build${camelize(role, true)}`, {
     value: function (this: Base, attrs: Record<string, unknown> = {}): Base {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) {
-        throw new Error(`Cannot build${camelize(role, true)}: ${foreignType} is not set`);
+        throw new Error(`Cannot build${camelize(role, true)}: ${roleType} is not set`);
       }
       autoloadModel(typeName);
       const TargetClass = constantize(typeName) as typeof Base;
@@ -195,24 +195,24 @@ export function defineDelegatedTypeMethods(
     // method (which is "#{singular}?"). "Access::NoticeMessage" → isAccessNoticeMessage().
     const predicateSuffix = camelize(singularSnake, true);
 
+    // delegated_type.rb:263 `scope scope_name, -> { where(role_type => type) }`
+    (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [roleType]: typeName }));
+
     // Type predicate: isMessage(), isAccessNoticeMessage()
     Object.defineProperty(modelClass.prototype, `is${predicateSuffix}`, {
       value: function (this: Base): boolean {
-        return this.readAttribute(foreignType) === typeName;
+        return this.readAttribute(roleType) === typeName;
       },
       writable: true,
       configurable: true,
     });
-
-    // delegated_type.rb:263 `scope scope_name, -> { where(role_type => type) }`
-    (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [foreignType]: typeName }));
 
     // Accessor: entry.message → returns the associated record via the
     // polymorphic belongs_to reader when type matches, otherwise null.
     // Rails: define_method(singular) { public_send(role) if public_send(query) }
     Object.defineProperty(modelClass.prototype, singularName, {
       get(this: Base) {
-        if (this.readAttribute(foreignType) !== typeName) return null;
+        if (this.readAttribute(roleType) !== typeName) return null;
         return (this as unknown as Record<string, unknown>)[role];
       },
       configurable: true,
@@ -223,8 +223,8 @@ export function defineDelegatedTypeMethods(
     const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
     Object.defineProperty(modelClass.prototype, fkAccessorName, {
       get(this: Base) {
-        if (this.readAttribute(foreignType) !== typeName) return null;
-        return this.readAttribute(foreignKey);
+        if (this.readAttribute(roleType) !== typeName) return null;
+        return this.readAttribute(roleId);
       },
       configurable: true,
     });
