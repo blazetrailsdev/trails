@@ -10,14 +10,22 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
-import { GeneratedAttributeMethods, isMethodDefinedWithin } from "./attribute-methods.js";
+import {
+  attributesForCreate,
+  GeneratedAttributeMethods,
+  isMethodDefinedWithin,
+} from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-fixtures.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
+import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
 registerModel(Minivan);
+registerModel(CpkBook);
+registerModel(CpkOrder);
 
 /** Internal attribute-method generation surface exercised by these tests. */
 interface Generatable {
@@ -537,5 +545,46 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     expect(t.accessedFields()).toEqual([]);
     read(t);
     expect(t.accessedFields()).toEqual(["title"]);
+  });
+});
+
+// attribute_methods.rb:519-525 rejects a column when `pk_attribute?(name) &&
+// id.nil?`. For a composite key `id` returns an Array (composite_primary_key.rb
+// :8-14), which is never nil even when a member is, and `pk_attribute?` compares
+// against the Array `@primary_key` (attribute_methods.rb:543-545) — so on a
+// composite PK no column is ever dropped. trails used to test the per-column
+// attribute value instead and silently dropped each unset member.
+describe("attributesForCreate (trails)", () => {
+  fixtures([]);
+
+  it("keeps a nil composite primary key member", async () => {
+    await CpkBook.loadSchema();
+    const book = new CpkBook({ author_id: 1, title: "The Rails Way" });
+    expect(attributesForCreate.call(book as never, book.attributeNames())).toContain("id");
+  });
+
+  // With `partial_inserts` off, `attribute_names_for_partial_inserts`
+  // (dirty.rb:249-258) hands every non-auto-populated column to
+  // `attributes_for_create`, so the nil `shop_id` reaches the filter.
+  it("inserts a nil composite primary key member on create", async () => {
+    const oldPartialInserts = CpkOrder.partialInserts;
+    CpkOrder.partialInserts = false;
+    try {
+      let order: CpkOrder | undefined;
+      await assertQueriesMatch(/INSERT INTO[^(]+\([^)]*shop_id/i, 1, false, async () => {
+        order = await CpkOrder.create({ status: "paid" });
+      });
+      expect(order?.shop_id).toBeNull();
+    } finally {
+      CpkOrder.partialInserts = oldPartialInserts;
+    }
+  });
+
+  it("drops the primary key of a scalar-keyed record with no id", async () => {
+    await Minivan.loadSchema();
+    const minivan = new Minivan({ name: "cool.car" });
+    expect(attributesForCreate.call(minivan as never, minivan.attributeNames())).not.toContain(
+      "minivan_id",
+    );
   });
 });
