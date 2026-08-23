@@ -2165,8 +2165,5 @@ const invokedAsScript =
   typeof process !== "undefined" &&
   Array.isArray(process.argv) &&
   typeof process.argv[1] === "string" &&
-  // Basename equality, not `endsWith`: a sibling CLI whose own filename ends
-  // with this one's (lint-extra-surface-ratchet.ts imports buildReport) would
-  // otherwise run this module's `main()` as a side effect of the import.
   path.basename(process.argv[1]) === "extra-surface.ts";
 if (invokedAsScript) void main();

@@ -1,8 +1,10 @@
 /**
- * Wiring for `Base.encrypts` — records declarations and applies them
- * to the class's attribute definitions.
+ * Wiring for the encryption add-on: registers `Base.encrypts`' hooks and holds
+ * the post-declaration bookkeeping that has no Rails counterpart.
  *
- * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypts
+ * `encrypts` itself lives in `encryption/encryptable-record.ts`, the file
+ * matching `encryptable_record.rb` — this module only routes `Base.encrypts`
+ * to it, so there is exactly one body for Rails' one method.
  *
  * In Rails, `encrypts` uses `decorate_attributes` which defers type
  * wrapping via `PendingDecorator` — the actual wrapping happens when
