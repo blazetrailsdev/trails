@@ -534,13 +534,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     expect(log).toEqual(["fn", "block"]);
   });
 
-  it("CallbackChain.register rejects on: for non-commit/rollback events", () => {
-    const proto = Object.create(null);
-    expect(() =>
-      _registerCallbackOnProto(proto, "before", "save", () => {}, { on: "create" }),
-    ).toThrow(/:on/);
-  });
-
   it("CallbackChain.register accepts on: for commit/rollback events", () => {
     const proto = Object.create(null);
     expect(() =>
@@ -960,27 +953,6 @@ describe("Callbacks (extended)", () => {
   });
 });
 
-describe("afterCommit / afterRollback callbacks", () => {
-  it("registers afterCommit callback", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("total", "integer");
-        this.afterCommit(() => {});
-      }
-    }
-    expect(await new Order({ total: 1 }).isValid()).toBe(true);
-  });
-
-  it("registers afterRollback callback", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("total", "integer");
-        this.afterRollback(() => {});
-      }
-    }
-    expect(await new Order({ total: 1 }).isValid()).toBe(true);
-  });
-});
 describe("defineModelCallbacks()", () => {
   it("creates before/after/around methods for custom events", async () => {
     class Payment extends Model {

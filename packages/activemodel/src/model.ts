@@ -48,7 +48,6 @@ import {
   AroundCallbackFn,
   type CallbackObject,
   CallbackConditions,
-  TransactionalCallbackConditions,
   type RunCallbacksOptions,
   defineModelCallbacks,
   _registerCallbackOnProto,
@@ -85,6 +84,11 @@ import {
   NoMethodError,
 } from "./attribute-assignment.js";
 import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
+import {
+  ClassMethods as ValidationsCallbacksClassMethods,
+  type ValidationCallbackFilter,
+  type ValidationCallbackOptions,
+} from "./validations/callbacks.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";
 import { LengthValidator } from "./validations/length.js";
@@ -133,33 +137,6 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute };
  * type matches what we actually accept at registration.
  */
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
-
-/**
- * Conditions accepted by `before_validation` / `after_validation`. Unlike the
- * generic callback conditions, validation callbacks also accept `on:` (Rails
- * `ActiveModel::Validations.before_validation`).
- */
-export type ValidationCallbackConditions<TRecord> = CallbackConditions<TRecord> & {
-  on?: string | string[];
-};
-
-/**
- * Mirrors Rails `ActiveModel::Validations.before_validation` / `after_validation`
- * (validations/callbacks.rb): the `on:` option becomes an `:if` predicate over the
- * record's current `validation_context`, PREPENDED to any existing `:if` —
- * `options[:if] = [predicate, *options[:if]]`.
- */
-function _validationOnToIf<TRecord extends object>(
-  conditions?: ValidationCallbackConditions<TRecord>,
-): CallbackConditions<TRecord> | undefined {
-  if (!conditions || conditions.on === undefined) return conditions;
-  const { on, if: existingIf, ...rest } = conditions;
-  const onPredicate = validationsPredicateForValidationContext(on) as (r: TRecord) => boolean;
-  return {
-    ...rest,
-    if: [onPredicate, ...kernelArray(existingIf)],
-  };
-}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model {
@@ -779,109 +756,19 @@ export class Model {
     this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
   }
 
-  static beforeValidation<T extends typeof Model>(
+  // The `ActiveModel::Validations::Callbacks::ClassMethods` half
+  // (validations/callbacks.rb:32-110), mixed on by the `extend(Model, …)` at
+  // the bottom of this file. Declared here only for their types.
+  declare static beforeValidation: <T extends typeof Model>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: ValidationCallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      "before",
-      "validation",
-      fn as CallbackFn | CallbackObject,
-      _validationOnToIf(conditions),
-    );
-  }
-
-  static afterValidation<T extends typeof Model>(
+    fn: ValidationCallbackFilter<T>,
+    options?: ValidationCallbackOptions,
+  ) => void;
+  declare static afterValidation: <T extends typeof Model>(
     this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: ValidationCallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "validation",
-      fn as CallbackFn | CallbackObject,
-      _validationOnToIf(conditions),
-    );
-  }
-
-  static afterCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
-  ): void {
-    if (conditions?.on !== undefined) {
-      _validateOnCondition(conditions.on);
-    }
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "commit",
-      fn as CallbackFn | CallbackObject,
-      conditions,
-    );
-  }
-
-  static afterRollback<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
-  ): void {
-    if (conditions?.on !== undefined) {
-      _validateOnCondition(conditions.on);
-    }
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "rollback",
-      fn as CallbackFn | CallbackObject,
-      conditions,
-    );
-  }
-
-  static afterInitialize<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "initialize",
-      fn as CallbackFn | CallbackObject,
-      conditions,
-    );
-  }
-
-  static afterFind<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "find",
-      fn as CallbackFn | CallbackObject,
-      conditions,
-    );
-  }
-
-  static afterTouch<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    _registerCallbackOnProto(
-      this.prototype,
-      "after",
-      "touch",
-      fn as CallbackFn | CallbackObject,
-      conditions,
-    );
-  }
+    fn: ValidationCallbackFilter<T>,
+    options?: ValidationCallbackOptions,
+  ) => void;
 
   // ---------------------------------------------------------------------------
   // Generic callback registration — Rails `set_callback` / `skip_callback` /
@@ -906,7 +793,10 @@ export class Model {
     this: T,
     event: string,
     timing: "before" | "after",
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void;
   static setCallback<T extends typeof Model>(
@@ -915,14 +805,15 @@ export class Model {
     timing: "around",
     fn:
       | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject,
+      | CallbackObject
+      | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void;
   static setCallback<T extends typeof Model>(
     this: T,
     event: string,
     timing: "before" | "after" | "around",
-    fn: CallbackFn | AroundCallbackFn | CallbackObject,
+    fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
     options?: CallbackConditions<InstanceType<T>>,
   ): void {
     _registerCallbackOnProto(
@@ -2094,18 +1985,9 @@ Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: fal
 Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
 Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
 
-const VALID_ON_CONDITIONS = new Set(["create", "update", "destroy"]);
-
-function _validateOnCondition(on: string | string[]): void {
-  const values = Array.isArray(on) ? on : [on];
-  for (const v of values) {
-    if (!VALID_ON_CONDITIONS.has(v)) {
-      throw new ArgumentError(
-        `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
-      );
-    }
-  }
-}
+// Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
+// (validations/callbacks.rb:32).
+extend(Model, ValidationsCallbacksClassMethods);
 
 include(Model, ToJsonWithActiveSupportEncoder);
 

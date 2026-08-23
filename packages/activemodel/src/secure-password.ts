@@ -106,7 +106,7 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  modelClass.afterInitialize((record: Model) => {
+  modelClass.setCallback("initialize", "after", (record: Model) => {
     if (record._attributes.has(attribute)) {
       const plaintext = record._readAttribute(attribute);
       record._attributes.delete(attribute);

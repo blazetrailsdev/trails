@@ -77,50 +77,17 @@ export function afterValidation<T extends ModelCtor>(
 
 /**
  * Mirrors: ActiveRecord::Callbacks' `included do ... end` (callbacks.rb:412-417).
- * `define_model_callbacks :save, :create, :update, :destroy` (callbacks.rb:416)
- * generates `before_save` … `around_destroy` on the including class
- * (activemodel/lib/active_model/callbacks.rb:109-127); the `:initialize`,
- * `:find` and `:touch` events of callbacks.rb:415 are still hand-written on
- * `Model`.
+ * The two `define_model_callbacks` calls (callbacks.rb:415-416) generate
+ * `after_initialize` / `after_find` / `after_touch` and `before_save` …
+ * `around_destroy` on the including class
+ * (activemodel/lib/active_model/callbacks.rb:109-127).
  */
 export const InstanceMethods = {
   [included](base: ModelCtor): void {
+    base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
 };
-
-/** @internal */
-type SyncOnly<R> = R extends PromiseLike<unknown> ? never : R;
-
-/**
- * Register an after_find callback. Fires on every record loaded from the DB.
- *
- * Rails defines :find with only: :after, so there is no before_find or around_find.
- *
- * Mirrors: ActiveRecord::Callbacks.after_find
- */
-export function afterFind<T extends ModelCtor, R>(
-  modelClass: T,
-  fn: (record: InstanceType<T>) => SyncOnly<R>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "find", fn, options);
-}
-
-/**
- * Register an after_initialize callback. Fires on every new or loaded record.
- *
- * Rails defines :initialize with only: :after, so there is no before_initialize or around_initialize.
- *
- * Mirrors: ActiveRecord::Callbacks.after_initialize
- */
-export function afterInitialize<T extends ModelCtor, R>(
-  modelClass: T,
-  fn: (record: InstanceType<T>) => SyncOnly<R>,
-  options?: CallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "initialize", fn, options);
-}
 
 /**
  * Snapshot the `event` callbacks on `modelClass` and every subclass, run `fn`,

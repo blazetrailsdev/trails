@@ -7,6 +7,7 @@ import {
   Model,
   type AttributeSet,
   type CallbackConditions,
+  type CallbackObject,
 } from "@blazetrails/activemodel";
 import {
   IsolatedExecutionState,
@@ -152,8 +153,21 @@ export async function savepoint<T>(
 // ---------------------------------------------------------------------------
 
 type CallbackFn = (...args: any[]) => any;
+
+/**
+ * What the `ClassMethods` transaction macros take as a filter. Rails' `*args`
+ * reaches `set_callback`, so a Symbol method name is accepted alongside a
+ * block — and a Ruby Symbol is a colon-prefixed string in trails.
+ */
+type TransactionCallbackFilter<T extends typeof Model> =
+  | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+  | CallbackObject
+  | string;
 type CallbackOptions = {
-  on?: TransactionAction | TransactionAction[];
+  // Rails takes any Symbol here and rejects a bad one at runtime, in
+  // `assert_valid_transaction_action` (transactions.rb:344-348) — so the type
+  // must stay wide enough for that raise to be reachable.
+  on?: string | string[];
   if?: CallbackFn | CallbackFn[];
   unless?: CallbackFn | CallbackFn[];
   prepend?: boolean;
@@ -162,7 +176,7 @@ type CallbackOptions = {
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
 export function beforeCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined);
@@ -172,7 +186,7 @@ export function beforeCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
 export function afterCommit<T extends typeof Model>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(
@@ -185,7 +199,7 @@ export function afterCommit<T extends typeof Model>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
 export function afterSaveCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -198,7 +212,7 @@ export function afterSaveCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
 export function afterCreateCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -211,7 +225,7 @@ export function afterCreateCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
 export function afterUpdateCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -224,7 +238,7 @@ export function afterUpdateCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
 export function afterDestroyCommit<T extends typeof Base>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
@@ -237,7 +251,7 @@ export function afterDestroyCommit<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
 export function afterRollback<T extends typeof Model>(
   this: T,
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<T>,
   options?: CallbackOptions,
 ): void {
   const args = setOptionsForCallbacksBang(
@@ -258,7 +272,7 @@ export function setCallback<T extends typeof Model>(
   this: T,
   name: string,
   timing: "before" | "after" | "around",
-  fn: CallbackFn,
+  fn: TransactionCallbackFilter<typeof Model>,
   options?: Record<string, unknown>,
 ): void {
   let filterList = options;
