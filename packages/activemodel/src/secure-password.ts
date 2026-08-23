@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
-import { humanize, camelize, isBlank } from "@blazetrails/activesupport";
+import { camelize, include, isBlank, Module } from "@blazetrails/activesupport";
 import { Model } from "./model.js";
 
+const MAX_PASSWORD_LENGTH_ALLOWED = 72;
 const MIN_COST = 4;
 const DEFAULT_COST = 12;
 const textEncoder = new TextEncoder();
@@ -20,189 +21,84 @@ export namespace SecurePassword {
   }
 }
 
+/**
+ * Mirrors: ActiveModel::SecurePassword::ClassMethods#has_secure_password
+ * (secure_password.rb:117-180): includes a freshly built
+ * {@link InstanceMethodsOnActivation}, registers the three `validate` blocks
+ * and `validates_confirmation_of` (:131-159), and — only for a model capable
+ * of it (`respond_to?(:generates_token_for)`, so an Active Record rather than a
+ * vanilla Active Model) — the reset-token purpose and its
+ * `find_by_#{attribute}_reset_token` finders (:161-178).
+ *
+ * The first `validate` keys its error to the password attribute rather than to
+ * the digest it checks, so the message makes sense to the end user
+ * (:133-138); the third bounds the password at BCrypt's 72-byte maximum
+ * (:151-156).
+ */
 export function hasSecurePassword(
   modelClass: typeof Model,
   attribute: string = "password",
-  options: {
-    validations?: boolean;
-    /**
-     * When true (default), wire up a password-reset token via
-     * `generates_token_for` (ActiveRecord only — no-op in plain
-     * ActiveModel).
-     *
-     * Mirrors: ActiveModel::SecurePassword has_secure_password :reset_token
-     */
-    resetToken?: boolean;
-  } = {},
+  options: { validations?: boolean; resetToken?: boolean } = {},
 ) {
-  const digestAttr = `${attribute}_digest`;
-  const confirmationAttr = `${attribute}Confirmation`;
-  const challengeAttr = `${attribute}Challenge`;
   const validations = options.validations !== false;
   const resetToken = options.resetToken !== false;
+  const digestAttr = `${attribute}_digest`;
+  const challengeAttr = `${attribute}Challenge`;
 
-  // Ruby's `attr_reader attribute` / `attr_accessor :"#{attribute}_confirmation",
-  // :"#{attribute}_challenge"` (secure_password.rb:184,197) are plain ivars, not
-  // attributes: they never reach the attribute set, and on an Active Record they
-  // must not shadow a column or suppress schema reflection.
-  const passwordCache = new WeakMap<object, string | null>();
-  const confirmationCache = new WeakMap<object, unknown>();
-  const challengeCache = new WeakMap<object, string | null>();
-
-  Object.defineProperty(modelClass.prototype, attribute, {
-    get(this: Model) {
-      return passwordCache.get(this) ?? null;
-    },
-    set(this: Model, unencryptedPassword: unknown) {
-      if (unencryptedPassword === null || unencryptedPassword === undefined) {
-        passwordCache.set(this, null);
-        this._writeAttribute(digestAttr, null);
-      } else if (String(unencryptedPassword) !== "") {
-        passwordCache.set(this, String(unencryptedPassword));
-        const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
-        this._writeAttribute(digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
-      }
-    },
-    configurable: true,
-  });
-
-  Object.defineProperty(modelClass.prototype, confirmationAttr, {
-    get(this: Model) {
-      return confirmationCache.has(this) ? confirmationCache.get(this) : null;
-    },
-    set(this: Model, value: unknown) {
-      confirmationCache.set(this, value);
-    },
-    configurable: true,
-  });
-
-  Object.defineProperty(modelClass.prototype, challengeAttr, {
-    get(this: Model) {
-      return challengeCache.get(this) ?? null;
-    },
-    set(this: Model, value: unknown) {
-      const str = value === null || value === undefined ? null : String(value);
-      challengeCache.set(this, str && str.trim() !== "" ? str : null);
-    },
-    configurable: true,
-  });
-
-  const saltMethodName = `${attribute}Salt`;
-  Object.defineProperty(modelClass.prototype, saltMethodName, {
-    get(this: Model) {
-      const digest = this._readAttribute(digestAttr) as string | null;
-      if (!digest) return null;
-      return bcrypt.getSalt(digest);
-    },
-    configurable: true,
-  });
-
-  const authMethodName = `authenticate${camelize(attribute)}`;
-  const authenticateAttribute = function (this: Model, unencryptedPassword: unknown) {
-    if (typeof unencryptedPassword !== "string" || !unencryptedPassword) return false;
-    const digest = this._readAttribute(digestAttr) as string | null;
-    if (!digest) return false;
-    return bcrypt.compareSync(unencryptedPassword, digest) ? this : false;
-  };
-
-  Object.defineProperty(modelClass.prototype, authMethodName, {
-    value: authenticateAttribute,
-    writable: true,
-    configurable: true,
-  });
-
-  // `alias_method :authenticate, :authenticate_password if attribute == :password`
-  // (secure_password.rb:219).
-  if (attribute === "password") {
-    Object.defineProperty(modelClass.prototype, "authenticate", {
-      value: authenticateAttribute,
-      writable: true,
-      configurable: true,
-    });
-  }
+  include(
+    modelClass as unknown as new (...args: unknown[]) => unknown,
+    new InstanceMethodsOnActivation(attribute, { resetToken }),
+  );
 
   if (validations) {
     modelClass.validate((record: Model) => {
-      const pwd = passwordCache.get(record);
-      const digest = record._readAttribute(digestAttr);
+      if (isBlank(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
+    });
 
-      if (isBlank(digest)) {
-        record.errors.add(attribute, ":blank");
-      }
-
-      const challenge = challengeCache.get(record) ?? null;
-      if (challenge !== null) {
-        // Rails secure_password.rb:141-147: read digest_was from dirty tracking
-        // so DB-loaded records (no setter call) work correctly.
-        // Error fires when digestWas is blank OR doesn't match challenge.
+    modelClass.validate((record: Model) => {
+      const challenge = publicSend(record, challengeAttr) as string | null;
+      if (challenge != null) {
         const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
-        if (!digestWas || !bcrypt.compareSync(challenge, digestWas)) {
+        if (isBlank(digestWas) || !bcrypt.compareSync(challenge, digestWas as string)) {
           record.errors.add(challengeAttr);
         }
       }
+    });
 
-      if (pwd !== null && pwd !== undefined) {
-        if (textEncoder.encode(pwd).length > 72) {
-          record.errors.add(attribute, ":password_too_long");
-        }
-
-        const humanAttr = modelClass.humanAttributeName
-          ? modelClass.humanAttributeName(attribute)
-          : humanize(attribute);
-        // `validates_confirmation_of attribute, allow_blank: true`
-        // (secure_password.rb:159) — ConfirmationValidator keys the error to
-        // `#{attribute}_confirmation` and interpolates the human name of the
-        // attribute itself.
-        const confirmation = confirmationCache.get(record);
-        if (confirmation !== undefined && confirmation !== null && pwd !== confirmation) {
-          record.errors.add(confirmationAttr, ":confirmation", { attribute: humanAttr });
-        }
+    modelClass.validate((record: Model) => {
+      const passwordValue = publicSend(record, attribute) as string | null;
+      if (
+        !isBlank(passwordValue) &&
+        textEncoder.encode(passwordValue as string).length > MAX_PASSWORD_LENGTH_ALLOWED
+      ) {
+        record.errors.add(attribute, ":password_too_long");
       }
     });
+
+    modelClass.validatesConfirmationOf(attribute, { allowBlank: true });
   }
 
-  // "Only generate tokens for records that are capable of doing so (Active
-  // Records, not vanilla Active Models)" — `if reset_token &&
-  // respond_to?(:generates_token_for)` (secure_password.rb:161-178).
-  const tokenHost = modelClass as unknown as {
-    generatesTokenFor?: (
-      purpose: string,
-      options: { expiresIn?: number; block?: (record: Model) => unknown },
-    ) => void;
-    findByTokenFor?: (purpose: string, token: string) => unknown;
-    findByTokenForBang?: (purpose: string, token: string) => unknown;
-  };
+  const tokenHost = modelClass as unknown as TokenHost;
   if (resetToken && typeof tokenHost.generatesTokenFor === "function") {
-    const purpose = `${attribute}_reset`;
-    tokenHost.generatesTokenFor(purpose, {
+    tokenHost.generatesTokenFor(`${attribute}_reset`, {
       expiresIn: 15 * 60,
       block: (record: Model) => {
-        const salt = (record as unknown as Record<string, string | null>)[saltMethodName];
-        return salt == null ? null : salt.slice(-10);
+        const salt = publicSend(record, `${attribute}Salt`) as string | null;
+        return salt?.slice(-10) ?? null;
       },
-    });
-
-    const resetTokenMethod = `${attribute}ResetToken`;
-    Object.defineProperty(modelClass.prototype, resetTokenMethod, {
-      get(this: Model) {
-        return (this as unknown as { generateTokenFor(purpose: string): string }).generateTokenFor(
-          purpose,
-        );
-      },
-      configurable: true,
     });
 
     const findByMethod = `findBy${camelize(attribute)}ResetToken`;
     Object.defineProperty(modelClass, findByMethod, {
-      value: function (this: typeof Model, token: string) {
-        return (this as unknown as typeof tokenHost).findByTokenFor!(purpose, token);
+      value: function (this: TokenHost, token: string) {
+        return this.findByTokenFor!(`${attribute}_reset`, token);
       },
       writable: true,
       configurable: true,
     });
     Object.defineProperty(modelClass, `${findByMethod}Bang`, {
-      value: function (this: typeof Model, token: string) {
-        return (this as unknown as typeof tokenHost).findByTokenForBang!(purpose, token);
+      value: function (this: TokenHost, token: string) {
+        return this.findByTokenForBang!(`${attribute}_reset`, token);
       },
       writable: true,
       configurable: true,
@@ -210,14 +106,123 @@ export function hasSecurePassword(
   }
 }
 
+interface TokenHost {
+  generatesTokenFor?: (
+    purpose: string,
+    options: { expiresIn?: number; block?: (record: Model) => unknown },
+  ) => void;
+  findByTokenFor?: (purpose: string, token: string) => unknown;
+  findByTokenForBang?: (purpose: string, token: string) => unknown;
+}
+
 /**
- * Module mixed into the model instance when hasSecurePassword is called.
- *
- * Mirrors: ActiveModel::SecurePassword::InstanceMethodsOnActivation
+ * Ruby's `public_send(name)` over a zero-arg reader, which is a property in
+ * trails (CLAUDE.md § "Generated attribute readers are properties").
  */
-export class InstanceMethodsOnActivation {
-  readonly attribute: string;
-  constructor(attribute: string) {
-    this.attribute = attribute;
+function publicSend(record: Model, name: string): unknown {
+  return (record as unknown as Record<string, unknown>)[name];
+}
+
+/**
+ * Mirrors: ActiveModel::SecurePassword::InstanceMethodsOnActivation
+ * (secure_password.rb:182-227), the module `has_secure_password` includes into
+ * the model — one per activated attribute. It carries the `attr_reader`
+ * `attribute` and the `attr_accessor` pair `#{attribute}_confirmation` /
+ * `#{attribute}_challenge` (:184,197), which are plain ivars rather than
+ * attributes — they never reach the attribute set, and on an Active Record
+ * must not shadow a column; `authenticate_#{attribute}`, which answers `self`
+ * when the password is correct and `false` otherwise (:209-212); the
+ * `#{attribute}_salt` reader (:215-218); the
+ * `alias_method :authenticate, :authenticate_password` Rails installs only for
+ * the default attribute (:219); and, under `reset_token`, the class-level
+ * configured `#{attribute}_reset_token` (:221-225).
+ */
+export class InstanceMethodsOnActivation extends Module {
+  constructor(attribute: string, options: { resetToken: boolean }) {
+    super();
+    const digestAttr = `${attribute}_digest`;
+    const passwordIvar = new WeakMap<object, string | null>();
+    const confirmationIvar = new WeakMap<object, unknown>();
+    const challengeIvar = new WeakMap<object, unknown>();
+
+    this.moduleEval((mod) => {
+      Object.defineProperty(mod, attribute, {
+        get(this: Model) {
+          return passwordIvar.get(this) ?? null;
+        },
+        set(this: Model, unencryptedPassword: unknown) {
+          if (unencryptedPassword == null) {
+            passwordIvar.set(this, null);
+            publicSendWriter(this, digestAttr, null);
+          } else if (String(unencryptedPassword) !== "") {
+            passwordIvar.set(this, String(unencryptedPassword));
+            const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
+            publicSendWriter(this, digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
+          }
+        },
+        configurable: true,
+      });
+
+      Object.defineProperty(mod, `${attribute}Confirmation`, {
+        get(this: Model) {
+          return confirmationIvar.has(this) ? confirmationIvar.get(this) : null;
+        },
+        set(this: Model, value: unknown) {
+          confirmationIvar.set(this, value);
+        },
+        configurable: true,
+      });
+
+      Object.defineProperty(mod, `${attribute}Challenge`, {
+        get(this: Model) {
+          return challengeIvar.get(this) ?? null;
+        },
+        set(this: Model, value: unknown) {
+          const str = value == null ? null : String(value);
+          challengeIvar.set(this, isBlank(str) ? null : str);
+        },
+        configurable: true,
+      });
+    });
+
+    const authenticateAttribute = function (this: Model, unencryptedPassword: unknown) {
+      if (typeof unencryptedPassword !== "string" || !unencryptedPassword) return false;
+      const attributeDigest = publicSend(this, digestAttr) as string | null;
+      return !isBlank(attributeDigest) &&
+        bcrypt.compareSync(unencryptedPassword, attributeDigest as string)
+        ? this
+        : false;
+    };
+    this.defineMethod(`authenticate${camelize(attribute)}`, authenticateAttribute);
+
+    this.moduleEval((mod) => {
+      Object.defineProperty(mod, `${attribute}Salt`, {
+        get(this: Model) {
+          const attributeDigest = publicSend(this, digestAttr) as string | null;
+          return isBlank(attributeDigest) ? null : bcrypt.getSalt(attributeDigest as string);
+        },
+        configurable: true,
+      });
+    });
+
+    if (attribute === "password") this.defineMethod("authenticate", authenticateAttribute);
+
+    if (options.resetToken) {
+      this.moduleEval((mod) => {
+        Object.defineProperty(mod, `${attribute}ResetToken`, {
+          get(this: Model) {
+            return (
+              this as unknown as { generateTokenFor(purpose: string): string }
+            ).generateTokenFor(`${attribute}_reset`);
+          },
+          configurable: true,
+        });
+      });
+    }
   }
+}
+
+/** Ruby's `public_send("#{name}=", value)`, a property write in trails. */
+function publicSendWriter(record: Model, name: string, value: string | null): void {
+  (record as unknown as Record<string, unknown>)[name] = value;
 }
