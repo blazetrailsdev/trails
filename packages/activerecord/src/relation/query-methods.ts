@@ -1973,13 +1973,18 @@ function excludingWithCallee(callee: "excluding" | "without") {
     const flatMappedIds: unknown[] = [];
     const deferredRelations: any[] = [];
     for (const relation of relations) {
-      const primaryKey = relation.model.primaryKey;
-      if (relation.isLoaded && !relation.isScheduled && !Array.isArray(primaryKey)) {
-        for (const record of relation._records) {
-          flatMappedIds.push(record._readAttribute(primaryKey));
-        }
-      } else {
+      if (!relation.isLoaded || relation.isScheduled) {
         deferredRelations.push(relation);
+        continue;
+      }
+      const primaryKey = relation.model.primaryKey;
+      const primaryKeyArray: string[] = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      for (const record of relation._records) {
+        flatMappedIds.push(
+          primaryKeyArray.length === 1
+            ? record._readAttribute(primaryKeyArray[0])
+            : primaryKeyArray.map((column: string) => record._readAttribute(column)),
+        );
       }
     }
     const combined: unknown[] = [...records, ...flatMappedIds, ...deferredRelations];
