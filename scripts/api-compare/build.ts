@@ -264,12 +264,15 @@ export function renderJsdoc(
   entries: TagEntry[],
   indent: string,
   tag: string = TAG,
+  slot?: number,
 ): string | null {
   // Order entries by call name (code-unit order, matching the ratchet).
   const ordered = [...entries].sort((a, b) => (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
   let body = rest.slice();
+  let synthesized = false;
   if (body.length === 0 || !body[0].trimStart().startsWith("/**")) {
     body = [`${indent}/**`, `${indent} */`];
+    synthesized = true;
   }
   if (ordered.length === 0 && body.length === 1) {
     return oneLineProse(body[0]) === "" ? null : body[0];
@@ -280,19 +283,35 @@ export function renderJsdoc(
   if (ordered.length > 0 && body.length === 1) {
     const inner = oneLineProse(body[0]);
     body = ["/**", ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
+    synthesized = true;
   }
   const closeIdx = body.findIndex((l) => l.trim().endsWith("*/"));
   const head = body.slice(0, closeIdx);
+  // Where this family's tags stood in the source comment. Reconciled tags go
+  // back there rather than after every other line, so a pass that migrates
+  // nothing rewrites nothing on a comment carrying the OTHER family's tags too
+  // (RFC 0106). Absent — nothing was tagged — they are appended as before.
+  const at = synthesized || slot === undefined ? undefined : Math.min(slot, head.length);
   // Normalize: drop trailing blank `*` lines so the separator below is not
-  // duplicated on a re-run (idempotency).
-  while (head.length > 1 && head.at(-1)!.trim() === "*") head.pop();
+  // duplicated on a re-run (idempotency). With a slot the separator is the one
+  // already in the source, so popping it would move the tags instead.
+  if (at === undefined) while (head.length > 1 && head.at(-1)!.trim() === "*") head.pop();
   const tail = body.slice(closeIdx);
   const hasProse = head.some((l) => l.replace(/^\s*(\/\*\*|\*)\s?/, "").trim() !== "");
   if (ordered.length === 0) {
     if (!hasProse) return null;
+    // The tags that stood at `at` are gone; the blank lines that separated them
+    // from their neighbours would otherwise be left doubled.
+    if (at !== undefined && head[at - 1]?.trim() === "*" && head[at]?.trim() === "*") {
+      head.splice(at, 1);
+    }
+    while (head.length > 1 && head.at(-1)!.trim() === "*") head.pop();
     return [...head, ...tail].join("\n");
   }
   const tagLines = ordered.flatMap((e) => renderEntry(e, indent, tag));
+  if (at !== undefined) {
+    return [...head.slice(0, at), ...tagLines, ...head.slice(at), ...tail].join("\n");
+  }
   const sep = hasProse ? [`${indent} *`] : [];
   return [...head, ...sep, ...tagLines, ...tail].join("\n");
 }
@@ -519,7 +538,7 @@ export function reconcileFileText(
     if (exp || (comment && comment.includes(tag))) {
       const lineStart = text.lastIndexOf("\n", node.getStart(sf)) + 1;
       const indent = text.slice(lineStart, node.getStart(sf)).match(/^\s*/)?.[0] ?? "";
-      const { rest, entries } = parseJsdoc(
+      const { rest, entries, slot } = parseJsdoc(
         comment ?? "",
         jsdocRange
           ? {
@@ -571,7 +590,13 @@ export function reconcileFileText(
       for (const d of r.dropped) {
         if (!PLACEHOLDER_REASONS.has(d.reason)) harvested.push({ tsName: name, entry: d });
       }
-      const next = renderJsdoc(comment ? rest : [], [...r.kept, ...r.added], indent, tag);
+      const next = renderJsdoc(
+        comment ? rest : [],
+        [...r.kept, ...r.added],
+        indent,
+        tag,
+        comment ? slot : undefined,
+      );
       if (comment && jsdocRange) {
         if (next === null) {
           // Remove the comment plus its trailing newline + indent.
