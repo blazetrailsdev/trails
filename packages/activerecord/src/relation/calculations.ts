@@ -178,10 +178,10 @@ interface CalculationRelation {
   // --- read by pluck / pick / ids (calculations.rb:291-412) ---
   /** Mirrors `Relation#loaded?`. */
   loaded: boolean;
-  /** Mirrors `Relation#@records`; the `loaded?` arm of `ids` reads it directly. */
-  _records: Array<{ _readAttribute(name: string): unknown }>;
   /** Mirrors `Relation#records` (relation.rb:250). */
-  records(): Promise<any[]>;
+  records(): Promise<
+    Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>
+  >;
   /** Mirrors `Relation#table`. */
   table: Table;
   /** Mirrors `Relation#limit` (query_methods.rb:407). */
@@ -757,7 +757,7 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     // calculations.rb:373 `records.map` — the `records` seam, not `@records`,
     // so a `load_async` relation (loaded? with its rows still parked,
     // relation.rb:1149) drains the future here instead of mapping over nothing.
-    const result = (await this.records()).map((record: any) => {
+    const result = (await this.records()).map((record) => {
       if (primaryKeyArray.length === 1) {
         return record._readAttribute(primaryKeyArray[0]);
       }
