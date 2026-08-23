@@ -1971,7 +1971,7 @@ Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
 //
 // So mysql2 keeps AbstractAdapter's per-statement loop, which is correct
 // because it never combines. Story:
-// install-mysql2-execute-batch-once-multi-statements-are-sendable.
+// mysql2-execute-batch-routes-through-raw-execute (blocked on the above).
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
