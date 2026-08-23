@@ -282,11 +282,11 @@ export function serializableAttributes(
     .readAttributeForSerialization;
   const read =
     typeof instanceRead === "function"
-      ? (key: string) => instanceRead.call(record, key)
-      : (key: string) => readAttributeForSerialization(record, key);
+      ? (n: string) => instanceRead.call(record, n)
+      : (n: string) => readAttributeForSerialization(record, n);
   const result: Record<string, unknown> = {};
-  for (const key of attributeNames) {
-    safeSet(result, key, read(key));
+  for (const n of attributeNames) {
+    safeSet(result, n, read(n));
   }
   return result;
 }

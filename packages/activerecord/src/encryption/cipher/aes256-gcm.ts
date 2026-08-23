@@ -70,19 +70,27 @@ export class Aes256Gcm {
    *   `generate_iv` can ask that object for `random_iv`; Node's `createCipheriv`
    *   takes the IV as a constructor argument, so the IV must be produced first
    *   and the two calls necessarily swap order.
+   *
+   * @missingRailsArgs generate_iv — PERMANENT: Rails' first argument is the live
+   *   `OpenSSL::Cipher` (aes256_gcm.rb:42), passed only so `generate_iv` can call
+   *   `cipher.random_iv` on it. Node's `createCipheriv` takes the IV as a
+   *   constructor argument, so no cipher object exists at that point and the slot
+   *   carries `@deterministic` — the value Rails reads off the receiver instead.
    */
   encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
-    const inputBuf = Buffer.isBuffer(clearText) ? clearText : Buffer.from(clearText, "utf-8");
-    const iv = this.generateIv(this.deterministic, inputBuf);
+    // Ruby's `clear_text` is a byte String; the JS pair of that is a Buffer, so a
+    // string argument is decoded once here and `clearText` is bytes from here on.
+    if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
+    const iv = this.generateIv(this.deterministic, clearText);
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
     // Rails' `clear_text.empty? ? clear_text.dup : cipher.update(clear_text)`
     // (aes256_gcm.rb:46) — an empty input never reaches `update`.
     let encryptedData =
-      inputBuf.length === 0 ? Buffer.from(inputBuf) : Buffer.from(cipher.update(inputBuf));
+      clearText.length === 0 ? Buffer.from(clearText) : Buffer.from(cipher.update(clearText));
     encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
     if (!cipher.getAuthTag) {
       throw new Configuration("Crypto adapter does not support GCM auth tags (getAuthTag)");

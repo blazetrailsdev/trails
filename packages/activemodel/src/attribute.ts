@@ -119,6 +119,13 @@ export abstract class Attribute {
     return this.typeCast(this.valueBeforeTypeCast);
   }
 
+  /**
+   * @missingRailsArgs changed_in_place? — PERMANENT: Rails passes the ivar
+   *   `@value_for_database` (attribute.rb:56), whose trails spelling is
+   *   `_valueForDatabase` — already taken by the port of the `_value_for_database`
+   *   method (attribute.rb:207). A TS class cannot carry a field and a method of
+   *   the same name, so the memo field keeps the `_cached` prefix.
+   */
   get valueForDatabase(): unknown {
     if (
       !this._hasValueForDatabase ||
