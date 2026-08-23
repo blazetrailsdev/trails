@@ -5,19 +5,5 @@
     "rubyName": "batch_on_unloaded_relation",
     "call": "any?",
     "reason": "Rails' `values.flatten.any?(nil)` guard raises ArgumentError when a custom select clause omits a cursor column; that nil-cursor check is not ported yet and is tracked separately from the empty_scope/use_ranges convergence."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "ensure_valid_options_for_batching!",
-    "call": "size",
-    "reason": "Per-entry verified (RFC 0072 batching cluster): Rails batches.rb:306-312 compares `Array(start).size != cursor.size`; trails relation/batches.ts spells the same arity check with `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of `Array()`/`#size`. Equivalent, not an omission."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "record_cursor_values",
-    "call": "slice",
-    "reason": "Verified per-site (RFC 0106): `record.attributes.slice(*cursor).values` (batches.rb:409) — Ruby `Hash#slice`, whose TS spelling over the attributes object is a `map` of the cursor names, not a call."
   }
 ]

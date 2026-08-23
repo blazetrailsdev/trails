@@ -287,7 +287,15 @@ export class Batches {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall size — PERMANENT: Per-entry verified (RFC 0072 batching
+ *   cluster): Rails batches.rb:306-312 compares `Array(start).size !=
+ *   cursor.size`; trails relation/batches.ts spells the same arity check with
+ *   `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of
+ *   `Array()`/`#size`. Equivalent, not an omission.
+ */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
   cursor: string[],
@@ -455,7 +463,14 @@ export function batchOnLoadedRelation(opts: {
   return result;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsCall slice — PERMANENT: Verified per-site (RFC 0106):
+ *   `record.attributes.slice(*cursor).values` (batches.rb:409) — Ruby
+ *   `Hash#slice`, whose TS spelling over the attributes object is a `map` of the
+ *   cursor names, not a call.
+ */
 export function recordCursorValues(record: any, cursor: string[]): unknown[] {
   return cursor.map((column) => record.readAttribute?.(column) ?? record[column]);
 }

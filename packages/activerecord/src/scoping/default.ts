@@ -199,6 +199,10 @@ export function unscoped<T extends typeof Base, R>(
  * registers in `defaultScopes` instead.
  *
  * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
+ *
+ * @missingRailsCall any? — PERMANENT: Ruby Array#any? has no ported counterpart:
+ *   `default_scopes.any?` (scoping/default.rb:56) ports to the
+ *   `defaultScopes.length` check in isScopeAttributes.
  */
 export function isScopeAttributes(this: {
   currentScope?(skipInheritedScope?: boolean): unknown;

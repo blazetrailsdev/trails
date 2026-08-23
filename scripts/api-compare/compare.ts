@@ -1025,6 +1025,10 @@ export interface SuppressedCall {
   reason?: string;
 }
 
+/** The separator {@link callTagKey} joins on, shared with the readers that take
+ *  a key apart — a character no TS file path, class or method name contains. */
+const TAG_KEY_SEP = "\u0000";
+
 /** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
  *  by (tsFile, tsClass, tsName), so a tag justifies the deviation for exactly
  *  the method that carries it — never for a same-named method in another file,
@@ -1032,7 +1036,7 @@ export interface SuppressedCall {
  *  next to `ConnectionPool#checkout`). `tsClass` is `""` for a top-level
  *  function and `"*"` when the owning class could not be resolved. */
 export function callTagKey(tsFile: string, tsClass: string, tsName: string): string {
-  return `${tsFile}\u0000${tsClass}\u0000${tsName}`;
+  return [tsFile, tsClass, tsName].join(TAG_KEY_SEP);
 }
 
 /**
@@ -1412,10 +1416,41 @@ export function applyCallTags(
   return { kept: suppressTaggedCalls([...flagged], tags, used), suppressed };
 }
 
+/** The union of every owner's suppressions for one (tsFile, tsName) — the set
+ *  {@link staleCallTags} asks about a top-level function, whose tag is recorded
+ *  under the `""` owner while the pair that suppressed with it may have
+ *  resolved a real one. `undefined` when no owner consulted a tag there, which
+ *  is what tells {@link staleCallTags} the declaration was never compared. */
+export function usedForAnyOwner(
+  used: Map<string, Set<string>>,
+  tsFile: string,
+  tsName: string,
+): Set<string> | undefined {
+  const union = new Set<string>();
+  let seen = false;
+  for (const [key, calls] of used) {
+    const [file, , name] = key.split(TAG_KEY_SEP);
+    if (file !== tsFile || name !== tsName) continue;
+    seen = true;
+    for (const c of calls) union.add(c);
+  }
+  return seen ? union : undefined;
+}
+
 /** Every tagged call on a COMPARED (tsFile, tsClass, tsName) that never
  *  suppressed a flag — the tag's stale half. Sorted for a deterministic
  *  artifact. A pair whose owning class stayed unresolved recorded its
- *  suppressions under the `"*"` class, so both keys are consulted. */
+ *  suppressions under the `"*"` class, so both keys are consulted.
+ *
+ *  A TOP-LEVEL function (`tsClass === ""`) needs every owner consulted, not
+ *  just those two: one exported function can be the TS side of two pairs — the
+ *  module-scoped Ruby method, whose owner resolves to the class the file
+ *  mirrors (`Inflector.safe_constantize`), and an unowned one — and only the
+ *  owned pair raises the flags the tag suppresses. Keying its staleness on the
+ *  `""` set alone reports a tag that IS suppressing as stale while the
+ *  artifact simultaneously lists the same call as suppressed. A real owner is
+ *  still matched exactly, so a sibling class's tag never borrows another's
+ *  suppression. */
 export function staleCallTags(
   tagsByFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
   used: Map<string, Set<string>>,
@@ -1424,7 +1459,9 @@ export function staleCallTags(
   for (const [tsFile, byName] of tagsByFileName) {
     for (const [tsName, byClass] of byName) {
       for (const [tsClass, calls] of byClass) {
+        const anyOwner = tsClass === "" ? usedForAnyOwner(used, tsFile, tsName) : undefined;
         const hit =
+          anyOwner ??
           used.get(callTagKey(tsFile, tsClass, tsName)) ??
           used.get(callTagKey(tsFile, "*", tsName));
         if (hit === undefined) continue;

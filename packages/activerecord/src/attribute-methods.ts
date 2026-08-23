@@ -234,6 +234,13 @@ let _dangerousMethodsCache: Set<string> | null = null;
  * Rails: collects Base.instance_methods + private_instance_methods
  * minus superclass methods. These are method names that would conflict
  * with attribute accessors if a column had the same name.
+ *
+ * @missingRailsCall map — PERMANENT: Deviation (RFC 0106): Rails builds the set
+ *   by reflecting over `Base.instance_methods -
+ *   Base.superclass.instance_methods` and `map`ping each Symbol to a frozen
+ *   String. JS has no equivalent of Ruby's owner-scoped `instance_methods`, so
+ *   trails enumerates the same names as a literal list; the `map` has nothing to
+ *   map over.
  */
 export function dangerousAttributeMethods(): Set<string> {
   if (_dangerousMethodsCache) return _dangerousMethodsCache;
@@ -380,6 +387,23 @@ export function generateAliasAttributeMethods(
  * properties"). `type_for_attribute` loads the schema, so trails DOES reach
  * this method there, and the guard would raise on a Rails test Rails passes.
  * The generation point is language-forced; the guard is downstream of it.
+ *
+ * @missingRailsCall has_attribute? — PERMANENT: Language shortcoming (RFC 0106):
+ *   Rails' `!abstract_class? && !has_attribute?(old_name)` ArgumentError
+ *   (attribute_methods.rb:90-92) is guarded by WHEN Rails generates. Ruby defers
+ *   generation to the first call via `method_missing`, so a model that is only
+ *   introspected never reaches `alias_attribute_method_definition` — which is
+ *   why `attributes_test.rb:54` aliases `:overloaded_float, :x` against a column
+ *   `overloaded_types` does not have (schema.rb:1408-1415), calls only
+ *   `type_for_attribute`, and passes. A JS property must exist before it is
+ *   read, so trails generates at the end of every schema load
+ *   (`defineAttributeMethodsAfterLoad`, model-schema.ts:1159), a generation point
+ *   CLAUDE.md ratifies repo-wide under "Generated attribute readers are
+ *   properties";
+ *   `type_for_attribute` loads the schema, so trails reaches this method there
+ *   and the guard would raise on a Rails test Rails passes. Verified by porting
+ *   it: it reds `attributes_test.rb:54` and the ignored-columns case in
+ *   base.trails.test.ts. Documented at the call site.
  */
 export function aliasAttributeMethodDefinition(
   this: AttributeMethodsHost,

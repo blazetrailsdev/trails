@@ -190,6 +190,13 @@ export class StatementCache {
   /**
    * Create a cached statement from a relation-building block.
    * Mirrors: ActiveRecord::StatementCache.create
+   *
+   * @missingRailsCall call — PERMANENT: Verified per-site (RFC 0106 wave 4g):
+   *   `(callable || block).call Params.new` (statement_cache.rb:133) is Ruby
+   *   `Proc#call`; a JS function is invoked directly as `callable(new Params())`
+   *   (statement-cache.ts:204). There is no `call` method to route through — JS
+   *   `Function.prototype.call` is the receiver-binding primitive, not Ruby's
+   *   Proc invocation.
    */
   static create(
     connection: {
