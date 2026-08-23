@@ -43,12 +43,6 @@
   },
   {
     "package": "activesupport",
-    "name": "ParsingError",
-    "rubyFile": "active_support/duration/iso8601_parser.rb",
-    "reason": "active_support/duration/iso8601_parser.rb (ISO8601 duration parser) is unported."
-  },
-  {
-    "package": "activesupport",
     "name": "SoleItemExpectedError",
     "rubyFile": "active_support/core_ext/enumerable.rb",
     "reason": "active_support/core_ext/enumerable.rb (Enumerable#sole/#pick) is unported."
