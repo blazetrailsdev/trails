@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "execute_batch",
-    "call": "combine_multi_statements",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/database_statements.rb's `execute_batch` joins the statements with `combine_multi_statements`; trails' PG executeBatch hands the statement ARRAY to the adapter, which drives libpq's simple-query protocol per statement — there is no combined string to build. The abstract `combineMultiStatements` remains the shared helper for the MySQL path."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "execute_batch",
-    "call": "raw_execute",
-    "reason": "Per-site verified (RFC 0106 wave 4b): same site — the batch is executed through `internalExecute` so the `materializeTransactions`/`allowRetry` kwargs and the query-transformer guard travel with it, rather than through a bare `rawExecute`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "last_insert_id_result",
     "call": "internal_exec_query",
     "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/database_statements.rb's `last_insert_id_result` is `internal_exec_query(\"SELECT currval(...)\")`; trails reads the sequence value through the same adapter entry point spelled `queryValue`, which is `internal_exec_query` plus `.rows.first.first` — the row extraction is folded in."
