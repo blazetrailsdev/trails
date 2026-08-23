@@ -842,9 +842,9 @@ describe("BasicsTest", () => {
       const topic = await Topic.create({ written_on: utcMidnight });
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
-      expect(savedTime.utc().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
+      expect(savedTime.utc().toTime().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
       // Rails: saved_time.to_a == [0, 0, 19, 31, 12, 1999, 5, 365, false, "EST"]
-      const local1 = savedTime.utc().toZonedDateTimeISO("America/New_York");
+      const local1 = savedTime.utc().toTime().withTimeZone("America/New_York");
       expect(local1.year).toBe(1999);
       expect(local1.month).toBe(12);
       expect(local1.day).toBe(31);
@@ -867,9 +867,9 @@ describe("BasicsTest", () => {
       const topic = await Topic.create({ written_on: cstMidnight });
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
-      expect(savedTime.utc().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
+      expect(savedTime.utc().toTime().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
       // Rails: saved_time.to_a == [0, 0, 1, 1, 1, 2000, 6, 1, false, "EST"]
-      const local2 = savedTime.utc().toZonedDateTimeISO("America/New_York");
+      const local2 = savedTime.utc().toTime().withTimeZone("America/New_York");
       expect(local2.year).toBe(2000);
       expect(local2.month).toBe(1);
       expect(local2.day).toBe(1);

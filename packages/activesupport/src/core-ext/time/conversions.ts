@@ -110,22 +110,30 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
  * the same way, so `:usec`/`:nsec` still read the microseconds a `Date` cannot
  * carry.
  */
-export function toFs(date: Date | Temporal.Instant, format: string = "default"): string {
-  const utc =
-    // boundary: the JS `Date` a caller still holds is the instant this bridges
-    // onto the ruby/date `Time` the Rails body formats.
-    date instanceof Date
-      ? Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO("UTC")
-      : date.toZonedDateTimeISO("UTC");
-  const time = RubyTime.utc(
-    utc.year,
-    utc.month,
-    utc.day,
-    utc.hour,
-    utc.minute,
-    utc.second,
-    utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
-  );
+export function toFs(date: Date | Temporal.Instant | RubyTime, format: string = "default"): string {
+  // A `::Time` receiver is already the one the Rails body formats — the value
+  // `TimeWithZone#to_fs` hands over as `utc.to_fs(format)`
+  // (time_with_zone.rb:220).
+  let time: RubyTime;
+  if (date instanceof RubyTime) {
+    time = date;
+  } else {
+    const utc =
+      // boundary: the JS `Date` a caller still holds is the instant this bridges
+      // onto the ruby/date `Time` the Rails body formats.
+      date instanceof Date
+        ? Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO("UTC")
+        : date.toZonedDateTimeISO("UTC");
+    time = RubyTime.utc(
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
+      utc.second,
+      utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
+    );
+  }
   const formatter = DATE_FORMATS[format];
   if (formatter != null) {
     return typeof formatter === "function" ? String(formatter(time)) : time.strftime(formatter);

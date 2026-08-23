@@ -421,67 +421,40 @@ interface ChangeOptions {
   offset?: string | number;
 }
 
-/**
- * `::Time.local` (time/calculations.rb:174) — builds a time in the system's
- * local zone, taking Ruby's reversed component order.
- * @internal
- */
-function local(
-  sec: number,
-  min: number,
-  hour: number,
-  day: number,
-  month: number,
-  year: number,
-): Date {
-  const secFloor = Math.floor(sec);
-  const nsec = Math.round((sec - secFloor) * 1_000_000_000);
-  return new Date(year, month - 1, day, hour, min, secFloor, Math.floor(nsec / 1_000_000));
-}
-
 export function change(
   date: Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
 /**
- * A `::Time` receiver answers a `::Time`, as `change` does in Ruby. The
- * components it reads are the ones its `to_time` carries, so the change runs
- * through the shared `ZonedDateTime` arm and is reseated. `Time`'s constructor
- * takes an offset rather than a zone id, so a zoned receiver comes back
- * carrying its offset — Rails' own `elsif zone` arm rebuilds through
- * `::Time.local`, which reseats in the system zone rather than the receiver's,
- * so neither keeps a foreign zone's abbreviation.
+ * A `::Time` receiver answers a `::Time`, as `change` does in Ruby, and takes
+ * the same four terminal arms the Ruby body does — `:offset`, `utc?`, `zone`
+ * and the trailing `utc_offset` one.
+ *
+ * The third arm, `elsif zone.respond_to?(:utc_to_local)`
+ * (time/calculations.rb:148-171), is unreachable here: it selects a receiver
+ * whose `zone` is a `TZInfo` zone OBJECT, and `@blazetrails/date`'s `Time#zone`
+ * answers the tzdata abbreviation String and nothing else
+ * (`packages/date/src/time.ts`, `Time#zone`), so `respond_to?(:utc_to_local)`
+ * is false for every trails `::Time`. Its second-occurrence correction is not
+ * lost with it — `::Time.local`'s own `isdst` argument makes the same choice on
+ * the `elsif zone` arm below.
  */
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
-  if (date instanceof RubyTime) {
-    const changed = change(date.toTime(), options);
-    return new RubyTime(
-      changed.year,
-      changed.month,
-      changed.day,
-      changed.hour,
-      changed.minute,
-      new Rational(
-        BigInt(changed.second) * 1_000_000_000n +
-          BigInt(
-            changed.millisecond * 1_000_000 + changed.microsecond * 1_000 + changed.nanosecond,
-          ),
-        1_000_000_000n,
-      ),
-      date.isUtc() ? "UTC" : changed.offset,
-    );
-  }
-
   // Ruby reads the components off the receiver; a JS `Date` spells those readers
-  // differently, and reads them in the system's local zone, so widen it to the
-  // one shape both arms below share.
+  // differently, and reads them in the system's local zone, and a `::Time`
+  // spells them on its own zone, so widen both to the one shape the arms below
+  // share.
   const self =
-    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
+    date instanceof Date
+      ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId())
+      : date instanceof RubyTime
+        ? date.toTime()
+        : date;
   const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
 
   const newYear = options.year ?? self.year;
@@ -532,16 +505,57 @@ export function change(
     nanosecond: newNsecOfSec % 1_000,
   };
 
+  const newSecRational = new Rational(
+    BigInt(newComponents.second) * 1_000_000_000n +
+      BigInt(
+        newComponents.millisecond * 1_000_000 +
+          newComponents.microsecond * 1_000 +
+          newComponents.nanosecond,
+      ),
+    1_000_000_000n,
+  );
+
   if (newOffset !== null) {
     // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
     // the same fixed-offset zone with the String form only.
+    if (date instanceof RubyTime) {
+      return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSecRational, newOffset);
+    }
     const timeZone =
       typeof newOffset === "number"
         ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(newOffset) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(newOffset) % 3600) / 60)).padStart(2, "0")}`
         : newOffset;
     const newTime = Temporal.ZonedDateTime.from({ timeZone, ...newComponents });
     return date instanceof Date ? newTime.toInstant() : newTime;
+  }
+
+  if (date instanceof RubyTime && date.isUtc()) {
+    // `elsif utc?` (time/calculations.rb:147-148).
+    return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSecRational);
+  }
+
+  if (date instanceof RubyTime) {
+    if (date.zone !== null) {
+      // `elsif zone` (time/calculations.rb:172-175) — Ruby's reversed component
+      // order, with the receiver's `isdst` picking the occurrence of a wall
+      // clock a DST fall-back repeats.
+      return RubyTime.local(
+        newSecRational,
+        newMin,
+        newHour,
+        newDay,
+        newMonth,
+        newYear,
+        null,
+        null,
+        date.isdst,
+        null,
+      );
+    }
+    // `else ::Time.new(..., utc_offset)` (time/calculations.rb:176-177) — a
+    // receiver built from an offset has no zone to answer.
+    return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSecRational, date.utcOffset);
   }
 
   if (!(date instanceof Date) && self.timeZoneId === "UTC") {
@@ -553,10 +567,26 @@ export function change(
   }
 
   if (date instanceof Date) {
-    // `elsif zone` (time/calculations.rb:173-174): a JS `Date` carries no zone
+    // `elsif zone` (time/calculations.rb:172-175): a JS `Date` carries no zone
     // object, only the system's local zone, so it lands here rather than on the
-    // `utc_to_local` arm below or the trailing `utc_offset` one.
-    return instantFrom(local(newSec, newMin, newHour, newDay, newMonth, newYear));
+    // `utc_to_local` arm below or the trailing `utc_offset` one, and it has no
+    // `isdst` flag of its own to hand over.
+    // boundary: a JS `Date` carries milliseconds and nothing finer, so the
+    // answer is read back at the receiver's own resolution.
+    return Temporal.Instant.fromEpochMilliseconds(
+      RubyTime.local(
+        newSecRational,
+        newMin,
+        newHour,
+        newDay,
+        newMonth,
+        newYear,
+        null,
+        null,
+        null,
+        null,
+      ).toTime().epochMilliseconds,
+    );
   }
 
   // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).

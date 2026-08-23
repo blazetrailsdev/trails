@@ -141,6 +141,13 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 export class TimeWithZone {
   /** `@utc` — `nil` until {@link utc} derives it from `@time`. */
   private _utc: UtcConstructed | null;
+  /**
+   * The `::Time` {@link utc} answers. Rails' `@utc` is both the memo and the
+   * answer; trails carries the memo as the {@link UtcConstructed} instant every
+   * `TimeZone` reader below takes, so the `::Time` seated from it is a second
+   * memo rather than the same one.
+   */
+  private _utcTime?: Time;
   /** `@time` — the local wall clock, `nil` until {@link time} derives it. */
   private _time: TimeLike | null;
   /** The timezone */
@@ -178,7 +185,7 @@ export class TimeWithZone {
    * local-time-only instance resolves its UTC value exactly where Rails does.
    */
   private get _zoned(): Temporal.ZonedDateTime {
-    return this.utc().toZonedDateTimeISO(this._timeZone.tzinfo.identifier);
+    return this._utcConstructed.toZonedDateTimeISO(this._timeZone.tzinfo.identifier);
   }
 
   /** Epoch milliseconds — sourced directly from the ZonedDateTime. */
@@ -188,7 +195,7 @@ export class TimeWithZone {
 
   /** UTC-zoned snapshot of the underlying instant for component access. */
   private get _utcPlain(): Temporal.PlainDateTime {
-    return this.utc().toZonedDateTimeISO("UTC").toPlainDateTime();
+    return this._utcConstructed.toZonedDateTimeISO("UTC").toPlainDateTime();
   }
 
   /**
@@ -318,6 +325,20 @@ export class TimeWithZone {
    */
   get period(): TimezonePeriod {
     return (this._period ??= this._timeZone.periodForUtc(this._utc!));
+  }
+
+  /**
+   * `@utc ||= incorporate_utc_offset(@time, -utc_offset)`
+   * (time_with_zone.rb:64), left on the {@link UtcConstructed} instant — the
+   * instant half of {@link utc}, split out because every `TimeZone` and
+   * `Temporal` reader in this file takes the instant where Rails' readers take
+   * the `::Time` it seats.
+   */
+  private get _utcConstructed(): UtcConstructed {
+    return (this._utc ??= this._incorporateUtcOffset(
+      this._time as UtcConstructed,
+      -this.utcOffset,
+    ));
   }
 
   /** The TimeZone instance */
@@ -487,27 +508,26 @@ export class TimeWithZone {
 
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#utc` (time_with_zone.rb:63-65) —
-   * `@utc ||= incorporate_utc_offset(@time, -utc_offset)`.
+   * `@utc ||= incorporate_utc_offset(@time, -utc_offset)`, a `::Time` in UTC.
    */
-  utc(): Temporal.Instant {
-    return (this._utc ??= this._incorporateUtcOffset(
-      this._time as UtcConstructed,
-      -this.utcOffset,
-    ));
+  utc(): Time {
+    return (this._utcTime ??= Time.at(
+      new Rational(this._utcConstructed.epochNanoseconds, 1_000_000_000n),
+    ).getutc());
   }
 
-  /** Alias for utc() */
-  getutc(): Temporal.Instant {
+  /** `alias_method :getutc, :utc` (time_with_zone.rb:67). */
+  getutc(): Time {
     return this.utc();
   }
 
-  /** Alias for utc() */
-  getgm(): Temporal.Instant {
+  /** `alias_method :getgm, :utc` (time_with_zone.rb:66). */
+  getgm(): Time {
     return this.utc();
   }
 
-  /** Alias for utc() */
-  gmtime(): Temporal.Instant {
+  /** `alias_method :gmtime, :utc` (time_with_zone.rb:68). */
+  gmtime(): Time {
     return this.utc();
   }
 
@@ -515,19 +535,17 @@ export class TimeWithZone {
    * `alias_method :comparable_time, :utc` (time_with_zone.rb:66) — the value
    * `<=>` and `between?` compare on.
    */
-  comparableTime(): Temporal.Instant {
+  comparableTime(): Time {
     return this.utc();
   }
 
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#localtime(utc_offset = nil)`
    * (time_with_zone.rb:83-85) — `utc.getlocal(utc_offset)`, a `::Time` at the
-   * given offset or zone, or in the system zone when none is given. trails'
-   * `utc` answers the instant rather than the `::Time` Rails' does, so the
-   * `::Time` `getlocal` is called on is seated from that instant here.
+   * given offset or zone, or in the system zone when none is given.
    */
   localtime(utcOffset: string | number | null = null): Time {
-    return Time.at(new Rational(this.utc().epochNanoseconds, 1_000_000_000n)).getlocal(utcOffset);
+    return this.utc().getlocal(utcOffset);
   }
 
   /** `alias_method :getlocal, :localtime` (time_with_zone.rb:86). */
@@ -1016,6 +1034,11 @@ export class TimeWithZone {
     }
     if (other instanceof Temporal.Instant) {
       return this._zoned.epochNanoseconds === other.epochNanoseconds;
+    }
+    // `other.eql?(utc)` (time_with_zone.rb:275) — `utc` is a `::Time`, so a
+    // `::Time` argument is the one Rails compares against it directly.
+    if (other instanceof Time) {
+      return this._zoned.epochNanoseconds === other.toTime().epochNanoseconds;
     }
     return false;
   }

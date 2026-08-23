@@ -345,14 +345,39 @@ describe("TimeExtCalculationsTest", () => {
     ).toThrow(ArgumentError);
   });
 
-  // Rails' `Time.local` receiver lands on `change`'s `elsif zone` arm
-  // (time/calculations.rb:173-174), which re-runs `Time.local` with the
-  // receiver's `isdst`. trails' JS-`Date` arm calls `local(...)` with no isdst
-  // equivalent, so a nominal time that occurs twice always resolves to the
-  // first occurrence and the second-occurrence assertions below cannot hold.
-  // Unskips with the `elsif zone` / `isdst` port
-  // (story `time-change-local-and-utc-offset-arms-conflated`).
-  it.skip("change preserves offset for local times around end of dst");
+  it("change preserves offset for local times around end of dst", () => {
+    withEnvTz("US/Eastern", () => {
+      // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
+      // were rolled back 1 hour.
+      const midnight = RubyTime.local(2005, 10, 30, 0, 0, 0); // 2005-10-30 00:00:00 -0400
+      // Rails reaches the first occurrence as `Time.local(..., 0, 59, 59) + 1`;
+      // trails' `Time` has no `#+`, so the same instant is named by the `isdst`
+      // argument `change`'s own `elsif zone` arm passes.
+      const oneAm1 = RubyTime.local(0, 0, 1, 30, 10, 2005, null, null, true, null); // -0400
+      const oneAm2 = RubyTime.local(2005, 10, 30, 1, 0, 0); // 2005-10-30 01:00:00 -0500
+      const twoAm = RubyTime.local(2005, 10, 30, 2, 0, 0); // 2005-10-30 02:00:00 -0500
+      expect(oneAm1.toTime().epochNanoseconds).toBeLessThan(oneAm2.toTime().epochNanoseconds);
+
+      const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
+      const second = 1_000_000_000n;
+
+      expect(at(change(midnight, { hour: 1 }))).toBe(at(oneAm1));
+      expect(at(change(midnight, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(oneAm1, { hour: 0 }))).toBe(at(midnight));
+      expect(at(change(oneAm1, { hour: 1 }))).toBe(at(oneAm1));
+      expect(at(change(oneAm1, { sec: 1 }))).toBe(at(oneAm1) + second);
+      expect(at(change(oneAm1, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(oneAm2, { hour: 0 }))).toBe(at(midnight));
+      expect(at(change(oneAm2, { hour: 1 }))).toBe(at(oneAm2));
+      expect(at(change(oneAm2, { sec: 1 }))).toBe(at(oneAm2) + second);
+      expect(at(change(oneAm2, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(twoAm, { hour: 1 }))).toBe(at(oneAm2));
+      expect(at(change(twoAm, { hour: 0 }))).toBe(at(midnight));
+    });
+  });
 
   it("change preserves offset for zoned times around end of dst", () => {
     // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
@@ -393,9 +418,36 @@ describe("TimeExtCalculationsTest", () => {
     expect([time2.year, time2.month, time2.day]).toEqual([2005, 1, 30]);
   });
 
-  // Same `elsif zone` / `isdst` gap as the US/Eastern local-times test above
-  // (story `time-change-local-and-utc-offset-arms-conflated`).
-  it.skip("change preserves fractional hour offset for local times around end of dst");
+  it("change preserves fractional hour offset for local times around end of dst", () => {
+    withEnvTz("Australia/Lord_Howe", () => {
+      // DST ended just before 2005-03-27 2:00:00 AM in Australia/Lord_Howe, and
+      // clocks were rolled back 30 minutes.
+      const oneAm = RubyTime.local(2005, 3, 27, 1, 0, 0); // 2005-03-27 01:00:00 +1100
+      const one30Am1 = RubyTime.local(0, 30, 1, 27, 3, 2005, null, null, true, null); // +1100
+      const one30Am2 = RubyTime.local(2005, 3, 27, 1, 30, 0); // 2005-03-27 01:30:00 +1030
+      const twoAm = RubyTime.local(2005, 3, 27, 2, 0, 0); // 2005-03-27 02:00:00 +1030
+      expect(one30Am1.toTime().epochNanoseconds).toBeLessThan(one30Am2.toTime().epochNanoseconds);
+
+      const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
+      const second = 1_000_000_000n;
+
+      expect(at(change(oneAm, { min: 30 }))).toBe(at(one30Am1));
+      expect(at(change(oneAm, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(one30Am1, { min: 0 }))).toBe(at(oneAm));
+      expect(at(change(one30Am1, { min: 30 }))).toBe(at(one30Am1));
+      expect(at(change(one30Am1, { min: 30, sec: 1 }))).toBe(at(one30Am1) + second);
+      expect(at(change(one30Am1, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(one30Am2, { min: 0 }))).toBe(at(oneAm));
+      expect(at(change(one30Am2, { min: 30 }))).toBe(at(one30Am2));
+      expect(at(change(one30Am2, { min: 30, sec: 1 }))).toBe(at(one30Am2) + second);
+      expect(at(change(one30Am2, { hour: 2 }))).toBe(at(twoAm));
+
+      expect(at(change(twoAm, { hour: 1, min: 30 }))).toBe(at(one30Am2));
+      expect(at(change(twoAm, { hour: 1 }))).toBe(at(oneAm));
+    });
+  });
 
   it("change preserves fractional hour offset for zoned times around end of dst", () => {
     // DST ended just before 2005-03-27 2:00:00 AM in Australia/Lord_Howe, and

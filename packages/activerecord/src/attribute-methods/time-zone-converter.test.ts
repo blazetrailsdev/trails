@@ -82,7 +82,7 @@ describe("TimeZoneConverterTest", () => {
     expect(twz.min).toBe(30);
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
     // UTC instant should be 14:30 (10:30 EDT = UTC-4, so UTC = 10:30 + 4h)
-    expect(twz.utc().epochMilliseconds).toBe(
+    expect(twz.utc().toTime().epochMilliseconds).toBe(
       Temporal.Instant.from("2024-06-15T14:30:00Z").epochMilliseconds,
     );
   });
@@ -168,7 +168,9 @@ describe("TimeZoneConverterTest", () => {
       const converter = new TimeZoneConverter(new ZonelessDateTime());
       const result = converter.cast({ 1: 2024, 2: 6, 3: 15, 4: 10, 5: 0 });
       expect(result).toBeInstanceOf(TimeWithZone);
-      expect((result as TimeWithZone).utc().toString()).toBe("2024-06-15T10:00:00Z");
+      expect((result as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
+        "2024-06-15T10:00:00Z",
+      );
     } finally {
       ActiveRecord.defaultTimezone = previous;
     }

@@ -469,7 +469,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, timeString, false) });
       const range1 = r.tstz_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -478,7 +478,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const range2 = r.tstz_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -493,7 +493,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, null, true) });
       const range1 = r.tstz_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -503,7 +503,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const range2 = r.tstz_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -520,7 +520,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range1 = r.tstz_range as Range;
       expect(range1.begin).toBeNull();
       expect(range1.end).toBeInstanceOf(TimeWithZone);
-      expect((range1.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range1.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
       expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
 
       await r.saveBang();
@@ -528,7 +530,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range2 = r.tstz_range as Range;
       expect(range2.begin).toBeNull();
       expect(range2.end).toBeInstanceOf(TimeWithZone);
-      expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range2.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
       expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
     it("timezone array awareness tzrange", async () => {
@@ -552,7 +556,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pre = r.tstz_ranges as Range[];
       expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
       expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((pre[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((pre[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         fromInstant.epochMilliseconds,
       );
 
@@ -562,10 +566,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(post).toHaveLength(4);
       expect(post[0].begin).toBeInstanceOf(TimeWithZone);
       expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((post[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((post[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         fromInstant.epochMilliseconds,
       );
-      expect((post[0].end as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((post[0].end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         toInstant.epochMilliseconds,
       );
       expect(post[2].begin).toBeInstanceOf(TimeWithZone);
@@ -700,7 +704,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
       const range1 = r.ts_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -709,7 +713,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const range2 = r.ts_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -724,7 +728,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, null, true) });
       const range1 = r.ts_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -734,7 +738,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const range2 = r.ts_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         instant.epochMilliseconds,
       );
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
@@ -751,7 +755,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range1 = r.ts_range as Range;
       expect(range1.begin).toBeNull();
       expect(range1.end).toBeInstanceOf(TimeWithZone);
-      expect((range1.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range1.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
       expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
 
       await r.saveBang();
@@ -759,7 +765,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range2 = r.ts_range as Range;
       expect(range2.begin).toBeNull();
       expect(range2.end).toBeInstanceOf(TimeWithZone);
-      expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range2.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
       expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
     it("timezone array awareness tsrange", async () => {
@@ -782,7 +790,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pre = r.ts_ranges as Range[];
       expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
       expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((pre[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((pre[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         fromInstant.epochMilliseconds,
       );
 
@@ -792,10 +800,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(post).toHaveLength(4);
       expect(post[0].begin).toBeInstanceOf(TimeWithZone);
       expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((post[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((post[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         fromInstant.epochMilliseconds,
       );
-      expect((post[0].end as TimeWithZone).utc().epochMilliseconds).toBe(
+      expect((post[0].end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
         toInstant.epochMilliseconds,
       );
       expect(post[2].begin).toBeInstanceOf(TimeWithZone);
@@ -865,7 +873,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const range1 = r.ts_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((range1.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
+      expect((range1.begin as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
+        instant.toString(),
+      );
 
       await r.saveBang();
       await r.reload();
@@ -873,7 +883,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
       // µs precision round-trips through PostgreSQL tsrange
-      expect((range2.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
+      expect((range2.begin as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
+        instant.toString(),
+      );
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))

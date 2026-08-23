@@ -239,7 +239,7 @@ export function compareWithCoercion(
       other instanceof Temporal.Instant
         ? other
         : other instanceof TimeWithZone
-          ? other.utc()
+          ? other.utc().toTime().toInstant()
           : Temporal.Instant.fromEpochMilliseconds(other.getTime());
     return Temporal.Instant.compare(
       (toDatetime instanceof Temporal.ZonedDateTime

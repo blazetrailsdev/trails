@@ -40,8 +40,8 @@ describe("TimeWithZoneTest", () => {
 
   it("utc", () => {
     const twz = maketwz();
-    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
-    expect(twz.utc()).toBeInstanceOf(Temporal.Instant);
+    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.utc()).toBeInstanceOf(RubyTime);
   });
 
   it("time", () => {
@@ -61,7 +61,7 @@ describe("TimeWithZoneTest", () => {
       const twz = maketwz();
       const result = twz.inTimeZone();
       expect(result.timeZone.name).toBe("Alaska");
-      expect(result.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+      expect(result.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
     });
   });
 
@@ -70,7 +70,7 @@ describe("TimeWithZoneTest", () => {
     const alaska = TimeZone.find("Alaska")!;
     const result = twz.inTimeZone("Alaska");
     expect(result.timeZone.name).toBe(alaska.name);
-    expect(result.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+    expect(result.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
   });
 
   it("in time zone with new zone equal to old zone does not create new object", () => {
@@ -87,7 +87,7 @@ describe("TimeWithZoneTest", () => {
     // 2014-10-26 01:00:00 Moscow time was ambiguous due to DST change
     const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
-    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
   it("localtime", () => {
@@ -612,7 +612,7 @@ describe("TimeWithZoneTest", () => {
 
   it("local to utc conversion with far future datetime", () => {
     const twz = eastern.local(2049, 12, 31, 19, 0, 0);
-    const utcMs = twz.utc().epochMilliseconds;
+    const utcMs = twz.utc().toTime().epochMilliseconds;
     expect(utcMs).toBe(Date.UTC(2050, 0, 1, 0, 0, 0));
   });
 
@@ -944,7 +944,7 @@ describe("TimeWithZoneTest", () => {
   it("marshal dump and load", () => {
     const twz = maketwz();
     const json = JSON.stringify({
-      utc: twz.utc().toString(),
+      utc: twz.utc().toTime().toInstant().toString(),
       timeZone: twz.timeZone.name,
     });
     const parsed = JSON.parse(json);
@@ -952,7 +952,7 @@ describe("TimeWithZoneTest", () => {
       instantFromDate(new Date(parsed.utc)),
       TimeZone.find(parsed.timeZone)!,
     );
-    expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+    expect(restored.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
     expect(restored.timeZone.name).toBe(twz.timeZone.name);
     expect(restored.inspect()).toBe(twz.inspect());
   });
@@ -960,7 +960,7 @@ describe("TimeWithZoneTest", () => {
   it("marshal dump and load with tzinfo identifier", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
     const json = JSON.stringify({
-      utc: twz.utc().toString(),
+      utc: twz.utc().toTime().toInstant().toString(),
       timeZone: twz.timeZone.tzinfo.identifier,
     });
     const parsed = JSON.parse(json);
@@ -968,7 +968,7 @@ describe("TimeWithZoneTest", () => {
       instantFromDate(new Date(parsed.utc)),
       TimeZone.find(parsed.timeZone)!,
     );
-    expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+    expect(restored.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
     expect(restored.inspect()).toBe(twz.inspect());
   });
 
@@ -1044,7 +1044,7 @@ describe("TimeWithZoneTest", () => {
 
   it("instance created with local time returns correct utc time", () => {
     const twz = eastern.local(1999, 12, 31, 19);
-    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
   });
 
   it("instance created with local time enforces spring dst rules", () => {
@@ -1364,7 +1364,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
       instantFromDate(time),
       TimeZone.find("Eastern Time (US & Canada)")!,
     );
-    expect(twz.utc().epochMilliseconds).toBe(time.getTime());
+    expect(twz.utc().toTime().epochMilliseconds).toBe(time.getTime());
     // Original Date should not be modified
     expect(time.getTime()).toBe(Date.UTC(2000, 6, 1));
   });
@@ -1455,6 +1455,6 @@ describe("TimeWithZoneMethodsForString", () => {
     const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
     // Should resolve to the UTC equivalent
-    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 });

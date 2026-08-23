@@ -537,14 +537,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         const record = new PgArrays({ datetimes: [timeString] } as any);
         const before = (record as any).datetimes as TimeWithZone[];
         expect(before[0]).toBeInstanceOf(TimeWithZone);
-        expect(before[0].utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+        expect(before[0].utc().toTime().epochMilliseconds).toBe(instant.epochMilliseconds);
         expect(before[0].timeZone.name).toBe(zone.name);
 
         await (record as any).save();
         await (record as any).reload();
         const after = (record as any).datetimes as TimeWithZone[];
         expect(after[0]).toBeInstanceOf(TimeWithZone);
-        expect(after[0].utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+        expect(after[0].utc().toTime().epochMilliseconds).toBe(instant.epochMilliseconds);
         expect(after[0].timeZone.name).toBe(zone.name);
       } finally {
         setZone(null);

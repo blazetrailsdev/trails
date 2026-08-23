@@ -941,7 +941,7 @@ describe("AttributeMethodsTest", () => {
       record.writeAttribute("written_on", utcTime);
       const wo = record.written_on;
       // record.written_on is equal to (i.e. simultaneous with) utc_time …
-      expect(wo.utc().epochNanoseconds).toBe(utcTime.epochNanoseconds);
+      expect(wo.utc().toTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
       // … but is a TimeWithZone …
       expect(wo).toBeInstanceOf(TimeWithZone);
       // … and is in the current Time.zone …
@@ -966,7 +966,7 @@ describe("AttributeMethodsTest", () => {
       const record = Topic.new({}) as unknown as { written_on: TimeWithZone };
       record.written_on = cstTime;
       const wo = record.written_on;
-      expect(wo.utc().epochNanoseconds).toBe(utcTime.epochNanoseconds);
+      expect(wo.utc().toTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
       expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
       const t = wo.time;
       expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([

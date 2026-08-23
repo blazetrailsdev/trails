@@ -559,12 +559,70 @@ export class Time {
    */
   static mktime(
     year: number | string,
-    month: number | string | null = 1,
-    day: number | string | null = 1,
-    hour: number | string | null = 0,
-    min: number | string | null = 0,
-    sec: number | string | Rational | null = 0,
+    month?: number | string | null,
+    day?: number | string | null,
+    hour?: number | string | null,
+    min?: number | string | null,
+    sec?: number | string | Rational | null,
     usec?: number,
+  ): Time;
+  /**
+   * MRI's ten-argument form (`time.c` `time_arg`: `if (argc == 10)`), which is
+   * the `Time#to_a` splat — `[sec, min, hour, day, month, year, wday, yday,
+   * isdst, zone]`, the components in reverse. `wday`, `yday` and `zone` are
+   * read as `Qnil` whatever they hold, and `isdst` picks the occurrence of a
+   * wall clock a DST fall-back repeats: under `TZ=America/New_York`,
+   * `Time.local(0, 30, 1, 2, 11, 2008, nil, nil, true, nil)` is `-0400` and the
+   * same call with `false` is `-0500`.
+   */
+  static mktime(
+    sec: number | string | Rational | null,
+    min: number | string | null,
+    hour: number | string | null,
+    day: number | string | null,
+    month: number | string | null,
+    year: number | string,
+    wday: null,
+    yday: null,
+    isdst: boolean | null,
+    zone: null,
+  ): Time;
+  static mktime(...args: unknown[]): Time {
+    if (args.length === 10) {
+      const [sec, min, hour, day, month, year, , , isdst] = args as [
+        number | string | Rational | null,
+        number | string | null,
+        number | string | null,
+        number | string | null,
+        number | string | null,
+        number | string,
+        null,
+        null,
+        boolean | null,
+        null,
+      ];
+      return Time.#mktimeIsdst(Time.#mktime(year, month, day, hour, min, sec, undefined), isdst);
+    }
+    const [year, month, day, hour, min, sec, usec] = args as [
+      number | string,
+      (number | string | null)?,
+      (number | string | null)?,
+      (number | string | null)?,
+      (number | string | null)?,
+      (number | string | Rational | null)?,
+      number?,
+    ];
+    return Time.#mktime(year, month ?? 1, day ?? 1, hour ?? 0, min ?? 0, sec ?? 0, usec);
+  }
+
+  static #mktime(
+    year: number | string,
+    month: number | string | null,
+    day: number | string | null,
+    hour: number | string | null,
+    min: number | string | null,
+    sec: number | string | Rational | null,
+    usec: number | undefined,
   ): Time {
     return new Time(
       year,
@@ -581,20 +639,47 @@ export class Time {
   }
 
   /**
+   * MRI's `isdst` argument (`time.c` `time_arg`, then `find_time_t`'s
+   * `!NIL_P(vtm->isdst)` search): a wall clock a DST fall-back repeats names
+   * two instants, and `isdst` picks the one whose flag matches. The
+   * constructor already seated the later — the `nil` `isdst` reading — so only
+   * the earlier occurrence has to be tried.
+   */
+  static #mktimeIsdst(time: Time, isdst: boolean | null): Time {
+    if (isdst == null || time.#timeZoneId == null || time.isdst === isdst) return time;
+    const earlier = time.#plain.toZonedDateTime(time.#timeZoneId, { disambiguation: "earlier" });
+    const candidate = Time.#atInstant(earlier.toInstant(), time.#timeZoneId);
+    return candidate.isdst === isdst ? candidate : time;
+  }
+
+  /**
    * Ruby `Time.local`, the singleton `Time.mktime` is aliased to
    * (`time.c`: both names bind `time_s_mktime`), so it takes the same
-   * positionals and builds in the LOCAL zone too.
+   * positionals — both forms — and builds in the LOCAL zone too.
    */
   static local(
     year: number | string,
-    month: number | string | null = 1,
-    day: number | string | null = 1,
-    hour: number | string | null = 0,
-    min: number | string | null = 0,
-    sec: number | string | Rational | null = 0,
+    month?: number | string | null,
+    day?: number | string | null,
+    hour?: number | string | null,
+    min?: number | string | null,
+    sec?: number | string | Rational | null,
     usec?: number,
-  ): Time {
-    return Time.mktime(year, month, day, hour, min, sec, usec);
+  ): Time;
+  static local(
+    sec: number | string | Rational | null,
+    min: number | string | null,
+    hour: number | string | null,
+    day: number | string | null,
+    month: number | string | null,
+    year: number | string,
+    wday: null,
+    yday: null,
+    isdst: boolean | null,
+    zone: null,
+  ): Time;
+  static local(...args: unknown[]): Time {
+    return (Time.mktime as (...args: unknown[]) => Time)(...args);
   }
 
   /**
@@ -689,12 +774,21 @@ export class Time {
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? nowTimeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
+    // A wall clock a DST fall-back repeats names two instants, and MRI's
+    // `find_time_t` (`time.c`) settles on the STANDARD-time one when `isdst` is
+    // `nil`: under `TZ=America/New_York`, `Time.local(2005, 10, 30, 1, 0, 0)` is
+    // `-0500` and its `isdst` is false. `Temporal`'s default `"compatible"`
+    // picks the earlier occurrence instead, so the later one is asked for by
+    // name. For the "spring forward" gap the two agree — MRI rolls
+    // `2005-04-03 02:30` forward to `03:30 -0400`, and so does `"later"`.
+    const disambiguation = { disambiguation: "later" } as const;
     this.#utcOffsetMemo =
       typeof utcOffset === "number"
         ? utcOffset
-        : Number(this.#plain.toZonedDateTime(utcOffset).offsetNanoseconds) / 1_000_000_000;
+        : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
+          1_000_000_000;
     this.#instant = this.#plain
-      .toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset))
+      .toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset), disambiguation)
       .toInstant();
   }
 
@@ -780,6 +874,28 @@ export class Time {
   /** Ruby `Time#gmt_offset`, the `utc_offset` alias. */
   get gmtOffset(): number {
     return this.#utcOffset;
+  }
+
+  /**
+   * Ruby `Time#isdst` (`ruby/time.c` `time_isdst`), true when the receiver's
+   * zone is observing daylight saving. A time built from an offset rather than
+   * a zone has no zone to ask, and MRI answers `false` — `Time.new(2008, 7, 1,
+   * 0, 0, 0, "-04:00").isdst` is false where the same instant in
+   * `America/New_York` is true. The standard offset is the smaller of the
+   * zone's January and July offsets, the same reading {@link zone} takes for
+   * its abbreviation, so a negative-DST zone falls out the same way.
+   */
+  get isdst(): boolean {
+    if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
+    const zoned = this.#instant.toZonedDateTimeISO(this.#timeZoneId);
+    const january = Number(zoned.with({ month: 1, day: 1 }).offsetNanoseconds);
+    const july = Number(zoned.with({ month: 7, day: 1 }).offsetNanoseconds);
+    return Number(zoned.offsetNanoseconds) > Math.min(january, july);
+  }
+
+  /** Ruby `Time#dst?`, the `isdst` alias (`ruby/time.c` `time_isdst`). */
+  isDst(): boolean {
+    return this.isdst;
   }
 
   /**
