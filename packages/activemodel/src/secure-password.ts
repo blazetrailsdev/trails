@@ -45,7 +45,7 @@ export function hasSecurePassword(
   }
 
   const passwordCache = new WeakMap<object, string | null>();
-  const confirmationCache = new WeakMap<object, string | null>();
+  const confirmationCache = new WeakMap<object, unknown>();
   const challengeCache = new WeakMap<object, string | null>();
 
   Object.defineProperty(modelClass.prototype, attribute, {
@@ -73,7 +73,7 @@ export function hasSecurePassword(
       return confirmationCache.get(this) ?? null;
     },
     set(this: Model, value: unknown) {
-      confirmationCache.set(this, value === null || value === undefined ? null : String(value));
+      confirmationCache.set(this, value);
     },
     configurable: true,
   });
