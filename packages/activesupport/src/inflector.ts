@@ -172,7 +172,7 @@ export function tableize(className: string): string {
 
 export function classify(tableName: string): string {
   // strip out any leading schema name
-  return camelize(singularize(tableName.replace(/.*\./, "")));
+  return camelize(singularize(String(tableName).replace(/.*\./, "")));
 }
 
 export function dasherize(underscoredWord: string): string {
