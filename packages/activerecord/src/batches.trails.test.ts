@@ -66,13 +66,19 @@ describe("BatchEnumerator (trails)", () => {
   });
   // batches.rb:456-459. Rails has no test for this raise; the guard fires when a
   // cursor column is nil on a batched row — Ruby reads it out of
-  // `values.flatten`, trails off each record's attributes.
+  // `values.flatten`, trails off each record's attributes. The relation is
+  // scoped to the nil-author book: NULLs sort first on SQLite and last on
+  // PostgreSQL, so an unscoped batch reaches the row on one adapter only.
   it("raises when a cursor column is nil", async () => {
-    await Book.create({ name: "Bourdain: The Definitive Oral Biography" });
+    const name = "Bourdain: The Definitive Oral Biography";
+    await Book.create({ name });
 
     await expect(
       (async () => {
-        for await (const _ of Book.inBatches({ of: 1, cursor: ["author_id", "name"] })) {
+        for await (const _ of Book.where({ name }).inBatches({
+          of: 1,
+          cursor: ["author_id", "name"],
+        })) {
           // no-op: the guard raises on the batch carrying the nil author_id
         }
       })(),
