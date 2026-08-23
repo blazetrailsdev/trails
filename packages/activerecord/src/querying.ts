@@ -158,12 +158,10 @@ export function _loadFromSql<T extends typeof Base>(
   const payload = { record_count: resultSet.length, class_name: this.name };
 
   return Notifications.instrument("instantiation.active_record", payload, () => {
-    // `columnTypes` has already had every known attribute name rejected above
-    // (querying.rb:76-78), so nothing in it can collide with a schema cast type
-    // — which is why the STI arm may route through the public `instantiate`,
-    // whose third argument is trails' `overrideTypes`, without overriding a
-    // known column. `toArray()` stands in for Rails' `indexed_rows`: our
-    // `_instantiate` reads a plain attribute hash, not an `IndexedRow`.
+    // The reject above (querying.rb:76-78) removed every known attribute name,
+    // so `instantiate`'s third argument — trails' `overrideTypes`, not Rails'
+    // additional types — cannot override a schema cast type here. `toArray()`
+    // stands in for `indexed_rows`: `_instantiate` reads an attribute hash.
     if (resultSet.includesColumn(this.inheritanceColumn as string)) {
       return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
     } else {

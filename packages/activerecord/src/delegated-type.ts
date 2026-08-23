@@ -102,16 +102,6 @@ export function delegatedType(
 }
 
 /**
- * Get the delegated type configuration for a model class and role.
- */
-export function getDelegatedTypeConfig(
-  modelClass: typeof Base,
-  role: string,
-): DelegatedTypeOptions | undefined {
-  return (modelClass as any)._delegatedTypes?.get(role);
-}
-
-/**
  * Define all accessor methods for a delegated type role on the given model class.
  * Called by `delegatedType`, which is the public entry point.
  *
@@ -245,4 +235,14 @@ export function defineDelegatedTypeMethods(
       configurable: true,
     });
   }
+}
+
+/**
+ * Get the delegated type configuration for a model class and role.
+ */
+export function getDelegatedTypeConfig(
+  modelClass: typeof Base,
+  role: string,
+): DelegatedTypeOptions | undefined {
+  return (modelClass as any)._delegatedTypes?.get(role);
 }
