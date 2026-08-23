@@ -16,8 +16,8 @@ import {
 } from "./test-infra-scope.mjs";
 
 const FILENAME = "packages/activerecord/src/dirty.test.ts";
-const OWN_TEST = "packages/activerecord/src/support/canonical-schema.test.ts";
-const OWN_REBUILD_TEST = "packages/activerecord/src/support/canonical-table-rebuild.test.ts";
+const OWN_TEST = "packages/activerecord/src/support/canonical-schema.trails.test.ts";
+const OWN_REBUILD_TEST = "packages/activerecord/src/support/canonical-table-rebuild.trails.test.ts";
 
 const tester = new RuleTester({
   languageOptions: {

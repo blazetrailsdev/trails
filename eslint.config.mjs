@@ -582,7 +582,7 @@ export default defineConfig(
   //    ensureCanonicalTables in support/canonical-table-rebuild.ts)
   //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
   //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
-  //    Only canonical-schema.test.ts / canonical-table-rebuild.test.ts may
+  //    Only canonical-schema.trails.test.ts / canonical-table-rebuild.trails.test.ts may
   //    import them, to test them directly (allowlisted in the rule).
   //    Enforced across every workspace package, not just activerecord: the
   //    loaders are matched by module basename, so a test file in another

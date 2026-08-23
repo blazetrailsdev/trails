@@ -61,7 +61,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   //
   // A table missing from the database puts this boot back on the old behaviour
   // — the arm re-lays the adapter-specific half — which is what a test file
-  // that drops one (`support/drop-all-tables.test.ts`) relies on. The snapshot
+  // that drops one (`support/drop-all-tables.trails.test.ts`) relies on. The snapshot
   // is carried forward rather than re-taken for the same reason: re-taking it
   // here would record the shrunken set as authoritative.
   const conn = await Base.leaseConnection();

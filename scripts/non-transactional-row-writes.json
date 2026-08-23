@@ -5,6 +5,6 @@
   "packages/activerecord/src/invertible-migration.test.ts",
   "packages/activerecord/src/migration/columns.test.ts",
   "packages/activerecord/src/migration/rename-table.test.ts",
-  "packages/activerecord/src/support/drop-all-tables.test.ts",
+  "packages/activerecord/src/support/drop-all-tables.trails.test.ts",
   "packages/activerecord/src/unconnected.test.ts"
 ]

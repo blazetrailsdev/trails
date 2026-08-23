@@ -49,7 +49,7 @@
  * `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE` / `PGDATABASE` are
  * therefore NOT read — Rails interpolates none of them, and an entry's own
  * `database` beats libpq's env in Rails too. The exact key set each lane reads
- * is pinned by a test (`config.test.ts`, "interpolates exactly the sub-setting
+ * is pinned by a test (`config.trails.test.ts`, "interpolates exactly the sub-setting
  * key set config.example.yml interpolates"), so re-widening it has to be a
  * decision rather than a drift.
  *

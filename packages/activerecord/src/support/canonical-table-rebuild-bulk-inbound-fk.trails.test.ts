@@ -1,6 +1,6 @@
 /**
  * End-to-end coverage for the PG/MySQL bulk reverse-FK catalog query behind
- * `bulkInboundFkHost`. `canonical-schema.test.ts` pins the seam and the
+ * `bulkInboundFkHost`. `canonical-schema.trails.test.ts` pins the seam and the
  * row -> blocker mapping against a fake adapter, and its live rebuild test
  * builds its own SQLite adapter — so the SQL itself only runs here.
  *

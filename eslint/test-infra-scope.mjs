@@ -90,7 +90,12 @@ export const canonicalLoaderModules = [
 
 /** Each loader module's own unit test (repo-relative), allowed to import it. */
 export const canonicalLoaderSelfTests = [
-  ...canonicalLoaderModules.map((name) => `${activerecordSrcRoot}/support/${name}.test.ts`),
+  // `canonical-schema` / `canonical-table-rebuild` are trails inventions, so
+  // their self-tests carry the `.trails.` marker (RFC 0078); `load-schema-helper`
+  // mirrors Rails' `test/support/load_schema_helper.rb` and keeps the plain name.
+  `${activerecordSrcRoot}/support/canonical-schema.trails.test.ts`,
+  `${activerecordSrcRoot}/support/canonical-table-rebuild.trails.test.ts`,
+  `${activerecordSrcRoot}/support/load-schema-helper.test.ts`,
   // `load-schema-helper` has a second self-test: the trails-only guard on the
   // boot-laid table snapshot the adapter-specific arm feeds.
   `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
@@ -101,5 +106,5 @@ export const canonicalLoaderSelfTests = [
   // …and the pin on `STUBBED_DDL_METHODS`, which drives `loadCanonicalSchema`
   // through a recording proxy to assert the guarded set still covers every
   // adapter member the lay path touches.
-  `${activerecordSrcRoot}/support/stubbed-ddl-methods.test.ts`,
+  `${activerecordSrcRoot}/support/stubbed-ddl-methods.trails.test.ts`,
 ];

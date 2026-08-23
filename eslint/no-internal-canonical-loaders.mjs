@@ -21,8 +21,8 @@
  * to restore a canonical table a sibling file left in a reduced shape on the
  * shared per-worker DB (see its JSDoc). It has no `fixtures({})` equivalent.
  *
- * Allowlist: the loaders' own unit tests (`canonical-schema.test.ts`,
- * `canonical-table-rebuild.test.ts`) import them to test them directly.
+ * Allowlist: the loaders' own unit tests (`canonical-schema.trails.test.ts`,
+ * `canonical-table-rebuild.trails.test.ts`) import them to test them directly.
  * Non-`*.test.ts` internal helpers are already out of scope because this rule
  * is wired to test files only.
  */
@@ -92,7 +92,7 @@ const rule = {
     schema: [],
     messages: {
       banned:
-        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only the loaders' own unit tests — `canonical-schema.test.ts`, `canonical-table-rebuild.test.ts` — may import it, to test it directly.)",
+        "`{{name}}` is internal canonical-schema plumbing — do not import it into a test file. Wire the canonical schema + fixtures through the `fixtures({ ... })` helper instead. (Only the loaders' own unit tests — `canonical-schema.trails.test.ts`, `canonical-table-rebuild.trails.test.ts` — may import it, to test it directly.)",
     },
   },
 
