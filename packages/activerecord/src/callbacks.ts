@@ -11,7 +11,6 @@
 import type { Base } from "./base.js";
 import { included } from "@blazetrails/activesupport";
 import {
-  _registerCallbackOnProto,
   runAllCallbacks,
   snapshotCallbacksOnProto,
   restoreCallbacksOnProto,
@@ -29,51 +28,6 @@ import {
 } from "./attribute-methods/dirty.js";
 
 type ModelCtor = typeof Base;
-
-export type CallbackOptions<TRecord = Base> = {
-  if?: (record: TRecord) => boolean;
-  unless?: (record: TRecord) => boolean;
-  prepend?: boolean;
-};
-
-/**
- * A callback filter: a block, or — as Rails' macros take a Symbol — the NAME
- * of a method on the record, resolved against it at invocation time
- * (ActiveSupport::Callbacks::CallTemplate::MethodCall).
- */
-export type CallbackFilter<TRecord, TReturn = void | Promise<void>> =
-  | ((record: TRecord) => TReturn)
-  | string;
-
-export type ValidationCallbackOptions<TRecord = Base> = CallbackOptions<TRecord> & {
-  on?: "create" | "update" | Array<"create" | "update">;
-};
-
-/**
- * Register a before_validation callback.
- *
- * Mirrors: ActiveRecord::Callbacks.before_validation
- */
-export function beforeValidation<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: ValidationCallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "before", "validation", fn, options);
-}
-
-/**
- * Register an after_validation callback.
- *
- * Mirrors: ActiveRecord::Callbacks.after_validation
- */
-export function afterValidation<T extends ModelCtor>(
-  modelClass: T,
-  fn: CallbackFilter<InstanceType<T>>,
-  options?: ValidationCallbackOptions<InstanceType<T>>,
-): void {
-  registerCallback(modelClass, "after", "validation", fn, options);
-}
 
 /**
  * Mirrors: ActiveRecord::Callbacks' `included do ... end` (callbacks.rb:412-417).
@@ -117,31 +71,6 @@ export async function resetCallbacks(
       restoreCallbacksOnProto((klass as { prototype: object }).prototype, event, snapshot);
     }
   }
-}
-
-type AnyCallbackOptions = CallbackOptions<never> | ValidationCallbackOptions<never>;
-
-function registerCallback(
-  modelClass: ModelCtor,
-  timing: "before" | "after",
-  event: string,
-  fn: ((...args: any[]) => unknown) | string,
-  options?: AnyCallbackOptions,
-): void {
-  const conditions: Record<string, unknown> = {};
-  if (options?.if) conditions.if = options.if;
-  if (options?.unless) conditions.unless = options.unless;
-  if (options?.prepend) conditions.prepend = options.prepend;
-  if (event === "validation" && "on" in (options ?? {})) {
-    conditions.on = (options as ValidationCallbackOptions<never>).on;
-  }
-  _registerCallbackOnProto(
-    (modelClass as unknown as { prototype: object }).prototype,
-    timing,
-    event,
-    fn,
-    conditions,
-  );
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeValidation } from "../../callbacks.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { ActiveRecord } from "../../ar-config.js";
@@ -294,7 +293,7 @@ export class BelongsTo extends SingularAssociation {
     // `_belongsToDefaultsApplied`, so we skip here to keep the block at Rails'
     // exactly-once (belongs_to_association.rb:46-48) — re-running would invoke a
     // block that returned nil a second time.
-    beforeValidation(model, (record: any) => {
+    model.beforeValidation((record: any) => {
       if (record._belongsToDefaultsApplied) return;
       if (typeof record.association !== "function") return;
       const assoc = record.association(reflection.name);
