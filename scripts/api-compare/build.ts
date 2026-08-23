@@ -577,8 +577,6 @@ export function buildExpectations(
     tsClass: string | undefined,
     rubyName: string,
   ) => {
-    // Grouped under the file the declaration is WRITTEN in, which is the file
-    // the migrator opens; `tsFile` rides along as the baseline/reason key.
     const file = declFile ?? tsFile;
     const fileMap = byFile.get(file) ?? byFile.set(file, new Map()).get(file)!;
     const key = expectationKey(tsClass ?? ANY_CLASS, tsName);
