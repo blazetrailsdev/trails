@@ -581,7 +581,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
         if (limitVal !== null || offsetVal !== null) {
           bounds.limitValue = null;
           bounds.offsetValue = null;
-          const ordered = (await Relation.prototype.toArray.call(merged)) as T[];
+          const ordered = await merged;
           const start = offsetVal ?? 0;
           return ordered.slice(start, limitVal == null ? undefined : start + limitVal);
         }

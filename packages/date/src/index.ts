@@ -24,3 +24,4 @@ export {
   type StrftimeSubject,
 } from "./date.js";
 export { Time, resetLocalTimeZoneId } from "./time.js";
+export { tzdataIsdst } from "./tzdata-isdst.js";
