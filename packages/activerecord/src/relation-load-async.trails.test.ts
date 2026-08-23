@@ -214,6 +214,32 @@ describe("Relation#load_async", () => {
     expect(relation.isLoaded).toBe(true);
   });
 
+  it("drains the scheduled query from the loaded? readers", async () => {
+    // relation.rb:1149 — `load_async` sets `@loaded` alongside `@future_result`,
+    // so `size` (relation.rb:353-359), `empty?` (:362-370), `one?` (:399-405)
+    // and `many?` all take their `loaded?` arm, reach `records` -> `load`, and
+    // drain the parked future through `!loaded? || scheduled?` (:1180) rather
+    // than issuing a COUNT/EXISTS of their own.
+    await Topic.create({ title: "sole async topic", author_name: "David" });
+
+    const connection = Base.connection as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    const relation = Topic.where({ title: "sole async topic" }).loadAsync();
+    expect(relation.isLoaded).toBe(true);
+    expect(relation.isScheduled).toBe(true);
+
+    expect(await relation.size()).toBe(1);
+    expect(await relation.isEmpty()).toBe(false);
+    expect(await relation.isOne()).toBe(true);
+    expect(await relation.isMany()).toBe(false);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(relation.isScheduled).toBe(false);
+  });
+
   it("runs the query in the foreground when no executor is configured", async () => {
     restoreExecutor?.();
     restoreExecutor = undefined;

@@ -754,7 +754,10 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
       : [primaryKey];
 
   if (this.loaded) {
-    const result = this._records.map((record) => {
+    // calculations.rb:373 `records.map` — the `records` seam, not `@records`,
+    // so a `load_async` relation (loaded? with its rows still parked,
+    // relation.rb:1149) drains the future here instead of mapping over nothing.
+    const result = (await this.records()).map((record: any) => {
       if (primaryKeyArray.length === 1) {
         return record._readAttribute(primaryKeyArray[0]);
       }

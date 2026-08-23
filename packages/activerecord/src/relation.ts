@@ -584,7 +584,12 @@ export class Relation<T extends Base> {
     // AssociationRelation distinction (three distinct Rails classes) while
     // rendering each one's namespace-qualified Rails constant path.
     const className = (this.constructor as typeof Relation)._railsClassName;
-    if (this.isLoaded) {
+    // `scheduled?` is excluded from Rails' plain `loaded?` (relation.rb:1149
+    // leaves both true at once) because this reader is synchronous: the rows
+    // sit unresolved in `@future_result` and JS cannot block to drain them, so
+    // a scheduled relation renders through the elided arm below rather than
+    // claiming it loaded to zero records.
+    if (this.isLoaded && !this.isScheduled) {
       const max = takeLimit(this.limitValue);
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
@@ -728,13 +733,11 @@ export class Relation<T extends Base> {
     // (relation.rb:1138-1154). Both of those reads need the connection that
     // will run the query, so trails makes them where it is in hand — in
     // `execMainQuery` — and marks the load async here.
-    if (!this.isLoaded && !this._futureResult) {
-      // Rails' `unless loaded?` (relation.rb:1141). trails also guards on the
-      // parked handle so a second `loadAsync()` joins the scheduled query
-      // rather than issuing another one; Rails cannot reach that state because
-      // its `load_async` sets `@loaded` in the same breath (relation.rb:1149),
-      // which trails leaves to `toArray`, whose own `loaded?` guard is what
-      // that assignment exists to satisfy.
+    if (!this.isLoaded) {
+      // Rails' `unless loaded?` (relation.rb:1141) — a second `loadAsync()`
+      // joins the scheduled query rather than issuing another one, because
+      // `@loaded` goes true in the same breath the handle is parked
+      // (relation.rb:1149).
       const result = this.execMainQuery(true);
       // relation.rb:1145-1146 `if result.is_a?(Array) then @records = result` —
       // the contradiction arm hands back rows rather than a handle
@@ -752,6 +755,13 @@ export class Relation<T extends Base> {
         if (result instanceof Promise) void result.catch(() => {});
         this._futureResult = result;
       }
+      // relation.rb:1149 `@loaded = true`. This is what makes the `loaded?`
+      // readers (`size`, `empty?`, `one?`, `many?`) reach `records` -> `load`,
+      // whose `!loaded? || scheduled?` guard (relation.rb:1180) drains the
+      // parked future instead of issuing a second query. The `Result` arm above
+      // already set it through `loadRecords`, as Rails' `@records = result` arm
+      // is followed by the same assignment.
+      this._loaded = true;
     }
     return this;
   }
@@ -995,12 +1005,11 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#load
    */
   async load(): Promise<LoadedRelation<this>> {
-    // relation.rb:1180 `if !loaded? || scheduled?`. The `scheduled?` disjunct
-    // is unreachable here: Rails' `load_async` sets `@loaded` in the same
-    // breath it parks the handle (relation.rb:1149), which is what its `load`
-    // needs the disjunct to see past; trails leaves `_loaded` false so the
-    // first disjunct already carries a scheduled relation into `execQueries`.
-    if (!this.isLoaded) await this.toArray();
+    // relation.rb:1180 `if !loaded? || scheduled?` — `load_async` leaves the
+    // relation `loaded?` with its rows still parked in `@future_result`
+    // (relation.rb:1149), and the `scheduled?` disjunct is what carries it into
+    // `exec_queries` to drain them.
+    if (!this.isLoaded || this.isScheduled) await this.toArray();
     return stripThenable(this);
   }
 
@@ -1013,14 +1022,15 @@ export class Relation<T extends Base> {
     if (this.isNullRelation()) return [];
     // relation.rb:1180's `loaded?` guard reads the seam, not `@loaded`, so a
     // subclass that owns its loadedness (CollectionProxy,
-    // collection_proxy.rb:53) takes this arm correctly. Rails' second
-    // disjunct — `|| scheduled?` — needs no spelling here: `loadAsync` leaves
-    // `_loaded` false, so a scheduled relation already falls through.
+    // collection_proxy.rb:53) takes this arm correctly. The negation of Rails'
+    // second disjunct — `|| scheduled?` — is spelled here: a `load_async`
+    // relation is `loaded?` with its rows still parked, and must fall through
+    // to `exec_queries` to drain them.
     // relation.rb:337-339 `to_ary` is `records.dup`, so the loaded arm reads
     // the `records` seam a CollectionProxy overrides (collection_proxy.rb:
     // 1024-1026), not the ivar. `records` re-enters `load`, whose `loaded?`
     // guard is already satisfied, so it returns without re-entering here.
-    if (this.isLoaded) return [...(await this.records())];
+    if (this.isLoaded && !this.isScheduled) return [...(await this.records())];
     // Run the query inside `with_connection` so the pool releases the connection
     // afterwards instead of holding it permanently. The build / execute path
     // reads the threaded connection via `_conn()` (see {@link withConnection})

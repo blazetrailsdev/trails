@@ -1967,7 +1967,11 @@ function excludingWithCallee(callee: "excluding" | "without") {
     // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
     const combined: unknown[] = [...records];
     for (const relation of relations) {
-      if (relation.isLoaded) combined.push(...relation._records);
+      // `scheduled?` is excluded from the `loaded?` read because `excluding`
+      // is synchronous and cannot drain a parked `@future_result`
+      // (relation.rb:1149): a scheduled relation defers to the marker arm,
+      // which re-queries its ids, rather than contributing zero.
+      if (relation.isLoaded && !relation.isScheduled) combined.push(...relation._records);
       else combined.push(relation);
     }
     return excludingBang.call(this.spawn(), combined);
