@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "instantiate_instance_of",
+    "call": "init_with_attributes",
+    "reason": "persistence.rb:110 `klass.allocate.init_with_attributes(attributes, &block)` — trails' `_instantiate` (base.ts:2827) is the single seat for Rails' allocate + `attributes_builder.build_from_database` + `init_with_attributes` sequence, so this body reaches `initWithAttributes` (core.ts:392) through it rather than calling it. Pre-existing divergence, surfaced only because `instantiateInstanceOf` became exported so `_loadFromSql` could make the Rails-direction call (querying.rb:92). Converges when `_instantiate` is decomposed onto `allocate`/`initWithAttributes`."
+  }
+]

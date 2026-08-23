@@ -2028,15 +2028,18 @@ export class Base extends Model {
   /** @internal */
   static defineDelegatedTypeMethods(
     role: string,
-    types: string[],
-    options: Omit<import("./delegated-type.js").DelegatedTypeOptions, "types">,
-  ): void {
-    _defineDelegatedTypeMethods(
-      this,
-      role,
+    {
       types,
-      options as import("./delegated-type.js").DelegatedTypeOptions,
-    );
+      options,
+    }: {
+      types: string[];
+      options: Omit<import("./delegated-type.js").DelegatedTypeOptions, "types">;
+    },
+  ): void {
+    _defineDelegatedTypeMethods(this, role, {
+      types,
+      options: options as import("./delegated-type.js").DelegatedTypeOptions,
+    });
   }
 
   // -- Store --

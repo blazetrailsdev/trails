@@ -1948,7 +1948,7 @@ export function _raiseRecordNotTouchedError(): never {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-function instantiateInstanceOf(
+export function instantiateInstanceOf(
   klass: {
     _instantiate(
       attrs: Record<string, unknown>,

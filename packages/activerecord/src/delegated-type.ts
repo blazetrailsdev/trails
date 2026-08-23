@@ -97,11 +97,49 @@ export function delegatedType(
   }
   (modelClass as any)._delegatedTypes.set(role, config);
 
+  // delegated_type.rb:233 `define_delegated_type_methods role, types: types, options: options`
+  defineDelegatedTypeMethods(modelClass, role, { types: options.types, options });
+}
+
+/**
+ * Get the delegated type configuration for a model class and role.
+ */
+export function getDelegatedTypeConfig(
+  modelClass: typeof Base,
+  role: string,
+): DelegatedTypeOptions | undefined {
+  return (modelClass as any)._delegatedTypes?.get(role);
+}
+
+/**
+ * Define all accessor methods for a delegated type role on the given model class.
+ * Called by `delegatedType`, which is the public entry point.
+ *
+ * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
+ *
+ * @internal
+ *
+ * @missingRailsCall define_method — PERMANENT: delegated_type.rb:246-274
+ *   `define_method "#{role}_class"` and its siblings — Ruby's `define_method` is
+ *   `Object.defineProperty` on the prototype in JS; there is no `defineMethod`
+ *   to call. Same language shortcoming as the `autosave-association.ts
+ *   define_non_cyclic_method -> define_method` row.
+ */
+export function defineDelegatedTypeMethods(
+  modelClass: typeof Base,
+  role: string,
+  { types, options }: { types: string[]; options: DelegatedTypeOptions },
+): void {
+  // delegated_type.rb:237-239
+  const primaryKey = options.primaryKey ?? "id";
+  const foreignType = options.foreignType ?? `${role}_type`;
+  const foreignKey = options.foreignKey ?? `${role}_id`;
+
   // Class method: Entry.entryableTypes → ["Message", "Comment"]
   // Mirrors Rails' define_singleton_method("#{role}_types") { types.map(&:to_s) }
   Object.defineProperty(modelClass, `${role}Types`, {
     get() {
-      return options.types.map(String);
+      return types.map(String);
     },
     configurable: true,
   });
@@ -164,7 +202,7 @@ export function delegatedType(
   // Rails: scope_name = type.tableize.tr("/", "_"); singular = scope_name.singularize
   // Namespaced types like "Access::NoticeMessage" tableize to "access/notice_messages",
   // then "/" → "_" gives "access_notice_messages" (a valid scope/method name).
-  for (const typeName of options.types) {
+  for (const typeName of types) {
     const scopeSnake = tableize(typeName).replace(/\//g, "_");
     const singularSnake = singularize(scopeSnake);
     const scopeName = camelize(scopeSnake, false);
@@ -182,14 +220,8 @@ export function delegatedType(
       configurable: true,
     });
 
-    // Scope: Model.messages(), Model.accessNoticeMessages()
-    Object.defineProperty(modelClass, scopeName, {
-      value: function (this: typeof Base) {
-        return this.where({ [foreignType]: typeName });
-      },
-      writable: true,
-      configurable: true,
-    });
+    // delegated_type.rb:263 `scope scope_name, -> { where(role_type => type) }`
+    (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [foreignType]: typeName }));
 
     // Accessor: entry.message → returns the associated record via the
     // polymorphic belongs_to reader when type matches, otherwise null.
@@ -213,31 +245,4 @@ export function delegatedType(
       configurable: true,
     });
   }
-}
-
-/**
- * Get the delegated type configuration for a model class and role.
- */
-export function getDelegatedTypeConfig(
-  modelClass: typeof Base,
-  role: string,
-): DelegatedTypeOptions | undefined {
-  return (modelClass as any)._delegatedTypes?.get(role);
-}
-
-/**
- * Define all accessor methods for a delegated type role on the given model class.
- * Called internally by `delegatedType`; the public entry point is `delegatedType`.
- *
- * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
- *
- * @internal
- */
-export function defineDelegatedTypeMethods(
-  modelClass: typeof Base,
-  role: string,
-  types: string[],
-  options: DelegatedTypeOptions,
-): void {
-  delegatedType(modelClass, role, { ...options, types });
 }

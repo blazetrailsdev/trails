@@ -236,17 +236,17 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
 describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("dispatches to the correct STI subclass when inheritance column is present", () => {
     const rows = [{ id: 1, type: Reply.name, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, rows);
+    const records = _loadFromSql.call(Topic as typeof Base, Result.fromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Reply);
   });
 
   it("instantiates as the base class when inheritance column is absent from result set", () => {
     const rows = [{ id: 1, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, rows);
+    const records = _loadFromSql.call(Topic as typeof Base, Result.fromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Topic);
   });
 
   it("returns empty array for empty result set", () => {
-    expect(_loadFromSql.call(Topic as typeof Base, [])).toEqual([]);
+    expect(_loadFromSql.call(Topic as typeof Base, Result.fromRowHashes([]))).toEqual([]);
   });
 });
