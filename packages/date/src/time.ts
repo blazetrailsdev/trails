@@ -794,6 +794,17 @@ export class Time {
   }
 
   /**
+   * Ruby `Time#getlocal(utc_offset = nil)` (`ruby/time.c` `time_getlocaltime`),
+   * the same instant read in the local zone, or at `utc_offset` when one is
+   * given — `Time.utc(...).getlocal(0).utc_offset` is `0` and
+   * `.getlocal("+05:00")` moves the wall clock five hours east. Like
+   * {@link Time#getutc} it answers a copy, because trails' `Time` is immutable.
+   */
+  getlocal(utcOffset: number | string | null = null): Time {
+    return Time.#atInstant(this.#instant, utcOffset);
+  }
+
+  /**
    * Ruby `Time#to_s` (`ruby/time.c` `time_to_s`), which is `#inspect` without
    * the sub-second: `"%Y-%m-%d %H:%M:%S UTC"` for a UTC time and
    * `"%Y-%m-%d %H:%M:%S %z"` for every other, the C writing the two formats
