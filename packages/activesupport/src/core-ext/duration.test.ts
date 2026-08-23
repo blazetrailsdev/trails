@@ -498,7 +498,9 @@ describe("DurationTest", () => {
       "+P1YT",
       "P1.5YT",
       "P1,5YT",
-      "-P-1Y", // mixed overall sign + per-component sign would double-negate
+      "P1.5Y0.5M",
+      "P1.5Y1M",
+      "P1.5MT10.5S",
     ];
     for (const pattern of invalid) {
       expect(() => Duration.parse(pattern)).toThrow();
@@ -514,7 +516,16 @@ describe("DurationTest", () => {
 
   it("iso8601 output", () => {
     expect(Duration.years(1).iso8601()).toBe("P1Y");
-    expect(Duration.weeks(1).iso8601()).toBe("P7D");
+    expect(Duration.weeks(1).iso8601()).toBe("P1W");
+    expect(Duration.weeks(4).iso8601()).toBe("P4W");
+    expect(Duration.years(1).plus(Duration.weeks(1)).iso8601()).toBe("P1Y7D");
+    expect(Duration.years(1).plus(Duration.months(1)).plus(Duration.weeks(3)).iso8601()).toBe(
+      "P1Y1M21D",
+    );
+    expect(Duration.years(-1).minus(Duration.days(1)).iso8601()).toBe("P-1Y-1D");
+    expect(Duration.seconds(1.4).iso8601()).toBe("PT1.4S");
+    expect(Duration.seconds(-0.2).iso8601()).toBe("PT-0.2S");
+    expect(Duration.seconds(1000000).iso8601()).toBe("PT1000000S");
     expect(Duration.seconds(1).iso8601()).toBe("PT1S");
     expect(Duration.minutes(0).iso8601()).toBe("PT0S");
     expect(Duration.years(1).plus(Duration.months(1)).iso8601()).toBe("P1Y1M");
@@ -529,6 +540,10 @@ describe("DurationTest", () => {
     expect(d.iso8601({ precision: 0 })).toBe("P1Y1MT9S");
     expect(d.iso8601({ precision: 1 })).toBe("P1Y1MT8.6S");
     expect(d.iso8601({ precision: 2 })).toBe("P1Y1MT8.55S");
+    expect(d.iso8601({ precision: 3 })).toBe("P1Y1MT8.550S");
+    expect(Duration.seconds(1).iso8601({ precision: 2 })).toBe("PT1.00S");
+    expect(Duration.seconds(1.4).iso8601({ precision: 0 })).toBe("PT1S");
+    expect(Duration.seconds(1.4).iso8601({ precision: 5 })).toBe("PT1.40000S");
   });
 
   it("iso8601 output and reparsing", () => {

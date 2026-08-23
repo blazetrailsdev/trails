@@ -14,6 +14,8 @@ import { inspect } from "./core-ext/object/inspect.js";
 import { ArgumentError } from "./hash-utils.js";
 import { isEmpty } from "./ruby-empty.js";
 import type { TimeWithZone } from "./time-with-zone.js";
+import { ISO8601Parser } from "./duration/iso8601-parser.js";
+import { ISO8601Serializer } from "./duration/iso8601-serializer.js";
 
 export type DurationParts = {
   years: number;
@@ -27,8 +29,8 @@ export type DurationParts = {
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
-const SECONDS_PER_DAY = 86400;
-const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
+export const SECONDS_PER_DAY = 86400;
+export const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
 const SECONDS_PER_MONTH = 2629746; // 1/12 of a gregorian year (duration.rb:117)
 const SECONDS_PER_YEAR = 31556952; // length of a gregorian year (duration.rb:118)
 
@@ -539,102 +541,30 @@ export class Duration {
     );
   }
 
-  // ISO 8601 output
-  iso8601(options: { precision?: number | null } = {}): string {
-    const { years, months, weeks, days, hours, minutes, seconds } = this.parts;
-
-    let datePart = "P";
-    if (years !== 0) datePart += `${years}Y`;
-    if (months !== 0) datePart += `${months}M`;
-    // Rails converts weeks to days in ISO output
-    const totalDays = weeks * 7 + days;
-    if (totalDays !== 0) datePart += `${totalDays}D`;
-
-    let timePart = "";
-    if (hours !== 0) timePart += `${hours}H`;
-    if (minutes !== 0) timePart += `${minutes}M`;
-
-    const totalSeconds = seconds;
-    if (totalSeconds !== 0 || (datePart === "P" && timePart === "")) {
-      const precision = options.precision;
-      let secStr: string;
-      if (precision == null) {
-        secStr = Number.isInteger(totalSeconds) ? String(totalSeconds) : String(totalSeconds);
-      } else {
-        secStr = totalSeconds.toFixed(precision);
-      }
-      timePart += `${secStr}S`;
-    }
-
-    if (timePart !== "") {
-      return datePart + "T" + timePart;
-    }
-    if (datePart === "P") return "PT0S";
-    return datePart;
+  /**
+   * Build ISO 8601 Duration string for this duration. The `precision`
+   * parameter can be used to limit seconds' precision of duration.
+   *
+   * Mirrors: ActiveSupport::Duration#iso8601 (duration.rb:471-475).
+   */
+  iso8601({ precision = null }: { precision?: number | null } = {}): string {
+    return new ISO8601Serializer(this, { precision }).serialize();
   }
 
-  // ISO 8601 parsing
-  static parse(iso: string): Duration {
-    if (
-      !iso ||
-      iso === "P" ||
-      iso === "PT" ||
-      iso === "-P" ||
-      iso === "-PT" ||
-      iso === "+P" ||
-      iso === "+PT" ||
-      iso === "T" ||
-      /^[~.]/.test(iso)
-    ) {
-      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
-    }
-
-    // A trailing `T` (e.g. "P1YT", "P1.5YT") is invalid: the time designator
-    // requires at least one of H/M/S after it. The main regex's optional time
-    // group would otherwise accept these.
-    if (iso.endsWith("T")) {
-      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
-    }
-
-    const moreInvalidPatterns = [
-      /^[+-]?PW$/,
-      /^[+-]?P-?\d+Y-?\d+W/,
-      /^[+-]?P-?\d+\.\d+Y-?\d+\.\d+M/,
-      /^[+-]?P-?\d+\.\d+MT-?\d+\.\d+S/,
-    ];
-    for (const p of moreInvalidPatterns) {
-      if (p.test(iso)) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
-    }
-
-    // PG's intervalstyle=iso_8601 emits per-component signs (e.g. "P-1Y-2D"),
-    // so allow an optional leading `-` on each component in addition to the
-    // single overall sign Rails uses.
-    const pattern =
-      /^([+-])?P(?:(-?\d+(?:[.,]\d+)?)Y)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)W)?(?:(-?\d+(?:[.,]\d+)?)D)?(?:T(?:(-?\d+(?:[.,]\d+)?)H)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)S)?)?$/;
-
-    const match = pattern.exec(iso.replace(/,/g, "."));
-    if (!match) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
-
-    // Reject mixing the overall `-` sign with any per-component `-`: combining
-    // them would silently double-negate (e.g. "-P-1Y" parsing to +1Y).
-    if (match[1] === "-" && match.slice(2).some((c) => c?.startsWith("-"))) {
-      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
-    }
-
-    const sign = match[1] === "-" ? -1 : 1;
-    const parse = (s: string | undefined) => (s ? parseFloat(s) * sign : 0);
-
-    const parts = {
-      years: parse(match[2]),
-      months: parse(match[3]),
-      weeks: parse(match[4]),
-      days: parse(match[5]),
-      hours: parse(match[6]),
-      minutes: parse(match[7]),
-      seconds: parse(match[8]),
-    };
-    const value = Duration.calculateTotalSeconds(parts);
-    return new Duration(value, parts);
+  /**
+   * Creates a new Duration from string formatted according to ISO 8601
+   * Duration.
+   *
+   * See {ISO 8601}[https://en.wikipedia.org/wiki/ISO_8601#Durations] for more
+   * information. This method allows negative parts to be present in pattern.
+   * If invalid string is provided, it will raise
+   * `ActiveSupport::Duration::ISO8601Parser::ParsingError`.
+   *
+   * Mirrors: ActiveSupport::Duration.parse (duration.rb:139-147).
+   */
+  static parse(iso8601duration: string): Duration {
+    const parts = new ISO8601Parser(iso8601duration).parseBang();
+    return new Duration(Duration.calculateTotalSeconds(parts), parts);
   }
 
   /**
