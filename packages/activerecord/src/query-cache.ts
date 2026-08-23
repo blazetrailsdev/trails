@@ -134,10 +134,13 @@ export const ClassMethods = {
     this: typeof Base,
     block: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
-  ): Promise<T> {
+  ): T | Promise<T> {
     if (this.connectedQ() || !this.configurations().empty) {
       return this.connectionPool().disableQueryCache(block, options);
     }
-    return Promise.resolve(block());
+    // Ruby returns the block's value; resolving it here would adopt a pending
+    // FutureResult, which `skip_query_cache_if_necessary` (relation.rb:
+    // 1466-1471) hands back untouched.
+    return block();
   },
 };

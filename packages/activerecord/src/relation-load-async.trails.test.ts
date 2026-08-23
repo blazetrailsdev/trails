@@ -135,6 +135,57 @@ describe("Relation#load_async", () => {
     await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
   });
 
+  itIfSupports(
+    "concurrent_connections",
+    "reset cancels the scheduled query of a skip_query_cache! relation",
+    async () => {
+      // `skip_query_cache_if_necessary` yields and hands the block's value
+      // back untouched (relation.rb:1466-1471), so the `uncached` arm parks the
+      // same pending handle the plain arm does.
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: unknown): void;
+      };
+      const scheduled: FutureResult[] = [];
+      vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult as FutureResult);
+      });
+
+      const relation = Topic.all().skipQueryCacheBang().loadAsync();
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+
+      relation.reset();
+
+      expect(scheduled[0].pending()).toBe(false);
+      await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+    },
+  );
+
+  itIfSupports(
+    "concurrent_connections",
+    "reset cancels an eager-loaded relation's scheduled query",
+    async () => {
+      // `apply_join_dependency` yields and hands the block's value back
+      // (finder_methods.rb:457-481), so the eager arm's
+      // `select_all(relation.arel, "SQL", async: async)` (relation.rb:1436)
+      // parks a pending handle too.
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: unknown): void;
+      };
+      const scheduled: FutureResult[] = [];
+      vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult as FutureResult);
+      });
+
+      const relation = Topic.eagerLoad(":replies").loadAsync();
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+
+      relation.reset();
+
+      expect(scheduled[0].pending()).toBe(false);
+      await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+    },
+  );
+
   it("issues an eager-loaded relation's join query with async on", async () => {
     // Rails' exec_main_query forwards `async:` to its eager_loading? arm too —
     // `c.select_all(relation.arel, "SQL", async: async)` (relation.rb:1436).

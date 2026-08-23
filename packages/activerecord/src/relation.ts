@@ -543,13 +543,13 @@ export class Relation<T extends Base> {
    * defines `then`, so an `async` boundary would resolve the handle into rows
    * and leave nothing to `cancel`.
    *
-   * The two remaining `Promise<Result>` arms are trails' own async residue —
-   * the eager-loading arm goes through the async `applyJoinDependency`, and
-   * `skipQueryCacheIfNecessary`'s `uncached` arm returns a promise where Ruby's
-   * `disable_query_cache` returns the block's value — so `reset` narrows before
-   * cancelling.
+   * The one `Promise<Result>` arm left is `apply_join_dependency`'s
+   * `distinct_relation_for_primary_key` rewrite (finder_methods.rb:465-475),
+   * which ISSUES a query before yielding. Ruby blocks on it and still yields
+   * the handle; JS cannot block, so that arm — and only that arm — settles
+   * through a promise, and `reset` narrows before cancelling.
    */
-  private _futureResult?: FutureResult | Complete | Result | Promise<Result>;
+  private _futureResult?: FutureResult | Complete | Promise<Result>;
   /**
    * Monotonic token bumped on reset()/reload() so an in-flight toArray()
    * that started before the reset can detect it lost the race and skip
@@ -759,14 +759,23 @@ export class Relation<T extends Base> {
       // its `load_async` sets `@loaded` in the same breath (relation.rb:1149),
       // which trails leaves to `toArray`, whose own `loaded?` guard is what
       // that assignment exists to satisfy.
-      const futureResult = this.execMainQuery(true);
-      // A FutureResult keeps its failure in `@error` and re-raises it from
-      // `result` (future_result.rb:120-125), so only the promise arms need a
-      // no-op rejection handler to keep an unawaited relation from surfacing an
-      // unhandled rejection. The stored value still carries the failure to
-      // `execQueries` through a separate chain.
-      if (futureResult instanceof Promise) void futureResult.catch(() => {});
-      this._futureResult = futureResult;
+      const result = this.execMainQuery(true);
+      // relation.rb:1145-1146 `if result.is_a?(Array) then @records = result` —
+      // the contradiction arm hands back rows rather than a handle
+      // (relation.rb:1433), and Rails parks only the handle. trails' rows are a
+      // `Result`, so they go through `instantiateRecords` first; Rails can
+      // assign them straight across because that arm is only ever `[].freeze`.
+      if (result instanceof Result) {
+        this.loadRecords(this.instantiateRecords(result));
+      } else {
+        // A FutureResult keeps its failure in `@error` and re-raises it from
+        // `result` (future_result.rb:120-125); only the promise arm needs a
+        // no-op rejection handler to keep an unawaited relation from surfacing
+        // an unhandled rejection. It still carries the failure to `execQueries`
+        // through a separate chain.
+        if (result instanceof Promise) void result.catch(() => {});
+        this._futureResult = result;
+      }
     }
     return this;
   }
@@ -1010,7 +1019,12 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#load
    */
   async load(): Promise<LoadedRelation<this>> {
-    await this.toArray();
+    // relation.rb:1180 `if !loaded? || scheduled?`. The `scheduled?` disjunct
+    // is unreachable here: Rails' `load_async` sets `@loaded` in the same
+    // breath it parks the handle (relation.rb:1149), which is what its `load`
+    // needs the disjunct to see past; trails leaves `_loaded` false so the
+    // first disjunct already carries a scheduled relation into `execQueries`.
+    if (!this.isLoaded) await this.toArray();
     return stripThenable(this);
   }
 
@@ -1026,7 +1040,11 @@ export class Relation<T extends Base> {
     // collection_proxy.rb:53) takes this arm correctly. Rails' second
     // disjunct — `|| scheduled?` — needs no spelling here: `loadAsync` leaves
     // `_loaded` false, so a scheduled relation already falls through.
-    if (this.isLoaded) return [...this._records];
+    // relation.rb:337-339 `to_ary` is `records.dup`, so the loaded arm reads
+    // the `records` seam a CollectionProxy overrides (collection_proxy.rb:
+    // 1024-1026), not the ivar. `records` re-enters `load`, whose `loaded?`
+    // guard is already satisfied, so it returns without re-entering here.
+    if (this.isLoaded) return [...(await this.records())];
     // Run the query inside `with_connection` so the pool releases the connection
     // afterwards instead of holding it permanently. The build / execute path
     // reads the threaded connection via `_conn()` (see {@link withConnection})
@@ -1044,7 +1062,9 @@ export class Relation<T extends Base> {
     // without clobbering the fresh state.
     if (token !== this._loadToken) return records;
     this.loadRecords(records);
-    return [...this._records];
+    // relation.rb:339 `records.dup` — `loadRecords` has satisfied the `loaded?`
+    // guard, so this is the seam read, not a re-entry.
+    return [...(await this.records())];
   }
 
   /**
@@ -1158,7 +1178,10 @@ export class Relation<T extends Base> {
       // (relation.rb:1434) exactly as `exec_queries` does for its preload list.
       if (this.isEagerLoading) {
         // Mirrors: relation.rb:1435-1446.
-        return this.applyJoinDependency({}, async (relation, joinDependency) => {
+        // The block is deliberately not `async` either: it returns
+        // `select_all(..., async: async)`'s pending handle (relation.rb:1436),
+        // which an `async` arrow would adopt and resolve into rows.
+        return this.applyJoinDependency({}, (relation, joinDependency) => {
           if (relation.isNullRelation()) return Result.empty();
           joinDependency.applyColumnAliases(relation);
           this._joinDependency = joinDependency;
@@ -1703,17 +1726,20 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::FinderMethods#apply_join_dependency
    * (finder_methods.rb:457-481).
    *
-   * Only the block form Rails also offers is provided: `distinct_relation_for_primary_key`
-   * EXECUTES a query, so this method is async, and a trails `Relation` is
-   * thenable — returning one out of a `Promise` would run it and resolve to its
-   * records. Callers that want Rails' `relation = apply_join_dependency` shape
-   * capture the yielded relation from the block.
+   * Only the block form Rails also offers is provided: a trails `Relation` is
+   * thenable, so returning one out of a `Promise` would run it and resolve to
+   * its records. Callers that want Rails' `relation = apply_join_dependency`
+   * shape capture the yielded relation from the block.
+   *
+   * NOT an `async` method: Ruby yields to the block and hands its value back
+   * untouched, and `exec_main_query`'s eager arm yields a pending FutureResult
+   * (relation.rb:1436) that an `async` boundary would adopt and resolve.
    * @internal
    */
-  async applyJoinDependency<R>(
+  applyJoinDependency<R>(
     { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
     block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
-  ): Promise<R> {
+  ): R | Promise<R> {
     const joinDependency = QueryMethodBangs.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
@@ -1746,15 +1772,22 @@ export class Relation<T extends Base> {
       // `distinct_relation_for_primary_key` performs is an in-place mutation of
       // the relation it is handed, and a thenable `Relation` cannot be returned
       // through a `Promise`, so it mutates `relation` and returns nothing here.
-      await this.skipQueryCacheIfNecessary(() =>
-        this.model.withConnection((c: DatabaseAdapter) =>
-          (
-            c as unknown as {
-              distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
-            }
-          ).distinctRelationForPrimaryKey(relation),
+      // The ONE arm that cannot hand the block's value straight back: Ruby
+      // blocks on this query (finder_methods.rb:465-475) and still yields
+      // afterwards, so a JS caller has to await it first. A FutureResult
+      // yielded past this point is therefore adopted — the residual promise
+      // arm `_futureResult` documents.
+      return Promise.resolve(
+        this.skipQueryCacheIfNecessary(() =>
+          this.model.withConnection((c: DatabaseAdapter) =>
+            (
+              c as unknown as {
+                distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
+              }
+            ).distinctRelationForPrimaryKey(relation),
+          ),
         ),
-      );
+      ).then(() => block(relation, joinDependency));
     }
 
     return block(relation, joinDependency);
@@ -3156,6 +3189,11 @@ export class Relation<T extends Base> {
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
+  /**
+   * Mirrors: ActiveRecord::Relation#skip_query_cache_if_necessary
+   * (relation.rb:1466-1471) — `uncached(&block)` or a bare `yield`, each
+   * handing the block's value back untouched.
+   */
   private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
     if (this.skipQueryCacheValue) {
       return this.model.uncached(block);
