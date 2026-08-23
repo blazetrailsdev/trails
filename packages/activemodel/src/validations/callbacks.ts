@@ -1,4 +1,5 @@
-import type { CallbackFn, CallbackConditions, CallbackObject } from "../callbacks.js";
+import type { CallbackConditions, CallbackObject } from "../callbacks.js";
+import type { Model } from "../model.js";
 
 /**
  * Validation callbacks — before_validation / after_validation hooks.
@@ -18,9 +19,9 @@ import type { CallbackFn, CallbackConditions, CallbackObject } from "../callback
  */
 export const ClassMethods = {
   /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#before_validation (callbacks.rb:55-61). */
-  beforeValidation(
-    this: SetCallbackHost,
-    fn: CallbackFn | CallbackObject | string,
+  beforeValidation<T extends typeof Model>(
+    this: T,
+    fn: ValidationCallbackFilter<T>,
     options: ValidationCallbackOptions = {},
   ): void {
     setOptionsForCallback(options);
@@ -29,9 +30,9 @@ export const ClassMethods = {
   },
 
   /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#after_validation (callbacks.rb:88-96). */
-  afterValidation(
-    this: SetCallbackHost,
-    fn: CallbackFn | CallbackObject | string,
+  afterValidation<T extends typeof Model>(
+    this: T,
+    fn: ValidationCallbackFilter<T>,
     options: ValidationCallbackOptions = {},
   ): void {
     options = { ...options };
@@ -43,15 +44,15 @@ export const ClassMethods = {
   },
 };
 
-/** @internal Host shape the two macros need: Rails reaches `set_callback` through `self`. */
-interface SetCallbackHost {
-  setCallback(
-    event: string,
-    timing: "before" | "after",
-    fn: CallbackFn | CallbackObject | string,
-    options?: CallbackConditions,
-  ): void;
-}
+/**
+ * What the two macros take as a filter. Rails' `*args` reaches `set_callback`,
+ * so a Symbol method name is accepted alongside a block (callbacks.rb:43, :73)
+ * — and a Ruby Symbol is a colon-prefixed string in trails.
+ */
+export type ValidationCallbackFilter<T extends typeof Model> =
+  | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+  | CallbackObject
+  | string;
 
 export interface CallbacksInstanceMethods {
   /** @internal Rails-private helper. */

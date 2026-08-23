@@ -84,7 +84,11 @@ import {
   NoMethodError,
 } from "./attribute-assignment.js";
 import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
-import { ClassMethods as ValidationsCallbacksClassMethods } from "./validations/callbacks.js";
+import {
+  ClassMethods as ValidationsCallbacksClassMethods,
+  type ValidationCallbackFilter,
+  type ValidationCallbackOptions,
+} from "./validations/callbacks.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";
 import { LengthValidator } from "./validations/length.js";
@@ -755,12 +759,16 @@ export class Model {
   // The `ActiveModel::Validations::Callbacks::ClassMethods` half
   // (validations/callbacks.rb:32-110), mixed on by the `extend(Model, …)` at
   // the bottom of this file. Declared here only for their types.
-  declare static beforeValidation: Extended<
-    typeof ValidationsCallbacksClassMethods
-  >["beforeValidation"];
-  declare static afterValidation: Extended<
-    typeof ValidationsCallbacksClassMethods
-  >["afterValidation"];
+  declare static beforeValidation: <T extends typeof Model>(
+    this: T,
+    fn: ValidationCallbackFilter<T>,
+    options?: ValidationCallbackOptions,
+  ) => void;
+  declare static afterValidation: <T extends typeof Model>(
+    this: T,
+    fn: ValidationCallbackFilter<T>,
+    options?: ValidationCallbackOptions,
+  ) => void;
 
   // ---------------------------------------------------------------------------
   // Generic callback registration — Rails `set_callback` / `skip_callback` /
