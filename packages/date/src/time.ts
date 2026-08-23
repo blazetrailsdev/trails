@@ -556,62 +556,44 @@ export class Time {
    * the `Time.local` alias, which builds in the LOCAL zone. As with
    * {@link Time.utc}, the seventh positional is the microsecond, and passing it
    * truncates `sec` to a whole second.
+   *
+   * MRI's ten-argument form (`time.c` `time_arg`: `if (argc == 10)`) is the
+   * second overload — the `Time#to_a` splat, `[sec, min, hour, day, month,
+   * year, wday, yday, isdst, zone]`, the components in reverse. `wday`, `yday`
+   * and `zone` are read as `Qnil` whatever they hold, and `isdst` picks the
+   * occurrence of a wall clock a DST fall-back repeats: under
+   * `TZ=America/New_York`, `Time.local(0, 30, 1, 2, 11, 2008, nil, nil, true,
+   * nil)` is `-0400` and the same call with `false` is `-0500`.
    */
   static mktime(
-    year: number | string,
-    month?: number | string | null,
-    day?: number | string | null,
-    hour?: number | string | null,
-    min?: number | string | null,
-    sec?: number | string | Rational | null,
-    usec?: number,
-  ): Time;
-  /**
-   * MRI's ten-argument form (`time.c` `time_arg`: `if (argc == 10)`), which is
-   * the `Time#to_a` splat — `[sec, min, hour, day, month, year, wday, yday,
-   * isdst, zone]`, the components in reverse. `wday`, `yday` and `zone` are
-   * read as `Qnil` whatever they hold, and `isdst` picks the occurrence of a
-   * wall clock a DST fall-back repeats: under `TZ=America/New_York`,
-   * `Time.local(0, 30, 1, 2, 11, 2008, nil, nil, true, nil)` is `-0400` and the
-   * same call with `false` is `-0500`.
-   */
-  static mktime(
-    sec: number | string | Rational | null,
-    min: number | string | null,
-    hour: number | string | null,
-    day: number | string | null,
-    month: number | string | null,
-    year: number | string,
-    wday: null,
-    yday: null,
-    isdst: boolean | null,
-    zone: null,
-  ): Time;
-  static mktime(...args: unknown[]): Time {
+    ...args:
+      | [
+          year: number | string,
+          month?: number | string | null,
+          day?: number | string | null,
+          hour?: number | string | null,
+          min?: number | string | null,
+          sec?: number | string | Rational | null,
+          usec?: number,
+        ]
+      | [
+          sec: number | string | Rational | null,
+          min: number | string | null,
+          hour: number | string | null,
+          day: number | string | null,
+          month: number | string | null,
+          year: number | string,
+          wday: null,
+          yday: null,
+          isdst: boolean | null,
+          zone: null,
+        ]
+  ): Time {
     if (args.length === 10) {
-      const [sec, min, hour, day, month, year, , , isdst] = args as [
-        number | string | Rational | null,
-        number | string | null,
-        number | string | null,
-        number | string | null,
-        number | string | null,
-        number | string,
-        null,
-        null,
-        boolean | null,
-        null,
-      ];
+      const [sec, min, hour, day, month, year, , , isdst] = args;
       return Time.#mktimeIsdst(Time.mktime(year, month, day, hour, min, sec), isdst);
     }
-    const [year, month, day, hour, min, sec, usec] = args as [
-      number | string,
-      (number | string | null)?,
-      (number | string | null)?,
-      (number | string | null)?,
-      (number | string | null)?,
-      (number | string | Rational | null)?,
-      number?,
-    ];
+    const [year, month, day, hour, min, sec, usec] = args;
     return new Time(
       year,
       month ?? 1,
@@ -645,29 +627,8 @@ export class Time {
    * (`time.c`: both names bind `time_s_mktime`), so it takes the same
    * positionals — both forms — and builds in the LOCAL zone too.
    */
-  static local(
-    year: number | string,
-    month?: number | string | null,
-    day?: number | string | null,
-    hour?: number | string | null,
-    min?: number | string | null,
-    sec?: number | string | Rational | null,
-    usec?: number,
-  ): Time;
-  static local(
-    sec: number | string | Rational | null,
-    min: number | string | null,
-    hour: number | string | null,
-    day: number | string | null,
-    month: number | string | null,
-    year: number | string,
-    wday: null,
-    yday: null,
-    isdst: boolean | null,
-    zone: null,
-  ): Time;
-  static local(...args: unknown[]): Time {
-    return (Time.mktime as (...args: unknown[]) => Time)(...args);
+  static local(...args: Parameters<typeof Time.mktime>): Time {
+    return Time.mktime(...args);
   }
 
   /**
