@@ -6,39 +6,16 @@
  * idiom `core-ext/object/blank.ts` uses for `NilClass`/`String`/`Time`.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { actsLikeDate, actsLikeTime } from "@blazetrails/date";
 
 /**
- * The receivers that stand in for Ruby's `Time` in this port, so
- * `actsLike(x, "time")` answers `true` for them the way
- * `core_ext/time/acts_like.rb:5-9` (`class Time; def acts_like_time?; true`)
- * and `core_ext/date_time/acts_like.rb:11-13` do for `Time` and `DateTime`.
- * TypeScript cannot reopen `Date` or the `Temporal` types to hang a marker
- * method on them, so the arm answers for them here instead.
+ * A JS `Date` is what this port's `Time` arm receives at its boundaries — the
+ * one Ruby-`Time`-shaped value `@blazetrails/date` does not construct, so its
+ * `actsLikeTime` cannot answer for it and the marker is answered here.
  */
-function isRubyTime(self: unknown): boolean {
-  return (
-    // boundary: a JS `Date` is what this port's `Time` arm receives, and this
-    // predicate is keyed on being one.
-    self instanceof Date ||
-    self instanceof Temporal.Instant ||
-    self instanceof Temporal.PlainDateTime ||
-    self instanceof Temporal.ZonedDateTime
-  );
-}
-
-/**
- * The receivers that stand in for Ruby's `Date` — `core_ext/date/acts_like.rb:5-9`
- * and `core_ext/date_time/acts_like.rb:6-8`. A `Temporal.Instant` is a moment
- * with no calendar day of its own, so it is not one, exactly as Ruby's `Time`
- * is not a `Date`.
- */
-function isRubyDate(self: unknown): boolean {
-  return (
-    self instanceof Temporal.PlainDate ||
-    self instanceof Temporal.PlainDateTime ||
-    self instanceof Temporal.ZonedDateTime
-  );
+function isJsDate(self: unknown): boolean {
+  // boundary: this predicate is keyed on being a JS `Date`.
+  return self instanceof Date;
 }
 
 export class Object {
@@ -52,9 +29,9 @@ export class Object {
   static actsLike(self: unknown, duck: string): boolean {
     switch (duck) {
       case "time":
-        return isRubyTime(self) || respondTo.call(self, "acts_like_time?");
+        return actsLikeTime(self) || isJsDate(self) || respondTo.call(self, "acts_like_time?");
       case "date":
-        return isRubyDate(self) || respondTo.call(self, "acts_like_date?");
+        return actsLikeDate(self) || respondTo.call(self, "acts_like_date?");
       case "string":
         return respondTo.call(self, "acts_like_string?");
       default:

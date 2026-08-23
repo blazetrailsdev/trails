@@ -10,6 +10,7 @@
  * `AbstractAdapter#quote` into its `can't quote` TypeError.
  */
 export { Temporal } from "@js-temporal/polyfill";
+export { actsLikeDate, actsLikeTime } from "./acts-like.js";
 export {
   ArgumentError,
   Date,
