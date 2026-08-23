@@ -153,7 +153,10 @@ export async function savepoint<T>(
 
 type CallbackFn = (...args: any[]) => any;
 type CallbackOptions = {
-  on?: TransactionAction | TransactionAction[];
+  // Rails takes any Symbol here and rejects a bad one at runtime, in
+  // `assert_valid_transaction_action` (transactions.rb:344-348) — so the type
+  // must stay wide enough for that raise to be reachable.
+  on?: string | string[];
   if?: CallbackFn | CallbackFn[];
   unless?: CallbackFn | CallbackFn[];
   prepend?: boolean;

@@ -37,7 +37,6 @@ import {
   type AttributeOptions,
   type CallbackConditions,
   type CallbackObject,
-  type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
@@ -4187,6 +4186,31 @@ export class Base extends Model {
   }
 
   /**
+   * Mirrors: ActiveRecord::Callbacks.after_initialize / .after_find /
+   * .after_touch — the three `define_model_callbacks :initialize, :find,
+   * :touch, only: :after` (callbacks.rb:415) generates. As with the twelve
+   * below, generation runs in {@link InstanceMethods}' `included` hook and
+   * these are the type-only halves TypeScript needs.
+   */
+  declare static afterInitialize: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterFind: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  declare static afterTouch: <T extends typeof Base>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  /**
    * Mirrors: ActiveRecord::Callbacks.before_save — one of the twelve macros
    * `define_model_callbacks :save, :create, :update, :destroy`
    * (callbacks.rb:416) generates through `define_singleton_method`
@@ -4277,23 +4301,8 @@ export class Base extends Model {
 
   static beforeCommit = _beforeCommit;
 
-  /**
-   * Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit
-   *
-   * The body lives in transactions.ts at the Rails name; this is the `include`
-   * point. It cannot be a plain `static override afterCommit = _afterCommit`
-   * assignment the way the non-overriding members here are: a `this`-typed
-   * function assigned as a *property* over an inherited *method* is checked
-   * contravariantly, which drops `typeof Base` out of `typeof Model` and reds
-   * every `this.beforeDestroy(...)` in a subclass body.
-   */
-  static override afterCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
-  ): void {
-    _afterCommit.call(this, fn as (...args: any[]) => any, conditions as never);
-  }
+  /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
+  static afterCommit = _afterCommit;
 
   static afterSaveCommit = _afterSaveCommit;
 
@@ -4304,13 +4313,7 @@ export class Base extends Model {
   static afterDestroyCommit = _afterDestroyCommit;
 
   /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
-  static override afterRollback<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
-  ): void {
-    _afterRollback.call(this, fn as (...args: any[]) => any, conditions as never);
-  }
+  static afterRollback = _afterRollback;
 
   /** Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback */
   static override setCallback<T extends typeof Model>(

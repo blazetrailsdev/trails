@@ -1,17 +1,61 @@
-import type { CallbackFn, CallbackConditions } from "../callbacks.js";
+import type { CallbackFn, CallbackConditions, CallbackObject } from "../callbacks.js";
 
 /**
  * Validation callbacks — before_validation / after_validation hooks.
  *
  * Mirrors: ActiveModel::Validations::Callbacks
  *
- * In Rails this module adds before_validation and after_validation
- * class methods. Model already implements these via beforeValidation()
- * and afterValidation() which delegate to CallbackChain.
+ * The module's `ClassMethods` half below carries `before_validation` /
+ * `after_validation`; `Model` picks both up through the `extend(Model, …)` at
+ * the bottom of model.ts.
  */
 export interface CallbacksClassMethods {
   beforeValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
   afterValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
+}
+
+/**
+ * The class-method half of `ActiveModel::Validations::Callbacks`
+ * (callbacks.rb:32-110), mixed onto the host with `extend()`. Ruby's
+ * `args.extract_options!` (callbacks.rb:56, :89) is the splat mechanics of a
+ * trailing options Hash; TypeScript spells that as the trailing `options`
+ * parameter every other trails callback macro takes.
+ */
+export const ClassMethods = {
+  /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#before_validation (callbacks.rb:55-61). */
+  beforeValidation(
+    this: SetCallbackHost,
+    fn: CallbackFn | CallbackObject,
+    options: ValidationCallbackOptions = {},
+  ): void {
+    setOptionsForCallback(options);
+
+    this.setCallback("validation", "before", fn, options as CallbackConditions);
+  },
+
+  /** Mirrors: ActiveModel::Validations::Callbacks::ClassMethods#after_validation (callbacks.rb:88-96). */
+  afterValidation(
+    this: SetCallbackHost,
+    fn: CallbackFn | CallbackObject,
+    options: ValidationCallbackOptions = {},
+  ): void {
+    options = { ...options };
+    options.prepend = true;
+
+    setOptionsForCallback(options);
+
+    this.setCallback("validation", "after", fn, options as CallbackConditions);
+  },
+};
+
+/** @internal Host shape the two macros need: Rails reaches `set_callback` through `self`. */
+interface SetCallbackHost {
+  setCallback(
+    event: string,
+    timing: "before" | "after",
+    fn: CallbackFn | CallbackObject,
+    options?: CallbackConditions,
+  ): void;
 }
 
 export interface CallbacksInstanceMethods {
@@ -28,6 +72,14 @@ interface CallbackOptions {
   if?: Conditional | Conditional[];
   unless?: Conditional | Conditional[];
 }
+
+/**
+ * The options `before_validation` / `after_validation` accept. Unlike the
+ * generic callback options these also take `on:`, which
+ * {@link setOptionsForCallback} converts into an `:if` over the record's
+ * current `validation_context` (callbacks.rb:99-109).
+ */
+export type ValidationCallbackOptions = CallbackOptions & { prepend?: boolean };
 
 interface CallbackHostRecord {
   validationContext?: string | string[] | null;

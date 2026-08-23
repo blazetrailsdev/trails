@@ -238,8 +238,6 @@ function _resolveCallbackObject(
     (method as (r: CallbackRecord) => unknown).call(obj, record)) as AnyCallback;
 }
 
-const VALID_ON_VALUES = new Set(["create", "update", "destroy"]);
-
 /**
  * Register a callback directly in activesupport's Symbol-keyed chain storage
  * on `proto`. Called by the generated `beforeX`/`afterX`/`aroundX` methods
@@ -295,23 +293,6 @@ export function _registerCallbackOnProto(
   fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
   conditions?: CallbackConditions | TransactionalCallbackConditions,
 ): void {
-  if (conditions && "on" in conditions) {
-    if (event !== "commit" && event !== "rollback") {
-      throw new ArgumentError(
-        `Unknown key: :on. The :on option is only supported for :commit and :rollback callbacks (got :${event})`,
-      );
-    }
-    const onValue = conditions.on;
-    if (onValue !== undefined) {
-      const values = Array.isArray(onValue) ? onValue : [onValue];
-      const invalid = values.filter((v) => !VALID_ON_VALUES.has(v));
-      if (invalid.length > 0) {
-        throw new ArgumentError(
-          `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
-        );
-      }
-    }
-  }
   asDefineCallbacks(proto, event, { skipAfterCallbacksIfTerminated: true });
   const chains = asGetCallbackChains(proto);
   const chain = chains.get(event)!;
