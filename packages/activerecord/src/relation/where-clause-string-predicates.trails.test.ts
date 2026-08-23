@@ -30,6 +30,14 @@ describe("WhereClause String predicates (trails)", () => {
     expect(node.expr).toBeInstanceOf(Nodes.SqlLiteral);
   });
 
+  it("compares a String predicate equal to a SqlLiteral carrying the same SQL", () => {
+    const asString = new WhereClause(["id = 1"]);
+    const asLiteral = new WhereClause([new Nodes.SqlLiteral("id = 1")]);
+    expect(asString.equals(asLiteral)).toBe(true);
+    expect(asString.minus(asLiteral).isEmpty()).toBe(true);
+    expect(asString.union(asLiteral).predicates).toHaveLength(1);
+  });
+
   it("does not treat a String predicate as an equality node", () => {
     const clause = new WhereClause([table().get("id").eq(1), "id = 1"]);
     expect(Object.keys(clause.toH())).toEqual(["id"]);
