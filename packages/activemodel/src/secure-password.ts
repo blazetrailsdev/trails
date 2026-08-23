@@ -106,14 +106,6 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  modelClass.setCallback("initialize", "after", (record: Model) => {
-    if (record._attributes.has(attribute)) {
-      const plaintext = record._readAttribute(attribute);
-      record._attributes.delete(attribute);
-      setPassword(record, plaintext, attribute, digestAttr, passwordCache);
-    }
-  });
-
   if (validations) {
     modelClass.validate((record: Model) => {
       const pwd = passwordCache.get(record);

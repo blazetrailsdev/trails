@@ -18,7 +18,11 @@ import {
   migrationSummary,
   scopedRows,
   staleTagKey,
+  buildArgExpectations,
+  justifiesArgs,
 } from "./build.js";
+import type { CallArgArtifact } from "./call-args-baseline.js";
+import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { serializeBaseline } from "./baseline-json.js";
 import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
@@ -837,5 +841,141 @@ describe("scopedRows", () => {
     expect(scopedRows(baseline, "activesupport", "encrypted-file.ts", new Set(["new"]))).toEqual([
       baseline[0],
     ]);
+  });
+});
+
+describe("@missingRailsArgs receipts (--kind args)", () => {
+  const src = ["export class Foo {", "  bar(): void {}", "}"].join("\n");
+  const expectations = new Map([anyClass("bar", ["bar"], new Set(["freeze"]))]);
+
+  it("mints a @missingRailsArgs tag from a curated args reason", () => {
+    const r = reconcileFileText(
+      "foo.ts",
+      src,
+      expectations,
+      () => "PERMANENT: a JS Map has no initial_capacity",
+      undefined,
+      undefined,
+      ARGS_TAG,
+    );
+    expect(r.text!).toContain(
+      "@missingRailsArgs freeze — PERMANENT: a JS Map has no initial_capacity",
+    );
+    expect(r.text!).not.toContain("@missingRailsCall");
+    expect(r.tagged).toEqual([{ rubyName: "bar", call: "freeze" }]);
+  });
+
+  it("is idempotent: a second pass over its own output produces no edit", () => {
+    const reason = () => "PERMANENT: no thread pool to size";
+    const first = reconcileFileText(
+      "foo.ts",
+      src,
+      expectations,
+      reason,
+      undefined,
+      undefined,
+      ARGS_TAG,
+    ).text!;
+    expect(
+      reconcileFileText("foo.ts", first, expectations, reason, undefined, undefined, ARGS_TAG).text,
+    ).toBeNull();
+  });
+
+  it("mints nothing for a seeded placeholder reason, and reports it skipped", () => {
+    const r = reconcileFileText(
+      "foo.ts",
+      src,
+      expectations,
+      () => DEFAULT_TAG_REASON,
+      undefined,
+      undefined,
+      ARGS_TAG,
+    );
+    expect(r.text).toBeNull();
+    expect(r.skipped).toEqual(["freeze"]);
+    expect(r.tagged).toEqual([]);
+  });
+
+  it("retires a stale tag keyed under ANY_CLASS, as the args artifact records no class", () => {
+    const tagged = [
+      "export class Foo {",
+      "  /** @missingRailsArgs freeze — PERMANENT: gone */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    const r = reconcileFileText(
+      "foo.ts",
+      tagged,
+      new Map(),
+      () => "PERMANENT: x",
+      undefined,
+      new Set([staleTagKey(ANY_CLASS, "bar", "freeze")]),
+      ARGS_TAG,
+    );
+    expect(r.text!).not.toContain(ARGS_TAG);
+    expect(r.preserved).toEqual([]);
+  });
+
+  it("justifiesArgs demands a permanence claim the call-set tag does not", () => {
+    expect(justifiesArgs("PERMANENT: a JS Map has no initial_capacity")).toBe(true);
+    expect(justifiesArgs("CONVERGEABLE: story <slug>")).toBe(true);
+    expect(justifiesArgs("the argument is not needed here")).toBe(false);
+    expect(justifiesArgs(DEFAULT_TAG_REASON)).toBe(false);
+  });
+
+  it("buildArgExpectations keeps shape rows and folds in already-suppressed calls", () => {
+    const artifact: CallArgArtifact = {
+      packages: ["activerecord"],
+      compared: 3,
+      mismatches: [
+        {
+          package: "activerecord",
+          tsFile: "foo.ts",
+          rubyName: "bar",
+          call: "freeze",
+          kind: "args",
+          rubyArgs: ["true"],
+          rubyFile: "foo.rb",
+          tsName: "bar",
+          class: "shape",
+          tsArgs: [],
+        },
+        {
+          package: "activerecord",
+          tsFile: "foo.ts",
+          rubyName: "bar",
+          call: "dup",
+          kind: "args",
+          rubyArgs: ["ref:stmt"],
+          rubyFile: "foo.rb",
+          tsName: "bar",
+          class: "naming",
+          tsArgs: ["ref:statement"],
+        },
+      ],
+      suppressed: [
+        { package: "activerecord", tsFile: "foo.ts", tsName: "bar", call: "new", reason: "x" },
+      ],
+    };
+    const byFile = buildArgExpectations(artifact, "activerecord");
+    const exp = byFile.get("foo.ts")!.get(expectationKey(ANY_CLASS, "bar"))!;
+    expect([...exp.calls].sort()).toEqual(["freeze", "new"]);
+  });
+
+  it("migrationSummary names the args tag and drops the call-set caveat", () => {
+    const rows = [
+      {
+        package: "activerecord",
+        tsFile: "foo.ts",
+        rubyName: "bar",
+        call: "freeze",
+        kind: "args" as const,
+        rubyArgs: ["true"],
+        reason: "PERMANENT: x",
+      },
+    ];
+    const lines = migrationSummary(rows, 1, false, "args");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("1 of 1 baseline entr(ies) in scope migrated to @missingRailsArgs");
   });
 });
