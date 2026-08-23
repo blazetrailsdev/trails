@@ -162,6 +162,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetAssociation._targetStore = records;
   }
 
+  /**
+   * Rails' `CollectionProxy#records` IS `load_target` (collection_proxy.rb:
+   * 1024-1026), so every inherited `Relation` reader that takes its `loaded?`
+   * arm reads the association target rather than `Relation`'s own `@records`.
+   * The async readers reach that through the overridden `records()`; the
+   * synchronous `inspect` (relation.rb:1290-1297) cannot await, so it reads the
+   * `@records` ivar and this override is what points that ivar at the target.
+   */
+  protected override get _records(): T[] {
+    return this._target;
+  }
+
+  protected override set _records(records: T[]) {
+    this._target = records;
+  }
+
   private get _targetLoaded(): boolean {
     return this._targetAssociation._loadedStore;
   }

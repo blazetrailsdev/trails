@@ -244,22 +244,34 @@ export class ConnectionPoolConfiguration {
     return connection;
   }
 
-  async disableQueryCache<T>(
+  disableQueryCache<T>(
     fn: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
-  ): Promise<T> {
+  ): T | Promise<T> {
     const { dirties = true } = options;
     const qc = this.queryCache;
     const oldEnabled = qc.enabled;
     const oldDirties = qc.dirties;
     qc.enabled = false;
     qc.dirties = dirties;
-    try {
-      return await fn();
-    } finally {
+    const restore = () => {
       qc.enabled = oldEnabled;
       qc.dirties = oldDirties;
+    };
+    // NOT an `async` method: Ruby's `ensure` fires when the block RETURNS, and
+    // `exec_main_query`'s block returns a pending FutureResult rather than
+    // rows, so the restore is synchronous there too. Awaiting the block would
+    // adopt that thenable and resolve the handle away.
+    let result: T | Promise<T>;
+    try {
+      result = fn();
+    } catch (error) {
+      restore();
+      throw error;
     }
+    if (result instanceof Promise) return result.finally(restore);
+    restore();
+    return result;
   }
 
   async enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
@@ -364,9 +376,9 @@ export function uncached<T>(
   this: QueryCacheHost,
   fn: () => T | Promise<T>,
   options: { dirties?: boolean } = {},
-): Promise<T> {
+): T | Promise<T> {
   const { dirties = true } = options;
-  return this.pool.disableQueryCache(fn, { dirties }) as Promise<T>;
+  return this.pool.disableQueryCache(fn, { dirties });
 }
 
 /**

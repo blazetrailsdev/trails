@@ -108,6 +108,84 @@ describe("Relation#load_async", () => {
     },
   );
 
+  itIfSupports("concurrent_connections", "reset cancels the scheduled query", async () => {
+    // Mirrors relation.rb:1195-1196 — `@future_result&.cancel` — which is
+    // reachable only because `exec_main_query` hands the pending FutureResult
+    // back unresolved (relation.rb:1148). Hold the scheduled query off the
+    // executor so `reset` lands while it is still pending, exactly as Rails'
+    // thread pool leaves it until a worker picks it up.
+    const pool = (await Base.connectionPool()) as unknown as {
+      scheduleQuery(futureResult: unknown): void;
+    };
+    const scheduled: FutureResult[] = [];
+    vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+      scheduled.push(futureResult as FutureResult);
+    });
+
+    const relation = Topic.all().loadAsync();
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0].pending()).toBe(true);
+
+    relation.reset();
+
+    expect(scheduled[0].pending()).toBe(false);
+    // `executeOrSkip` is the worker's entry point (future_result.rb:100-108);
+    // a canceled handle is no longer pending, so it skips the query outright.
+    scheduled[0].executeOrSkip();
+    await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+  });
+
+  itIfSupports(
+    "concurrent_connections",
+    "reset cancels the scheduled query of a skip_query_cache! relation",
+    async () => {
+      // `skip_query_cache_if_necessary` yields and hands the block's value
+      // back untouched (relation.rb:1466-1471), so the `uncached` arm parks the
+      // same pending handle the plain arm does.
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: unknown): void;
+      };
+      const scheduled: FutureResult[] = [];
+      vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult as FutureResult);
+      });
+
+      const relation = Topic.all().skipQueryCacheBang().loadAsync();
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+
+      relation.reset();
+
+      expect(scheduled[0].pending()).toBe(false);
+      await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+    },
+  );
+
+  itIfSupports(
+    "concurrent_connections",
+    "reset cancels an eager-loaded relation's scheduled query",
+    async () => {
+      // `apply_join_dependency` yields and hands the block's value back
+      // (finder_methods.rb:457-481), so the eager arm's
+      // `select_all(relation.arel, "SQL", async: async)` (relation.rb:1436)
+      // parks a pending handle too.
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: unknown): void;
+      };
+      const scheduled: FutureResult[] = [];
+      vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult as FutureResult);
+      });
+
+      const relation = Topic.eagerLoad(":replies").loadAsync();
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+
+      relation.reset();
+
+      expect(scheduled[0].pending()).toBe(false);
+      await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+    },
+  );
+
   it("issues an eager-loaded relation's join query with async on", async () => {
     // Rails' exec_main_query forwards `async:` to its eager_loading? arm too —
     // `c.select_all(relation.arel, "SQL", async: async)` (relation.rb:1436).
