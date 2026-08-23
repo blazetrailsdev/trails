@@ -1734,6 +1734,20 @@ export function initInternals(this: Base, super_: () => void): void {
 }
 
 /**
+ * Empties the copy's association cache, then hands control down the chain.
+ *
+ * Mirrors: ActiveRecord::Associations#initialize_dup (associations.rb:69-72) —
+ * `@association_cache = {}` then `super`. `include Associations` is base.rb:317,
+ * so this is the outermost link of the `initialize_dup` chain.
+ *
+ * @internal
+ */
+export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+  this._resetAssociationCaches();
+  super_(other);
+}
+
+/**
  * Returns the cached `Association` wrapper for `name`, or `null` if none
  * has been built yet.
  *

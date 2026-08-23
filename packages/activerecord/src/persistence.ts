@@ -1292,9 +1292,7 @@ interface DupRecord {
  * in the duped `_attributes`, run the dirty-vs-default pass, dispatch
  * `after_initialize` manually, then run the `initialize_dup` chain — so the hook
  * reads the duped values (with timestamp/locking columns still populated), not
- * the empty construction bag. (Like Rails' `initialize_dup`, this runs only the
- * initialize callbacks, not `ensure_proper_type`: the STI type column rides along
- * in the deep-dup'd attributes.)
+ * the empty construction bag.
  *
  * The `initialize_dup` chain (aggregations cache copy + locking/timestamp clear)
  * runs AFTER the hook because Rails' Timestamp/Locking modules `super` into
@@ -1368,10 +1366,7 @@ export function dup<T extends DupRecord>(this: T): T {
   // rebinds its column's dirty baseline (`clear_attribute_change`), so the
   // cleared columns read back as nil/default and not-dirty regardless of the
   // reinstate pass above (test_dup_timestamps_are_cleared /
-  // _locking_column_is_not_dirty). It does NOT re-run
-  // `initialize_internals_callback`/`ensure_proper_type` (that lives in
-  // Core#initialize), so the STI type column is carried solely by the deep-dup'd
-  // `@attributes`, not re-asserted here.
+  // _locking_column_is_not_dirty).
   duped.initializeDup(this);
   return duped;
 }

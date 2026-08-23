@@ -27,13 +27,13 @@ describe("test-infra lint scope", () => {
 
   it("allowlists exactly the canonical loaders' own unit tests", () => {
     expect(canonicalLoaderSelfTests).toEqual([
-      `${SRC}/support/canonical-schema.test.ts`,
-      `${SRC}/support/canonical-table-rebuild.test.ts`,
+      `${SRC}/support/canonical-schema.trails.test.ts`,
+      `${SRC}/support/canonical-table-rebuild.trails.test.ts`,
       `${SRC}/support/load-schema-helper.test.ts`,
       `${SRC}/support/load-schema-helper.trails.test.ts`,
       `${SRC}/support/load-schema-helper-uuid-default.trails.test.ts`,
       `${SRC}/support/load-schema-helper-arm-guard.trails.test.ts`,
-      `${SRC}/support/stubbed-ddl-methods.test.ts`,
+      `${SRC}/support/stubbed-ddl-methods.trails.test.ts`,
     ]);
     expect([...ALLOW]).toEqual(canonicalLoaderSelfTests);
     expect(canonicalLoaderModules).toEqual([

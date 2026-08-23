@@ -101,6 +101,7 @@ import {
   attribute,
   setDefineMethodAttribute,
   freeze as attributesFreeze,
+  initializeDup as attributesInitializeDup,
 } from "./attributes.js";
 import {
   _defaultAttributes,
@@ -483,13 +484,37 @@ export class Model {
         `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
       );
     };
-    _registerCallbackOnProto(
-      this.prototype,
-      "before",
-      "validate",
-      fn,
-      this._buildValidateConditions(options),
-    );
+    // validations.rb:170-172 — `options.merge(if: [predicate_for_validation_context(options[:on]), *options[:if]])`.
+    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
+    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
+
+    if (options.on !== undefined) {
+      const pred = validationsPredicateForValidationContext(options.on);
+      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
+    }
+
+    // validations.rb:174-182 — an `unless:` intersecting `Array(except_on)` with
+    // `Array(o.validation_context)`, so a nil context never intersects and the
+    // validator still runs.
+    if (options.exceptOn !== undefined) {
+      const exceptOn = kernelArray(options.exceptOn);
+      unlessConds = [
+        (record: object) => {
+          const current = kernelArray(
+            (record as unknown as ValidationsContextHost).validationContext,
+          );
+          return exceptOn.some((c) => current.includes(c));
+        },
+        ...unlessConds,
+      ];
+    }
+
+    // validations.rb:184 — `set_callback(:validate, *args, options, &block)`.
+    _registerCallbackOnProto(this.prototype, "before", "validate", fn, {
+      ...(ifConds.length > 0 ? { if: ifConds } : {}),
+      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
+      ...(options.prepend ? { prepend: true } : {}),
+    });
   }
 
   /**
@@ -510,13 +535,9 @@ export class Model {
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
     );
     this._registerValidator(validator);
-    _registerCallbackOnProto(
-      this.prototype,
-      "before",
-      "validate",
-      (record: object) => validator.validate(record as ValidatableRecord),
-      this._buildValidateConditions(options),
-    );
+    // validations.rb:190-192 forwards to `validates_with`, whose `validate(validator,
+    // options)` (with.rb:103) is where the `on:` / `except_on:` merge happens.
+    this.validate((record: ValidatableRecord) => validator.validate(record), options);
   }
 
   /**
@@ -549,13 +570,6 @@ export class Model {
       strict: isStrict,
       ...rest
     } = options;
-    const conditions = this._buildValidateConditions({
-      if: ifOpt,
-      unless: unlessOpt,
-      on: onOpt,
-      exceptOn: exceptOnOpt,
-    });
-
     const rawExplicit = (rest as { attributes?: unknown }).attributes;
     const explicitAttributes: string[] | null = Array.isArray(rawExplicit)
       ? rawExplicit.map(String)
@@ -634,7 +648,14 @@ export class Model {
         callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
       }
 
-      _registerCallbackOnProto(this.prototype, "before", "validate", callbackFn, conditions);
+      // with.rb:103 — `validate(validator, options)`; the `on:` / `except_on:`
+      // merge lives in `validate`.
+      this.validate(callbackFn as (record: ValidatableRecord) => unknown, {
+        if: ifOpt,
+        unless: unlessOpt,
+        on: onOpt,
+        exceptOn: exceptOnOpt,
+      });
     }
   }
 
@@ -1040,47 +1061,6 @@ export class Model {
       }
       bucket.push(validator);
     }
-  }
-
-  /**
-   * `exceptOn` mirrors Rails `except_on:` (validations.rb:175-182): an `unless:`
-   * intersecting `Array(except_on)` with `Array(o.validation_context)`, so a nil
-   * context never intersects and the validator still runs.
-   *
-   * @internal Rails-private helper.
-   */
-  private static _buildValidateConditions(
-    options: ConditionalOptions,
-  ): CallbackConditions | undefined {
-    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
-    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
-
-    if (options.on !== undefined) {
-      const pred = validationsPredicateForValidationContext(options.on);
-      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
-    }
-
-    if (options.exceptOn !== undefined) {
-      const exceptOn = kernelArray(options.exceptOn);
-      unlessConds = [
-        (record: object) => {
-          const mc = (record as unknown as ValidationsContextHost).validationContext;
-          const current = kernelArray(mc);
-          return exceptOn.some((c) => current.includes(c));
-        },
-        ...unlessConds,
-      ];
-    }
-
-    if (ifConds.length === 0 && unlessConds.length === 0) {
-      return options.prepend ? { prepend: true } : undefined;
-    }
-
-    return {
-      ...(ifConds.length > 0 ? { if: ifConds } : {}),
-      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
-      ...(options.prepend ? { prepend: true } : {}),
-    };
   }
 
   /**
@@ -1545,15 +1525,15 @@ export class Model {
    * Mirrors Ruby's `Object#dup`: allocate, copy the ivars, dispatch
    * `initialize_dup`; like Ruby `dup` it does NOT re-enter the constructor, and
    * the copy is unfrozen even from a frozen source. Rails splits the hook across
-   * two modules chained by `super` — `Attributes#initialize_dup` deep-dups
+   * three modules chained by `super` — `Attributes#initialize_dup` deep-dups
    * `@attributes` (attributes.rb:111-114), `Validations#initialize_dup` replaces
-   * `@errors` (validations.rb:310-313). TS has no `super` across mixins, so both
-   * land here, the second through {@link initializeDup}.
+   * `@errors` (validations.rb:310-313), `Dirty#initialize_dup` rebuilds the
+   * mutation trackers (dirty.rb:248-251). All three are links in the
+   * {@link initializeDup} chain, so `dup` only allocates and dispatches.
    */
   dup(): this {
     const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
     Object.assign(duped, this);
-    duped._attributes = this._attributes.deepDup();
     duped.initializeDup(this);
     return duped;
   }
@@ -2122,10 +2102,15 @@ include(Model, {
 // The `super`-opening halves of the Validations and Dirty modules: each
 // defines `init_internals` / `initialize_dup` and opens with `super`
 // (validations.rb:467-471 and :310-313, dirty.rb:371-376 and :248-251), so
-// the chain IS the include order.
+// the chain IS the include order — with `Attributes#initialize_dup`
+// (attributes.rb:111-114) at the bottom, since `include ActiveModel::API`
+// (which includes Attributes) precedes both.
 // `prepend()` is that chain — the later include wraps the earlier one and
 // receives it as `super_`, with a no-op root where Ruby's only definition is
 // `ActiveRecord::Core#init_internals` (core.rb:834).
+prepend(Model.prototype, {
+  initializeDup: attributesInitializeDup,
+});
 prepend(Model.prototype, {
   initInternals: validationsInitInternals,
   initializeDup: validationsInitializeDup,

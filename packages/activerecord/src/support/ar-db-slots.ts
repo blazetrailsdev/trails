@@ -64,7 +64,7 @@ function hostForkCap(): number | null {
  * the pool is sized against a worker count that never starts — and the
  * single-worker bypass in test-setup-worker-db.ts would miss a
  * `TRAILS_TEST_FORKS=1` solo run. Both sides run the same
- * {@link resolveForkCount}, and ar-db-forks-parity.test.ts holds them together.
+ * {@link resolveForkCount}, and ar-db-forks-parity.trails.test.ts holds them together.
  */
 export function workerForkCount(): number {
   return resolveForkCount(process.env, hostForkCap());

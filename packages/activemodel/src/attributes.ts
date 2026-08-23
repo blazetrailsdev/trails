@@ -229,6 +229,26 @@ export function setDefineMethodAttribute(
 }
 
 /**
+ * Deep-dups the attribute set on the copy, then hands control down the
+ * `initialize_dup` chain.
+ *
+ * Mirrors: ActiveModel::Attributes#initialize_dup (attributes.rb:111-114).
+ * `ActiveModel::Model` includes `ActiveModel::API`, which includes
+ * `Attributes`, so this link sits BELOW Validations and Dirty in the chain —
+ * their `super` unwinds into it.
+ *
+ * @internal Rails-private helper.
+ */
+export function initializeDup(
+  this: AttributeInstanceHost,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  this._attributes = this._attributes.deepDup();
+  super_(other);
+}
+
+/**
  * Mirrors: ActiveModel::Attributes#freeze (attributes.rb:150-153)
  *
  *   def freeze # :nodoc:

@@ -801,6 +801,21 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
 }
 
 /**
+ * Re-asserts the STI type column on the copy once the rest of the chain has
+ * run.
+ *
+ * Mirrors: ActiveRecord::Inheritance#initialize_dup (inheritance.rb:343-346) —
+ * `super` then `ensure_proper_type`. `include Inheritance` is base.rb:303, so
+ * this link sits directly above Core.
+ *
+ * @internal
+ */
+export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+  super_(other);
+  ensureProperType.call(this);
+}
+
+/**
  * Sets the inheritance column to the proper STI class name if needed.
  *
  * Mirrors: ActiveRecord::Inheritance#initialize_internals_callback. In Rails

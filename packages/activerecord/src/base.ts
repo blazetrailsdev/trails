@@ -343,6 +343,7 @@ import {
   associationInstanceSet as _associationInstanceSet,
   registerModelConstant,
   initInternals as _associationsInitInternals,
+  initializeDup as _associationsInitializeDup,
   type AssociationDefinition,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
@@ -4897,13 +4898,19 @@ prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMeth
 // initialize callbacks and resets the new-record state, then `super` unwinds
 // through Locking::Optimistic (optimistic.rb:72-75) and Timestamp
 // (timestamp.rb:50-53), whose clears therefore run AFTER the callbacks have seen
-// the source's `lock_version` / timestamps. Aggregations' link (aggregations.rb:6)
+// the source's `lock_version` / timestamps. Wired in base.rb include order, so
+// Associations (associations.rb:69, base.rb:317) empties the association cache
+// first and Inheritance (inheritance.rb:343, base.rb:303) re-asserts the STI
+// type column last, after Core has fired the initialize callbacks.
+// Aggregations' link (aggregations.rb:6)
 // is prepended above these by `includeAggregations` on composed_of models only.
 // `dup` (persistence.ts) enters the chain once the duped attributes and dirty
 // baseline are in place.
 prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
+prepend(Base.prototype, { initializeDup: Inheritance.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
+prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 // AutosaveAssociation#reload resets marked-for-destruction / destroyed-by-
 // association state, then calls super. Capture the inherited reload (Persistence)
