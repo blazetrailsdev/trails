@@ -44,9 +44,20 @@ class StringScanner {
 
 /**
  * Mirrors: ActiveSupport::Duration::ISO8601Parser::ParsingError
- * (duration/iso8601_parser.rb:13). Ruby's parent is `::ArgumentError`, a
- * hierarchy root that `blazetrails/rails-error-parity` requires a TS root to
- * spell as a global `Error`; the Rails class name lives on `name`.
+ * (duration/iso8601_parser.rb:13). Ruby's parent is `::ArgumentError`, and the
+ * Rails class name lives on `name`.
+ *
+ * The TS base is `Error` rather than `hash-utils.ts`'s
+ * `ArgumentError` port, for two independent reasons. (1) `::ArgumentError` is
+ * a Ruby hierarchy ROOT, and `blazetrails/rails-error-parity`
+ * (`eslint/rails-error-parity.mjs:50,157-165`) requires the TS mirror of a
+ * root-based Rails error to extend a global `Error` constructor — extending
+ * the port is a lint error, not a choice. (2) `hash-utils.ts` imports
+ * `xml-mini.ts` (`hash-utils.ts:6`), which imports `duration.ts`
+ * (`xml-mini.ts:7`), which imports this module: importing the port closes that
+ * cycle and evaluates this `extends` clause with its base still in TDZ
+ * (`Class extends value undefined`, measured on this branch). Ruby has neither
+ * constraint — Zeitwerk resolves `::ArgumentError` at raise time.
  */
 export class ParsingError extends Error {
   override name = "ParsingError";
