@@ -145,6 +145,10 @@ export class EncryptedFile {
    *   |tmp_file|` — Ruby's Tempfile is stdlib, not Rails, and has no port; the
    *   block-scoped temp file is spelled as `fs.mkdtemp` plus an explicit
    *   `finally` unlink/rmdir, which is what Tempfile.create's block form does.
+   * @missingRailsArgs chomp — PERMANENT. encrypted_file.rb:89
+   *   `content_path.basename.to_s.chomp(".enc")` — trails ports Ruby's String
+   *   methods as free functions rather than String.prototype patches, so the
+   *   receiver is argument 1: `chomp(path.basename(contentPath), ".enc")`.
    */
   private async writing(
     contents: string,
@@ -189,6 +193,13 @@ export class EncryptedFile {
     return (await this.encryptor()).decryptAndVerify(contents) as string;
   }
 
+  /**
+   * @missingRailsArgs new — PERMANENT. encrypted_file.rb:113
+   *   `MessageEncryptor.new([key].pack("H*"), cipher: CIPHER, serializer: Marshal)`
+   *   — `Buffer.from(key, "hex")` is the `pack("H*")`, and Ruby's `Marshal` has
+   *   no JS equivalent: the file body is already a string, so trails passes
+   *   `NullSerializer`, the settled substitute.
+   */
   private async encryptor(): Promise<MessageEncryptor> {
     if (this.memoEncryptor) return this.memoEncryptor;
     this.memoEncryptor = new MessageEncryptor(Buffer.from((await this.key()) ?? "", "hex"), {
