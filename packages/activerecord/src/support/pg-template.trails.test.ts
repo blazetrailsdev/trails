@@ -31,10 +31,6 @@ describe.skipIf(!pgActive)("PG template-clone (Phase 1 probe)", () => {
   });
 
   it("the template DB is stamped with the canonical schema SHA1", async () => {
-    // The stamp workers derive from this run's token must equal the value
-    // globalSetup wrote into the template — that match is exactly what
-    // `canonicalSchemaUpToDate` checks, so every slot cloned from this template
-    // skips the boot DDL and only TRUNCATEs.
     const expectedSha1 = canonicalSchemaStamp(process.env[RUN_TOKEN_ENV]!);
 
     const templateDb = process.env[PG_TEMPLATE_ENV]!;

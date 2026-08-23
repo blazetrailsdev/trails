@@ -15,13 +15,6 @@ beforeAll(() => {
   adapter = Base.adapter;
 });
 
-// Track the bespoke `sdh_*` tables each test creates so afterEach can drop
-// exactly those. Nothing clears these between tests — one
-// test reuses `sdh_kept` and would hit "table already exists" if left. Dropping
-// only the created tables (RFC 0060) replaces the old afterAll/afterEach
-// dropAllTables' ~330-table canonical DROP fan-out. Deriving the drop set
-// from `createSdhTable` (rather than a hand-maintained list) keeps it correct
-// as tests are added or renamed.
 const createdTables = new Set<string>();
 async function createSdhTable(name: string, columns = "id INTEGER PRIMARY KEY"): Promise<void> {
   createdTables.add(name);

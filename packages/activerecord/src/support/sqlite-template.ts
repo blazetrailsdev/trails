@@ -56,9 +56,7 @@ export function unlinkDbFiles(fs: FsAdapter, base: string): void {
   for (const suffix of DB_FILE_SUFFIXES) {
     try {
       fs.unlinkSync(base + suffix);
-    } catch {
-      // already gone / never created — nothing to do.
-    }
+    } catch {}
   }
 }
 
@@ -80,10 +78,6 @@ const cleanupG = globalThis as typeof globalThis & { __arDbCleanupPaths?: Set<st
 export async function registerDbFileCleanupOnExit(base: string): Promise<void> {
   const registered = (cleanupG.__arDbCleanupPaths ??= new Set<string>());
   if (registered.has(base)) return;
-  // Claimed before the await so concurrent callers can't both get past the
-  // check, but released again if attaching fails — otherwise a rejected
-  // `getFsAsync()` would mark the path registered with no listener behind it,
-  // silently forfeiting cleanup for the rest of the process.
   registered.add(base);
   try {
     const fs = await getFsAsync();
@@ -113,9 +107,7 @@ async function tempDbEntries(fs: FsAdapter): Promise<string[]> {
 async function unlinkQuietly(fs: FsAdapter, target: string): Promise<void> {
   try {
     await fs.unlink?.(target);
-  } catch {
-    // best-effort
-  }
+  } catch {}
 }
 
 /**
@@ -186,9 +178,6 @@ export async function templatePathFor(runToken: string): Promise<string> {
   return path.join(await tmpRoot(), `ar-test-template-${runToken}.sqlite`);
 }
 
-// Shared across re-evaluations of the worker setupFile within one worker
-// process (isolate:true reloads the module graph per file, but globalThis
-// persists). Lets the restore happen once per worker, not once per file.
 const g = globalThis as typeof globalThis & { __arWorkerDbPath?: string };
 
 /**

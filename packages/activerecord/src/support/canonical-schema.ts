@@ -89,8 +89,6 @@ class TableBuilder {
   ) {}
 
   private col(name: string, primitive: string, o: ColOpts = {}): void {
-    // The single-column integer PK is emitted inline at its declared offset,
-    // preserving the declared INTEGER width across adapters (see serialIdType).
     if (name === this.serialPk) {
       this.t.column(name, serialIdType(primitive as ColumnSpec, this.adapterName), {
         primaryKey: true,
@@ -2313,8 +2311,6 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       assertSerialPkIsPlainIntegral(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }
     if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
-      // `col` leaves these as declared, so nothing to reconcile; declaredSpec
-      // still raises when `primaryKey:` names a column the block never declared.
       for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
     }
     const indexes: IndexSpec[] = builder.indexes.map(({ columns: c, opts }) => ({

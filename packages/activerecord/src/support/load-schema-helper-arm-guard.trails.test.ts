@@ -54,10 +54,6 @@ describe("load_schema arm-probe guard", () => {
     });
   });
 
-  // `createTable` is not the only interception that lays nothing: `runTable`
-  // reaches the database through the adapter's mixed-in SchemaStatements
-  // bodies, so a cover that stubs the members *they* go through is just as
-  // unsafe, and just as invisible outside the PG lane.
   for (const method of ["dropTable", "addIndex", "execute", "schemaCreation"]) {
     it(`rejects an adapter whose ${method} a proxy intercepts`, async () => {
       await withAdapter(async (adapter) => {
@@ -75,9 +71,6 @@ describe("load_schema arm-probe guard", () => {
     });
   }
 
-  // `schemaCreation` is an accessor, not a method, so the guard compares what
-  // the real one yields rather than its identity — PostgreSQLAdapter's builds a
-  // fresh visitor per read.
   it("rejects an adapter whose schemaCreation a proxy intercepts", async () => {
     await withAdapter(async (adapter) => {
       const probe = new Proxy(adapter, {
@@ -103,12 +96,6 @@ describe("load_schema arm-probe guard", () => {
     });
   });
 
-  // The gap this guard cannot close, pinned so it is not mistaken for a bug:
-  // a class-body override is found by the walk as that class's own member and
-  // matches what the lookup returned, exactly as PostgreSQLAdapter's override
-  // of AbstractAdapter's does. `assertNotStubbed`'s docstring carries the
-  // reasoning; `blazetrails/no-load-schema-with-stubbed-ddl` catches the shape
-  // lexically instead, which is what makes this acceptable.
   it("does not see a subclass that overrides createTable on its own prototype", async () => {
     class Probe extends BetterSQLite3Adapter {
       override async createTable(): Promise<void> {}
@@ -124,9 +111,6 @@ describe("load_schema arm-probe guard", () => {
     }
   });
 
-  // The counterpart direction: a proxy that only observes must still load, or
-  // the guard would break the pooling/logging wrappers that hand `loadSchema` a
-  // wrapped connection.
   it("passes an adapter behind a transparent proxy", async () => {
     await withAdapter(async (adapter) => {
       const passthrough = new Proxy(adapter, {

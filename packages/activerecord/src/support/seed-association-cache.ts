@@ -12,10 +12,6 @@ import type { Base } from "../base.js";
  * does not require a real reflection — matching `@association_cache`.
  */
 export function seedAssociationCache(record: Base, name: string, target: unknown): void {
-  // A declared association has a real holder — set its target so the genuine
-  // reader / strict-loading logic runs off it. Mark `_explicitTarget` so the
-  // inner-loader short-circuit treats it as an explicit set (matching the old
-  // `_cachedAssociations.set` poke this replaces).
   try {
     const assoc = (
       record as unknown as {
@@ -28,10 +24,7 @@ export function seedAssociationCache(record: Base, name: string, target: unknown
     assoc._setTargetFromLoader(target);
     assoc._explicitTarget = true;
     return;
-  } catch {
-    // Undeclared name (FakeTopic/FakeReply fixtures): fall through to a minimal
-    // loaded holder, the way `@association_cache` tolerates ad-hoc inverses.
-  }
+  } catch {}
   (record as unknown as { _associationInstances: Map<string, unknown> })._associationInstances.set(
     name,
     {

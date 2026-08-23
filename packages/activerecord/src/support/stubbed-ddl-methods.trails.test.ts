@@ -165,12 +165,9 @@ describe("STUBBED_DDL_METHODS", () => {
   test("covers every adapter member the canonical lay path touches", async () => {
     const touched = await recordLayPath();
 
-    // Floor: a proxy that recorded almost nothing would pass the subset check
-    // vacuously.
     expect(touched.has("execute")).toBe(true);
     expect(touched.has("createTable")).toBe(true);
     expect(touched.has("addIndex")).toBe(true);
-    // Floor: these come back only through the renderer boundary.
     expect(touched.has("quoteTableName")).toBe(true);
     expect(touched.has("nativeDatabaseTypes")).toBe(true);
 

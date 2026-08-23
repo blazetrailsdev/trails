@@ -16,8 +16,6 @@ import { MyAppBusinessCompany } from "../test-helpers/models/company-in-module.j
 
 describe("canonical model autoload index (Zeitwerk analog)", () => {
   it("indexes canonical models by their class name", () => {
-    // Association-target-only models (no fixture set of their own) are present
-    // so they resolve on first reference without a manual `registerModel`.
     expect(canonicalModelIndex.get("Comment")).toBe(Comment);
     expect(canonicalModelIndex.get("Owner")).toBe(Owner);
   });
@@ -31,17 +29,11 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
   });
 
   it("resolveModel autoloads an indexed model on a registry miss", () => {
-    // Whether or not another test already registered it, the two-step returns
-    // the canonical class — the fallback covers the un-registered case.
     expect(resolve("Comment")).toBe(Comment);
     expect(resolve("Owner")).toBe(Owner);
   });
 
   it("autoloads an association-target model through reflection's computeClass", () => {
-    // `Pet belongsTo owner` names `Owner` only as a target — no fixture set, no
-    // manual `registerModel`. Resolving the reflection's `.klass` must autoload
-    // it via the fallback (reflection.ts computeClass), the empirical anchor for
-    // this part (HasManyReflection/BelongsToReflection._klass).
     const refl = (
       Pet as unknown as { _reflectOnAssociation(name: string): { klass: unknown } }
     )._reflectOnAssociation("owner");
@@ -57,16 +49,9 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
   });
 
   it("faults in a model that is constantize-able but absent from the registry", () => {
-    // registerSubclass (inheritance.ts:416) and the adapter setter
-    // (base.ts:1358) write the constant table WITHOUT registerModel, so an STI
-    // subclass can resolve through constantize while missing from
-    // modelRegistry — which the join planner reads directly
-    // (join-dependency.ts:344,371). autoloadModel must therefore gate on the
-    // registry, not on safeConstantize, or the fault-in is skipped and the join
-    // silently builds no node.
     const had = modelRegistry.get("Reply");
-    modelRegistry.delete("Reply"); // write-through drops the constant too
-    registerConstant("Reply", Reply); // re-create registerSubclass's half alone
+    modelRegistry.delete("Reply");
+    registerConstant("Reply", Reply);
     try {
       expect(safeConstantize("Reply")).toBe(Reply);
       expect(modelRegistry.has("Reply")).toBe(false);
@@ -78,8 +63,6 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
   });
 
   it("throws a constant-not-found error for a genuine miss", () => {
-    // A name in neither the registry nor the index must still throw, so the
-    // fallback can never silently mask a missing or misnamed model.
     expect(() => resolve("NoSuchCanonicalModel")).toThrow(
       /uninitialized constant NoSuchCanonicalModel/,
     );

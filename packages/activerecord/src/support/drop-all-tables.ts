@@ -204,10 +204,6 @@ async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]):
       .join(" UNION ALL ");
     const rows = (await adapter.execute(probe)) as Array<{ t?: string; T?: string }>;
     toTruncate = rows.map((r) => r.t ?? r.T).filter((t): t is string => Boolean(t));
-    // A table nobody probed as non-empty still has to ride along when it holds a
-    // foreign key into one that did: PostgreSQL refuses to truncate a table an FK
-    // points at unless the referencing table is in the same statement, and it
-    // refuses whether or not that table holds rows.
     const dependents = await canonicalForeignKeyDependents();
     const wanted = new Set(toTruncate);
     for (const name of toTruncate) {
@@ -244,10 +240,6 @@ async function resetPgTables(
   try {
     await _resetPgTablesOnce(adapter, mode, bootLaid);
   } catch (e) {
-    // exec() routes through withRawConnection, whose retry loop calls
-    // reconnectBang → the PG reconnect() override on a connection error, so
-    // _rawConnection is now null and the next _acquireFreshClient() will open a
-    // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
       await _resetPgTablesOnce(adapter, mode, bootLaid);
     } else {
@@ -262,7 +254,6 @@ async function _resetPgTablesOnce(
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
-  // Views/matviews are never canonical — always drop them.
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
@@ -287,9 +278,6 @@ async function _resetPgTablesOnce(
     `SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ${schema}`,
   )) as { schemaname: string; tablename: string }[];
   for (const { schemaname: s, tablename: t } of tableRows) {
-    // A table living outside the default (public) schema — e.g. schema.test.ts's
-    // test_schema/test_schema2 — can never be a boot-laid canonical table; drop
-    // it regardless of mode so it can't bleed state into the next file.
     if (mode === "reset" && s === "public" && bootLaid.has(t)) {
       toTruncate.push(t);
       continue;

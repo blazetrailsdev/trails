@@ -33,7 +33,6 @@ describe("classifyDdl", () => {
       op: "DROP_INDEX",
       table: "people",
     });
-    // PG/SQLite DROP INDEX has no ON clause — fall back to the index name.
     expect(classifyDdl('DROP INDEX "idx_people_on_name"')).toEqual({
       op: "DROP_INDEX",
       table: "idx_people_on_name",
@@ -53,7 +52,6 @@ describe("classifyDdl", () => {
       op: "REFERENTIAL_INTEGRITY",
       table: "people",
     });
-    // Combined multi-table statement (PG disableReferentialIntegrity).
     const combined =
       'ALTER TABLE "ar_internal_metadata" ENABLE TRIGGER ALL;ALTER TABLE "people" ENABLE TRIGGER ALL';
     expect(classifyDdl(combined)).toEqual({
@@ -88,7 +86,6 @@ describe("classifyStatements", () => {
   });
 
   it("splits a ;-joined combined string into per-statement ops", () => {
-    // MariaDB combineMultiStatements / PG combined FK-toggle form.
     const combined = 'TRUNCATE TABLE "people";TRUNCATE TABLE "posts";TRUNCATE TABLE "books"';
     expect(classifyStatements(combined)).toEqual([
       { op: "TRUNCATE", table: "people" },

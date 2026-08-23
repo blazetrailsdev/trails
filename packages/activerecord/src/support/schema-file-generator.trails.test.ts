@@ -37,7 +37,6 @@ const MINI_SCHEMA: Schema = {
     columns: { gadget_id: "integer", name: "string" },
     primaryKey: ["gadget_id"],
   },
-  // Single-column STRING custom PK → stays the array form (not serial).
   registries: {
     columns: { code: "string", label: "string" },
     primaryKey: ["code"],
@@ -58,9 +57,7 @@ describe("generateSchemaFile", () => {
     const fs = await getFsAsync();
     try {
       fs.unlinkSync(filePath);
-    } catch {
-      /* already gone */
-    }
+    } catch {}
   });
 
   it("writes file to os.tmpdir keyed by VITEST_POOL_ID", async () => {
@@ -108,13 +105,11 @@ describe("generateSchemaFile", () => {
     // so its reflected position matches Rails (mirrors schema-types.ts).
     expect(content).toContain('"gadgets", { id: false }');
     expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
-    // The non-PK column is still emitted.
     expect(content).toContain('"name", "string"');
   });
 
   it("keeps a single-column string custom PK as the array (non-serial) form", () => {
     expect(content).toContain('primaryKey: ["code"]');
-    // The string PK column is still emitted as a column.
     expect(content).toContain('"code", "string"');
   });
 });
@@ -145,17 +140,10 @@ describe("generateSchemaFile (MySQL adapter)", () => {
     const fs = await getFsAsync();
     try {
       fs.unlinkSync(filePath);
-    } catch {
-      /* already gone */
-    }
+    } catch {}
   });
 
   it("emits native date, time, json column types (matching define-schema.ts)", () => {
-    // schema-types.ts COLUMN_TYPE_MAP_MYSQL maps date/time/json to their
-    // native MySQL types (PR #4141) so DATE/TIME/JSON columns round-trip as
-    // PlainDate/PlainTime/parsed-JSON instead of raw strings. The generator
-    // must agree, or the boot-laid canonical schema lays these as VARCHAR and
-    // schema loading never registers them for casting.
     expect(content).toContain('"occurred_on", "date"');
     expect(content).toContain('"scheduled_time", "time"');
     expect(content).toContain('"metadata", "json"');
@@ -208,9 +196,7 @@ describe("generateSchemaFile foreign keys", () => {
     for (const filePath of written) {
       try {
         fs.unlinkSync(filePath);
-      } catch {
-        /* already gone */
-      }
+      } catch {}
     }
   });
 
@@ -282,19 +268,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
   });
 });
 
-// PARITY GUARD — schema-file-generator.ts's per-adapter type mapping is a
-// parallel re-implementation of schema-types.ts's COLUMN_TYPE_MAP_* /
-// serialIdType. A one-sided edit reintroduces silent drift: PR #4461 fixed a
-// MariaDB regression where the generator's stale SCHEMA_TO_AR_MYSQL still
-// remapped date/time/json → string, even though schema-types.ts's map had
-// been converged to native MySQL types by PR #4141 — so boot-laid canonical
-// `topics.last_read` was created as varchar(255) instead of date. This guard
-// drives the generator for a schema covering every PrimitiveColumnSpec on each
-// adapter and asserts the emitted `t.column(name, "type", …)` matches the
-// authoritative COLUMN_TYPE_MAP_* the fixtures path (schema-types.ts) uses.
 describe("generateSchemaFile / define-schema.ts type-map parity", () => {
-  // Generate a schema file, read it back, and delete it — the generator's only
-  // observable output is the emitted module text.
   async function readGenerated(schema: Schema, adapter: string): Promise<string> {
     const filePath = await generateSchemaFile(schema, adapter);
     const fs = await getFsAsync();
@@ -303,8 +277,6 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     return content;
   }
 
-  // Extract the emitted AR type for each column from a generated schema file:
-  // matches `t.column("colName", "arType", …)`.
   function emittedTypes(content: string): Record<string, string> {
     const out: Record<string, string> = {};
     const re = /t\.column\("([^"]+)", "([^"]+)"/g;
@@ -313,16 +285,12 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     return out;
   }
 
-  // One column per key, named after the primitive so we can look it up.
   function schemaFor(types: readonly AnyPrimitiveColumnSpec[]): Schema {
     const columns: Record<string, ColumnSpec> = {};
     for (const t of types) columns[`c_${t}`] = t;
     return { parity_probe: columns };
   }
 
-  // `Record<PrimitiveColumnSpec, string>` forces each map to carry every
-  // primitive, so iterating its keys covers the full type surface — a primitive
-  // added to schema-types.ts is automatically exercised here.
   const CASES: ReadonlyArray<{
     adapter: string;
     map: Record<string, string>;
@@ -344,8 +312,6 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     });
   }
 
-  // The exact #4461 regression, pinned: the generator's stale map remapped
-  // date/time/json → string on MySQL, so these must stay native, not VARCHAR.
   it("emits native date/time/json (not string) on MySQL — the PR #4461 regression", async () => {
     const emitted = emittedTypes(
       await readGenerated(schemaFor(["date", "time", "json"]), "mysql2"),
@@ -405,10 +371,6 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
 //     below, since the generator has no DB version.
 type RecordedIndex = { columns: string | string[]; options: Record<string, unknown> };
 
-// A recording context capturing every `addIndex` with the exact options object
-// the emitter passed. `createTable` runs the column callback against a no-op
-// table builder (columns aren't under test here); `dropTable` is the only other
-// surface the generated module touches.
 function makeIndexRecorder(): { recorded: RecordedIndex[]; ctx: Record<string, unknown> } {
   const recorded: RecordedIndex[] = [];
   const noopTable = { column: () => {} };
@@ -428,9 +390,6 @@ function makeIndexRecorder(): { recorded: RecordedIndex[]; ctx: Record<string, u
   return { recorded, ctx };
 }
 
-// Strip `undefined` values (canonical-schema.ts passes every option key,
-// undefined where absent; the generator omits absent keys) so the two normalize
-// equal.
 function normalizeIndexOptions(options: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(options)) if (v !== undefined) out[k] = v;
@@ -443,9 +402,6 @@ function normalizeRecorded(recorded: RecordedIndex[]): string {
   );
 }
 
-// Drive the GENERATOR: emit the schema file, dynamic-import it (the real
-// loadSchema path — DatabaseTasks.loadSchema imports the same file:// URL), and
-// run its default export against the recorder.
 async function generatorIndexes(
   schema: Schema,
   adapter: string,
@@ -462,11 +418,6 @@ async function generatorIndexes(
   return recorded;
 }
 
-// Drive the CANONICAL loader's shared `emitTableIndexes` (the real code
-// canonical-schema.ts's boot path runs) against the recorder and a fake
-// pool-less adapter. `supportsExpressionIndex` mimics the live DB capability the
-// runtime check reads (MySQL ≥ 8.0.13 / SQLite ≥ 3.9 true, MariaDB false);
-// `getDatabaseVersion` is awaited first by the real gate.
 async function canonicalIndexes(
   indexes: Parameters<typeof emitTableIndexes>[3],
   adapter: string,
@@ -485,12 +436,6 @@ async function canonicalIndexes(
   return recorded;
 }
 
-// One table's indexes exercising every option plus an expression index, in
-// canonical-schema.ts's `{ columns, opts }` shape. Boolean flags are only ever
-// set truthy (never explicit `false`) so the generator's truthy
-// `if (index.unique)` omission and the loader's always-passed `unique: opts.unique`
-// normalize identically. `GENERATOR_SCHEMA` flattens the same specs into the
-// generator's `IndexSpec` input.
 const PARITY_INDEXES: Parameters<typeof emitTableIndexes>[3] = [
   { columns: "title", opts: { unique: true, name: "idx_probe_title", where: "rating > 0" } },
   { columns: ["title", "rating"], opts: { order: { rating: "desc" }, length: { title: 10 } } },
@@ -521,40 +466,24 @@ const GENERATOR_SCHEMA: Schema = {
 };
 
 describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
-  // On PG/SQLite the generator keeps expression indexes (its coarse skip is
-  // MySQL-only) and the loader keeps them when the adapter supports them — so
-  // drive `emitTableIndexes` with `supportsExpressionIndex: true` to match.
   for (const adapter of ["postgres", "sqlite"] as const) {
     it(`emits the same addIndex calls as canonical-schema.ts on ${adapter}`, async () => {
       const [gen, canon] = await Promise.all([
         generatorIndexes(GENERATOR_SCHEMA, adapter),
         canonicalIndexes(PARITY_INDEXES, adapter, true),
       ]);
-      // Everything but the MySQL-only adapters-gated index survives on
-      // PG/SQLite (expression kept). Pin the count so the equality below can't
-      // pass vacuously if the schema wrapper stops being recognized and both
-      // sides silently record zero indexes.
       expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
       expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
     });
   }
 
-  // On MySQL the generator drops every expression index unconditionally; the
-  // MariaDB reality (no expression-index support) makes the loader drop it too,
-  // so the deterministic surface — length gating + pass-through options — stays
-  // in lockstep. (The MySQL-8 divergence is the tracked residual below.)
   it("emits the same addIndex calls as canonical-schema.ts on mysql (MariaDB, no expression index)", async () => {
     const [gen, canon] = await Promise.all([
       generatorIndexes(GENERATOR_SCHEMA, "mysql2"),
       canonicalIndexes(PARITY_INDEXES, "mysql2", false),
     ]);
-    // Only the expression index is dropped (the adapters-gated MySQL-only
-    // index survives here), so the rest come through — pin the count so the
-    // equality can't pass vacuously.
     expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
     expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
-    // Length survives on MySQL (both keep it) and the expression index is
-    // dropped by both — pin those two gates explicitly.
     expect(gen.some((r) => r.options.length !== undefined)).toBe(true);
     expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
   });
@@ -574,21 +503,11 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
     }
   });
 
-  // Expression-index gating parity on MySQL 8. The generator now threads the
-  // caller-resolved `supportsExpressionIndex` capability (MySQL >= 8.0.13,
-  // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql2"`
-  // skip, so on a live MySQL 8 (supportsExpressionIndex true) it keeps the
-  // expression index — matching canonical-schema.ts's `emitTableIndexes`, which
-  // uses the same runtime check. (Previously the PR #4471 tracked residual: the
-  // two diverged because the generator had no DB version. Closed by threading
-  // the capability flag from the caller into `generateSchemaFile`.)
   it("emits the same addIndex calls as canonical-schema.ts on mysql 8 (expression index kept)", async () => {
     const [gen, canonMysql8] = await Promise.all([
       generatorIndexes(GENERATOR_SCHEMA, "mysql2", true),
       canonicalIndexes(PARITY_INDEXES, "mysql2", true),
     ]);
-    // All four indexes survive on MySQL 8 (expression kept). Pin the count so
-    // the equality below can't pass vacuously.
     expect(gen).toHaveLength(PARITY_INDEXES.length);
     expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(true);
     expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canonMysql8));

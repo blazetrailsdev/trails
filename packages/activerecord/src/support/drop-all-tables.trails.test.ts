@@ -51,7 +51,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
-        // Second call (retry): return empty table list so no DROPs run.
         return [];
       }),
       executeMutation: vi.fn(async () => {}),
@@ -59,8 +58,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
-    // First attempt: 1 execute call throws. Retry: 3 execute calls (matviews,
-    // views, tables) all return []. Total = 4.
     expect(executeCallCount).toBe(4);
   });
 
@@ -88,7 +85,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     const fakeAdapter = {
       adapterName: "postgres" as const,
       execute: vi.fn(async (sql: string) => {
-        // Return one matview on first pass; empty on retry.
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
         }
@@ -102,9 +98,6 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
-    // First pass: 1 execute (matviews→mv1) + 1 executeMutation (throws).
-    // Retry: 3 execute calls (matviews/views/tables → all empty) + 0 mutations.
-    // Total execute calls = 4 proves the retry path ran.
     expect(fakeAdapter.execute).toHaveBeenCalledTimes(4);
     expect(mutationCallCount).toBe(1);
   });
@@ -119,9 +112,7 @@ describe("resetTestTables", () => {
 
     await resetTestTables(adapter);
 
-    // Canonical table survives (not dropped)...
     expect(await listTables(adapter)).toContain("articles");
-    // ...but its rows are cleared.
     expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
   });
 
@@ -132,15 +123,10 @@ describe("resetTestTables", () => {
     await resetTestTables(adapter);
 
     expect(await listTables(adapter)).not.toContain("bespoke_reset_t");
-    // Canonical tables are still present after the bespoke drop.
     expect(await listTables(adapter)).toContain("articles");
   });
 
   it("drops bookkeeping tables (schema_migrations / ar_internal_metadata) like the old drop-all", async () => {
-    // These are non-canonical, so the reset drops them — matching the previous
-    // unconditional dropAllTables. Migrator tests (non-transactional) rely on a
-    // clean schema_migrations per test; preserving it would leak migration
-    // state and break them.
     await adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
     );
@@ -221,8 +207,6 @@ describe("purge-only pre-snapshot path", () => {
     schemaCache: { clearBang() {} },
   } as unknown as DatabaseAdapter;
 
-  // The sqlite arm lays its one table through createTable and nothing else, so
-  // stubbing that member runs the arm without touching a database.
   const armOnlyAdapter = {
     adapterName: "sqlite",
     createTable: async () => {},
@@ -273,8 +257,6 @@ describe("purge-only pre-snapshot path", () => {
     expect(await listTables(adapter)).toContain("defaults");
   });
 
-  // Kept last: this one runs a real purge, which drops the adapter-specific
-  // tables until the next test file's boot re-lays them.
   it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
     const { dropAllTablesModule } = await freshModules();
     await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4243)`);

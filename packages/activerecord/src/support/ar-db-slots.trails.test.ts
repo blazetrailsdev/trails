@@ -2,10 +2,6 @@ import { osAdapterConfig, registerOsAdapter } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
-// workerForkCount() clamps to the host's cores - 1, so every expectation below
-// would otherwise depend on the machine running it (a 4-vCPU CI runner clamps
-// where a dev box does not). Pin the core count through the OS adapter instead
-// and vary it explicitly in the clamp tests.
 let cores = 64;
 const HOST_CORES = 64;
 
@@ -38,8 +34,6 @@ describe("ar-db-slots", () => {
     }
   });
 
-  // TRAILS_TEST_FORKS outranks AR_DB_FORKS, so it has to be cleared for every
-  // case that exercises the latter — a dev box may well have it exported.
   function setEnv(forks?: string, slots?: string): void {
     delete process.env.TRAILS_TEST_FORKS;
     if (forks === undefined) delete process.env.AR_DB_FORKS;
@@ -148,7 +142,6 @@ describe("ar-db-slots", () => {
       for (const forks of [1, 2, 4, 8]) {
         setEnv(String(forks));
         expect(slotPoolSize()).toBeGreaterThan(workerForkCount());
-        // ...even when an undersized override is supplied.
         setEnv(String(forks), "1");
         expect(slotPoolSize()).toBeGreaterThan(workerForkCount());
       }

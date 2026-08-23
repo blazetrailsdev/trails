@@ -19,10 +19,6 @@ describe("quoting a database name for harness DDL", () => {
   });
 
   it("keeps a sweepable leftover sweepable when its suffix carries a quote", () => {
-    // The regression: `runTokenOfDatabase` matches on the run-token *prefix*,
-    // so everything after it is unconstrained. Interpolating such a name raw
-    // made `DROP DATABASE` a syntax error, and globalSetup then failed on every
-    // subsequent run instead of reclaiming the leftover.
     const leftover = `${slotDatabaseName(BASE, "rabc000001", 1)}"; SELECT 1; --`;
     expect(runTokenOfDatabase(BASE, leftover)).toBe("rabc000001");
 
@@ -30,7 +26,6 @@ describe("quoting a database name for harness DDL", () => {
     expect(sql).toBe(
       `DROP DATABASE IF EXISTS "activerecord_unittest_rabc000001_1""; SELECT 1; --"`,
     );
-    // One identifier, so nothing after it can be read as a second statement.
     expect(sql.split('"').length - 1).toBe(4);
   });
 });

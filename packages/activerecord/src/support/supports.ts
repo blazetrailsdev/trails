@@ -53,12 +53,6 @@ import { inMemoryDb } from "./adapter-helper.js";
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
-// The MySQL-family `supports_*?` predicates that branch on `mariadb?` /
-// `database_version` have no static answer: the mysql lane runs MySQL 8 locally
-// but a MariaDB stand-in in CI, and the two disagree. Probe the server once, on
-// the mysql lane only — the dynamic import keeps the probe's connection attempt
-// off the pg/sqlite lanes, where the literals below stand in for a lane that
-// never asks.
 const mysql =
   adapterType === "mysql"
     ? await import("./mysql-server-version.js")
@@ -79,7 +73,6 @@ function withMysql(base: readonly Backend[], supported: boolean): readonly Backe
 }
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
-  // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
   savepoints: ALL,
   foreign_keys: ALL,
   // `supports_check_constraints?`: MySQL ≥ 8.0.16; MariaDB ≥ 10.3.10 or
@@ -88,14 +81,11 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_json?`: `!mariadb? && database_version >= "5.7.8"`
   // (mysql2_adapter.rb:70).
   json: withMysql(["postgres", "sqlite"], mysql.supportsJson),
-  // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
   // `supports_concurrent_connections?`: `!@memory_database` on SQLite
   // (sqlite3_adapter.rb:198), true elsewhere — so it is config-derived, not
   // adapter-keyed: only the `sqlite3_mem` lane is `:memory:`.
   concurrent_connections: inMemoryDb() ? ["postgres", "mysql"] : ALL,
-  // `ON CONFLICT (target)` — Postgres/SQLite only; MySQL has no conflict
-  // target. Matches `adapterType !== "mysql"` in insert-all.test.ts.
   insert_conflict_target: ["postgres", "sqlite"],
   // Rails `supports_advisory_locks?`: PostgreSQL + MySQL true, SQLite false
   // (abstract default). (postgresql_adapter.rb:420, abstract_mysql_adapter.rb:161)
@@ -220,9 +210,6 @@ export const SUPPORTS_FEATURES: readonly string[] = Object.keys(SUPPORTS);
  */
 export function adapterSupports(feature: string): boolean {
   if (feature.includes(",")) {
-    // Resolve every member before folding: `.every()` short-circuits on the
-    // first false, which would let an unknown key downstream of an unsupported
-    // one pass silently on exactly the lanes where the typo matters.
     const answers = feature.split(",").map((f) => adapterSupports(f.trim()));
     return answers.every(Boolean);
   }

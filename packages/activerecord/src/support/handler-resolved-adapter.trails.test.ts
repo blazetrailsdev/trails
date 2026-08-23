@@ -14,8 +14,6 @@ import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.
 
 class HandlerResolvedPost extends Base {
   static {
-    // Declare attribute types explicitly so the getter/setter is installed
-    // without schema reflection (which would re-enter the pool).
     this.attribute("title", "string");
   }
 
@@ -41,8 +39,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   beforeAll(async () => {
     const adapter = Base.connection;
     await adapter.createTable("handler_resolved_comments", (t) => t.string("body"));
-    // D-0a: load schema for the bare model (no explicit attribute declarations).
-    // This deadlocked before the fix; now routes through the checked-out adapter.
     await HandlerResolvedComment.loadSchema();
   });
 
@@ -55,8 +51,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   it("bare class extends Base loads schema via lazy reflection without deadlock", async () => {
-    // D-0a: no explicit this.attribute() — schema comes from loadSchemaFromAdapter.
-    // On SQLite :memory: + pool size 1 this deadlocked before the fix.
     const comment = await HandlerResolvedComment.create({ body: "world" });
     expect(comment.body).toBe("world");
     expect(comment.isPersisted()).toBe(true);
@@ -64,7 +58,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
 
   it("model resolves adapter via handler — no static { this.adapter = X } needed", async () => {
     expect(Object.prototype.hasOwnProperty.call(HandlerResolvedPost, "_adapter")).toBe(false);
-    // The adapter is still accessible (via handler → pool → Base._adapter cache)
     expect(() => HandlerResolvedPost.connection).not.toThrow();
   });
 });

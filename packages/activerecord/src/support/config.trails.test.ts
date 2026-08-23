@@ -37,8 +37,6 @@ describe("config", () => {
   });
 
   it("never selects a backend from a connection sub-setting", () => {
-    // The regression this whole module exists to prevent: connection details
-    // present in the environment must not switch the lane on their own.
     expect(activeLane(reader({ PGHOST: "db.example", MYSQL_HOST: "mysql.example" }))).toBe(
       "sqlite",
     );
@@ -78,7 +76,6 @@ describe("config", () => {
     ).toEqual({
       host: "db",
       port: 3307,
-      // config.example.yml:4,24 hard-code `username: rails` with no password.
       user: "rails",
       database: "activerecord_unittest",
       socket: "/tmp/mysql.sock",
@@ -120,8 +117,6 @@ describe("config", () => {
   });
 
   it("turns prepared statements on when MYSQL_PREPARED_STATEMENTS is present", () => {
-    // config.example.yml:7-11,27-31 tests the var with a bare `if`, so any
-    // value at all — including "" and "0" — turns prepared statements on.
     expect(mysqlPreparedStatements(reader({}))).toBe(false);
     expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "1" }))).toBe(true);
     expect(mysqlPreparedStatements(reader({ MYSQL_PREPARED_STATEMENTS: "0" }))).toBe(true);
@@ -129,8 +124,6 @@ describe("config", () => {
   });
 
   it("suffixes the database with the worker isolation slot above slot 1", () => {
-    // No run token: globalSetup provisioned nothing, so the historical
-    // shared-base-plus-`_N` naming stands.
     expect(postgresSettings(reader({ AR_DB_SLOT: "1" })).database).toBe("activerecord_unittest");
     expect(postgresSettings(reader({ AR_DB_SLOT: "4" })).database).toBe("activerecord_unittest_4");
     expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("activerecord_unittest_2");
@@ -152,9 +145,6 @@ describe("config", () => {
   });
 
   it("stamps the run token into the database name, slot 1 included", () => {
-    // With a run token stamped, slot 1 stops aliasing the bare base database:
-    // that alias is what made two concurrent runs collide on the un-suffixed
-    // name, leaving globalSetup free to DROP a live run's database.
     const stamped = (slot: string) =>
       postgresSettings(reader({ AR_DB_SLOT: slot, AR_TEST_RUN_TOKEN: "aaax1" })).database;
     expect(stamped("1")).toBe("activerecord_unittest_aaax1_1");
@@ -165,9 +155,6 @@ describe("config", () => {
   });
 
   it("treats an empty sub-setting as unset rather than as an empty value", () => {
-    // CI routinely sets a var to "" to mean "no value". Taking that literally
-    // yields host: "" / user: "" and the server answers `Access denied for
-    // user ''`.
     const settings = mysqlSettings(reader({ MYSQL_HOST: "", MYSQL_SOCK: "" }));
     expect(settings.host).toBe("localhost");
     expect(settings.socket).toBeUndefined();
@@ -175,9 +162,6 @@ describe("config", () => {
   });
 
   it("raises on a malformed slot rather than sharing the base database", () => {
-    // Silently falling back to the base DB is the cross-worker collision the
-    // slot mechanism exists to prevent, and would surface as an unrelated
-    // DDL failure much later.
     expect(() => postgresSettings(reader({ AR_DB_SLOT: "abc" }))).toThrow(/must be an integer/);
     expect(() => postgresSettings(reader({ AR_DB_SLOT: "0" }))).toThrow(/must be >= 1/);
   });
@@ -215,7 +199,6 @@ describe("config", () => {
   });
 
   it("raises for a socket field on the postgres scheme", () => {
-    // Postgres has no socket sub-setting; PGHOST carries it (see above).
     expect(() =>
       settingsUrl("postgres", { ...postgresSettings(reader({})), socket: "/tmp/pg.sock" }),
     ).toThrow(/PGHOST=/);
@@ -226,8 +209,6 @@ describe("config", () => {
     expect(postgresUrl(reader({ PGUSER: "u", PGPASSWORD: "p@ss word" }))).toBe(
       "postgres://u:p%40ss%20word@localhost:5432/activerecord_unittest",
     );
-    // No PGUSER means no userinfo at all, so pg resolves libpq's default user
-    // rather than seeing an empty username.
     expect(postgresUrl(reader({}))).toBe("postgres://localhost:5432/activerecord_unittest");
   });
 
@@ -247,7 +228,6 @@ describe("config", () => {
   });
 
   it("driverConfig omits password and socket entirely when unset", () => {
-    // `undefined` is not the same as absent to mysql2.
     const config = driverConfig(mysqlSettings(reader({})));
     expect(config).not.toHaveProperty("password");
     expect(config).not.toHaveProperty("socket");
