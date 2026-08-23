@@ -691,6 +691,13 @@ export class Callback {
     return this.filter === filter;
   }
 
+  /**
+   * @missingRailsCall concat — PERMANENT. callbacks.rb:262-263 `options[:if].concat
+   *   Array(unless_option)` — Ruby Array#concat mutates in place; the port
+   *   builds the array in the object literal it passes to `Callback.build`
+   *   (`[...existingIf, ...kernelArray(unlessOption)]`), so there is no separate
+   *   array to concat onto. Language shortcoming.
+   */
   mergeConditionalOptions(
     chain: { name: string; config: DefineCallbacksOptions },
     { ifOption, unlessOption }: { ifOption?: unknown; unlessOption?: unknown },
@@ -711,6 +718,13 @@ export class Callback {
     });
   }
 
+  /**
+   * @missingRailsCall matches? — PERMANENT. Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails callbacks.rb:272-279 delegates to
+   *   `matches?(other.kind, other.filter)` for Symbol filters; trails
+   *   callbacks.ts:629-634 isDuplicates inlines the kind/filter equality for
+   *   string filters.
+   */
   isDuplicates(other: Callback): boolean {
     if (typeof this.filter === "string") {
       return this.kind === other.kind && this.filter === other.filter;
@@ -1171,6 +1185,11 @@ export class CallbackChain {
     this.chain.unshift(callback);
   }
 
+  /**
+   * @missingRailsCall delete_if — PERMANENT. Ruby Array#delete_if has no trails port;
+   *   `this.chain = this.chain.filter(...)` is the same in-place removal, and is
+   *   how CallbackChain#remove spells it in this file already.
+   */
   private removeDuplicates(callback: Callback): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
@@ -1278,6 +1297,18 @@ function isCallbackOptions(value: unknown): boolean {
 
 /**
  * Mirrors: ActiveSupport::Callbacks::ClassMethods#__update_callbacks
+ *
+ * @missingRailsCall descendants — CONVERGEABLE (story
+ *   callbacks-update-callbacks-reads-its-own-descendants). callbacks.rb:687
+ *   `self.descendants.prepend(self)` — trails' `__updateCallbacks` takes the
+ *   target list as its `targets` parameter because the callers hold it (a TS
+ *   class has no DescendantsTracker registration at this layer). Converging
+ *   means giving the callbacks host a `descendants` reader and changing every
+ *   caller; tracked, not ratified.
+ * @missingRailsCall prepend — CONVERGEABLE (story
+ *   callbacks-update-callbacks-reads-its-own-descendants). callbacks.rb:687 `descendants.prepend(self)` — the
+ *   same one call as the `descendants` row above: with `targets` handed in,
+ *   there is no receiver list to prepend `self` onto. Converges with that row.
  */
 export function __updateCallbacks(
   name: string,

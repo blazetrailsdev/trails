@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
-    "rubyName": "instantiate",
-    "call": "match?",
-    "reason": "Verified per-site (RFC 0106 wave 4g): `/\\At\\d+_r\\d+\\z/.match?(name)` (join_dependency.rb:121) is Rails' heuristic for \"is this column one of the join aliases\". trails already holds the exact alias set the aliases object emitted, so `instantiate` tests `aliasSet.has(key)` (join-dependency.ts:738) instead of re-deriving it from the alias spelling. Same partition of the result columns, no regex to match against."
-  }
-]

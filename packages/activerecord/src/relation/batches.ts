@@ -519,6 +519,18 @@ export async function* batchOnUnloadedRelation(opts: {
   while (true) {
     const rows = await (opts.load ? batchRelation : batchRelation.select(...cursor)).toArray();
     if (rows.length === 0) break;
+
+    // batches.rb:456-459: `values.flatten.any?(nil)`. trails yields the records
+    // rather than the plucked cursor values, so the same nil check reads the
+    // cursor columns off each record — an omitted column is `undefined` here
+    // where Ruby's `pluck` would have produced `nil`.
+    if (rows.some((record: any) => cursor.some((column) => record.attributes[column] == null))) {
+      throw new ArgumentError(
+        "Not all of the batch cursor columns were included in the custom select clause " +
+          "or some columns contain nil.",
+      );
+    }
+
     yield { rows, useRanges };
     if (rows.length < batchLimit) break;
     if (remaining != null) {

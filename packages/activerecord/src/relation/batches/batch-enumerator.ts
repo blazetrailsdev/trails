@@ -103,6 +103,14 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
+  /**
+   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum(&:delete_all)`
+   *   (batch_enumerator.rb:66) — Enumerable#sum over the enumerator `include
+   *   Enumerable` supplies. trails' batches are an async iterator with no
+   *   Enumerable mixin, so the identical accumulation is the `for await` running
+   *   total (batch-enumerator.ts:106-112); adding a `sum` helper would be
+   *   surface Rails gets from a core module.
+   */
   async deleteAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -111,6 +119,11 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
+  /**
+   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation|
+   *   relation.update_all(updates) }` (batch_enumerator.rb:74-76) — same
+   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
+   */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -119,6 +132,11 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
+  /**
+   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation|
+   *   relation.touch_all(...) }` (batch_enumerator.rb:84-86) — same
+   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
+   */
   async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -129,6 +147,16 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
+  /**
+   * @missingRailsCall count — PERMANENT. Verified per-site (RFC 0106):
+   *   `relation.destroy_all.count(&:destroyed?)` (batch_enumerator.rb:97) —
+   *   Enumerable#count WITH A BLOCK over the destroyed records Array, spelled
+   *   `.filter(...).length` in TS (batch-enumerator.ts:135-136). The homonymous
+   *   `Relation#count` is a different method and is not what this line calls.
+   * @missingRailsCall sum — PERMANENT. Verified per-site (RFC 0106): `sum { |relation| ...
+   *   }` (batch_enumerator.rb:96-98) — same
+   *   Enumerable#sum-over-an-async-iterator case as the `delete_all` row.
+   */
   async destroyAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {

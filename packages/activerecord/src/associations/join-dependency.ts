@@ -746,7 +746,6 @@ export class JoinDependency {
     // The base table's aliased (column, alias) pairs — all columns normally, or
     // just the primary key under an explicit select (`applyColumnAliases`).
     const baseAliasCols = aliases.columnsForNode(joinRoot);
-    const aliasSet = new Set(aliases.columns().map((a) => a.alias));
 
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
     const modelCache = new Map<JoinPart, Map<unknown, any>>();
@@ -761,7 +760,7 @@ export class JoinDependency {
       // Rails appends Aliases::Column.new(name, name) for non-`t\d+_r\d+` columns
       // so they land on the parent (and only the parent) record.
       for (const key of Object.keys(row)) {
-        if (!aliasSet.has(key)) parentAttrs[key] = row[key];
+        if (!/^t\d+_r\d+$/.test(key)) parentAttrs[key] = row[key];
       }
 
       // The base key is read out of the aliased row exactly as the child keys are

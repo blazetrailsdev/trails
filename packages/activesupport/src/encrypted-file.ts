@@ -71,6 +71,12 @@ export class EncryptedFile {
   private resolvedContentPath: string | null = null;
   private memoEncryptor: MessageEncryptor | null = null;
 
+  /**
+   * @missingRailsCall new — PERMANENT. encrypted_file.rb:42-43 `Pathname.new(content_path)`
+   *   / `Pathname.new(key_path)` — Ruby's Pathname has no port; trails keeps
+   *   paths as strings and reaches the filesystem through the async fs/path
+   *   adapters, so there is no Pathname to construct.
+   */
   constructor(opts: EncryptedFileOptions) {
     this.contentPath = opts.contentPath;
     this.keyPath = opts.keyPath;
@@ -104,6 +110,12 @@ export class EncryptedFile {
     return (await this.readKeyFile()) !== null;
   }
 
+  /**
+   * @missingRailsCall exist? — PERMANENT. encrypted_file.rb:71 `content_path.exist?` —
+   *   `Pathname#exist?` with no Pathname to call it on; the same predicate is
+   *   `await fs.exists(path)` on the async fs adapter. See the `initialize ->
+   *   new` row above.
+   */
   async read(): Promise<string> {
     const key = await this.key();
     const fs = await getFsAsync();
@@ -129,6 +141,12 @@ export class EncryptedFile {
 
   // ---- private ----
 
+  /**
+   * @missingRailsCall create — PERMANENT. encrypted_file.rb:89 `Tempfile.create([...]) do
+   *   |tmp_file|` — Ruby's Tempfile is stdlib, not Rails, and has no port; the
+   *   block-scoped temp file is spelled as `fs.mkdtemp` plus an explicit
+   *   `finally` unlink/rmdir, which is what Tempfile.create's block form does.
+   */
   private async writing(
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,
@@ -181,11 +199,22 @@ export class EncryptedFile {
     return this.memoEncryptor;
   }
 
+  /**
+   * @missingRailsCall presence — PERMANENT. Per-entry verified (RFC 0032 wide-entry
+   *   verification): Rails encrypted_file.rb:117-119 reads
+   *   `ENV[env_key].presence`; trails encrypted-file.ts:192-195 spells presence
+   *   as an explicit empty-string check.
+   */
   private readEnvKey(): string | null {
     const v = processEnv[this.envKey];
     return v && v.length > 0 ? v : null;
   }
 
+  /**
+   * @missingRailsCall exist? — PERMANENT. encrypted_file.rb:121 `key_path.exist?` — same
+   *   Pathname substitution as `read -> exist?` above: `await
+   *   fs.exists(this.keyPath)`.
+   */
   private async readKeyFile(): Promise<string | null> {
     if (this.keyFileChecked) return this.keyFileContents;
     this.keyFileChecked = true;

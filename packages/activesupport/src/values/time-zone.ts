@@ -892,6 +892,12 @@ export class TimeZone {
    *   going through `in_time_zone` would close the `values/time-zone` ->
    *   `core-ext/date-and-time/zones` import cycle (zones.ts:17 imports
    *   `TimeZone` from this file), which ESM cannot express.
+   * @missingRailsCall utc — PERMANENT. `time_now.utc.in_time_zone(self)`
+   *   (time_zone.rb:516-518). trails' `timeNow()` answers a JS `Date`, which
+   *   already names an absolute instant, so the `.utc` hop has nothing to
+   *   convert. Pre-existing: surfaced only once `DateTime#utc`
+   *   (date_time/calculations.rb:184) was ported and `utc` entered the
+   *   population.
    */
   now(): TimeWithZone {
     // `time_now.utc.in_time_zone(self)` (time_zone.rb:516-518).
@@ -915,6 +921,14 @@ export class TimeZone {
    * after which this body collapses into that single call. Until then it
    * inlines exactly what that constructor path does, over the same ported
    * members — no second search lives here.
+   *
+   * @missingRailsCall utc — CONVERGEABLE (story
+   *   time-zone-local-builds-its-wall-clock-through-time). `Time.utc(*args)` (time_zone.rb:363-366). trails'
+   *   `local` builds the wall clock as `new Date(Date.UTC(...))` rather than
+   *   through a `Time` value, so the `Time.utc` call has no receiver here;
+   *   converging is the TimeZone-seat port, not this call. Pre-existing:
+   *   surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was
+   *   ported and `utc` entered the population.
    */
   local(
     year: number,
@@ -976,6 +990,12 @@ export class TimeZone {
    *   close a `values/time-zone` -> `zones` -> `values/time-zone` module cycle
    *   (zones.ts:17 imports `TimeZone` from this file, and `timeWithZone` is not
    *   exported), which ESM cannot express — for no behavioural difference.
+   * @missingRailsCall utc — PERMANENT. `Time.at(*args).utc` (time_zone.rb:379-381). trails'
+   *   `at` reaches the same instant through `Time#getutc` (packages/date
+   *   time.ts:783) — ruby/time's own `utc`/`getutc` pair — because the ported
+   *   `Time` is immutable and carries no in-place `utc`. Pre-existing: surfaced
+   *   only once `DateTime#utc` (date_time/calculations.rb:184) was ported and
+   *   `utc` entered the population.
    */
   at(
     seconds: number | bigint | Rational,
@@ -1051,6 +1071,13 @@ export class TimeZone {
    * `ActiveSupport.utc_to_local_returns_utc_offset_times` arm hands that back
    * as is; the legacy arm rebuilds `Time.utc(...)` from its parts, which is a
    * `Date` whose UTC fields carry the local wall clock.
+   *
+   * @missingRailsCall utc — PERMANENT. `Time.utc(t.year, ..., t.sec_fraction * 1_000_000)`
+   *   (time_zone.rb:542-547). trails' non-offset arm rebuilds the same
+   *   components as a JS `Date` through `Date.UTC`, the seat this method's
+   *   callers read. Pre-existing: surfaced only once `DateTime#utc`
+   *   (date_time/calculations.rb:184) was ported and `utc` entered the
+   *   population.
    */
   utcToLocal(time: Date | Temporal.Instant): Temporal.ZonedDateTime | Date {
     const t = this.tzinfo.utcToLocal(time);
