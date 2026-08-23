@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { DateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Rational, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import { Object as ObjectExt } from "./object/acts-like.js";
 import {
   advance,
@@ -69,10 +69,12 @@ function asDate(instant: Temporal.Instant): Date {
 
 function withEnvTz<T>(tz: string, fn: () => T): T {
   vi.stubEnv("TZ", tz);
+  resetLocalTimeZoneId();
   try {
     return fn();
   } finally {
     vi.unstubAllEnvs();
+    resetLocalTimeZoneId();
   }
 }
 

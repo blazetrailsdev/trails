@@ -7,6 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { toSqlAndBinds } from "./connection-adapters/abstract/database-statements.js";
 import { Nodes } from "@blazetrails/arel";
+import { resetLocalTimeZoneId } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
@@ -33,6 +34,7 @@ const FIXED_LOCAL = "2026-07-25 19:25:21.123";
 describe("InternalMetadata#currentTime", () => {
   beforeAll(() => {
     vi.stubEnv("TZ", "America/New_York");
+    resetLocalTimeZoneId();
     vi.useFakeTimers();
     vi.setSystemTime(new Date(FIXED_INSTANT));
   });
@@ -40,6 +42,7 @@ describe("InternalMetadata#currentTime", () => {
   afterAll(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    resetLocalTimeZoneId();
   });
 
   it("formats as YYYY-MM-DD HH:mm:ss.SSS with no zone designator", () => {
