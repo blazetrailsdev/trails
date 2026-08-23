@@ -889,6 +889,7 @@ describe("TimeWithZoneTest", () => {
     const twz = maketwz();
     const time = twz.toTime();
     expect(time).toBeInstanceOf(RubyTime);
+    expect(twz.toTime()).toBe(time);
     expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
     expect(time.utcOffset).toBe(-18000);
     expect(time.zone).toBe("EST");
@@ -899,6 +900,7 @@ describe("TimeWithZoneTest", () => {
     const twz = maketwz();
     const time = twz.toTime();
     expect(time).toBeInstanceOf(RubyTime);
+    expect(twz.toTime()).toBe(time);
     expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
     expect(time.utcOffset).toBe(-18000);
     expect(time.zone).toBeNull();
@@ -909,6 +911,7 @@ describe("TimeWithZoneTest", () => {
     const twz = maketwz();
     const time = twz.toTime();
     expect(time).toBeInstanceOf(RubyTime);
+    expect(twz.toTime()).toBe(time);
     expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
     expect(time.utcOffset).toBe(-18000);
     expect(time.zone).toBeNull();
