@@ -888,17 +888,20 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "and `Time#acts_like_time?` (core_ext/time/acts_like.rb:6-8) " +
       "are marker methods: Ruby reopens the class to hang an empty predicate on " +
       "it so `Object#acts_like?` can find it with `respond_to?`. trails' " +
-      "receivers for those two arms are `Temporal.PlainDate` and a JS `Date` / " +
-      "`Temporal.Instant` — built-ins the port does not monkey-patch — so there " +
-      "is no reopening to define a marker in, and the `:date` / `:time` arms " +
-      "answer from the receiver's own type instead " +
-      "(core-ext/date-and-time/calculations.ts:200-210). Scoped to the three " +
+      "receivers for those two arms are `Temporal.PlainDate` / " +
+      "`Temporal.PlainDateTime` / `Temporal.ZonedDateTime` / `Temporal.Instant`, " +
+      "a JS `Date`, and `@blazetrails/date`'s `Time` — none of them a class the " +
+      "port may reopen, so there is no reopening to define a marker in. RFC 0098 " +
+      "(`time-with-zone-residue-structural-blockers`) settled where the markers " +
+      "live instead: `@blazetrails/date` owns them, as the `actsLikeDate` / " +
+      "`actsLikeTime` predicates over its own value types " +
+      "(packages/date/src/acts-like.ts), which `Object.actsLike` calls " +
+      "(core-ext/object/acts-like.ts:20-30). Installing them on the `Temporal` " +
+      "polyfill prototypes at import time was rejected as a global side effect " +
+      "on a third-party package, and that choice costs the Rails file path for " +
+      "these members — which is what this entry records. Scoped to the three " +
       "acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a " +
-      "trails-owned class and IS ported (time-with-zone.ts:955). " +
-      "`@blazetrails/date`'s `Time` is not one of these receivers either — it is " +
-      "the Ruby core `::Time` stand-in the `date` package duck-types, and no " +
-      "ActiveSupport core_ext member takes it, so `Object#acts_like?`'s `:time` " +
-      "arm never reaches it.",
+      "trails-owned class and IS ported (time-with-zone.ts:955).",
     names: ["acts_like_date?", "acts_like_time?"],
     rubyFiles: [
       "core_ext/date/acts_like.rb",
