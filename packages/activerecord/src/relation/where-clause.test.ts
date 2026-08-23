@@ -190,10 +190,7 @@ describe("ActiveRecord::Relation", () => {
     it("ast removes any empty strings", () => {
       const t = table();
       const whereClause = new WhereClause([t.get("id").in([1, 2, 3])]);
-      const whereClauseWithEmpty = new WhereClause([
-        t.get("id").in([1, 2, 3]),
-        new Nodes.SqlLiteral(""),
-      ]);
+      const whereClauseWithEmpty = new WhereClause([t.get("id").in([1, 2, 3]), ""]);
       expect(whereClause.ast.eql(whereClauseWithEmpty.ast)).toBe(true);
     });
 

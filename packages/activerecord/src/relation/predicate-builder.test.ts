@@ -284,7 +284,7 @@ describe("PredicateBuilderTest", () => {
     const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
     const buildInverted = (builder: PredicateBuilder, hash: Record<string, unknown>) =>
-      new WhereClause(builder.buildFromHash(hash)).invert().predicates;
+      new WhereClause(builder.buildFromHash(hash)).invert().predicates as Nodes.Node[];
 
     it("builds IS NOT NULL for null values", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
@@ -428,7 +428,7 @@ describe("PredicateBuilderTest", () => {
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = new WhereClause(builder.buildFromHash({ authors: { name: "Rails" } })).invert()
-        .predicates;
+        .predicates as Nodes.Node[];
       const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
       // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.

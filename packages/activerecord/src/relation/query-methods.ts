@@ -1064,14 +1064,6 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
 
 /**
  * @internal
- *
- * @missingRailsCall order:constructor,buildFromHash — CONVERGEABLE: the sanitize_sql arm
- *   wraps the fragment in `new Nodes.SqlLiteral` where Rails stores the bare
- *   String (query_methods.rb:1627), so a constructor Rails does not make lands
- *   ahead of `build_from_hash`. trails' WhereClause types its predicates
- *   `Nodes.Node[]` and lacks Rails' String predicate arms
- *   (where_clause.rb:160,167,190,203), which the bare String needs. Tracked by
- *   story where-clause-string-predicate-arms (RFC 0106).
  */
 export function buildWhereClause(
   this: QueryMethodsHost,
@@ -1090,7 +1082,7 @@ export function buildWhereClause(
     return buildWhereClause.call(this, head, tail);
   }
 
-  let parts: Nodes.Node[];
+  let parts: (Nodes.Node | string)[];
   if (typeof opts === "string") {
     // Mirrors build_where_clause (query_methods.rb:1620-1628): a bare fragment is
     // wrapped verbatim as Arel.sql(opts); a fragment whose first rest arg is a
@@ -1104,9 +1096,7 @@ export function buildWhereClause(
     } else if (opts.includes("?")) {
       parts = [buildBoundSqlLiteral.call(this, opts, rest)];
     } else {
-      parts = [
-        new Nodes.SqlLiteral(this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!),
-      ];
+      parts = [this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!];
     }
   } else if (isPlainObject(opts)) {
     // Mirrors build_where_clause (query_methods.rb:1640): a hash condition
