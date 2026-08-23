@@ -5,7 +5,7 @@
  * (activemodel/lib/active_model/callbacks.rb)
  */
 
-import { ArgumentError } from "./attribute-assignment.js";
+import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import {
   Callback,
   Value,
@@ -66,7 +66,16 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
     if (klass.prototype) asDefineCallbacks(klass.prototype, callback, options);
 
     for (const type of types) {
-      _defineModelCallbackByType[type](this, callback);
+      const methodName = `_define_${String(type)}_model_callback`;
+      const generator = _defineModelCallbackByType[methodName];
+      // Ruby's `send` on an unknown name raises NoMethodError; a bare call of
+      // the missing entry would surface a TypeError instead.
+      if (!generator) {
+        throw new NoMethodError(
+          `undefined method '${methodName}' for class ${(this as { name?: string }).name}`,
+        );
+      }
+      generator(this, callback);
     }
   }
 }
@@ -74,13 +83,15 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
 /**
  * @noRailsEquivalent PERMANENT: stands in for `send("_define_#{type}_model_callback", ...)`
  *   (callbacks.rb:125) — TS has no `send`, and the three targets are
- *   module-private functions, not members of `this`. Not exported.
+ *   module-private functions, not members of `this`. Keyed by the interpolated
+ *   Ruby method name so an unknown `only:` entry misses exactly as `send` does.
+ *   Not exported.
  */
 const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
   {
-    before: _defineBeforeModelCallback,
-    after: _defineAfterModelCallback,
-    around: _defineAroundModelCallback,
+    _define_before_model_callback: _defineBeforeModelCallback,
+    _define_after_model_callback: _defineAfterModelCallback,
+    _define_around_model_callback: _defineAroundModelCallback,
   };
 
 /** Minimum shape required of a record object threaded through a callback chain. */
