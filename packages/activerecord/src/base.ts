@@ -731,49 +731,6 @@ function _extractAssociationAttrs(
 }
 
 /**
- * Route a constructor-form composite primary key through the deferred `id`
- * handling: trails holds the `id` key out of super()'s attribute loop and
- * re-dispatches it here, once `initInternals` has run.
- *
- * `id: [a, b]` goes through the `id=` setter (`PrimaryKey#id=`, mirroring
- * `CompositePrimaryKey#id=`), which zips the Enumerable (array/set) across the
- * key columns. A scalar `id` on a model-level composite PK raises `TypeError`
- * there, matching Rails (which wants `id: [author_id, id]`, not a bare scalar).
- * @internal
- */
-function _applyCompositePrimaryKey(
-  record: Base,
-  ctor: typeof Base,
-  attrs: Record<string, unknown>,
-): void {
-  const pk = (ctor as { primaryKey?: unknown }).primaryKey;
-  if (!Array.isArray(pk) || !Object.prototype.hasOwnProperty.call(attrs, "id")) return;
-  // Dispatch through the `id=` setter (`PrimaryKey#id=`): an array spreads across the key
-  // columns; a scalar raises TypeError, matching `CompositePrimaryKey#id=`.
-  (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
-}
-
-/**
- * The one key held out of super()'s setter-dispatching attribute loop and
- * re-applied post-`initInternals`: a composite-PK `id`
- * (→ `_applyCompositePrimaryKey`), whose `id=` writes key columns that are not
- * wired until after `super()`.
- * @internal
- */
-function _withoutDeferredConstructionKeys(
-  ctor: typeof Base | undefined,
-  attrs: Record<string, unknown>,
-): Record<string, unknown> {
-  if (
-    !Array.isArray((ctor as { primaryKey?: unknown } | undefined)?.primaryKey) ||
-    !Object.prototype.hasOwnProperty.call(attrs, "id")
-  ) {
-    return attrs;
-  }
-  return Object.fromEntries(Object.entries(attrs).filter(([k]) => k !== "id"));
-}
-
-/**
  * Re-mark constructor-assigned attributes as dirty against their schema
  * defaults, so `new Model(attrs).changes` matches Rails — a new record built
  * by assignment is dirty against column defaults (`Topic.new(title: "x")` →
@@ -3090,12 +3047,8 @@ export class Base extends Model {
       const wasSuppressed = suppressor._suppressInitializeCallback;
       suppressor._suppressInitializeCallback = true;
       const { multiparams, regular } = extractMultiparameterCallstack(attrs);
-      // Same deferral as the non-multiparameter branch: a composite-PK `id` or
-      // nested-attribute key sitting alongside multiparameter keys must not
-      // dispatch its setter inside super() before `initInternals` runs.
-      const regularForSuper = _withoutDeferredConstructionKeys(ctor, regular);
       try {
-        super(regularForSuper);
+        super(regular);
       } finally {
         // Always restore the flag even if super() throws, so later instances
         // on this class still fire after_initialize normally.
@@ -3106,7 +3059,6 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
-      _applyCompositePrimaryKey(this as unknown as Base, ctor, attrs);
       executeMultiparameterAssignment(this as any, multiparams);
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
@@ -3163,11 +3115,6 @@ export class Base extends Model {
           );
         }
       }
-      // Hold the composite-PK `id` out of super()'s setter-dispatching loop:
-      // `id=` touches key columns that aren't wired until after super()
-      // (`initInternals`). Re-dispatched post-super by
-      // `_applyCompositePrimaryKey`.
-      attrsForSuper = _withoutDeferredConstructionKeys(ctor2, attrsForSuper);
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
         suppressor2,
@@ -3185,7 +3132,6 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
-      _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
