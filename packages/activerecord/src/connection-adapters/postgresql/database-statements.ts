@@ -7,10 +7,10 @@
 import type pg from "pg";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
-import type { ExplainOption } from "../abstract/database-statements.js";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
+import { combineMultiStatements, type ExplainOption } from "../abstract/database-statements.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
@@ -260,35 +260,50 @@ export function affectedRows(result: pg.QueryResult): number {
 
 /** @internal */
 interface ExecuteBatchHost {
-  execute(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
+  rawExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    prepare?: boolean,
+    async?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+    batch?: boolean,
+  ): Promise<unknown>;
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#execute_batch
  *
- * Rails joins statements and calls execute once; we iterate because node-postgres returns
- * an array of results for multi-statement queries and our execute() expects a single result.
+ * Rails: `raw_execute(combine_multi_statements(statements), name, batch: true, **kwargs)`
+ * (postgresql/database_statements.rb:195-197). PG accepts the joined string in one
+ * simple-query message, so this is a single `rawExecute`; the positional arguments
+ * below are `raw_execute`'s own defaults (abstract/database_statements.rb:552) with
+ * the `**kwargs` PG forwards travelling on this call. Going through `raw_execute`
+ * rather than `internal_execute` is also what leaves batch statements uncommented —
+ * `preprocess_query`, which runs the query_transformers, is `internal_execute`'s
+ * step (`:589-591`).
  * @internal
  */
 export async function executeBatch(
   this: ExecuteBatchHost,
   statements: string[],
   name: string | null = null,
+  {
+    allowRetry = false,
+    materializeTransactions = true,
+  }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
-  // Match Rails' execute_batch → raw_execute, which skips the query_transformers
-  // pass: batch statements carry no QueryLogs comment. Flag each statement so
-  // preprocessQuery skips the transformer pass (write-checks still run); the flag
-  // is consumed synchronously there before any await, so it never spans the await,
-  // and the finally clears it if execute throws before consuming it.
-  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
-  for (const statement of statements) {
-    host._inQueryTransformers = true;
-    try {
-      await this.execute(statement, [], name ?? undefined);
-    } finally {
-      host._inQueryTransformers = false;
-    }
-  }
+  await this.rawExecute(
+    combineMultiStatements(statements),
+    name,
+    [],
+    false,
+    false,
+    allowRetry,
+    materializeTransactions,
+    true,
+  );
 }
 
 /** @internal */
