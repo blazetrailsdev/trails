@@ -2170,8 +2170,9 @@ export class MigrationContext<
     const fileList = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
-      const [, name, scope] = parsed;
       let version = parsed[0];
+      const name = parsed[1];
+      const scope = parsed[2];
       if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
         throw new InvalidMigrationTimestampError(version, name);
       }
@@ -2285,9 +2286,9 @@ export class MigrationContext<
     const migrations = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
-      const scope = parsed[2];
       let version: string | number = parsed[0];
       let name = parsed[1];
+      const scope = parsed[2];
       if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
         throw new InvalidMigrationTimestampError(version, name);
       }

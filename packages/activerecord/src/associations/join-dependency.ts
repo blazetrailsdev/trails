@@ -196,7 +196,7 @@ export class JoinDependency {
   ) {
     this._baseModel = base;
     table ??= (base as any).arelTable;
-    this._baseAlias = String(table!.name ?? (base as any).tableName);
+    this._baseAlias = (table as any).name ?? (base as any).tableName;
     this._aliasTracker = new AliasTracker(
       this._baseTableAliasLength(),
       new Map([[this._baseAlias, 1]]),
