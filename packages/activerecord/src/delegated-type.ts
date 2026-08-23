@@ -97,11 +97,33 @@ export function delegatedType(
   }
   (modelClass as any)._delegatedTypes.set(role, config);
 
+  // delegated_type.rb:233 `define_delegated_type_methods role, types: types, options: options`
+  defineDelegatedTypeMethods(modelClass, role, { types: options.types, options });
+}
+
+/**
+ * Define all accessor methods for a delegated type role on the given model class.
+ * Called by `delegatedType`, which is the public entry point.
+ *
+ * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
+ *
+ * @internal
+ */
+export function defineDelegatedTypeMethods(
+  modelClass: typeof Base,
+  role: string,
+  { types, options }: { types: string[]; options: DelegatedTypeOptions },
+): void {
+  // delegated_type.rb:237-239
+  const primaryKey = options.primaryKey ?? "id";
+  const roleType = options.foreignType ?? `${role}_type`;
+  const roleId = options.foreignKey ?? `${role}_id`;
+
   // Class method: Entry.entryableTypes → ["Message", "Comment"]
   // Mirrors Rails' define_singleton_method("#{role}_types") { types.map(&:to_s) }
   Object.defineProperty(modelClass, `${role}Types`, {
     get() {
-      return options.types.map(String);
+      return types.map(String);
     },
     configurable: true,
   });
@@ -111,7 +133,7 @@ export function delegatedType(
   // — the constantized model class for the current foreign_type.
   Object.defineProperty(modelClass.prototype, `${role}Class`, {
     get(this: Base) {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
       autoloadModel(typeName);
       return constantize(typeName) as typeof Base;
@@ -128,7 +150,7 @@ export function delegatedType(
   // lookup that an unsaved/unregistered foreign_type would make throw.
   Object.defineProperty(modelClass.prototype, `${role}Name`, {
     get(this: Base) {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
       // Rails: model_name.singular == name.underscore.tr("/", "_").
       // "Access::NoticeMessage" → "access/notice_message" → "access_notice_message".
@@ -144,9 +166,9 @@ export function delegatedType(
   // Rails: define_method "build_#{role}" { |*params| public_send("#{role}=", public_send("#{role}_class").new(*params)) }
   Object.defineProperty(modelClass.prototype, `build${camelize(role, true)}`, {
     value: function (this: Base, attrs: Record<string, unknown> = {}): Base {
-      const typeName = this.readAttribute(foreignType) as string | null;
+      const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) {
-        throw new Error(`Cannot build${camelize(role, true)}: ${foreignType} is not set`);
+        throw new Error(`Cannot build${camelize(role, true)}: ${roleType} is not set`);
       }
       autoloadModel(typeName);
       const TargetClass = constantize(typeName) as typeof Base;
@@ -164,7 +186,7 @@ export function delegatedType(
   // Rails: scope_name = type.tableize.tr("/", "_"); singular = scope_name.singularize
   // Namespaced types like "Access::NoticeMessage" tableize to "access/notice_messages",
   // then "/" → "_" gives "access_notice_messages" (a valid scope/method name).
-  for (const typeName of options.types) {
+  for (const typeName of types) {
     const scopeSnake = tableize(typeName).replace(/\//g, "_");
     const singularSnake = singularize(scopeSnake);
     const scopeName = camelize(scopeSnake, false);
@@ -173,19 +195,13 @@ export function delegatedType(
     // method (which is "#{singular}?"). "Access::NoticeMessage" → isAccessNoticeMessage().
     const predicateSuffix = camelize(singularSnake, true);
 
+    // delegated_type.rb:263 `scope scope_name, -> { where(role_type => type) }`
+    (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [roleType]: typeName }));
+
     // Type predicate: isMessage(), isAccessNoticeMessage()
     Object.defineProperty(modelClass.prototype, `is${predicateSuffix}`, {
       value: function (this: Base): boolean {
-        return this.readAttribute(foreignType) === typeName;
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // Scope: Model.messages(), Model.accessNoticeMessages()
-    Object.defineProperty(modelClass, scopeName, {
-      value: function (this: typeof Base) {
-        return this.where({ [foreignType]: typeName });
+        return this.readAttribute(roleType) === typeName;
       },
       writable: true,
       configurable: true,
@@ -196,7 +212,7 @@ export function delegatedType(
     // Rails: define_method(singular) { public_send(role) if public_send(query) }
     Object.defineProperty(modelClass.prototype, singularName, {
       get(this: Base) {
-        if (this.readAttribute(foreignType) !== typeName) return null;
+        if (this.readAttribute(roleType) !== typeName) return null;
         return (this as unknown as Record<string, unknown>)[role];
       },
       configurable: true,
@@ -207,8 +223,8 @@ export function delegatedType(
     const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
     Object.defineProperty(modelClass.prototype, fkAccessorName, {
       get(this: Base) {
-        if (this.readAttribute(foreignType) !== typeName) return null;
-        return this.readAttribute(foreignKey);
+        if (this.readAttribute(roleType) !== typeName) return null;
+        return this.readAttribute(roleId);
       },
       configurable: true,
     });
@@ -223,21 +239,4 @@ export function getDelegatedTypeConfig(
   role: string,
 ): DelegatedTypeOptions | undefined {
   return (modelClass as any)._delegatedTypes?.get(role);
-}
-
-/**
- * Define all accessor methods for a delegated type role on the given model class.
- * Called internally by `delegatedType`; the public entry point is `delegatedType`.
- *
- * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
- *
- * @internal
- */
-export function defineDelegatedTypeMethods(
-  modelClass: typeof Base,
-  role: string,
-  types: string[],
-  options: DelegatedTypeOptions,
-): void {
-  delegatedType(modelClass, role, { ...options, types });
 }

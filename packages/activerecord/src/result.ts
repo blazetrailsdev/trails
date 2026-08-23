@@ -135,8 +135,8 @@ export class Result {
     return this.hashRows()[Symbol.iterator]();
   }
 
-  includesColumn(name: string): boolean {
-    return this.columns.includes(name);
+  includesColumn(name: string | null): boolean {
+    return this.columns.includes(name as string);
   }
 
   get length(): number {

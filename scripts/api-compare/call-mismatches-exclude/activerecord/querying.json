@@ -3,14 +3,7 @@
     "package": "activerecord",
     "tsFile": "querying.ts",
     "rubyName": "_load_from_sql",
-    "call": "inheritance_column",
-    "reason": "querying.rb:88 `result_set.includes_column?(inheritance_column)` — trails' `_loadFromSql` (querying.ts:147) receives plain rows, not the `Result`, so it has no `includes_column?` to ask. `_instantiate` short-circuits the STI lookup when the column value is absent, covering both Rails arms. Converges once `_loadFromSql` takes the Result."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "querying.ts",
-    "rubyName": "_load_from_sql",
     "call": "instantiate_instance_of",
-    "reason": "querying.rb:92 — the homogeneous arm of the same branch. Routing it through `instantiateInstanceOf` would also change which of `_instantiate`'s two type maps the column types land in (see the `persistence.ts instantiate -> instantiate_instance_of` row). Converges with the `inheritance_column` row."
+    "reason": "querying.rb:92 `instantiate_instance_of(self, record, column_types, &block)` — trails' `instantiateInstanceOf` (persistence.ts:1951) is module-private, and Rails' body it would reach (persistence.rb:311-313 `klass.allocate.init_with_attributes`) is itself seated inside `_instantiate` (base.ts:2827), which this arm calls directly with the same arguments. Exporting the helper to make the literal call only relocates the gap onto `instantiate_instance_of -> init_with_attributes`, so the row stays here. Tracked by story `decompose-instantiate-onto-allocate-init-with-attributes` (RFC 0023): converges when `_instantiate` is decomposed onto `allocate`/`initWithAttributes` — trails' `initWithAttributes` (core.ts:392) is still only core.rb:509-510, missing `init_internals`, the yield, and the find/initialize callback runs at core.rb:512-517."
   }
 ]

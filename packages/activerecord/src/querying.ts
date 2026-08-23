@@ -44,19 +44,10 @@ export async function findBySql<T extends typeof Base>(
       allowRetry: resolvedOpts.allowRetry,
       preparable: resolvedOpts.preparable,
     });
-    return _loadFromSql.call<
-      T,
-      [
-        Record<string, unknown>[],
-        typeof resolvedBlock,
-        Record<string, { deserialize(value: unknown): unknown }>,
-      ],
-      InstanceType<T>[]
-    >(
+    return _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
       this,
-      result.toArray(),
+      result,
       resolvedBlock,
-      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
     );
   });
 }
@@ -146,28 +137,39 @@ export async function _queryBySql(
  */
 export function _loadFromSql<T extends typeof Base>(
   this: T,
-  rows: Record<string, unknown>[],
+  resultSet: Result,
   block?: (record: InstanceType<T>) => void,
-  columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
 ): InstanceType<T>[] {
-  if (rows.length === 0) return [];
+  if (resultSet.isEmpty()) return [];
 
-  const payload = { record_count: rows.length, class_name: this.name };
-  const records = Notifications.instrument("instantiation.active_record", payload, () =>
-    // Rails uses instantiate() when the result set includes the inheritance
-    // column (full STI dispatch) and instantiate_instance_of(self, …) otherwise
-    // (skip dispatch). _instantiate short-circuits the STI lookup when the
-    // column value is absent (undefined is falsy), covering both paths.
-    // The block is threaded into instantiate so it runs (Rails'
-    // `init_with_attributes` yield) before the find/initialize callbacks.
-    // `columnTypes` casts extra/computed columns absent from the schema; known
-    // columns ignore it and keep their declared cast type, mirroring Rails'
-    // `column_types.reject { |k,_| attribute_types.key?(k) }`.
-    rows.map((row) =>
-      this._instantiate(row, block as ((r: InstanceType<T>) => void) | undefined, columnTypes),
-    ),
-  );
-  return records;
+  let columnTypes = resultSet.columnTypes as Record<
+    string,
+    { deserialize(value: unknown): unknown }
+  >;
+
+  if (Object.keys(columnTypes).length !== 0) {
+    const attributeTypes = this.attributeTypes();
+    columnTypes = Object.fromEntries(
+      Object.entries(columnTypes).filter(([k]) => !Object.hasOwn(attributeTypes, k)),
+    );
+  }
+
+  const messageBus = Notifications.instrumenter;
+
+  const payload = { record_count: resultSet.length, class_name: this.name };
+
+  return messageBus.instrument("instantiation.active_record", payload, () => {
+    // The reject above (querying.rb:76-78) removed every known attribute name,
+    // so `instantiate`'s third argument — trails' `overrideTypes`, not Rails'
+    // additional types — cannot override a schema cast type here. `toArray()`
+    // stands in for `indexed_rows`: `_instantiate` reads an attribute hash.
+    if (resultSet.includesColumn(this.inheritanceColumn)) {
+      return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
+    } else {
+      // Instantiate a homogeneous set
+      return resultSet.toArray().map((record) => this._instantiate(record, block, columnTypes));
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
