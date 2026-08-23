@@ -116,7 +116,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     // NOTE: PG `quoting_test.rb` has no `test_quote_binary`. Binary-quoting
     // coverage lives where Rails keeps it: `quotedBinary`/`escape_bytea` is
-    // unit-tested in connection-adapters/postgresql/quoting.test.ts, and the
+    // unit-tested in connection-adapters/postgresql/quoting.trails.test.ts, and the
     // bytea round-trip is covered by bytea.test.ts (Rails bytea_test.rb). The
     // phantom-named stub that used to sit here was removed to avoid an
     // unmatched parity:test entry.
