@@ -389,7 +389,11 @@ export function affectedRows(this: PerformQueryHost, _result: unknown): number {
 export async function executeBatch(
   this: ExecuteBatchHost,
   statements: string[],
-  name?: string | null,
+  name: string | null = null,
+  {
+    allowRetry = false,
+    materializeTransactions = true,
+  }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   const sql = combineMultiStatements(statements);
   // Rails: `raw_execute(sql, name, batch: true, **kwargs)`
@@ -399,7 +403,7 @@ export async function executeBatch(
   // statements uncommented — `preprocess_query`, which runs the
   // query_transformers, is `internal_execute`'s step (`:589-591`) — so the
   // `_inQueryTransformers` suppression flag this used to set is gone with it.
-  await this.rawExecute(sql, name, [], false, false, false, true, true);
+  await this.rawExecute(sql, name, [], false, false, allowRetry, materializeTransactions, true);
 }
 
 /** @internal */

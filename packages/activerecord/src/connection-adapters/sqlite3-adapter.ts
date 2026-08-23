@@ -1304,8 +1304,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    *  (sqlite3/database_statements.rb:126-129).
    * @internal
    */
-  override async executeBatch(statements: string[], name?: string | null): Promise<void> {
-    return sqliteExecuteBatch.call(this, statements, name);
+  override async executeBatch(
+    statements: string[],
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<void> {
+    return sqliteExecuteBatch.call(this, statements, name, kwargs);
   }
 
   /** SQLite has no TRUNCATE; emit `DELETE FROM`.

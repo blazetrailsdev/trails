@@ -700,7 +700,11 @@ export interface AbstractAdapter {
   /** @internal */
   castResult?(rawResult: unknown): Result;
   /** @internal */
-  executeBatch(statements: string[], name?: string | null): Promise<void>;
+  executeBatch(
+    statements: string[],
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<void>;
   /** @internal */
   preprocessQuery(sql: string): string;
 
@@ -1147,9 +1151,9 @@ export class AbstractAdapter implements Quoting {
     return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
   }
 
-  async cache<T>(fn: () => T | Promise<T>): Promise<T> {
+  cache<T>(fn: () => T | Promise<T>): T | Promise<T> {
     this._ensureQueryCache();
-    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as Promise<T>;
+    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as T | Promise<T>;
   }
 
   enableQueryCacheBang(): void {

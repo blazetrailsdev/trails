@@ -274,18 +274,30 @@ export class ConnectionPoolConfiguration {
     return result;
   }
 
-  async enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
     const qc = this.queryCache;
     const oldEnabled = qc.enabled;
     const oldDirties = qc.dirties;
     qc.enabled = true;
     qc.dirties = true;
-    try {
-      return await fn();
-    } finally {
+    const restore = () => {
       qc.enabled = oldEnabled;
       qc.dirties = oldDirties;
+    };
+    // NOT an `async` method, for the same reason `disableQueryCache` above is
+    // not: Ruby's `ensure` fires when the block RETURNS, so a block handing
+    // back a pending FutureResult restores synchronously and the handle passes
+    // through untouched. Awaiting it would adopt the thenable.
+    let result: T | Promise<T>;
+    try {
+      result = fn();
+    } catch (error) {
+      restore();
+      throw error;
     }
+    if (result instanceof Promise) return result.finally(restore);
+    restore();
+    return result;
   }
 
   enableQueryCacheBang(): void {
@@ -356,8 +368,8 @@ export function queryCacheEnabled(this: QueryCacheHost): boolean {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache
  */
-export function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): Promise<T> {
-  return this.pool.enableQueryCache(fn) as Promise<T>;
+export function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): T | Promise<T> {
+  return this.pool.enableQueryCache(fn);
 }
 
 /**
