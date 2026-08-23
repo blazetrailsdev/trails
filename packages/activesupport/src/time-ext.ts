@@ -515,6 +515,24 @@ export function change(
     1_000_000_000n,
   );
 
+  // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag, set
+  // by `Time.utc`; a `Temporal.ZonedDateTime` answers it by its zone; a JS
+  // `Date` carries no such flag and reads back in the system zone, so it stays
+  // off that arm even under `TZ=UTC`.
+  const isUtc =
+    date instanceof RubyTime
+      ? date.isUtc()
+      : date instanceof Date
+        ? false
+        : date.timeZoneId === "UTC";
+
+  // `zone` (time/calculations.rb:149, :172) — a `::Time`'s tzdata abbreviation,
+  // `nil` when it was built from an offset. A JS `Date` carries only the
+  // system's local zone; a `Temporal.ZonedDateTime` is the receiver Rails reads
+  // through `utc_to_local`, the arm between the two.
+  const zone =
+    date instanceof RubyTime ? date.zone : date instanceof Date ? Temporal.Now.timeZoneId() : null;
+
   if (newOffset !== null) {
     // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
@@ -530,100 +548,89 @@ export function change(
     return date instanceof Date ? newTime.toInstant() : newTime;
   }
 
-  if (date instanceof RubyTime && date.isUtc()) {
+  if (isUtc) {
     // `elsif utc?` (time/calculations.rb:147-148).
-    return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSecRational);
-  }
-
-  if (date instanceof RubyTime) {
-    if (date.zone !== null) {
-      // `elsif zone` (time/calculations.rb:172-175) — Ruby's reversed component
-      // order, with the receiver's `isdst` picking the occurrence of a wall
-      // clock a DST fall-back repeats.
-      return RubyTime.local(
-        newSecRational,
-        newMin,
-        newHour,
-        newDay,
-        newMonth,
-        newYear,
-        null,
-        null,
-        date.isdst,
-        null,
-      );
+    if (date instanceof RubyTime) {
+      return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSecRational);
     }
-    // `else ::Time.new(..., utc_offset)` (time/calculations.rb:176-177) — a
-    // receiver built from an offset has no zone to answer.
-    return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSecRational, date.utcOffset);
-  }
-
-  if (!(date instanceof Date) && self.timeZoneId === "UTC") {
-    // `elsif utc?` (time/calculations.rb:147-148). Ruby's `utc?` is an explicit
-    // flag set by `Time.utc`, never true for a `Time.local` receiver whatever
-    // the host zone is; a JS `Date` carries no such flag and reads back in the
-    // system zone, so it stays off this arm even under `TZ=UTC`.
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
-  if (date instanceof Date) {
-    // `elsif zone` (time/calculations.rb:172-175): a JS `Date` carries no zone
-    // object, only the system's local zone, so it lands here rather than on the
-    // `utc_to_local` arm below or the trailing `utc_offset` one, and it has no
-    // `isdst` flag of its own to hand over.
-    // boundary: a JS `Date` carries milliseconds and nothing finer, so the
-    // answer is read back at the receiver's own resolution.
-    return Temporal.Instant.fromEpochMilliseconds(
-      RubyTime.local(
-        newSecRational,
-        newMin,
-        newHour,
-        newDay,
-        newMonth,
-        newYear,
-        null,
-        null,
-        null,
-        null,
-      ).toTime().epochMilliseconds,
+  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:148-171).
+  // Only a `Temporal.ZonedDateTime` reaches it: `@blazetrails/date`'s
+  // `Time#zone` answers the tzdata abbreviation String and nothing else, so
+  // `respond_to?(:utc_to_local)` is false for every trails `::Time`.
+  if (date instanceof Temporal.ZonedDateTime) {
+    let newTime = Temporal.ZonedDateTime.from(
+      { timeZone: date.timeZoneId, ...newComponents },
+      // Ruby's `Time.new` with a zone object picks the first chronological
+      // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
+      { disambiguation: "compatible" },
     );
+
+    // Some versions of Ruby have a bug where Time.new with a zone object and
+    // fractional seconds will end up with a broken utc_offset.
+    // This is fixed in Ruby 3.3.1 and 3.2.4
+    if (!Number.isInteger(newTime.offsetNanoseconds)) {
+      newTime = newTime.add({ nanoseconds: 0 });
+    }
+
+    // When there are two occurrences of a nominal time due to DST ending,
+    // `Time.new` chooses the first chronological occurrence (the one with a
+    // larger UTC offset). However, for `change`, we want to choose the
+    // occurrence that matches this time's UTC offset.
+    //
+    // If the new time's UTC offset is larger than this time's UTC offset, the
+    // new time might be a first chronological occurrence. So we add the offset
+    // difference to fast-forward the new time, and check if the result has the
+    // desired UTC offset (i.e. is the second chronological occurrence).
+    const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
+    let newTime2: Temporal.ZonedDateTime;
+    if (
+      offsetDifference > 0 &&
+      (newTime2 = newTime.add({ nanoseconds: offsetDifference })).offsetNanoseconds ===
+        date.offsetNanoseconds
+    ) {
+      return newTime2;
+    } else {
+      return newTime;
+    }
   }
 
-  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).
-  let newTime = Temporal.ZonedDateTime.from(
-    { timeZone: date.timeZoneId, ...newComponents },
-    // Ruby's `Time.new` with a zone object picks the first chronological
-    // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
-    { disambiguation: "compatible" },
+  if (zone !== null) {
+    // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
+    // reversed component order, with the receiver's `isdst` picking the
+    // occurrence of a wall clock a DST fall-back repeats. A JS `Date` has no
+    // `isdst` flag of its own to hand over, and carries milliseconds and
+    // nothing finer, so the answer is read back at its own resolution.
+    const newTime = RubyTime.local(
+      newSecRational,
+      newMin,
+      newHour,
+      newDay,
+      newMonth,
+      newYear,
+      null,
+      null,
+      date instanceof RubyTime ? date.isdst : null,
+      null,
+    );
+    return date instanceof Date
+      ? Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds)
+      : newTime;
+  }
+
+  // `else ::Time.new(..., utc_offset)` (time/calculations.rb:176-177) — a
+  // `::Time` built from an offset has no zone to answer.
+  return new RubyTime(
+    newYear,
+    newMonth,
+    newDay,
+    newHour,
+    newMin,
+    newSecRational,
+    (date as RubyTime).utcOffset,
   );
-
-  // Some versions of Ruby have a bug where Time.new with a zone object and
-  // fractional seconds will end up with a broken utc_offset.
-  // This is fixed in Ruby 3.3.1 and 3.2.4
-  if (!Number.isInteger(newTime.offsetNanoseconds)) {
-    newTime = newTime.add({ nanoseconds: 0 });
-  }
-
-  // When there are two occurrences of a nominal time due to DST ending,
-  // `Time.new` chooses the first chronological occurrence (the one with a
-  // larger UTC offset). However, for `change`, we want to choose the
-  // occurrence that matches this time's UTC offset.
-  //
-  // If the new time's UTC offset is larger than this time's UTC offset, the
-  // new time might be a first chronological occurrence. So we add the offset
-  // difference to fast-forward the new time, and check if the result has the
-  // desired UTC offset (i.e. is the second chronological occurrence).
-  const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
-  let newTime2: Temporal.ZonedDateTime;
-  if (
-    offsetDifference > 0 &&
-    (newTime2 = newTime.add({ nanoseconds: offsetDifference })).offsetNanoseconds ===
-      date.offsetNanoseconds
-  ) {
-    return newTime2;
-  } else {
-    return newTime;
-  }
 }
 
 // ---------------------------------------------------------------------------
