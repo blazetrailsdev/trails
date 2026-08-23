@@ -725,9 +725,8 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   // so this function stays the generic, locking-agnostic filter Rails ships.
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
-    // Rails: pk_attribute?(name) && id.nil? — check per-column PK value so
-    // composite PKs work correctly (this.id would be an array, not null).
-    if (pkAttribute.call(this, name) && this._attributes?.get?.(name) == null) return false;
+    // Rails: pk_attribute?(name) && id.nil?
+    if (pkAttribute.call(this, name) && this.id == null) return false;
     // Rails: column_for_attribute(name).virtual?
     const col = mc.columnForAttribute?.(name);
     if (col?.virtual || col?.isVirtual?.()) return false;
@@ -743,7 +742,7 @@ export function formatForInspect(this: InstanceMethodHost, attr: string, value: 
 /** @internal */
 export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
   const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
-  return Array.isArray(pk) ? pk.includes(name) : name === pk;
+  return name === pk;
 }
 
 interface AttributeNamesHost {

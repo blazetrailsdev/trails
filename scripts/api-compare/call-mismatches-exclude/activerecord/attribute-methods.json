@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attributes_for_create",
-    "call": "id",
-    "reason": "Deviation (RFC 0106): Rails' `id.nil?` reads the composite-PK reader, which returns an Array for a composite key and so is never nil even when one member is. trails checks the per-column attribute value instead so a composite PK drops each unset member individually. Converging depends on the composite `id` reader story."
-  }
-]
