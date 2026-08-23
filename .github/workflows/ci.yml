@@ -114,7 +114,7 @@ jobs:
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
           RACK_PKGS_RE='^packages/(rack|activesupport|date)/'
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|date|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|tasks-shim|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|non-transactional-row-writes|generate-canonical-zone-identifiers)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|date|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|tasks-shim|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|non-transactional-row-writes|generate-canonical-zone-identifiers|generate-tzdata-isdst)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|date|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/src/test-helpers(/|\.ts$)|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           WEBSITE_PKGS_RE='^packages/website/'
@@ -621,6 +621,7 @@ jobs:
           scripts/stale-story-references.test.ts
           scripts/non-transactional-row-writes.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
+          scripts/generate-tzdata-isdst.test.ts
           vendor/sources.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
