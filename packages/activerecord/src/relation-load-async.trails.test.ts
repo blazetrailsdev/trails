@@ -229,4 +229,37 @@ describe("Relation#load_async", () => {
     // Rails: `return load if !c.async_enabled?` (relation.rb:1140).
     expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(false);
   });
+  itIfSupports(
+    "concurrent_connections",
+    "cache hands the block's pending FutureResult back unresolved",
+    async () => {
+      // `QueryCache::ClassMethods#cache` runs its restore in an `ensure`, which
+      // fires when the block RETURNS (query_cache.rb:9-21), so a block handing
+      // back a pending handle restores synchronously and the handle passes
+      // through untouched — the same shape `uncached` has on the other half of
+      // the pair. Adopting it here would resolve the scheduled query away.
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: unknown): void;
+      };
+      const scheduled: FutureResult[] = [];
+      vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult as FutureResult);
+      });
+
+      const relation = Topic.cache(() => Topic.all().loadAsync()) as unknown as ReturnType<
+        typeof Topic.all
+      >;
+
+      // Not a Promise: an `async` wrapper would have adopted the relation.
+      expect(relation).not.toBeInstanceOf(Promise);
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+      expect(scheduled[0].pending()).toBe(true);
+      // The restore already ran, synchronously, when the block returned.
+      expect((await Base.connectionPool()).queryCacheEnabled).toBe(false);
+
+      relation.reset();
+      expect(scheduled[0].pending()).toBe(false);
+      await expect(scheduled[0].result()).rejects.toBeInstanceOf(FutureResult.Canceled);
+    },
+  );
 });

@@ -17,6 +17,8 @@ import {
 import type { ExplainOption } from "./abstract/database-statements.js";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
+import { KeyError } from "@blazetrails/activesupport";
+import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import { rubyInspect } from "../relation/ruby-inspect.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
@@ -551,8 +553,28 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async beginDbTransaction(): Promise<void> {}
 
+  /**
+   * Mirrors: AbstractMysqlAdapter#begin_isolated_db_transaction
+   * (abstract_mysql_adapter.rb:230-239)
+   *
+   * @missingRailsCall fetch — PERMANENT: `Hash#fetch`'s raise-on-miss arm has no
+   *   JS equivalent — a plain index returns `undefined` — so the two arms are
+   *   ported explicitly below: the lookup, then Ruby's `KeyError` with Ruby's
+   *   own message. Same shape as the Mysql2Adapter and PostgreSQLAdapter
+   *   overrides of this method.
+   */
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    void isolation;
+    // From MySQL manual: The [SET TRANSACTION] statement applies only to the next single transaction performed within the session.
+    // So we don't need to implement #reset_isolation_level
+    //
+    // Rails: `transaction_isolation_levels.fetch(isolation)`
+    // (abstract_mysql_adapter.rb:235) — unknown levels raise Ruby's `KeyError`.
+    const level = transactionIsolationLevels()[isolation];
+    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
+    await this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
   }
 
   async commitDbTransaction(): Promise<void> {}

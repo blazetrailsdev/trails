@@ -110,16 +110,29 @@ export class QueryCache {
 export const ClassMethods = {
   /**
    * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
+   *
+   * NOT `async`: Ruby's `ensure` fires when the block RETURNS
+   * (query_cache.rb:9-21), so a block handing back a pending FutureResult
+   * clears synchronously and the handle passes through untouched; awaiting it
+   * would adopt the thenable and resolve the scheduled query away.
    */
-  async cache<T>(this: typeof Base, block: () => T | Promise<T>): Promise<T> {
+  cache<T>(this: typeof Base, block: () => T | Promise<T>): T | Promise<T> {
     if (this.connectedQ() || !this.configurations().empty) {
       const pool = this.connectionPool();
       const wasEnabled = pool.queryCacheEnabled;
-      try {
-        return await pool.enableQueryCache(block);
-      } finally {
+      const ensure = () => {
         if (!wasEnabled) pool.clearQueryCache();
+      };
+      let result: T | Promise<T>;
+      try {
+        result = pool.enableQueryCache(block);
+      } catch (error) {
+        ensure();
+        throw error;
       }
+      if (result instanceof Promise) return result.finally(ensure);
+      ensure();
+      return result;
     }
     return block();
   },

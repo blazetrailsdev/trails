@@ -166,28 +166,57 @@ export async function selectAll(
   return this.internalExecQuery(sql, name, binds);
 }
 
+/** @internal */
+interface ExecuteBatchHost extends MaxAllowedPacketHost {
+  rawExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    prepare?: boolean,
+    async?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+    batch?: boolean,
+  ): Promise<unknown>;
+}
+
 /**
- * Combines statements via `combineMultiStatements` then executes each block.
- * Mirrors Rails' use of `multi_statement: true` for batched execution.
+ * Combines statements via `combineMultiStatements` then hands each combined
+ * block to `raw_execute` with `batch: true`.
+ *
+ * Going through `raw_execute` rather than `execute` is what leaves batch
+ * statements uncommented — `preprocess_query`, which runs the
+ * query_transformers, is `internal_execute`'s step
+ * (abstract/database_statements.rb:589-591) — so the `_inQueryTransformers`
+ * suppression flag this used to need is gone with it.
+ *
+ * The positional arguments below are `raw_execute`'s own defaults
+ * (abstract/database_statements.rb:552).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch
+ * (mysql2/database_statements.rb:17-21)
  * @internal
- *
- * @missingRailsCall raw_execute — PERMANENT: Per-site verified (RFC 0106 wave
- *   4b): mysql2/database_statements.rb's `execute_batch` calls
- *   `raw_execute(combine_multi_statements(statements), name, batch: true)`;
- *   trails routes the batch through `internalExecute` so the multi-statement
- *   flag and the retry/materialize kwargs travel with it — see project note
- *   `_inQueryTransformers leaks off preprocessQuery` for why the batch path must
- *   not re-enter rawExecute directly.
  */
 export async function executeBatch(
-  this: MaxAllowedPacketHost & { execute(sql: string, name?: string | null): Promise<unknown> },
+  this: ExecuteBatchHost,
   statements: string[],
-  name?: string | null,
+  name: string | null = null,
+  {
+    allowRetry = false,
+    materializeTransactions = true,
+  }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   for (const statement of await combineMultiStatements.call(this, statements)) {
-    await this.execute(statement, name);
+    await this.rawExecute(
+      statement,
+      name,
+      [],
+      false,
+      false,
+      allowRetry,
+      materializeTransactions,
+      true,
+    );
   }
 }
 

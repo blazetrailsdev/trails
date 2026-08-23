@@ -151,7 +151,11 @@ export interface DatabaseStatementsHost {
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
   disableReferentialIntegrity?(fn: () => Promise<void>, tables?: string[]): Promise<void>;
   /** @internal */
-  executeBatch?(statements: string[], name?: string | null): Promise<void>;
+  executeBatch?(
+    statements: string[],
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<void>;
   /** @internal */
   buildTruncateStatement?(tableName: string): string;
   /** @internal */
@@ -1695,17 +1699,12 @@ function affectedRows(rawResult: any): never {
  * (commented) SQL — the Rails-faithful ordering where `preprocess_query` runs
  * in `internal_execute`, before `raw_execute`'s `log` block.
  *
- * `_inQueryTransformers` is a one-shot "skip the transformer pass" flag.
- * `executeBatch` sets it before each statement so batch SQL stays uncommented —
- * matching Rails, whose `execute_batch` calls `raw_execute` directly and so
- * skips the `query_transformers` loop. (Unlike Rails' `raw_execute`, the
- * write-checks above still run for batch statements; only the transformer pass
- * is suppressed.) The flag is **consumed synchronously here, before any await**,
- * so it can never span an await boundary and bleed into a concurrent query on
- * the same adapter. It also short-circuits a synchronous re-entrant call (a
- * transformer that itself runs SQL); real, async, DB-issuing transformers don't
- * hit this — by the time their query runs, the flag is already cleared, so they
- * transform normally, exactly as in Rails (which has no guard at all).
+ * `_inQueryTransformers` short-circuits a synchronous re-entrant call (a
+ * transformer that itself runs SQL). It is set and cleared **within one
+ * synchronous stretch**, so it can never span an await boundary and bleed into
+ * a concurrent query on the same adapter; real, async, DB-issuing transformers
+ * don't hit it — by the time their query runs the flag is already cleared, so
+ * they transform normally, exactly as in Rails (which has no guard at all).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
  * @internal
@@ -1714,10 +1713,7 @@ export function preprocessQuery(this: DatabaseStatementsHost, sql: string): stri
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
   const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
-  if (host._inQueryTransformers) {
-    host._inQueryTransformers = false;
-    return sql;
-  }
+  if (host._inQueryTransformers) return sql;
   host._inQueryTransformers = true;
   try {
     for (const t of ActiveRecord.queryTransformers) {
@@ -1766,28 +1762,37 @@ export function internalExecute(
  * Executes each statement sequentially. Adapters with native batch support
  * (e.g. a driver that accepts a multi-statement string) should override this.
  *
+ * Going through `raw_execute` rather than `internal_execute` is what leaves
+ * batch statements uncommented — `preprocess_query`, which runs the
+ * query_transformers, is `internal_execute`'s step
+ * (abstract/database_statements.rb:589-591).
+ *
+ * The positional arguments below are `raw_execute`'s own defaults
+ * (abstract/database_statements.rb:552).
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#execute_batch
+ * (abstract/database_statements.rb:594-598)
  * @internal
  */
 export async function executeBatch(
   this: DatabaseStatementsHost,
   statements: string[],
-  name?: string | null,
+  name: string | null = null,
+  {
+    allowRetry = false,
+    materializeTransactions = true,
+  }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
-  // Rails' execute_batch calls raw_execute directly, so batch statements skip the
-  // query_transformers pass and carry no QueryLogs comment. trails routes batches
-  // through executeMutation (which preprocesses), so flag each statement to
-  // suppress the transformer pass (write-checks still run). The flag is consumed
-  // synchronously inside preprocessQuery before any await — so it never spans the
-  // await — and the finally clears it if executeMutation throws before consuming.
-  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
   for (const statement of statements) {
-    host._inQueryTransformers = true;
-    try {
-      await (this as any).executeMutation(statement);
-    } finally {
-      host._inQueryTransformers = false;
-    }
+    await (this as any).rawExecute(
+      statement,
+      name,
+      [],
+      false,
+      false,
+      allowRetry,
+      materializeTransactions,
+    );
   }
 }
 

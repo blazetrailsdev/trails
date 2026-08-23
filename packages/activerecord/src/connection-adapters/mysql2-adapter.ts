@@ -1951,6 +1951,27 @@ dirtiesQueryCache(Mysql2Adapter, "execute");
 // method of the adapter, so `raw_execute`'s `this.performQuery(...)` dispatch
 // resolves here (mysql2/database_statements.rb:41).
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
+// Rails installs `Mysql2::DatabaseStatements#execute_batch` here too
+// (`include Mysql2::DatabaseStatements`, mysql2_adapter.rb:21). trails cannot
+// yet, and the blocker is the driver rather than the port: the ported body is
+// correct (mysql2/database-statements.ts), but `combine_multi_statements`
+// (mysql/database_statements.rb:66-76) joins with `";\n"` unconditionally and
+// carries no multi-statement guard. Rails' guard lives in `perform_query`,
+// which turns the option on for the batch query itself —
+// `raw_connection.set_server_option(OPTION_MULTI_STATEMENTS_ON)`
+// (mysql2/database_statements.rb:41-45) — and node-mysql2 ships no command
+// class for COM_SET_OPTION: `lib/constants/commands.js:31` defines
+// `SET_OPTION: 0x1b` but `lib/commands/` has no `set_option.js`, and the
+// option is protocol-level with no SQL equivalent. Installing the override
+// therefore fails every batch on a connection not created with
+// multi-statements; measured against mariadb:11:
+//
+//   ER_PARSE_ERROR (1064) ... near 'CREATE TABLE batch_probe (id int)' at line 2
+//   sql: 'DROP TABLE IF EXISTS batch_probe;\nCREATE TABLE batch_probe (id int)'
+//
+// So mysql2 keeps AbstractAdapter's per-statement loop, which is correct
+// because it never combines. Story:
+// mysql2-execute-batch-routes-through-raw-execute (blocked on the above).
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`

@@ -640,7 +640,7 @@ export class ConnectionPool implements ReapablePool {
     return this._cacheConfig.dirtiesQueryCache;
   }
 
-  enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
     return this._cacheConfig.enableQueryCache(fn);
   }
 
