@@ -44,26 +44,26 @@ describe("Relation#unscope — full Rails key coverage", () => {
   it("unscope('preload') clears preload only — leaves includes / eagerLoad alone", () => {
     const rel = (UscAuthor as any)
       .all()
-      .preload("uscPosts")
-      .includes("uscPosts")
-      .eagerLoad("uscPosts");
-    expect(rel.preloadValues).toEqual(["uscPosts"]);
+      .preload(":uscPosts")
+      .includes(":uscPosts")
+      .eagerLoad(":uscPosts");
+    expect(rel.preloadValues).toEqual([":uscPosts"]);
     const cleared = rel.unscope("preload");
     expect(cleared.preloadValues).toEqual([]);
-    expect(cleared.includesValues).toEqual(["uscPosts"]);
-    expect(cleared.eagerLoadValues).toEqual(["uscPosts"]);
+    expect(cleared.includesValues).toEqual([":uscPosts"]);
+    expect(cleared.eagerLoadValues).toEqual([":uscPosts"]);
   });
 
   it("unscope('eagerLoad') clears eagerLoad only — leaves includes / preload alone", () => {
     const rel = (UscAuthor as any)
       .all()
-      .preload("uscPosts")
-      .includes("uscPosts")
-      .eagerLoad("uscPosts");
+      .preload(":uscPosts")
+      .includes(":uscPosts")
+      .eagerLoad(":uscPosts");
     const cleared = rel.unscope("eagerLoad");
     expect(cleared.eagerLoadValues).toEqual([]);
-    expect(cleared.includesValues).toEqual(["uscPosts"]);
-    expect(cleared.preloadValues).toEqual(["uscPosts"]);
+    expect(cleared.includesValues).toEqual([":uscPosts"]);
+    expect(cleared.preloadValues).toEqual([":uscPosts"]);
   });
 
   it("unscope('includes') clears includes only — leaves preload / eagerLoad alone (Rails-faithful)", () => {
@@ -71,12 +71,12 @@ describe("Relation#unscope — full Rails key coverage", () => {
     // eagerLoad. Rails' query_methods.rb scopes each key independently.
     const rel = (UscAuthor as any)
       .all()
-      .preload("uscPosts")
-      .includes("uscPosts")
-      .eagerLoad("uscPosts");
+      .preload(":uscPosts")
+      .includes(":uscPosts")
+      .eagerLoad(":uscPosts");
     const cleared = rel.unscope("includes");
     expect(cleared.includesValues).toEqual([]);
-    expect(cleared.preloadValues).toEqual(["uscPosts"]);
-    expect(cleared.eagerLoadValues).toEqual(["uscPosts"]);
+    expect(cleared.preloadValues).toEqual([":uscPosts"]);
+    expect(cleared.eagerLoadValues).toEqual([":uscPosts"]);
   });
 });

@@ -38,7 +38,7 @@ export class Category extends Base {
     this.hasAndBelongsToMany("otherPosts", { className: "Post" });
     this.hasAndBelongsToMany(
       "postsWithAuthorsSortedByAuthorId",
-      (q: any) => q.includes("authors").order("authors.id"),
+      (q: any) => q.includes(":authors").order("authors.id"),
       { className: "Post" },
     );
     this.hasAndBelongsToMany(

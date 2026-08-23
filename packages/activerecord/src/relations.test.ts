@@ -145,7 +145,7 @@ describe("RelationTest", () => {
     // Car.incl_engines.incl_tyres). Rails' includes! unions (`|=`), so a repeat
     // of the SAME include folds to one — only distinct ones accumulate.
     const relation = (Car.inclEngines() as any).inclTyres();
-    expect(relation.includesValues.map(String)).toEqual(["engines", "tyres"]);
+    expect(relation.includesValues.map(String)).toEqual([":engines", ":tyres"]);
   });
 
   it("dynamic finder", () => {

@@ -4,7 +4,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
@@ -17,6 +17,7 @@ import {
 } from "../time-zone-config.js";
 import { inTimeZone } from "./date-and-time/zones.js";
 import { current } from "../time-ext.js";
+import { setPreserveTimezone } from "./date-and-time/compatibility.js";
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
@@ -27,6 +28,10 @@ describe("TimeWithZoneTest", () => {
     eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     pacific = TimeZone.find("Pacific Time (US & Canada)")!;
     utcZone = TimeZone.find("UTC")!;
+  });
+
+  afterEach(() => {
+    setPreserveTimezone(null);
   });
 
   // @twz = 2000-01-01 00:00:00 UTC in Eastern = 1999-12-31 19:00:00 EST
@@ -88,7 +93,7 @@ describe("TimeWithZoneTest", () => {
   it("localtime", () => {
     const twz = maketwz();
     const local = twz.localtime();
-    expect(local).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(local).toBeInstanceOf(RubyTime);
   });
 
   it("localtime with offset", () => {
@@ -96,12 +101,12 @@ describe("TimeWithZoneTest", () => {
     // -7h offset → wall-clock 1999-12-31 17:00:00.
     const twz = maketwz();
     const local = twz.localtime(-7 * 3600);
-    expect(local).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(local).toBeInstanceOf(RubyTime);
     expect(local.year).toBe(1999);
     expect(local.month).toBe(12);
     expect(local.day).toBe(31);
     expect(local.hour).toBe(17);
-    expect(local.minute).toBe(0);
+    expect(local.min).toBe(0);
     // getlocal alias mirrors localtime
     const aliased = twz.getlocal(-7 * 3600);
     expect(aliased.toString()).toBe(local.toString());
@@ -880,34 +885,51 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("to time with preserve timezone using zone", () => {
+    setPreserveTimezone(":zone");
     const twz = maketwz();
-    const time = twz.utc();
-    expect(time).toBeInstanceOf(Temporal.Instant);
-    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    const time = twz.toTime();
+    expect(time).toBeInstanceOf(RubyTime);
+    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(time.utcOffset).toBe(-18000);
+    expect(time.zone).toBe("EST");
   });
 
   it("to time with preserve timezone using offset", () => {
+    setPreserveTimezone(":offset");
     const twz = maketwz();
-    const time = twz.utc();
-    expect(time.epochMilliseconds).toBe(twz.getTime());
+    const time = twz.toTime();
+    expect(time).toBeInstanceOf(RubyTime);
+    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(time.utcOffset).toBe(-18000);
+    expect(time.zone).toBeNull();
   });
 
   it("to time with preserve timezone using true", () => {
+    setPreserveTimezone(true);
     const twz = maketwz();
-    const time = twz.utc();
-    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    const time = twz.toTime();
+    expect(time).toBeInstanceOf(RubyTime);
+    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(time.utcOffset).toBe(-18000);
+    expect(time.zone).toBeNull();
   });
 
   it("to time without preserve timezone", () => {
+    setPreserveTimezone(false);
     const twz = maketwz();
-    const time = twz.utc();
-    expect(time).toBeInstanceOf(Temporal.Instant);
+    const time = twz.toTime();
+    expect(time).toBeInstanceOf(RubyTime);
+    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(time.zone).not.toBeNull();
   });
 
   it("to time without preserve timezone configured", () => {
+    setPreserveTimezone(null);
     const twz = maketwz();
-    const time = twz.utc();
-    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    const time = twz.toTime();
+    expect(time).toBeInstanceOf(RubyTime);
+    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(time.zone).not.toBeNull();
   });
 
   it("method missing with time return value", () => {

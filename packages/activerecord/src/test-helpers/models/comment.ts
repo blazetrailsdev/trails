@@ -218,7 +218,7 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
 
   static {
     this.defaultScope((q: any) =>
-      q.includes(":developer").order("developers.name").references("developer"),
+      q.includes(":developer").order("developers.name").references(":developer"),
     );
     this.belongsTo("developer");
   }

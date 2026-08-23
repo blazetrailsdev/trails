@@ -66,8 +66,8 @@ export class Car extends Base {
 
     this.hasMany("priceEstimates", { as: "estimateOf" });
 
-    this.scope("inclTyres", (q: any) => q.includes("tyres"));
-    this.scope("inclEngines", (q: any) => q.includes("engines"));
+    this.scope("inclTyres", (q: any) => q.includes(":tyres"));
+    this.scope("inclEngines", (q: any) => q.includes(":engines"));
     this.scope("orderUsingNewStyle", (q: any) => q.order("name asc"));
 
     this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });

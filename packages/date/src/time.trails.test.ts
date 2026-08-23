@@ -293,4 +293,40 @@ describe("Time", () => {
       );
     });
   });
+
+  describe("Time#getlocal", () => {
+    it("answers the same instant in the local system zone", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      const local = t.getlocal();
+      expect(local.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+      expect(local.utcOffset).toBe(
+        Number(
+          Temporal.Instant.fromEpochMilliseconds(946728000000).toZonedDateTimeISO(
+            Temporal.Now.timeZoneId(),
+          ).offsetNanoseconds,
+        ) / 1_000_000_000,
+      );
+    });
+
+    it("seats the instant at an explicit utc_offset", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      expect(t.getlocal("+05:00").utcOffset).toBe(18000);
+      expect(t.getlocal("+05:00").hour).toBe(17);
+      expect(t.getlocal(18000).utcOffset).toBe(18000);
+    });
+
+    it("an offset-built time has no zone, as MRI's has none", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      expect(t.getlocal("+05:00").zone).toBeNull();
+      expect(t.getlocal("+05:00").strftime("%Z")).toBe("");
+      expect(t.getlocal("+05:00").toS()).toBe("2020-01-01 17:00:00 +0500");
+    });
+
+    it("a zone identifier stands in for MRI's zone object argument", () => {
+      const t = Time.utc(2020, 1, 1, 12, 0, 0);
+      const eastern = t.getlocal("America/New_York");
+      expect(eastern.utcOffset).toBe(-18000);
+      expect(eastern.zone).toBe("EST");
+    });
+  });
 });

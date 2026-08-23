@@ -64,7 +64,7 @@ describe("Relation on an aliased table", () => {
   });
 
   it("roots the limited-id subquery on the alias", () => {
-    const sql = aliased().eagerLoad("comments").limit(1).toSql();
+    const sql = aliased().eagerLoad(":comments").limit(1).toSql();
     expect(sql).toContain(`${aliasQ}.${idQ}`);
     expect(sql).not.toMatch(new RegExp(`SELECT DISTINCT ${escapeRegExp(`${baseQ}.${idQ}`)}`));
   });
@@ -75,13 +75,13 @@ describe("Relation on an aliased table", () => {
       undefined,
       false,
       async () => {
-        await aliased().eagerLoad("comments").limit(1);
+        await aliased().eagerLoad(":comments").limit(1);
       },
     );
   });
 
   it("projects the eager load's base columns off the alias", async () => {
-    const posts = await aliased().eagerLoad("comments").limit(1);
+    const posts = await aliased().eagerLoad(":comments").limit(1);
     expect(posts.length).toBe(1);
     expect(posts[0].id).toBeDefined();
   });

@@ -81,7 +81,7 @@ export class Person extends Base {
     this.hasMany("securePosts", { through: "secureReaders" });
     this.hasMany(
       "postsWithNoComments",
-      (q: any) => q.includes(":comments").where("comments.id is null").references("comments"),
+      (q: any) => q.includes(":comments").where("comments.id is null").references(":comments"),
       { through: "readers", source: "post" },
     );
 

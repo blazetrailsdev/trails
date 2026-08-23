@@ -15,7 +15,7 @@ describe("Relation eager_loading? memo", () => {
   fixtures(["posts", "comments"]);
 
   it("memoizes a truthy result instead of recomputing it", () => {
-    const relation = Post.eagerLoad("comments");
+    const relation = Post.eagerLoad(":comments");
     expect(relation.isEagerLoading).toBe(true);
 
     relation.eagerLoadValues = [];
@@ -32,7 +32,7 @@ describe("Relation eager_loading? memo", () => {
   });
 
   it("clears the memo in reset", () => {
-    const relation = Post.eagerLoad("comments");
+    const relation = Post.eagerLoad(":comments");
     expect(relation.isEagerLoading).toBe(true);
 
     relation.eagerLoadValues = [];

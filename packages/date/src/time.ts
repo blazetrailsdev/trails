@@ -49,6 +49,16 @@ export function resetLocalTimeZoneId(): void {
 }
 
 /**
+ * Whether a string names a zone rather than spelling a `utc_offset`. MRI's
+ * `Time#getlocal` takes only the offset spellings — a leading sign, or one of
+ * the military letters — plus a zone OBJECT, which a zone identifier stands in
+ * for here.
+ */
+function isZoneIdentifier(zone: string): boolean {
+  return !/^([+-]|[A-IK-Z]$)/.test(zone);
+}
+
+/**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
  * `"+09"`, `"+0900"`, `"+09:00"`, `"+09:00:30"` or a number of seconds east of
  * UTC, which is the form Rails passes
@@ -855,8 +865,17 @@ export class Time {
    * given — `Time.utc(...).getlocal(0).utc_offset` is `0` and
    * `.getlocal("+05:00")` moves the wall clock five hours east. Like
    * {@link Time#getutc} it answers a copy, because trails' `Time` is immutable.
+   *
+   * An offset spelling — `"+05:00"`, `"Z"`, a seconds Integer — is read the way
+   * the constructor's `utc_offset` is, so the answer carries the offset and no
+   * zone, and its `zone` is `nil` as MRI's is. MRI also takes a zone OBJECT
+   * here, the one thing a JS string cannot be; a zone identifier stands in for
+   * it, and seats the answer in that zone.
    */
   getlocal(utcOffset: number | string | null = null): Time {
+    if (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) {
+      return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset));
+    }
     return Time.#atInstant(this.#instant, utcOffset);
   }
 

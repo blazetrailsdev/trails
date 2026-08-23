@@ -91,7 +91,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck over eagerLoad('chapters') joins the composite-FK collection", async () => {
     await seedBooks();
-    const titles = await CpkBook.eagerLoad("chapters")
+    const titles = await CpkBook.eagerLoad(":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .pluck("title");
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
@@ -99,7 +99,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck over eagerLoad('chapters') can project the joined table's column", async () => {
     await seedBooks();
-    const chapterTitles = await CpkBook.eagerLoad("chapters")
+    const chapterTitles = await CpkBook.eagerLoad(":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .pluck("cpk_chapters.title");
     expect(chapterTitles).toEqual(["ch-1", null, null]);
@@ -107,7 +107,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck over multiple eager specs joins both", async () => {
     await seedBooks();
-    const titles = await CpkBook.eagerLoad("author", "chapters")
+    const titles = await CpkBook.eagerLoad(":author", ":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .pluck("title");
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
@@ -119,7 +119,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     // (distinct_relation_for_primary_key, schema_statements.rb:1429) and
     // re-queries with one `IN` per key column, so the LIMIT bounds PARENTS —
     // not the fanned-out joined rows.
-    const titles = await CpkBook.eagerLoad("chapters")
+    const titles = await CpkBook.eagerLoad(":chapters")
       .order("cpk_books.author_id", "cpk_books.id")
       .limit(2)
       .pluck("title");
@@ -137,7 +137,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters", "chapters.book"]);
 
-    const titles = await CpkBook.eagerLoad({ chapters: "book" })
+    const titles = await CpkBook.eagerLoad({ ":chapters": ":book" })
       .order("cpk_books.author_id", "cpk_books.id")
       .pluck("cpk_chapters.title");
     expect(titles).toEqual(["ch-1", null, null]);

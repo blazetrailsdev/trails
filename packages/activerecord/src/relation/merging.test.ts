@@ -224,8 +224,8 @@ describe("RelationMergingTest", () => {
 
   it("relation merging with eager load", async () => {
     const relations = [
-      Post.order("comments.id DESC").merge(Post.eagerLoad("lastComment")).merge(Post.all()),
-      Post.eagerLoad("lastComment").merge(Post.order("comments.id DESC")).merge(Post.all()),
+      Post.order("comments.id DESC").merge(Post.eagerLoad(":lastComment")).merge(Post.all()),
+      Post.eagerLoad(":lastComment").merge(Post.order("comments.id DESC")).merge(Post.all()),
     ];
 
     // `lastComment` is a lazy hasOne: on a freshly-found record it returns a
@@ -249,8 +249,8 @@ describe("RelationMergingTest", () => {
 
   it("relation merging with preload", async () => {
     const relations = [
-      Post.all().merge(Post.preload("author")),
-      Post.preload("author").merge(Post.all()),
+      Post.all().merge(Post.preload(":author")),
+      Post.preload(":author").merge(Post.all()),
     ];
     for (const posts of relations) {
       await assertQueriesCount(2, false, async () => {

@@ -294,7 +294,7 @@ export class Firm extends Company {
       autosave: false,
     });
 
-    this.hasMany("associationWithReferences", (q: any) => q.references("foo"), {
+    this.hasMany("associationWithReferences", (q: any) => q.references(":foo"), {
       className: "Client",
     });
 

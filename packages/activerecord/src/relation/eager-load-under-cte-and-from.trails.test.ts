@@ -26,7 +26,7 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
   it("emits the aliased eager JOIN alongside the CTE", async () => {
     const relation = Post.with({
       posts_with_comments: Post.where("legacy_comments_count > 0"),
-    }).eagerLoad("comments");
+    }).eagerLoad(":comments");
 
     const sql = relation.toSql();
     expect(sql).toMatch(/WITH\s+/i);
@@ -37,7 +37,7 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
   });
 
   it("emits the aliased eager JOIN alongside a FROM override", async () => {
-    const relation = Post.from("posts AS posts").eagerLoad("comments");
+    const relation = Post.from("posts AS posts").eagerLoad(":comments");
 
     expect(relation.toSql()).toMatch(/LEFT OUTER JOIN/i);
 
