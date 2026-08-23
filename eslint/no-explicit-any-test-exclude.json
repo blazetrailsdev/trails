@@ -125,7 +125,7 @@
   "packages/activerecord/src/connection-adapters/connection-handlers-sharding-db.test.ts",
   "packages/activerecord/src/connection-adapters/connection-swapping-nested.test.ts",
   "packages/activerecord/src/connection-adapters/mysql/explain-pretty-printer.trails.test.ts",
-  "packages/activerecord/src/connection-adapters/mysql/schema-creation.test.ts",
+  "packages/activerecord/src/connection-adapters/mysql/schema-creation.trails.test.ts",
   "packages/activerecord/src/connection-adapters/mysql/schema-dumper.trails.test.ts",
   "packages/activerecord/src/connection-adapters/mysql2-adapter.test.ts",
   "packages/activerecord/src/connection-adapters/pool-config.trails.test.ts",
