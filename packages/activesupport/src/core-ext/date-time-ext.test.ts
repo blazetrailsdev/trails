@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { DateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import { Object as ObjectExt } from "./object/acts-like.js";
 import {
   advance,
   ago,
@@ -436,13 +437,11 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("acts like date", () => {
-    const dt = new Date();
-    expect(dt instanceof Date).toBe(true);
+    expect(ObjectExt.actsLike(DateTime.parse("2005-02-21T10:11:12"), "date")).toBe(true);
   });
 
   it("acts like time", () => {
-    const dt = new Date();
-    expect(typeof dt.getHours()).toBe("number");
+    expect(ObjectExt.actsLike(DateTime.parse("2005-02-21T10:11:12"), "time")).toBe(true);
   });
 
   it("blank?", () => {

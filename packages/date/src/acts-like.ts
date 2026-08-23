@@ -47,9 +47,9 @@ export function actsLikeDate(self: unknown): boolean {
 /**
  * Ruby `Time#acts_like_time?` (`core_ext/time/acts_like.rb:7`) and
  * `DateTime#acts_like_time?` (`core_ext/date_time/acts_like.rb:12`), answered
- * on behalf of the values this package builds for those two classes —
- * {@link Time}, which `Time.now` returns, and the `Temporal` values
- * `DateTime.parse` returns.
+ * on behalf of the values this package owns the mapping for: {@link Time},
+ * which `Time.now` returns; the `Temporal` values `DateTime.parse` returns; and
+ * the JS `Date` trails' boundaries carry a Ruby `Time` in.
  *
  * @noRailsEquivalent PERMANENT — Rails spells this as a marker method on
  * reopened `Time`/`DateTime`; the values are `Temporal`'s, which TypeScript
@@ -58,6 +58,8 @@ export function actsLikeDate(self: unknown): boolean {
 export function actsLikeTime(self: unknown): boolean {
   return (
     self instanceof Time ||
+    // boundary: a JS `Date` is one of the Ruby-`Time`-shaped values this answers for.
+    self instanceof globalThis.Date ||
     self instanceof Temporal.Instant ||
     self instanceof Temporal.PlainDateTime ||
     self instanceof Temporal.ZonedDateTime

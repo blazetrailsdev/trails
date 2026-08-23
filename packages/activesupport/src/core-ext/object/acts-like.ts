@@ -8,16 +8,6 @@
 
 import { actsLikeDate, actsLikeTime } from "@blazetrails/date";
 
-/**
- * A JS `Date` is what this port's `Time` arm receives at its boundaries — the
- * one Ruby-`Time`-shaped value `@blazetrails/date` does not construct, so its
- * `actsLikeTime` cannot answer for it and the marker is answered here.
- */
-function isJsDate(self: unknown): boolean {
-  // boundary: this predicate is keyed on being a JS `Date`.
-  return self instanceof Date;
-}
-
 export class Object {
   /**
    * Provides a way to check whether some class acts like some other class
@@ -29,7 +19,7 @@ export class Object {
   static actsLike(self: unknown, duck: string): boolean {
     switch (duck) {
       case "time":
-        return actsLikeTime(self) || isJsDate(self) || respondTo.call(self, "acts_like_time?");
+        return actsLikeTime(self) || respondTo.call(self, "acts_like_time?");
       case "date":
         return actsLikeDate(self) || respondTo.call(self, "acts_like_date?");
       case "string":
