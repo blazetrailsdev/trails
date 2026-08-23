@@ -883,16 +883,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `replace_records`, `replace_common_records_in_memory` and the
    * `difference` / `intersection` hooks.
    *
-   * The association's `replace` is synchronous and hands its persisted-owner
-   * half back as a plan (RFC 0068 — the property setter cannot await), so the
-   * delegation spells the same two steps `CollectionAssociation#writer`
-   * (collection_association.rb:46-48) does, then answers with the resulting
-   * target the way Rails' `replace` does.
+   * The association's `replace` returns `Promise | Base[]` rather than being
+   * `async` (its `syncWrite` caller cannot await, RFC 0068); awaiting either
+   * spelling is the same one-line delegation Rails writes.
    */
   async replace(otherArray: T[]): Promise<T[]> {
     const association = this._collectionAssociation();
-    const plan = association.replace(otherArray);
-    if (plan?.pending) await plan.pending;
+    await association.replace(otherArray);
     return this._target;
   }
 

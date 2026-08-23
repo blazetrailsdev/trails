@@ -97,6 +97,11 @@ export interface ArtifactMismatch {
    *  alone; absent, every declaration of the name in the file is reconciled,
    *  as before this was keyed. */
   tsClass?: string;
+  /** The file `tsName` is DECLARED in, when trails split it out of the file
+   *  the Ruby path mirrors (compare.ts `declFileFor`): `cache.rb`'s `Store`
+   *  members live in `cache/store.ts` while the row stays keyed `cache.ts`.
+   *  The tag is written THERE; the baseline row keeps its `tsFile` key. */
+  tsDeclFile?: string;
   missing: string[];
 }
 
@@ -107,6 +112,8 @@ export interface SuppressedCall {
   tsName: string;
   /** See `ArtifactMismatch.tsClass`. */
   tsClass?: string;
+  /** See `ArtifactMismatch.tsDeclFile`. */
+  tsDeclFile?: string;
   call: string;
 }
 
@@ -275,6 +282,9 @@ export interface MethodExpectation {
   rubyNames: string[];
   /** The declaration's TS name, since the map key is class-qualified. */
   tsName: string;
+  /** The file to open to reach the declaration, when it is not the row's
+   *  `tsFile` — see `ArtifactMismatch.tsDeclFile`. */
+  declFile?: string;
   calls: Set<string>;
 }
 
@@ -560,26 +570,51 @@ export function buildExpectations(
     tsName: string,
     tsClass: string | undefined,
     rubyName: string,
+    declFile: string | undefined,
   ) => {
     const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
     const key = expectationKey(tsClass ?? ANY_CLASS, tsName);
     const exp =
-      fileMap.get(key) ?? fileMap.set(key, { rubyNames: [], tsName, calls: new Set() }).get(key)!;
+      fileMap.get(key) ??
+      fileMap.set(key, { rubyNames: [], tsName, declFile, calls: new Set() }).get(key)!;
     if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
     return exp;
   };
   for (const m of artifact.mismatches) {
     if (m.package !== pkg) continue;
     if (onlyFile && m.tsFile !== onlyFile) continue;
-    const exp = expectationFor(m.tsFile, m.tsName, m.tsClass, m.rubyName);
+    const exp = expectationFor(m.tsFile, m.tsName, m.tsClass, m.rubyName, m.tsDeclFile);
     for (const missing of m.missing) exp.calls.add(callOf(missing));
   }
   for (const c of artifact.suppressed ?? []) {
     if (c.package !== pkg) continue;
     if (onlyFile && c.tsFile !== onlyFile) continue;
-    expectationFor(c.tsFile, c.tsName, c.tsClass, c.rubyName).calls.add(c.call);
+    expectationFor(c.tsFile, c.tsName, c.tsClass, c.rubyName, c.tsDeclFile).calls.add(c.call);
   }
   return byFile;
+}
+
+/**
+ * Split one baseline file's expectations into the files that actually declare
+ * them.
+ *
+ * A row is keyed by the `tsFile` the Ruby path mirrors, which is where the
+ * baseline reason lives; the declaration can sit elsewhere when trails split a
+ * Rails class into a subdirectory module (see `ArtifactMismatch.tsDeclFile`).
+ * The row's own file is always a group, so a run whose only business there is a
+ * stale tag still opens it.
+ */
+export function groupByDeclFile(
+  tsFile: string,
+  expectations: ReadonlyMap<string, MethodExpectation>,
+): Map<string, Map<string, MethodExpectation>> {
+  const byDecl = new Map<string, Map<string, MethodExpectation>>([[tsFile, new Map()]]);
+  for (const [key, exp] of expectations) {
+    const file = exp.declFile ?? tsFile;
+    const group = byDecl.get(file) ?? byDecl.set(file, new Map()).get(file)!;
+    group.set(key, exp);
+  }
+  return byDecl;
 }
 
 /**
@@ -663,65 +698,80 @@ async function main(argv: string[]): Promise<number> {
     if (!byFile.has(t.tsFile)) byFile.set(t.tsFile, new Map());
   }
 
-  let changed = 0;
   let skipped = 0;
   const migrated = new Set<string>();
   const srcDir = packageSrcDir(pkg);
+  // Two baseline files can reconcile into ONE declaration file, so the text is
+  // threaded through in memory and written once at the end: re-reading it for
+  // the second pass would drop the first pass's edits.
+  const texts = new Map<string, string>();
+  const rewritten = new Set<string>();
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {
-    const abs = path.join(srcDir, tsFile);
-    let text: string;
-    try {
-      text = await fs.readFile(abs, "utf-8");
-    } catch {
-      continue; // expected TS file not ported yet — stub phase, not this slice
+    for (const [declFile, group] of [...groupByDeclFile(tsFile, expectations).entries()].sort()) {
+      const abs = path.join(srcDir, declFile);
+      let text = texts.get(abs);
+      if (text === undefined) {
+        try {
+          text = await fs.readFile(abs, "utf-8");
+        } catch {
+          continue; // expected TS file not ported yet — stub phase, not this slice
+        }
+        texts.set(abs, text);
+      }
+      let reconciled;
+      try {
+        reconciled = reconcileFileText(
+          // Repo-relative so an unjustified-tag error names a path the operator
+          // can open; the artifact key stays `tsFile`.
+          path.relative(ROOT_DIR, abs),
+          text,
+          group,
+          (rubyName, call) =>
+            reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
+          onlyCall.size > 0 ? onlyCall : undefined,
+          staleByFile.get(tsFile),
+        );
+      } catch (err) {
+        console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
+        return 1;
+      }
+      const {
+        text: next,
+        harvested,
+        preserved,
+        tagged,
+        unmatched,
+        skipped: fileSkipped,
+      } = reconciled;
+      skipped += fileSkipped.length;
+      for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
+      for (const h of harvested) {
+        console.log(
+          `DROPPED ${TAG} on ${declFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +
+            `longer flagged there, so its receipt is retired. Reason it carried: ${h.entry.reason}`,
+        );
+      }
+      for (const kept of preserved) {
+        console.log(
+          `preserved ${TAG} on ${declFile} ${kept.tsName} for \`${kept.entry.call}\` — no ` +
+            "expectation for that declaration in the artifact; the tag is left exactly as written.",
+        );
+      }
+      if (unmatched.length > 0) {
+        console.log(
+          `unmatched (${declFile}): ${unmatched.join(", ")} — no body-bearing declaration`,
+        );
+      }
+      if (next !== null) {
+        texts.set(abs, next);
+        rewritten.add(abs);
+      }
     }
-    let reconciled;
-    try {
-      reconciled = reconcileFileText(
-        // Repo-relative so an unjustified-tag error names a path the operator
-        // can open; the artifact key stays `tsFile`.
-        path.relative(ROOT_DIR, abs),
-        text,
-        expectations,
-        (rubyName, call) =>
-          reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
-        onlyCall.size > 0 ? onlyCall : undefined,
-        staleByFile.get(tsFile),
-      );
-    } catch (err) {
-      console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
-      return 1;
-    }
-    const {
-      text: next,
-      harvested,
-      preserved,
-      tagged,
-      unmatched,
-      skipped: fileSkipped,
-    } = reconciled;
-    skipped += fileSkipped.length;
-    for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
-    for (const h of harvested) {
-      console.log(
-        `DROPPED ${TAG} on ${tsFile} ${h.tsName} for \`${h.entry.call}\` — the call is no ` +
-          `longer flagged there, so its receipt is retired. Reason it carried: ${h.entry.reason}`,
-      );
-    }
-    for (const kept of preserved) {
-      console.log(
-        `preserved ${TAG} on ${tsFile} ${kept.tsName} for \`${kept.entry.call}\` — no expectation ` +
-          "for that declaration in the artifact; the tag is left exactly as written.",
-      );
-    }
-    if (unmatched.length > 0) {
-      console.log(`unmatched (${tsFile}): ${unmatched.join(", ")} — no body-bearing declaration`);
-    }
-    if (next !== null) {
-      changed++;
-      if (dryRun) console.log(`would update ${path.relative(ROOT_DIR, abs)}`);
-      else await fs.writeFile(abs, next);
-    }
+  }
+  const changed = rewritten.size;
+  for (const abs of [...rewritten].sort()) {
+    if (dryRun) console.log(`would update ${path.relative(ROOT_DIR, abs)}`);
+    else await fs.writeFile(abs, texts.get(abs)!);
   }
   const remaining = baseline.filter((e) => !migrated.has(keyOf(e)));
   const droppedEntries = baseline.filter((e) => migrated.has(keyOf(e)));

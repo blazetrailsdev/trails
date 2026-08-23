@@ -17,27 +17,6 @@ import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 
 /**
- * The persisted-owner DB work `replace` defers to its awaitable caller: the
- * assigned collection plus the baseline to diff it against (`wasLoaded` says
- * whether that baseline is trustworthy or must be re-read from the DB).
- */
-export interface ReplacePlan {
-  newTarget: Base[];
-  originalTarget: Base[];
-  wasLoaded: boolean;
-  /**
-   * The DB work `replace` has already started and cannot await: on the
-   * persisted arm the `transaction { replace_records(...) }` it opened
-   * (collection_association.rb:251), and on the new-owner arm that arm's own
-   * work when it had any — it is I/O-free (a new owner's `concat` never
-   * inserts and `remove_records` skips `delete_records`) except when the
-   * records being REMOVED are persisted, which Rails deletes in a transaction
-   * (`delete_or_destroy`, :393-397).
-   */
-  pending?: Promise<unknown>;
-}
-
-/**
  * Base class for has_many and has_and_belongs_to_many associations.
  *
  * CollectionAssociation provides common CRUD methods for collections.
@@ -139,12 +118,11 @@ export class CollectionAssociation extends Association {
    * Awaitable: mirrors Rails' `CollectionAssociation#writer` → `replace`
    * (collection_association.rb:46-48, :242), which for a *persisted* owner
    * runs the diffed deletes + inserts inline in a transaction. That is DB I/O,
-   * so this returns a Promise — the sync property setter cannot reach it and
+   * so this returns a Promise — the sync property setter cannot await it and
    * uses {@link syncWrite} instead (RFC 0068).
    */
   async writer(records: Base[]): Promise<void> {
-    const plan = this.replace(records);
-    if (plan?.pending) await plan.pending;
+    await this.replace(records);
   }
 
   /**
@@ -194,7 +172,10 @@ export class CollectionAssociation extends Association {
     ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
     }
-    this.replace(records);
+    // The guard above refuses every arm `replace` would owe I/O on, so its
+    // `Promise | Base[]` return is a plain array here and nothing is left to
+    // await — see `replace` for why it is not `async`.
+    this.replace(records) as Base[];
   }
 
   /**
@@ -337,11 +318,7 @@ export class CollectionAssociation extends Association {
         .all()
         .raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, primaryKey, notFoundIds);
     } else {
-      // Rails' `replace(records)` is synchronous; ours defers the
-      // persisted-owner half to the plan the sync `replace` returns (the
-      // awaitable `writer` does the same two steps).
-      const plan = this.replace(records);
-      if (plan?.pending) await plan.pending;
+      await this.replace(records);
     }
   }
 
@@ -704,23 +681,19 @@ export class CollectionAssociation extends Association {
    * Replace this collection with other_array. Performs a diff and
    * delete/add only records that have changed.
    *
-   * The new-owner arm is Rails' own — `replace_records(other_array,
-   * original_target)` (collection_association.rb:247) — so removal goes through
-   * `delete` → `delete_or_destroy` → `remove_records` and addition through
-   * `concat` → `concat_records`, each with its single `catch(:abort)` and (for
-   * HMT) its own `build_through_record` loop. It is I/O-free, so the owner's
-   * first `save()` autosaves the target.
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#replace
+   * (collection_association.rb:242-256) — the type-mismatch guard, its own
+   * `skip_strict_loading { load_target }.dup` baseline, and both owner arms,
+   * with `transaction { replace_records(...) }` inline on the persisted one.
    *
-   * For a *persisted* owner Rails additionally runs the diffed deletes +
-   * inserts in a transaction (`transaction { replace_records(...) }`,
-   * collection_association.rb:251) — opened here, on Rails' arm and under
-   * Rails' `other_array != original_target` guard. The DB work inside it
-   * cannot be awaited here (this is synchronous, and reached from mass
-   * assignment), so the open transaction's promise rides out on the returned
-   * plan for the awaitable {@link writer} to await. Returns `null` when there
-   * is nothing to persist.
+   * `Promise<Base[] | undefined> | Base[]` rather than `async`, for the reason
+   * {@link concat} (collection_association.rb:120) has the same shape: this is
+   * reached from `syncWrite`, whose mass-assignment caller cannot await, and an
+   * `async` body would defer even the I/O-free new-owner arm past its caller's
+   * next statement. `loadTarget` is the one place Rails' body does I/O, so the
+   * rest of it continues off that promise where there is one.
    */
-  replace(otherArray: Base[]): ReplacePlan | null {
+  replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
     // The writer path (`firm.clients = [...]`, `firm.client_ids = [...]`, mass
     // assignment) mutates `target` directly rather than going through
     // `setTarget`, so it needs the in-flight guard applied here too —
@@ -728,92 +701,22 @@ export class CollectionAssociation extends Association {
     // while only the raw `association(name).setTarget(...)` call is protected.
     this.raiseIfLoadInFlight();
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
-    const wasLoaded = this.isLoaded();
-    if (this.owner.isNewRecord()) {
-      // Rails: `original_target = skip_strict_loading { load_target }.dup`
-      // (collection_association.rb:244) — run unconditionally, so a new owner
-      // whose primary key is already set (`find_target?`, association.rb:190)
-      // diffs against the loaded baseline, not against an unloaded target.
-      const loaded = this.skipStrictLoading(() => this.loadTarget());
-      // Deviation (language-forced): that load is the one I/O in Rails' body and
-      // this one is synchronous — it is reached from the property setter — so
-      // when it owes a query the whole Rails body goes to the awaitable caller.
-      if (isThenable(loaded)) {
-        const pending = loaded.then((target) =>
-          replaceRecords(this, otherArray, [...(target ?? [])]),
-        );
-        return { newTarget: [...otherArray], originalTarget: [...this.target], wasLoaded, pending };
-      }
-      const originalTarget = [...(loaded ?? [])];
-      const replaced = replaceRecords(this, otherArray, originalTarget);
-      if (isThenable(replaced)) {
-        return { newTarget: [...otherArray], originalTarget, wasLoaded, pending: replaced };
-      }
-    } else {
-      // Persisted owner: `load_target` here is DB I/O this synchronous body
-      // cannot run, so the in-memory baseline stands in and `replaceRecordsInTransaction`
-      // re-reads the real `original_target` before diffing. Rails also calls
-      // replace_common_records_in_memory before diffing; for a new owner it
-      // skips it (replace_records leaves common records untouched), so it lives
-      // here rather than above the branch.
-      const originalTarget = [...this.target];
-      replaceCommonRecordsInMemory(this, otherArray, originalTarget);
-      if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
-        for (const r of this.difference(originalTarget, otherArray)) {
-          const idx = this.target.indexOf(r);
-          if (idx !== -1) this.target.splice(idx, 1);
+    const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
+      if (this.owner.isNewRecord()) {
+        return replaceRecords(this, otherArray, originalTarget);
+      } else {
+        replaceCommonRecordsInMemory(this, otherArray, originalTarget);
+        if (!arraysEqual(otherArray, originalTarget)) {
+          return this.transaction(() => replaceRecords(this, otherArray, originalTarget));
+        } else {
+          return otherArray;
         }
-        for (const r of this.difference(otherArray, this.target)) {
-          this.setOwnerAttributes(r);
-          // `skipCallbacks` because this add is only the in-memory placeholder
-          // for the deferred `replace_records`: `replaceRecordsInTransaction` restores
-          // `originalTarget` and re-runs the Rails body, whose `concat` fires
-          // `before_add`/`after_add` for real. Firing them here too would
-          // double them for every gained record.
-          this.addToTarget(r, { skipCallbacks: true });
-        }
-        this.loadedBang();
-        const plan: ReplacePlan = { newTarget: [...otherArray], originalTarget, wasLoaded };
-        plan.pending = this.transaction(() => this.replaceRecordsInTransaction(plan));
-        return plan;
       }
-    }
-    return null;
-  }
-
-  /**
-   * The body of the transaction {@link replace} opens on Rails' persisted-owner
-   * arm: `replace_records(other_array, original_target)`
-   * (collection_association.rb:251), against the baseline captured before the
-   * in-memory half of `replace` mutated `target`.
-   *
-   * Rails inlines this as the transaction's block; it is a named private
-   * helper here only because the block is async while `replace` is not (a JS
-   * property setter cannot await, RFC 0068). It retires with that split.
-   *
-   * @internal
-   */
-  protected async replaceRecordsInTransaction(pending: ReplacePlan): Promise<void> {
-    // If the association wasn't loaded at assignment time, fetch the persisted
-    // baseline directly rather than via findTarget, to avoid the loadedBang short-circuit
-    // and without mutating this.target (mirrors Rails' load_target in replace).
-    if (!pending.wasLoaded) {
-      // Query the DB directly via scope() to get the persisted baseline.
-      // findTarget() hits the association-instance cache (which may
-      // already reflect the in-memory replace) and returns the wrong diff.
-      const rel = this.scope() as { toArray?: () => Promise<Base[]> } | null | undefined;
-      const dbRecords = rel?.toArray ? await rel.toArray() : [];
-      pending.originalTarget = [...dbRecords];
-    }
-    const currentTarget = this.target;
-    // replaceRecords diffs against assoc.target; restore originalTarget so
-    // it sees the real DB state rather than the already-updated in-memory target
-    this._targetStore = [...pending.originalTarget];
-    try {
-      await replaceRecords(this, pending.newTarget, pending.originalTarget);
-    } finally {
-      this._targetStore = currentTarget;
-    }
+    };
+    const loaded = this.skipStrictLoading(() => this.loadTarget());
+    return isThenable(loaded)
+      ? loaded.then((target) => replaceAgainst([...target]))
+      : replaceAgainst([...loaded]);
   }
 
   /**
@@ -1597,9 +1500,9 @@ export function includesRecord(records: Base[], record: Base): boolean {
  * (collection_association.rb:414-424).
  *
  * `Promise<Base[]> | Base[]` because both arms of `replace` reach it: the
- * persisted one from the awaitable {@link CollectionAssociation.replaceRecordsInTransaction},
- * the new-owner one from the synchronous `replace` body, where `delete` and
- * `concat` are I/O-free and this runs inline start to finish.
+ * persisted one inside the transaction it opens, the new-owner one inline in
+ * the `replace` body, where `delete` and `concat` are I/O-free and this runs
+ * start to finish without awaiting.
  *
  * Rails' `unless concat(...)` reads the nil `concat_records` answers when a
  * failed `insert_record` raised Rollback inside the transaction (:127-135);

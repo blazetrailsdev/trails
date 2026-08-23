@@ -1018,6 +1018,8 @@ export interface SuppressedCall {
   tsName: string;
   /** See `CallMismatch.tsClass`. */
   tsClass?: string;
+  /** See `CallMismatch.tsDeclFile`. */
+  tsDeclFile?: string;
   call: string;
   /** The tag's reason, carried so the report can group the receipts by the
    *  permanence claim it opens with (RFC 0099). `""` when the artifact the
@@ -1213,6 +1215,34 @@ export function ownerRecordsNothing(
 ): boolean {
   if (tsClass === undefined || (owners?.size ?? 0) <= 1) return false;
   return byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) === undefined;
+}
+
+/**
+ * The file a matched member is DECLARED in, when that is not the file the pair
+ * matched under.
+ *
+ * `extract-ts-api.ts` attributes a class to the file that exports it, so
+ * `cache.rb`'s `Store` — which trails splits into `cache/store.ts` — is
+ * harvested as the entity `cache.ts:Store` while every member keeps its own
+ * declaring path. compare.ts matches, and the baseline keys, on `cache.ts`;
+ * `parity:api:build` has to open `cache/store.ts` to write the tag, so the
+ * artifact carries the declaring path (RFC 0106).
+ *
+ * With no resolved owner, every owner in the file must agree — two classes
+ * declaring the name in different files say nothing about which one this pair
+ * is, exactly as `ambiguousTsOwner` treats the call sets.
+ */
+export function declFileFor(
+  byFileNameOwner: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, string>>>,
+  tsFile: string,
+  tsName: string,
+  tsClass: string | undefined,
+): string | undefined {
+  const byOwner = byFileNameOwner.get(tsFile)?.get(tsName);
+  if (byOwner === undefined) return undefined;
+  if (tsClass !== undefined) return byOwner.get(tsClass);
+  const files = new Set(byOwner.values());
+  return files.size === 1 ? [...files][0] : undefined;
 }
 
 /**
@@ -1542,6 +1572,11 @@ interface CallMismatch {
    *  that name resolve to one (see `resolveTsOwner`). `parity:api:build` mints
    *  the tag on that declaration alone. */
   tsClass?: string;
+  /** The file `tsName` is DECLARED in, when trails split it out of the file
+   *  the Ruby path mirrors — `cache.rb`'s `Store` members live in
+   *  `cache/store.ts` while the row stays keyed `cache.ts`. Absent when the
+   *  declaration is in `tsFile` itself. See `declFileFor`. */
+  tsDeclFile?: string;
   missing: string[];
 }
 
@@ -2654,6 +2689,9 @@ export function main() {
     >();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // (file → name → owner → the file the member is DECLARED in), recorded only
+    // where it differs from the entity's own file — see `declFileFor`.
+    const tsDeclFileByFileNameOwner = new Map<string, Map<string, Map<string, string>>>();
     // The same population split by the SEAT each owner declares the name on
     // (file → name → owners), so `resolveTsOwner` can pair a Ruby
     // `X::ClassMethods` owner with the static declaration and the bare `X`
@@ -2732,6 +2770,14 @@ export function main() {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsOwnersByFileName.set(file, owners);
+        if (m.file !== undefined && m.file !== file) {
+          const byName =
+            tsDeclFileByFileNameOwner.get(file) ?? new Map<string, Map<string, string>>();
+          const byOwner = byName.get(m.name) ?? new Map<string, string>();
+          byOwner.set(owner, m.file);
+          byName.set(m.name, byOwner);
+          tsDeclFileByFileNameOwner.set(file, byName);
+        }
         if (m.writer === true) {
           const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
@@ -3404,6 +3450,7 @@ export function main() {
           );
         }
         const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
+        const tsDeclFile = declFileFor(tsDeclFileByFileNameOwner, tsFile, tsName, tsClass);
         let flagged = [...missing, ...ordered];
         if (tags !== undefined && tags.size > 0) {
           const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
@@ -3411,11 +3458,19 @@ export function main() {
           const applied = applyCallTags(flagged, tags, used);
           flagged = applied.kept;
           for (const s of applied.suppressed) {
-            suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, ...s });
+            suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, tsDeclFile, ...s });
           }
         }
         if (flagged.length === 0) return;
-        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, tsClass, missing: flagged });
+        callMismatches.push({
+          rubyFile,
+          tsFile,
+          rubyName,
+          tsName,
+          tsClass,
+          tsDeclFile,
+          missing: flagged,
+        });
       };
 
       // Advisory call-argument check (RFC 0095), on the pair checkCalls

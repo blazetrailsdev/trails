@@ -13,6 +13,7 @@ import {
   renderJsdoc,
   buildExpectations,
   fileModuleName,
+  groupByDeclFile,
   lowerMarksForDropped,
   staleTagKey,
 } from "./build.js";
@@ -603,6 +604,44 @@ describe("buildExpectations", () => {
       .get("insert-manager.ts")!
       .get(expectationKey(ANY_CLASS, "insert"))!;
     expect(exp.rubyNames).toEqual(["insert", "insert_all"]);
+  });
+});
+
+describe("buildExpectations / groupByDeclFile for a class split into a subdirectory", () => {
+  // `cache.rb`'s `Store` is ported to `cache/store.ts`, so the row keyed
+  // `cache.ts` has to be tagged in the file the member is declared in.
+  const artifact = {
+    mismatches: [
+      {
+        package: "activesupport",
+        tsFile: "cache.ts",
+        rubyName: "merged_options",
+        tsName: "mergedOptions",
+        tsClass: "Store",
+        tsDeclFile: "cache/store.ts",
+        missing: ["merge → merge"],
+      },
+      {
+        package: "activesupport",
+        tsFile: "cache.ts",
+        rubyName: "lookup_store",
+        tsName: "lookupStore",
+        missing: ["new → new"],
+      },
+    ],
+  };
+
+  it("routes each expectation to the file that declares it, keeping the row's key", () => {
+    const expectations = buildExpectations(artifact, "activesupport").get("cache.ts")!;
+    const groups = groupByDeclFile("cache.ts", expectations);
+    expect([...groups.get("cache/store.ts")!.values()].map((e) => e.tsName)).toEqual([
+      "mergedOptions",
+    ]);
+    expect([...groups.get("cache.ts")!.values()].map((e) => e.tsName)).toEqual(["lookupStore"]);
+  });
+
+  it("always groups the row's own file, so a stale-tag-only run still opens it", () => {
+    expect([...groupByDeclFile("cache.ts", new Map()).keys()]).toEqual(["cache.ts"]);
   });
 });
 
