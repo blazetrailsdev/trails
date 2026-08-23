@@ -14,6 +14,7 @@ export {
   AttrNames,
   buildMangledName,
   defineAttributeMethods,
+  undefineAttributeMethods,
   isInstanceMethodAlreadyImplemented,
 } from "./attribute-methods.js";
 export type { InstanceHost } from "./attribute-methods.js";

@@ -196,6 +196,7 @@ import {
   ClassMethods as AttributeMethodsClassMethods,
   isAttributeMethod as _isAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
+  undefineAttributeMethods as _undefineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
   GeneratedAttributeMethods,
   generateAliasAttributes as _generateAliasAttributes,
@@ -1510,6 +1511,7 @@ export class Base extends Model {
   // (attribute_methods.rb:139-159): no attr-name splat, and it answers whether
   // the class's methods were generated.
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
+  declare static undefineAttributeMethods: typeof _undefineAttributeMethods;
   declare static generateAliasAttributes: typeof _generateAliasAttributes;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
   /** @internal */
@@ -4720,6 +4722,7 @@ extend(Base, ModelSchema.ClassMethods);
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
+  undefineAttributeMethods: _undefineAttributeMethods,
   initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,

@@ -863,22 +863,6 @@ export function arelTable(this: CoreHost): Table {
  * a placeholder key for its whole life. Converging that slot is tracked
  * separately (RFC 0115 `seat-the-per-instance-primary-key-slot`).
  *
- * `klass.define_attribute_methods` (core.rb:849) has no seat here either, and
- * is CONVERGEABLE rather than permanent. It carries no `@missingRailsCall`
- * because the tag cannot apply to it: the extractor records the Ruby side as
- * `ref:define_attribute_methods`, and `ref:` identifiers are report-only, so
- * `parity:api:calls` never flags this omission and reads any tag on it as a
- * STALE justification (gate exit 1). The reason therefore lives here in prose
- * until the call itself lands. Porting it was tried and reverted: a
- * construction-time generation pass runs before the async schema load, and the
- * post-load pass (`applyColumnsHash`, model-schema.ts:1301-1302, which clears
- * `_attributeMethodsGenerated` so the next demand regenerates) then seats a
- * SECOND generated-module carrier. `undefineAttributeMethods` clears one of the
- * two, so the accessor survives an undefine that Rails' own
- * `attribute_methods_test.rb:1098-1117` requires to clear it. The duplicate
- * carrier is the blocker, not the call; RFC 0115
- * `call-define-attribute-methods-from-init-internals` carries the finding.
- *
  * @internal
  */
 export function initInternals(
@@ -910,6 +894,8 @@ export function initInternals(
   if (isPrimaryKeySettled.call(klass)) this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
+
+  klass.defineAttributeMethods();
 }
 
 /**

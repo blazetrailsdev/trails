@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
+import { CodeGenerator, include, uninclude, Module } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import {
   aliasesByAttributeName,
@@ -11,6 +11,7 @@ import {
   type AttributeMethodPattern,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
   defineAttributeMethods as amDefineAttributeMethods,
+  undefineAttributeMethods as amUndefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
   type DirtyOptions,
 } from "@blazetrails/activemodel";
@@ -310,10 +311,30 @@ export function dangerousAttributeMethods(): Set<string> {
  * wires this attribute-methods entry point as the single static (see base.ts),
  * so the super call reaches `generatedAssociationMethods` just as Rails' method
  * ancestry does.
+ *
+ * Rails runs this from `inherited`, so the ivar is always empty and the
+ * `include` is the class's only generated-methods entry. In trails a class body
+ * can reach ActiveModel's lazy `generated_attribute_methods`
+ * (attribute_methods.rb:400-402) first, which seats a bare `Module` and
+ * includes it. Replacing that one means taking its carrier back out of the
+ * prototype chain: `include()` splices a fresh carrier per call, so the stale
+ * one would keep answering every method it defines after an `undef_method` on
+ * the replacement. Its methods carry over, leaving the single module Ruby has.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
+  const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
+    ? this._generatedAttributeMethods
+    : undefined;
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._generatedAttributeMethods.ownerName = this.name;
+  if (previous instanceof Module) {
+    this._generatedAttributeMethods.moduleEval((mod) => {
+      for (const name of previous.instanceMethods()) {
+        Object.defineProperty(mod, name, previous.instanceMethod(name)!);
+      }
+    });
+    uninclude(this as unknown as new (...args: unknown[]) => unknown, previous);
+  }
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
@@ -520,9 +541,23 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   this._aliasAttributesMassGenerated = true;
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#undefine_attribute_methods
+ * (attribute_methods.rb:143-149). `GeneratedAttributeMethods::LOCK.synchronize`
+ * has no seat — JS is single-threaded — but the `super if
+ * @attribute_methods_generated` guard does: without generated methods there is
+ * nothing to undefine, and ActiveModel's `super` would otherwise clear a
+ * module this class never generated into. Both ivars are per-class, so only an
+ * *own* truthy flag counts as generated (an inherited `true` belongs to the
+ * parent).
+ */
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
-  const amFn = Object.getPrototypeOf(this)?.undefineAttributeMethods;
-  if (typeof amFn === "function") amFn.call(this);
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+    this._attributeMethodsGenerated
+  ) {
+    amUndefineAttributeMethods.call(this as never);
+  }
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
 }

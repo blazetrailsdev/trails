@@ -388,13 +388,36 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    expect(typeof (new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBe(
-      "function",
-    );
+    const employee = new Employee({}) as unknown as { nameChanged: unknown };
+    expect(typeof employee.nameChanged).toBe("function");
 
     (Employee as unknown as { undefineAttributeMethods(): void }).undefineAttributeMethods();
 
-    expect((new Employee({}) as unknown as { nameChanged: unknown }).nameChanged).toBeUndefined();
+    // Read through the existing record: constructing again would regenerate,
+    // since `init_internals` calls `define_attribute_methods` (core.rb:849).
+    expect(employee.nameChanged).toBeUndefined();
+  });
+
+  it("seats one generated-methods carrier when construction generates first", () => {
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // Construction generates (core.rb:849) over the bare module ActiveModel
+    // seated for the class-body `attribute` call; two carriers would leave
+    // `undefineAttributeMethods` clearing only one of them.
+    new Employee({});
+
+    let carriers = 0;
+    for (
+      let link: object | null = Employee.prototype;
+      link;
+      link = Object.getPrototypeOf(link) as object | null
+    ) {
+      if (Object.prototype.hasOwnProperty.call(link, "nameChanged")) carriers += 1;
+    }
+    expect(carriers).toBe(1);
   });
 
   it("generates once when the schema load drives generation first", () => {
