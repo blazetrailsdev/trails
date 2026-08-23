@@ -1,9 +1,11 @@
 /**
  * WhereClause — manages WHERE predicates on a Relation.
  *
- * Stores a single array of Arel nodes, matching Rails' WhereClause which
- * holds a flat `predicates` array. All condition types (hash, raw SQL,
- * NOT, Arel nodes) are converted to nodes at insertion time.
+ * Stores a single array of predicates, matching Rails' WhereClause which
+ * holds a flat `predicates` array. A predicate is an Arel node or a raw
+ * String — `build_where_clause`'s sanitize_sql arm stores the bare String
+ * (query_methods.rb:1627) and this class handles it at where_clause.rb:160,
+ * 167, 190 and 203.
  *
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
@@ -12,10 +14,6 @@ import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 export class WhereClause {
-  // Rails' predicates array holds raw Strings alongside Arel nodes —
-  // `build_where_clause`'s sanitize_sql arm stores the bare String
-  // (query_methods.rb:1627) and this class handles it at where_clause.rb:160,
-  // 167, 190 and 203.
   private _predicates: (Nodes.Node | string)[];
 
   /** @internal */
@@ -394,7 +392,6 @@ function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
 
 /** @internal */
 function isEqualityNode(node: Nodes.Node | string): boolean {
-  // Rails' `!node.is_a?(String) && node.equality?` (where_clause.rb:159-161).
   if (typeof node === "string") return false;
   if (node instanceof Nodes.Equality) return true;
   if (typeof (node as any).isEquality === "function") return (node as any).isEquality();
