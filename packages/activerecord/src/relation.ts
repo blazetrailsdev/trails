@@ -1050,16 +1050,23 @@ export class Relation<T extends Base> {
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
-      await (
-        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
-      ).ensureSchemaLoaded();
-
+      //
       // Rails materializes a `distinct_relation_for_primary_key` subquery value
       // (an eager-loading relation with limit/offset over a collection reflection)
       // into a literal id list inside `.where()`. trails' `.where()` is sync, so
       // the materialization is deferred to here — run it before `exec_main_query`
       // so an empty id set becomes an empty `IN` (contradiction, no query).
-      await this._materializeDeferredDistinctPkPredicates();
+      //
+      // A scheduled relation ran both inside the promise `loadAsync` parked, and
+      // this pass only drains that handle (relation.rb:1405-1408), so re-running
+      // them here would race the scheduled pass to the same deferred predicate
+      // and issue a second `distinct_relation_for_primary_key` SELECT.
+      if (!this.isScheduled) {
+        await (
+          this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
+        ).ensureSchemaLoaded();
+        await this._materializeDeferredDistinctPkPredicates();
+      }
 
       // Capture the load token before any await so we can detect if a
       // reset() landed while the query was in flight and bail without
