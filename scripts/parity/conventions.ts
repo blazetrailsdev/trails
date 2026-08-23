@@ -898,7 +898,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`Temporal.PlainDate` / `PlainDateTime` / `ZonedDateTime` / `Instant` and " +
       "a JS `Date` — are built-ins the port does not monkey-patch, so there is " +
       "no reopening to define a marker in at all, and RFC 0098 " +
-      "(`time-with-zone-residue-structural-blockers`) settled that " +
+      "(`time-with-zone-residue-structural-blockers`) landed the decision that " +
       "`@blazetrails/date` answers for them with the `actsLikeDate` / " +
       "`actsLikeTime` predicates (packages/date/src/acts-like.ts) that " +
       "`Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing " +
