@@ -235,11 +235,8 @@ describe("reconcileFileText", () => {
   });
 
   it("leaves a mixed-family comment alone in either kind", () => {
-    // A comment carrying BOTH families' receipts was re-flowed by whichever
-    // pass ran — the other family's tag lines land in `rest` (prose), and every
-    // reconciled tag used to be re-emitted after all of it. Observed on
-    // `encryption/cipher/aes256-gcm.ts` `encrypt`: 0 rows migrated, 1 file
-    // rewritten (RFC 0106).
+    // Observed on `encryption/cipher/aes256-gcm.ts` `encrypt`: 0 rows migrated,
+    // 1 file rewritten (RFC 0106).
     const src = [
       "export class Foo {",
       "  /**",

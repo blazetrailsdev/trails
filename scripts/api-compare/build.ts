@@ -290,7 +290,7 @@ export function renderJsdoc(
   // Where this family's tags stood in the source comment. Reconciled tags go
   // back there rather than after every other line, so a pass that migrates
   // nothing rewrites nothing on a comment carrying the OTHER family's tags too
-  // (RFC 0106). Absent — nothing was tagged — they are appended as before.
+  // — those land in `rest` as prose (RFC 0106). Absent, they are appended.
   const at = synthesized || slot === undefined ? undefined : Math.min(slot, head.length);
   // Normalize: drop trailing blank `*` lines so the separator below is not
   // duplicated on a re-run (idempotency). With a slot the separator is the one

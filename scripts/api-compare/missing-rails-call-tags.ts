@@ -152,10 +152,7 @@ export function parseJsdoc(
 ): { rest: string[]; entries: TagEntry[]; slot?: number } {
   const rest: string[] = [];
   const entries: TagEntry[] = [];
-  // Index in `rest` where this family's tags began, so `renderJsdoc` can put
-  // the reconciled tags back where they were instead of after every other line
-  // — a comment carrying BOTH families' tags is otherwise re-flowed by either
-  // pass while migrating nothing (RFC 0106).
+  // Index in `rest` where this family's tags began — see `renderJsdoc`'s `at`.
   let slot: number | undefined;
   const tagLineOf = new Map<TagEntry, number>();
   let open: TagEntry | null = null;
