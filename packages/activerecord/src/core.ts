@@ -540,6 +540,11 @@ export type ConnectedToEntry = {
 
 const CONNECTED_TO_STACK_KEY = Symbol.for("ar_connected_to_stack");
 
+/**
+ * @missingRailsCall new — PERMANENT: Rails allocates a `Concurrent::Array.new`
+ *   (core.rb:220); JS has no concurrent-array class and the single-threaded
+ *   event loop needs none, so the stack is a plain `[]`.
+ */
 export function connectedToStack(): ConnectedToEntry[] {
   return IsolatedExecutionState.fetch<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY, () => []);
 }
@@ -607,6 +612,11 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 
 /**
  * Mirrors: ActiveRecord::Core.preventing_writes? (`core.rb:205-213`).
+ *
+ * @missingRailsCall include? — PERMANENT: TS language shortcoming: Rails'
+ *   `hash[:klasses].include?(Base)` (core.rb:206) names Base, but core.ts is
+ *   imported *by* base.ts, so the constant cannot be referenced here; the arm is
+ *   spelled `klasses.some(isBase)` against the own `_isActiveRecordBase` brand.
  */
 export function isPreventingWrites(className?: string): boolean {
   const stack = connectedToStack();
@@ -710,6 +720,12 @@ export function initializeGeneratedModules(this: CoreHost): void {
   generatedAssociationMethods.call(this);
 }
 
+/**
+ * @missingRailsCall include — PERMANENT: Rails `include mod` mixes a generated
+ *   Module into the class (core.rb:341); trails has no generated module —
+ *   `generatedAssociationMethods` is a Set of generated method names — so there
+ *   is nothing to include.
+ */
 export function generatedAssociationMethods(this: CoreHost): Set<string> {
   if (!this._generatedAssociationMethods) {
     this._generatedAssociationMethods = new Set();

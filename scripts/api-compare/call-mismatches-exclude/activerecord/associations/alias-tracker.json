@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "associations/alias-tracker.ts",
     "rubyName": "create",
-    "call": "initial_count_for",
-    "reason": "Rails only reaches `initial_count_for` from the Hash DEFAULT_PROC it installs on `aliases` (alias_tracker.rb:14-21); a JS Map has no default proc, so the port defers the call to AliasTracker#_getCount, which is where a missing key is first read — same language gap as the `Hash.new(0)` args row above."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/alias-tracker.ts",
-    "rubyName": "create",
     "call": "new",
     "kind": "args",
     "rubyArgs": [
@@ -28,12 +21,5 @@
       "ref:aliases"
     ],
     "reason": "alias_tracker.rb:24 `new(connection.table_alias_length, aliases)` — the alias counts Rails computes lazily through the Hash `default_proc` installed at lines 13-22 have no `Map` analogue, so trails carries `joins` and the quoter onto the tracker and computes the initial count in `_getCount` instead. The two extra arguments ARE the default_proc. Language shortcoming."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/alias-tracker.ts",
-    "rubyName": "initial_count_for",
-    "call": "size",
-    "reason": "Ruby Array#size on the scan result: `join.left.scan(/.../).size` (alias_tracker.rb:39-41) ports to `matches ? matches.length : 0` off String#match with the /g flag."
   }
 ]

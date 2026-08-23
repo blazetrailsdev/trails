@@ -75,6 +75,13 @@ export class AliasTracker {
     this._quoter = quoter;
   }
 
+  /**
+   * @missingRailsCall initial_count_for — PERMANENT: Rails only reaches
+   *   `initial_count_for` from the Hash DEFAULT_PROC it installs on `aliases`
+   *   (alias_tracker.rb:14-21); a JS Map has no default proc, so the port defers
+   *   the call to AliasTracker#_getCount, which is where a missing key is first
+   *   read — same language gap as the `Hash.new(0)` args row above.
+   */
   static create(
     pool: any,
     initialTable: string,
@@ -101,6 +108,11 @@ export class AliasTracker {
     return new AliasTracker(tableAliasLength, map, joins, quoter);
   }
 
+  /**
+   * @missingRailsCall size — PERMANENT: Ruby Array#size on the scan result:
+   *   `join.left.scan(/.../).size` (alias_tracker.rb:39-41) ports to `matches ?
+   *   matches.length : 0` off String#match with the /g flag.
+   */
   static initialCountFor(quoter: Quoting | undefined, name: string, tableJoins: any[]): number {
     const quotedName = quoter ? quoter.quoteTableName(name) : `"${name}"`;
     const quotedNameEscaped = quotedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

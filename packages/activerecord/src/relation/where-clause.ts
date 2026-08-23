@@ -70,6 +70,14 @@ export class WhereClause {
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
+  /**
+   * @missingRailsCall first — PERMANENT: Verified per-site (RFC 0106):
+   *   `predicates.first` (where_clause.rb:85) — Ruby `Array#first`, spelled
+   *   `predicates[0]` in TS.
+   * @missingRailsCall size — PERMANENT: Verified per-site (RFC 0106):
+   *   `predicates.size == 1` (where_clause.rb:84) — Ruby `Array#size`, spelled
+   *   `.length` in TS.
+   */
   invert(): WhereClause {
     if (this.predicates.length === 0) return this.clone();
     if (this.predicates.length === 1) {
@@ -128,6 +136,11 @@ export class WhereClause {
     );
   }
 
+  /**
+   * @missingRailsCall any? — PERMANENT: Verified per-site (RFC 0106):
+   *   `predicates.any? do |x| ... end` (where_clause.rb:100) — Enumerable#any?
+   *   with a block on a Ruby Array, spelled `.some(...)` in TS.
+   */
   isContradiction(): boolean {
     for (const node of this.predicates) {
       if (node instanceof Nodes.In) {

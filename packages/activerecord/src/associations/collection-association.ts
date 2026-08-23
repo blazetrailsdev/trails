@@ -216,6 +216,14 @@ export class CollectionAssociation extends Association {
   /**
    * Implements the ids reader, e.g. foo.item_ids.
    * Returns an array of primary key values from the target.
+   *
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `target.empty?` (collection_association.rb:54) — `empty?` on a Ruby Array,
+   *   whose faithful JS spelling is `xs.length === 0`. That emits no callee, so
+   *   no TS call can ever credit the Ruby one. The gate flags it only because
+   *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
+   *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
+   *   nothing in the TS body was dropped.
    */
   async idsReader(): Promise<unknown[]> {
     // Rails `ids_reader` plucks `reflection.association_primary_key` in all
@@ -653,6 +661,12 @@ export class CollectionAssociation extends Association {
    * abstractly from here; every concrete collection association is a
    * `HasManyAssociation`, so it is reached through the subclass rather than
    * through a base declaration Rails does not have.
+   *
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `target.empty?` / `association_scope.group_values.empty?`
+   *   (collection_association.rb:214, :216) are `.length === 0` property reads,
+   *   which the gate deliberately does not credit as calls
+   *   (JS_ENUMERABLE_ALIASES, RFC 0092).
    */
   size(): Promise<number> | number {
     if (!this.findTargetNeeded() || this.isLoaded()) {

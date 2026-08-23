@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "statement-cache.ts",
-    "rubyName": "create",
-    "call": "call",
-    "reason": "Verified per-site (RFC 0106 wave 4g): `(callable || block).call Params.new` (statement_cache.rb:133) is Ruby `Proc#call`; a JS function is invoked directly as `callable(new Params())` (statement-cache.ts:204). There is no `call` method to route through — JS `Function.prototype.call` is the receiver-binding primitive, not Ruby's Proc invocation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "statement-cache.ts",
     "rubyName": "execute",
     "call": "async_find_by_sql",
     "reason": "Verified per-site (RFC 0106 wave 4g): `@model.async_find_by_sql(...)` (statement_cache.rb:149) is the `async: true` arm of `execute`. trails' `execute` takes no `async` kwarg because no caller can pass one — `Association#find_target`'s `sc.execute(binds, c, async: async)` (association.rb:269) has no ported counterpart while `ActiveRecord::Promise` is unmodelled. Tracked by story `port-promise-complete-for-async-loaded-arms` (RFC 0023); adding the arm before then would be an unreachable code path."

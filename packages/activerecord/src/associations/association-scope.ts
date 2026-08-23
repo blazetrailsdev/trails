@@ -476,6 +476,10 @@ export class AssociationScope {
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#get_chain
    * (association_scope.rb:112-122).
+   *
+   * @missingRailsCall drop — PERMANENT: Ruby Array#drop:
+   *   `reflection.chain.drop(1)` (association_scope.rb:115) ports to
+   *   `reflection.chain.slice(1)`.
    */
   protected getChain(
     reflection: AssociationReflection,
@@ -672,6 +676,15 @@ export class AssociationScope {
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#add_constraints
    * (association_scope.rb:124-159).
+   *
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `item.references_values.empty?` / `associations.empty?`
+   *   (association_scope.rb:138,143) — `empty?` on a Ruby Array, whose faithful
+   *   JS spelling is `xs.length === 0`. That emits no callee, so no TS call can
+   *   ever credit the Ruby one. The gate flags it only because `empty?` maps
+   *   onto the unrelated `ActiveRecord::Result.empty`, which takes arguments
+   *   since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the
+   *   TS body was dropped.
    */
   private addConstraints(
     scope: unknown,

@@ -110,6 +110,12 @@ export class CommandRecorder {
    * a single batched command (mirrors the Rails bulk alter path).
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#change_table
+   *
+   * @missingRailsCall bulk_change_table — PERMANENT: Rails records the bulk path
+   *   as a lambda `-> t { bulk_change_table(table_name, commands) }`
+   *   (migration/command_recorder.rb:142); the port's command tuple carries no
+   *   block seat, so it records `[tableName, commands]` and `replay`
+   *   re-dispatches each sub-command (command-recorder.ts:138,152-160).
    */
   async changeTable(
     tableName: string,
@@ -174,7 +180,13 @@ export class CommandRecorder {
   // invert* methods — mirrors Rails private StraightReversions + overrides
   // ---------------------------------------------------------------------------
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall delete — PERMANENT: Ruby `Hash#delete(:if_not_exists)`
+   *   (migration/command_recorder.rb:199); JS spells the same operation as the
+   *   `delete` OPERATOR (command-recorder.ts:192), which records no callee.
+   */
   invertCreateTable(args: unknown[]): [string, unknown[]] {
     const a = args.slice();
     // createTable may be recorded as [name, options, fn] — find the trailing options hash
@@ -317,7 +329,13 @@ export class CommandRecorder {
     return this.invertRemoveReference(args);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall delete — PERMANENT: Ruby `Hash#delete(:validate)`
+   *   (migration/command_recorder.rb:288); JS spells the same operation as the
+   *   `delete` OPERATOR (command-recorder.ts:326), which records no callee.
+   */
   invertAddForeignKey(args: unknown[]): [string, unknown[]] {
     const a = args.slice();
     if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {

@@ -646,6 +646,12 @@ const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
  * event and rejected.
  *
  * @internal
+ *
+ * @missingRailsCall merge! — PERMANENT: Reviewed (RFC 0106 wave 4c): Ruby's
+ *   `args.extract_options!.merge!(enforced_options)` mutates the extracted hash
+ *   in place; TS returns a fresh merged object via spread because the caller
+ *   binds the result straight into `set_callback`, so there is no in-place
+ *   `merge!` to name.
  */
 export function setOptionsForCallbacksBang(
   options: Record<string, unknown> | undefined,

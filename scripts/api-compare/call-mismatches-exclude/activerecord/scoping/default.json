@@ -5,12 +5,5 @@
     "rubyName": "build_default_scope",
     "call": "any?",
     "reason": "default.rb:157 `elsif default_scopes.any?` — Ruby Array#any? on a plain array has no trails port; the port spells it `scopes.length === 0` and inverts it into an early return (default.ts:71-72), so the `elsif` becomes a guard. Same predicate, inverted branch shape; tracked."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "scoping/default.ts",
-    "rubyName": "scope_attributes?",
-    "call": "any?",
-    "reason": "Ruby Array#any? has no ported counterpart: `default_scopes.any?` (scoping/default.rb:56) ports to the `defaultScopes.length` check in isScopeAttributes."
   }
 ]

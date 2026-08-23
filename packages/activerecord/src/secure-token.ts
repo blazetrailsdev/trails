@@ -31,6 +31,18 @@ const MINIMUM_TOKEN_LENGTH = 24;
  * Rails reaches `generate_unique_secure_token` through `self.class` because
  * `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11); both
  * members are assigned onto `Base` the same way (base.ts).
+ *
+ * @missingRailsCall define_method — PERMANENT: Verified per-site (RFC 0106):
+ *   `define_method("regenerate_#{attribute}")` (`secure_token.rb:49`) — JS has
+ *   no `define_method`; the settled spelling is `Object.defineProperty` on the
+ *   prototype.
+ * @missingRailsCall set_callback — PERMANENT: Verified per-site (RFC 0106):
+ *   `set_callback on, on == :initialize ? :after : :before`
+ *   (`secure_token.rb:50`) — AR's callbacks in trails are registered on their
+ *   own per-prototype registry (`callbacks.ts` `registerCallback`), not on an
+ *   ActiveSupport `CallbackChain`, so ActiveSupport's `setCallback` has no chain
+ *   named "create"/"initialize" to reach and the
+ *   `beforeCreate`/`afterInitialize` helpers are the only route.
  */
 export function hasSecureToken(
   this: typeof Base,

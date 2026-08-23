@@ -1966,6 +1966,53 @@ describe("staleCallTags", () => {
     ]);
     expect(staleCallTags(twoClasses, used)).toEqual([]);
   });
+
+  it("credits a top-level function's tag with the suppression its owned pair made", () => {
+    const topLevel = new Map([
+      [
+        "inflector.ts",
+        new Map([
+          [
+            "safeConstantize",
+            new Map([
+              [
+                "",
+                new Map([
+                  ["const_regexp", "PERMANENT — receipt."],
+                  ["match?", "PERMANENT — receipt."],
+                ]),
+              ],
+            ]),
+          ],
+        ]),
+      ],
+    ]);
+    const used = new Map([
+      [callTagKey("inflector.ts", "", "safeConstantize"), new Set<string>()],
+      [
+        callTagKey("inflector.ts", "Inflector", "safeConstantize"),
+        new Set(["const_regexp", "match?"]),
+      ],
+    ]);
+    expect(staleCallTags(topLevel, used)).toEqual([]);
+  });
+
+  it("still reports a top-level function's tag no owner suppressed", () => {
+    const topLevel = new Map([
+      [
+        "inflector.ts",
+        new Map([
+          ["safeConstantize", new Map([["", new Map([["const_regexp", "PERMANENT — receipt."]])]])],
+        ]),
+      ],
+    ]);
+    const used = new Map([
+      [callTagKey("inflector.ts", "Inflector", "safeConstantize"), new Set(["match?"])],
+    ]);
+    expect(staleCallTags(topLevel, used)).toEqual([
+      { tsFile: "inflector.ts", tsName: "safeConstantize", call: "const_regexp" },
+    ]);
+  });
 });
 
 describe("resolveTsOwner", () => {

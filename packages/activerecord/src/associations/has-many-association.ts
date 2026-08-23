@@ -101,6 +101,14 @@ export class HasManyAssociation extends CollectionAssociation {
    * Handle the :dependent option when the owner is being destroyed.
    * Supports: restrict_with_exception, restrict_with_error, destroy,
    * nullify, delete (delete_all).
+   *
+   * @missingRailsCall fetch — PERMANENT: Ruby
+   *   `options.fetch(:ensuring_owner_was, nil)` (has_many_association.rb:52); a
+   *   JS object has no `fetch`, so the stored-nil semantics are spelled as an
+   *   own-key check at the call site.
+   * @missingRailsCall first — PERMANENT: Ruby `target.first.class`
+   *   (has_many_association.rb:36); JS arrays have no `first`, so the same
+   *   element is read as `this.target[0]`.
    */
   async handleDependency(): Promise<void | false> {
     const dependent = this.reflection.options.dependent;
