@@ -279,11 +279,13 @@ describe("PersistenceTest (trails)", () => {
     }
     registerModel(PostWithStringSequence as never);
 
+    let insertSql: string | null = null;
     let insertBinds: unknown[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: unknown) => {
       const payload = (event as { payload?: Record<string, unknown> }).payload;
       if (typeof payload?.sql === "string" && payload.sql.startsWith("INSERT")) {
-        insertBinds = payload.type_casted_binds as unknown[];
+        insertSql = payload.sql;
+        insertBinds = (payload.type_casted_binds ?? []) as unknown[];
       }
     });
     try {
@@ -292,7 +294,20 @@ describe("PersistenceTest (trails)", () => {
       Notifications.unsubscribe(sub);
     }
 
-    expect(insertBinds).not.toContain("654321");
-    expect(insertBinds.map(String)).toContain("654321");
+    // Fails loudly rather than passing vacuously if the INSERT is ever emitted
+    // under a shape this subscriber does not match.
+    expect(insertSql).not.toBeNull();
+
+    // SQLite and PostgreSQL bind the value; MySQL and MariaDB inline it into
+    // the statement. Render both channels with strings quoted the way the
+    // inlined form quotes them, so one pair of assertions covers every adapter:
+    // the cast Integer appears bare, the raw String would appear quoted.
+    const emitted = [
+      insertSql ?? "",
+      ...insertBinds.map((b) => (typeof b === "string" ? `'${b}'` : String(b))),
+    ].join(" | ");
+
+    expect(emitted).toContain("654321");
+    expect(emitted).not.toContain("'654321'");
   });
 });
