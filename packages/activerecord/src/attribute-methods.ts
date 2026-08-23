@@ -396,8 +396,9 @@ export function generateAliasAttributeMethods(
  *   `overloaded_types` does not have (schema.rb:1408-1415), calls only
  *   `type_for_attribute`, and passes. A JS property must exist before it is
  *   read, so trails generates at the end of every schema load
- *   (`defineAttributeMethodsAfterLoad`, model-schema.ts:1159, tagged @noRailsEquivalent
- *   against CLAUDE.md's "Generated attribute readers are properties");
+ *   (`defineAttributeMethodsAfterLoad`, model-schema.ts:1159), a generation point
+ *   CLAUDE.md ratifies repo-wide under "Generated attribute readers are
+ *   properties";
  *   `type_for_attribute` loads the schema, so trails reaches this method there
  *   and the guard would raise on a Rails test Rails passes. Verified by porting
  *   it: it reds `attributes_test.rb:54` and the ignored-columns case in
