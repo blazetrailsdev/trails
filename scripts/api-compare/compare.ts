@@ -1025,6 +1025,10 @@ export interface SuppressedCall {
   reason?: string;
 }
 
+/** The separator {@link callTagKey} joins on, shared with the readers that take
+ *  a key apart — a character no TS file path, class or method name contains. */
+const TAG_KEY_SEP = "\u0000";
+
 /** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
  *  by (tsFile, tsClass, tsName), so a tag justifies the deviation for exactly
  *  the method that carries it — never for a same-named method in another file,
@@ -1032,7 +1036,7 @@ export interface SuppressedCall {
  *  next to `ConnectionPool#checkout`). `tsClass` is `""` for a top-level
  *  function and `"*"` when the owning class could not be resolved. */
 export function callTagKey(tsFile: string, tsClass: string, tsName: string): string {
-  return `${tsFile}\u0000${tsClass}\u0000${tsName}`;
+  return [tsFile, tsClass, tsName].join(TAG_KEY_SEP);
 }
 
 /**
@@ -1425,7 +1429,7 @@ export function usedForAnyOwner(
   const union = new Set<string>();
   let seen = false;
   for (const [key, calls] of used) {
-    const [file, , name] = key.split("\u0000");
+    const [file, , name] = key.split(TAG_KEY_SEP);
     if (file !== tsFile || name !== tsName) continue;
     seen = true;
     for (const c of calls) union.add(c);

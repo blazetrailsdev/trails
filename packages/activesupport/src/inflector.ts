@@ -314,7 +314,7 @@ export function constantize(camelCasedWord: string): unknown {
  * Mirrors: Inflector.safe_constantize.
  *
  * @missingRailsCall const_regexp — PERMANENT: Same `rescue LoadError` arm as
- *   this file's `safe_constantize` → `match?` row: `const_regexp` is only
+ *   this file's `safe_constantize` → `match?` tag: `const_regexp` is only
  *   interpolated into the "Unable to autoload constant" pattern that arm
  *   matches. trails has no Ruby autoload and `constantize` never raises
  *   LoadError, so the arm has no analogue — `constRegexp` itself is ported
