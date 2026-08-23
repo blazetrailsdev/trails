@@ -656,6 +656,7 @@ describe("HashToXmlTest", () => {
         age: 26,
         age_in_millis: 820497600000,
         moved_on: RubyDate.civil(2005, 11, 15),
+        resident: ":yes",
       },
       xmlOptions,
     );
@@ -665,6 +666,7 @@ describe("HashToXmlTest", () => {
     expect(xml).toContain('<age type="integer">26</age>');
     expect(xml).toContain('<age-in-millis type="integer">820497600000</age-in-millis>');
     expect(xml).toContain('<moved-on type="date">2005-11-15</moved-on>');
+    expect(xml).toContain('<resident type="symbol">yes</resident>');
   });
 
   it("one level with nils", () => {

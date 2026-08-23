@@ -82,7 +82,9 @@ const DEFAULT_ENCODINGS: Record<string, string> = {
  * `ActiveSupport::Duration`).
  */
 const FORMATTING: Record<string, (value: unknown) => string> = {
-  symbol: (value) => (typeof value === "symbol" ? (value.description ?? "") : String(value)),
+  // `symbol.to_s` (xml_mini.rb:47) — the Symbol's name. A Ruby Symbol is a
+  // colon-prefixed string in trails, so the leading colon comes off.
+  symbol: (value) => String(value).slice(1),
   date: (value) => (value instanceof Temporal.PlainDate ? value.toString() : String(value)),
   time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
   dateTime: formatDateTime,
@@ -425,16 +427,17 @@ export interface ToTagOptions extends RenameKeyOptions {
 function inferTypeName(value: unknown): string | undefined {
   if (value == null) return undefined;
   switch (typeof value) {
-    case "symbol":
-      return "symbol";
     case "boolean":
       return "boolean";
     case "bigint":
       return "integer";
     case "number":
       return Number.isInteger(value) ? "integer" : "float";
+    // A Ruby Symbol is a colon-prefixed string in trails, so the
+    // `TYPE_NAMES["Symbol"] => "symbol"` arm (xml_mini.rb:29) reads it here;
+    // any other string is untyped, as `to_str`-responders are in Rails.
     case "string":
-      return undefined;
+      return value.startsWith(":") ? "symbol" : undefined;
   }
   if (value instanceof BigDecimal) return "decimal";
   // boundary: a JS Date maps to the XML `dateTime` type.
