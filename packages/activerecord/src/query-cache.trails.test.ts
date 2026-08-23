@@ -171,6 +171,37 @@ describe("Store max size eviction gate (trails)", () => {
     expect(store.get("b")).toEqual([{ key: "b" }]);
     expect(store.get("c")).toEqual([{ key: "c" }]);
   });
+
+  // `compute_if_absent` (query_cache.rb:66-80) touches the entry it finds —
+  // `@map.delete(key)` then `@map[key] = entry` — so a cache HIT makes that key
+  // the newest and the eviction shift takes some other key.
+  it("a hit refreshes the entry so the shift evicts a colder key", async () => {
+    const store = new Store(null, 2);
+    store.enabled = true;
+    await fill(store, ["a", "b"]);
+    await store.computeIfAbsent("a", () => Promise.reject(new Error("miss")));
+    await fill(store, ["c"]);
+    expect(store.get("a")).toEqual([{ key: "a" }]);
+    expect(store.get("b")).toBeUndefined();
+  });
+
+  // `@map[key] ||= yield` (query_cache.rb:79) only assigns when the key is
+  // still absent, so the loser of two concurrent misses on the same key does
+  // not clobber the value the winner stored.
+  it("a concurrent miss on the same key does not overwrite the stored value", async () => {
+    const store = new Store(null, null);
+    store.enabled = true;
+    let resolveSecond: (rows: Record<string, unknown>[]) => void = () => {};
+    const second = new Promise<Record<string, unknown>[]>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const first = store.computeIfAbsent("a", () => Promise.resolve([{ key: "first" }]));
+    const later = store.computeIfAbsent("a", () => second);
+    await first;
+    resolveSecond([{ key: "second" }]);
+    expect(await later).toEqual([{ key: "first" }]);
+    expect(store.get("a")).toEqual([{ key: "first" }]);
+  });
 });
 
 // Rails routes schema reflection through `internal_exec_query`, a method

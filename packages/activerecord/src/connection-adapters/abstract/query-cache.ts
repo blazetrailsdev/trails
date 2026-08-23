@@ -80,18 +80,29 @@ export class Store {
     compute: () => Promise<Record<string, unknown>[]>,
   ): Promise<Record<string, unknown>[]> {
     this.checkVersion();
+
     if (!this.enabled) return compute();
 
-    const cached = this.get(key);
-    if (cached !== undefined) {
-      return Promise.resolve(cached.map((row) => ({ ...row })));
+    const entry = this._map.get(key);
+    if (entry) {
+      this._map.delete(key);
+      this._map.set(key, entry);
+      return Promise.resolve(entry.map((row) => ({ ...row })));
+    }
+
+    if (this._maxSize != null && this._map.size >= this._maxSize) {
+      // `@map.shift` (query_cache.rb:76) — evict the oldest entry, which for a
+      // JS `Map` is the first insertion-ordered key.
+      const oldestKey = this._map.keys().next().value;
+      if (oldestKey !== undefined) this._map.delete(oldestKey);
     }
 
     return compute().then((result) => {
-      if (this._maxSize != null && this._map.size >= this._maxSize) {
-        const firstKey = this._map.keys().next().value;
-        if (firstKey !== undefined) this._map.delete(firstKey);
-      }
+      // `@map[key] ||= yield` (query_cache.rb:79): the assignment loses to a
+      // value stored while this compute was in flight, so a second concurrent
+      // miss on the same key does not overwrite the first one's result.
+      const stored = this._map.get(key);
+      if (stored) return stored.map((row) => ({ ...row }));
       this._map.set(key, result);
       return result.map((row) => ({ ...row }));
     });
