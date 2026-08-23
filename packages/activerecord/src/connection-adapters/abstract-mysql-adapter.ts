@@ -1109,6 +1109,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // (abstract_mysql_adapter.rb:638-682). Async where Rails is sync: the arm is
   // selected by `supports_insert_raw_alias_syntax?` (rb:892-894), which reads
   // `database_version` — a server round-trip trails can only await.
+  /**
+   * @missingRailsCall first — PERMANENT: RFC 0106: Ruby Set#first on `insert.keys`
+   *   (abstract_mysql_adapter.rb:640). JS Set has no `first`; the port
+   *   destructures the iterator (`const [firstKey] = insert.keys`), which emits
+   *   no callee. The sibling `quote_column_name` call converged in the same
+   *   pass.
+   */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     // Can use any column as it will be assigned to itself.
     const [firstKey] = insert.keys;
@@ -1186,11 +1193,32 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `'` and the control chars MySQL's wire protocol requires (`\0 \n
    * \r \Z \\`). Distinct from `quote()`, which wraps with surrounding
    * `'...'` for SQL-literal contexts.
+   *
+   * @missingRailsCall with_raw_connection — PERMANENT: Verified per-site (RFC 0106):
+   *   `with_raw_connection { |c| c.escape(string) }`
+   *   (abstract_mysql_adapter.rb:695-699) is an async checkout in trails, while
+   *   `quoteString` is the synchronous `Quoting` contract every `quote()` call
+   *   site depends on. The body delegates to `mysql/quoting.ts#quoteString`,
+   *   which applies the same escape rules without a connection.
    */
   override quoteString(s: string): string {
     return mysqlQuoteString(s);
   }
 
+  /**
+   * @missingRailsCall empty? — PERMANENT: Verified per-site (RFC 0106):
+   *   `mysql_config[:password].to_s.empty?` (abstract_mysql_adapter.rb:76) —
+   *   `empty?` on a Ruby String, whose faithful JS spelling is `s === ""`. That
+   *   emits no callee, so no TS call can ever credit the Ruby one. The gate
+   *   flags it only because `empty?` maps onto the unrelated
+   *   `ActiveRecord::Result.empty`, which takes arguments since it gained Rails'
+   *   `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped.
+   * @missingRailsCall find_cmd_and_exec — PERMANENT: Verified per-site (RFC 0106):
+   *   `find_cmd_and_exec` (abstract_mysql_adapter.rb:82) resolves the mysql
+   *   binary on PATH and `exec`s it. trails forbids `process.*`/`node:*` here,
+   *   so `dbconsole` returns the assembled argv for the CLI layer to spawn — the
+   *   argument construction this method is tested on is fully ported.
+   */
   static dbconsole(
     config: Record<string, unknown>,
     options: Record<string, unknown> = {},
@@ -1365,6 +1393,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * details needed for a helpful MismatchedForeignKey error message.
    *
    * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
+   *
+   * @missingRailsCall column_for — CONVERGEABLE (story
+   *   mysql-mismatched-fk-details-omits-primary-key-column, RFC 0112): Verified per-site (RFC 0106):
+   *   `options[:primary_key_column] = column_for(...)`
+   *   (abstract_mysql_adapter.rb:995) is an async schema read in trails, while
+   *   this method is reached synchronously from `_translateException`. The
+   *   lookup is performed instead in `_enrichMismatchedForeignKey`, which
+   *   rebuilds the error with the referenced column's sql_type once it can
+   *   await.
    */
   protected mismatchedForeignKeyDetails({
     message,

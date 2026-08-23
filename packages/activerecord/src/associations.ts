@@ -785,6 +785,40 @@ export class Associations {
    * normal ActiveRecord persistence on the join model — no raw SQL.
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_and_belongs_to_many
+   *
+   * @missingRailsCall add_reflection — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): Rails' macro body
+   *   (associations.rb:1870-1905) builds the HABTM inline; trails ports that
+   *   same body into `HasAndBelongsToMany._build`
+   *   (builder/has-and-belongs-to-many.ts:255-414), which the macro reaches
+   *   through `HabtmBuilder.build`. `Reflection.add_reflection self,
+   *   middle_reflection.name, middle_reflection` (associations.rb:1879) is made
+   *   there, one frame down — see `Reflection.addReflection` at
+   *   has-and-belongs-to-many.ts:279 and :409.
+   * @missingRailsCall define_callbacks — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `Builder::HasMany.define_callbacks
+   *   self, middle_reflection` (associations.rb:1878) is made one frame down in
+   *   `HasAndBelongsToMany._build` — `addAutosaveAssociationCallbacks` at
+   *   has-and-belongs-to-many.ts:278 plus the
+   *   `CollectionAssociationBuilder.defineCallback` loop at :396-398 — because
+   *   trails ports the whole macro body into the builder rather than the macro.
+   * @missingRailsCall has_many — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `has_many name, scope, **hm_options,
+   *   &extension` (associations.rb:1904) is the generated through-has_many;
+   *   trails builds the same reflection one frame down in
+   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:399-409) via
+   *   `Reflection.create("hasAndBelongsToMany", ...)` + `addReflection`, because
+   *   the port has no macro-recursion path that would re-enter `hasMany` with
+   *   the HABTM options.
+   * @missingRailsCall include — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112): `include Module.new { def destroy_associations
+   *   ... super end }` (associations.rb:1886-1894) is ported one frame down in
+   *   `HasAndBelongsToMany._build` (has-and-belongs-to-many.ts:303-323): JS has
+   *   no anonymous-module include, so the override is layered onto
+   *   `model.prototype.destroyAssociations` with the previous implementation
+   *   captured as the `super` chain.
+   * @missingRailsCall new — CONVERGEABLE (story habtm-macro-body-lives-in-the-builder, RFC 0112):
+   *   `ActiveRecord::Reflection::HasAndBelongsToManyReflection.new` and
+   *   `Builder::HasAndBelongsToMany.new` (associations.rb:1870-1872) are both
+   *   made one frame down: `new this(name, model, options)` at
+   *   has-and-belongs-to-many.ts:253 and `Reflection.create(...)` at :403,
+   *   because trails ports the macro body into the builder.
    */
   static hasAndBelongsToMany(
     name: string,
