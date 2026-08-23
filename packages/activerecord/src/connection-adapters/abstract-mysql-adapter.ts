@@ -1134,14 +1134,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * @missingRailsCall first — PERMANENT: RFC 0106: Ruby Set#first on `insert.keys`
    *   (abstract_mysql_adapter.rb:640). JS Set has no `first`; the port
-   *   destructures the iterator (`const [firstKey] = insert.keys`), which emits
+   *   destructures the iterator (`const [first] = insert.keys`), which emits
    *   no callee. The sibling `quote_column_name` call converged in the same
    *   pass.
    */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     // Can use any column as it will be assigned to itself.
-    const [firstKey] = insert.keys;
-    const noOpColumn = firstKey !== undefined ? this.quoteColumnName(firstKey) : undefined;
+    const [first] = insert.keys;
+    const noOpColumn = first !== undefined ? this.quoteColumnName(first) : undefined;
 
     // MySQL 8.0.19 replaces `VALUES(<expression>)` clauses with row and column alias names, see https://dev.mysql.com/worklog/task/?id=6312 .
     // then MySQL 8.0.20 deprecates the `VALUES(<expression>)` see https://dev.mysql.com/worklog/task/?id=13325 .

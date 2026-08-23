@@ -80,18 +80,18 @@ export class CollectionAssociation extends Association {
    * inversing: true)` and a `nil` is a no-op — it cannot be removed from the
    * inverse.
    */
-  override set target(records: Base | Base[] | null) {
+  override set target(record: Base | Base[] | null) {
     if (!this.reflection.klass?.hasManyInversing) {
-      super.target = records;
+      super.target = record;
       return;
     }
 
-    if (records === null) {
+    if (record === null) {
       // It's not possible to remove the record from the inverse association.
-    } else if (Array.isArray(records)) {
-      super.target = records;
+    } else if (Array.isArray(record)) {
+      super.target = record;
     } else {
-      void this.replaceOnTarget(records, true, { replace: true, inversing: true });
+      void this.replaceOnTarget(record, true, { replace: true, inversing: true });
     }
   }
 

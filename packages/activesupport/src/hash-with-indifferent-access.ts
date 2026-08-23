@@ -343,12 +343,12 @@ export class HashWithIndifferentAccess<V = unknown> {
     if (otherHash instanceof HashWithIndifferentAccess) {
       this.regularUpdate(otherHash, block);
     } else {
-      for (const [key, value] of Object.entries(otherHash)) {
-        let v = value as V;
+      for (const [key, given] of Object.entries(otherHash) as [string, V][]) {
+        let value = given;
         if (block && this.key(key)) {
-          v = block(this.convertKey(key), this.get(key)!, v);
+          value = block(this.convertKey(key), this.get(key)!, value);
         }
-        this.regularWriter(this.convertKey(key), this.convertValue(v));
+        this.regularWriter(this.convertKey(key), this.convertValue(value));
       }
     }
   }

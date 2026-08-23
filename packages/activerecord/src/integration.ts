@@ -36,8 +36,8 @@ type TemporalTimestamp = Temporal.Instant;
 export function toParam(this: Identifiable): string | null {
   const pk = this.id;
   if (pk == null) return null;
-  const delimiter: string = (this.constructor as any).paramDelimiter ?? "_";
-  return Array.isArray(pk) ? pk.join(delimiter) : String(pk);
+  const paramDelimiter: string = (this.constructor as any).paramDelimiter ?? "_";
+  return Array.isArray(pk) ? pk.join(paramDelimiter) : String(pk);
 }
 
 /**
@@ -115,14 +115,14 @@ export function cacheVersion(this: Identifiable): string | null {
     // type-casting reader. Only user-assigned values fall through to the
     // alias-aware reader (so models aliasing updated_at to a real column
     // still resolve their cache version).
-    const raw = this.readAttributeBeforeTypeCast("updated_at");
-    if (canUseFastCacheVersion(this, raw)) {
-      return rawTimestampToCacheVersion(raw as string);
+    let timestamp = this.readAttributeBeforeTypeCast("updated_at");
+    if (canUseFastCacheVersion(this, timestamp)) {
+      return rawTimestampToCacheVersion(timestamp as string);
     }
-    const val = this.readAttribute("updated_at");
-    if (val instanceof Temporal.Instant) {
+    timestamp = this.readAttribute("updated_at");
+    if (timestamp instanceof Temporal.Instant) {
       const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
-      return toFs(val, cacheTimestampFormat);
+      return toFs(timestamp, cacheTimestampFormat);
     }
     return null;
   }

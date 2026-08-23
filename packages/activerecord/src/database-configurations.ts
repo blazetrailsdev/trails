@@ -302,7 +302,7 @@ export class DatabaseConfigurations {
    */
   private buildConfigs(
     configs: RawConfigurations | DatabaseConfig[],
-    currentEnv: string = DatabaseConfigurations.defaultEnv,
+    defaultEnv: string = DatabaseConfigurations.defaultEnv,
   ): DatabaseConfig[] {
     if (Array.isArray(configs)) return configs;
 
@@ -317,15 +317,15 @@ export class DatabaseConfigurations {
     );
 
     // `unless db_configs.find(&:for_current_env?)` (database_configurations.rb:212).
-    // `currentEnv` stands in for Rails' `default_env` so `fromEnv` can build under
-    // the env the runtime selectors actually look configs up by.
-    if (!dbConfigs.some((c) => c.envName === currentEnv)) {
-      const urlConfig = this.environmentUrlConfig(currentEnv, "primary", {});
+    // Rails' `default_env` is supplied by the caller here so `fromEnv` can build
+    // under the env the runtime selectors actually look configs up by.
+    if (!dbConfigs.some((c) => c.envName === defaultEnv)) {
+      const urlConfig = this.environmentUrlConfig(defaultEnv, "primary", {});
       if (urlConfig) dbConfigs.push(urlConfig);
     }
 
     return this.mergeDbEnvironmentVariables(
-      currentEnv,
+      defaultEnv,
       dbConfigs.filter((c) => c != null),
     );
   }

@@ -9,10 +9,9 @@ import { AbsenceValidator as BaseAbsenceValidator } from "@blazetrails/activemod
 import { wrap } from "@blazetrails/activesupport";
 
 export class AbsenceValidator extends BaseAbsenceValidator {
-  validateEach(record: any, attribute: string, value: unknown): void {
-    let associationOrValue = value;
+  validateEach(record: any, attribute: string, associationOrValue: unknown): void {
     if (record.constructor._reflectOnAssociation?.(attribute)) {
-      associationOrValue = wrap(value).filter(
+      associationOrValue = wrap(associationOrValue).filter(
         (v: any) => !(typeof v?.markedForDestruction === "function" && v.markedForDestruction()),
       );
     }

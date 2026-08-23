@@ -9,10 +9,9 @@ import { PresenceValidator as BasePresenceValidator } from "@blazetrails/activem
 import { wrap } from "@blazetrails/activesupport";
 
 export class PresenceValidator extends BasePresenceValidator {
-  validateEach(record: any, attribute: string, value: unknown): void {
-    let associationOrValue = value;
+  validateEach(record: any, attribute: string, associationOrValue: unknown): void {
     if (record.constructor._reflectOnAssociation?.(attribute)) {
-      associationOrValue = wrap(value).filter(
+      associationOrValue = wrap(associationOrValue).filter(
         (v: any) => !(typeof v?.markedForDestruction === "function" && v.markedForDestruction()),
       );
     }

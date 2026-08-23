@@ -163,6 +163,7 @@ export const JS_RESERVED_WORDS = new Set(
 export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   class: ["constructor"],
   compact: ["filter"],
+  detect: ["find"],
   first: ["at"],
   gsub: ["replaceAll", "replace"],
   httpdate: ["toUTCString"],
@@ -174,9 +175,11 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   read: ["readFile"],
   size: ["length"],
   strip: ["trim"],
+  sub: ["replace"],
   to_f: ["parseFloat", "Number"],
   to_i: ["parseInt", "Number"],
   to_s: ["toString", "String"],
+  unicode_normalize: ["normalize"],
 };
 
 /**

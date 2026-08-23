@@ -33,8 +33,8 @@ export function zone(): TimeZone | null {
  * Mirrors `IsolatedExecutionState[:time_zone] = find_zone!(time_zone)`
  * (zones.rb:41-43).
  */
-export function setZone(zone: TimeZone | string | number | Duration | null | false): void {
-  _zone = findZoneBang(zone);
+export function setZone(timeZone: TimeZone | string | number | Duration | null | false): void {
+  _zone = findZoneBang(timeZone);
 }
 
 /**
@@ -53,8 +53,8 @@ export function setZoneDefault(zone: TimeZone | null): void {
  * Matches Rails' Time.use_zone. Only supports synchronous callbacks — async
  * callbacks would observe the wrong zone after the first await.
  */
-export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
-  const newZone = findZoneBang(zone);
+export function useZone<T>(timeZone: string | TimeZone, fn: () => T): T {
+  const newZone = findZoneBang(timeZone);
   const prev = _zone;
   _zone = newZone;
   try {
@@ -76,9 +76,9 @@ export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
  * implementation, the bang form, with the ArgumentError swallowed
  * (core_ext/time/zones.rb:97-99).
  */
-export function findZone(zone: unknown): TimeZone | null | false {
+export function findZone(timeZone: unknown): TimeZone | null | false {
   try {
-    return findZoneBang(zone);
+    return findZoneBang(timeZone);
   } catch (e) {
     if (e instanceof ArgumentError) return null;
     throw e;
@@ -92,11 +92,11 @@ export function findZone(zone: unknown): TimeZone | null | false {
  * lookup, the Numeric/Duration offset scan, and the wrong-class raise
  * (time_zone.rb:249) — lives in `TimeZone.find`, the port of `[]`.
  */
-export function findZoneBang(zone: unknown): TimeZone | null | false {
-  if (zone === null || zone === undefined) return null;
-  if (zone === false) return false;
-  const found = TimeZone.find(zone);
-  if (found == null) throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
+export function findZoneBang(timeZone: unknown): TimeZone | null | false {
+  if (timeZone === null || timeZone === undefined) return null;
+  if (timeZone === false) return false;
+  const found = TimeZone.find(timeZone);
+  if (found == null) throw new ArgumentError(`Invalid Timezone: ${String(timeZone)}`);
   return found;
 }
 

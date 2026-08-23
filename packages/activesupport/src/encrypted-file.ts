@@ -121,8 +121,7 @@ export class EncryptedFile {
     const fs = await getFsAsync();
     const path = await this.resolveContentPath();
     if (key !== null && (await fs.exists(path))) {
-      const raw = (await fs.readFile!(path, "utf8")).trim();
-      return this.decrypt(raw);
+      return this.decrypt((await fs.readFile!(path, "utf8")).trim());
     }
     throw new MissingContentError(path);
   }
