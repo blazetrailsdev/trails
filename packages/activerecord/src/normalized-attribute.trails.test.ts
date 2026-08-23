@@ -25,12 +25,7 @@ class OtherCompany extends Company {}
 class ReloadedCompany extends Company {}
 class RefreshedCompany extends Company {}
 
-const defTypeFor = (klass: typeof Company, name: string) =>
-  (
-    klass as unknown as {
-      _attributeDefinitions: Map<string, { type: { cast(v: unknown): unknown } }>;
-    }
-  )._attributeDefinitions.get(name)!.type;
+const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name);
 
 describe("STI subclass normalizes", () => {
   fixtures([]);
@@ -76,9 +71,8 @@ describe("STI subclass normalizes", () => {
     await Company.loadSchema();
 
     RefreshedCompany.normalizes("description", { with: (value: unknown) => value });
-    const defsOf = (klass: typeof Company) =>
-      (klass as unknown as { _attributeDefinitions: Map<string, object> })._attributeDefinitions;
-    expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
+    const defsOf = (klass: typeof Company) => klass.columnsHash();
+    expect(Object.keys(defsOf(Company)).every((k) => k in defsOf(RefreshedCompany))).toBe(true);
 
     // Rails' reset_column_information invalidates the class AND its descendants,
     // so a subclass must not keep an old overlay merely because it still covers
@@ -88,8 +82,7 @@ describe("STI subclass normalizes", () => {
     await RefreshedCompany.loadSchema();
 
     expect(defsOf(RefreshedCompany)).not.toBe(defsOf(Company));
-    expect(defsOf(RefreshedCompany).get("name")).not.toBe(defsOf(Company).get("name"));
-    expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
+    expect(Object.keys(defsOf(Company)).every((k) => k in defsOf(RefreshedCompany))).toBe(true);
     expect(defTypeFor(RefreshedCompany, "description").cast("x")).toBe("x");
   });
 });

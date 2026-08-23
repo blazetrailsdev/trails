@@ -60,14 +60,14 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     await Widget.loadSchema();
 
     // Adapter A has no cast for "unknown" → ValueType fallback.
-    expect(Widget._attributeDefinitions.get("payload")?.type.name).toBe("value");
+    expect(Widget.typeForAttribute("payload").name).toBe("value");
 
     // Swap to adapter B that provides the DoublingType.
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
     await Widget.loadSchema();
 
-    expect(Widget._attributeDefinitions.get("payload")?.type.name).toBe("doubling");
+    expect(Widget.typeForAttribute("payload").name).toBe("doubling");
   });
 
   it("drops stale schema-sourced columns on adapter swap", async () => {
@@ -80,14 +80,14 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsA);
     await Widget.loadSchema();
-    expect(Widget._attributeDefinitions.has("removed")).toBe(true);
+    expect(Object.keys(Widget.columnsHash())).toContain("removed");
 
     // Adapter B doesn't have the `removed` column.
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     (Widget as unknown as { adapter: unknown }).adapter = makeAdapter(colsB);
     await Widget.loadSchema();
 
-    expect(Widget._attributeDefinitions.has("removed")).toBe(false);
+    expect(Object.keys(Widget.columnsHash())).not.toContain("removed");
     expect(Object.getOwnPropertyDescriptor(Widget.prototype, "removed")).toBeUndefined();
   });
 });

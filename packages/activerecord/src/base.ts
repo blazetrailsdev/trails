@@ -1339,75 +1339,21 @@ export class Base extends Model {
     // would otherwise synthesize a columnsHash containing only the virtual
     // attrs and mark the model schema-loaded, hiding every real column.
     //
-    // Bail early when a concrete attr exists that proves the schema is known:
-    // either (a) a source:"schema" attr (DB reflection already ran), or (b) a
-    // source:"user" attr that is NOT an enum overlay (the model explicitly
-    // declared its own schema, no DB reflection needed).
-    //
-    // Enum-only attrs (registered by `_enum` via `this.attribute()`) must NOT
-    // block reflection — they're type overlays, not full schema declarations,
-    // and the model still needs the DB to discover its other columns.
-    // The bail check reads `_attributeDefinitions`, which is copy-on-write and
-    // thus inherited from an ancestor until this class mutates it. A subclass
-    // that overrides `_tableName` (a non-STI subclass pointing at a different
-    // table) but has not yet reflected reads its ancestor's map — reflected
-    // against a *different* table. Bailing here would flag those foreign
-    // columns as known and never reflect this class's own table. Find the class
-    // that actually owns the map; if it is a table-backed class whose
-    // `tableName` differs from ours, the inherited defs describe another table,
-    // so reflect instead of bailing. The `typeof ... === "string"` guard keeps
-    // us on the fast path when the owner is a table-less root (e.g. the
-    // activemodel `Model`, which has no `tableName` getter) — that case falls
-    // through to the loop below rather than spuriously forcing a reflection.
-    const thisTable = this.tableName;
-    let defsOwner: unknown = this;
-    while (defsOwner && !Object.prototype.hasOwnProperty.call(defsOwner, "_attributeDefinitions")) {
-      defsOwner = Object.getPrototypeOf(defsOwner);
-    }
-    let foreignTable = false;
-    if (defsOwner && defsOwner !== this) {
-      // Map still inherited: if its owner is a table-backed class whose
-      // `tableName` differs from ours, the inherited defs describe another
-      // table. (`typeof ... === "string"` keeps us on the fast path when the
-      // owner is a table-less root like activemodel `Model`.)
-      const ownerTable = (defsOwner as { tableName?: unknown }).tableName;
-      foreignTable = typeof ownerTable === "string" && ownerTable !== thisTable;
-    } else if (typeof thisTable === "string") {
-      // Map already forked (defsOwner === this): a subclass overriding
-      // `_tableName` that declared an `attribute()` before reflecting copied the
-      // ancestor's schema defs. Those carry a `reflectedTable` that differs from
-      // ours — trust none of them; reflect our own table instead.
-      for (const [, def] of this._attributeDefinitions) {
-        const d = def as { reflectedTable?: string };
-        if (typeof d.reflectedTable === "string" && d.reflectedTable !== thisTable) {
-          foreignTable = true;
-          break;
-        }
-      }
-    }
-    if (foreignTable) {
-      // Reset first so the reflection actually runs against our own table. The
-      // subclass otherwise inherits the ancestor's `_schemaLoaded` /
-      // `_schemaLoadPromise` (set when the ancestor reflected — which is what
-      // put foreign schema defs in the shared map) and `loadSchema` would bail
-      // on that stale "loaded" state. `resetColumnInformation` shadows those
-      // inherited flags with own `false`/`undefined` and scrubs the copied
-      // foreign schema defs from a forked map.
-      void (ModelSchema.resetColumnInformation as () => PromiseLike<void> | void).call(this);
-      return this.loadSchema();
-    }
-
+    // `_attributeDefinitions` holds user `attribute()` declarations only —
+    // reflected columns live in `columns_hash` — so a concrete (non-virtual)
+    // declaration means the model spelled its own schema out and needs no DB
+    // reflection. Enum-declared attrs (registered by `_enum` via
+    // `this.attribute()`) must NOT block reflection: they are type overlays,
+    // not full schema declarations, and the model still needs the DB to
+    // discover its other columns.
     const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
     for (const [name, def] of this._attributeDefinitions) {
       const d = def as { virtual?: boolean };
-      if (
-        !d.virtual &&
-        (!ModelSchema.pendingAttributeDeclarationQ(this, name) || !enumNames?.has(name))
-      ) {
-        // The model declares its own attributes, but some may be virtual (no
-        // backing DB column). Rails' `column_names` is always DB-sourced, so
-        // reconcile against the real columns and flag those as virtual — keeping
-        // `columnNames()` correct without a full re-reflection. One-shot.
+      if (!d.virtual && !enumNames?.has(name)) {
+        // Some declared attributes may be virtual (no backing DB column).
+        // Rails' `column_names` is always DB-sourced, so reconcile against the
+        // real columns and flag those as virtual — keeping `columnNames()`
+        // correct without a full re-reflection. One-shot.
         return (ModelSchema.reconcileVirtualAttributes as () => Promise<void>).call(this);
       }
     }

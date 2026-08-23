@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ValueType, typeRegistry } from "@blazetrails/activemodel";
 type Type = ValueType;
 import { Base } from "./base.js";
-import { loadSchemaFromAdapter, pendingAttributeDeclarationQ } from "./model-schema.js";
+import { loadSchemaFromAdapter } from "./model-schema.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -52,11 +52,12 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    const guid = Model._attributeDefinitions.get("guid");
-    const payload = Model._attributeDefinitions.get("payload");
-    expect(guid?.type.name).toBe("uuid");
-    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(false);
-    expect(payload?.type.name).toBe("jsonb");
+    // A reflected column lives in `columns_hash` and reaches the attribute set
+    // through `_default_attributes`' seed (attributes.rb:241-245) — never
+    // through a class-level registry, which holds user declarations only.
+    expect(Model.typeForAttribute("guid").name).toBe("uuid");
+    expect(Model.typeForAttribute("payload").name).toBe("jsonb");
+    expect(Model._attributeDefinitions.has("guid")).toBe(false);
   });
 
   it("does not overwrite user-declared attributes", async () => {
@@ -68,7 +69,7 @@ describe("loadSchemaFromAdapter", () => {
 
     const def = Model._attributeDefinitions.get("guid");
     expect(def?.type.name).toBe("string");
-    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(true);
+    expect(Model._attributeDefinitions.has("guid")).toBe(true);
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -94,7 +95,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Post as typeof Base);
 
-    expect((Post as typeof Base)._attributeDefinitions.has("guid")).toBe(true);
+    expect(Object.keys((Post as typeof Base).columnsHash())).toContain("guid");
   });
 
   it("is a no-op when data source does not exist (explicit false)", async () => {
@@ -124,7 +125,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(pendingAttributeDeclarationQ(Model, "guid")).toBe(false);
+    expect(Model._attributeDefinitions.has("guid")).toBe(false);
   });
 
   it("falls back to ValueType when adapter has no cast type", async () => {
@@ -141,9 +142,10 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    const def = Model._attributeDefinitions.get("mystery");
-    expect(def?.type).toBeInstanceOf(typeRegistry.lookup("value").constructor);
-    expect(pendingAttributeDeclarationQ(Model, "mystery")).toBe(false);
+    expect(Model.typeForAttribute("mystery")).toBeInstanceOf(
+      typeRegistry.lookup("value").constructor,
+    );
+    expect(Model._attributeDefinitions.has("mystery")).toBe(false);
   });
 
   it("invalidates the _attributesBuilder cache", async () => {
@@ -194,14 +196,14 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { adapter: unknown }).adapter = adapter;
     await Post.loadSchema();
 
-    expect(Post._attributeDefinitions.has("secret")).toBe(false);
+    expect(Object.keys(Post.columnsHash())).not.toContain("secret");
     // The schema-sourced def is dropped, but an accessor that already exists
     // survives: `load_schema!` defines and undefines no methods, and
     // `ignored_columns=` (model_schema.rb:366-369) calls only
     // `reload_schema_from_cache` — only `reset_column_information` (:523-530)
     // undefines attribute methods.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "secret")).toBeDefined();
-    expect(Post._attributeDefinitions.has("guid")).toBe(true);
+    expect(Object.keys(Post.columnsHash())).toContain("guid");
   });
 
   it("preserves user-declared defs for ignoredColumns (only strips accessor)", async () => {
@@ -219,7 +221,7 @@ describe("loadSchemaFromAdapter integration details", () => {
 
     // User-declared def survives ignoredColumns.
     expect(Post._attributeDefinitions.has("age")).toBe(true);
-    expect(pendingAttributeDeclarationQ(Post, "age")).toBe(true);
+    expect(Post._attributeDefinitions.has("age")).toBe(true);
     // Accessor stripped.
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
@@ -249,7 +251,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     await Post.loadSchema();
 
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "id")).toBeUndefined();
-    expect(pendingAttributeDeclarationQ(Post, "id")).toBe(false);
+    expect(Post._attributeDefinitions.has("id")).toBe(false);
 
     const rec = new Post();
     rec.writeAttribute("id", "abc-123");
@@ -297,8 +299,7 @@ describe("set adapter auto-loads schema", () => {
 
     await Post.loadSchema();
 
-    const def = Post._attributeDefinitions.get("guid");
-    expect(def?.type.name).toBe("uuid");
-    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
+    expect(Post.typeForAttribute("guid").name).toBe("uuid");
+    expect(Post._attributeDefinitions.has("guid")).toBe(false);
   });
 });

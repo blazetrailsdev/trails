@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { registerSubclass } from "./inheritance.js";
-import { pendingAttributeDeclarationQ, resetColumnInformation } from "./model-schema.js";
+import { resetColumnInformation } from "./model-schema.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -33,7 +33,7 @@ describe("sync loadSchema / columnsHash", () => {
     const hash = Post.columnsHash();
 
     expect(hash.guid).toBe(cols.guid);
-    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
+    expect(Post._attributeDefinitions.has("guid")).toBe(false);
   });
 
   it("columnsHash filters ignoredColumns out of the cached hash", () => {
@@ -81,14 +81,15 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
-    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
+    expect(Circle._attributeDefinitions.has("guid")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
+    expect(Object.keys(Circle.columnsHash())).toContain("guid");
     // The subclass's own map is its own — but the base reflects too: generating
     // Circle's attribute methods runs `superclass.define_attribute_methods
     // unless base_class?` (attribute_methods.rb:111), whose body loads Shape's
     // schema (:114). Shape and Circle share the `shapes` table, so `guid` is
     // Shape's column as much as Circle's.
-    expect(Shape._attributeDefinitions.has("guid")).toBe(true);
+    expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
 
   // D-Y-INCOMPATIBLE: D-Y installs Base.connectionHandler globally so Shape (which
@@ -113,7 +114,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     // Reflection should have landed on the STI base via subclass adapter;
     // subclass shares the base's map reference.
-    expect(pendingAttributeDeclarationQ(Shape, "guid")).toBe(false);
+    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
     expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
   });
 
@@ -164,33 +165,6 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
-  });
-
-  it("resetColumnInformation scrubs schema-sourced defs from a subclass-forked map", () => {
-    class Shape extends Base {
-      static override tableName = "shapes";
-      static {
-        this.inheritanceColumn = "type";
-      }
-    }
-    class Circle extends Shape {}
-
-    // Fork the subclass map and put a schema-sourced def in it directly.
-    (Circle as unknown as { _attributeDefinitions: Map<string, unknown> })._attributeDefinitions =
-      new Map([
-        [
-          "guid",
-          {
-            name: "guid",
-            type: { name: "uuid" },
-            defaultValue: null,
-          },
-        ],
-      ]);
-
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
-
     expect(Circle._attributeDefinitions.has("guid")).toBe(false);
   });
 
@@ -213,8 +187,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(pendingAttributeDeclarationQ(Circle, "guid")).toBe(false);
-    expect(pendingAttributeDeclarationQ(Circle, "radius")).toBe(true);
+    expect(Circle._attributeDefinitions.has("guid")).toBe(false);
+    expect(Circle._attributeDefinitions.has("radius")).toBe(true);
     expect(Shape._attributeDefinitions.has("radius")).toBe(false);
     expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
   });
@@ -346,11 +320,11 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Shape.columnsHash();
-    expect(pendingAttributeDeclarationQ(Shape, "guid")).toBe(false);
+    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
 
-    expect(Shape._attributeDefinitions.has("guid")).toBe(true);
+    expect(Object.keys(Shape.columnsHash())).toContain("guid");
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
@@ -365,13 +339,13 @@ describe("sync loadSchema / columnsHash", () => {
     (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Post.columnsHash(); // triggers reflection
 
-    expect(pendingAttributeDeclarationQ(Post, "guid")).toBe(false);
-    expect(pendingAttributeDeclarationQ(Post, "title")).toBe(true);
+    expect(Post._attributeDefinitions.has("guid")).toBe(false);
+    expect(Post._attributeDefinitions.has("title")).toBe(true);
 
     (resetColumnInformation as any).call(Post);
 
     expect(Post._attributeDefinitions.has("guid")).toBe(false);
-    expect(pendingAttributeDeclarationQ(Post, "title")).toBe(true);
+    expect(Post._attributeDefinitions.has("title")).toBe(true);
   });
 
   // An internalSchemaCache that starts warm and tracks whether resetColumnInformation
