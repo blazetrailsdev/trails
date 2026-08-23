@@ -117,7 +117,7 @@ const COMPARISONS = new Set(["===", "==", "!==", "!="]);
  * and is reported anyway. `execute` is the generic name here and the one most
  * likely to be overridden for such a reason. Class bodies defining these
  * members are not rare in the enforced files (the fake adapters in
- * `connection-adapters/abstract/schema-statements-on-adapter.test.ts`, the
+ * `connection-adapters/abstract/schema-statements-on-adapter.trails.test.ts`, the
  * database-tasks covers), but none of them so much as names `loadSchema`, and
  * the rule reports only where the two meet — so the surface is empty today
  * rather than merely tolerable.

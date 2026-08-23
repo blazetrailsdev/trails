@@ -24,7 +24,7 @@ const E2E_FILES = [
 ];
 
 /**
- * Temporary databases `connection-adapters/postgresql/schema-statements.test.ts`
+ * Temporary databases `connection-adapters/postgresql/schema-statements.trails.test.ts`
  * creates through the postgres role, whose `CREATEDB` is not per-database. No
  * MySQL grant covers them by design.
  */
