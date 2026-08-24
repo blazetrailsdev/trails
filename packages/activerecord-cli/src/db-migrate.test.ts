@@ -91,6 +91,11 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate calls MigrationContext#migrations before migrate", async () => {
+    // Discovery is `migration_connection_pool.migration_context`
+    // (`database_tasks.rb:270`), so the real `migrate` has to run for the
+    // getter to be reached.
+    vi.mocked(DatabaseTasks.migrate).mockRestore();
+    DatabaseConfigurations.defaultEnv = "development";
     const discoverSpy = vi
       .spyOn(MigrationContext.prototype, "migrations", "get")
       .mockReturnValue([]);

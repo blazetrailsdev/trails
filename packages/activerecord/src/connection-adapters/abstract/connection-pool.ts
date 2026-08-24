@@ -31,7 +31,7 @@ import {
 import { executionContextId } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
-import { MigrationContext } from "../../migration.js";
+import { MigrationContext, Migrator } from "../../migration.js";
 
 /**
  * A connection that supports transaction management.
@@ -531,8 +531,6 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Migration / Schema ---
 
-  private _schemaMigration?: SchemaMigration;
-  private _internalMetadata?: InternalMetadata;
   private _adapterProxy?: DatabaseAdapter;
 
   private _getAdapterProxy(): DatabaseAdapter {
@@ -589,35 +587,20 @@ export class ConnectionPool implements ReapablePool {
     // `DatabaseConfig#migrationsPaths` answers a bare string for a single-path
     // config; Rails wraps in `Array(migrations_paths)` before globbing
     // (migration.rb:1369), and without that a string iterates per character.
-    const paths = (this.dbConfig as any).migrationsPaths ?? ["db/migrate"];
+    const paths = (this.dbConfig as any).migrationsPaths ?? Migrator.migrationsPaths;
     return Array.isArray(paths) ? paths : [paths];
   }
 
   get schemaMigration(): SchemaMigration {
-    if (!this._schemaMigration) {
-      this._schemaMigration = new SchemaMigration(this);
-    }
-    return this._schemaMigration;
+    return new SchemaMigration(this);
   }
 
   get internalMetadata(): InternalMetadata {
-    if (!this._internalMetadata) {
-      this._internalMetadata = new InternalMetadata(this);
-    }
-    return this._internalMetadata;
+    return new InternalMetadata(this);
   }
 
-  private _migrationContext?: MigrationContext;
-
   get migrationContext(): MigrationContext {
-    if (!this._migrationContext) {
-      this._migrationContext = new MigrationContext(
-        this.migrationsPaths,
-        this.schemaMigration,
-        this.internalMetadata,
-      );
-    }
-    return this._migrationContext;
+    return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
   // --- Query cache (delegated to ConnectionPoolConfiguration) ---

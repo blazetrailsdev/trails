@@ -1,7 +1,7 @@
 import { join, resolve } from "path";
 import { getEnv, getFsAsync, setEnv } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
-import { loadDatabaseConfig, loadMigrations, tryLoadModels } from "./db-helpers.js";
+import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { withEnvironmentConnection } from "./environment.js";
 
 async function runCreate(
@@ -105,7 +105,6 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
   await tryLoadModels(cwd);
-  loadMigrations(cwd);
 
   // Rails' `rake db:migrate` (railties/databases.rake:89) takes its target from
   // `ENV["VERSION"]`, which `migrate_all` reads back through `target_version`;
@@ -132,7 +131,6 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
   await tryLoadModels(cwd);
-  loadMigrations(cwd);
   const step = parseStep(args, 1);
 
   try {
@@ -299,7 +297,6 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
   }
 
   await tryLoadModels(cwd);
-  loadMigrations(cwd);
   installSeedLoader(cwd);
 
   try {
@@ -362,7 +359,6 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
     return 1;
   }
   await tryLoadModels(cwd);
-  loadMigrations(cwd);
 
   const env = DatabaseConfigurations.currentEnv();
 
