@@ -1562,13 +1562,22 @@ function buildPackageReport(
     }
   }
   for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
-    if (rubyFiles.has(rubyFile)) continue;
     const tsFile = rubyFileToTs(rubyFile, pkg);
-    if (coveredTsFiles.has(tsFile)) continue;
+    const alreadyDeclared = rubyFiles.has(rubyFile);
+    // A file already in `rubyFiles` still needs the reopening pass: an entity
+    // whose PRIMARY declaration site is elsewhere can declare methods here too
+    // (`ActiveModel::Validations#validates_with` is stamped
+    // `validations/with.rb` while the module's primary site is
+    // `validations.rb`), and without this its methods are scored as drift in
+    // exactly the file Rails puts them in. `coveredTsFiles` only guards the
+    // case where this file introduces a NEW TS target.
+    if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
+    const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
     for (const [fqn, info] of [
       ...Object.entries(rubyPkg.classes),
       ...Object.entries(rubyPkg.modules),
     ]) {
+      if (declared.has(fqn)) continue;
       const declaresHere = (m: MethodInfo): boolean => m.file === rubyFile;
       if (!info.instanceMethods.some(declaresHere) && !info.classMethods.some(declaresHere)) {
         continue;

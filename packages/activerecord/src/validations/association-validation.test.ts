@@ -9,9 +9,9 @@
  * `repairValidations(...)` for the block-form cases.
  *
  * Where Rails appends in-memory associated records (`t.replies << r`) we build
- * them through the real association (no insert on an unsaved/just-built target)
- * or seed the association cache — the behavior under test is the cascading
- * `valid?`, not collection persistence.
+ * them through the real association (no insert on an unsaved/just-built
+ * target) — the behavior under test is the cascading `valid?`, not collection
+ * persistence.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { association } from "../associations.js";
@@ -21,7 +21,6 @@ import { association } from "../associations.js";
 import "../support/canonical-model-index.js";
 import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
-import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -76,7 +75,7 @@ describe("AssociationValidationTest", () => {
     Topic.validatesPresenceOf("content");
     const r = new Reply({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
-    seedAssociationCache(r, "topic", topic);
+    r.topic = topic;
     expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
     topic.writeAttribute("content", "non-empty");
@@ -87,10 +86,10 @@ describe("AssociationValidationTest", () => {
     // Rails' `validates_associated(*attr_names)` arity: `_merge_attributes`
     // flattens nested arrays and supports several association names in one call.
     Topic.validatesAssociated(["replies"], "openReplies");
-    const invalid = { isValid: () => false };
+    Reply.validatesPresenceOf("content");
     const t = new Topic();
-    seedAssociationCache(t, "replies", [invalid]);
-    seedAssociationCache(t, "openReplies", [invalid]);
+    association(t, "replies").build({ title: "A reply" });
+    association(t, "openReplies").build({ title: "A reply" });
     expect(await t.isValid()).toBe(false);
     expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
     expect(t.errors.messagesFor("openReplies").length).toBeGreaterThan(0);
@@ -107,12 +106,11 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates associated without marked for destruction", async () => {
-    // Rails defines an anonymous class whose `valid?` is always true and stubs
-    // `t.replies` to return `[reply.new]`; we seed the same shape into the cache.
-    const reply = { isValid: () => true };
+    // Rails stubs `t.replies` to return one always-valid record; with no
+    // validator registered on Reply, a built reply IS that record.
     Topic.validatesAssociated("replies");
     const t = new Topic();
-    seedAssociationCache(t, "replies", [reply]);
+    association(t, "replies").build({ title: "A reply" });
     expect(await t.isValid()).toBe(true);
   });
 
@@ -123,7 +121,7 @@ describe("AssociationValidationTest", () => {
     Topic.validatesPresenceOf("content");
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
-    seedAssociationCache(r, "topic", topic);
+    r.topic = topic;
     expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic")).toEqual([
       "This string contains 'single' and \"double\" quotes",
@@ -136,7 +134,7 @@ describe("AssociationValidationTest", () => {
     expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
 
-    seedAssociationCache(r, "topic", await Topic.first());
+    r.topic = (await Topic.first()) as Topic;
     expect(await r.isValid()).toBe(true);
   });
 
@@ -164,7 +162,7 @@ describe("AssociationValidationTest", () => {
     Topic.validatesPresenceOf("content", { on: "custom" });
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
-    seedAssociationCache(r, "topic", topic);
+    r.topic = topic;
     expect(await r.isValid()).toBe(true);
     expect(await r.isValid("custom")).toBe(false);
     expect(r.errors.messagesFor("topic")).toEqual(["is invalid"]);
@@ -178,7 +176,7 @@ describe("AssociationValidationTest", () => {
     expect(await t.save()).toBe(true); // update! succeeds: presence is validated on :create only
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     // NOTE: Does not pass along :create context from reply to Topic validation.
-    seedAssociationCache(r, "topic", t);
+    r.topic = t;
 
     expect(await t.isValid()).toBe(true);
     expect(await r.isValid()).toBe(true);

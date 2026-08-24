@@ -1,30 +1,6 @@
-import {
-  DatabaseTasks,
-  DatabaseConfigurations,
-  InternalMetadata,
-  Migrator,
-  SchemaMigration,
-} from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 import type { MigrationProxy } from "@blazetrails/activerecord";
-import { loadDatabaseConfig, loadMigrations } from "./db-helpers.js";
-
-async function resolvePending(migrations: MigrationProxy[]): Promise<MigrationProxy[]> {
-  const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor({ envName: env });
-  if (configs.length === 0) return [];
-  const config = configs.find((c) => c.name === "primary") ?? configs[0];
-  let pending: MigrationProxy[] = [];
-  await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
-    const migrator = new Migrator(
-      "up",
-      migrations,
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-    );
-    pending = await migrator.pendingMigrationsReadOnly();
-  });
-  return pending;
-}
+import { loadDatabaseConfig } from "./db-helpers.js";
 
 function pendingMessage(pending: MigrationProxy[]): string {
   const count = pending.length;
@@ -37,14 +13,20 @@ function pendingMessage(pending: MigrationProxy[]): string {
 
 /**
  * Resolve the list of pending migrations for the current environment.
- * Loads config and migration registry from `cwd` (defaults to `process.cwd()`).
- * Returns an empty array when all migrations are up to date.
+ *
+ * Mirrors `db:abort_if_pending_migrations`' reader
+ * (`railties/databases.rake:330-336`): each pool's own `migration_context`
+ * answers what is pending, rather than a second migration scan of its own.
  */
 export async function checkPendingMigrations(cwd?: string): Promise<MigrationProxy[]> {
   const dir = cwd ?? process.cwd();
   await loadDatabaseConfig(dir);
-  const migrations = loadMigrations(dir);
-  return resolvePending(migrations);
+  const pendingMigrations: MigrationProxy[][] = [];
+  await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
+    const pending = await pool.migrationContext.open().pendingMigrations();
+    if (pending != null) pendingMigrations.push(pending);
+  });
+  return pendingMigrations.flat();
 }
 
 export async function dbAbortIfPendingMigrations(cwd: string): Promise<number> {
