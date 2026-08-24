@@ -19,6 +19,9 @@ import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
 
+/** `must*`-prefixed trails helpers that are normalizers, not assertions. */
+const NON_ASSERTION_MUST_HELPERS = new Set(["mustBeLike"]);
+
 /**
  * Does a call's callee identifier name it an assertion? The camelCase twin of
  * the Ruby extractor's `assertion_method?` (extract-ruby-tests.rb) — matched by
@@ -39,8 +42,6 @@ const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
  * sides of a native `expect(mustBeLike(a)).toBe(mustBeLike(b))`. Counting it
  * would score one Rails assertion as three.
  */
-const NON_ASSERTION_MUST_HELPERS = new Set(["mustBeLike"]);
-
 function isAssertionCallee(name: string): boolean {
   if (NON_ASSERTION_MUST_HELPERS.has(name)) return false;
   return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
