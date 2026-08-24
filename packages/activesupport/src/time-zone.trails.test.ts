@@ -187,6 +187,13 @@ describe("TimeZoneLocalPeriodsTest", () => {
     expect(twz.nsec).toBe(456000000);
   });
 
+  it("utc_to_local keeps digits below the microsecond on the legacy arm", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const utc = Time.utc(2000, 1, 1, 0, 0, 0, 123456.789);
+    expect(utc.nsec).toBe(123456789);
+    expect((eastern.utcToLocal(utc) as Time).nsec).toBe(123456789);
+  });
+
   it("at keeps digits below the millisecond", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     expect(eastern.at(946684800, 123456.789).nsec).toBe(123456789);

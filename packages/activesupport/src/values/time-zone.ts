@@ -1060,7 +1060,8 @@ export class TimeZone {
    * as is; the legacy arm rebuilds it with `Time.utc(t.year, t.month, t.day,
    * t.hour, t.min, t.sec, t.sec_fraction * 1_000_000)` (time_zone.rb:545) —
    * `sec_fraction` in microseconds being the Temporal value's sub-second
-   * components, which carry no Rational.
+   * components folded into one microsecond count, the nanosecond remainder
+   * riding as its fraction so the full sub-microsecond precision survives.
    */
   utcToLocal(time: Time): Temporal.ZonedDateTime | Time {
     const t = this.tzinfo.utcToLocal(time);
@@ -1073,7 +1074,7 @@ export class TimeZone {
           t.hour,
           t.minute,
           t.second,
-          t.millisecond * 1_000 + t.microsecond,
+          t.millisecond * 1_000 + t.microsecond + t.nanosecond / 1_000,
         );
   }
 
