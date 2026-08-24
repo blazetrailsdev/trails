@@ -412,12 +412,7 @@ export class SchemaCache {
    * connection-checkout flip).
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
-    if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
-    const cols = this._columns.get(tableName);
-    if (!cols) return undefined;
-    const pkCols = cols.filter((c) => c.primaryKey).map((c) => c.name);
-    if (pkCols.length === 0) return undefined;
-    return pkCols.length === 1 ? pkCols[0] : pkCols;
+    return this._primaryKeys.get(tableName);
   }
 
   async indexes(pool: unknown, tableName: string): Promise<IndexDefinition[]> {
@@ -494,7 +489,6 @@ export class SchemaCache {
    * connection-checkout flip).
    */
   setColumns(tableName: string, cols: Column[]): void {
-    this.reconcilePrimaryKeyFlags(tableName, cols);
     this._columns.set(tableName, cols);
     const hash: Record<string, Column> = {};
     for (const col of cols) {
@@ -502,40 +496,6 @@ export class SchemaCache {
     }
     this._columnsHash.set(tableName, hash);
     this._dataSourceExists.set(tableName, true);
-  }
-
-  /**
-   * Clear per-column `primaryKey` flags that the authoritative `_primaryKeys`
-   * cache contradicts. This is a general safety net for any adapter whose
-   * `columns()` could over-report a primary flag, reconciled query-free against
-   * `_primaryKeys` (which `add()` warms via the authoritative
-   * `SHOW KEYS ... 'PRIMARY'` / key_column_usage query before `columns()`, so
-   * by the time `setColumns` runs the key is already authoritative).
-   *
-   * Historically this cleared MySQL/MariaDB's "promoted unique" false positive:
-   * they report `column_key = 'PRI'` for a UNIQUE-NOT-NULL index when a table has
-   * no PRIMARY KEY, so `columns()` used to reflect a bogus flag on that column.
-   * `columns()` now carries no per-column primary flag at all for MySQL/MariaDB —
-   * matching Rails' `MySQL::Column`, which has none and resolves the key solely
-   * from the `PRIMARY` constraint — so this reconcile is a no-op for MySQL
-   * (nothing is ever set `true`, so there is nothing to clear). It stays as a
-   * harmless guard for any adapter that could theoretically over-report.
-   *
-   * Clear-only: a flag is dropped when the authoritative key set excludes the
-   * column, never added. Real primary keys (whose flag the adapter already set
-   * and whose name the query returns) are untouched, and adapters that reflect
-   * the flag correctly (sqlite/postgres) agree with the query so nothing changes.
-   * When `_primaryKeys` is not yet warm the flags are left as reflected.
-   */
-  private reconcilePrimaryKeyFlags(tableName: string, cols: Column[]): void {
-    if (!this._primaryKeys.has(tableName)) return;
-    const pk = this._primaryKeys.get(tableName);
-    const pkNames = new Set(pk == null ? [] : Array.isArray(pk) ? pk : [pk]);
-    for (const col of cols) {
-      if (col.primaryKey && !pkNames.has(col.name)) {
-        (col as { primaryKey: boolean }).primaryKey = false;
-      }
-    }
   }
 
   async addAll(pool: unknown): Promise<void> {
@@ -608,14 +568,6 @@ export class SchemaCache {
    * Rebuild `_columnsHash` from `_columns`, the tail of both load paths
    * (`initWith` and `marshalLoad`).
    *
-   * Both `_columns` and the authoritative `_primaryKeys` are already loaded, so
-   * reconcile the per-column `primaryKey` flags against the key cache before
-   * exposing the hash — a schema cache dumped before this convergence can carry
-   * MySQL's promoted-unique `primaryKey: true` alongside
-   * `primary_keys: { table: null }`, and the derive step must not resurface the
-   * bogus flag. Mirrors Rails treating `@primary_keys` as authoritative while
-   * deriving `columns_hash` (schema_cache.rb).
-   *
    * @missingRailsCall deep_deduplicate — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with
    *   Ruby's `-@`; JS has no string-interning primitive and identical string
@@ -625,7 +577,6 @@ export class SchemaCache {
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
-      this.reconcilePrimaryKeyFlags(table, cols);
       const hash: Record<string, Column> = {};
       for (const col of cols) {
         hash[col.name] = col;

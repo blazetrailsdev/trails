@@ -33,7 +33,6 @@ export class Column extends BaseColumn {
       collation?: string | null;
       comment?: string | null;
       defaultFunction?: string | null;
-      primaryKey?: boolean;
       unsigned?: boolean;
       autoIncrement?: boolean;
       virtual?: boolean;
@@ -51,7 +50,6 @@ export class Column extends BaseColumn {
       collation: options.collation,
       comment: options.comment,
       defaultFunction: options.defaultFunction,
-      primaryKey: options.primaryKey,
     });
     this.unsigned = options.unsigned ?? false;
     this.autoIncrement = options.autoIncrement ?? false;

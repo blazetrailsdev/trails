@@ -365,12 +365,11 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
       for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
     });
 
-    const [id] = await ss.columns("things");
+    await ss.columns("things");
 
     const definitions = sql.find((text) => text.includes("pg_attribute"))!;
     expect(definitions).not.toContain("indisprimary");
     expect(definitions).not.toContain("pg_index");
-    expect(id.primaryKey).toBe(false);
   });
 
   it("carries the serial and comment flags through the ported body", async () => {

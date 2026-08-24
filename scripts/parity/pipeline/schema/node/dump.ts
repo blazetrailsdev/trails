@@ -95,12 +95,16 @@ async function main(): Promise<void> {
 
     for (const tableName of tables) {
       const cols = await adapter.columns(tableName);
+      // Columns carry no primary-key flag (Rails' do not either); the key is
+      // the adapter's own `primary_key(table)`.
+      const tablePk = await adapter.primaryKey(tableName);
+      const pkNames = new Set(tablePk == null ? [] : Array.isArray(tablePk) ? tablePk : [tablePk]);
       const idxDefs = (await adapter.indexes(tableName)) as IntrospectedIndex[];
 
       const columns: NativeColumn[] = cols.map((col) => ({
         name: col.name,
         sqlType: col.sqlType ?? col.type ?? "",
-        primaryKey: col.primaryKey,
+        primaryKey: pkNames.has(col.name),
         null: col.null,
         default: col.default !== null && col.default !== undefined ? String(col.default) : null,
         limit: col.limit,

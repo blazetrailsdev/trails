@@ -253,7 +253,6 @@ export function newColumnFromField(
       // trails-only: Rails' new_column_from_field passes no primary_key (PKs are
       // derived separately via primary_keys). trails' Column carries the flag and
       // `columns()` reflection consumers expect it set, so seed it from PRAGMA pk.
-      primaryKey: Number(field["pk"]) > 0,
       autoIncrement: Boolean(field["auto_increment"]),
       rowid,
       generatedType,

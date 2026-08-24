@@ -1060,9 +1060,7 @@ export class SchemaStatements {
         ).toArray();
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
-          return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
-            primaryKey: row.pk > 0,
-          });
+          return new Column(row.name, row.dflt_value, meta, row.notnull === 0);
         });
       }
       case "postgres": {
@@ -1120,9 +1118,7 @@ export class SchemaStatements {
               scale: row.numeric_scale ?? null,
             }),
           );
-          return new Column(row.column_name, row.column_default, meta, row.is_nullable === "YES", {
-            primaryKey: row.is_primary_key === true,
-          });
+          return new Column(row.column_name, row.column_default, meta, row.is_nullable === "YES");
         });
       }
       case "mysql2": {
@@ -1162,9 +1158,6 @@ export class SchemaStatements {
             row.COLUMN_DEFAULT ?? row.column_default,
             meta,
             (row.IS_NULLABLE ?? row.is_nullable) === "YES",
-            {
-              primaryKey: (row.COLUMN_KEY ?? row.column_key) === "PRI",
-            },
           );
         });
       }

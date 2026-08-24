@@ -29,12 +29,6 @@ describe("ColumnEqualityTrails", () => {
     ).toBe(false);
   });
 
-  it("ignores primaryKey, which Rails' Column does not carry", () => {
-    const a = new Column("id", null, meta(), false, { primaryKey: true });
-    const b = new Column("id", null, meta(), false, { primaryKey: false });
-    expect(a.equals(b)).toBe(true);
-  });
-
   it("is not equal to a non-Column", () => {
     const column = new Column("title", null, meta());
     expect(column.equals(null)).toBe(false);

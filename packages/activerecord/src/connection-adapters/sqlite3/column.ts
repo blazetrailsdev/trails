@@ -27,7 +27,6 @@ export class Column extends BaseColumn {
     options: {
       collation?: string | null;
       defaultFunction?: string | null;
-      primaryKey?: boolean;
       autoIncrement?: boolean;
       rowid?: boolean;
       generatedType?: "stored" | "virtual" | null;
@@ -43,7 +42,6 @@ export class Column extends BaseColumn {
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
-      primaryKey: options.primaryKey,
     });
     this.autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;

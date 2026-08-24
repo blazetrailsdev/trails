@@ -44,7 +44,6 @@ describe("SQLite3::Column#hasDefault", () => {
 describe("SQLite3::Column JSON round-trip", () => {
   it("preserves the subclass and its state through the schema-cache dump", () => {
     const col = new Column("id", null, { sqlType: "INTEGER", type: "integer" }, false, {
-      primaryKey: true,
       autoIncrement: true,
       rowid: true,
       generatedType: "stored",

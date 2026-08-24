@@ -8,7 +8,7 @@ describe("MysqlColumn", () => {
       null,
       { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
       false,
-      { primaryKey: true, autoIncrement: true, unsigned: true, virtual: false },
+      { autoIncrement: true, unsigned: true, virtual: false },
     );
     const coder: Record<string, unknown> = {};
     original.encodeWith(coder);
@@ -17,7 +17,6 @@ describe("MysqlColumn", () => {
     expect(restored.autoIncrement).toBe(true);
     expect(restored.unsigned).toBe(true);
     expect(restored.virtual).toBe(false);
-    expect(restored.primaryKey).toBe(true);
     expect(restored.sqlType).toBe("bigint(20) unsigned");
   });
 });

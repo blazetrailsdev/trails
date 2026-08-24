@@ -33,7 +33,6 @@ export class Column extends BaseColumn {
       collation?: string | null;
       defaultFunction?: string | null;
       comment?: string | null;
-      primaryKey?: boolean;
       serial?: boolean;
       array?: boolean;
       identity?: string | null;
@@ -51,7 +50,6 @@ export class Column extends BaseColumn {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
       comment: options.comment,
-      primaryKey: options.primaryKey,
     });
     this.serial = options.serial ?? false;
     this.oid = sqlTypeMetadata.oid ?? null;
