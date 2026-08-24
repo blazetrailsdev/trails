@@ -5,6 +5,7 @@
  */
 
 import { Column as BaseColumn } from "../column.js";
+import type { ColumnJSON } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class Column extends BaseColumn {
@@ -126,4 +127,68 @@ export class Column extends BaseColumn {
       this.isSerial === other.isSerial
     );
   }
+
+  /**
+   * @noRailsEquivalent PERMANENT: the schema-cache dump. Rails dumps through
+   *   YAML/Marshal, which round-trips the adapter's Column subclass and its
+   *   state on its own (`schema_cache.rb:406`); trails' dump is JSON, so the
+   *   subclass has to spell out what it carries and tag itself for
+   *   `rehydrateColumn`. Mirrors MySQL::Column's pair.
+   */
+  override toJSON(): PostgresqlColumnJSON {
+    return {
+      ...super.toJSON(),
+      __postgresql: true,
+      serial: this.serial,
+      oid: this.oid,
+      fmod: this.fmod,
+      array: this.array,
+      identity: this.identity,
+      generated: this.generated,
+    };
+  }
+
+  static override fromJSON(data: ColumnJSON): BaseColumn {
+    const p = data as PostgresqlColumnJSON;
+    return new Column(
+      p.name,
+      p.default,
+      {
+        sqlType: p.sqlTypeMetadata?.sqlType,
+        type: p.sqlTypeMetadata?.type,
+        oid: p.oid ?? undefined,
+        fmod: p.fmod ?? undefined,
+        limit: p.sqlTypeMetadata?.limit ?? null,
+        precision: p.sqlTypeMetadata?.precision ?? null,
+        scale: p.sqlTypeMetadata?.scale ?? null,
+      },
+      p.null,
+      {
+        collation: p.collation,
+        defaultFunction: p.defaultFunction,
+        comment: p.comment,
+        primaryKey: p.primaryKey,
+        serial: p.serial,
+        array: p.array,
+        identity: p.identity,
+        generated: p.generated,
+      },
+    );
+  }
+}
+
+/**
+ * A dumped PostgreSQL::Column — the discriminator and subclass state a JSON
+ * dump has to carry where Rails' YAML/Marshal dump round-trips the class
+ * itself. Without it a loaded cache reports every column non-`array?`,
+ * non-`serial?` and OID-less (`schema_cache.rb:406`, `schema_cache.rb:228`).
+ */
+export interface PostgresqlColumnJSON extends ColumnJSON {
+  __postgresql: true;
+  serial: boolean;
+  oid: number | null;
+  fmod: number | null;
+  array: boolean;
+  identity: string | null;
+  generated: string | null;
 }

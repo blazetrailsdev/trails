@@ -23,6 +23,7 @@ import { PoolConfig } from "../connection-adapters/pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
+import { SCHEMA_CACHE_DUMP_ENV, dumpTemplateSchemaCache } from "./schema-cache-dump.js";
 import {
   TEMPLATE_PATH_ENV,
   isSqliteRun,
@@ -78,16 +79,38 @@ async function pooledTemplateAdapter(
 
 async function buildTemplateSchema(
   adapter: DatabaseAdapter,
+  pool: ConnectionPool,
   runToken: string,
   close: () => Promise<void>,
 ): Promise<void> {
   try {
     await loadSchema(adapter);
     await stampCanonicalSchema(adapter, runToken);
+    await dumpSchemaCacheOnce(adapter, pool, runToken);
   } finally {
     await close();
   }
 }
+
+/**
+ * Take the run's one schema-cache dump off whichever template this adapter
+ * built. Every template of a run is laid from the same registry, so the first
+ * one to finish describes them all — MySQL builds a template per slot, and
+ * dumping each would only rewrite the same file N times.
+ */
+async function dumpSchemaCacheOnce(
+  adapter: DatabaseAdapter,
+  pool: ConnectionPool,
+  runToken: string,
+): Promise<void> {
+  _schemaCacheDump ??= dumpTemplateSchemaCache(adapter, pool, runToken).then((dump) => {
+    if (dump) process.env[SCHEMA_CACHE_DUMP_ENV] = dump;
+  });
+  await _schemaCacheDump;
+}
+
+/** The in-flight (or settled) dump — MySQL builds its templates concurrently. */
+let _schemaCacheDump: Promise<void> | null = null;
 
 /**
  * Per-adapter template-clone strategy. Each adapter checks whether it is
@@ -125,7 +148,7 @@ const sqliteAdapter: DbTemplateAdapter = {
       adapter: "sqlite3",
       database: templatePath,
     });
-    await buildTemplateSchema(adapter, runToken, async () => {
+    await buildTemplateSchema(adapter, pool, runToken, async () => {
       pool.releaseConnection();
       await pool.disconnectBang();
     });
@@ -186,6 +209,7 @@ const pgAdapter: DbTemplateAdapter = {
     try {
       await loadSchema(adapter);
       await stampCanonicalSchema(adapter, runToken);
+      await dumpSchemaCacheOnce(adapter, pool, runToken);
     } finally {
       try {
         pool.releaseConnection();
@@ -213,6 +237,7 @@ const pgAdapter: DbTemplateAdapter = {
         ownRunDatabases(base, runToken, await pgDatabaseNames(cleanup)),
       );
       await cleanup.end();
+      await sweepRunDbFiles(runToken);
     };
   },
 };
@@ -270,7 +295,7 @@ const mysqlAdapter: DbTemplateAdapter = {
           connectionLimit: 1,
           flags: ["FOUND_ROWS"],
         });
-        await buildTemplateSchema(adapter, runToken, async () => {
+        await buildTemplateSchema(adapter, pool, runToken, async () => {
           pool.releaseConnection();
           await pool.disconnectBang();
         });
@@ -287,6 +312,7 @@ const mysqlAdapter: DbTemplateAdapter = {
         ownRunDatabases(baseDb, runToken, await mysqlDatabaseNames(cleanup)),
       );
       await cleanup.end();
+      await sweepRunDbFiles(runToken);
     };
   },
 };

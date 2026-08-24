@@ -40,3 +40,22 @@ describe("SQLite3::Column#hasDefault", () => {
     expect(col.hasDefault).toBe(false);
   });
 });
+
+describe("SQLite3::Column JSON round-trip", () => {
+  it("preserves the subclass and its state through the schema-cache dump", () => {
+    const col = new Column("id", null, { sqlType: "INTEGER", type: "integer" }, false, {
+      primaryKey: true,
+      autoIncrement: true,
+      rowid: true,
+      generatedType: "stored",
+    });
+
+    const back = Column.fromJSON(col.toJSON()) as Column;
+
+    expect(back).toBeInstanceOf(Column);
+    expect(back.autoIncrement).toBe(true);
+    expect(back.rowid).toBe(true);
+    expect(back.isVirtualStored()).toBe(true);
+    expect(back).toEqual(col);
+  });
+});

@@ -10,6 +10,8 @@ import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
+import { Column as PostgresqlColumn } from "./postgresql/column.js";
+import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
@@ -60,8 +62,14 @@ function serializeColumn(col: any): ColumnJSON {
 
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
-  const json = data as ColumnJSON & { __mysql?: boolean };
+  const json = data as ColumnJSON & {
+    __mysql?: boolean;
+    __postgresql?: boolean;
+    __sqlite3?: boolean;
+  };
   if (json && json.__mysql) return MysqlColumn.fromJSON(json);
+  if (json && json.__postgresql) return PostgresqlColumn.fromJSON(json);
+  if (json && json.__sqlite3) return Sqlite3Column.fromJSON(json);
   return Column.fromJSON(json);
 }
 

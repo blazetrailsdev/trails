@@ -10,6 +10,8 @@ import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
+import type { SchemaCache } from "../connection-adapters/schema-cache.js";
+import { templateSchemaCache } from "../support/schema-cache-dump.js";
 
 interface TxnHost {
   transactionManager: {
@@ -52,6 +54,16 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * adapters without a pool, and reflection failures are swallowed (the cache
  * simply stays cold for that table, falling back to the synthesized branch).
  *
+ * The introspection is **not** re-done per test file. `SchemaCache#add` issues
+ * four queries per table (`dataSourceExists` / `primaryKeys` / `columns` /
+ * `indexes`), which over the ~200 canonical tables is ~800 queries and ~0.3s of
+ * every file's runtime. globalSetup reflects the template database once and
+ * dumps it (`support/schema-cache-dump.ts`), and this loads the dump — Rails'
+ * `db:schema:cache:dump` plus `ActiveRecord.schema_cache_path`: dump once
+ * (`schema_cache.rb:406`), `SchemaCache._load_from` per process
+ * (`schema_cache.rb:228`). Only a run without a boot dump falls back to
+ * reflecting the database itself.
+ *
  * @internal
  */
 async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Promise<void> {
@@ -59,10 +71,45 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   if (!sc || pool === null) return;
   try {
+    const dumped = templateSchemaCache();
+    if (dumped && (await replaySchemaCacheDump(adapter, pool, sc, dumped))) return;
     await sc.addAll(pool);
   } catch {
     // best-effort warm
   }
+}
+
+/**
+ * Load the boot dump into `sc` if the live database still agrees with it, and
+ * report whether it was used.
+ *
+ * The dump describes the template as it was laid, and every worker database is
+ * a clone of that template whose canonical tables are rebuilt to their laid
+ * shape between files — but a file that drops a table must not make the next
+ * file read a schema that is no longer there. So the dump is checked against
+ * one `dataSources()` query (the call `add_all` makes first anyway, so it is
+ * not an extra round trip): every dumped table must still exist, or the pool
+ * reflects from scratch. Tables the live database has and the dump does not —
+ * the bespoke table a previous file created — are reflected individually, a
+ * handful of `add`s rather than ~200.
+ */
+async function replaySchemaCacheDump(
+  adapter: TransactionalFixturesAdapter,
+  pool: ConnectionPool,
+  sc: NonNullable<TransactionalFixturesAdapter["internalSchemaCache"]>,
+  dumped: SchemaCache,
+): Promise<boolean> {
+  const marshalled = dumped.marshalDump();
+  const cached = new Set(Object.keys((marshalled[4] as Record<string, boolean>) ?? {}));
+  const live = new Set(await adapter.dataSources());
+  for (const table of cached) {
+    if (!live.has(table)) return false;
+  }
+  sc.marshalLoad(marshalled);
+  for (const table of live) {
+    if (!cached.has(table)) await sc.add(pool, table);
+  }
+  return true;
 }
 
 /**
