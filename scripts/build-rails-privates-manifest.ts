@@ -23,6 +23,14 @@
  * spurious matches against unrelated Rails-private accessors that
  * happen to share a name.
  *
+ * That all-private decision is made per RUBY name while the manifest is keyed
+ * by TS name, and the two are not one-to-one: `rubyMethodToTs` gives a `?`
+ * method the bare stem as a candidate, so private `content_security_policy?`
+ * yields `contentSecurityPolicy` — the spelling of the PUBLIC
+ * `content_security_policy` class DSL beside it. Every `mixed` name's
+ * candidates are therefore subtracted after projection, applying the guard in
+ * the TS namespace it actually gates on.
+ *
  * Run after `pnpm parity:api` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
  *   pnpm rails-privates:manifest
  */
@@ -232,15 +240,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       if (status !== "all-private") continue;
       for (const c of rubyMethodToTs(ruby) ?? []) tsNames.add(c);
     }
-    // The all-private decision above is made per RUBY name, but the manifest is
-    // keyed by TS name, and the two are not one-to-one: `rubyMethodToTs` gives a
-    // `?` method the bare stem as a candidate, so a private `content_security_policy?`
-    // contributes `contentSecurityPolicy` — the spelling of the PUBLIC
-    // `content_security_policy` sitting beside it in the same file. Left in, the
-    // manifest demands `@internal` on a public Rails DSL method and hides it from
-    // the website API reference. Subtracting every candidate of a `mixed` name
-    // restores the all-private guard's intent in the TS namespace it actually
-    // gates on.
     for (const [ruby, status] of names) {
       if (status === "all-private") continue;
       for (const c of rubyMethodToTs(ruby) ?? []) tsNames.delete(c);
