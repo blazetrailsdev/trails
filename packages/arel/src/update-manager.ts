@@ -36,7 +36,7 @@ export class UpdateManager extends TreeManager {
    *
    * Mirrors: Arel::UpdateManager#table
    */
-  table(table: Table): this {
+  table(table: Table | Node): this {
     this.ast.relation = table;
     return this;
   }
@@ -98,8 +98,11 @@ export class UpdateManager extends TreeManager {
    *
    * Mirrors: Arel::UpdateManager#having
    */
-  having(condition: Node): this {
-    this.ast.havings.push(condition);
+  having(expr: Node | string): this {
+    // Rails pushes the raw expression and lets `visit_String` render it
+    // (update_manager.rb:43-46). A TS AST holds Nodes only, so a String arrives
+    // as the SqlLiteral it is in Ruby — the same wrap `group` above applies.
+    this.ast.havings.push(typeof expr === "string" ? new SqlLiteral(expr) : expr);
     return this;
   }
 }

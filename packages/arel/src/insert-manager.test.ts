@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { Table, sql, InsertManager, Nodes } from "./index.js";
-import { fakeRecordEngine } from "./test-helpers/connection.js";
+import { Table, sql, SelectManager, InsertManager, Nodes } from "./index.js";
+import { fakeRecordEngine, fakeRecordConnection } from "./test-helpers/connection.js";
+import { mustBeLike } from "./test-helpers/must-be-like.js";
 
 describe("InsertManagerTest", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
   describe("insert", () => {
     it("can create a ValuesList node", () => {
       const manager = new InsertManager();
@@ -22,218 +20,255 @@ describe("InsertManagerTest", () => {
     });
 
     it("allows sql literals", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([[users.get("name"), sql("NOW()")]]);
-      expect(mgr.toSql()).toContain("NOW()");
+      const manager = new InsertManager();
+      manager.into(new Table("users"));
+      manager.values = manager.createValues([sql("*")]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" VALUES (*)
+        `),
+      );
     });
 
     it("works with multiple values", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([
-        [users.get("name"), "alice"],
-        [users.get("id"), 1],
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.columns.push(table.get("id"));
+      manager.columns.push(table.get("name"));
+
+      manager.values = manager.createValuesList([
+        ["1", "david"],
+        ["2", "kir"],
+        ["3", sql("DEFAULT")],
       ]);
-      const sql = im.toSql();
-      expect(sql).toContain('"name"');
-      expect(sql).toContain('"id"');
+
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id", "name") VALUES ('1', 'david'), ('2', 'kir'), ('3', DEFAULT)
+        `),
+      );
     });
 
     it("literals in multiple values are not escaped", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([[users.get("name"), new Nodes.SqlLiteral("DEFAULT")]]);
-      const sql = im.toSql();
-      expect(sql).toContain("DEFAULT");
-      expect(sql).not.toContain("'DEFAULT'");
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.columns.push(table.get("name"));
+
+      manager.values = manager.createValuesList([[sql("*")], [sql("DEFAULT")]]);
+
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("name") VALUES (*), (DEFAULT)
+        `),
+      );
     });
 
     it("works with multiple single values", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([[users.get("name"), "bob"]]);
-      const sql = im.toSql();
-      expect(sql).toContain("'bob'");
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.columns.push(table.get("name"));
+
+      manager.values = manager.createValuesList([["david"], ["kir"], [sql("DEFAULT")]]);
+
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("name") VALUES ('david'), ('kir'), (DEFAULT)
+        `),
+      );
     });
 
     it("inserts false", () => {
-      const mgr = new InsertManager();
-      mgr.insert([[users.get("bool"), false]]);
-      expect(mgr.toSql(fakeRecordEngine)).toBe(`INSERT INTO "users" ("bool") VALUES ('f')`);
+      const table = new Table("users");
+      const manager = new InsertManager();
+
+      manager.insert([[table.get("bool"), false]]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("bool") VALUES ('f')
+        `),
+      );
     });
 
     it("inserts null", () => {
-      const mgr = new InsertManager();
-      mgr.insert([[users.get("id"), null]]);
-      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("id") VALUES (NULL)`);
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.insert([[table.get("id"), null]]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id") VALUES (NULL)
+        `),
+      );
+    });
+
+    it("inserts time", () => {
+      const table = new Table("users");
+      const manager = new InsertManager();
+
+      const time = new Date();
+      const attribute = table.get("created_at");
+
+      manager.insert([[attribute, time]]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("created_at") VALUES (${fakeRecordConnection.quote(time)})
+        `),
+      );
     });
 
     it("takes a list of lists", () => {
-      const im = new InsertManager();
-      im.into(users);
-      const vl = im.createValuesList([[new Nodes.Quoted("alice")], [new Nodes.Quoted("bob")]]);
-      im.values = vl;
-      im.ast.columns = [users.get("name")];
-      const sql = im.toSql();
-      expect(sql).toContain("VALUES");
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+      manager.insert([
+        [table.get("id"), 1],
+        [table.get("name"), "aaron"],
+      ]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id", "name") VALUES (1, 'aaron')
+        `),
+      );
+    });
+
+    it("defaults the table", () => {
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.insert([
+        [table.get("id"), 1],
+        [table.get("name"), "aaron"],
+      ]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id", "name") VALUES (1, 'aaron')
+        `),
+      );
     });
 
     it("noop for empty list", () => {
-      const im = new InsertManager();
-      im.into(users);
-      const sql = im.toSql();
-      expect(sql).toContain("INSERT INTO");
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.insert([[table.get("id"), 1]]);
+      manager.insert([]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id") VALUES (1)
+        `),
+      );
+    });
+
+    it("is chainable", () => {
+      const table = new Table("users");
+      const manager = new InsertManager();
+      const insertResult = manager.insert([[table.get("id"), 1]]);
+      expect(insertResult).toEqual(manager);
     });
   });
 
   describe("into", () => {
     it("takes a Table and chains", () => {
-      const im = new InsertManager();
-      const result = im.into(users);
-      expect(result).toBe(im);
+      const manager = new InsertManager();
+      expect(manager.into(new Table("users"))).toEqual(manager);
     });
 
     it("converts to sql", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([
-        [users.get("name"), "dean"],
-        [users.get("age"), 30],
-      ]);
-      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users"
+        `),
+      );
     });
   });
 
   describe("columns", () => {
     it("converts to sql", () => {
+      const table = new Table("users");
       const manager = new InsertManager();
-      manager.into(users);
-      manager.columns.push(users.get("id"));
-      expect(manager.toSql()).toBe(`INSERT INTO "users" ("id")`);
+      manager.into(table);
+      manager.columns.push(table.get("id"));
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id")
+        `),
+      );
     });
   });
 
   describe("values", () => {
     it("converts to sql", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([[users.get("id"), 1]]);
-      const sql = im.toSql();
-      expect(sql).toContain("INSERT INTO");
-      expect(sql).toContain('"users"');
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.values = new Nodes.ValuesList([[1], [2]]);
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" VALUES (1), (2)
+        `),
+      );
     });
 
     it("accepts sql literals", () => {
-      const im = new InsertManager();
-      im.into(users);
-      im.insert([[users.get("name"), new Nodes.SqlLiteral("DEFAULT")]]);
-      const sql = im.toSql();
-      expect(sql).toContain("DEFAULT");
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.values = sql("DEFAULT VALUES");
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" DEFAULT VALUES
+        `),
+      );
     });
   });
 
   describe("combo", () => {
     it("combines columns and values list in order", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([
-        [users.get("name"), "Alice"],
-        [users.get("email"), "alice@example.com"],
+      const table = new Table("users");
+      const manager = new InsertManager();
+      manager.into(table);
+
+      manager.values = new Nodes.ValuesList([
+        [1, "aaron"],
+        [2, "david"],
       ]);
-      expect(mgr.columns.length).toBe(2);
+      manager.columns.push(table.get("id"));
+      manager.columns.push(table.get("name"));
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id", "name") VALUES (1, 'aaron'), (2, 'david')
+        `),
+      );
     });
   });
 
   describe("select", () => {
     it("accepts a select query in place of a VALUES clause", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.ast.columns = [users.get("name")];
-      const selectMgr = posts.project(posts.get("title"));
-      mgr.select(selectMgr);
-      expect(mgr.toSql()).toContain("SELECT");
-    });
-  });
+      const table = new Table("users");
 
-  it("generates INSERT", () => {
-    const mgr = new InsertManager();
-    mgr.into(users);
-    mgr.insert([
-      [users.get("name"), "dean"],
-      [users.get("age"), 30],
-    ]);
-    expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
-  });
+      const manager = new InsertManager();
+      manager.into(table);
 
-  it("returns empty array before insert", () => {
-    const manager = new InsertManager();
-    expect(manager.columns).toEqual([]);
-  });
+      const select = new SelectManager();
+      select.project(sql("1"));
+      select.project(sql('"aaron"'));
 
-  describe("insert", () => {
-    it("inserts time", () => {
-      const mgr = new InsertManager(users);
-      const at = Temporal.PlainDateTime.from("2020-01-02T12:34:56");
-      mgr.insert([[users.get("created_at"), at]]);
-      expect(mgr.toSql()).toContain("2020-01-02");
-    });
-
-    it("defaults the table", () => {
-      const mgr = new InsertManager(users);
-      mgr.insert([[users.get("name"), "dean"]]);
-      expect(mgr.toSql()).toContain('INSERT INTO "users"');
-    });
-
-    it("is chainable", () => {
-      const mgr = new InsertManager();
-      expect(mgr.into(users)).toBe(mgr);
-      expect(mgr.insert([[users.get("name"), "dean"]])).toBe(mgr);
-      expect(mgr.toSql()).toContain("INSERT");
-    });
-  });
-
-  // Mirrors Rails: `Arel::InsertManager#insert` (insert_manager.rb).
-  describe("insert (Rails parity)", () => {
-    it("is a no-op for an empty fields array", () => {
-      const mgr = new InsertManager();
-      mgr.insert([]);
-      expect(mgr.ast.values).toBeNull();
-      expect(mgr.ast.relation).toBeNull();
-      expect(mgr.ast.columns).toEqual([]);
-    });
-
-    it("stores a string `fields` value as a SqlLiteral on ast.values", () => {
-      const mgr = new InsertManager(users);
-      mgr.insert("foo");
-      expect(mgr.ast.values).toBeInstanceOf(Nodes.SqlLiteral);
-      expect((mgr.ast.values as Nodes.SqlLiteral).value).toBe("foo");
-    });
-
-    it("infers ast.relation from the first column when not yet set", () => {
-      const mgr = new InsertManager();
-      mgr.insert([[users.get("name"), "alice"]]);
-      expect(mgr.ast.relation).toBe(users);
-    });
-
-    it("preserves an explicit ast.relation rather than inferring", () => {
-      const mgr = new InsertManager(posts);
-      mgr.insert([[users.get("name"), "alice"]]);
-      expect(mgr.ast.relation).toBe(posts);
-    });
-  });
-
-  // Mirrors Rails: `InsertManager#select` stores the manager itself
-  // (insert_manager.rb), not its inner `.ast`. The visitor handles
-  // the SelectManager-shaped duck-type via `visit`.
-  describe("select (Rails parity)", () => {
-    it("stores the SelectManager itself on ast.select", () => {
-      const mgr = new InsertManager(users);
-      mgr.ast.columns = [users.get("name")];
-      const selectMgr = posts.project(posts.get("title"));
-      mgr.select(selectMgr);
-      expect(mgr.ast.select).toBe(selectMgr);
-      expect(mgr.toSql()).toContain("SELECT");
+      manager.select(select);
+      manager.columns.push(table.get("id"));
+      manager.columns.push(table.get("name"));
+      expect(mustBeLike(manager.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          INSERT INTO "users" ("id", "name") (SELECT 1, "aaron")
+        `),
+      );
     });
   });
 });

@@ -65,10 +65,13 @@ describe("Arel::Nodes.build_quoted", () => {
     expect(binds).toEqual([amAttr]);
   });
 
-  it("unwraps a TreeManager-shaped .ast so the visitor receives a real Node", () => {
+  it("passes a TreeManager-shaped .ast holder through unchanged", () => {
+    // Rails' `build_quoted` returns an `Arel::SelectManager` as-is
+    // (casted.rb:47-51) so `visit_Arel_SelectManager` supplies the subquery
+    // parens; matching on `.ast` is only how the class arm is spelled here.
     const sub = new SelectManager(users).project(users.get("id"));
     const node = buildQuoted(sub);
-    expect(node).toBeInstanceOf(Nodes.SelectStatement);
+    expect(node).toBe(sub);
   });
 
   it("wraps in Casted when the second arg is an Arel::Attribute", () => {

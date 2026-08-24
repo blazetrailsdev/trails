@@ -10,11 +10,7 @@ import {
   EmptyJoinError,
 } from "./index.js";
 import { testConnection, fakeRecordConnection } from "./test-helpers/connection.js";
-
-/** Minitest's `must_be_like`: compare SQL with runs of whitespace collapsed. */
-function mustBeLike(sql: string): string {
-  return sql.trim().replace(/\s+/g, " ");
-}
+import { mustBeLike } from "./test-helpers/must-be-like.js";
 
 describe("SelectManagerTest", () => {
   const users = new Table("users");

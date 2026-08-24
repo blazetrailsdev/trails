@@ -2,26 +2,56 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { testConnection } from "../test-helpers/connection.js";
 import { Table, star, Nodes, Visitors } from "../index.js";
+import { Attribute } from "./attribute.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
   const visitor = new Visitors.ToSql(testConnection);
+
+  // Mirrors Rails' private `quoted_range` (attribute_test.rb:1163-1169).
+  function quotedRange(beginVal: unknown, endVal: unknown, exclude: boolean) {
+    return {
+      begin: new Nodes.Quoted(beginVal),
+      end: new Nodes.Quoted(endVal),
+      excludeEnd: exclude,
+    };
+  }
+
+  // Mimic PG::TextDecoder::Array casting (attribute_test.rb:1171-1181).
+  function fakePgCaster() {
+    return {
+      typeCastForDatabase(attrName: string, value: unknown) {
+        return attrName === "tags" ? `{${(value as unknown[]).join(",")}}` : value;
+      },
+    };
+  }
   describe("#not_eq", () => {
     it("should create a NotEqual node", () => {
-      expect(users.project(star).where(users.get("id").notEq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" != 10',
-      );
+      const relation = new Table("users");
+      expect(relation.get("id").notEq(10)).toBeInstanceOf(Nodes.NotEqual);
     });
 
     it("should generate != in sql", () => {
-      const result = users.project(star).where(users.get("id").notEq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."id" != 10');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notEq(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" != 10
+        `),
+      );
     });
 
     it("should handle nil", () => {
       const relation = new Table("users");
-      const node = relation.get("id").notEq(null);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NOT NULL");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notEq(null));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" IS NOT NULL
+        `),
+      );
     });
   });
 
@@ -62,29 +92,43 @@ describe("AttributeTest", () => {
 
   describe("#gt", () => {
     it("should create a GreaterThan node", () => {
-      expect(users.get("age").gt(10)).toBeInstanceOf(Nodes.GreaterThan);
-      expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > 10',
-      );
+      const relation = new Table("users");
+      expect(relation.get("id").gt(10)).toBeInstanceOf(Nodes.GreaterThan);
     });
 
     it("should generate > in sql", () => {
-      expect(users.project(star).where(users.get("age").gt(21)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > 21',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").gt(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" > 10
+        `),
       );
     });
 
     it("should handle comparing with a subquery", () => {
-      const subquery = users.project(users.get("id").maximum());
-      const node = users.get("age").gt(subquery);
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+      const avg = users.project(users.get("karma").average());
+      const mgr = users.project(star).where(users.get("karma").gt(avg));
+
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT * FROM "users" WHERE "users"."karma" > (SELECT AVG("users"."karma") FROM "users")
+        `),
+      );
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").gt("fake_name"));
-      expect(mgr.toSql()).toContain("fake_name");
+      expect(mgr.toSql()).toMatch(`"users"."name" > 'fake_name'`);
+
+      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
+      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
+      const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
+      mgr.where(relation.get("created_at").gt(currentTime));
+      expect(mgr.toSql()).toMatch(`"users"."created_at" > '2024-01-01 00:00:00 +0000'`);
     });
   });
 
@@ -118,20 +162,32 @@ describe("AttributeTest", () => {
 
   describe("#gteq", () => {
     it("should create a GreaterThanOrEqual node", () => {
-      const node = users.get("age").gteq(10);
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const relation = new Table("users");
+      expect(relation.get("id").gteq(10)).toBeInstanceOf(Nodes.GreaterThanOrEqual);
     });
 
     it("should generate >= in sql", () => {
-      const result = users.project(star).where(users.get("age").gteq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" >= 10');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").gteq(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" >= 10
+        `),
+      );
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").gteq("fake_name"));
-      expect(mgr.toSql()).toContain("fake_name");
+      expect(mgr.toSql()).toMatch(`"users"."name" >= 'fake_name'`);
+
+      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
+      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
+      const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
+      mgr.where(relation.get("created_at").gteq(currentTime));
+      expect(mgr.toSql()).toMatch(`"users"."created_at" >= '2024-01-01 00:00:00 +0000'`);
     });
   });
 
@@ -165,22 +221,32 @@ describe("AttributeTest", () => {
 
   describe("#lt", () => {
     it("should create a LessThan node", () => {
-      expect(users.get("age").lt(10)).toBeInstanceOf(Nodes.LessThan);
-      expect(users.project(star).where(users.get("age").lt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" < 10',
-      );
+      const relation = new Table("users");
+      expect(relation.get("id").lt(10)).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("should generate < in sql", () => {
-      const result = users.project(star).where(users.get("age").lt(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" < 10');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").lt(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" < 10
+        `),
+      );
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").lt("fake_name"));
-      expect(mgr.toSql()).toContain("fake_name");
+      expect(mgr.toSql()).toMatch(`"users"."name" < 'fake_name'`);
+
+      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
+      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
+      const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
+      mgr.where(relation.get("created_at").lt(currentTime));
+      expect(mgr.toSql()).toMatch(`"users"."created_at" < '2024-01-01 00:00:00 +0000'`);
     });
   });
 
@@ -214,27 +280,32 @@ describe("AttributeTest", () => {
 
   describe("#lteq", () => {
     it("should create a LessThanOrEqual node", () => {
-      const node = users.get("age").lteq(10);
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const relation = new Table("users");
+      expect(relation.get("id").lteq(10)).toBeInstanceOf(Nodes.LessThanOrEqual);
     });
 
     it("should generate <= in sql", () => {
-      const result = users.project(star).where(users.get("age").lteq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" <= 10');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").lteq(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" <= 10
+        `),
+      );
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").lteq("fake_name"));
-      expect(mgr.toSql()).toContain(`"users"."name" <= 'fake_name'`);
+      expect(mgr.toSql()).toMatch(`"users"."name" <= 'fake_name'`);
 
-      // Rails compares against Time.now; a fixed value keeps the assertion
-      // deterministic. Instant is the Time analogue and reaches FakeRecord's
-      // `else` arm, which renders Ruby's `Time#to_s` shape.
+      // Rails interpolates `::Time.now`; a fixed Instant keeps the assertion
+      // deterministic while reaching the same Ruby `Time#to_s` rendering arm.
       const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").lteq(currentTime));
-      expect(mgr.toSql()).toContain(`"users"."created_at" <= '2024-01-01 00:00:00 +0000'`);
+      expect(mgr.toSql()).toMatch(`"users"."created_at" <= '2024-01-01 00:00:00 +0000'`);
     });
   });
 
@@ -261,172 +332,234 @@ describe("AttributeTest", () => {
 
   describe("#average", () => {
     it("should create a AVG node", () => {
-      const node = users.get("age").average();
-      expect(node).toBeInstanceOf(Nodes.Avg);
+      const relation = new Table("users");
+      expect(relation.get("id").average()).toBeInstanceOf(Nodes.Avg);
     });
 
     it("should generate the proper SQL", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id").average());
-      expect(mgr.toSql()).toContain("AVG");
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT AVG("users"."id")
+          FROM "users"
+        `),
+      );
     });
   });
 
   describe("#maximum", () => {
     it("should create a MAX node", () => {
-      const node = users.get("age").maximum();
-      expect(node).toBeInstanceOf(Nodes.Max);
+      const relation = new Table("users");
+      expect(relation.get("id").maximum()).toBeInstanceOf(Nodes.Max);
     });
 
     it("should generate proper SQL", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id").maximum());
-      expect(mgr.toSql()).toContain("MAX");
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT MAX("users"."id")
+          FROM "users"
+        `),
+      );
     });
   });
 
   describe("#minimum", () => {
     it("should create a Min node", () => {
-      const node = users.get("age").minimum();
-      expect(node).toBeInstanceOf(Nodes.Min);
+      const relation = new Table("users");
+      expect(relation.get("id").minimum()).toBeInstanceOf(Nodes.Min);
     });
 
     it("should generate proper SQL", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id").minimum());
-      expect(mgr.toSql()).toContain("MIN");
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT MIN("users"."id")
+          FROM "users"
+        `),
+      );
     });
   });
 
   describe("#sum", () => {
     it("should create a SUM node", () => {
-      const node = users.get("age").sum();
-      expect(node).toBeInstanceOf(Nodes.Sum);
+      const relation = new Table("users");
+      expect(relation.get("id").sum()).toBeInstanceOf(Nodes.Sum);
     });
 
     it("should generate the proper SQL", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id").sum());
-      expect(mgr.toSql()).toContain("SUM");
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT SUM("users"."id")
+          FROM "users"
+        `),
+      );
     });
   });
 
   describe("#count", () => {
     it("should return a count node", () => {
-      const node = users.get("id").count();
-      expect(node).toBeInstanceOf(Nodes.Count);
+      const relation = new Table("users");
+      expect(relation.get("id").count()).toBeInstanceOf(Nodes.Count);
     });
 
     it("should take a distinct param", () => {
-      expect(users.project(users.get("name").count(true)).toSql()).toBe(
-        'SELECT COUNT(DISTINCT "users"."name") FROM "users"',
-      );
+      const relation = new Table("users");
+      const count = relation.get("id").count(null);
+      expect(count).toBeInstanceOf(Nodes.Count);
+      expect(count.distinct).toBeNull();
     });
   });
 
   describe("#eq", () => {
     it("should return an equality node", () => {
-      expect(users.get("id").eq(10)).toBeInstanceOf(Nodes.Equality);
-      expect(users.project(star).where(users.get("id").eq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" = 10',
-      );
+      const attribute = new Attribute(null, null);
+      const equality = attribute.eq(1);
+      expect(equality.left).toEqual(attribute);
+      expect((equality.right as Nodes.Casted).value).toEqual(1);
+      expect(equality).toBeInstanceOf(Nodes.Equality);
     });
 
     it("should generate = in sql", () => {
-      expect(users.project(star).where(users.get("id").eq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" = 10',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").eq(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" = 10
+        `),
       );
     });
 
     it("should handle nil", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("name").eq(null);
-      expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").eq(null));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" IS NULL
+        `),
+      );
     });
   });
 
   describe("#matches_any", () => {
     it("should create a Grouping node", () => {
-      expect(users.get("name").matchesAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
+      const relation = new Table("users");
+      expect(relation.get("name").matchesAny(["%chunky%", "%bacon%"])).toBeInstanceOf(
+        Nodes.Grouping,
+      );
     });
 
     it("should generate ORs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("name").matchesAny(["%foo%", "%bar%"]));
-      expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%foo%' OR "users"."name" LIKE '%bar%')`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").matchesAny(["%chunky%", "%bacon%"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%chunky%' OR "users"."name" LIKE '%bacon%')
+        `),
       );
     });
   });
 
   describe("#matches_all", () => {
     it("should create a Grouping node", () => {
-      expect(users.get("name").matchesAll(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
+      const relation = new Table("users");
+      expect(relation.get("name").matchesAll(["%chunky%", "%bacon%"])).toBeInstanceOf(
+        Nodes.Grouping,
+      );
     });
 
     it("should generate ANDs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("name").matchesAll(["%foo%", "%bar%"]));
-      expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%foo%' AND "users"."name" LIKE '%bar%')`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").matchesAll(["%chunky%", "%bacon%"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%chunky%' AND "users"."name" LIKE '%bacon%')
+        `),
       );
     });
   });
 
   describe("#matches", () => {
     it("should create a Matches node", () => {
-      expect(users.get("name").matches("%bacon%")).toBeInstanceOf(Nodes.Matches);
-      expect(users.project(star).where(users.get("name").matches("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" LIKE '%bacon%'`,
-      );
+      const relation = new Table("users");
+      expect(relation.get("name").matches("%bacon%")).toBeInstanceOf(Nodes.Matches);
     });
 
     it("should generate LIKE in sql", () => {
-      expect(users.project(star).where(users.get("name").matches("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" LIKE '%bacon%'`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").matches("%bacon%"));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."name" LIKE '%bacon%'
+        `),
       );
     });
   });
 
   describe("#does_not_match_any", () => {
     it("should create a Grouping node", () => {
-      expect(users.get("name").doesNotMatchAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
+      const relation = new Table("users");
+      expect(relation.get("name").doesNotMatchAny(["%chunky%", "%bacon%"])).toBeInstanceOf(
+        Nodes.Grouping,
+      );
     });
 
     it("should generate ORs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("name").doesNotMatchAny(["%foo%", "%bar%"]));
-      expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%foo%' OR "users"."name" NOT LIKE '%bar%')`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").doesNotMatchAny(["%chunky%", "%bacon%"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%chunky%' OR "users"."name" NOT LIKE '%bacon%')
+        `),
       );
     });
   });
 
   describe("#does_not_match_all", () => {
     it("should create a Grouping node", () => {
-      expect(users.get("name").doesNotMatchAll(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
+      const relation = new Table("users");
+      expect(relation.get("name").doesNotMatchAll(["%chunky%", "%bacon%"])).toBeInstanceOf(
+        Nodes.Grouping,
+      );
     });
 
     it("should generate ANDs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("name").doesNotMatchAll(["%foo%", "%bar%"]));
-      expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%foo%' AND "users"."name" NOT LIKE '%bar%')`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").doesNotMatchAll(["%chunky%", "%bacon%"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%chunky%' AND "users"."name" NOT LIKE '%bacon%')
+        `),
       );
     });
   });
 
   describe("#does_not_match", () => {
     it("should create a DoesNotMatch node", () => {
-      expect(users.get("name").doesNotMatch("%bacon%")).toBeInstanceOf(Nodes.DoesNotMatch);
-      expect(users.project(star).where(users.get("name").doesNotMatch("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'`,
-      );
+      const relation = new Table("users");
+      expect(relation.get("name").doesNotMatch("%bacon%")).toBeInstanceOf(Nodes.DoesNotMatch);
     });
 
     it("should generate NOT LIKE in sql", () => {
-      expect(users.project(star).where(users.get("name").doesNotMatch("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'`,
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").doesNotMatch("%bacon%"));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'
+        `),
       );
     });
   });
@@ -481,189 +614,283 @@ describe("AttributeTest", () => {
 
   describe("#between", () => {
     it("can be constructed with a standard range", () => {
-      const node = users.get("id").between([1, 3]);
-      expect(node).toBeInstanceOf(Nodes.Between);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between([1, 3]);
+
+      expect(node).toEqual(
+        new Nodes.Between(
+          attribute,
+          new Nodes.And([new Nodes.Casted(1, attribute), new Nodes.Casted(3, attribute)]),
+        ),
+      );
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("id").between([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between([-Infinity, 3]);
+
+      expect(node).toEqual(new Nodes.LessThanOrEqual(attribute, new Nodes.Casted(3, attribute)));
     });
 
     it("can be constructed with a quoted range starting from -Infinity", () => {
-      const node = users.get("id").between({ begin: -Infinity, end: 3 });
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between(quotedRange(-Infinity, 3, false));
+
+      expect(node).toEqual(new Nodes.LessThanOrEqual(attribute, new Nodes.Quoted(3)));
     });
 
     it("can be constructed with an exclusive range starting from -Infinity", () => {
-      const node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: -Infinity, end: 3, excludeEnd: true });
+
+      expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Casted(3, attribute)));
     });
 
     it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
-      const node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between(quotedRange(-Infinity, 3, true));
+
+      expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Quoted(3)));
     });
 
     it("can be constructed with an infinite range", () => {
-      const node = users.get("id").between([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between([-Infinity, Infinity]);
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, []));
     });
 
     it("can be constructed with a quoted infinite range", () => {
-      const node = users.get("id").between({ begin: -Infinity, end: Infinity });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between(quotedRange(-Infinity, Infinity, false));
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, []));
     });
 
     it("can be constructed with a range ending at Infinity", () => {
-      const node = users.get("id").between([1, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between([0, Infinity]);
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("id").between({ begin: null, end: 3 });
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: null, end: 0 });
+
+      expect(node).toEqual(new Nodes.LessThanOrEqual(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("id").between({ begin: 1, end: null });
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: 0, end: null });
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with an exclusive range implicitly ending at Infinity", () => {
-      const node = users.get("id").between({ begin: 1, end: null, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: 0, end: null, excludeEnd: true });
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("id").between({ begin: 1, end: Infinity });
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between(quotedRange(0, Infinity, false));
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Quoted(0)));
     });
 
     it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("id").between({ begin: Infinity, end: null });
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: Infinity, end: null });
+
+      expect(node).toEqual(new Nodes.In(attribute, []));
     });
 
     it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("id").between({ begin: null, end: -Infinity });
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: null, end: -Infinity });
+
+      expect(node).toEqual(new Nodes.In(attribute, []));
     });
 
     it("can be constructed with an exclusive range", () => {
-      const node = users.get("id").between({ begin: 1, end: 3, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.And);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between({ begin: 0, end: 3, excludeEnd: true });
+
+      expect(node).toEqual(
+        new Nodes.And([
+          new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(0, attribute)),
+          new Nodes.LessThan(attribute, new Nodes.Casted(3, attribute)),
+        ]),
+      );
     });
 
     it("can be constructed with a range where the begin and end are equal", () => {
-      const node = users.get("id").between([5, 5]);
-      expect(node).toBeInstanceOf(Nodes.Equality);
+      const attribute = new Attribute(null, null);
+      const node = attribute.between([1, 1]);
+
+      expect(node).toEqual(new Nodes.Equality(attribute, new Nodes.Casted(1, attribute)));
     });
   });
 
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
-      const node = users.get("age").notBetween([18, 65]);
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-      expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Or);
-      expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" > 65)');
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween([1, 3]);
+
+      expect(node).toEqual(
+        new Nodes.Grouping(
+          new Nodes.Or([
+            new Nodes.LessThan(attribute, new Nodes.Casted(1, attribute)),
+            new Nodes.GreaterThan(attribute, new Nodes.Casted(3, attribute)),
+          ]),
+        ),
+      );
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").notBetween([-Infinity, 65]);
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
-      expect(visitor.compile(node)).toBe('"users"."age" > 65');
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween([-Infinity, 3]);
+
+      expect(node).toEqual(new Nodes.GreaterThan(attribute, new Nodes.Casted(3, attribute)));
     });
 
     it("can be constructed with a quoted range starting from -Infinity", () => {
-      const node = users.get("id").notBetween({ begin: -Infinity, end: 3 });
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween(quotedRange(-Infinity, 3, false));
+
+      expect(node).toEqual(new Nodes.GreaterThan(attribute, new Nodes.Quoted(3)));
     });
 
     it("can be constructed with an exclusive range starting from -Infinity", () => {
-      const node = users.get("id").notBetween({ begin: -Infinity, end: 3, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: -Infinity, end: 3, excludeEnd: true });
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(3, attribute)));
     });
 
     it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
-      const node = users.get("id").notBetween({ begin: -Infinity, end: 3, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween(quotedRange(-Infinity, 3, true));
+
+      expect(node).toEqual(new Nodes.GreaterThanOrEqual(attribute, new Nodes.Quoted(3)));
     });
 
     it("can be constructed with an infinite range", () => {
-      const node = users.get("id").notBetween([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween([-Infinity, Infinity]);
+
+      expect(node).toEqual(new Nodes.In(attribute, []));
     });
 
     it("can be constructed with a quoted infinite range", () => {
-      const node = users.get("id").notBetween({ begin: -Infinity, end: Infinity });
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween(quotedRange(-Infinity, Infinity, false));
+
+      expect(node).toEqual(new Nodes.In(attribute, []));
     });
 
     it("can be constructed with a range ending at Infinity", () => {
-      const node = users.get("id").notBetween([1, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.LessThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween([0, Infinity]);
+
+      expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("age").notBetween({ begin: null, end: 0 });
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: null, end: 0 });
+
+      expect(node).toEqual(new Nodes.GreaterThan(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("age").notBetween({ begin: 0, end: null });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: 0, end: null });
+
+      expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Casted(0, attribute)));
     });
 
     it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("age").notBetween({ begin: 18, end: Infinity });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween(quotedRange(0, Infinity, false));
+
+      expect(node).toEqual(new Nodes.LessThan(attribute, new Nodes.Quoted(0)));
     });
 
     it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("age").notBetween({ begin: Infinity, end: null });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: Infinity, end: null });
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, []));
     });
 
     it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("age").notBetween({ begin: null, end: -Infinity });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: null, end: -Infinity });
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, []));
     });
 
     it("can be constructed with an exclusive range", () => {
-      const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-      const inner = (node as Nodes.Grouping).expr as Nodes.Or;
-      expect(inner.children[1]).toBeInstanceOf(Nodes.GreaterThanOrEqual);
-      expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
+      const attribute = new Attribute(null, null);
+      const node = attribute.notBetween({ begin: 0, end: 3, excludeEnd: true });
+
+      expect(node).toEqual(
+        new Nodes.Grouping(
+          new Nodes.Or([
+            new Nodes.LessThan(attribute, new Nodes.Casted(0, attribute)),
+            new Nodes.GreaterThanOrEqual(attribute, new Nodes.Casted(3, attribute)),
+          ]),
+        ),
+      );
     });
   });
 
   describe("#not_in", () => {
     it("can be constructed with a subquery", () => {
-      const mgr = users.project(users.get("id"));
-      const node = users.get("id").notIn(mgr);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").doesNotMatchAll(["%chunky%", "%bacon%"]));
+      const attribute = new Attribute(null, null);
+
+      const node = attribute.notIn(mgr);
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, mgr.ast));
     });
 
     it("can be constructed with a Union", () => {
-      const mgr1 = users.project(users.get("id"));
-      const mgr2 = users.project(users.get("id"));
+      const relation = new Table("users");
+      const mgr1 = relation.project(relation.get("id"));
+      const mgr2 = relation.project(relation.get("id"));
+
       const union = mgr1.union(mgr2);
-      const node = users.get("id").in(union);
-      expect(visitor.compile(node)).toBe(
-        '"users"."id" IN (( SELECT "users"."id" FROM "users" UNION SELECT "users"."id" FROM "users" ))',
+      const node = relation.get("id").in(union);
+      expect(mustBeLike(visitor.compile(node))).toBe(
+        mustBeLike(`
+          "users"."id" IN (( SELECT "users"."id" FROM "users" UNION SELECT "users"."id" FROM "users" ))
+        `),
       );
     });
 
     it("can be constructed with a list", () => {
-      const node = users.get("id").notIn([1, 2, 3]);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
-      expect(visitor.compile(node)).toBe('"users"."id" NOT IN (1, 2, 3)');
+      const attribute = new Attribute(null, null);
+      const node = attribute.notIn([1, 2, 3]);
+
+      expect(node).toEqual(
+        new Nodes.NotIn(attribute, [
+          new Nodes.Casted(1, attribute),
+          new Nodes.Casted(2, attribute),
+          new Nodes.Casted(3, attribute),
+        ]),
+      );
     });
 
     it("can be constructed with a random object", () => {
-      const attribute = users.get("id");
+      const attribute = new Attribute(null, null);
       const randomObject = {};
       const node = attribute.notIn(randomObject);
 
@@ -671,38 +898,55 @@ describe("AttributeTest", () => {
     });
 
     it("should generate NOT IN in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").notIn([1, 2, 3]));
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2, 3)',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").notIn([1, 2, 3]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2, 3)
+        `),
       );
     });
   });
 
   describe("#in", () => {
     it("should generate IN in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").in([1, 2, 3]));
-      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" IN (1, 2, 3)');
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("id").in([1, 2, 3]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" WHERE "users"."id" IN (1, 2, 3)
+        `),
+      );
     });
 
     it("can be constructed with a subquery", () => {
-      const mgr = users.project(users.get("id"));
-      const attribute = users.get("id");
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").doesNotMatchAll(["%chunky%", "%bacon%"]));
+      const attribute = new Attribute(null, null);
+
       const node = attribute.in(mgr);
 
       expect(node).toEqual(new Nodes.In(attribute, mgr.ast));
-      expect(visitor.compile(node)).toBe('"users"."id" IN (SELECT "users"."id" FROM "users")');
     });
 
     it("can be constructed with a list", () => {
-      const node = users.get("id").in([1, 2, 3]);
-      expect(node).toBeInstanceOf(Nodes.In);
-      expect(visitor.compile(node)).toBe('"users"."id" IN (1, 2, 3)');
+      const attribute = new Attribute(null, null);
+      const node = attribute.in([1, 2, 3]);
+
+      expect(node).toEqual(
+        new Nodes.In(attribute, [
+          new Nodes.Casted(1, attribute),
+          new Nodes.Casted(2, attribute),
+          new Nodes.Casted(3, attribute),
+        ]),
+      );
     });
 
     it("can be constructed with a random object", () => {
-      const attribute = users.get("id");
+      const attribute = new Attribute(null, null);
       const randomObject = {};
       const node = attribute.in(randomObject);
 
@@ -764,63 +1008,82 @@ describe("AttributeTest", () => {
 
   describe("#asc", () => {
     it("should create an Ascending node", () => {
-      const node = users.get("name").asc();
-      expect(node).toBeInstanceOf(Nodes.Ascending);
+      const relation = new Table("users");
+      expect(relation.get("id").asc()).toBeInstanceOf(Nodes.Ascending);
     });
 
     it("should generate ASC in sql", () => {
-      expect(users.project(star).order(users.get("name").asc()).toSql()).toBe(
-        'SELECT * FROM "users" ORDER BY "users"."name" ASC',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.order(relation.get("id").asc());
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" ORDER BY "users"."id" ASC
+        `),
       );
     });
   });
 
   describe("#desc", () => {
     it("should create a Descending node", () => {
-      const node = users.get("name").desc();
-      expect(node).toBeInstanceOf(Nodes.Descending);
+      const relation = new Table("users");
+      expect(relation.get("id").desc()).toBeInstanceOf(Nodes.Descending);
     });
 
     it("should generate DESC in sql", () => {
-      expect(users.project(star).order(users.get("name").desc()).toSql()).toBe(
-        'SELECT * FROM "users" ORDER BY "users"."name" DESC',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.order(relation.get("id").desc());
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+          SELECT "users"."id" FROM "users" ORDER BY "users"."id" DESC
+        `),
       );
     });
   });
 
   describe("#contains", () => {
     it("should create a Contains node", () => {
-      const node = users.get("tags").contains("foo");
-      expect(node).toBeInstanceOf(Nodes.InfixOperation);
+      const relation = new Table("products");
+      expect(relation.get("tags").contains(["foo", "bar"])).toBeInstanceOf(Nodes.Contains);
     });
 
     it("should generate @> in sql", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("tags").contains("foo");
-      expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
+      const relation = new Table("products", { typeCaster: fakePgCaster() });
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("tags").contains(["foo", "bar"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(
+          ` SELECT "products"."id" FROM "products" WHERE "products"."tags" @> '{foo,bar}' `,
+        ),
+      );
     });
   });
 
   describe("#overlaps", () => {
     it("should create an Overlaps node", () => {
-      const node = users.get("tags").overlaps("bar");
-      expect(node).toBeInstanceOf(Nodes.Overlaps);
+      const relation = new Table("products");
+      expect(relation.get("tags").overlaps(["foo", "bar"])).toBeInstanceOf(Nodes.Overlaps);
     });
 
     it("should generate && in sql", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("tags").overlaps("bar");
-      expect(visitor.compile(node)).toBe('"users"."tags" && \'bar\'');
+      const relation = new Table("products", { typeCaster: fakePgCaster() });
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("tags").overlaps(["foo", "bar"]));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(
+          ` SELECT "products"."id" FROM "products" WHERE "products"."tags" && '{foo,bar}' `,
+        ),
+      );
     });
   });
 
   describe("equality", () => {
     describe("#to_sql", () => {
       it("should produce sql", () => {
-        const relation = new Table("users");
-        const node = relation.get("id").eq(10);
-        const visitor = new Visitors.ToSql(testConnection);
-        expect(visitor.compile(node)).toContain('"users"."id" = 10');
+        const table = new Table("users");
+        const condition = table.get("id").eq(1);
+        expect(visitor.compile(condition)).toBe('"users"."id" = 1');
       });
     });
   });
@@ -830,7 +1093,7 @@ describe("AttributeTest", () => {
       const table = new Table("foo");
       const condition = table.get("id").eq("1");
 
-      expect(table.isAbleToTypeCast()).toBe(false);
+      expect(table.isAbleToTypeCast()).toBeFalsy();
       expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" = \'1\'');
     });
 

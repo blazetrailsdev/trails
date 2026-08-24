@@ -155,6 +155,24 @@ const AREL_HELPER_ALIAS: Record<string, string> = {
   assert_edge: "assert_match",
 };
 
+/**
+ * trails-side `must*`-named helpers that are NOT assertions, and so must not be
+ * counted as one by the TS extractor's `must*` prefix rule.
+ *
+ * The Ruby `must_be_like` above IS an assertion — it squeezes whitespace and
+ * then delegates to `must_equal` (helper.rb:10-13), which is why it aliases to
+ * `assert_equal` in AREL_HELPER_ALIAS. The trails port splits those two halves:
+ * `packages/arel/src/test-helpers/must-be-like.ts` keeps only the squeezing,
+ * and a native `expect(mustBeLike(a)).toBe(mustBeLike(b))` does the asserting.
+ * The terminal `toBe` is therefore the whole assertion, and counting the two
+ * normalizer calls beside it scores one Rails assertion as three.
+ *
+ * This lives next to AREL_HELPER_ALIAS because it is the same fact about the
+ * same Rails helper, read from the other side: the Ruby name maps to an
+ * assertion, the TS name deliberately does not.
+ */
+export const NON_ASSERTION_TRAILS_HELPERS = new Set(["mustBeLike"]);
+
 // Minitest spec-form expectations whose builtin twin is NOT the bare
 // `assert_<suffix>`/`refute_<suffix>` the prefix rewrite in normalizeRailsKind
 // produces: `must_be_kind_of` is `assert_kind_of`, not `assert_be_kind_of`.

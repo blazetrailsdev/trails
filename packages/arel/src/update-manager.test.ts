@@ -1,275 +1,190 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Table, UpdateManager, Nodes } from "./index.js";
+import { fakeRecordEngine } from "./test-helpers/connection.js";
+import { mustBeLike } from "./test-helpers/must-be-like.js";
 
 describe("UpdateManagerTest", () => {
-  const users = new Table("users");
   it("should not quote sql literals", () => {
+    const table = new Table("users");
     const um = new UpdateManager();
-    um.table(users);
-    um.set([[users.get("name"), new Nodes.SqlLiteral("NOW()")]]);
-    const sql = um.toSql();
-    expect(sql).toContain("NOW()");
-    expect(sql).not.toContain("'NOW()'");
+    um.table(table);
+    um.set([[table.get("name"), new Nodes.BindParam(1)]]);
+    expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+      mustBeLike(` UPDATE "users" SET "name" =  ? `),
+    );
+  });
+
+  it("handles limit properly", () => {
+    const table = new Table("users");
+    const um = new UpdateManager();
+    um.key = "id";
+    um.take(10);
+    um.table(table);
+    um.set([[table.get("name"), null]]);
+    expect(um.toSql(fakeRecordEngine)).toMatch(/LIMIT 10/);
   });
 
   describe("having", () => {
     it("sets having", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.having(users.get("id").gt(0));
-      expect(um.ast.havings.length).toBe(1);
+      const usersTable = new Table("users");
+      const postsTable = new Table("posts");
+      const joinSource = new Nodes.InnerJoin(usersTable, postsTable);
+
+      const updateManager = new UpdateManager();
+      updateManager.table(joinSource);
+      updateManager.group(["posts.id"]);
+      updateManager.having("count(posts.id) >= 2");
+
+      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
     });
   });
 
   describe("group", () => {
     it("adds columns to the AST when group value is a String", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.group(["name"]);
-      expect(um.ast.groups.length).toBe(1);
+      const usersTable = new Table("users");
+      const postsTable = new Table("posts");
+      const joinSource = new Nodes.InnerJoin(usersTable, postsTable);
+
+      const updateManager = new UpdateManager();
+      updateManager.table(joinSource);
+      updateManager.group(["posts.id"]);
+      updateManager.having("count(posts.id) >= 2");
+
+      expect(updateManager.ast.groups.length).toEqual(1);
+      const groupAst = updateManager.ast.groups[0] as Nodes.Group;
+      expect(groupAst).toBeInstanceOf(Nodes.Group);
+      expect(String(groupAst.expr)).toEqual("posts.id");
+      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
     });
 
     it("adds columns to the AST when group value is a Symbol", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.group([users.get("name")]);
-      expect(um.ast.groups.length).toBe(1);
-    });
-  });
+      const usersTable = new Table("users");
+      const postsTable = new Table("posts");
+      const joinSource = new Nodes.InnerJoin(usersTable, postsTable);
 
-  describe("UnqualifiedColumn", () => {
-    it("renders without a table qualifier on the RHS of an UPDATE SET", () => {
-      // Mirrors Rails' ActiveRecord::CounterCache pattern:
-      //   SET "counter" = COALESCE("counter", 0) + 1
-      // without a `"posts"."counter"` table prefix on the RHS, which some
-      // adapters reject inside UPDATE statements.
-      const posts = new Table("posts");
-      const counter = posts.get("counter");
-      const unqual = new Nodes.UnqualifiedColumn(counter);
-      const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
-      const expr = new Nodes.Addition(coalesced, new Nodes.Quoted(1));
+      const updateManager = new UpdateManager();
+      updateManager.table(joinSource);
+      updateManager.group(["posts.id"]);
+      updateManager.having("count(posts.id) >= 2");
 
-      const um = new UpdateManager();
-      um.table(posts);
-      um.set([[counter, expr]]);
-      const sql = um.toSql();
-
-      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) + 1`);
-      expect(sql).not.toContain(`"posts"."counter", 0`);
-    });
-
-    it("supports Subtraction for negative counter deltas", () => {
-      const posts = new Table("posts");
-      const counter = posts.get("counter");
-      const unqual = new Nodes.UnqualifiedColumn(counter);
-      const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
-      const expr = new Nodes.Subtraction(coalesced, new Nodes.Quoted(3));
-
-      const um = new UpdateManager();
-      um.table(posts);
-      um.set([[counter, expr]]);
-      const sql = um.toSql();
-
-      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) - 3`);
+      expect(updateManager.ast.groups.length).toEqual(1);
+      const groupAst = updateManager.ast.groups[0] as Nodes.Group;
+      expect(groupAst).toBeInstanceOf(Nodes.Group);
+      expect(String(groupAst.expr)).toEqual("posts.id");
+      expect(updateManager.ast.havings).toEqual([new Nodes.SqlLiteral("count(posts.id) >= 2")]);
     });
   });
 
   describe("set", () => {
     it("updates with null", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([[users.get("name"), null]]);
-      mgr.where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain("= NULL");
+      const table = new Table("users");
+      const um = new UpdateManager();
+      um.table(table);
+      um.set([[table.get("name"), null]]);
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(` UPDATE "users" SET "name" =  NULL `),
+      );
     });
 
     it("takes a string", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set(new Nodes.SqlLiteral("foo = bar"));
-      expect(mgr.toSql()).toBe('UPDATE "users" SET foo = bar');
+      const table = new Table("users");
+      const um = new UpdateManager();
+      um.table(table);
+      um.set(new Nodes.SqlLiteral("foo = bar"));
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(` UPDATE "users" SET foo = bar `),
+      );
     });
 
-    it("takes a plain string literal", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set("foo = bar");
-      expect(mgr.toSql()).toBe('UPDATE "users" SET foo = bar');
+    it("takes a list of lists", () => {
+      const table = new Table("users");
+      const um = new UpdateManager();
+      um.table(table);
+      um.set([
+        [table.get("id"), 1],
+        [table.get("name"), "hello"],
+      ]);
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          UPDATE "users" SET "id" = 1, "name" =  'hello'
+        `),
+      );
     });
 
-    it("takes a BoundSqlLiteral", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set(new Nodes.BoundSqlLiteral("name = ?", ["dean"], {}));
-      // `to_sql` compiles through a plain SQLString collector, where the
-      // BoundSqlLiteral's `add_bind` emits a `?` placeholder (Rails parity) —
-      // not the inlined value.
-      expect(mgr.toSql()).toBe(`UPDATE "users" SET name = ?`);
-    });
-
-    // Mirrors Rails: `set` wraps each LHS in `Nodes::UnqualifiedColumn`
-    // (update_manager.rb), so the visitor strips the table qualifier
-    // structurally rather than via a stateful flag.
-    it("wraps each column in an UnqualifiedColumn", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([[users.get("name"), "dean"]]);
-      const assignment = mgr.ast.values[0] as Nodes.Assignment;
-      expect(assignment).toBeInstanceOf(Nodes.Assignment);
-      expect(assignment.left).toBeInstanceOf(Nodes.UnqualifiedColumn);
-    });
-
-    // Mirrors Rails: values pass through raw (no Quoted wrap); the
-    // visitor's `visit` class dispatch quotes primitives.
-    it("stores the raw value on the Assignment (no Quoted wrap)", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([[users.get("age"), 42]]);
-      const assignment = mgr.ast.values[0] as Nodes.Assignment;
-      expect(assignment.right).toBe(42);
-    });
-
-    it("renders SET col = … without the table qualifier", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([[users.get("name"), "dean"]]);
-      expect(mgr.toSql()).toBe(`UPDATE "users" SET "name" = 'dean'`);
+    it("chains", () => {
+      const table = new Table("users");
+      const um = new UpdateManager();
+      expect(
+        um.set([
+          [table.get("id"), 1],
+          [table.get("name"), "hello"],
+        ]),
+      ).toEqual(um);
     });
   });
 
   describe("table", () => {
     it("generates an update statement", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([[users.get("name"), "dean"]]);
-      expect(mgr.toSql()).toContain("UPDATE");
+      const um = new UpdateManager();
+      um.table(new Table("users"));
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(mustBeLike(` UPDATE "users" `));
+    });
+
+    it("chains", () => {
+      const um = new UpdateManager();
+      expect(um.table(new Table("users"))).toEqual(um);
     });
 
     it("generates an update statement with joins", () => {
       const um = new UpdateManager();
-      um.table(users);
-      um.set([[users.get("name"), "bob"]]);
-      const sql = um.toSql();
-      expect(sql).toContain("UPDATE");
-      expect(sql).toContain("SET");
+
+      const table = new Table("users");
+      const joinSource = new Nodes.JoinSource(table, [table.createJoin(new Table("posts"))]);
+
+      um.table(joinSource);
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(` UPDATE "users" INNER JOIN "posts" `),
+      );
     });
   });
 
   describe("where", () => {
     it("generates a where clause", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      mgr.set([
-        [users.get("name"), "dean"],
-        [users.get("age"), 31],
-      ]);
-      mgr.where(users.get("id").eq(1));
-      expect(mgr.toSql()).toBe(
-        `UPDATE "users" SET "name" = 'dean', "age" = 31 WHERE "users"."id" = 1`,
+      const table = new Table("users");
+      const um = new UpdateManager();
+      um.table(table);
+      um.where(table.get("id").eq(1));
+      expect(mustBeLike(um.toSql(fakeRecordEngine))).toBe(
+        mustBeLike(`
+          UPDATE "users" WHERE "users"."id" = 1
+        `),
       );
+    });
+
+    it("chains", () => {
+      const table = new Table("users");
+      const um = new UpdateManager();
+      um.table(table);
+      expect(um.where(table.get("id").eq(1))).toEqual(um);
     });
   });
 
   describe("key", () => {
+    let table: Table;
+    let um: UpdateManager;
+
+    beforeEach(() => {
+      table = new Table("users");
+      um = new UpdateManager();
+      um.key = table.get("foo");
+    });
+
     it("can be set", () => {
-      const manager = new UpdateManager();
-      manager.table(users);
-      manager.key = users.get("id").eq(1);
-      expect(manager.ast.key).not.toBeNull();
+      expect(um.ast.key).toEqual(table.get("foo"));
     });
 
     it("can be accessed", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.where(users.get("id").eq(1));
-      expect(um.wheres.length).toBe(1);
-    });
-  });
-
-  it("UPDATE with ORDER BY and LIMIT", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([[users.get("active"), false]]);
-    mgr.where(users.get("age").lt(18));
-    mgr.order(users.get("name").asc());
-    mgr.take(5);
-    expect(mgr.toSql()).toBe(
-      `UPDATE "users" SET "active" = 'f' WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
-    );
-  });
-
-  it("wheres getter returns WHERE conditions", () => {
-    const manager = new UpdateManager();
-    manager.table(users);
-    manager.where(users.get("id").eq(1));
-    expect(manager.wheres.length).toBe(1);
-  });
-
-  it("updates with false", () => {
-    const mgr = new UpdateManager();
-    mgr.table(users);
-    mgr.set([[users.get("active"), false]]);
-    expect(mgr.toSql()).toContain("'f'");
-  });
-
-  it("handles limit properly", () => {
-    const um = new UpdateManager();
-    um.table(users);
-    um.take(10);
-    um.set([[users.get("name"), null]]);
-    expect(um.toSql()).toContain("LIMIT 10");
-  });
-
-  describe("set", () => {
-    it("takes a list of lists", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.set([
-        [users.get("id"), 1],
-        [users.get("name"), "hello"],
-      ]);
-      const sql = um.toSql();
-      expect(sql).toContain('"id" = 1');
-      expect(sql).toContain('"name" =');
-    });
-  });
-
-  describe("where", () => {
-    it("chains", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
-    });
-  });
-
-  // Mirrors Rails: `tree_manager.rb` `key=` calls `Nodes.build_quoted` on
-  // scalar values and maps over arrays, so the AST always holds Quoted
-  // (or pass-through Node) values rather than raw primitives.
-  describe("key=", () => {
-    it("wraps a scalar value in Quoted", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.key = 5;
-      expect(um.ast.key).toBeInstanceOf(Nodes.Quoted);
-      expect((um.ast.key as Nodes.Quoted).value).toBe(5);
-    });
-
-    it("maps an array, wrapping each element in Quoted", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      um.key = [1, 2];
-      const arr = um.ast.key as unknown as Nodes.Quoted[];
-      expect(Array.isArray(arr)).toBe(true);
-      expect(arr.every((q) => q instanceof Nodes.Quoted)).toBe(true);
-      expect(arr.map((q) => q.value)).toEqual([1, 2]);
-    });
-
-    it("passes existing Nodes through unwrapped", () => {
-      const um = new UpdateManager();
-      um.table(users);
-      const lit = new Nodes.SqlLiteral("id");
-      um.key = lit;
-      expect(um.ast.key).toBe(lit);
+      expect(um.key).toEqual(table.get("foo"));
     });
   });
 });

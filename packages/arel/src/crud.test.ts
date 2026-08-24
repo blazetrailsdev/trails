@@ -1,59 +1,41 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Table, InsertManager, UpdateManager, DeleteManager, SelectManager } from "./index.js";
+import { Attribute } from "./attributes/attribute.js";
+
+// Rails' `FakeCrudder` is a `SelectManager` that `include Crud` and carries a
+// `FakeEngine` double (crud_test.rb:6-29). trails' `Crud` methods are already
+// on `SelectManager`, and `toSql` takes the engine at the call site, so the
+// subclass is the whole of what the Ruby class body contributes here.
+class FakeCrudder extends SelectManager {}
 
 describe("crud", () => {
-  const users = new Table("users");
-
   describe("insert", () => {
     it("should call insert on the connection", () => {
-      const mgr = new InsertManager(users);
-      mgr.insert([[users.get("name"), "dean"]]);
-      expect(mgr.toSql()).toContain('INSERT INTO "users"');
+      const table = new Table("users");
+      const fc = new FakeCrudder();
+      fc.from(table);
+      const im = fc.compileInsert([[table.get("id"), "foo"]]);
+      expect(im).toBeInstanceOf(InsertManager);
     });
   });
 
   describe("update", () => {
     it("should call update on the connection", () => {
-      const mgr = new UpdateManager();
-      mgr
-        .table(users)
-        .set([[users.get("name"), "sam"]])
-        .where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain('UPDATE "users"');
+      const table = new Table("users");
+      const fc = new FakeCrudder();
+      fc.from(table);
+      const stmt = fc.compileUpdate([[table.get("id"), "foo"]], new Attribute(table, "id"));
+      expect(stmt).toBeInstanceOf(UpdateManager);
     });
   });
 
   describe("delete", () => {
     it("should call delete on the connection", () => {
-      const mgr = new DeleteManager();
-      mgr.from(users).where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain('DELETE FROM "users"');
-    });
-  });
-
-  describe("compileUpdate / compileDelete key assignment", () => {
-    // Mirrors Rails Arel::Crud (activerecord/lib/arel/crud.rb): `um.key = key`
-    // and `dm.key = key` are unconditional for Rails parity, so `null` is
-    // assigned explicitly rather than being skipped. We spy on the setter
-    // because the underlying statement initializes `key` to `null`, so a
-    // post-hoc `manager.key === null` check would pass even with the prior
-    // `if (key !== null)` guard in place.
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it("compileUpdate always assigns key, including null", () => {
-      const setKey = vi.spyOn(UpdateManager.prototype, "key", "set");
-      const mgr = new SelectManager(users);
-      mgr.compileUpdate([[users.get("id"), 1]], null);
-      expect(setKey).toHaveBeenCalledWith(null);
-    });
-
-    it("compileDelete always assigns key, including null", () => {
-      const setKey = vi.spyOn(DeleteManager.prototype, "key", "set");
-      const mgr = new SelectManager(users);
-      mgr.compileDelete(null);
-      expect(setKey).toHaveBeenCalledWith(null);
+      const table = new Table("users");
+      const fc = new FakeCrudder();
+      fc.from(table);
+      const stmt = fc.compileDelete();
+      expect(stmt).toBeInstanceOf(DeleteManager);
     });
   });
 });

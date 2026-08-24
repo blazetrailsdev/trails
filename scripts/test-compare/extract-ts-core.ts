@@ -5,7 +5,7 @@
 
 import * as path from "path";
 import * as ts from "typescript";
-import { normalizeTrailsKind } from "./assertion-kinds.js";
+import { NON_ASSERTION_TRAILS_HELPERS, normalizeTrailsKind } from "./assertion-kinds.js";
 import { VALUE_BEARING_KINDS } from "./assertion-values.js";
 import {
   ADAPTER_GATE_WRAPPERS,
@@ -31,8 +31,12 @@ const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
  * look-alikes (`assertion`, `asserted`, `expected`) out. Only the inner
  * `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier callee,
  * so each chain counts once.
+ *
+ * NON_ASSERTION_TRAILS_HELPERS (assertion-kinds.ts) carves out the `must*`
+ * names that are normalizers rather than assertions; see it for why.
  */
 function isAssertionCallee(name: string): boolean {
+  if (NON_ASSERTION_TRAILS_HELPERS.has(name)) return false;
   return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
 }
 

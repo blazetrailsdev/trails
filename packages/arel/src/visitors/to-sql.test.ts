@@ -142,7 +142,7 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(users.get("name"));
       const node = users.get("name").doesNotMatch(mgr);
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("NOT LIKE SELECT");
+      expect(sql).toContain("NOT LIKE (SELECT");
     });
   });
 
@@ -1627,7 +1627,7 @@ describe("the to_sql visitor", () => {
       const mgr = users.project(users.get("name"));
       const node = users.get("name").matches(mgr);
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("LIKE SELECT");
+      expect(sql).toContain("LIKE (SELECT");
     });
   });
 
