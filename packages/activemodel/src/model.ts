@@ -26,7 +26,6 @@ import {
   type Extended,
   type CodeGenerator,
   Module,
-  classAttribute,
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { Type } from "./type/value.js";
@@ -35,6 +34,7 @@ import { ModelLike, ModelName } from "./naming.js";
 import {
   Dirty,
   DirtyTracker,
+  _writeAttribute as dirtyWriteAttribute,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
@@ -847,13 +847,6 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-// Rails' `included do` block (attribute_methods.rb:70-73).
-classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default: {} });
-classAttribute.call(Model, "attributeMethodPatterns", {
-  instanceWriter: false,
-  default: [new AttributeMethodPattern()],
-});
-
 // Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
 // friends (validations.rb:57-307, validations/validates.rb:111-178) onto the
 // class; `with.rb:87` reopens the same `ClassMethods`, hence the second extend.
@@ -900,15 +893,9 @@ extend(Model, {
   attributeMethodPatternsCache: AttributeMethods.attributeMethodPatternsCache,
   attributeMethodPatternsMatching: AttributeMethods.attributeMethodPatternsMatching,
 });
-include(Model, {
-  respondTo: AttributeMethods.respondTo,
-  _readAttribute: AttributeMethods._readAttribute,
-  attributeMissing: AttributeMethods.attributeMissing,
-  isAttributeMethod: AttributeMethods.isAttributeMethod,
-  matchedAttributeMethod: AttributeMethods.matchedAttributeMethod,
-  missingAttribute: AttributeMethods.missingAttribute,
-  isRespondToWithoutAttributes: AttributeMethods.isRespondToWithoutAttributes,
-});
+// Its `included do` block (attribute_methods.rb:70-73) rides along, issued from
+// the module's own `[included]` hook.
+include(Model, AttributeMethods.InstanceMethods);
 
 // `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
 // issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
@@ -932,6 +919,7 @@ include(Model, {
 // only `include()`'s class branch carries the accessor descriptors the module's
 // zero-arg readers port to.
 include(Model, Dirty);
+prepend(Model.prototype, { _writeAttribute: dirtyWriteAttribute });
 
 // Its `included do` block (dirty.rb:241-245).
 // The Ruby affixes are snake_case fragments of the generated name, trails' the

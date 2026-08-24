@@ -1,7 +1,6 @@
 import { include, type CodeGenerator, included } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
-import type { DirtyTracker } from "./dirty.js";
 import {
   AttrNames,
   attributeMissing,
@@ -41,9 +40,6 @@ export function attributeNames(this: { attributeTypes(): Record<string, Type> })
 
 type AttributeInstanceHost = { _attributes: AttributeSet };
 
-/** The `_write_attribute` receiver — trails records the write against the dirty tracker. */
-type AttributeWriteHost = AttributeInstanceHost & { _dirty: DirtyTracker };
-
 /**
  * Mirrors: ActiveModel::Attributes#_write_attribute (attributes.rb:156-158) —
  * `@attributes.write_from_user(attr_name, value)`.
@@ -51,15 +47,16 @@ type AttributeWriteHost = AttributeInstanceHost & { _dirty: DirtyTracker };
  * Rails computes nothing here: `write_from_user` builds a `FromUser` whose
  * `@value` stays uncomputed, so `has_been_read?` is false after a write and
  * `accessed_fields` is empty on a freshly built record
- * (attribute_methods_test.rb:1308). The write is recorded against the
- * tracker without casting: the cast reaches `type.changed?` from
- * `Attribute#changed?` (attribute.rb:155-160) when someone asks.
+ * (attribute_methods_test.rb:1308).
  *
  * @internal Rails-private helper.
  */
-export function _writeAttribute(this: AttributeWriteHost, attrName: string, value: unknown): void {
+export function _writeAttribute(
+  this: AttributeInstanceHost,
+  attrName: string,
+  value: unknown,
+): void {
   this._attributes.writeFromUser(attrName, value);
-  this._dirty.attributeWritten(attrName);
 }
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,14 @@
  * can mix them onto a host class (see the bottom of model.ts) — no delegation
  * wrappers needed.
  */
-import { camelize, CodeGenerator, include, Module } from "@blazetrails/activesupport";
+import {
+  camelize,
+  classAttribute,
+  CodeGenerator,
+  include,
+  included,
+  Module,
+} from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
   attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
@@ -877,3 +884,30 @@ export function _resurrectAttributeMethods(klass: ClassMethods): void {
     .map(([attrName]) => attrName);
   if (stale.length > 0) klass.defineAttributeMethods(...stale);
 }
+
+/**
+ * The instance half of `ActiveModel::AttributeMethods`, plus the module's
+ * `included do` block (attribute_methods.rb:70-73):
+ *
+ *   included do
+ *     class_attribute :attribute_aliases, instance_writer: false, default: {}
+ *     class_attribute :attribute_method_patterns, instance_writer: false,
+ *       default: [ ClassMethods::AttributeMethodPattern.new ]
+ *   end
+ */
+export const InstanceMethods = {
+  [included](base: object): void {
+    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "attributeMethodPatterns", {
+      instanceWriter: false,
+      default: [new AttributeMethodPattern()],
+    });
+  },
+  respondTo,
+  attributeMissing,
+  isAttributeMethod,
+  matchedAttributeMethod,
+  missingAttribute,
+  isRespondToWithoutAttributes,
+  _readAttribute,
+};
