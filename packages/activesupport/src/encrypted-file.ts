@@ -23,6 +23,7 @@ import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
 import { chomp } from "./string-utils.js";
+import { Tempfile } from "./tempfile.js";
 
 const CIPHER = "aes-128-gcm";
 
@@ -141,10 +142,10 @@ export class EncryptedFile {
   // ---- private ----
 
   /**
-   * @missingRailsCall create — PERMANENT. encrypted_file.rb:89 `Tempfile.create([...]) do
-   *   |tmp_file|` — Ruby's Tempfile is stdlib, not Rails, and has no port; the
-   *   block-scoped temp file is spelled as `fs.mkdtemp` plus an explicit
-   *   `finally` unlink/rmdir, which is what Tempfile.create's block form does.
+   * `Tempfile.create` defaults to mode 0600, which is load-bearing here: the
+   * temp file holds plaintext secrets between the editor write and the
+   * re-encrypt step, so it must not be world-readable.
+   *
    * @missingRailsArgs chomp — PERMANENT. encrypted_file.rb:89
    *   `content_path.basename.to_s.chomp(".enc")` — trails ports Ruby's String
    *   methods as free functions rather than String.prototype patches, so the
@@ -157,31 +158,21 @@ export class EncryptedFile {
     const fs = await getFsAsync();
     const path = await getPathAsync();
     const contentPath = await this.resolveContentPath();
-    const base = chomp(path.basename(contentPath), ".enc");
-    const dir = await fs.mkdtemp!(`${path.dirname(contentPath)}${path.sep}encfile-`);
-    const tmpPath = path.join(dir, `-${base}`);
-    try {
-      // Rails uses Ruby `Tempfile.create`, which defaults to mode 0600.
-      // The temp file holds plaintext secrets between the editor write and
-      // the re-encrypt step, so it must not be world-readable.
-      await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
-      await block(tmpPath);
-      const updatedContents = await fs.readFile!(tmpPath, "utf8");
-      if (updatedContents !== contents) await this.write(updatedContents);
-    } finally {
-      try {
-        await fs.unlink!(tmpPath);
-      } catch {
-        /* tmp already gone */
-      }
-      try {
-        // Rails' Tempfile cleans both file and (implicit) dir; mkdtemp gives
-        // us our own dir, so remove it explicitly to avoid encfile-*/ leaks.
-        await fs.rmdir!(dir);
-      } catch {
-        /* dir already gone */
-      }
-    }
+
+    await Tempfile.create(
+      ["", "-" + chomp(path.basename(contentPath), ".enc")],
+      path.dirname(contentPath),
+      async (tmpFile) => {
+        const tmpPath = tmpFile.path!;
+        await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
+
+        await block(tmpPath);
+
+        const updatedContents = await fs.readFile!(tmpPath, "utf8");
+
+        if (updatedContents !== contents) await this.write(updatedContents);
+      },
+    );
   }
 
   private async encrypt(contents: string): Promise<string> {

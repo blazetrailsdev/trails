@@ -7,9 +7,9 @@
 import {
   getFs,
   getOsAsync,
-  getPath,
   getChildProcessAsync,
   isBlank,
+  Tempfile,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -130,7 +130,7 @@ export class PostgreSQLDatabaseTasks {
 
     args.push(this.dbConfig.database as string);
     await this.runCmd("pg_dump", args, "dumping");
-    await this.removeSqlHeaderComments(filename);
+    this.removeSqlHeaderComments(filename);
     getFs().appendFileSync(
       filename,
       `SET search_path TO ${await (await this.connection()).schemaSearchPath()};\n\n`,
@@ -211,36 +211,28 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /**
-   * @missingRailsCall open — PERMANENT: Verified per-site (RFC 0106):
-   *   `Tempfile.open("uncommented_structure.sql")`
-   *   (`postgresql_database_tasks.rb:132`) — the fs port has no Tempfile
-   *   analogue, so the body makes a temp dir with `mkdtempSync` and writes into
-   *   it. `open` has no TS call spelling here.
+   * `File.foreach` streams the file line by line, newline included; the fs
+   * adapter is read-whole-file, so the same lines come from a lookbehind split
+   * that keeps each terminator where `foreach` leaves it. And Ruby leaves the
+   * tempfile's removal to its finalizer, which JS has no equivalent of, so the
+   * non-block form is unlinked explicitly once the copy has been made.
    */
-  private async removeSqlHeaderComments(filename: string): Promise<void> {
+  private removeSqlHeaderComments(filename: string): void {
     const fs = getFs();
-    const path = getPath();
-    const os = await getOsAsync();
-    const contents = fs.readFileSync(filename, "utf8");
-    const lines = contents.split("\n");
-    let i = 0;
-    while (i < lines.length && (lines[i].startsWith(SQL_COMMENT_BEGIN) || lines[i].trim() === "")) {
-      i++;
-    }
-    if (!fs.mkdtempSync) {
-      throw new Error(
-        "PostgreSQLDatabaseTasks.structureDump requires FsAdapter.mkdtempSync. " +
-          "The configured FsAdapter does not provide it.",
-      );
-    }
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "uncommented_structure_"));
-    const tmp = path.join(tmpDir, "structure.sql");
+    let removingComments = true;
+    const tempfile = Tempfile.open("uncommented_structure.sql");
     try {
-      fs.writeFileSync(tmp, lines.slice(i).join("\n"));
-      fs.copyFileSync(tmp, filename);
+      for (const line of fs.readFileSync(filename, "utf8").split(/(?<=\n)/)) {
+        if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
+          tempfile.write(line);
+          removingComments = false;
+        }
+      }
     } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tempfile.close();
     }
+    fs.copyFileSync(tempfile.path!, filename);
+    tempfile.unlink();
   }
 
   /** @internal */

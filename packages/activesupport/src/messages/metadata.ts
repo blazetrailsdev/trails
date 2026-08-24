@@ -107,6 +107,13 @@ export abstract class Metadata {
     return { _rails: hash };
   }
 
+  /**
+   * @missingRailsCall utc — PERMANENT: `Time.now.utc >= parse_expiry(...)`
+   *   (messages/metadata.rb:81). trails reads the clock as a
+   *   `Temporal.Instant`, which by construction carries no offset to drop, so
+   *   `Time#utc` has no receiver here to call it on — the same seat that makes
+   *   `advance` and `iso8601` below PERMANENT.
+   */
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
@@ -136,6 +143,10 @@ export abstract class Metadata {
   }
 
   /**
+   * @missingRailsCall utc — PERMANENT: `expires_at.utc` / `Time.now.utc.advance(...)`
+   *   (messages/metadata.rb:100-105). Same seat as `extractFromMetadataEnvelope`
+   *   above: the expiry is a `Temporal.Instant`, absolute by construction, so
+   *   there is no offset for `Time#utc` to drop and no receiver to call it on.
    * @missingRailsCall advance — PERMANENT: Rails advances a `Time` with
    *   `Time.now.utc.advance(seconds:)`; trails' `Time` analogue is
    *   `Temporal.Instant`, whose equivalent is `add({ milliseconds })`.

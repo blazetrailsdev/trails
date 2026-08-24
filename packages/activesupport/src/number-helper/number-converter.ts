@@ -2,6 +2,7 @@ import { Rational } from "@blazetrails/date";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { merge, mergeBang } from "../hash-utils.js";
 
 /** `BigDecimal.double_fig * 2`, the default precision `Rational#to_d(0)` uses. */
 const RATIONAL_DEFAULT_PRECISION = 32;
@@ -142,21 +143,15 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     }
   }
 
-  /**
-   * @missingRailsCall merge — PERMANENT: Verified per-site (RFC 0106):
-   *   `format_options.merge(opts)` (number_converter.rb:142) is object spread `{
-   *   ...this.formatOptions(), ...this.opts }`; `Hash#merge` has no JS call
-   *   form.
-   */
   protected get options(): Record<string, unknown> {
     if (!this._options) {
-      this._options = { ...this.formatOptions(), ...this.opts };
+      this._options = merge(this.formatOptions(), this.opts as Record<string, unknown>);
     }
     return this._options;
   }
 
   protected formatOptions(): Record<string, unknown> {
-    return { ...this.defaultFormatOptions(), ...this.i18nFormatOptions() };
+    return mergeBang(this.defaultFormatOptions(), this.i18nFormatOptions());
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {
