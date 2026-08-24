@@ -8,10 +8,6 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
 
-// `rake db:rollback` inlines
-// `DatabaseTasks.migration_connection_pool.migration_context.rollback(step)`
-// (`railties/databases.rake:269`), which is what these exercise.
-//
 // Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) reading
 // the pool's own `db_config.migrations_paths` (`connection_pool.rb:294-299`),
 // so a migration these tests can watch has to be a file under such a path — the

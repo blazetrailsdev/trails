@@ -396,7 +396,7 @@ async function runMigrate(
   targetVersion?: string,
   options: RunOptions = {},
 ): Promise<void> {
-  const migrations = discoverMigrations([await migrationsDir()]);
+  const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
   if (migrations.length === 0) {
     console.log("No migrations found.");
     return;
@@ -769,8 +769,6 @@ export function dbCommand(): Command {
       }
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          // Rails: `migration_connection_pool.migration_context.rollback(step)`
-          // (`railties/databases.rake:269`).
           await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
         });
       });
@@ -790,8 +788,6 @@ export function dbCommand(): Command {
       }
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          // Rails: `migration_connection_pool.migration_context.forward(step)`
-          // (`railties/databases.rake:279`).
           await DatabaseTasks.migrationConnectionPool().migrationContext.forward(step);
         });
       });
@@ -896,9 +892,6 @@ export function dbCommand(): Command {
         await withMigrationTasksForDb(
           ctx,
           async () => {
-            // Rails: `check_target_version` then
-            // `migration_connection_pool.migration_context.run(:up, target_version)`
-            // (`railties/databases.rake:172-177`).
             DatabaseTasks.checkTargetVersion(opts.version);
             await DatabaseTasks.migrationConnectionPool().migrationContext.run("up", opts.version);
           },
@@ -917,9 +910,6 @@ export function dbCommand(): Command {
         await withMigrationTasksForDb(
           ctx,
           async () => {
-            // Rails: `check_target_version` then
-            // `migration_connection_pool.migration_context.run(:down, target_version)`
-            // (`railties/databases.rake:203-208`).
             DatabaseTasks.checkTargetVersion(opts.version);
             await DatabaseTasks.migrationConnectionPool().migrationContext.run(
               "down",
@@ -1101,9 +1091,6 @@ export function dbCommand(): Command {
         await withMigrationTasksForDb(
           ctx,
           async () => {
-            // Rails `db:migrate:redo` invokes `db:rollback` then `db:migrate`
-            // (`railties/databases.rake:216-227`), i.e. the same inline
-            // `migration_context.rollback(step)` as `db:rollback` (`:269`).
             await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
             await DatabaseTasks.migrate();
           },
