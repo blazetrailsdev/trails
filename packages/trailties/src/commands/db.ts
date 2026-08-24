@@ -803,7 +803,6 @@ export function dbCommand(): Command {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(raw);
         const migrationContext = migrationContextFor(adapter, mDirs);
-        if (migrationContext.migrations.length === 0) return;
         const pending = await migrationContext.open().pendingMigrations();
         if (pending.length > 0) {
           // Match Rails' output format (from activerecord/lib/active_record/
