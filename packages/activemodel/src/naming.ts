@@ -17,42 +17,8 @@ import { ArgumentError, TypeError } from "./attribute-assignment.js";
  *
  * Mirrors: ActiveModel::Naming
  */
-
-export class Naming {
-  declare private static _modelName: ModelName | null;
-
-  /**
-   * Mirrors Rails `model_name` (naming.rb:270-277), which a host gains by
-   * `extend ActiveModel::Naming` (api.rb:66). The namespace is the enclosing
-   * module, carried as `moduleName` because a JS class has no module path;
-   * `@_model_name ||=` is a per-class ivar, so the memo is an own property
-   * rather than an inherited one.
-   */
-  static get modelName(): ModelName {
-    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      // Rails walks `module_parents` for a module answering
-      // `use_relative_model_naming?` (naming.rb:271-276). JS has no
-      // enclosing-module chain to walk, so nothing can declare relative naming
-      // and the detect answers nil.
-      const namespace = null;
-      this._modelName = new ModelName(this as unknown as ModelLike, namespace);
-    }
-    return this._modelName;
-  }
-
-  /**
-   * Ruby reaches a record's `model_name` through `self.class.model_name`
-   * wherever it needs one (naming.rb:344-348 does exactly that). trails
-   * surfaces the same walk as an instance reader so a record answers it
-   * directly.
-   *
-   * @noRailsEquivalent CONVERGEABLE — `ActiveModel::Naming` defines only the
-   * class-level reader; every trails call site that reads it off an instance
-   * should read `this.constructor.modelName` instead.
-   */
-  get modelName(): ModelName {
-    return (this.constructor as unknown as typeof Naming).modelName;
-  }
+export interface Naming {
+  readonly modelName: ModelName;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace

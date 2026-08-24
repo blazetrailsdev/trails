@@ -32,7 +32,7 @@ import {
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { AttributeSet } from "./attribute-set.js";
-import { ModelName } from "./naming.js";
+import { ModelLike, ModelName } from "./naming.js";
 import {
   Dirty,
   initInternals as dirtyInitInternals,
@@ -84,7 +84,6 @@ import {
 } from "./attribute-registration.js";
 import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
-import { Naming } from "./naming.js";
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
@@ -103,7 +102,7 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeN
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface Model extends Dirty, Access, Conversion, Serialization, Naming {
+export interface Model extends Dirty, Access, Conversion, Serialization {
   /**
    * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
    * mixed on by the `include(Model, …)` at the bottom of this file.
@@ -239,6 +238,7 @@ export class Model {
    */
   declare static paramDelimiter: string;
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+  declare private static _modelName: ModelName | null;
   // Runtime accessors come from the `classAttribute()` calls at the bottom of
   // this file (attribute_methods.rb:70-73).
   declare static attributeAliases: Record<string, string>;
@@ -250,7 +250,6 @@ export class Model {
   // this file (validations.rb:50). Keyed by attribute name (or `null` for
   // validators registered without `attributes:`), as Ruby's Hash-of-Arrays is.
   declare static _validators: Map<string | null, Array<ValidatorLike>>;
-  declare private static _modelName: ModelName | null;
 
   declare static attribute: Extended<typeof AttributesClassMethods>["attribute"];
   declare static setDefineMethodAttribute: Extended<
@@ -469,8 +468,23 @@ export class Model {
    */
   declare static moduleName?: string;
 
-  /** `extend ActiveModel::Naming` (api.rb:66) — naming.rb:270-277. */
-  declare static modelName: ModelName;
+  /**
+   * Mirrors Rails `model_name` (naming.rb:270-277). The namespace is the
+   * enclosing module, carried as `moduleName` because a JS class has no module
+   * path; `@_model_name ||=` is a per-class ivar, so the memo is an own
+   * property rather than an inherited one.
+   */
+  static get modelName(): ModelName {
+    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
+      // Rails walks `module_parents` for a module answering
+      // `use_relative_model_naming?` (naming.rb:271-276). JS has no
+      // enclosing-module chain to walk, so nothing can declare relative naming
+      // and the detect answers nil.
+      const namespace = null;
+      this._modelName = new ModelName(this as unknown as ModelLike, namespace);
+    }
+    return this._modelName;
+  }
 
   _attributes: AttributeSet = new AttributeSet();
   errors!: Errors<this>;
@@ -509,11 +523,11 @@ export class Model {
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   /**
-   * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
+   * Mirrors: ActiveModel::API#initialize (api.rb:82-85) →
+   * ActiveModel::Attributes#initialize (attributes.rb:106-109)
    *
-   * Rails pattern:
    *   Attributes#initialize: @attributes = self.class._default_attributes.deep_dup
-   *   API#initialize:        assign_attributes(attributes); super()
+   *   API#initialize:        assign_attributes(attributes) if attributes; super()
    */
   constructor(attrs: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
@@ -528,19 +542,10 @@ export class Model {
 
     this._attributes = ctor._defaultAttributes().deepDup();
 
-    // api.rb:82 — `assign_attributes(attributes) if attributes`. The send goes
-    // through the model, so `assign_attributes` (attribute_assignment.rb:28-34)
-    // does its own argument check, its `return if new_attributes.empty?`, and
-    // the `sanitize_for_mass_assignment` an unpermitted
-    // `ActionController::Parameters`-like bag raises `ForbiddenAttributesError`
-    // from — and a subclass override of either half is honoured. The
-    // `_initializingAttributes` window lets the AR write path detect
-    // construction (e.g. composite-PK `id=` remap) without re-raising
-    // mid-construction.
     this._initializingAttributes = true;
     try {
-      // AR's override can owe I/O; Rails' `initialize` does not await it
-      // either — the deferred writes drain on save (RFC 0087).
+      // AR's override of `_assign_attributes` can owe I/O; Rails' `initialize`
+      // does not await it either — the writes drain on save (RFC 0087).
       if (attrs != null) void this.assignAttributes(attrs);
     } finally {
       this._initializingAttributes = false;
@@ -672,6 +677,7 @@ export class Model {
     return false;
   }
 
+  /** `Naming.extended`'s `delegate :model_name, to: :class` (naming.rb:253-256). */
   get modelName(): ModelName {
     return (this.constructor as typeof Model).modelName;
   }
@@ -747,11 +753,6 @@ include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 // the module's own `[included]` hook.
 include(Model, Conversion);
 extend(Model, ConversionClassMethods);
-
-// api.rb:65-68 — `included do extend ActiveModel::Naming; extend ActiveModel::Translation end`.
-// The Translation half is issued from `Validations.[included]` (validations.rb:43).
-extend(Model, Naming);
-include(Model, Naming);
 
 // Ruby `include ActiveModel::Serialization` (serialization.rb:127), which
 // `ActiveModel::Serializers::JSON` pulls in (json.rb:11).
