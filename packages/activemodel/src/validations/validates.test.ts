@@ -210,26 +210,26 @@ describe("ValidatesTest", () => {
     expect(p.errors.messagesFor("name")).toEqual(["is required"]);
   });
 
-  it("validates with unknown validator", async () => {
+  it("validates with unknown validator", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validates("name", { unknownValidator: true } as any);
       }
     }
-    const p = new Person({ name: "Alice" });
-    expect(await p.isValid()).toBe(true);
+    expect(() => Person.validates("name", { unknown: true } as any)).toThrow(
+      "Unknown validator: 'UnknownValidator'",
+    );
   });
 
-  it("validates with disabled unknown validator", async () => {
+  it("validates with disabled unknown validator", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validates("name", { foobar: false } as any);
       }
     }
-    const p = new Person({ name: "Alice" });
-    expect(await p.isValid()).toBe(true);
+    expect(() => Person.validates("name", { unknown: false } as any)).toThrow(
+      "Unknown validator: 'UnknownValidator'",
+    );
   });
 
   it("validates with if as shared conditions", async () => {

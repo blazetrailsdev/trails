@@ -165,9 +165,9 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // entire surface — every method in `global_id.rb` itself — buckets there.
   "globalid:global_id.rb": "global-id.ts",
   // `validations.rb` opens `Validations::ClassMethods` first, so `validates`,
-  // `validates!` and their two private helpers bucket under it. trails carries
-  // all four on `Model` (model.ts), the class `Validations` is mixed into.
-  "activemodel:validations/validates.rb": "model.ts",
+  // `validates!` and their two private helpers bucket under it. trails keeps
+  // all four in the file whose name Rails gives them.
+  "activemodel:validations/validates.rb": "validations/validates.ts",
   // Likewise `HelperMethods`, whose first definition Rails puts in
   // `validations/absence.rb`; trails' `_mergeAttributes` lives in validations.ts.
   "activemodel:validations/helper_methods.rb": "validations.ts",

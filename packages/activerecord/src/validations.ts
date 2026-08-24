@@ -265,16 +265,17 @@ export function validates(
     // The Model.validates class method is reached via _parentValidates,
     // registered by Base at module load via _setSuperValidates.
   },
-  attribute: string,
-  rules: Record<string, unknown>,
+  ...args: [...attributes: string[], rules: Record<string, unknown>]
 ): void {
+  const rules = args[args.length - 1] as Record<string, unknown>;
+  const attributes = args.slice(0, -1) as string[];
   const arRules = { ...rules };
   const shared = extractShared(arRules);
   const { allowNil: sharedAllowNil, allowBlank: sharedAllowBlank, ...sharedRest } = shared;
 
   const buildOpts = (opts: Record<string, unknown>) => ({
     ...opts,
-    attributes: [attribute],
+    attributes,
     ...sharedRest,
     ...(opts.allowNil === undefined && sharedAllowNil !== undefined
       ? { allowNil: sharedAllowNil }
@@ -312,11 +313,13 @@ export function validates(
     // routes to validatesWith); its async validateEach runs the existence check
     // inline in the async validation chain, honoring on/if/unless/strict.
     const { attributes: _attributes, ...uniqOpts } = buildOpts(opts) as Record<string, unknown>;
-    validatesUniqueness.call(
-      this,
-      attribute,
-      uniqOpts as Parameters<typeof validatesUniqueness>[1],
-    );
+    for (const attribute of attributes) {
+      validatesUniqueness.call(
+        this,
+        attribute,
+        uniqOpts as Parameters<typeof validatesUniqueness>[1],
+      );
+    }
   }
   // Delegate remaining rules (inclusion/exclusion/format/...) to ActiveModel's validates.
   const hasRemaining = Object.keys(arRules).some(
@@ -329,19 +332,19 @@ export function validates(
       );
     }
     // `super.validates` — delegate to Model's `validates` class method.
-    _parentValidates.call(this, attribute, arRules);
+    _parentValidates.call(this, ...attributes, arRules);
   }
 }
 
 // Late-bound reference to Model's `validates` class method — registered by
 // Base to break the circular-import chain.
 let _parentValidates:
-  | ((this: unknown, attribute: string, rules: Record<string, unknown>) => void)
+  | ((this: unknown, ...args: [...attributes: string[], rules: Record<string, unknown>]) => void)
   | null = null;
 
 /** @internal Called by Base to register Model's validates as the super. */
 export function _setSuperValidates(
-  fn: (this: unknown, attribute: string, rules: Record<string, unknown>) => void,
+  fn: (this: unknown, ...args: [...attributes: string[], rules: Record<string, unknown>]) => void,
 ): void {
   _parentValidates = fn;
 }
