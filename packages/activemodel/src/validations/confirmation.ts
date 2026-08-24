@@ -2,6 +2,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { except, humanize } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Mirrors: ActiveModel::Validations::ConfirmationValidator (confirmation.rb)
@@ -128,3 +129,18 @@ export function isConfirmationValueEqual(
 
 ConfirmationValidator.prototype.setupBang = setupBang;
 ConfirmationValidator.prototype.isConfirmationValueEqual = isConfirmationValueEqual;
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (confirmation.rb:80-82) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ *
+ * As with acceptance, `validatesWith` invokes the validator's `setupBang`
+ * (Rails' `setup!`), which defines the `${attr}Confirmation` accessors on the
+ * prototype.
+ */
+export const HelperMethods = {
+  validatesConfirmationOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(ConfirmationValidator, this._mergeAttributes(attrNames));
+  },
+};

@@ -3,6 +3,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isIncludeObj as isInclude } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Mirrors: ActiveModel::Validations::FormatValidator (format.rb)
@@ -174,3 +175,14 @@ FormatValidator.prototype.resolveValue = resolveValue;
 FormatValidator.prototype.recordError = recordError;
 FormatValidator.prototype.checkOptionsValidity = checkOptionsValidity;
 FormatValidator.prototype.regexpUsingMultilineAnchors = regexpUsingMultilineAnchors;
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (format.rb:107-109) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ */
+export const HelperMethods = {
+  validatesFormatOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(FormatValidator, this._mergeAttributes(attrNames));
+  },
+};

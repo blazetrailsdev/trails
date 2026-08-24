@@ -20,8 +20,8 @@ import {
   contextForValidation as validationsContextForValidation,
   runValidationsBang as validationsRunValidationsBang,
   raiseValidationError as validationsRaiseValidationError,
-  _mergeAttributes as validationsMergeAttributes,
 } from "./validations.js";
+import { HelperMethods } from "./validations/helper-methods.js";
 import {
   _assignAttributes as attrAssign,
   _assignAttribute as attrAssignOne,
@@ -56,7 +56,7 @@ export const raiseValidationError = validationsRaiseValidationError;
 /**
  * @internal Rails-private helper.
  */
-export const _mergeAttributes = validationsMergeAttributes;
+export const _mergeAttributes = HelperMethods._mergeAttributes;
 
 /**
  * @internal Rails-private helper.

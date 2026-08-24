@@ -1,10 +1,28 @@
+import {
+  classAttribute,
+  defineCallbacks,
+  extend,
+  include,
+  included,
+  kernelArray,
+  runCallbacks,
+} from "@blazetrails/activesupport";
+
 import { Errors } from "./errors.js";
+import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 
-import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
-import { NoMethodError } from "./attribute-assignment.js";
 import {
+  humanAttributeName,
+  lookupAncestors,
+  raiseOnMissingTranslations as translationRaise,
+} from "./translation.js";
+import { HelperMethods } from "./validations/helper-methods.js";
+import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
+import type { CallbackFn, CallbackConditions } from "./callbacks.js";
+import {
+  defineModelCallbacks,
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
   _defineAfterModelCallback as _defineAfterModelCallbackImpl,
@@ -90,65 +108,305 @@ export function contextForValidation(this: ContextForValidationHost): Validation
   return vc;
 }
 
+/** The class Ruby's `included(base)` hook receives (validations.rb:40). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
+
 /**
- * Validations mixin contract — provides the validation lifecycle.
- *
- * Mirrors: ActiveModel::Validations
- *
- * Model implements this interface: errors, isValid/isInvalid,
- * validate, validateBang, validationContext, validatesWith.
+ * Mirrors: ActiveModel::Validations (validations.rb:37) — the instance half,
+ * which `include(Model, Validations)` installs. A class module rather than a
+ * plain object because Ruby's `validation_context` reader (:454) ports as an
+ * accessor property, and only a prototype carries accessors across `include()`.
  */
-export interface Validations {
-  errors: Errors;
-  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+export class Validations {
   /**
-   * Run validations and return whether the record is valid.
-   * Mirrors Rails `alias_method :validate, :valid?`
-   * (activemodel/lib/active_model/validations.rb:370). Context may be a
-   * single symbol or an array — Rails supports e.g.
-   * `valid?([:create, :publish])` so a validator with `on: :publish`
-   * fires alongside the usual `:create` context.
+   * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-43
+   * install what their modules already export: `define_model_callbacks`
+   * (callbacks.rb:72) and Translation's `human_attribute_name` /
+   * `lookup_ancestors` (translation.rb:44, :58). `model_name` (naming.rb:270)
+   * and `i18n_scope` (translation.rb:28) are still `Model` class bodies, so
+   * there is nothing to extend from yet; relocating those two is the
+   * `fan-out-model-serialization-conversion-access-naming-surface` story, whose
+   * member table owns them.
    */
-  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  static [included](base: IncludingClass): void {
+    extend(base, { defineModelCallbacks });
+    extend(base, { humanAttributeName, lookupAncestors });
+    extend(base, HelperMethods);
+    include(base, HelperMethods);
+    defineCallbacks(base.prototype, "validate", { scope: ["name"] });
+    classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+  }
+
+  declare errors: Errors;
+  /** @internal */
+  declare contextForValidation: () => ValidationContext;
+  /** @internal */
+  declare runValidationsBang: () => Promise<boolean>;
+  declare raiseValidationError: () => never;
+
   /**
-   * Opposite of `isValid`. Mirrors Rails `def invalid?(context = nil)`
-   * (activemodel/lib/active_model/validations.rb:408-410).
+   * Mirrors: ActiveModel::Validations#valid? (validations.rb:361-368). The
+   * `run_callbacks(:validation)` wrapper is Rails'
+   * `Validations::Callbacks#run_validations!` override (validations/callbacks.rb:113-115);
+   * a halted chain returns `false` where Ruby's `throw :abort` unwinds.
    */
-  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+    const currentContext = this.validationContext;
+    // Rails assigns the Symbol (or Array of Symbols) straight through; trails
+    // also accepts a `ValidationContext`, and copies an Array so a caller's
+    // later mutation cannot reach in.
+    const inner = context instanceof ValidationContext ? context.context : (context ?? null);
+    this.contextForValidation().context = Array.isArray(inner) ? [...inner] : inner;
+    this.errors.clear();
+
+    try {
+      const completed = await runCallbacks(this, "validation", async () => {
+        await this.runValidationsBang();
+        return true;
+      });
+      if (!completed) return false;
+      return this.errors.empty;
+    } finally {
+      this.contextForValidation().context = currentContext;
+    }
+  }
+
+  /**
+   * Mirrors Rails `alias_method :validate, :valid?` (validations.rb:370) — the
+   * assignment below this class body is that alias.
+   */
+  declare validate: (context?: string | string[] | ValidationContext | null) => Promise<boolean>;
+
+  /**
+   * Mirrors Rails `def invalid?(context = nil); !valid?(context); end`
+   * (validations.rb:408-410).
+   */
+  async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+    return !(await this.isValid(context));
+  }
+
   /**
    * Run validations; return `true` or raise `ValidationError`. Mirrors Rails
    * `def validate!(context = nil); valid?(context) || raise_validation_error; end`
-   * (activemodel/lib/active_model/validations.rb:417-419) — never returns false.
+   * (validations.rb:417-419) — never returns false.
    */
-  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
+  async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
+    if (!(await this.isValid(context))) {
+      this.raiseValidationError();
+    }
+    return true;
+  }
+
   /**
-   * The active validation context — a single symbol, an array of
-   * symbols, or `null`. Mirrors Rails `validations.rb:454-456` where
-   * `validation_context` surfaces `context_for_validation.context`
-   * directly (Symbol or Array of Symbols).
+   * Mirrors Rails `def validation_context; context_for_validation.context; end`
+   * (validations.rb:454-456) — a Symbol, an Array of Symbols, or `null`.
+   *
+   * @internal
    */
-  readonly validationContext: string | string[] | null;
+  get validationContext(): string | string[] | null {
+    return this.contextForValidation().context;
+  }
+
+  /**
+   * Mirrors Rails' private `def validation_context=(context)` (validations.rb:459-461).
+   * Rails has no `@validation_context` ivar — the context lives on the
+   * `ValidationContext`, which is what lets a frozen model be validated.
+   *
+   * @internal
+   */
+  get _validationContext(): string | string[] | null {
+    return this.contextForValidation().context;
+  }
+
+  /** @internal */
+  set _validationContext(value: string | string[] | null) {
+    this.contextForValidation().context = value;
+  }
+
+  /**
+   * The `_run_validate_callbacks` that Rails' `define_callbacks :validate`
+   * (validations.rb:48) generates and `run_validations!` (:473) sends; trails'
+   * `defineCallbacks` generates none, so the body is spelled out here.
+   *
+   * @internal Rails-private helper.
+   */
+  async _runValidateCallbacks(): Promise<void> {
+    await runCallbacks(this, "validate");
+  }
 }
 
-/**
- * Mirrors: ActiveModel::Validations::ClassMethods
- */
-export interface ValidationsClassMethods {
-  validates(...args: [...attributes: string[], rules: Record<string, unknown>]): void;
-  validatesBang(...args: [...attributes: string[], rules: Record<string, unknown>]): void;
-  validate(methodOrFn: string | ((record: unknown) => void), options?: ConditionalOptions): void;
-  validatesWith(
-    validatorClass: {
-      new (options?: Record<string, unknown>): { validate(record: unknown): void };
-    },
-    options?: Record<string, unknown>,
+// Rails `alias_method :validate, :valid?` (validations.rb:370).
+Validations.prototype.validate = Validations.prototype.isValid;
+
+/** Anything `validates_with` accepts — a `Validator` subclass or a bare `validate(record)`. */
+type ValidatorLike = Validator | EachValidator | { validate(record: ValidatableRecord): unknown };
+
+/** The class-level surface `ClassMethods` self-sends. */
+export interface ValidationsClassHost {
+  _validators: Map<string | null, ValidatorLike[]>;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  validatesWith(...args: unknown[]): void;
+  validate(
+    methodOrFn: string | ((record: ValidatableRecord) => unknown),
+    options?: ConditionalOptions,
   ): void;
-  validators(): unknown[];
-  validatorsOn(...attributes: string[]): unknown[];
-  clearValidatorsBang(): void;
-  isAttributeMethod(attribute: string): boolean;
-  inherited(subclass: unknown): void;
+  setCallback(name: string, fn: (record: object) => unknown, options: CallbackConditions): void;
+  resetCallbacks(name: string): void;
+  /** @internal */
+  predicateForValidationContext(
+    context: string | string[],
+  ): (model: ValidationsContextHost) => boolean;
 }
+
+/** Mirrors: ActiveModel::Validations::ClassMethods (validations.rb:57). */
+export const ClassMethods = {
+  /**
+   * Mirrors `def validates_each(*attr_names, &block)` —
+   * `validates_with BlockValidator, _merge_attributes(attr_names), &block`
+   * (validations.rb:88-90). `_merge_attributes` flattens (a nested
+   * `[:title, :content]` contributes its members again) and pops the trailing
+   * options hash, which trails takes as its own parameter so the block stays last.
+   */
+  validatesEach<T extends ValidatableRecord = ValidatableRecord>(
+    this: ValidationsClassHost,
+    attrNames: Array<string | string[]>,
+    block: (record: T, attribute: string, value: unknown) => void,
+    options: ConditionalOptions = {},
+  ): void {
+    this.validatesWith(BlockValidator, this._mergeAttributes([...attrNames, options]), block);
+  },
+
+  /**
+   * Mirrors `def validate(*args, &block)` (validations.rb:160-185). The key
+   * check runs only under `args.all?(Symbol)` — a block validator may carry
+   * validator-ish keys. An unknown method name is a `send`-dispatched callback
+   * filter, so it raises `NoMethodError` at validation time, not registration
+   * time. `on:` merges into `:if` (:170-172) and `except_on:` into `:unless` as
+   * an intersection of `Array(except_on)` with `Array(o.validation_context)`
+   * (:174-182), so a nil context never intersects and the validator still runs.
+   */
+  validate<T extends ValidatableRecord = ValidatableRecord>(
+    this: ValidationsClassHost,
+    methodOrFn: string | ((record: T) => unknown),
+    options: ConditionalOptions = {},
+  ): void {
+    if (typeof methodOrFn === "string") {
+      for (const k of Object.keys(options)) {
+        if (!(VALID_OPTIONS_FOR_VALIDATE as readonly string[]).includes(k)) {
+          throw new ArgumentError(
+            `Unknown key: :${k}. Valid keys are: ${VALID_OPTIONS_FOR_VALIDATE.map((v) => `:${v}`).join(", ")}. Perhaps you meant to call \`validates\` instead of \`validate\`?`,
+          );
+        }
+      }
+    }
+
+    const fn: CallbackFn = (record: object) => {
+      // Rails' filter (validations.rb:184) returns the method's value; trails
+      // returns it too so a Promise-returning validator reaches the callback
+      // runner, which awaits it (RFC 0063), rather than being dropped.
+      const r = record as T & Record<string, unknown>;
+      if (typeof methodOrFn === "function") {
+        // Bind `this` to the record so block validators written as
+        // `function () { this.foo }` (Rails `instance_exec`) resolve `this`.
+        return methodOrFn.call(r, r) as void;
+      } else if (typeof r[methodOrFn] === "function") {
+        return (r[methodOrFn] as () => void)();
+      }
+      throw new NoMethodError(
+        `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
+      );
+    };
+    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
+    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
+
+    if (options.on !== undefined) {
+      const pred = this.predicateForValidationContext(options.on);
+      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
+    }
+
+    if (options.exceptOn !== undefined) {
+      const exceptOn = kernelArray(options.exceptOn);
+      unlessConds = [
+        (record: object) => {
+          const current = kernelArray(
+            (record as unknown as ValidationsContextHost).validationContext,
+          );
+          return exceptOn.some((c) => current.includes(c));
+        },
+        ...unlessConds,
+      ];
+    }
+
+    this.setCallback("validate", fn, {
+      ...(ifConds.length > 0 ? { if: ifConds } : {}),
+      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
+      ...(options.prepend ? { prepend: true } : {}),
+    });
+  },
+
+  /** Mirrors `def validators; _validators.values.flatten.uniq; end` (validations.rb:204-206). */
+  validators(this: ValidationsClassHost): ValidatorLike[] {
+    const seen = new Set<ValidatorLike>();
+    const out: ValidatorLike[] = [];
+    for (const bucket of this._validators.values()) {
+      for (const v of bucket) {
+        if (seen.has(v)) continue;
+        seen.add(v);
+        out.push(v);
+      }
+    }
+    return out;
+  },
+
+  /**
+   * Mirrors `def clear_validators!; reset_callbacks(:validate); _validators.clear; end`
+   * (validations.rb:246-249). Ruby empties the Hash the `inherited` hook dupped
+   * onto this class; `class_attribute`'s writer is local to the class, so
+   * assigning an empty Map is that same class-local clear.
+   */
+  clearValidatorsBang(this: ValidationsClassHost): void {
+    this.resetCallbacks("validate");
+    this._validators = new Map();
+  },
+
+  /**
+   * Mirrors `attributes.flat_map { |attribute| _validators[attribute.to_sym] }`
+   * (validations.rb:266-270). Deliberately does NOT mirror Rails' default-proc
+   * auto-vivification (`Hash.new { |h,k| h[k] = [] }`) — a Ruby hash artifact
+   * that would turn a read into a state mutation.
+   */
+  validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
+    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
+  },
+
+  /**
+   * Build the `if`-predicate that gates a validator on a validation context.
+   * Mirrors Rails' private `predicate_for_validation_context(context)`
+   * (validations.rb:296-306), memoized in the module-level
+   * `@@predicates_for_validation_contexts` (:294).
+   *
+   * @internal Rails-private helper.
+   */
+  predicateForValidationContext(
+    context: string | string[],
+  ): (model: ValidationsContextHost) => boolean {
+    const arr = Array.isArray(context) ? [...context].sort() : [context];
+    const key = JSON.stringify(arr);
+    let cached = _predicatesForValidationContexts.get(key);
+    if (!cached) {
+      cached = (model: ValidationsContextHost): boolean => {
+        const mc = model.validationContext;
+        if (Array.isArray(mc)) {
+          return mc.some((c) => arr.includes(c));
+        }
+        return mc !== null && mc !== undefined && arr.includes(mc);
+      };
+      _predicatesForValidationContexts.set(key, cached);
+    }
+    return cached;
+  },
+};
 
 /** Minimum shape required by ValidationError. */
 export interface ModelWithErrors {
@@ -320,60 +578,11 @@ export interface ContextForValidationHost {
 }
 
 /**
- * Build a predicate that returns whether a model's
- * `validationContext` matches one of the supplied contexts. Used by
- * `validates(..., on: :create)` to gate a validator on the active
- * context. Mirrors Rails
- * `predicate_for_validation_context(context)`
- * (activemodel/lib/active_model/validations.rb:296-306).
- *
- * @internal Rails-private helper.
- */
-export function predicateForValidationContext(
-  context: string | string[],
-): (model: ValidationsContextHost) => boolean {
-  const arr = Array.isArray(context) ? [...context].sort() : [context];
-  const key = JSON.stringify(arr);
-  let cached = _predicatesForValidationContexts.get(key);
-  if (!cached) {
-    cached = (model: ValidationsContextHost): boolean => {
-      const mc = model.validationContext;
-      if (Array.isArray(mc)) {
-        return mc.some((c) => arr.includes(c));
-      }
-      return mc !== null && mc !== undefined && arr.includes(mc);
-    };
-    _predicatesForValidationContexts.set(key, cached);
-  }
-  return cached;
-}
-
-/**
  * Host shape consumed by `runValidationsBang`.
  */
 export interface RunValidationsHost<TBase extends object = object> {
   errors: Errors<TBase>;
   _runValidateCallbacks(): void | Promise<void>;
-}
-
-/**
- * Normalize the `validates_each` argument list, splitting attribute
- * names from the trailing options hash and stamping the merged
- * options with `attributes:`. Mirrors Rails
- * `Validations::HelperMethods#_merge_attributes`
- * (activemodel/lib/active_model/validations/helper_methods.rb:7-11).
- *
- * @internal Rails-private helper.
- */
-export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> {
-  const last = attrNames[attrNames.length - 1];
-  const options: Record<string, unknown> =
-    last !== null && typeof last === "object" && !Array.isArray(last) && last.constructor === Object
-      ? { ...(attrNames.pop() as Record<string, unknown>) }
-      : {};
-  const flat = attrNames.flat(Infinity).map((n) => String(n));
-  options.attributes = flat;
-  return options;
 }
 
 /** Host shape for the {@link readAttributeForValidation} mixin method. */

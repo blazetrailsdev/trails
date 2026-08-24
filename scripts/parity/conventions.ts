@@ -169,8 +169,9 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // all four in the file whose name Rails gives them.
   "activemodel:validations/validates.rb": "validations/validates.ts",
   // Likewise `HelperMethods`, whose first definition Rails puts in
-  // `validations/absence.rb`; trails' `_mergeAttributes` lives in validations.ts.
-  "activemodel:validations/helper_methods.rb": "validations.ts",
+  // `validations/absence.rb`; trails keeps the module in the file whose name
+  // Rails gives it, which is what the kebab-case rule already produces.
+  "activemodel:validations/helper_methods.rb": "validations/helper-methods.ts",
   // `ARTest` is defined by `config.rb` first; `connection.rb` reopens it for the
   // three connection helpers, which trails ports to `support/connection.ts`.
   "activerecord-test-support:connection.rb": "connection.ts",

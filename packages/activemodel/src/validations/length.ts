@@ -3,6 +3,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { camelize, except, Range } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Mirrors: ActiveModel::Validations::LengthValidator (length.rb)
@@ -212,3 +213,19 @@ export function skipNilCheck(
 
 LengthValidator.prototype.resolveValue = resolveValue;
 LengthValidator.prototype.skipNilCheck = skipNilCheck;
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (length.rb:123-128) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ */
+export const HelperMethods = {
+  validatesLengthOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+  },
+
+  /** Mirrors: `alias_method :validates_size_of, :validates_length_of` (length.rb:128). */
+  validatesSizeOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+  },
+};

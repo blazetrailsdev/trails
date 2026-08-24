@@ -2,6 +2,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { except } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Manages lazily-defined virtual attributes for acceptance validation.
@@ -162,3 +163,18 @@ function isNonStringIterable(value: unknown): value is Iterable<unknown> {
 
 AcceptanceValidator.prototype.setupBang = setupBang;
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (acceptance.rb:99-101) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ *
+ * `validatesWith` injects the host class and invokes the validator's `setupBang`
+ * (Rails' `setup!(options[:class])`), which materializes the virtual acceptance
+ * accessors on the prototype.
+ */
+export const HelperMethods = {
+  validatesAcceptanceOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(AcceptanceValidator, this._mergeAttributes(attrNames));
+  },
+};
