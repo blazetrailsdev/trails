@@ -495,14 +495,15 @@ export class DatabaseTasks {
    *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
    *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
    *   nothing in the TS body was dropped.
+   *
+   * `TRAILS_MIGRATION_VERSION` is canonical; `VERSION` is the legacy fallback
+   * (one-release window). The `to_i` is Rails'
+   * (`ENV["VERSION"].to_i`, database_tasks.rb:323-325) and never fails —
+   * `"unknown"` is `0`, which is truthy in Ruby and is exactly what lets
+   * {@link checkTargetVersion} reach its format check for a malformed VERSION.
    */
   static targetVersion(): number | null {
-    // TRAILS_MIGRATION_VERSION is canonical; VERSION is the legacy fallback (one-release window).
     const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    // Rails: `ENV["VERSION"].to_i if ENV["VERSION"] && !ENV["VERSION"].empty?`
-    // (database_tasks.rb:323-325). `to_i` never fails — "unknown" is 0, and 0 is
-    // truthy in Ruby, which is what lets `check_target_version` below reach its
-    // format check for a malformed VERSION.
     if (version === undefined || version === "") return null;
     const match = version.match(/^\s*(-?\d+)/);
     return match ? Number(match[1]) : 0;
@@ -1018,12 +1019,18 @@ export class DatabaseTasks {
     await this.seedLoader.loadSeed();
   }
 
+  /**
+   * Mirrors: `ActiveRecord::Tasks::DatabaseTasks#migrate_status`
+   * (`database_tasks.rb:302-315`), which `databases.rake:230-232` calls rather
+   * than inlining.
+   *
+   * The missing-table arm is Rails' `Kernel.abort` (`:304`) as a throw:
+   * `Kernel.abort` exits the process, which a library method has no business
+   * doing here, so the CLI's own error-to-exit-code path carries it. Same shape
+   * {@link checkSchemaFile} already takes for the same Ruby call.
+   */
   static async migrateStatus(): Promise<void> {
     if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
-      // Rails: Kernel.abort "Schema migrations table does not exist yet."
-      // (database_tasks.rb:303-305). Same shape as checkSchemaFile above:
-      // Kernel.abort exits the process, which a library method has no business
-      // doing in trails, so the CLI's own error-to-exit-code path carries it.
       throw new Error("Schema migrations table does not exist yet.");
     }
     const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();

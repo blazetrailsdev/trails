@@ -9,8 +9,6 @@ import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
 
 export class Column {
-  // Ruby ivars, assigned by the constructor and re-assigned by `initWith`
-  // (`column.rb:46-53`), so they cannot be `readonly`.
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
   null: boolean;
@@ -136,7 +134,12 @@ export class Column {
    * Mirrors: ActiveRecord::ConnectionAdapters::Column#init_with
    * (`column.rb:46-53`). Rails' YAML/Marshal protocol allocates the class named
    * by the document's tag and then fills its ivars from the coder; the caller
-   * that does the allocating is `rehydrateColumn` (`schema-cache.ts`).
+   * that does the allocating is `rehydrateColumn` (`schema-cache.ts`). Because
+   * these are Ruby ivars re-assigned here, the fields above cannot be `readonly`.
+   *
+   * `primary_key` has no Rails counterpart in this pair: Rails' Column carries
+   * no `@primary_key` ivar at all — the primary key lives on the schema cache's
+   * own map — while trails' Column does.
    */
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
@@ -148,9 +151,6 @@ export class Column {
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
     this.collation = (coder["collation"] as string | null) ?? null;
     this.comment = (coder["comment"] as string | null) ?? null;
-    // `primary_key` has no Rails counterpart in this pair: Rails' Column has no
-    // `@primary_key` ivar at all (it lives on the schema cache's primary-key
-    // map), while trails' Column carries one.
     this.primaryKey = (coder["primary_key"] as boolean) ?? false;
   }
 

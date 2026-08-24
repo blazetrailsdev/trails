@@ -12,8 +12,6 @@ describe("MysqlColumn", () => {
     );
     const coder: Record<string, unknown> = {};
     original.encodeWith(coder);
-    // Psych's restore step (`column.rb:46-53`): allocate the tagged class, then
-    // fill its ivars from the coder.
     const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
     restored.initWith(JSON.parse(JSON.stringify(coder)));
     expect(restored.autoIncrement).toBe(true);

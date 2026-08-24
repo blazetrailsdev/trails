@@ -36,7 +36,10 @@ describe("templateSchemaCache", () => {
    * consumer has to see it through that swap — `AbstractAdapter#schemaCache`
    * and `#internalSchemaCache`, and `TypeCaster::Connection` via
    * `poolConfig.schemaCache` — which is only true because each reads the
-   * reflection's slot live rather than holding a cache by identity.
+   * reflection's slot live rather than holding a cache by identity. The
+   * installed cache is not the shared module-scoped dump either: each pool gets
+   * its own dup, as Rails gets for free from `_load_from` running per reflection
+   * (`schema_cache.rb:116-121`).
    */
   it("is one object, reached by every adapter-side consumer after the swap", () => {
     const conn = Base.connection;
@@ -44,9 +47,6 @@ describe("templateSchemaCache", () => {
     expect(installed).not.toBeNull();
     expect(conn.internalSchemaCache).toBe(installed);
     expect(Base.connectionPool().poolConfig.schemaCache).toBe(installed);
-    // Not the shared module-scoped dump: each pool installs its own dup, as
-    // Rails gets for free from `_load_from` running per reflection
-    // (`schema_cache.rb:116-121`).
     expect(installed).not.toBe(templateSchemaCache());
   });
 

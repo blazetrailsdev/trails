@@ -827,6 +827,13 @@ export function dbCommand(): Command {
       });
     });
 
+  /**
+   * `db:migrate:up` / `db:migrate:down` — `check_target_version` then
+   * `migration_context.run(:up | :down, target_version)`
+   * (`railties/databases.rake:165-208`). Both of those read `ENV["VERSION"]`
+   * themselves (`database_tasks.rb:317-325`), so the `--version` flag is
+   * published as the env var rather than threaded through the predicate.
+   */
   cmd
     .command("migrate:up")
     .description("Run a specific migration up (by version)")
@@ -835,11 +842,6 @@ export function dbCommand(): Command {
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          // Rails' rake task sets nothing: `check_target_version` and
-          // `target_version` both read ENV["VERSION"] themselves
-          // (`databases.rake:171-177`, `database_tasks.rb:317-325`), so the
-          // --version flag is published as the env var rather than threaded
-          // through the predicate.
           await withTargetVersionEnv(opts.version, async () => {
             DatabaseTasks.checkTargetVersion();
             await DatabaseTasks.migrationConnectionPool().migrationContext.run(
@@ -859,8 +861,6 @@ export function dbCommand(): Command {
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          // Same env-var contract as migrate:up above
-          // (`databases.rake:195-207`).
           await withTargetVersionEnv(opts.version, async () => {
             DatabaseTasks.checkTargetVersion();
             await DatabaseTasks.migrationConnectionPool().migrationContext.run(
