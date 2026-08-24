@@ -22,7 +22,7 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackFn, CallbackConditions } from "./callbacks.js";
 import {
-  defineModelCallbacks,
+  Callbacks,
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
   _defineAfterModelCallback as _defineAfterModelCallbackImpl,
@@ -130,7 +130,7 @@ export class Validations {
    * member table owns them.
    */
   static [included](base: IncludingClass): void {
-    extend(base, { defineModelCallbacks });
+    extend(base, Callbacks);
     extend(base, { humanAttributeName, lookupAncestors });
     extend(base, HelperMethods);
     include(base, HelperMethods);

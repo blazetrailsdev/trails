@@ -9,6 +9,7 @@
     "build:sw": "vite build --config vite.sw.config.ts",
     "build": "pnpm run build:sw && vite build && pnpm run docs:build",
     "preview": "vite preview",
+    "pretest": "svelte-kit sync",
     "test": "vitest run",
     "docs:typedoc": "tsc --build ../../tsconfig.json && typedoc --tsconfig ../../tsconfig.json && node scripts/escape-typedoc.mjs",
     "docs:dev": "pnpm run docs:typedoc && vitepress dev docs",

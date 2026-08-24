@@ -2081,7 +2081,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   },
 };`,
     );
-    // Primary migrations in db/migrations; animals in db/migrate_animals.
+    // Primary migrations in db/migrate; animals in db/migrate_animals.
     fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),

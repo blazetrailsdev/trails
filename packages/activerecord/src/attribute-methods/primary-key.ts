@@ -355,6 +355,20 @@ export function resetPrimaryKey(this: PrimaryKeyHost): void {
  * leasing a connection; a cold cache falls through to the "id" convention.
  * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
  * itself has none.
+ *
+ * @missingRailsCall table_exists? — CONVERGEABLE: `tableExists` is async in
+ *   trails, and its synchronous cache-only view (`cachedTableExists`) leases a
+ *   connection to reach the cache — which `getPrimaryKey` must not do, because
+ *   `getPrimaryKeyAttr` / `primaryKey` are read from synchronous paths
+ *   (model construction). The guard is subsumed by the read below: a table
+ *   absent from the schema cache has no cached primary keys either, so
+ *   `getCachedPrimaryKeys` returns `undefined` and both arms fall through to
+ *   the same "id" convention. Converges once RFC 0073 settles the lease shape
+ *   and a synchronous `tableExists` cache read is expressible.
+ * @missingRailsCall primary_keys — CONVERGEABLE: `schemaCache.primaryKeys`
+ *   (primary_key.rb:104) is async in trails; `getCachedPrimaryKeys` is its
+ *   lease-free, cache-only view, called here for the same reason — this body
+ *   runs on synchronous paths. Same RFC 0073 dependency.
  */
 export function getPrimaryKey(
   this: PrimaryKeyHost & { primaryKeyPrefixType?: string | null },
