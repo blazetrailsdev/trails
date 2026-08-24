@@ -71,6 +71,12 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#compute_table_name
  * (model_schema.rb:604-618)
  *
+ * The `base === this` guard on the STI arm has no Rails counterpart: there
+ * `base_class? == false` is exactly `base_class != self` (inheritance.rb:119-121),
+ * while trails reaches the two answers through separate memos (`isBaseClass` /
+ * `baseClass`, inheritance.ts), so the guard stops a self-call recursing
+ * forever if they ever disagree.
+ *
  * @internal
  */
 function computeTableName(this: typeof Base): string {
@@ -85,10 +91,6 @@ function computeTableName(this: typeof Base): string {
   }
   // STI subclasses always use their superclass's table.
   const base = baseClass.call(this);
-  // Rails' `base_class` never answers `self` here — `base_class? == false` is
-  // exactly `base_class != self` (inheritance.rb:119-121). trails' `baseClass`
-  // reaches the same answer through a separate memo, so guard the self-call
-  // rather than recurse forever if the two ever disagree.
   if (base === this) return "";
   return base.tableName;
 }
@@ -613,15 +615,15 @@ export function quotedTableName(this: SchemaHost): string {
  * (model_schema.rb:289-300)
  *
  * Reaches its value by assigning through `table_name=`, so a first read gets
- * the writer's cache invalidation exactly where Rails has it.
+ * the writer's cache invalidation exactly where Rails has it. Rails' `self ==
+ * Base` is spelled through the own-property sentinel `setBaseClass` tests for
+ * the same thing (inheritance.ts).
  */
 export function resetTableName(this: SchemaHost): string {
   const klass = this as unknown as typeof Base;
   const superclass = Object.getPrototypeOf(klass) as typeof Base | null;
   tableName.call(
     this,
-    // `self == Base`, spelled through the own-property sentinel `setBaseClass`
-    // uses for the same test (inheritance.ts).
     Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
       ? null
       : klass.abstractClass
@@ -1433,17 +1435,18 @@ function warmColumnsHashSync(
  * Ruby class ivars are not inherited but JS statics are, so the `defined?`
  * guard is an own-property check — a plain read would hand a subclass on
  * another table its base's name.
+ *
+ * Two of the writer's clears have no code below them. `@arel_table = nil`:
+ * `arelTable` builds a fresh Table per call (core.ts:835), so there is no memo
+ * to clear. `@sequence_name = nil unless @explicit_sequence_name`: a non-null
+ * `_sequenceName` IS `@explicit_sequence_name` — only `sequence_name=` sets it
+ * and `reset_sequence_name` nils it — so the clear is a no-op on every
+ * reachable state.
  */
 export function tableName(this: SchemaHost, value?: string | null): string {
   if (value !== undefined) {
     const changed = this._tableName !== value;
     this._tableName = value;
-    // `@arel_table = nil`: trails' `arelTable` builds a fresh Table per call
-    // (core.ts:835), so there is no memo to clear.
-    // `@sequence_name = nil unless @explicit_sequence_name`: trails has no
-    // separate explicit flag because a non-null `_sequenceName` IS one — only
-    // `sequence_name=` sets it, and `reset_sequence_name` nils it — so the
-    // clear would be a no-op on every reachable state.
     if (changed) {
       // Rails table_name= runs `reset_column_information if connected?`, which
       // resets the predicate builder and (via initialize_find_by_cache) the
