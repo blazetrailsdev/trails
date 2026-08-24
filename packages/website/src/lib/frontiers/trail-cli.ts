@@ -58,7 +58,7 @@ function discoverMigrations(
 ): MigrationProxy[] {
   return vfs
     .list()
-    .filter((f) => f.path.startsWith("db/migrations/"))
+    .filter((f) => f.path.startsWith("db/migrate/"))
     .flatMap((file) => {
       const basename = file.path.split("/").pop() ?? "";
       const match = basename.match(MIGRATION_FILE_PATTERN);
@@ -145,7 +145,7 @@ export function createTrailCLI(deps: TrailCliDeps) {
   async function withMigrator(fn: (migrator: Migrator) => Promise<void>): Promise<void> {
     const proxies = discoverMigrations(vfs, deps.executeCode, deps.getMigrations);
     if (proxies.length === 0) {
-      log("No migrations found in db/migrations/.");
+      log("No migrations found in db/migrate/.");
       return;
     }
     const migrator = new Migrator(

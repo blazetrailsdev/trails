@@ -36,7 +36,7 @@ describe("exec: new", () => {
     expect(runtime.vfs.exists("src/app/models/application-record.ts")).toBe(true);
     expect(runtime.vfs.exists("src/app/controllers/application-controller.ts")).toBe(true);
     expect(runtime.vfs.exists("db/seeds.ts")).toBe(true);
-    expect(runtime.vfs.exists("db/migrations/.gitkeep")).toBe(true);
+    expect(runtime.vfs.exists("db/migrate/.gitkeep")).toBe(true);
   });
 
   it("clears existing files", async () => {
@@ -62,7 +62,7 @@ describe("exec: generate model", () => {
     // Migration uses trailties format
     const migFiles = runtime.vfs
       .list()
-      .filter((f) => f.path.startsWith("db/migrations/") && f.path.includes("create-users"));
+      .filter((f) => f.path.startsWith("db/migrate/") && f.path.includes("create_users"));
     expect(migFiles.length).toBe(1);
     expect(migFiles[0].content).toContain("class CreateUsers extends Migration");
     expect(migFiles[0].content).toContain('t.string("name")');
@@ -88,7 +88,7 @@ describe("exec: generate migration", () => {
     expect(result.success).toBe(true);
     const migFiles = runtime.vfs
       .list()
-      .filter((f) => f.path.startsWith("db/migrations/") && f.path.includes("add-age-to-users"));
+      .filter((f) => f.path.startsWith("db/migrate/") && f.path.includes("add_age_to_users"));
     expect(migFiles.length).toBe(1);
     expect(migFiles[0].content).toContain("AddAgeToUsers");
   });

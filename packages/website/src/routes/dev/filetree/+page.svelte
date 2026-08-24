@@ -24,8 +24,8 @@
     v.write("src/app/models/post.ts", 'import { Base } from "@blazetrails/activerecord";\n\nexport class Post extends Base {\n  static {\n    this.attribute("title", "string");\n    this.attribute("body", "text");\n  }\n}');
     v.write("src/app/controllers/application-controller.ts", "class ApplicationController {}");
     v.write("src/app/controllers/posts-controller.ts", "class PostsController {}");
-    v.write("db/migrations/20260401120000_create_users.ts", "class CreateUsers extends Migration {}");
-    v.write("db/migrations/20260401120001_create_posts.ts", "class CreatePosts extends Migration {}");
+    v.write("db/migrate/20260401120000_create_users.ts", "class CreateUsers extends Migration {}");
+    v.write("db/migrate/20260401120001_create_posts.ts", "class CreatePosts extends Migration {}");
     v.write("db/seeds.ts", "// seeds");
     v.write("db/schema.ts", "// schema");
     v.write("test/models/user.test.ts", "// user tests");
