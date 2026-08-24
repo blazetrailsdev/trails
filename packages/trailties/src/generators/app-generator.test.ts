@@ -84,7 +84,7 @@ describe("AppGenerator", () => {
     expect(exists("src/app/assets/images/.gitkeep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
 
-    expect(exists("db/migrations/.gitkeep")).toBe(true);
+    expect(exists("db/migrate/.gitkeep")).toBe(true);
     expect(exists("db/seeds.ts")).toBe(true);
     expect(exists("db/schema.ts")).toBe(true);
 

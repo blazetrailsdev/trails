@@ -24,6 +24,7 @@ import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { SchemaCache } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
+import { supportsExpressionIndex } from "./schema-types.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
 
 /** Env var: absolute path of the boot-produced schema-cache dump. */
@@ -107,7 +108,7 @@ export function dumpedTables(marshalled: unknown[]): ReadonlySet<string> {
  */
 export async function schemaShapes(adapter: DatabaseAdapter): Promise<Map<string, string>> {
   const shapes = new Map<string, string>();
-  for (const sql of SHAPE_QUERIES[adapter.adapterName] ?? []) {
+  for (const sql of await shapeQueriesFor(adapter)) {
     for (const row of (await adapter.execute(sql)) as { name: string; col: string | null }[]) {
       const name = String(row.name);
       shapes.set(name, `${shapes.get(name) ?? ""}\n${row.col ?? ""}`);
@@ -151,9 +152,14 @@ const MISSING_TABLE = "missing-table";
  * `Comment`. Its index rows carry `STATISTICS.COLLATION` because that is where
  * `IndexDefinition#orders` comes from — `"D"` is a descending column
  * (`mysql/schema_statements.rb:43`, `:47`) — alongside `SUB_PART`
- * (`lengths`) and `INDEX_TYPE` (`using`); MySQL 8's `EXPRESSION` is left out
- * because MariaDB's `STATISTICS` has no such column, and the canonical schema
- * has no functional index for it to describe. PostgreSQL and sqlite
+ * (`lengths`) and `INDEX_TYPE` (`using`), and `EXPRESSION`, which is where a
+ * functional index's `IndexDefinition#columns` comes from (`SHOW KEYS`'
+ * `Expression`, `mysql/schema_statements.rb:36-52`) and whose row carries a
+ * NULL `COLUMN_NAME`. MariaDB's `STATISTICS` has no `EXPRESSION` column at all
+ * — selecting it is `ER_BAD_FIELD_ERROR` — so the projection is keyed off
+ * `supportsExpressionIndex`, which is Rails' own
+ * `!mariadb? && database_version >= "8.0.13"`
+ * (`mysql/schema_statements.rb` / `abstract_mysql_adapter.rb`). PostgreSQL and sqlite
  * need no such spelling out: `pg_indexes.indexdef` and `sqlite_master.sql` are
  * the index's own DDL, `DESC` and all.
  */
@@ -200,14 +206,27 @@ const SHAPE_QUERIES: Record<string, string[]> = {
      WHERE TABLE_SCHEMA = DATABASE()
      ORDER BY TABLE_NAME, ORDINAL_POSITION`,
     `SELECT TABLE_NAME AS name,
-            CONCAT(INDEX_NAME, ' ', SEQ_IN_INDEX, ' ', COLUMN_NAME, ' ', NON_UNIQUE, ' ',
+            CONCAT(INDEX_NAME, ' ', SEQ_IN_INDEX, ' ', COALESCE(COLUMN_NAME, ''), ' ', NON_UNIQUE, ' ',
                    COALESCE(COLLATION, ''), ' ', COALESCE(SUB_PART, ''), ' ',
-                   INDEX_TYPE, ' ', COALESCE(INDEX_COMMENT, '')) AS col
+                   INDEX_TYPE, ' ', COALESCE(INDEX_COMMENT, ''), ' ', /*EXPRESSION*/'') AS col
      FROM information_schema.STATISTICS
      WHERE TABLE_SCHEMA = DATABASE()
      ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX`,
   ],
 };
+
+/**
+ * `SHAPE_QUERIES` for this adapter, with the MySQL index projection's
+ * `EXPRESSION` slot filled in only where the server has that column. A
+ * functional index reports `COLUMN_NAME` NULL, so without it two different
+ * expressions over the same (empty) column set fingerprint identically.
+ */
+async function shapeQueriesFor(adapter: DatabaseAdapter): Promise<string[]> {
+  const queries = SHAPE_QUERIES[adapter.adapterName] ?? [];
+  if (adapter.adapterName !== "mysql2") return queries;
+  const expression = (await supportsExpressionIndex(adapter)) ? "COALESCE(EXPRESSION, '')" : "''";
+  return queries.map((sql) => sql.replace("/*EXPRESSION*/''", expression));
+}
 
 /**
  * The boot dump, or `null` when this run produced none (no globalSetup, or a

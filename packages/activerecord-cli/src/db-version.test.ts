@@ -36,7 +36,7 @@ describe("DbVersionTest", () => {
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     currentVersionSpy = vi.fn().mockResolvedValue(20260101000001);
-    vi.spyOn(DatabaseTasks, "currentVersion").mockImplementation(currentVersionSpy);
+    vi.spyOn(MigrationContext.prototype, "currentVersion").mockImplementation(currentVersionSpy);
     withTemporaryPoolFn = vi
       .fn()
       .mockImplementation(async (_config: unknown, fn: () => unknown) => fn());

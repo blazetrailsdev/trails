@@ -55,7 +55,7 @@ export class MigrationGenerator extends NamedBase {
       timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
     }
     lastTimestamp = timestamp;
-    const filename = `db/migrations/${timestamp}_${this.fileName}${this.ext()}`;
+    const filename = `db/migrate/${timestamp}_${this.fileName}${this.ext()}`;
     this.createFile(filename, emitMigrationSource(classify(this.fileName), timestamp));
     return this.getCreatedFiles();
   }

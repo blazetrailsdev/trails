@@ -224,7 +224,7 @@ export class MigrationGenerator extends GeneratorBase {
     }
     lastTimestamp = timestamp;
     const ext = this.ext();
-    const filename = `db/migrations/${timestamp}_${underscore(name)}${ext}`;
+    const filename = `db/migrate/${timestamp}_${underscore(name)}${ext}`;
     const ts = this.isTypeScript();
     const returnType = ts ? ": Promise<void>" : "";
 
