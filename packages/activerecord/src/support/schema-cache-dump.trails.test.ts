@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
+import { activeLane } from "./connection.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   dumpedTables,
@@ -62,5 +63,47 @@ describe("templateSchemaCache", () => {
     } finally {
       await Base.connection.dropTable("boot_dump_bespoke");
     }
+  });
+
+  /**
+   * sqlite has no column comments — `supports_comments?` is false there
+   * (`abstract_adapter.rb:502` returns false and
+   * `sqlite3_adapter.rb` has no override) — so the
+   * comment arm of the fingerprint is only exercisable on PG and MySQL.
+   */
+  it.skipIf(activeLane() === "sqlite")(
+    "stops matching once a canonical column's comment changes",
+    async () => {
+      const cached = dumpedTables(templateSchemaCache()!);
+      await Base.connection.addColumn("topics", "boot_dump_probe", "string");
+      const before = fingerprintOf(await schemaShapes(Base.connection), cached);
+      try {
+        const commenting = Base.connection as unknown as {
+          changeColumnComment(table: string, column: string, comment: string): Promise<void>;
+        };
+        await commenting.changeColumnComment("topics", "boot_dump_probe", "changed");
+        expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(before);
+      } finally {
+        await Base.connection.removeColumn("topics", "boot_dump_probe");
+      }
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
+        templateSchemaFingerprint(),
+      );
+    },
+  );
+
+  it("stops matching once an index is added to a canonical table", async () => {
+    const cached = dumpedTables(templateSchemaCache()!);
+    await Base.connection.addIndex("topics", "title", { name: "boot_dump_probe_index" });
+    try {
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(
+        templateSchemaFingerprint(),
+      );
+    } finally {
+      await Base.connection.removeIndex("topics", { name: "boot_dump_probe_index" });
+    }
+    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
+      templateSchemaFingerprint(),
+    );
   });
 });

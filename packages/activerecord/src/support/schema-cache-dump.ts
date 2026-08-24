@@ -90,16 +90,16 @@ export function dumpedTables(cache: SchemaCache): ReadonlySet<string> {
  * `postgresql/schema_statements.rb:460-467`, `:523-524`), which trails also
  * does — but only within the process that ran the DDL, and the dump outlives it.
  *
- * One query, not one per table: reflecting each table to check it would cost
- * exactly what the dump exists to avoid.
+ * Whole-database queries, not one per table: reflecting each table to check it
+ * would cost exactly what the dump exists to avoid.
  */
 export async function schemaShapes(adapter: DatabaseAdapter): Promise<Map<string, string>> {
-  const sql = SHAPE_QUERIES[adapter.adapterName];
-  if (sql === undefined) return new Map();
   const shapes = new Map<string, string>();
-  for (const row of (await adapter.execute(sql)) as { name: string; col: string | null }[]) {
-    const name = String(row.name);
-    shapes.set(name, `${shapes.get(name) ?? ""}\n${row.col ?? ""}`);
+  for (const sql of SHAPE_QUERIES[adapter.adapterName] ?? []) {
+    for (const row of (await adapter.execute(sql)) as { name: string; col: string | null }[]) {
+      const name = String(row.name);
+      shapes.set(name, `${shapes.get(name) ?? ""}\n${row.col ?? ""}`);
+    }
   }
   return shapes;
 }
@@ -107,7 +107,7 @@ export async function schemaShapes(adapter: DatabaseAdapter): Promise<Map<string
 /**
  * Digest the shapes of `tables` alone, so tables the dump never described — a
  * bespoke table a file laid in its own `beforeAll` — cannot make the dump look
- * stale. `null` when a table the dump describes is no longer there.
+ * stale. A table the dump describes that is no longer there can never match.
  */
 export function fingerprintOf(shapes: Map<string, string>, tables: ReadonlySet<string>): string {
   const parts: string[] = [];
@@ -122,22 +122,70 @@ export function fingerprintOf(shapes: Map<string, string>, tables: ReadonlySet<s
 /** The fingerprint of a schema that has lost a table the dump described. */
 const MISSING_TABLE = "missing-table";
 
-const SHAPE_QUERIES: Record<string, string> = {
-  sqlite: `SELECT name, sql AS col FROM sqlite_master
-           WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`,
-  postgres: `SELECT table_name AS name,
-                    column_name || ' ' || data_type || ' ' ||
-                      coalesce(character_maximum_length::text, '') || ' ' ||
-                      is_nullable || ' ' || coalesce(column_default, '') AS col
-             FROM information_schema.columns
-             WHERE table_schema = ANY (current_schemas(false))
-             ORDER BY table_name, ordinal_position`,
-  mysql2: `SELECT TABLE_NAME AS name,
-                  CONCAT(COLUMN_NAME, ' ', COLUMN_TYPE, ' ', IS_NULLABLE, ' ',
-                         COALESCE(COLUMN_DEFAULT, '')) AS col
-           FROM information_schema.COLUMNS
-           WHERE TABLE_SCHEMA = DATABASE()
-           ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+/**
+ * What a lane hashes, in whole-database form: the projection its own
+ * `columnDefinitions` reflects a Column from, plus its indexes — everything a
+ * cached entry holds and DDL can change, so no alteration to a dumped table can
+ * leave the fingerprint intact.
+ *
+ * sqlite needs one query for both: `sqlite_master.sql` is the `CREATE`
+ * statement itself, which carries collation and every column attribute, and its
+ * index rows carry `tbl_name`. PostgreSQL's column projection is
+ * `postgresql/schema-statements-class.ts:605-614` — type, default, notnull,
+ * oid, typmod, identity, generated, collation and comment, the fields
+ * `PostgreSQL::Column` stores. MySQL's is `SHOW FULL FIELDS`
+ * (`abstract-mysql-adapter.ts:1904`) read out of `information_schema`, whose
+ * `COLLATION_NAME` / `EXTRA` / `COLUMN_COMMENT` are its `Collation` / `Extra` /
+ * `Comment`.
+ */
+const SHAPE_QUERIES: Record<string, string[]> = {
+  sqlite: [
+    `SELECT tbl_name AS name, type || ' ' || coalesce(sql, '') AS col
+     FROM sqlite_master
+     WHERE name NOT LIKE 'sqlite_%'
+     ORDER BY type, name`,
+  ],
+  postgres: [
+    `SELECT t.relname AS name,
+            a.attname || ' ' ||
+              pg_catalog.format_type(a.atttypid, a.atttypmod) || ' ' ||
+              coalesce(pg_get_expr(d.adbin, d.adrelid), '') || ' ' ||
+              a.attnotnull::text || ' ' || a.atttypid::text || ' ' ||
+              a.atttypmod::text || ' ' || a.attidentity::text || ' ' ||
+              a.attgenerated::text || ' ' ||
+              coalesce(col.collname, '') || ' ' || coalesce(pgd.description, '') AS col
+     FROM pg_attribute a
+     JOIN pg_class t ON t.oid = a.attrelid
+     JOIN pg_namespace n ON n.oid = t.relnamespace
+     LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+     LEFT JOIN pg_type pt ON a.atttypid = pt.oid
+     LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
+     LEFT JOIN pg_description pgd
+       ON pgd.objoid = a.attrelid AND pgd.classoid = 'pg_class'::regclass AND pgd.objsubid = a.attnum
+     WHERE n.nspname = ANY (current_schemas(false))
+       AND t.relkind IN ('r', 'v', 'm', 'p', 'f')
+       AND a.attnum > 0
+       AND NOT a.attisdropped
+     ORDER BY t.relname, a.attnum`,
+    `SELECT tablename AS name, indexdef AS col
+     FROM pg_indexes
+     WHERE schemaname = ANY (current_schemas(false))
+     ORDER BY tablename, indexname`,
+  ],
+  mysql2: [
+    `SELECT TABLE_NAME AS name,
+            CONCAT(COLUMN_NAME, ' ', COLUMN_TYPE, ' ', IS_NULLABLE, ' ',
+                   COALESCE(COLLATION_NAME, ''), ' ', COLUMN_KEY, ' ',
+                   COALESCE(COLUMN_DEFAULT, ''), ' ', EXTRA, ' ', COLUMN_COMMENT) AS col
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+     ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+    `SELECT TABLE_NAME AS name,
+            CONCAT(INDEX_NAME, ' ', SEQ_IN_INDEX, ' ', COLUMN_NAME, ' ', NON_UNIQUE) AS col
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+     ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX`,
+  ],
 };
 
 /**
