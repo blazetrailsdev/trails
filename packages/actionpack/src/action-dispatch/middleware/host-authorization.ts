@@ -187,6 +187,7 @@ export class Permissions {
   }
 }
 
+/** @internal */
 function sanitizeHosts(
   hosts: HostPermission[] | HostPermission | undefined | null,
 ): (RegExp | IPAddr)[] {
@@ -198,10 +199,12 @@ function sanitizeHosts(
   });
 }
 
+/** @internal */
 function sanitizeRegexp(host: RegExp): RegExp {
   return new RegExp(`^(?:${host.source})${PORT_REGEX}?$`, host.flags.replace(/[gym]/g, ""));
 }
 
+/** @internal */
 function sanitizeString(host: string): RegExp {
   if (host.startsWith(".")) {
     return new RegExp(`^${SUBDOMAIN_REGEX}?${escapeRegExp(host.slice(1))}${PORT_REGEX}?$`, "i");

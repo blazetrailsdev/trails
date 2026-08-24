@@ -47,6 +47,7 @@ export class ContentDisposition {
   }
 }
 
+/** @internal */
 function percentEscape(str: string, pattern: RegExp): string {
   return str.replace(pattern, (char) => {
     const bytes = utf8Encoder.encode(char);

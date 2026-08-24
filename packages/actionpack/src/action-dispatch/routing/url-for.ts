@@ -45,6 +45,7 @@ export {
  */
 export interface UrlForRoutes {
   urlFor(options: Record<string, unknown>, routeName?: string | null): string;
+  /** @internal */
   optimizeRoutesGeneration?(): boolean;
   /**
    * Rails' UrlFor includes PolymorphicRoutes, whose helpers read

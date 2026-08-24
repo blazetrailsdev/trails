@@ -989,9 +989,13 @@ export class Request {
 
   // --- Mime-negotiation privates (declared; bound below via prototype) ---
 
+  /** @internal */
   declare validAcceptHeader: () => boolean;
+  /** @internal */
   declare useAcceptHeader: () => boolean;
+  /** @internal */
   declare formatFromPathExtension: () => MimeType | undefined;
+  /** @internal */
   declare isParamsReadable: () => boolean;
 
   // --- Controller dispatch ---

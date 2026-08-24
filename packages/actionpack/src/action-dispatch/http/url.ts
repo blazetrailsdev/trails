@@ -41,15 +41,18 @@ export interface UrlOptions {
   domain?: string;
 }
 
+/** @internal */
 function namedHost(host: string): boolean {
   return !IP_HOST_REGEXP.test(host);
 }
 
+/** @internal */
 function extractDomainFrom(host: string, tldLength: number): string {
   const parts = host.split(".");
   return parts.slice(-(1 + tldLength)).join(".");
 }
 
+/** @internal */
 function extractSubdomainsFrom(host: string, tldLength: number): string[] {
   const parts = host.split(".");
   // Rails: `parts[0..-(tld_length + 2)]` returns `[]` (not the tail) when the
@@ -59,6 +62,7 @@ function extractSubdomainsFrom(host: string, tldLength: number): string[] {
   return parts.slice(0, Math.max(0, parts.length - (tldLength + 1)));
 }
 
+/** @internal */
 function addParams(parts: string[], params: unknown): void {
   let hash: Record<string, unknown>;
   if (params && typeof params === "object" && !Array.isArray(params)) {
@@ -73,6 +77,7 @@ function addParams(parts: string[], params: unknown): void {
   if (query.length > 0) parts.push(`?${query}`);
 }
 
+/** @internal */
 function addAnchor(parts: string[], anchor: unknown): void {
   if (anchor !== null && anchor !== undefined && anchor !== false) {
     const p = toParam(anchor);
@@ -80,6 +85,7 @@ function addAnchor(parts: string[], anchor: unknown): void {
   }
 }
 
+/** @internal */
 function normalizeProtocol(protocol: string | false | null | undefined): string {
   if (protocol === null || protocol === undefined) {
     return URL.secureProtocol ? "https://" : "http://";
@@ -92,6 +98,7 @@ function normalizeProtocol(protocol: string | false | null | undefined): string 
   throw new Error(`Invalid :protocol option: ${JSON.stringify(protocol)}`);
 }
 
+/** @internal */
 function normalizeHost(rawHost: string, options: UrlOptions): string {
   if (!namedHost(rawHost)) return rawHost;
 
@@ -111,6 +118,7 @@ function normalizeHost(rawHost: string, options: UrlOptions): string {
   return host;
 }
 
+/** @internal */
 function normalizePort(
   port: number | string | null | undefined,
   protocol: string,
@@ -122,6 +130,7 @@ function normalizePort(
   return n === 80 ? null : port;
 }
 
+/** @internal */
 function buildHostUrl(
   hostIn: string,
   portIn: number | string | null | undefined,

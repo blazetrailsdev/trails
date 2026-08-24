@@ -691,13 +691,16 @@ export class IntegrationTest {
   declare assertGenerates: typeof routingAssertions.assertGenerates;
   declare assertRouting: typeof routingAssertions.assertRouting;
   declare withRouting: typeof routingAssertions.withRouting;
+  /** @internal */
   declare createRoutes: typeof routingAssertions.createRoutes;
+  /** @internal */
   declare resetRoutes: typeof routingAssertions.resetRoutes;
   declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
   declare failOn: typeof routingAssertions.failOn;
   declare urlFor: typeof urlForMod.urlFor;
   declare fullUrlFor: typeof urlForMod.fullUrlFor;
   declare routeFor: typeof urlForMod.routeFor;
+  /** @internal */
   declare optimizeRoutesGeneration: typeof urlForMod.optimizeRoutesGeneration;
   declare _withRoutes: typeof urlForMod._withRoutes;
   declare _routesContext: typeof urlForMod._routesContext;

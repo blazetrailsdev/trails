@@ -117,3 +117,39 @@ export function packageSrcDir(pkg: string): string {
     ? path.join(ROOT_DIR, "packages", dirName, "src", subDir)
     : path.join(ROOT_DIR, "packages", dirName, "src");
 }
+
+/**
+ * The api-compare packages `scripts/build-rails-privates-manifest.ts` projects
+ * Rails visibility onto. Deliberately a subset of `PACKAGES`: the gem ports
+ * (`rack`, `globalid`, `i18n`, `did-you-mean`) have no entry yet, so their
+ * `@internal` tags are unvalidatable in both directions — tracked by
+ * `rails-privates-manifest-missing-gem-packages`.
+ */
+export const MANIFEST_PACKAGES = [
+  "arel",
+  "activemodel",
+  "activerecord",
+  "activesupport",
+  "actiondispatch",
+  "actioncontroller",
+  "actionview",
+  "trailties",
+] as const;
+
+/**
+ * Manifest package → repo-relative POSIX src dir, derived from `packageSrcDir`
+ * rather than hand-copied in the manifest builder. It lives here so the two can
+ * never drift: the builder's own copy spelled `actiondispatch` /
+ * `actioncontroller` against the real `action-dispatch` / `action-controller`,
+ * which voided every actionpack key in `eslint/rails-private-methods.json` and
+ * with it the `rails-private-jsdoc` rule for the whole package.
+ *
+ * Forward slashes because the ESLint rule looks entries up by
+ * `path.relative(...).split(path.sep).join("/")`.
+ */
+export const PACKAGE_DIRS: Record<string, string> = Object.fromEntries(
+  MANIFEST_PACKAGES.map((pkg) => [
+    pkg,
+    path.relative(ROOT_DIR, packageSrcDir(pkg)).split(path.sep).join("/"),
+  ]),
+);

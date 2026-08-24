@@ -36,25 +36,12 @@ import {
   beginManifestBatch,
   flushManifestBatch,
 } from "@blazetrails/parity/write-json-manifest";
+import { PACKAGE_DIRS } from "./api-compare/config.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-
-// Reuses the package layout from scripts/api-compare/config.ts so the
-// two stay in lockstep. Paths are POSIX (forward slashes) — the ESLint
-// rule looks up entries built from `path.relative(...).split(sep).join("/")`.
-const PACKAGE_DIRS: Record<string, string> = {
-  arel: "packages/arel/src",
-  activemodel: "packages/activemodel/src",
-  activerecord: "packages/activerecord/src",
-  activesupport: "packages/activesupport/src",
-  actiondispatch: "packages/actionpack/src/actiondispatch",
-  actioncontroller: "packages/actionpack/src/actioncontroller",
-  actionview: "packages/actionview/src",
-  trailties: "packages/trailties/src",
-};
 
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
@@ -244,6 +231,19 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     for (const [ruby, status] of names) {
       if (status !== "all-private") continue;
       for (const c of rubyMethodToTs(ruby) ?? []) tsNames.add(c);
+    }
+    // The all-private decision above is made per RUBY name, but the manifest is
+    // keyed by TS name, and the two are not one-to-one: `rubyMethodToTs` gives a
+    // `?` method the bare stem as a candidate, so a private `content_security_policy?`
+    // contributes `contentSecurityPolicy` — the spelling of the PUBLIC
+    // `content_security_policy` sitting beside it in the same file. Left in, the
+    // manifest demands `@internal` on a public Rails DSL method and hides it from
+    // the website API reference. Subtracting every candidate of a `mixed` name
+    // restores the all-private guard's intent in the TS namespace it actually
+    // gates on.
+    for (const [ruby, status] of names) {
+      if (status === "all-private") continue;
+      for (const c of rubyMethodToTs(ruby) ?? []) tsNames.delete(c);
     }
     if (tsNames.size === 0) continue;
     const existing = manifest.files[tsRel] ?? [];

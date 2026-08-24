@@ -812,7 +812,11 @@ export class Base extends Metal {
 
   // --- Send File / Send Data ---
 
-  /** Mirrors Rails `send_file_headers!`; wired below via `Base.prototype`. */
+  /**
+   * Mirrors Rails `send_file_headers!`; wired below via `Base.prototype`.
+   *
+   * @internal
+   */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
 
   /** Send file content. */
