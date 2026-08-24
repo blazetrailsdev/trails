@@ -1457,9 +1457,11 @@ export class CreatePosts extends Migration {
   // config is the only place to set it.
   async function disableMetadataTable(adapter: unknown, database?: string): Promise<void> {
     const { Base } = await import("@blazetrails/activerecord");
-    // Hand the adapter back before it is leased into the replacement pool.
+    // Hand the adapter back before it is leased into the replacement pool:
+    // removing the connection disconnects the pool, whose `disconnect` does
+    // `conn.steal!; checkin conn` (connection_pool.rb:456-459), and `checkin`
+    // expires the connection.
     Base.connectionHandler.removeConnection("Base");
-    (adapter as { expire(): void }).expire();
     await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
 

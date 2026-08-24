@@ -11,6 +11,12 @@
  * layering just the abstract bodies over the live connection — that is the code
  * path the abstract bodies actually own, while everything they delegate to
  * (`dataSourceSql`, `internalExecQuery`) still resolves on the real adapter.
+ *
+ * `columns` and `primaryKey` are not layered: the abstract bodies
+ * (schema_statements.rb:107-113, :145-149) issue no query of their own, they
+ * only map `column_definitions` through `new_column_from_field` and read
+ * `primary_keys` — all per-adapter overrides — so the SCHEMA naming they must
+ * carry is the adapters' and is asserted through them.
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../../index.js";
@@ -29,14 +35,7 @@ describe("SchemaStatements reflection probes", () => {
   function statements(): SchemaStatements {
     const host = Object.create(conn()) as SchemaStatements;
     const proto = Object.getOwnPropertyDescriptors(SchemaStatements.prototype);
-    for (const name of [
-      "tables",
-      "views",
-      "dataSources",
-      "dataSourceExists",
-      "columns",
-      "primaryKey",
-    ] as const) {
+    for (const name of ["tables", "views", "dataSources", "dataSourceExists"] as const) {
       Object.defineProperty(host, name, proto[name]);
     }
     return host;
