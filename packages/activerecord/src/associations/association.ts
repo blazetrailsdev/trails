@@ -707,7 +707,7 @@ export class Association {
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
     );
-    if (Object.keys(attributes).length > 0) record._assignAttributes(attributes);
+    if (Object.keys(attributes).length > 0) void record._assignAttributes(attributes);
     this.setInverseInstance(record);
   }
 
