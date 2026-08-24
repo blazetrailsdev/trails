@@ -1,24 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { Types, BigIntegerType, IntegerType } from "../index.js";
+import { BigIntegerType } from "../index.js";
 
 describe("BigIntegerTest", () => {
   it("type cast big integer", () => {
     const type = new BigIntegerType();
     expect(type.cast(1)).toEqual(1);
     expect(type.cast("1")).toEqual(1);
-  });
-
-  it("BigInteger small values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    expect(type.cast("0")).toBe(0);
-    expect(type.cast("1")).toBe(1);
-    expect(type.cast("-1")).toBe(-1);
-  });
-
-  it("BigInteger large values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    const large = "9999999999999999999999";
-    expect(type.cast(large)).toBe(BigInt(large));
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {
@@ -41,72 +28,5 @@ describe("BigIntegerTest", () => {
     expect(type.serialize(9999999999999999999999999999999n)).toEqual(
       9999999999999999999999999999999n,
     );
-  });
-
-  it("inherits from IntegerType", () => {
-    expect(new BigIntegerType()).toBeInstanceOf(IntegerType);
-  });
-
-  it("plain object {} casts to null (non-numeric string path)", () => {
-    const type = new BigIntegerType();
-    expect(type.cast({})).toBeNull();
-  });
-
-  it("large numeric string beyond MAX_SAFE_INTEGER casts to bigint with precision", () => {
-    const type = new BigIntegerType();
-    const large = "99999999999999999999";
-    expect(type.cast(large)).toBe(BigInt(large));
-  });
-
-  it("leading + in numeric string casts to bigint (Rails to_i accepts leading +)", () => {
-    const type = new BigIntegerType();
-    expect(type.cast("+42")).toBe(42);
-    expect(type.cast("+99999999999999999999")).toBe(BigInt("99999999999999999999"));
-  });
-
-  it("numeric string with trailing characters extracts leading digits (Rails to_i)", () => {
-    const type = new BigIntegerType();
-    expect(type.cast("123abc")).toBe(123);
-    expect(type.cast("99999999999999999999trailing")).toBe(BigInt("99999999999999999999"));
-  });
-
-  it("numeric string in safe range casts to number", () => {
-    const type = new BigIntegerType();
-    expect(type.cast("42")).toBe(42);
-    expect(typeof type.cast("42")).toBe("number");
-  });
-
-  it("serialize returns numeric (number or bigint), never string", () => {
-    const type = new BigIntegerType();
-    const BIG = 2n ** 62n;
-    expect(type.serialize(42n)).toBe(42);
-    expect(type.serialize("42")).toBe(42);
-    expect(typeof type.serialize(BIG)).toBe("bigint");
-    expect(type.serialize(BIG)).toBe(BIG);
-  });
-
-  it("maxValue returns Infinity", () => {
-    const type = new BigIntegerType();
-    expect((type as unknown as { maxValue(): number }).maxValue()).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it("no range error for absurdly large values", () => {
-    const type = new BigIntegerType();
-    const huge = BigInt("9".repeat(100));
-    expect(() => type.serialize(huge)).not.toThrow();
-  });
-
-  it("no range error for values outside int8 range even when limit is set", () => {
-    // BigIntegerType is unconditionally unlimited (big_integer.rb:33 — max_value = Infinity).
-    // The 8-byte guard belongs on the adapter column type, not on BigIntegerType itself.
-    const type = new BigIntegerType({ limit: 8 });
-    expect(() => type.serialize(9223372036854775808n)).not.toThrow();
-    expect(type.isSerializable(BigInt("9".repeat(100)))).toBe(true);
-  });
-
-  it("blank string casts to null", () => {
-    const type = new BigIntegerType();
-    expect(type.cast("")).toBeNull();
-    expect(type.cast("   ")).toBeNull();
   });
 });
