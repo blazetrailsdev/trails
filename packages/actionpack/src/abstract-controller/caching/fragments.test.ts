@@ -136,6 +136,31 @@ describe("read/write/expire fragment", () => {
     expect(readFragment.call(host, "other")).toBe("c");
   });
 
+  it("write_fragment converts the body with to_str and raises for a non-string body", () => {
+    const stringLike = { toStr: () => "converted" };
+    expect(writeFragment.call(host, "n", stringLike)).toBe("converted");
+    expect(readFragment.call(host, "n")).toBe("converted");
+    expect(() => writeFragment.call(host, "m", 42)).toThrow("undefined method 'to_str' for 42");
+    expect(readFragment.call(host, "m")).toBeNull();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("forwards options to exist?, delete and delete_matched", () => {
+    const store = HostClass.cacheStore!;
+    const exist = vi.spyOn(store, "exist");
+    const del = vi.spyOn(store, "delete");
+    const deleteMatched = vi.spyOn(store, "deleteMatched");
+    fragmentExist.call(host, "n", { namespace: "ns" });
+    expireFragment.call(host, "n", { namespace: "ns" });
+    expireFragment.call(host, /n/, { namespace: "ns" });
+    expect(exist).toHaveBeenCalledWith("views/n", { namespace: "ns" });
+    expect(del).toHaveBeenCalledWith("views/n", { namespace: "ns" });
+    expect(deleteMatched).toHaveBeenCalledWith(/n/, { namespace: "ns" });
+  });
+
   it("returns content / undefined when caching is not configured", () => {
     HostClass.performCaching = false;
     expect(writeFragment.call(host, "n", "body")).toBe("body");

@@ -4,19 +4,22 @@ import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { resetI18n } from "../test-helpers/i18n.js";
+import { Reply } from "../test-helpers/models/reply.js";
 
 fixtures([]);
 // The canonical `topics` table is laid at boot by loadCanonicalSchema.
 
 /** An associated child whose validation always fails — stands in for Rails'
  *  `replied_topic.replies` (a topic carrying one invalid reply). */
-class FakeReply {
-  isValid(): boolean {
-    return false;
+class FakeReply extends Reply {
+  override isValid(): Promise<boolean> {
+    return Promise.resolve(false);
   }
 }
 
 describe("I18nValidationTest", () => {
+  registerModel("Reply", Reply);
+
   afterEach(() => {
     vi.restoreAllMocks();
     resetI18n();
@@ -51,6 +54,7 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }
     }
@@ -80,6 +84,7 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }
     }
@@ -99,6 +104,7 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
+        this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }
     }

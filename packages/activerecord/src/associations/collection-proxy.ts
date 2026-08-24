@@ -376,10 +376,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._record = record;
     this._assocName = assocName;
     this._assocDef = assocDef;
-    const instance = record.association(assocName) as unknown as CollectionAssociation & {
-      isCollection?(): boolean;
-    };
-    this._targetAssociation = instance.isCollection?.()
+    const instance = record.association(assocName) as unknown as CollectionAssociation;
+    this._targetAssociation = instance.isCollection()
       ? instance
       : new CollectionAssociation(record, assocDef);
 

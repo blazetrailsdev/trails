@@ -25,8 +25,8 @@ export interface CacheOptions {
 export interface CacheStore {
   read(key: string, options?: CacheOptions): unknown;
   write(key: string, value: unknown, options?: CacheOptions): boolean;
-  delete(key: string): boolean;
-  exist(key: string): boolean;
+  delete(key: string, options?: CacheOptions): boolean;
+  exist(key: string, options?: CacheOptions): boolean;
   fetch(key: string, options: CacheOptions, fallback: () => unknown): unknown;
   fetch(key: string, fallback: () => unknown): unknown;
   clear(): void;

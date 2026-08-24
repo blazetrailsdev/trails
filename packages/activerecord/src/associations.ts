@@ -549,6 +549,11 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
  * RFC 0022: writers and inverse-of seeders route through the holder, which is
  * the single source of truth — surfaced to readers via `Base#_associationCache`.
  *
+ * An inverse name with no declared singular reflection is not cached at all:
+ * `@association_cache` holds only `Association` instances built from a
+ * reflection (associations.rb:290-296), and Rails cannot reach that state —
+ * `inverse_of` resolution yields a reflection or nothing.
+ *
  * @internal
  */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
@@ -572,15 +577,6 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
   if (existing) {
     existing._setTargetFromLoader(target);
     existing._explicitTarget = true;
-  } else {
-    record._associationInstances.set(assocName, {
-      target,
-      _explicitTarget: true,
-      isLoaded: () => true,
-      setTarget(this: { target: unknown }, t: unknown) {
-        this.target = t;
-      },
-    } as never);
   }
 }
 
@@ -838,11 +834,11 @@ export class Associations {
     if (!ownWrappedNames.has(name)) {
       ownWrappedNames.add(name);
       self.prototype.destroyAssociations = async function (this: {
-        association(n: string): { handleDependency(): Promise<void>; reset?(): void };
+        association(n: string): { handleDependency(): Promise<void>; reset(): void };
         _collectionProxies?: { delete(n: string): void };
       }): Promise<void> {
         await this.association(middleName).handleDependency();
-        this.association(name).reset?.();
+        this.association(name).reset();
         // Rails' `association(:name).reset` only clears the Association
         // instance's loaded state. In this codebase, collection readers are
         // additionally memoized in `_collectionProxies` (see associations.ts
@@ -1235,13 +1231,13 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
     | {
         _setTargetFromLoader(t: Base | Base[] | null): void;
         _loaderWritebackSuppressed?: number;
-        isCollection?(): boolean;
-        _mergeLoaderResults?(rows: Base[]): void;
+        isCollection(): boolean;
+        _mergeLoaderResults(rows: Base[]): void;
       }
     | undefined;
   if (!holder || holder._loaderWritebackSuppressed) return;
-  if (holder.isCollection?.()) {
-    holder._mergeLoaderResults?.((result ?? []) as Base[]);
+  if (holder.isCollection()) {
+    holder._mergeLoaderResults((result ?? []) as Base[]);
     return;
   }
   holder._setTargetFromLoader(result as Base | Base[] | null);
@@ -1676,10 +1672,10 @@ export function associationInstanceGet(this: Base, name: string): unknown {
     _collectionProxies?: Map<string, unknown>;
   };
   const existing = record._associationInstances.get(name) as
-    | { isLoaded?(): boolean; target?: unknown }
+    | { isLoaded(): boolean; target?: unknown }
     | undefined;
   if (typeof record.association !== "function") {
-    return existing?.isLoaded?.() ? existing : null;
+    return existing?.isLoaded() ? existing : null;
   }
   // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
   // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
@@ -1698,13 +1694,13 @@ export function associationInstanceGet(this: Base, name: string): unknown {
     !!proxy?.loaded ||
     proxyHasBuiltRecords ||
     existingHasBuiltRecords ||
-    !!existing?.isLoaded?.();
+    !!existing?.isLoaded();
   if (!hasCachedData) return null;
   try {
     const inst = record.association(name) as
-      | { isLoaded?(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
+      | { isLoaded(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
       | undefined;
-    if (inst?.isLoaded?.()) return inst;
+    if (inst?.isLoaded()) return inst;
     if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
       inst._writeTargetStore?.(proxy.target);
       return inst;

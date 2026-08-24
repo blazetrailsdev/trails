@@ -2888,12 +2888,10 @@ export class Base extends Model {
     // reader's target a single record on every preload path (RFC 0022).
     const instance = this._associationInstances.get(name) as
       | (AssociationInstance & {
-          isLoaded?(): boolean;
-          isCollection?(): boolean;
           target?: Base | Base[] | null;
         })
       | undefined;
-    if (instance?.isLoaded?.() && instance.isCollection?.() !== true) return instance;
+    if (instance?.isLoaded() && !instance.isCollection()) return instance;
     const proxy = this._collectionProxies.get(name) as
       | { loaded?: boolean; target?: Base[] }
       | undefined;
@@ -2909,8 +2907,8 @@ export class Base extends Model {
     // same store — so an inverse-seeded target is visible here without anyone
     // having materialized the proxy first.
     if (
-      instance?.isCollection?.() === true &&
-      (instance.isLoaded?.() === true ||
+      instance?.isCollection() === true &&
+      (instance.isLoaded() === true ||
         (Array.isArray(instance.target) && instance.target.length > 0))
     ) {
       return instance;
@@ -3354,7 +3352,7 @@ export class Base extends Model {
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
-        if (!assoc || assoc.isLoaded?.()) continue;
+        if (!assoc || assoc.isLoaded()) continue;
         if (useSavepoint) {
           await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
         } else {

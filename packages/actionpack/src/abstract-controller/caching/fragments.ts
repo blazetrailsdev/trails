@@ -12,7 +12,7 @@
  * @internal
  */
 
-import { Notifications } from "@blazetrails/activesupport";
+import { NameError, Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
 // `cacheConfigured` is duplicated here (it also lives in `caching.ts`) so
@@ -99,18 +99,40 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+/** Ruby's `NoMethodError`, raised when a receiver does not answer `to_str`. */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
+ * Ruby's implicit string conversion (`Object#to_str`), which only String — and
+ * objects that opt in by defining `to_str`, such as `ActionView::OutputBuffer`
+ * (`toStr()` here) — answer. `write_fragment` relies on it to reject a
+ * non-string-like body (fragments.rb:85).
+ */
+function toStr(content: unknown): string {
+  if (typeof content === "string") return content;
+  const toStrMethod = (content as { toStr?: unknown } | null)?.toStr;
+  if (typeof toStrMethod === "function") return (toStrMethod as () => string).call(content);
+  throw new NoMethodError(`undefined method 'to_str' for ${String(content)}`);
+}
+
 export function writeFragment(
   this: FragmentsHost,
   key: unknown,
-  content: string,
+  content: unknown,
   options?: CacheOptions,
-): string {
+): unknown {
   if (!cacheConfigured(this)) return content;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "write_fragment", key, () => {
+  instrumentFragmentCache(this, "write_fragment", key, () => {
+    content = toStr(content);
     this.constructor.cacheStore!.write(key as string, content, options);
-    return content;
   });
+  return content;
 }
 
 export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
@@ -121,36 +143,27 @@ export function readFragment(this: FragmentsHost, key: unknown, options?: CacheO
   );
 }
 
-// `_options` on fragmentExist / expireFragment: Rails forwards options
-// to `cache_store.exist?` / `delete` / `delete_matched`, but the trails
-// `CacheStore` interface in activesupport doesn't accept options on
-// those methods. Follow-up: widen `CacheStore.exist` / `delete` /
-// `deleteMatched` signatures, then drop the `_` prefix here.
 export function fragmentExist(
   this: FragmentsHost,
   key: unknown,
-  _options?: CacheOptions,
+  options?: CacheOptions,
 ): boolean | undefined {
   if (!cacheConfigured(this)) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   return instrumentFragmentCache(this, "exist_fragment?", key, () =>
-    this.constructor.cacheStore!.exist(key as string),
+    this.constructor.cacheStore!.exist(key as string, options),
   );
 }
 
-export function expireFragment(
-  this: FragmentsHost,
-  key: unknown,
-  _options?: CacheOptions,
-): unknown {
+export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
   if (!cacheConfigured(this)) return undefined;
   if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
 
   return instrumentFragmentCache(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
-      return this.constructor.cacheStore!.deleteMatched(key);
+      return this.constructor.cacheStore!.deleteMatched(key, options);
     } else {
-      return this.constructor.cacheStore!.delete(key as string);
+      return this.constructor.cacheStore!.delete(key as string, options);
     }
   });
 }

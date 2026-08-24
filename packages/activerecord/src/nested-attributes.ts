@@ -619,7 +619,7 @@ interface OneToOneAssociation {
   buildRecord(attrs: Record<string, unknown>): Base | null;
   setNewRecord(record: Base): void;
   initializeAttributes(record: Base): void;
-  isLoaded?(): boolean;
+  isLoaded(): boolean;
   // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
   // where trails raises strict-loading violations (singular-association.ts:210).
   readonly reader?: Base | null | Promise<Base | null>;
@@ -760,7 +760,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   // load, so the whole body is re-entered once it lands (`assoc.isLoaded()` is
   // true by then, so this resolves and falls through).
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
-  if ((hasId || updateOnly) && assoc.isLoaded?.() === false && "reader" in assoc) {
+  if ((hasId || updateOnly) && assoc.isLoaded() === false && "reader" in assoc) {
     const read = assoc.reader;
     if (read instanceof Promise) {
       return read.then(() =>
