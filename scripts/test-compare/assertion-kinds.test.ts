@@ -25,9 +25,28 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("wont_equal")).toBe("notEqual");
   });
 
+  it("maps the must_be_* spec family, which the prefix rewrite alone cannot reach", () => {
+    // `must_be_kind_of` is `assert_kind_of`, not `assert_be_kind_of`.
+    expect(normalizeRailsKind("must_be_kind_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("must_be_instance_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("must_be_nil")).toBe("nil");
+    expect(normalizeRailsKind("must_be_empty")).toBe("empty");
+    expect(normalizeRailsKind("must_be_same_as")).toBe("same");
+    expect(normalizeRailsKind("wont_be_same_as")).toBe("notSame");
+    expect(normalizeRailsKind("wont_be_nil")).toBe("notNil");
+  });
+
+  it("maps the arel-local must_be_like and assert_edge helpers", () => {
+    // helper.rb:10-13 squeezes whitespace then delegates to must_equal.
+    expect(normalizeRailsKind("must_be_like")).toBe("equal");
+    // visitors/dot_test.rb:13-15 wraps assert_match over a label regex.
+    expect(normalizeRailsKind("assert_edge")).toBe("match");
+  });
+
   it("returns null for an unmapped assertion helper", () => {
     expect(normalizeRailsKind("assert_queries_count")).toBeNull();
     expect(normalizeRailsKind("assert_cycle")).toBeNull();
+    expect(normalizeRailsKind("must_be_frobnicated")).toBeNull();
   });
 });
 

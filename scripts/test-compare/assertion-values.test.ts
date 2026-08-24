@@ -122,4 +122,38 @@ describe("assertionValueMismatch", () => {
     ).toBeNull();
     expect(assertionValueMismatch(undefined, undefined, ["toEqual"], ["n:4"], false)).toBeNull();
   });
+
+  it("folds whitespace for must_be_like, which squeezes both operands", () => {
+    // helper.rb:10-13: `%{\n  SELECT id FROM "users"\n}` and the ported
+    // single-line literal are the SAME assertion.
+    expect(
+      assertionValueMismatch(
+        ["must_be_like"],
+        ['s:\n            SELECT id FROM "users"\n          '],
+        ["toEqual"],
+        ['s:SELECT id FROM "users"'],
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("still flags a must_be_like pair whose SQL actually differs", () => {
+    expect(
+      assertionValueMismatch(
+        ["must_be_like"],
+        ['s: SELECT id FROM "users" '],
+        ["toEqual"],
+        ['s:SELECT * FROM "users"'],
+        false,
+      ),
+    ).toEqual([
+      { kind: "equal", rails: ['s:SELECT id FROM "users"'], trails: ['s:SELECT * FROM "users"'] },
+    ]);
+  });
+
+  it("does not fold whitespace for an ordinary must_equal pair", () => {
+    expect(
+      assertionValueMismatch(["must_equal"], ["s:a  b"], ["toEqual"], ["s:a b"], false),
+    ).toEqual([{ kind: "equal", rails: ["s:a  b"], trails: ["s:a b"] }]);
+  });
 });

@@ -84,6 +84,7 @@ function collectSide(
   kinds: string[],
   values: (string | null)[] | undefined,
   side: "rails" | "trails",
+  squeezeEqual = false,
 ): Map<string, SideKind> {
   const normalize = side === "rails" ? normalizeRailsKind : normalizeTrailsKind;
   const map = new Map<string, SideKind>();
@@ -97,7 +98,10 @@ function collectSide(
     }
     entry.total++;
     const value = values?.[i];
-    if (value != null) entry.captured.push(foldSymbolToken(value));
+    if (value != null) {
+      const folded = foldSymbolToken(value);
+      entry.captured.push(squeezeEqual && kind === "equal" ? squeezeToken(folded) : folded);
+    }
   }
   return map;
 }
@@ -113,6 +117,18 @@ function collectSide(
  */
 function foldSymbolToken(token: string): string {
   return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
+}
+
+/**
+ * Arel's `must_be_like` (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13)
+ * squeezes runs of whitespace and strips both operands before delegating to
+ * `must_equal`, so `%{\n  SELECT id FROM "users"\n}` and `SELECT id FROM
+ * "users"` are the SAME assertion. Its value token must be compared the same
+ * way, on both sides — the Ruby heredoc keeps its indentation and the ported
+ * string literal does not, and that is formatting, not a fidelity divergence.
+ */
+function squeezeToken(token: string): string {
+  return token.startsWith("s:") ? `s:${token.slice(2).replace(/\s+/g, " ").trim()}` : token;
 }
 
 /**
@@ -137,8 +153,11 @@ export function assertionValueMismatch(
 ): ValueDelta[] | null {
   if (pending) return null;
   if (!railsKinds || !trailsKinds) return null;
-  const rails = collectSide(railsKinds, railsValues, "rails");
-  const trails = collectSide(trailsKinds, trailsValues, "trails");
+  // Whitespace-insensitive equality is a property of the Rails-side helper, so
+  // it is decided from the Rails kinds and then applied to BOTH sides.
+  const squeezeEqual = railsKinds.includes("must_be_like");
+  const rails = collectSide(railsKinds, railsValues, "rails", squeezeEqual);
+  const trails = collectSide(trailsKinds, trailsValues, "trails", squeezeEqual);
   const deltas: ValueDelta[] = [];
   for (const kind of [...new Set([...rails.keys(), ...trails.keys()])].sort()) {
     const r = rails.get(kind);

@@ -143,6 +143,31 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toBeCloseTo: "inDelta",
 };
 
+// Minitest spec-form expectations that are not a bare `must_<assert-suffix>`:
+// `must_be_kind_of` is `assert_kind_of`, not `assert_be_kind_of`. Keyed on the
+// spec spelling so the prefix fallback in normalizeRailsKind can stay small.
+const SPEC_MAP: Record<string, CanonicalKind> = {
+  must_be_nil: "nil",
+  wont_be_nil: "notNil",
+  must_be_empty: "empty",
+  wont_be_empty: "notEmpty",
+  must_be_kind_of: "instanceOf",
+  must_be_instance_of: "instanceOf",
+  must_be_same_as: "same",
+  wont_be_same_as: "notSame",
+  must_be: "operator",
+  must_be_close_to: "inDelta",
+  must_be_within_delta: "inDelta",
+  // Arel's own test helper: `sql.must_be_like "…"` whitespace-normalizes both
+  // sides and delegates to `must_equal`
+  // (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13).
+  must_be_like: "equal",
+  // Arel's dot_test-local helper: `assert_edge(name, dot)` is an `assert_match`
+  // over a `->…label="name"` regex
+  // (vendor/rails/activerecord/test/cases/arel/visitors/dot_test.rb:13-15).
+  assert_edge: "match",
+};
+
 /**
  * Normalize a raw Rails assertion method name (`assert_equal`, `refute_nil`,
  * `must_equal`, …) to a canonical kind, or `null` when there is no mapped twin.
@@ -150,7 +175,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
  * `assert_*`/`refute_*` equivalents before lookup.
  */
 export function normalizeRailsKind(name: string): CanonicalKind | null {
-  const direct = RAILS_MAP[name];
+  const direct = RAILS_MAP[name] ?? SPEC_MAP[name];
   if (direct) return direct;
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
   const must = /^must_(.+)$/.exec(name);
