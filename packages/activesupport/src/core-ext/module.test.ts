@@ -116,9 +116,20 @@ describe("ModuleTest", () => {
   });
 
   it("module nesting is empty", () => {
-    class Foo {}
-    expect(Foo.name).toBe("Foo");
-    expect(Foo.name.includes("::")).toBe(false);
+    class Json {
+      static parse(source: string) {
+        return JSON.parse(source);
+      }
+    }
+    registerConstant("Admin::Json", Json);
+    try {
+      class C {}
+      delegate(C, "parse", { to: Json });
+      const c = C as typeof C & { parse(source: string): unknown };
+      expect(c.parse("[1]")).toEqual([1]);
+    } finally {
+      unregisterConstant("Admin::Json", Json);
+    }
   });
 
   it("delegation to methods", () => {
@@ -621,12 +632,19 @@ describe("ModuleTest", () => {
   });
 
   it("delegation unreacheable module", () => {
-    class Container {
-      val: undefined = undefined;
-    }
-    delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something(): unknown };
-    expect(() => c.something()).toThrow();
+    const anonymousClass = [class {}][0];
+
+    expect(() => {
+      class C {}
+      delegate(C.prototype, "something", { to: anonymousClass });
+    }).toThrow(/Can't delegate to anonymous class or module/);
+
+    Object.defineProperty(anonymousClass, "name", { value: "FakeName" });
+
+    expect(() => {
+      class C {}
+      delegate(C.prototype, "something", { to: anonymousClass });
+    }).toThrow(/Can't delegate to detached class or module: FakeName/);
   });
 
   it("delegation arity to module", () => {
@@ -655,37 +673,5 @@ describe("ModuleTest", () => {
     delegate(Service.prototype, "compute", { to: "helper" });
     const s = new Service() as Service & { compute: (x: number) => number };
     expect(s.compute(4)).toBe(16);
-  });
-  it("module nesting is empty", () => {
-    class Json {
-      static parse(source: string) {
-        return JSON.parse(source);
-      }
-    }
-    registerConstant("Json", Json);
-    try {
-      class C {}
-      delegate(C, "parse", { to: Json });
-      const c = C as typeof C & { parse(source: string): unknown };
-      expect(c.parse("[1]")).toEqual([1]);
-    } finally {
-      unregisterConstant("Json", Json);
-    }
-  });
-
-  it("delegation unreacheable module", () => {
-    const anonymousClass = [class {}][0];
-
-    expect(() => {
-      class C {}
-      delegate(C.prototype, "something", { to: anonymousClass });
-    }).toThrow(/Can't delegate to anonymous class or module/);
-
-    Object.defineProperty(anonymousClass, "name", { value: "FakeName" });
-
-    expect(() => {
-      class C {}
-      delegate(C.prototype, "something", { to: anonymousClass });
-    }).toThrow(/Can't delegate to detached class or module: FakeName/);
   });
 });

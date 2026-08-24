@@ -4,7 +4,7 @@
  */
 
 import { NameError } from "./core-ext/name-error.js";
-import { constantize, safeConstantize } from "./inflector.js";
+import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "./method-missing-proxy.js";
 
 class ArgumentError extends Error {
@@ -85,6 +85,11 @@ export namespace Delegation {
    * raises here: Ruby reaches `TypeError` from `/^[^a-z_]/.match?(to)` (`:27`)
    * because a Module has no implicit String conversion, where TS has to test the
    * type itself, so it raises the `ArgumentError` that line is guarding for.
+   *
+   * `to.name` (`:38`, `:41`, `:45`) is Ruby's full constant path, so a nested
+   * `Admin::Json` delegates through `::Admin::Json`; a JS class carries only its
+   * own identifier, so the registered path comes from `registeredConstantName`
+   * and the class's own `name` is the fallback for a top-level registration.
    */
   export function generate<T extends object>(
     owner: T,
@@ -109,7 +114,7 @@ export namespace Delegation {
 
     let receiver: string;
     if (typeof to !== "string") {
-      const name = (to as { name?: string }).name;
+      const name = registeredConstantName(to) ?? (to as { name?: string }).name;
       if (name == null || name === "") {
         throw new ArgumentError(`Can't delegate to anonymous class or module: ${String(to)}`);
       }

@@ -254,6 +254,24 @@ export function privateConstant(name: string): void {
   _privateConstants.add(name);
 }
 
+/**
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — the reverse of the
+ *   invented registry; Ruby needs none because `Module#name` already IS the full constant path).
+ * The name half of Ruby's `Module#name` for a namespaced class. Ruby names a
+ * constant as a side effect of definition, so `Admin::Json.name` is
+ * `"Admin::Json"`; a JS class carries only its own identifier, so the path a
+ * host registered through {@link registerConstant} is the only place it exists.
+ * Returns the registered name for `value`, or `undefined` when nothing
+ * registered it — the trails spelling of Ruby's anonymous `name.nil?`.
+ */
+export function registeredConstantName(value: unknown): string | undefined {
+  for (const [name, registered] of _constants) {
+    if (registered === value) return name;
+  }
+  return undefined;
+}
+
 /** @internal — test use only: clear the registered constant table. */
 export function _resetConstants(): void {
   _constants.clear();
