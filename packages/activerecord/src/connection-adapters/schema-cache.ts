@@ -527,14 +527,6 @@ export class SchemaCache {
    * the flag correctly (sqlite/postgres) agree with the query so nothing changes.
    * When `_primaryKeys` is not yet warm the flags are left as reflected.
    */
-  private derivePrimaryKeyFlags(tableName: string, cols: Column[]): void {
-    const pk = this._primaryKeys.get(tableName);
-    const pkNames = new Set(pk == null ? [] : Array.isArray(pk) ? pk : [pk]);
-    for (const col of cols) {
-      col.primaryKey = pkNames.has(col.name);
-    }
-  }
-
   private reconcilePrimaryKeyFlags(tableName: string, cols: Column[]): void {
     if (!this._primaryKeys.has(tableName)) return;
     const pk = this._primaryKeys.get(tableName);
@@ -616,17 +608,13 @@ export class SchemaCache {
    * Rebuild `_columnsHash` from `_columns`, the tail of both load paths
    * (`initWith` and `marshalLoad`).
    *
-   * Rails' `Column#encode_with` writes seven keys and no `@primary_key`
-   * (`column.rb:55-63`) — a column's primary-key membership is not column state
-   * in Rails at all, it lives in the cache's own `@primary_keys` slot, which
-   * `marshal_dump` carries separately (`schema_cache.rb:416`). trails' Column
-   * does carry the flag, so rather than widening the column coder past Rails'
-   * key set, the flag is derived here from that authoritative slot once both
-   * halves are loaded. This is a derive, not
-   * {@link reconcilePrimaryKeyFlags}' clear-only reconcile: on the load path
-   * there is no adapter-reported flag to preserve or contradict, so
-   * `_primaryKeys` is the only source — which also drops MySQL's
-   * promoted-unique false positive out of any older dump for free.
+   * Both `_columns` and the authoritative `_primaryKeys` are already loaded, so
+   * reconcile the per-column `primaryKey` flags against the key cache before
+   * exposing the hash — a schema cache dumped before this convergence can carry
+   * MySQL's promoted-unique `primaryKey: true` alongside
+   * `primary_keys: { table: null }`, and the derive step must not resurface the
+   * bogus flag. Mirrors Rails treating `@primary_keys` as authoritative while
+   * deriving `columns_hash` (schema_cache.rb).
    *
    * @missingRailsCall deep_deduplicate — PERMANENT: Per-site verified (RFC 0106 wave 4b):
    *   schema_cache.rb:441-445 calls `deep_deduplicate` to intern strings with
@@ -637,7 +625,7 @@ export class SchemaCache {
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
-      this.derivePrimaryKeyFlags(table, cols);
+      this.reconcilePrimaryKeyFlags(table, cols);
       const hash: Record<string, Column> = {};
       for (const col of cols) {
         hash[col.name] = col;

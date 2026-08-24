@@ -22,9 +22,6 @@ describe("PostgreSQL::Column JSON round-trip", () => {
     expect(back.fmod).toBe(-1);
     expect(back.isIdentity).toBe(true);
     expect(back.isVirtual()).toBe(true);
-    // Rails' `encode_with` writes no `@primary_key` (`column.rb:55-63`); the
-    // flag is the schema cache's, derived from its own `primary_keys` slot.
-    expect(coder).not.toHaveProperty("primary_key");
-    expect({ ...back, primaryKey: col.primaryKey }).toEqual({ ...col });
+    expect(back).toEqual(col);
   });
 });

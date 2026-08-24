@@ -137,10 +137,26 @@ export class Column {
    * that does the allocating is `rehydrateColumn` (`schema-cache.ts`). Because
    * these are Ruby ivars re-assigned here, the fields above cannot be `readonly`.
    *
-   * The key set is Rails' exactly — `primaryKey` is deliberately absent, because
-   * Rails' Column carries no `@primary_key` ivar: primary-key membership lives
-   * in the schema cache's own `@primary_keys` slot (`schema_cache.rb:416`), and
-   * `SchemaCache` derives the trails-only flag back from there on load.
+   * `primary_key` is the one key beyond Rails' seven, and it is a deviation, not
+   * an oversight — Rails' Column has no `@primary_key` ivar, because primary-key
+   * membership lives in the cache's own `@primary_keys` slot
+   * (`schema_cache.rb:416`).
+   *
+   * It cannot be dropped while trails' Column carries the flag at all, because
+   * the flag is **adapter-dependent**: sqlite3's `columns()` reflects
+   * `primaryKey: true` for a real primary key, while postgresql's and mysql's
+   * reflect `false` and resolve the key solely from `@primary_keys`. So the
+   * dump has to reproduce whichever answer the reflecting adapter gave —
+   * deriving it from `@primary_keys` instead makes a dump-loaded cache report
+   * `true` on every lane and reds `base_test.rb`'s `test_clear_cache!` on
+   * postgresql and mysql (it compares a dump-loaded cache against a reflected
+   * one, where Rails only ever compares reflected-vs-reflected); omitting it
+   * entirely reports `false` on every lane and reds the same test plus the
+   * schema dumper on sqlite3. Both were measured on CI for this PR.
+   *
+   * Converging this means making the flag authoritative on the reflect path too
+   * (or removing it), which is RFC 0078
+   * `make-column-primary-key-flag-authoritative-or-remove-it`, filed from here.
    */
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
@@ -152,6 +168,7 @@ export class Column {
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
     this.collation = (coder["collation"] as string | null) ?? null;
     this.comment = (coder["comment"] as string | null) ?? null;
+    this.primaryKey = (coder["primary_key"] as boolean) ?? false;
   }
 
   /**
@@ -185,6 +202,7 @@ export class Column {
     coder["default_function"] = this.defaultFunction;
     coder["collation"] = this.collation;
     coder["comment"] = this.comment;
+    coder["primary_key"] = this.primaryKey;
   }
 
   deduplicate(): this {

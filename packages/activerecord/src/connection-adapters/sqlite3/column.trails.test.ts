@@ -59,9 +59,6 @@ describe("SQLite3::Column JSON round-trip", () => {
     expect(back.autoIncrement).toBe(true);
     expect(back.rowid).toBe(true);
     expect(back.isVirtualStored()).toBe(true);
-    // Rails' `encode_with` writes no `@primary_key` (`column.rb:55-63`); the
-    // flag is the schema cache's, derived from its own `primary_keys` slot.
-    expect(coder).not.toHaveProperty("primary_key");
-    expect({ ...back, primaryKey: col.primaryKey }).toEqual({ ...col });
+    expect(back).toEqual(col);
   });
 });
