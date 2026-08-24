@@ -10,6 +10,7 @@ import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
+import { parkNestedReaderLoad } from "../nested-attributes.js";
 import {
   camelize,
   constantize,
@@ -843,23 +844,18 @@ export class Association {
     // (association.rb:384-387); ours needs it twice because of the plain-`new`
     // fallback below, so it is bound once here.
     //
-    // Rails yields inside `build_record`, so the block has run by the time
-    // `build_record` returns and `set_new_record`/`save` follow
-    // (singular_association.rb:29-32, :67-70). When `_assignAttributes` defers
-    // — `scope_for_create`'s `create_with` half can name an association writer
+    // Rails yields inside `build_record` and returns after, so
+    // `set_new_record`/`save` (singular_association.rb:29-32, :67-70) see a
+    // fully initialized record. When `_assignAttributes` defers —
+    // `scope_for_create`'s `create_with` half can name an association writer
     // (relation.rb:1231-1235) — a JS constructor cannot await it back into this
-    // synchronous return, so the block is yielded from the continuation
-    // instead; the writes drain on save (RFC 0087). Converging this needs an
-    // awaited `buildRecord` across all seven call sites: story
-    // 0023-surfaced-deviations/build-record-await-deferred-initialize.
+    // synchronous return, so the assign is parked on the record for `save` to
+    // drain, exactly as `populate_with_current_scope_attributes` is
+    // (`_applyScopeAttributes`, base.ts). The yield and the return keep Rails'
+    // order.
     const initializeAndYield = (record: Base): void => {
       const pending = this.initializeAttributes(record, attributes);
-      if (pending) {
-        void pending.then(() => {
-          if (block) block(record);
-        });
-        return;
-      }
+      if (pending) parkNestedReaderLoad(record, pending);
       if (block) block(record);
     };
     if (reflection?.buildAssociation) {
