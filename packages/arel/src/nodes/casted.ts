@@ -14,10 +14,11 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
  * in Casted (when an attribute is supplied) or Quoted.
  *
  * TS deviations, all narrower/safer:
- * - Table / SelectManager aren't Arel nodes here and our visitor only
- *   handles them via duck-type in specific contexts (see visitIn). When
- *   their AST is what's wanted, unwrap to the ast node so downstream
- *   visitors always receive a real Node.
+ * - Table / SelectManager aren't Arel nodes here, so the SelectManager arm is
+ *   matched on its `ast` duck-type rather than by class (importing
+ *   `SelectManager` from a node module closes a require cycle). The manager
+ *   itself is returned, as Rails does (casted.rb:47-51), so
+ *   `visit_Arel_SelectManager` supplies the subquery parens.
  * - ActiveModel::Attribute isn't an Arel node either. Rails has
  *   visit_ActiveModel_Attribute that routes it through add_bind; we
  *   wrap it in BindParam so the value participates in prepared-statement
@@ -32,7 +33,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     // returning `other`. Class dispatch, like Rails.
     if (other instanceof ModelAttribute) return new BindParam(other);
     const maybeAst = (other as { ast?: unknown }).ast;
-    if (maybeAst instanceof Node) return maybeAst;
+    if (maybeAst instanceof Node) return other as Node;
   }
   if (_Attribute && attribute instanceof _Attribute)
     return new Casted(other, attribute as Attribute);

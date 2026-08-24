@@ -31,8 +31,18 @@ const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
  * look-alikes (`assertion`, `asserted`, `expected`) out. Only the inner
  * `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier callee,
  * so each chain counts once.
+ *
+ * `mustBeLike` is the one `must*` name that is NOT an assertion: Rails'
+ * `must_be_like` squeezes whitespace and then defers to `must_equal`
+ * (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13), and the trails
+ * port keeps only the squeezing half — a pure string normalizer used on BOTH
+ * sides of a native `expect(mustBeLike(a)).toBe(mustBeLike(b))`. Counting it
+ * would score one Rails assertion as three.
  */
+const NON_ASSERTION_MUST_HELPERS = new Set(["mustBeLike"]);
+
 function isAssertionCallee(name: string): boolean {
+  if (NON_ASSERTION_MUST_HELPERS.has(name)) return false;
   return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
 }
 

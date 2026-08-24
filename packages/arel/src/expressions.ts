@@ -10,7 +10,7 @@ import type { Node } from "./nodes/node.js";
  * Mixed into NodeExpression and SqlLiteral via include() in ./index.ts.
  */
 export interface ExpressionsModule {
-  count(distinct?: boolean): Count;
+  count(distinct?: boolean | null): Count;
   sum(): Sum;
   maximum(): Max;
   minimum(): Min;
@@ -19,7 +19,7 @@ export interface ExpressionsModule {
 }
 
 export const Expressions: ExpressionsModule = {
-  count(this: Node, distinct = false): Count {
+  count(this: Node, distinct: boolean | null = false): Count {
     return new Count([this], distinct);
   },
   sum(this: Node): Sum {

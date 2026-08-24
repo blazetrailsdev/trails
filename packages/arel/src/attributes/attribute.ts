@@ -46,10 +46,12 @@ export class Attribute extends Node {
   readonly relation: RelationLike;
   readonly name: string;
 
-  constructor(relation: RelationLike, name: string) {
+  // Rails' `Attribute.new(nil, nil)` is legal (attribute_test.rb:388); the
+  // relation-dependent methods below simply raise NoMethodError if reached.
+  constructor(relation: RelationLike | null, name: string | null) {
     super();
-    this.relation = relation;
-    this.name = name;
+    this.relation = relation as RelationLike;
+    this.name = name as string;
   }
 
   get typeCaster(): unknown {
@@ -149,7 +151,7 @@ export class Attribute extends Node {
   // (visitAggregate in to-sql.ts) renders them identically to a
   // NamedFunction with the same name.
 
-  count(distinct = false): Count {
+  count(distinct: boolean | null = false): Count {
     return new Count([this], distinct);
   }
 

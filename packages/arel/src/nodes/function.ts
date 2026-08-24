@@ -7,7 +7,9 @@ import { SqlLiteral } from "./sql-literal.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
   readonly expressions: Node[];
-  distinct: boolean;
+  // Rails' `count(nil)` stores nil (expressions.rb:5-7), which `must_be_nil`
+  // asserts on (attribute_test.rb:377-381), so nil is part of the domain.
+  distinct: boolean | null;
   private _alias: Node | null;
 
   get alias(): Node | null {
