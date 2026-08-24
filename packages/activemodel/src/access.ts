@@ -1,3 +1,6 @@
+import { withIndifferentAccess, type HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { NoMethodError } from "./attribute-assignment.js";
+
 /**
  * Access mixin — provides slice and values_at for attribute access.
  *
@@ -11,19 +14,13 @@ export class Access {
    *   def slice(*methods)
    *     methods.flatten.index_with { |method| public_send(method) }.with_indifferent_access
    *   end
-   *
-   * The result is a plain object rather than a `HashWithIndifferentAccess`:
-   * Ruby's is a `Hash` subclass, so `h[:name]`, `h["name"]` and `h == {…}` all
-   * answer on the same object, while the trails class is `Map`-backed and
-   * answers only through `get`/`set`. Converging the return type is tracked by
-   * 0115/converge-access-slice-with-indifferent-access.
    */
-  slice(...methods: (string | string[])[]): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+  slice(...methods: (string | string[])[]): HashWithIndifferentAccess<unknown> {
+    const indexed: Record<string, unknown> = {};
     for (const method of methods.flat()) {
-      result[method] = publicSend(this, method);
+      indexed[method] = publicSend(this, method);
     }
-    return result;
+    return withIndifferentAccess(indexed);
   }
 
   /**
@@ -39,12 +36,19 @@ export class Access {
 }
 
 /**
- * Ruby `public_send(method)` with no arguments. A generated attribute reader
- * ports as an accessor property (CLAUDE.md § "Generated attribute readers are
- * properties"), so reading the member is the whole send for one; a member that
- * is a function is a `def` and Ruby's send invokes it.
+ * Ruby `public_send(method)` with no arguments. Member existence is the JS
+ * analog of `respond_to?`, and a receiver that does not respond raises
+ * `NoMethodError` as Ruby's send does. A generated attribute reader ports as an
+ * accessor property (CLAUDE.md § "Generated attribute readers are properties"),
+ * so reading the member is the whole send for one; a member that is a function
+ * is a `def` and Ruby's send invokes it.
  */
 function publicSend(obj: object, method: string): unknown {
+  if (!(method in obj)) {
+    throw new NoMethodError(
+      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
+    );
+  }
   const value = (obj as Record<string, unknown>)[method];
   return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }

@@ -32,14 +32,15 @@ import {
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { AttributeSet } from "./attribute-set.js";
-import { ModelLike, ModelName } from "./naming.js";
+import { ModelName } from "./naming.js";
 import {
   Dirty,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
-import { Serialization, SerializeOptions, asJsonThenable } from "./serialization.js";
+import { Serialization } from "./serialization.js";
+import { JSON as SerializersJSON } from "./serializers/json.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
@@ -52,7 +53,6 @@ import {
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
 import * as AttributeAssignment from "./attribute-assignment.js";
-import { ArgumentError } from "./attribute-assignment.js";
 import {
   ClassMethods as ValidationsCallbacksClassMethods,
   type ValidationCallbackFilter,
@@ -84,6 +84,7 @@ import {
 } from "./attribute-registration.js";
 import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
+import { Naming } from "./naming.js";
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
@@ -102,7 +103,7 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeN
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface Model extends Dirty, Access, Conversion, Serialization {
+export interface Model extends Dirty, Access, Conversion, Serialization, Naming, SerializersJSON {
   /**
    * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
    * mixed on by the `include(Model, …)` at the bottom of this file.
@@ -231,7 +232,11 @@ export interface Model extends Dirty, Access, Conversion, Serialization {
 export class Model {
   [key: string]: unknown;
 
-  static includeRootInJson: boolean | string = false;
+  /**
+   * `class_attribute :include_root_in_json, instance_writer: false,
+   * default: false` (json.rb:15), installed by `JSON.[included]`.
+   */
+  declare static includeRootInJson: boolean | string;
   /**
    * `class_attribute :param_delimiter, instance_reader: false, default: "-"`
    * (conversion.rb:32), installed by `Conversion.[included]`.
@@ -468,28 +473,8 @@ export class Model {
    */
   declare static moduleName?: string;
 
-  /**
-   * Mirrors Rails `model_name` (naming.rb:270-277), which a host gains by
-   * `extend ActiveModel::Naming` (api.rb:66) — it stays a `model.ts` body only
-   * until `naming.ts` can carry `def model_name` separately from its `def
-   * self.*` module functions (naming.rb:283-348), which trails' `extend()`
-   * would otherwise copy onto the host too; tracked by
-   * 0115/relocate-model-name-to-naming-module. The namespace is the
-   * enclosing module, carried as `moduleName` because a JS class has no module
-   * path; `@_model_name ||=` is a per-class ivar, so the memo is an own
-   * property rather than an inherited one.
-   */
-  static get modelName(): ModelName {
-    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      // Rails walks `module_parents` for a module answering
-      // `use_relative_model_naming?` (naming.rb:271-276). JS has no
-      // enclosing-module chain to walk, so nothing can declare relative naming
-      // and the detect answers nil.
-      const namespace = null;
-      this._modelName = new ModelName(this as unknown as ModelLike, namespace);
-    }
-    return this._modelName;
-  }
+  /** `extend ActiveModel::Naming` (api.rb:66) — naming.rb:270-277. */
+  declare static modelName: ModelName;
 
   _attributes: AttributeSet = new AttributeSet();
   errors!: Errors<this>;
@@ -566,11 +551,6 @@ export class Model {
     }
   }
 
-  /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
-  get includeRootInJson(): boolean | string {
-    return (this.constructor as typeof Model).includeRootInJson;
-  }
-
   /**
    * `ActiveModel::Attributes#attributes` (attributes.rb:131-133), installed on
    * the prototype by the `include(Model, Attributes)` at the bottom of this
@@ -615,63 +595,6 @@ export class Model {
     return duped;
   }
 
-  asJson(options?: SerializeOptions): Record<string, unknown> {
-    const ctor = this.constructor as typeof Model;
-    return asJsonThenable(
-      () => this.serializableHash(options),
-      ctor.includeRootInJson,
-      () => ctor.modelName.element,
-      options ?? {},
-    );
-  }
-
-  /**
-   * Deserialize a JSON string into this model's attributes.
-   *
-   * Mirrors: ActiveModel::Serializers::JSON#from_json (json.rb:144-149)
-   *
-   *   def from_json(json, include_root = include_root_in_json)
-   *     hash = ActiveSupport::JSON.decode(json)
-   *     hash = hash.values.first if include_root
-   *     self.attributes = hash
-   *     self
-   *   end
-   *
-   * `includeRoot` defaults to the class-level `includeRootInJson`
-   * (matching Rails); when truthy, unwrap unconditionally via
-   * first-value semantics regardless of the configured root key. Empty
-   * strings are truthy here per Ruby semantics — only `false`/`null`
-   * skip the unwrap.
-   */
-  fromJson(json: string, includeRoot?: boolean | string): this {
-    const ctor = this.constructor as typeof Model;
-    const root = includeRoot ?? ctor.includeRootInJson;
-    let attrs: unknown = JSON.parse(json);
-    // Rails' `self.attributes = hash` routes through `assign_attributes`,
-    // which raises `ArgumentError` when the payload isn't hash-like
-    // (attribute_assignment.rb:29-30). Surface the same class loudly with
-    // shape-accurate diagnostics, matching JSONSerializer.fromJson
-    // (serializers/json.ts).
-    const shapeOf = (v: unknown) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
-    const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-      typeof v === "object" && v !== null && !Array.isArray(v);
-    if (!isPlainObject(attrs)) {
-      throw new ArgumentError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
-    }
-    if (root !== false && root != null) {
-      attrs = Object.values(attrs)[0];
-      if (!isPlainObject(attrs)) {
-        throw new ArgumentError(
-          `fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`,
-        );
-      }
-    }
-    for (const [key, value] of Object.entries(attrs)) {
-      this._writeAttribute(key, value);
-    }
-    return this;
-  }
-
   /**
    * Whether this model instance has been persisted.
    * ActiveModel returns false; ActiveRecord overrides.
@@ -680,11 +603,6 @@ export class Model {
    */
   isPersisted(): boolean {
     return false;
-  }
-
-  /** `Naming.extended`'s `delegate :model_name, to: :class` (naming.rb:253-256). */
-  get modelName(): ModelName {
-    return (this.constructor as typeof Model).modelName;
   }
 
   /**
@@ -753,6 +671,11 @@ include(Model, Attributes);
 // attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
 include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 
+// api.rb:65-68 — `included do extend ActiveModel::Naming; extend ActiveModel::Translation end`.
+// The Translation half is issued from `Validations.[included]` (validations.rb:43);
+// the `Naming.extended` hook (naming.rb:253-256) installs the instance delegate.
+extend(Model, Naming);
+
 // Ruby `include ActiveModel::Conversion` (api.rb:16) and its ClassMethods half
 // (conversion.rb:105-118); the `included do` block (:28-33) rides along from
 // the module's own `[included]` hook.
@@ -760,8 +683,11 @@ include(Model, Conversion);
 extend(Model, ConversionClassMethods);
 
 // Ruby `include ActiveModel::Serialization` (serialization.rb:127), which
-// `ActiveModel::Serializers::JSON` pulls in (json.rb:11).
+// `ActiveModel::Serializers::JSON` pulls in (json.rb:11); its `included do`
+// block (json.rb:12-16) extends Naming and issues the
+// `class_attribute :include_root_in_json`.
 include(Model, Serialization);
+include(Model, SerializersJSON);
 
 // Ruby `include ActiveModel::AttributeAssignment` (api.rb:14).
 include(Model, {

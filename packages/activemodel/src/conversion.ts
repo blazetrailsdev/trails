@@ -1,3 +1,4 @@
+import { NoMethodError } from "./attribute-assignment.js";
 import {
   underscore,
   tableize,
@@ -114,12 +115,19 @@ interface ConversionHost {
 }
 
 /**
- * Ruby `public_send(method)` with no arguments. A generated attribute reader
+ * Ruby `public_send(method)` with no arguments. Member existence is the JS
+ * analog of `respond_to?`, and a receiver that does not respond raises
+ * `NoMethodError` as Ruby's send does. A generated attribute reader
  * ports as an accessor property (CLAUDE.md § "Generated attribute readers are
  * properties"), so reading the member is the whole send for one; a member that
  * is a function is a `def` and Ruby's send invokes it.
  */
 function publicSend(obj: object, method: string): unknown {
+  if (!(method in obj)) {
+    throw new NoMethodError(
+      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
+    );
+  }
   const value = (obj as Record<string, unknown>)[method];
   return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }

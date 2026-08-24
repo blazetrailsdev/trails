@@ -18,12 +18,18 @@ describe("Serializers::JSON host", () => {
         get() {
           return { name: this._name, age: this._age };
         },
-        set(this: { _name: string; _age: number }, h: { name: string; age: number }) {
-          this._name = h.name;
-          this._age = h.age;
-        },
         configurable: true,
       });
+    }
+
+    /**
+     * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+     * (json.rb:120-126); trails spells the `attributes=` alias
+     * `setAttributes` (attribute_assignment.rb:36).
+     */
+    setAttributes(this: { _name: string; _age: number }, h: { name: string; age: number }) {
+      this._name = h.name;
+      this._age = h.age;
     }
     _name = "";
     _age = 0;
@@ -82,11 +88,17 @@ describe("Serializers::JSON host", () => {
           get() {
             return { x: this._x };
           },
-          set(this: { _x: number }, h: { x: number }) {
-            this._x = h.x;
-          },
           configurable: true,
         });
+      }
+
+      /**
+       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+       * (json.rb:120-126); trails spells the `attributes=` alias
+       * `setAttributes` (attribute_assignment.rb:36).
+       */
+      setAttributes(this: { _x: number }, h: { x: number }) {
+        this._x = h.x;
       }
       _x = 0;
       get x() {
@@ -117,11 +129,17 @@ describe("Serializers::JSON host", () => {
           get() {
             return { id: this._id };
           },
-          set(this: { _id: bigint }, h: { id: bigint }) {
-            this._id = h.id;
-          },
           configurable: true,
         });
+      }
+
+      /**
+       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+       * (json.rb:120-126); trails spells the `attributes=` alias
+       * `setAttributes` (attribute_assignment.rb:36).
+       */
+      setAttributes(this: { _id: bigint }, h: { id: bigint }) {
+        this._id = h.id;
       }
       _id = 0n;
       get id() {
@@ -141,11 +159,17 @@ describe("Serializers::JSON host", () => {
           get() {
             return { name: this._name };
           },
-          set(this: { _name: string }, h: { name: string }) {
-            this._name = h.name;
-          },
           configurable: true,
         });
+      }
+
+      /**
+       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+       * (json.rb:120-126); trails spells the `attributes=` alias
+       * `setAttributes` (attribute_assignment.rb:36).
+       */
+      setAttributes(this: { _name: string }, h: { name: string }) {
+        this._name = h.name;
       }
       _name = "";
       get name() {
@@ -175,11 +199,17 @@ describe("Serializers::JSON host", () => {
           get() {
             return { v: this._v };
           },
-          set(this: { _v: number }, h: { v: number }) {
-            this._v = h.v;
-          },
           configurable: true,
         });
+      }
+
+      /**
+       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+       * (json.rb:120-126); trails spells the `attributes=` alias
+       * `setAttributes` (attribute_assignment.rb:36).
+       */
+      setAttributes(this: { _v: number }, h: { v: number }) {
+        this._v = h.v;
       }
       _v = 0;
       get v() {
@@ -198,11 +228,17 @@ describe("Serializers::JSON host", () => {
           get() {
             return { v: this._v };
           },
-          set(this: { _v: number }, h: { v: number }) {
-            this._v = h.v;
-          },
           configurable: true,
         });
+      }
+
+      /**
+       * The host `def attributes=(hash)` Rails' `from_json` docstring defines
+       * (json.rb:120-126); trails spells the `attributes=` alias
+       * `setAttributes` (attribute_assignment.rb:36).
+       */
+      setAttributes(this: { _v: number }, h: { v: number }) {
+        this._v = h.v;
       }
       _v = 0;
       get v() {
