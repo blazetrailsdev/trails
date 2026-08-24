@@ -17,7 +17,6 @@ import type {
 interface DirtyRecord {
   mutationsFromDatabase: AttributeMutationTracker;
   mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker;
-  readAttribute(name: string): unknown;
 }
 
 /**
@@ -52,10 +51,10 @@ export function savedChangeToAttribute(
  * Return the value of an attribute before the last save.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_before_last_save
+ * (dirty.rb:108-110)
  */
 export function attributeBeforeLastSave(record: DirtyRecord, attr: string): unknown {
-  const change = savedChangeToAttribute(record, attr);
-  return change ? change[0] : record.readAttribute(attr);
+  return record.mutationsBeforeLastSave.originalValue(attr);
 }
 
 /**
@@ -98,10 +97,10 @@ export function attributeChangeToBeSaved(
  * Return the database value of an attribute (before unsaved changes).
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#attribute_in_database
+ * (dirty.rb:164-166)
  */
 export function attributeInDatabase(record: DirtyRecord, attr: string): unknown {
-  const change = attributeChangeToBeSaved(record, attr);
-  return change ? change[0] : record.readAttribute(attr);
+  return record.mutationsFromDatabase.originalValue(attr);
 }
 
 /**
