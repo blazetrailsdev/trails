@@ -49,11 +49,6 @@ export interface ValidatesWithClassHost {
   validate(fn: (record: ValidatableRecord) => unknown, options?: Record<string, unknown>): void;
 }
 
-/** The instance-level surface `Validations#validates_with` self-sends. */
-export interface ValidatesWithHost {
-  constructor: unknown;
-}
-
 /**
  * Passes the record off to the class or classes specified and allows them
  * to add errors based on more complex conditions, so a `validate :foo` body
@@ -64,13 +59,13 @@ export interface ValidatesWithHost {
  * validation async), so each run is awaited in turn, which preserves Rails'
  * one-validator-at-a-time order.
  */
-export async function validatesWith(this: ValidatesWithHost, ...args: unknown[]): Promise<void> {
+export async function validatesWith(this: ValidatableRecord, ...args: unknown[]): Promise<void> {
   const [klasses, options] = extractOptionsBang(args);
   options.class = this.constructor;
 
   for (const klass of klasses as ValidatorClass[]) {
     const validator = new klass({ ...options });
-    await validator.validate(this as unknown as ValidatableRecord);
+    await validator.validate(this);
   }
 }
 
@@ -116,6 +111,9 @@ export const ClassMethods = {
  * Ruby's `_validators` is a `Hash.new { |h, k| h[k] = [] }`
  * (validations.rb:50), so `_validators[key] << validator` vivifies the bucket.
  * A JS `Map` has no default proc; this is that one expression.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's default-proc vivification, which a JS
+ * `Map` cannot express in the subscript itself.
  */
 function _pushValidator(
   validators: Map<string | null, ValidatorLike[]>,
