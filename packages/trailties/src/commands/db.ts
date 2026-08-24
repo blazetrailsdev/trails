@@ -148,10 +148,21 @@ async function taskableDatabaseEntries(
 ): Promise<DatabaseEntry[]> {
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
-  const all = allConfigs.map(({ name, config: rawConfig }) => {
-    const raw = normalizeRawConfig(rawConfig);
-    return { name, raw, hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>) };
-  });
+  // Rails reads discovery paths off the configuration hash
+  // (`hash_config.rb:52`), and the pool's `migration_context` is built from
+  // them (`connection_pool.rb:294-299`) — so the resolved defaults belong in
+  // the hash the HashConfig is built from, not in a side registry.
+  const all = await Promise.all(
+    allConfigs.map(async ({ name, config: rawConfig }) => {
+      const raw = normalizeRawConfig(rawConfig);
+      raw.migrationsPaths = await migrationsDirsForConfig(name, raw);
+      return {
+        name,
+        raw,
+        hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>),
+      };
+    }),
+  );
   const taskable = all.filter((c) => c.hashConfig.databaseTasks());
   const filtered = dbName ? taskable.filter((c) => c.name === dbName) : taskable;
   if (filtered.length === 0 && dbName) {
@@ -582,7 +593,6 @@ async function withMigrationTasksForDb(
     console.log(`${ctx.prefix}No migrations found.`);
     return;
   }
-  DatabaseTasks.registerMigrations(migrations, ctx.config);
   await withPrefixedStdout(ctx.prefix, async () => {
     await withRegisteredConfiguration(ctx.config, operation);
   });
@@ -629,10 +639,9 @@ async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
   const migrationsFor = new Map<string, MigrationProxy[]>();
-  for (const { name, raw, hashConfig } of entries) {
+  for (const { name, raw } of entries) {
     const migrations = discoverMigrations(await migrationsDirsForConfig(name, raw));
     migrationsFor.set(name, migrations);
-    DatabaseTasks.registerMigrations(migrations, hashConfig);
   }
   if ([...migrationsFor.values()].every((m) => m.length === 0)) {
     console.log("No migrations found.");
@@ -964,22 +973,6 @@ export function dbCommand(): Command {
         entries.findIndex((entry) => entry.hashConfig.isPrimary()),
         0,
       );
-
-      // Per config, not per name: an env may point the same-named database at
-      // its own migrationsPaths.
-      const migrationSets = await Promise.all(
-        allEntries.map(async (entry) =>
-          discoverMigrations(await migrationsDirsForConfig(entry.name, entry.raw)),
-        ),
-      );
-      // Register the current env's primary set unregistered first: that clears
-      // any per-config registrations left by an earlier command and leaves a
-      // sensible fallback for a config with no directory of its own.
-      // `allEntries` leads with the current env, so `primaryIndex` lines up.
-      DatabaseTasks.registerMigrations(migrationSets[primaryIndex] ?? []);
-      allEntries.forEach((entry, i) => {
-        DatabaseTasks.registerMigrations(migrationSets[i] ?? [], entry.hashConfig);
-      });
 
       // Rails' load_seed runs against the established connection, which is
       // the primary's; Base has no connection here, so lend it one.

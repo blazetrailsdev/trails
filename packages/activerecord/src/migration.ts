@@ -2422,8 +2422,8 @@ export class MigrationContext<
 }
 
 export class Migrator {
-  /** Mirrors: ActiveRecord::Migrator.migrations_paths (`migration.rb:1407`) */
-  static migrationsPaths: string[] = [];
+  /** Mirrors: ActiveRecord::Migrator.migrations_paths (`migration.rb:1407`, `:1419`) */
+  static migrationsPaths: string[] = ["db/migrate"];
 
   private _migrations: MigrationProxy[];
   private _schemaMigration: SchemaMigration;

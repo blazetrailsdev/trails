@@ -5,14 +5,16 @@ import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
-import type { MigrationProxy } from "../migration.js";
-import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
+
+// Rails' `MIGRATIONS_ROOT` (`test/cases/migration_test.rb`); `10_urban` holds
+// one self-contained migration, so `migrate_all` has something to run without
+// depending on the canonical schema.
+const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.registerMigrations([]);
     DatabaseTasks.databaseConfiguration = null;
     try {
       Base.removeConnection();
@@ -20,18 +22,6 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
       void 0;
     }
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
-  });
-
-  const migration = (version: number, name: string): MigrationProxy => ({
-    version,
-    name,
-    migration: () =>
-      anonymousMigration(
-        name,
-        version,
-        async () => {},
-        async () => {},
-      ),
   });
 
   async function setupConfigs(): Promise<void> {
@@ -45,16 +35,17 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
           database: join(dir, "primary.sqlite3"),
           pool: 1,
           useMetadataTable: false,
+          migrationsPaths: `${MIGRATIONS_ROOT}/10_urban`,
         },
         animals: {
           adapter: "sqlite3",
           database: join(dir, "animals.sqlite3"),
           pool: 1,
           useMetadataTable: false,
+          migrationsPaths: `${MIGRATIONS_ROOT}/10_urban`,
         },
       },
     });
-    DatabaseTasks.registerMigrations([migration(1, "CreateNothing")]);
     await Base.establishConnection({
       adapter: "sqlite3",
       database: join(dir, "primary.sqlite3"),

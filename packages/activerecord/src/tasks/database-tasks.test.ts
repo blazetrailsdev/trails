@@ -23,7 +23,6 @@ import type { ConnectionPool } from "../connection-adapters/abstract/connection-
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
-import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
 // database_tasks_test.rb:476-485 — Rails saves and restores
 // `ActiveRecord::Base.configurations` around a stubbed set rather than clearing
@@ -893,9 +892,9 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
  *
  * `self.use_transactional_tests = false` needs no analogue: trails tests are
  * non-transactional unless they opt in via `useTransactionalTests()`. The
- * `folder_name` class attribute likewise has none — trails migrations are
- * registered programmatically with `DatabaseTasks.registerMigrations` rather
- * than read from `MIGRATIONS_ROOT/<folder_name>`.
+ * `folder_name` class attribute is the argument of
+ * {@link databaseTasksMigrationTestCase}, since a TS describe block has no
+ * class body to override it in.
  */
 const skipMigrationTestCase = adapterType !== "sqlite" || inMemoryDb();
 
@@ -959,7 +958,9 @@ async function backupIntoConnection(sourceFile: string): Promise<void> {
   }
 }
 
-function databaseTasksMigrationTestCase(): MigrationTestCase {
+const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
+
+function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase {
   let stdoutChunks: string[] = [];
   let stdoutSpy: MockInstance | undefined;
 
@@ -972,14 +973,19 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
     });
     const ambient = ambientPoolConfiguration();
     const sourceFile = String(ambient.database);
-    await Base.establishConnection({ ...ambient, database: ":memory:", pool: 1 });
+    const migrationsPath = [MIGRATIONS_ROOT, folderName].join("/");
+    await Base.establishConnection({
+      ...ambient,
+      database: ":memory:",
+      pool: 1,
+      migrationsPaths: migrationsPath,
+    });
     await backupIntoConnection(sourceFile);
   });
 
   afterEach(async () => {
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
-    DatabaseTasks.registerMigrations([]);
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.clearRegisteredTasks();
     try {
@@ -1003,13 +1009,17 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
 }
 
 describe("DatabaseTasksMigrateTest", () => {
+  let originalVerbose: string | undefined;
   let originalVersion: string | undefined;
-  databaseTasksMigrationTestCase();
+  const testCase = databaseTasksMigrationTestCase();
 
   beforeEach(() => {
+    originalVerbose = process.env.VERBOSE;
     originalVersion = process.env.VERSION;
   });
   afterEach(() => {
+    if (originalVerbose === undefined) delete process.env.VERBOSE;
+    else process.env.VERBOSE = originalVerbose;
     if (originalVersion === undefined) delete process.env.VERSION;
     else process.env.VERSION = originalVersion;
   });
@@ -1017,39 +1027,34 @@ describe("DatabaseTasksMigrateTest", () => {
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset empty values for verbose and version env vars",
     async () => {
-      DatabaseTasks.registerTask(
-        "sqlite",
-        class {
-          async create(): Promise<void> {}
-        },
-      );
-      let migrated = false;
-      DatabaseTasks.registerMigrations([
-        {
-          version: 1,
-          name: "M1",
-          migration: () =>
-            anonymousMigration(
-              "M1",
-              1,
-              async () => {
-                migrated = true;
-              },
-              async () => {},
-            ),
-        },
-      ]);
+      process.env.VERSION = "2";
+      process.env.VERBOSE = "false";
+
+      // run down migration because it was already run on copied db
+      expect(await testCase.captureMigrationOutput()).toBe("");
+
+      process.env.VERBOSE = "";
       process.env.VERSION = "";
-      await DatabaseTasks.migrate();
-      expect(migrated).toBe(true);
+
+      // re-run up migration
+      expect(await testCase.captureMigrationOutput()).toContain("migrating");
     },
   );
 
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset nonsense values for verbose and version env vars",
     async () => {
-      process.env.VERSION = "nonsense";
-      await expect(DatabaseTasks.migrate()).rejects.toThrow(/Invalid format/);
+      // run down migration because it was already run on copied db
+      process.env.VERSION = "2";
+      process.env.VERBOSE = "false";
+
+      expect(await testCase.captureMigrationOutput()).toBe("");
+
+      process.env.VERBOSE = "yes";
+      process.env.VERSION = "2";
+
+      // run no migration because 2 was already run
+      expect(await testCase.captureMigrationOutput()).toBe("");
     },
   );
 });
@@ -1058,26 +1063,14 @@ describe("DatabaseTasksMigrateScopeTest", () => {
   let originalVerbose: string | undefined;
   let originalVersion: string | undefined;
   let originalScope: string | undefined;
-  const testCase = databaseTasksMigrationTestCase();
+  // Rails: `self.folder_name = "scope"` (database_tasks_test.rb:1103).
+  const testCase = databaseTasksMigrationTestCase("scope");
 
   beforeEach(() => {
     if (skipMigrationTestCase) return;
     originalVerbose = process.env.VERBOSE;
     originalVersion = process.env.VERSION;
     originalScope = process.env.SCOPE;
-    DatabaseTasks.registerMigrations([
-      {
-        version: 1,
-        name: "Unscoped",
-        migration: () => anonymousMigration("Unscoped", 1),
-      },
-      {
-        version: 2,
-        name: "MysqlOnly",
-        scope: "mysql",
-        migration: () => anonymousMigration("MysqlOnly", 2),
-      },
-    ]);
   });
 
   afterEach(() => {
@@ -1135,23 +1128,6 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
     const pool = Base.connectionPool();
     await new SchemaMigration(pool).createTable();
-    DatabaseTasks.registerMigrations([
-      {
-        version: 1,
-        name: "Valid people have last names",
-        migration: () => anonymousMigration("Valid people have last names", 1),
-      },
-      {
-        version: 2,
-        name: "We need reminders",
-        migration: () => anonymousMigration("We need reminders", 2),
-      },
-      {
-        version: 3,
-        name: "Innocent jointable",
-        migration: () => anonymousMigration("Innocent jointable", 3),
-      },
-    ]);
   });
 
   it.skipIf(skipMigrationTestCase)("migrate status table", async () => {
@@ -1200,7 +1176,6 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
     });
-    DatabaseTasks.registerMigrations([]);
     const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
     try {
       await DatabaseTasks.migrate();
@@ -1215,7 +1190,6 @@ describe("DatabaseTasksMigrateErrorTest", () => {
         /* no pool */
       }
       DatabaseTasks.databaseConfiguration = originalConfigurations;
-      DatabaseTasks.registerMigrations([]);
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }

@@ -4,6 +4,7 @@ import {
   DatabaseTasks,
   DatabaseConfigurations,
   MigrationContext,
+  Migrator,
   NullSchemaMigration,
   NullInternalMetadata,
 } from "@blazetrails/activerecord";
@@ -33,6 +34,10 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const configs = normalizeSqlitePaths(DatabaseConfigurations.fromEnv(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
   DatabaseTasks.root = cwd;
+  // `db:load_config` (`railties/databases.rake:27`): the discovery paths every
+  // pool falls back to when its own `db_config.migrations_paths` is absent
+  // (`connection_pool.rb:299`). Absolute, as `Rails.application.paths` are.
+  Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
   await establishEnvironmentConnection(DatabaseConfigurations.currentEnv());
   return configs;
 }
@@ -51,11 +56,6 @@ export async function tryLoadModels(cwd: string): Promise<Record<string, unknown
  */
 export function loadMigrations(cwd: string): import("@blazetrails/activerecord").MigrationProxy[] {
   const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  const migrations = new MigrationContext(
-    paths,
-    new NullSchemaMigration(),
-    new NullInternalMetadata(),
-  ).migrations;
-  DatabaseTasks.registerMigrations(migrations);
-  return migrations;
+  return new MigrationContext(paths, new NullSchemaMigration(), new NullInternalMetadata())
+    .migrations;
 }

@@ -31,7 +31,7 @@ import {
 import { executionContextId } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
-import { MigrationContext } from "../../migration.js";
+import { MigrationContext, Migrator } from "../../migration.js";
 
 /**
  * A connection that supports transaction management.
@@ -589,7 +589,7 @@ export class ConnectionPool implements ReapablePool {
     // `DatabaseConfig#migrationsPaths` answers a bare string for a single-path
     // config; Rails wraps in `Array(migrations_paths)` before globbing
     // (migration.rb:1369), and without that a string iterates per character.
-    const paths = (this.dbConfig as any).migrationsPaths ?? ["db/migrate"];
+    const paths = (this.dbConfig as any).migrationsPaths ?? Migrator.migrationsPaths;
     return Array.isArray(paths) ? paths : [paths];
   }
 
