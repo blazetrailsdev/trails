@@ -173,8 +173,7 @@ describe("AttributesTest", () => {
         this.aliasAttribute("fullName", "name");
       }
     }
-    const m = new MyModel({ name: "test" });
-    expect(m.typeForAttribute("name")).not.toBeNull();
+    expect(MyModel.typeForAttribute("name")).not.toBeNull();
   });
 
   it("properties assignment", () => {
@@ -283,8 +282,7 @@ describe("typeForAttribute", () => {
         this.attribute("name", "string");
       }
     }
-    const u = new User({ name: "Alice" });
-    expect(u.typeForAttribute("unknown")).toBeInstanceOf(ValueType);
+    expect(User.typeForAttribute("unknown")).toBeInstanceOf(ValueType);
   });
 });
 

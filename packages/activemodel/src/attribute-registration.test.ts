@@ -90,8 +90,7 @@ describe("AttributeRegistrationTest", () => {
         this.attribute("name", "string");
       }
     }
-    const m = new MyModel({});
-    const fallback = m.typeForAttribute("unknown");
+    const fallback = MyModel.typeForAttribute("unknown");
     expect(fallback).toBeInstanceOf(ValueType);
     expect(fallback.cast("anything")).toBe("anything");
   });
@@ -349,9 +348,8 @@ describe("AttributeRegistrationTest", () => {
         this.attribute("age", "integer");
       }
     }
-    const u = new User({ name: "Alice", age: 25 });
-    expect(u.typeForAttribute("name")?.name).toBe("string");
-    expect(u.typeForAttribute("age")?.name).toBe("integer");
+    expect(User.typeForAttribute("name")?.name).toBe("string");
+    expect(User.typeForAttribute("age")?.name).toBe("integer");
   });
 
   it(".attribute_types returns the default type when key is missing", () => {
@@ -360,9 +358,8 @@ describe("AttributeRegistrationTest", () => {
         this.attribute("name", "string");
       }
     }
-    const p = new Person({});
-    expect(p.typeForAttribute("name").name).toBe("string");
-    expect(p.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
+    expect(Person.typeForAttribute("name").name).toBe("string");
+    expect(Person.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
   });
 
   it("_pendingAttributeModifications queue is populated by attribute()", () => {

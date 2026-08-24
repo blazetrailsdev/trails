@@ -1,6 +1,38 @@
 import { describe, it, expect } from "vitest";
 import { Model, Errors } from "./index.js";
 
+/**
+ * Mirrors: ErrorsTest::Person (errors_test.rb:6-30) — the plain class the
+ * Rails errors tests build their `ActiveModel::Errors` over.
+ */
+class Person {
+  errors: Errors;
+  name: string | null = null;
+  age: number | null = null;
+  gender: string | null = null;
+  city: string | null = null;
+
+  constructor() {
+    this.errors = new Errors(this);
+  }
+
+  validateBang(): void {
+    if (this.name === null) this.errors.add("name", ":blank", { message: "cannot be nil" });
+  }
+
+  readAttributeForValidation(attr: string): unknown {
+    return (this as unknown as Record<string, unknown>)[attr];
+  }
+
+  static humanAttributeName(attr: string, _options: object = {}): string {
+    return attr;
+  }
+
+  static lookupAncestors(): unknown[] {
+    return [this];
+  }
+}
+
 describe("ErrorsTest", () => {
   it("details returns added error detail", () => {
     const e = new Errors(null);
@@ -203,11 +235,12 @@ describe("ErrorsTest", () => {
   });
 
   it("clear errors", () => {
-    const e = new Errors(null);
-    e.add("name", ":blank");
-    e.clear();
-    expect(e.count).toBe(0);
-    expect(e.empty).toBe(true);
+    const person = new Person();
+    person.validateBang();
+
+    expect(person.errors.count).toBe(1);
+    person.errors.clear();
+    expect(person.errors.empty).toBe(true);
   });
 
   it("attribute_names returns the error attributes", () => {
@@ -318,18 +351,15 @@ describe("ErrorsTest", () => {
   });
 
   it("size calculates the number of error messages", () => {
-    const e = new Errors(null);
-    e.add("name", ":blank");
-    e.add("age", ":not_a_number");
-    expect(e.count).toBe(2);
-    expect(e.size).toBe(2);
+    const person = new Person();
+    person.errors.add("name", "cannot be blank");
+    expect(person.errors.size).toBe(1);
   });
 
   it("count calculates the number of error messages", () => {
-    const e = new Errors(null);
-    e.add("name", ":blank");
-    e.add("name", ":too_short");
-    expect(e.count).toBe(2);
+    const person = new Person();
+    person.errors.add("name", "cannot be blank");
+    expect(person.errors.count).toBe(1);
   });
 
   it("to_a returns the list of errors with complete messages containing the attribute names", () => {
@@ -383,8 +413,8 @@ describe("ErrorsTest", () => {
   });
 
   it("full_message returns the given message when attribute is :base", () => {
-    const e = new Errors(null);
-    expect(e.fullMessage("base", "Something went wrong")).toBe("Something went wrong");
+    const person = new Person();
+    expect(person.errors.fullMessage("base", "press the button")).toBe("press the button");
   });
 
   it("full_message returns the given message with the attribute name included", () => {
@@ -453,10 +483,12 @@ describe("ErrorsTest", () => {
   });
 
   it("clear removes details", () => {
-    const e = new Errors(null);
-    e.add("name", ":blank");
-    e.clear();
-    expect(e.details.size).toBe(0);
+    const person = new Person();
+    person.errors.add("name", ":invalid");
+
+    expect(person.errors.details.size).toBe(1);
+    person.errors.clear();
+    expect(person.errors.details.size).toBe(0);
   });
 
   it("details returns empty array when accessed with non-existent attribute", () => {

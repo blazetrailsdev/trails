@@ -3662,6 +3662,7 @@ export class Base extends Model {
   declare attributePresent: (name: string) => boolean;
   declare readAttributeBeforeTypeCast: (name: string) => unknown;
   declare attributesBeforeTypeCast: () => Record<string, unknown>;
+  declare typeForAttribute: (name: string, block?: () => Type) => Type;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
