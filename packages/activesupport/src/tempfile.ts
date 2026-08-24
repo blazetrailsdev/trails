@@ -61,6 +61,15 @@ function random(): string {
  * the way Ruby's `IO` buffers them behind the descriptor: the fs adapter is
  * open-write-close per call, so there is no descriptor to hold between writes.
  *
+ * A block may be synchronous or asynchronous and its value is returned either
+ * way, but {@link open} and {@link create} always return a Promise rather than
+ * `T | Promise<T>`. Creating the file is what forces it: `getFsAsync` resolves
+ * the adapter asynchronously and `mkdtemp`/`writeFile` are async-only, so
+ * `Tempfile.new` has no synchronous seat to return `T` from — no arrangement of
+ * the block's own signature reaches one. This is also why `File.atomic_write`
+ * (`core_ext/file/atomic.rb:24`), the one synchronous caller, keeps its own
+ * stand-in rather than routing through here.
+ *
  * @noRailsEquivalent CONVERGEABLE — `Tempfile` is Ruby stdlib rather than
  *   Rails, so it has no `vendor/rails` anchor and no natural package. It lives
  *   beside activesupport's other unanchored Ruby primitives (`range-ext.ts`,
@@ -194,7 +203,9 @@ export class Tempfile {
 
   /**
    * `Tempfile#unlink` (`tempfile.rb:252-265`) — removes the file, and with it
-   * the `mkdtemp` directory `createTmpname` put it in.
+   * the `mkdtemp` directory `createTmpname` put it in. `ENOENT` is swallowed
+   * and `EACCES` returns without marking the file unlinked, the way Ruby
+   * leaves a Windows unlink-before-close for a later `close!` to retry.
    */
   async unlink(): Promise<void> {
     if (this.unlinked) return;
@@ -203,7 +214,9 @@ export class Tempfile {
     try {
       await fs.unlink!(this.tmpname);
     } catch (error) {
-      if ((error as { code?: string }).code !== "ENOENT") throw error;
+      const code = (error as { code?: string }).code;
+      if (code === "EACCES") return;
+      if (code !== "ENOENT") throw error;
     }
     await fs.rmdir!(path.dirname(this.tmpname));
     this.unlinked = true;

@@ -132,6 +132,16 @@ export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
 }
 
 /**
+ * Ruby's `Hash#merge!` — the destructive form of {@link merge}: `otherHash`'s
+ * pairs are written into the receiver, which is returned.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link merge} is.
+ */
+export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
+  return Object.assign(hash, otherHash);
+}
+
+/**
  * Return a copy of the object without the specified keys.
  */
 export function except<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
