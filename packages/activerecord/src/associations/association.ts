@@ -839,16 +839,23 @@ export class Association {
         } | null;
       }
     )._reflectOnAssociation?.(this.reflection.name);
-    if (reflection?.buildAssociation) {
-      return reflection.buildAssociation(attributes ?? {}, (record: Base) => {
-        void this.initializeAttributes(record, attributes);
-        if (block) block(record);
-      });
-    }
-    return new (Klass as any)(attributes ?? {}, (record: Base) => {
-      void this.initializeAttributes(record, attributes);
+    // Rails' block is one literal shared by both construction paths
+    // (association.rb:384-387); ours needs it twice because of the plain-`new`
+    // fallback below, so it is bound once here.
+    const initializeAndYield = (record: Base): void => {
+      const pending = this.initializeAttributes(record, attributes);
+      if (pending) {
+        void pending.then(() => {
+          if (block) block(record);
+        });
+        return;
+      }
       if (block) block(record);
-    });
+    };
+    if (reflection?.buildAssociation) {
+      return reflection.buildAssociation(attributes ?? {}, initializeAndYield);
+    }
+    return new (Klass as any)(attributes ?? {}, initializeAndYield);
   }
 
   private inverseAssociationFor(record: Base): Association | null {
