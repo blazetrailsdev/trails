@@ -115,6 +115,10 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // call, so activerecord's `ruby-first.ts` exports it as `first(collection)`
   // and the Ruby receiver is TS argument 1.
   "first",
+  // Ruby core `Array#drop` — the same shape as `first` above: `chain.slice(1)`
+  // names a JS method Ruby never calls, so activerecord's `ruby-drop.ts`
+  // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
+  "drop",
   // Ruby core `Enumerable#min` in its no-argument receiver form —
   // `[limit_value, count].compact.min`. JS's `Math.min(...values)` takes the
   // values as ARGUMENTS and is numbers-only, so @blazetrails/activesupport

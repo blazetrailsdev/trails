@@ -100,7 +100,7 @@
   "packages/activerecord/src/reflection.test.ts::Parent::hasMany::notModels",
   "packages/activerecord/src/reflection.trails.test.ts::HostA::hasMany::targetAs",
   "packages/activerecord/src/reflection.trails.test.ts::NsTagB::hasMany::taggedPostsB",
-  "packages/activerecord/src/relation/unscope-coverage.test.ts::UscAuthor::hasMany::uscPosts",
+  "packages/activerecord/src/relation/unscope-coverage.trails.test.ts::UscAuthor::hasMany::uscPosts",
   "packages/activerecord/src/reserved-word.test.ts::Distinct::hasAndBelongsToMany::selects",
   "packages/activerecord/src/reserved-word.test.ts::Distinct::hasMany::values",
   "packages/activerecord/src/reserved-word.test.ts::Group::belongsTo::select",
