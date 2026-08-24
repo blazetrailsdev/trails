@@ -695,7 +695,10 @@ export class Association {
     }
   }
 
-  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
+  initializeAttributes(
+    record: Base,
+    exceptFromScopeAttributes?: Record<string, unknown>,
+  ): Promise<void> | void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
       this.reflection.foreignKey,
@@ -707,7 +710,15 @@ export class Association {
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
     );
-    if (Object.keys(attributes).length > 0) void record._assignAttributes(attributes);
+    const pending =
+      Object.keys(attributes).length > 0
+        ? (record._assignAttributes(attributes) as Promise<void> | undefined)
+        : undefined;
+    if (pending) {
+      return pending.then(() => {
+        this.setInverseInstance(record);
+      });
+    }
     this.setInverseInstance(record);
   }
 
@@ -830,12 +841,12 @@ export class Association {
     )._reflectOnAssociation?.(this.reflection.name);
     if (reflection?.buildAssociation) {
       return reflection.buildAssociation(attributes ?? {}, (record: Base) => {
-        this.initializeAttributes(record, attributes);
+        void this.initializeAttributes(record, attributes);
         if (block) block(record);
       });
     }
     return new (Klass as any)(attributes ?? {}, (record: Base) => {
-      this.initializeAttributes(record, attributes);
+      void this.initializeAttributes(record, attributes);
       if (block) block(record);
     });
   }

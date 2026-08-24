@@ -618,7 +618,7 @@ interface OneToOneAssociation {
   // displacement removal can sit between them, where Rails puts it.
   buildRecord(attrs: Record<string, unknown>): Base | null;
   setNewRecord(record: Base): void;
-  initializeAttributes(record: Base): void;
+  initializeAttributes(record: Base): Promise<void> | void;
   isLoaded(): boolean;
   // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
   // where trails raises strict-loading violations (singular-association.ts:210).
@@ -806,7 +806,7 @@ export function assignNestedAttributesForOneToOneAssociation(
       if (pending) {
         return pending.then(() => assoc.initializeAttributes(existingRecord));
       }
-      assoc.initializeAttributes(existingRecord);
+      return assoc.initializeAttributes(existingRecord);
     } else {
       // Rails nested_attributes.rb:451 — `method = :"build_#{association_name}";
       // respond_to?(method) ? public_send(method, ...) : raise`. A plain
