@@ -1,6 +1,7 @@
 import type { Human } from "./human.js";
 // vendor/rails/activerecord/test/models/face.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Face extends Base {
   declare human: Human | null;
@@ -49,3 +50,4 @@ export class Face extends Base {
     });
   }
 }
+registerModel(Face);

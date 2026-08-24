@@ -28,7 +28,7 @@ export class NullStore extends Store implements CacheStore {
     return null;
   }
 
-  override deleteMatched(_pattern: string | RegExp): void {}
+  override deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): void {}
 
   // Mirrors Rails NullStore#read_entry (null_store.rb:41-43): the serialized
   // read always misses, so the deserialization always yields nil.

@@ -50,7 +50,7 @@ export function _buildAssociationInstance(this: Base, assocDef: AssocDef): Assoc
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  if ((instance as { isCollection?(): boolean }).isCollection?.()) {
+  if (instance.isCollection()) {
     if (instance.loaded === true && !instance._staleStateIsSnapshotted) instance.loadedBang();
     return;
   }

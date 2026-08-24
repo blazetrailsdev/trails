@@ -566,21 +566,17 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
+  // Rails' `@association_cache` only ever holds `Association` instances built
+  // from a reflection (`associations.rb:290-296`), and `set_inverse_instance`
+  // writes through `inversed_from` on such an instance. An inverse name with
+  // no declared singular reflection has no association to write to, and Rails
+  // cannot reach that state at all, so nothing is cached for it here.
   const existing = record._associationInstances.get(assocName) as
     | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
     | undefined;
   if (existing) {
     existing._setTargetFromLoader(target);
     existing._explicitTarget = true;
-  } else {
-    record._associationInstances.set(assocName, {
-      target,
-      _explicitTarget: true,
-      isLoaded: () => true,
-      setTarget(this: { target: unknown }, t: unknown) {
-        this.target = t;
-      },
-    } as never);
   }
 }
 
@@ -1235,13 +1231,13 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
     | {
         _setTargetFromLoader(t: Base | Base[] | null): void;
         _loaderWritebackSuppressed?: number;
-        isCollection?(): boolean;
-        _mergeLoaderResults?(rows: Base[]): void;
+        isCollection(): boolean;
+        _mergeLoaderResults(rows: Base[]): void;
       }
     | undefined;
   if (!holder || holder._loaderWritebackSuppressed) return;
-  if (holder.isCollection?.()) {
-    holder._mergeLoaderResults?.((result ?? []) as Base[]);
+  if (holder.isCollection()) {
+    holder._mergeLoaderResults((result ?? []) as Base[]);
     return;
   }
   holder._setTargetFromLoader(result as Base | Base[] | null);

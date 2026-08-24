@@ -6,34 +6,22 @@ import type { Base } from "../base.js";
  * `@association_cache[name]`), as an in-memory test fixture.
  *
  * Stands in for the old direct `record._cachedAssociations.set(name, target)`
- * pokes: it installs a minimal loaded association object under `name` so that
- * `record._associationCache(name)?.target` (and the production readers that
- * consult it) return `target`. Tolerates undeclared names — the seeded object
- * does not require a real reflection — matching `@association_cache`.
+ * pokes: it loads the record's real `Association` for `name` with `target`, so
+ * that `record._associationCache(name)?.target` (and the production readers
+ * that consult it) return `target`. Like Rails' `@association_cache`, the map
+ * only ever holds `Association` instances built from a reflection — an
+ * undeclared name has no association to seed and raises here rather than
+ * caching an ad-hoc holder.
  */
 export function seedAssociationCache(record: Base, name: string, target: unknown): void {
-  try {
-    const assoc = (
-      record as unknown as {
-        association(n: string): {
-          _setTargetFromLoader(t: unknown): void;
-          _explicitTarget: boolean;
-        };
-      }
-    ).association(name);
-    assoc._setTargetFromLoader(target);
-    assoc._explicitTarget = true;
-    return;
-  } catch {}
-  (record as unknown as { _associationInstances: Map<string, unknown> })._associationInstances.set(
-    name,
-    {
-      target,
-      _explicitTarget: true,
-      isLoaded: () => true,
-      setTarget(this: { target: unknown }, t: unknown) {
-        this.target = t;
-      },
-    },
-  );
+  const assoc = (
+    record as unknown as {
+      association(n: string): {
+        _setTargetFromLoader(t: unknown): void;
+        _explicitTarget: boolean;
+      };
+    }
+  ).association(name);
+  assoc._setTargetFromLoader(target);
+  assoc._explicitTarget = true;
 }
