@@ -76,7 +76,7 @@ const tagLineStart = (tag: string): RegExp => new RegExp(`^\\s*\\*?\\s*${tag}\\b
 // hang indent (`*   `) can place one at line start — deeper-indented `@`
 // lines are continuations, not tag boundaries (found by the activerecord-wide
 // run: core.ts initInternals).
-const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
+export const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
 const ONE_LINE_COMMENT = /^(\s*)\/\*\*(.*)\*\/\s*$/;
 
 /** One line of a comment as the parser sees it, carrying the line of the

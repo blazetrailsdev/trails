@@ -2161,6 +2161,21 @@ describe("mid-line tag mentions in reason prose", () => {
     expect(method.internal).toBeUndefined();
   });
 
+  it("mints no tag from a hang-indented continuation line, as ANY_TAG_LINE reads it", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @missingRailsCall has_attribute? — PERMANENT: the readers are generated
+         *   at schema load, tagged
+         *   @noRailsEquivalent against CLAUDE.md's ratified rule.
+         */
+        aliasAttributeMethodDefinition(): void {}
+      }
+    `);
+    const method = info.instanceMethods.find((m) => m.name === "aliasAttributeMethodDefinition")!;
+    expect(method.noRailsEquivalent).toBeUndefined();
+  });
+
   it("mints no @missingRailsArgs from a mention inside a @missingRailsCall reason", () => {
     const info = extractFromSource(`
       class Foo {

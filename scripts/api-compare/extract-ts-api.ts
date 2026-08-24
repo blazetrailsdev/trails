@@ -69,6 +69,7 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
 import {
+  ANY_TAG_LINE,
   TAG as MISSING_RAILS_CALL_TAG,
   suppressedCallReasonsIn,
   suppressedCallsIn,
@@ -1836,10 +1837,9 @@ function proseTagAfter(tag: ts.JSDocTag): { name: string; lineLeading: boolean }
 }
 
 /**
- * True when a JSDoc tag OPENS its line — the same rule `ANY_TAG_LINE`
- * (`missing-rails-call-tags.ts`) applies to the raw comment text, expressed
- * over TypeScript's parse instead of a regex. It is the single anchor every
- * tag reader here shares.
+ * True when a JSDoc tag OPENS its line, by the shared `ANY_TAG_LINE`
+ * (`missing-rails-call-tags.ts`) — the single anchor every tag reader here
+ * shares with the raw-text parser.
  *
  * TypeScript parses `@word` as a real tag wherever it appears, including
  * mid-sentence inside another tag's reason prose. A curated
@@ -1856,12 +1856,17 @@ export function isLineLeadingJsDocTag(tag: ts.JSDocTag): boolean {
 }
 
 /**
- * True when only comment-frame padding precedes `pos` on its line — the `/**`
- * opener of a one-line comment, the `*` of a continuation line, spaces and tabs.
+ * True when a tag at `pos` opens its line, by `ANY_TAG_LINE` — the rule
+ * `missing-rails-call-tags.ts` already applies to the raw comment text, shared
+ * rather than re-derived, so `*   @foo` is a continuation to both readers.
+ *
+ * The one normalization is the `/**` opener of a one-line comment, rewritten to
+ * the `*` frame `ANY_TAG_LINE` expects: `splitCommentLines` lifts a one-line
+ * comment's tags the same way before the parser walks them.
  */
 function isLineLeading(text: string, pos: number): boolean {
   const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
-  return /^[ \t]*(?:\/\*)?\**[ \t]*$/.test(text.slice(lineStart, pos));
+  return ANY_TAG_LINE.test(text.slice(lineStart, pos + 2).replace(/^(\s*)\/\*\*/, "$1*"));
 }
 
 /**
