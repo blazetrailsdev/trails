@@ -9,13 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
-    "rubyName": "attribute_changed_in_place?",
-    "call": "changed_in_place?",
-    "reason": "Rails dirty.rb:367-369 calls `mutations_from_database.changed_in_place?(attr_name.to_s)`; trails' single DirtyTracker exposes no `changedInPlace` reader, so the body compares the current value against `mutationsFromDatabase` / `attributeWas` itself. Converges with the tracker split (story `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`)."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
     "rubyName": "attribute_previous_change",
     "call": "change_to_attribute",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:404-406 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails dirty.ts:76-81 reads the `previousChanges` record directly by string key."
@@ -23,23 +16,9 @@
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
-    "rubyName": "attribute_previously_was",
-    "call": "original_value",
-    "reason": "Rails dirty.rb:315-317 calls `mutations_before_last_save.original_value(attr_name.to_s)`; trails' DirtyTracker has no `originalValue` reader, so the body reads `previousChanges[name]` and falls back to `_readAttribute`. Converges with the tracker split (story `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`)."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
-    "rubyName": "clear_attribute_change",
-    "call": "forget_change",
-    "reason": "Rails dirty.rb:378-380 calls `mutations_from_database.forget_change(attr_name.to_s)`; trails' DirtyTracker spells that body `clearAttributeChange(attributes, name)` because it holds no AttributeSet of its own. Converges with the tracker split (story `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`)."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
     "rubyName": "forget_attribute_assignments",
     "call": "map",
-    "reason": "Rails dirty.rb:390-392 is `@attributes = @attributes.map(&:forgetting_assignment)`; trails' AttributeSet spells that whole rebuild `forgetAssignmentsBang()`, an in-place mutator, so there is no `map` call site."
+    "reason": "Rails dirty.rb:390-392 REBINDS `@attributes = @attributes.map(&:forgetting_assignment)`; trails' AttributeSet spells the same rebuild `forgetAssignmentsBang()`, an in-place mutator (attribute-set.ts:459-475), because `becomes()` and the DirtyTracker's own `_attrs` alias the one AttributeSet instance and a rebind would strand them on the pre-forget copy. Same per-attribute `forgettingAssignment()` call, no `map` call site."
   },
   {
     "package": "activemodel",

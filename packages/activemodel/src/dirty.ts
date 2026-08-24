@@ -24,7 +24,6 @@ export class Dirty {
   declare _dirty: DirtyTracker;
   declare _attributes: AttributeSet;
   /** @internal */
-  declare _readAttribute: (name: string) => unknown;
 
   /**
    * Mirrors: ActiveModel::Dirty#changes_applied (dirty.rb:272-279)
@@ -91,9 +90,9 @@ export class Dirty {
    * Mirrors: ActiveModel::Dirty#attribute_previously_was (dirty.rb:315-317)
    */
   attributePreviouslyWas(name: string): unknown {
-    name = (this.constructor as unknown as DirtyClass).resolveAttributeName(name);
-    const change = this._dirty.previousChanges[name];
-    return change ? change[0] : this._readAttribute(name);
+    return this._dirty.originalValue(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
   }
 
   /**
@@ -151,13 +150,9 @@ export class Dirty {
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place? (dirty.rb:367-369)
    */
   attributeChangedInPlace(name: string): boolean {
-    name = (this.constructor as unknown as DirtyClass).resolveAttributeName(name);
-    const current = this._readAttribute(name);
-    const recorded = this._dirty.mutationsFromDatabase[name];
-    if (recorded) return current !== recorded[1];
-    const original = this._dirty.attributeWas(name);
-    if (original === undefined) return false;
-    return original !== current;
+    return this._dirty.changedInPlace(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
   }
 
   /**
@@ -168,7 +163,7 @@ export class Dirty {
    * @internal
    */
   clearAttributeChange(name: string): void {
-    this._dirty.clearAttributeChange(this._attributes, name);
+    this._dirty.forgetChange(this._attributes, name);
   }
 
   /**
@@ -356,6 +351,13 @@ export class DirtyTracker {
   private _originalHas: Set<string> = new Set();
   private _changedAttributes: Map<string, [unknown, unknown]> = new Map();
   private _previousChanges: Map<string, [unknown, unknown]> = new Map();
+  /**
+   * Rails' `@mutations_before_last_save` is nil until `changes_applied` assigns
+   * the pre-save tracker (dirty.rb:276), and `mutations_before_last_save`
+   * substitutes the `NullMutationTracker` while it is (dirty.rb:394-396). One
+   * tracker holds both change sets here, so that nil is this flag.
+   */
+  private _hasMutationsBeforeLastSave = false;
   /** Names explicitly force-dirtied via attribute_will_change!. @internal */
   private _forcedNames: Set<string> = new Set();
   /** Live AttributeSet reference — set on first snapshot, used to detect changedInPlace(). */
@@ -403,6 +405,7 @@ export class DirtyTracker {
     copy._originalAttributes = attrs.snapshotValues();
     copy._originalHas = new Set(copy._originalAttributes.keys());
     copy._previousChanges = new Map(this._previousChanges);
+    copy._hasMutationsBeforeLastSave = this._hasMutationsBeforeLastSave;
     copy._attrs = attrs;
     copy._pendingNames = new Set(attrs.keys());
     return copy;
@@ -425,6 +428,7 @@ export class DirtyTracker {
       }
     });
     this._previousChanges = snapshot;
+    this._hasMutationsBeforeLastSave = true;
     if (currentAttributes instanceof Map) {
       this._originalAttributes = new Map(currentAttributes);
       this._originalHas = new Set(currentAttributes.keys());
@@ -459,6 +463,16 @@ export class DirtyTracker {
   }
 
   /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed_in_place?
+   * (attribute_mutation_tracker.rb:50-52) — `attributes[attr_name].changed_in_place?`.
+   * An attribute the set does not carry answers through `Attribute::Null`,
+   * whose `changed_in_place?` is false.
+   */
+  changedInPlace(name: string): boolean {
+    return this._attrs?.getAttribute(name).changedInPlace() ?? false;
+  }
+
+  /**
    * Mirrors: ActiveModel::AttributeMutationTracker#changed?
    * (attribute_mutation_tracker.rb:44-48) — the one body every
    * `attribute_changed?` / `attribute_previously_changed?` /
@@ -490,9 +504,35 @@ export class DirtyTracker {
     return resolveValue(this._originalAttributes.get(name));
   }
 
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#original_value
+   * (attribute_mutation_tracker.rb:59-61) over `mutations_before_last_save`.
+   * {@link attributeWas} is the same Ruby method read off
+   * `mutations_from_database`; one object holds both change sets here, so the
+   * two readings cannot share the Ruby name until DirtyTracker splits into two
+   * `AttributeMutationTracker`s (story `0023-surfaced-deviations/
+   * dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`).
+   *
+   * Before the first save Rails' `mutations_before_last_save` is the
+   * `NullMutationTracker`, whose `original_value` returns nil
+   * (attribute_mutation_tracker.rb:186-187, dirty.rb:394-396); this tracker
+   * holds both change sets in one object, so `_hasMutationsBeforeLastSave` is
+   * where the nil-vs-real-tracker distinction lives. Otherwise the answer is
+   * the pre-save value: the recorded change's `from` for an attribute the save
+   * changed, and the snapshot baseline `changes_applied` left behind for one
+   * it did not.
+   */
+  originalValue(name: string): unknown {
+    if (!this._hasMutationsBeforeLastSave) return undefined;
+    const change = this._previousChanges.get(name);
+    if (change) return change[0];
+    return resolveValue(this._originalAttributes.get(name));
+  }
+
   clearChangesInformation(): void {
     this._clearChanges();
     this._previousChanges.clear();
+    this._hasMutationsBeforeLastSave = false;
   }
 
   clearAttributeChanges(attributes: string[]): void {
@@ -566,8 +606,8 @@ export class DirtyTracker {
    * the current value, so a later write reports `[current, next]` instead
    * of `[originalFromFirstSnapshot, next]`.
    *
-   * Mirrors: ActiveModel::Dirty#clear_attribute_change
-   * -> `mutation_tracker.forget_change(name)`, whose body is
+   * Mirrors: ActiveModel::AttributeMutationTracker#forget_change
+   * (attribute_mutation_tracker.rb:54-57), whose body is
    * `attributes[name] = attributes[name].forgetting_assignment`
    * (attribute_mutation_tracker.rb:33-35) — so the assigned value becomes the
    * new from-database seat and `original_value_for_database` moves with it, not
@@ -576,7 +616,7 @@ export class DirtyTracker {
    *
    * @internal
    */
-  clearAttributeChange(
+  forgetChange(
     attributes:
       | Map<string, unknown>
       | { has(name: string): boolean; fetchValue(name: string): unknown }
