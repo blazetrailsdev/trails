@@ -130,7 +130,7 @@ export class PostgreSQLDatabaseTasks {
 
     args.push(this.dbConfig.database as string);
     await this.runCmd("pg_dump", args, "dumping");
-    await this.removeSqlHeaderComments(filename);
+    this.removeSqlHeaderComments(filename);
     getFs().appendFileSync(
       filename,
       `SET search_path TO ${await (await this.connection()).schemaSearchPath()};\n\n`,
@@ -217,10 +217,10 @@ export class PostgreSQLDatabaseTasks {
    * tempfile's removal to its finalizer, which JS has no equivalent of, so the
    * non-block form is unlinked explicitly once the copy has been made.
    */
-  private async removeSqlHeaderComments(filename: string): Promise<void> {
+  private removeSqlHeaderComments(filename: string): void {
     const fs = getFs();
     let removingComments = true;
-    const tempfile = await Tempfile.open("uncommented_structure.sql");
+    const tempfile = Tempfile.open("uncommented_structure.sql");
     try {
       for (const line of fs.readFileSync(filename, "utf8").split(/(?<=\n)/)) {
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
@@ -229,10 +229,10 @@ export class PostgreSQLDatabaseTasks {
         }
       }
     } finally {
-      await tempfile.close();
+      tempfile.close();
     }
     fs.copyFileSync(tempfile.path!, filename);
-    await tempfile.unlink();
+    tempfile.unlink();
   }
 
   /** @internal */

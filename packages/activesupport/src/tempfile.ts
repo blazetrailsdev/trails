@@ -1,6 +1,6 @@
-import { getFsAsync, getPathAsync } from "./fs-adapter.js";
-import { ArgumentError } from "./hash-utils.js";
-import { getOsAsync } from "./os-adapter.js";
+import { getCrypto } from "./crypto-adapter.js";
+import { getFs, getPath } from "./fs-adapter.js";
+import { getOs } from "./os-adapter.js";
 
 /** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */
 export type TempfileBasename = string | [string, string];
@@ -9,47 +9,68 @@ export type TempfileBasename = string | [string, string];
 const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
 
 /**
- * `Dir::Tmpname.create(basename, tmpdir = nil)` (`tmpdir.rb:139-163`).
+ * `Dir::Tmpname::RANDOM.next` (`tmpdir.rb:126-136`) — `Random.urandom(4)` read
+ * as a little-endian `L`, modulo `36**6`, in base 36.
  *
- * Ruby yields candidate names and retries on `Errno::EEXIST`, which is what
- * makes the name unique. The fs adapter exposes no exclusive-create flag, so
- * the candidate is placed inside a fresh `mkdtemp` directory instead and the
- * `EEXIST` retry loop has nothing left to retry — which is also why
- * {@link Tempfile.unlink} removes a directory Ruby's has no counterpart for.
- * Ruby's second name component is `$$`, the process id; trails has no
- * `process.*`, so it is a second draw from the `RANDOM.next` generator.
+ * Ruby's `Random.urandom` is always available; trails' CSPRNG sits behind the
+ * crypto adapter, which a host need not have registered by the time a temp file
+ * is made — an ESM worker thread has no synchronous resolution path for it. The
+ * name's uniqueness comes from {@link createTmpname}'s `EEXIST` retry rather
+ * than from this draw, so an unregistered adapter falls back rather than
+ * raising where Ruby would have carried on.
  *
  * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
  *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
  */
-async function createTmpname(basename: TempfileBasename, tmpdir?: string): Promise<string> {
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
-
-  if (!fs.mkdtemp || !fs.writeFile) {
-    throw new ArgumentError(
-      "Tempfile requires FsAdapter.mkdtemp and FsAdapter.writeFile. " +
-        "The configured FsAdapter does not provide them.",
-    );
+function random(): string {
+  const MAX = 36 ** 6;
+  let n: number;
+  try {
+    n = getCrypto().randomBytes(4).readUInt32LE(0);
+  } catch {
+    n = Math.floor(Math.random() * 0x100000000);
   }
+  return (n % MAX).toString(36);
+}
 
-  tmpdir ??= (await getOsAsync()).tmpdir();
+/**
+ * `Dir::Tmpname.create(basename, tmpdir = nil)` (`tmpdir.rb:139-163`) — yields
+ * candidate names until one is not taken, retrying on `Errno::EEXIST`, and
+ * returns the name that stuck.
+ *
+ * Ruby's second name component is `$$`, the process id; trails has no
+ * `process.*`, so it is a second draw from {@link random}.
+ *
+ * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
+ *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
+ */
+function createTmpname(
+  basename: TempfileBasename,
+  tmpdir: string | undefined,
+  block: (path: string) => void,
+): string {
+  tmpdir ??= getOs().tmpdir();
   let [prefix, suffix] = typeof basename === "string" ? [basename, undefined] : basename;
   prefix = prefix.replace(UNUSABLE_CHARS, "");
   suffix &&= suffix.replace(UNUSABLE_CHARS, "");
 
-  // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is a
-  // filename component, not a modelled instant.
-  const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return path.join(
-    await fs.mkdtemp(path.join(tmpdir, "tempfile-")),
-    `${prefix}${t}-${random()}-${random()}${suffix ?? ""}`,
-  );
-}
-
-/** `Dir::Tmpname::RANDOM.next` (`tmpdir.rb:126-136`) — up to 6 base-36 bytes. */
-function random(): string {
-  return Math.floor(Math.random() * 36 ** 6).toString(36);
+  let n: number | null = null;
+  for (;;) {
+    // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is
+    // a filename component, not a modelled instant.
+    const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const path = getPath().join(
+      tmpdir,
+      `${prefix}${t}-${random()}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
+    );
+    try {
+      block(path);
+      return path;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EEXIST") throw error;
+      n = (n ?? 0) + 1;
+    }
+  }
 }
 
 /**
@@ -61,14 +82,12 @@ function random(): string {
  * the way Ruby's `IO` buffers them behind the descriptor: the fs adapter is
  * open-write-close per call, so there is no descriptor to hold between writes.
  *
- * A block may be synchronous or asynchronous and its value is returned either
- * way, but {@link open} and {@link create} always return a Promise rather than
- * `T | Promise<T>`. Creating the file is what forces it: `getFsAsync` resolves
- * the adapter asynchronously and `mkdtemp`/`writeFile` are async-only, so
- * `Tempfile.new` has no synchronous seat to return `T` from — no arrangement of
- * the block's own signature reaches one. This is also why `File.atomic_write`
- * (`core_ext/file/atomic.rb:24`), the one synchronous caller, keeps its own
- * stand-in rather than routing through here.
+ * {@link open} and {@link create} run a synchronous block inline and return its
+ * value directly, the way Ruby does (`tempfile.rb:373-379`, `:446-464`); an
+ * asynchronous block gets its `ensure` chained onto the returned Promise
+ * instead. That is why creation goes through the fs adapter's synchronous
+ * primitives: an `async` wrapper would defer a synchronous block's value past
+ * every synchronous reader of it.
  *
  * @noRailsEquivalent CONVERGEABLE — `Tempfile` is Ruby stdlib rather than
  *   Rails, so it has no `vendor/rails` anchor and no natural package. It lives
@@ -89,14 +108,16 @@ export class Tempfile {
   /**
    * `Tempfile.new(basename = "", tmpdir = nil)` (`tempfile.rb:150-166`).
    *
-   * Ruby's `initialize` opens the file at `opts[:perm] = 0600`
-   * (`tempfile.rb:159`); a TypeScript constructor cannot await, so the Ruby
-   * name lives on the static factory instead.
+   * `File.open(tmpname, RDWR|CREAT|EXCL, perm: 0600)` is `openSync(path, "wx")`
+   * — the exclusive create whose `EEXIST` is what {@link createTmpname} retries
+   * on — followed by `chmodSync`, since the adapter's `openSync` takes no mode.
    */
-  static async new(basename: TempfileBasename = "", tmpdir?: string): Promise<Tempfile> {
-    const fs = await getFsAsync();
-    const tmpname = await createTmpname(basename, tmpdir);
-    await fs.writeFile!(tmpname, "", { mode: 0o600 });
+  static new(basename: TempfileBasename = "", tmpdir?: string): Tempfile {
+    const fs = getFs();
+    const tmpname = createTmpname(basename, tmpdir, (path) => {
+      fs.closeSync(fs.openSync(path, "wx"));
+      fs.chmodSync?.(path, 0o600);
+    });
     return new Tempfile(tmpname);
   }
 
@@ -107,25 +128,24 @@ export class Tempfile {
    * leaves removal to the finalizer, which JS has no equivalent of, so a
    * caller of this form removes the file itself.
    */
-  static open(basename?: TempfileBasename, tmpdir?: string): Promise<Tempfile>;
+  static open(basename?: TempfileBasename, tmpdir?: string): Tempfile;
   static open<T>(
     basename: TempfileBasename | undefined,
     tmpdir: string | undefined,
-    block: (tempfile: Tempfile) => T | Promise<T>,
-  ): Promise<T>;
-  static async open<T>(
+    block: (tempfile: Tempfile) => T,
+  ): T;
+  static open<T>(
     basename?: TempfileBasename,
     tmpdir?: string,
-    block?: (tempfile: Tempfile) => T | Promise<T>,
-  ): Promise<T | Tempfile> {
-    const tempfile = await Tempfile.new(basename, tmpdir);
+    block?: (tempfile: Tempfile) => T,
+  ): T | Tempfile {
+    const tempfile = Tempfile.new(basename, tmpdir);
 
     if (block) {
-      try {
-        return await block(tempfile);
-      } finally {
-        await tempfile.close();
-      }
+      return ensure(
+        () => block(tempfile),
+        () => tempfile.close(),
+      );
     } else {
       return tempfile;
     }
@@ -137,34 +157,33 @@ export class Tempfile {
    * path too — and returns the block's value; without one, returns the open
    * file, which the caller closes and unlinks itself.
    */
-  static create(basename?: TempfileBasename, tmpdir?: string): Promise<Tempfile>;
+  static create(basename?: TempfileBasename, tmpdir?: string): Tempfile;
   static create<T>(
     basename: TempfileBasename | undefined,
     tmpdir: string | undefined,
-    block: (tmpfile: Tempfile) => T | Promise<T>,
-  ): Promise<T>;
-  static async create<T>(
+    block: (tmpfile: Tempfile) => T,
+  ): T;
+  static create<T>(
     basename?: TempfileBasename,
     tmpdir?: string,
-    block?: (tmpfile: Tempfile) => T | Promise<T>,
-  ): Promise<T | Tempfile> {
-    const tmpfile = await Tempfile.new(basename, tmpdir);
+    block?: (tmpfile: Tempfile) => T,
+  ): T | Tempfile {
+    const tmpfile = Tempfile.new(basename, tmpdir);
 
     if (block) {
-      try {
-        return await block(tmpfile);
-      } finally {
-        await tmpfile.close();
-        await tmpfile.unlink();
-      }
+      return ensure(
+        () => block(tmpfile),
+        () => {
+          tmpfile.close();
+          tmpfile.unlink();
+        },
+      );
     } else {
       return tmpfile;
     }
   }
 
-  /**
-   * `Tempfile#path` (`tempfile.rb:268-270`) — nil once {@link unlink} has run.
-   */
+  /** `Tempfile#path` (`tempfile.rb:268-270`) — nil once {@link unlink} has run. */
   get path(): string | null {
     return this.unlinked ? null : this.tmpname;
   }
@@ -178,16 +197,15 @@ export class Tempfile {
   }
 
   /** `IO#read` — the whole file. */
-  async read(): Promise<Buffer> {
-    await this.flush();
-    return (await getFsAsync()).readFile!(this.tmpname);
+  read(): Buffer {
+    this.flush();
+    return getFs().readFileSync(this.tmpname);
   }
 
   /** `IO#flush` — writes the buffered bytes through to the file. */
-  async flush(): Promise<void> {
+  private flush(): void {
     if (this.flushed) return;
-    const fs = await getFsAsync();
-    await fs.writeFile!(this.tmpname, this.buffer, { mode: 0o600 });
+    getFs().writeFileSync(this.tmpname, this.buffer, { mode: 0o600 });
     this.flushed = true;
   }
 
@@ -196,29 +214,47 @@ export class Tempfile {
    * `_close` releases the descriptor; there is none to release here, so what
    * closing does is flush the buffered writes.
    */
-  async close(unlinkNow = false): Promise<void> {
-    await this.flush();
-    if (unlinkNow) await this.unlink();
+  close(unlinkNow = false): void {
+    this.flush();
+    if (unlinkNow) this.unlink();
   }
 
   /**
-   * `Tempfile#unlink` (`tempfile.rb:252-265`) — removes the file, and with it
-   * the `mkdtemp` directory `createTmpname` put it in. `ENOENT` is swallowed
-   * and `EACCES` returns without marking the file unlinked, the way Ruby
-   * leaves a Windows unlink-before-close for a later `close!` to retry.
+   * `Tempfile#unlink` (`tempfile.rb:252-265`). `ENOENT` is swallowed and
+   * `EACCES` returns without marking the file unlinked, the way Ruby leaves a
+   * Windows unlink-before-close for a later `close!` to retry.
    */
-  async unlink(): Promise<void> {
+  unlink(): void {
     if (this.unlinked) return;
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
     try {
-      await fs.unlink!(this.tmpname);
+      getFs().unlinkSync(this.tmpname);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === "EACCES") return;
       if (code !== "ENOENT") throw error;
     }
-    await fs.rmdir!(path.dirname(this.tmpname));
     this.unlinked = true;
   }
+}
+
+/**
+ * Ruby's `begin ... ensure ... end` around a block whose value is returned:
+ * synchronous values run the ensure inline, a Promise chains it on.
+ *
+ * @noRailsEquivalent CONVERGEABLE — `ensure` is Ruby syntax, so a JS body that
+ *   must serve both a synchronous and an asynchronous block has to spell it
+ *   out. Removable once RFC 0089 gives these primitives a shared home with
+ *   somewhere for it to live.
+ */
+function ensure<T>(body: () => T, cleanup: () => void): T {
+  let value: T;
+  try {
+    value = body();
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+  if (value instanceof Promise) return value.finally(cleanup) as T;
+  cleanup();
+  return value;
 }
