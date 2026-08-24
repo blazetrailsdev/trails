@@ -124,8 +124,6 @@ describe("assertionValueMismatch", () => {
   });
 
   it("folds whitespace for must_be_like, which squeezes both operands", () => {
-    // helper.rb:10-13: `%{\n  SELECT id FROM "users"\n}` and the ported
-    // single-line literal are the SAME assertion.
     expect(
       assertionValueMismatch(
         ["must_be_like"],

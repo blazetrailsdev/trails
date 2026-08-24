@@ -143,39 +143,52 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toBeCloseTo: "inDelta",
 };
 
-// Minitest spec-form expectations that are not a bare `must_<assert-suffix>`:
-// `must_be_kind_of` is `assert_kind_of`, not `assert_be_kind_of`. Keyed on the
-// spec spelling so the prefix fallback in normalizeRailsKind can stay small.
-const SPEC_MAP: Record<string, CanonicalKind> = {
-  must_be_nil: "nil",
-  wont_be_nil: "notNil",
-  must_be_empty: "empty",
-  wont_be_empty: "notEmpty",
-  must_be_kind_of: "instanceOf",
-  must_be_instance_of: "instanceOf",
-  must_be_same_as: "same",
-  wont_be_same_as: "notSame",
-  must_be: "operator",
-  must_be_close_to: "inDelta",
-  must_be_within_delta: "inDelta",
-  // Arel's own test helper: `sql.must_be_like "…"` whitespace-normalizes both
-  // sides and delegates to `must_equal`
+// Rails-side assertion helpers defined by the arel suite itself rather than by
+// Minitest, resolved to the builtin they delegate to.
+const AREL_HELPER_ALIAS: Record<string, string> = {
+  // `sql.must_be_like other` squeezes runs of whitespace and strips BOTH
+  // operands, then `must_equal`
   // (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13).
-  must_be_like: "equal",
-  // Arel's dot_test-local helper: `assert_edge(name, dot)` is an `assert_match`
-  // over a `->…label="name"` regex
+  must_be_like: "assert_equal",
+  // `assert_edge(name, dot)` is `assert_match(/->.*label="name"/, dot)`
   // (vendor/rails/activerecord/test/cases/arel/visitors/dot_test.rb:13-15).
-  assert_edge: "match",
+  assert_edge: "assert_match",
+};
+
+// Minitest spec-form expectations whose builtin twin is NOT the bare
+// `assert_<suffix>`/`refute_<suffix>` the prefix rewrite in normalizeRailsKind
+// produces: `must_be_kind_of` is `assert_kind_of`, not `assert_be_kind_of`.
+// Resolving to the builtin NAME (as minitest/expectations.rb itself does) keeps
+// RAILS_MAP the single source of canonical kinds. The `wont_be_*` forms with no
+// entry here — `wont_be_kind_of`, `wont_be`, `wont_be_close_to` — have no
+// negated twin in RAILS_MAP either (`refute_kind_of`, `refute_operator`), so
+// they stay unmapped, exactly as their `refute_*` spellings already do.
+const SPEC_FORM_ALIAS: Record<string, string> = {
+  must_be_nil: "assert_nil",
+  wont_be_nil: "refute_nil",
+  must_be_empty: "assert_empty",
+  wont_be_empty: "refute_empty",
+  must_be_kind_of: "assert_kind_of",
+  must_be_instance_of: "assert_instance_of",
+  must_be_same_as: "assert_same",
+  wont_be_same_as: "refute_same",
+  must_be: "assert_operator",
+  must_be_close_to: "assert_in_delta",
+  must_be_within_delta: "assert_in_delta",
 };
 
 /**
  * Normalize a raw Rails assertion method name (`assert_equal`, `refute_nil`,
  * `must_equal`, …) to a canonical kind, or `null` when there is no mapped twin.
- * Handles the minitest `must_*`/`wont_*` spec forms by rewriting them to their
- * `assert_*`/`refute_*` equivalents before lookup.
+ * Handles the minitest `must_*`/`wont_*` spec forms — which arel's suite uses
+ * throughout, `Arel::Spec < Minitest::Spec`
+ * (vendor/rails/activerecord/test/cases/arel/helper.rb:29) — by resolving them
+ * to their `assert_*`/`refute_*` builtin before lookup, via SPEC_FORM_ALIAS for
+ * the `must_be_*` family and the bare prefix rewrite for the rest.
  */
 export function normalizeRailsKind(name: string): CanonicalKind | null {
-  const direct = RAILS_MAP[name] ?? SPEC_MAP[name];
+  const builtin = AREL_HELPER_ALIAS[name] ?? SPEC_FORM_ALIAS[name] ?? name;
+  const direct = RAILS_MAP[builtin];
   if (direct) return direct;
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
   const must = /^must_(.+)$/.exec(name);
