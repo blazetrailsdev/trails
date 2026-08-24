@@ -34,8 +34,6 @@ describe("Serializers::JSON host", () => {
     }
     _name = "";
     _age = 0;
-    // json.rb's own docstring host declares `def attributes=(hash)`; trails
-    // spells that alias `setAttributes` (attribute_assignment.rb:36).
     setAttributes(h: { name: string; age: number }) {
       this._name = h.name;
       this._age = h.age;
@@ -197,12 +195,6 @@ describe("Serializers::JSON host", () => {
     expect(c.asJson()).toMatchObject({ author: { name: "Eve" } });
   });
 
-  it("fromJson rejects non-object JSON with shape-accurate diagnostics", () => {
-    expect(() => new Person().fromJson("42")).toThrow(/got number/);
-    expect(() => new Person().fromJson("[1,2,3]")).toThrow(/got array/);
-    expect(() => new Person().fromJson("null")).toThrow(/got null/);
-  });
-
   it("fromJson always unwraps via first-value semantics (Rails hash.values.first)", () => {
     // Rails json.rb:147 — `hash = hash.values.first if include_root`,
     // ignoring the configured root key. Pin that behavior explicitly so
@@ -300,8 +292,6 @@ describe("Serializers::JSON host", () => {
   });
 
   it("Model already implements the same surface ergonomically", () => {
-    // Sanity: `Model` gets this surface from `include(Model, JSON)`, the
-    // direct port of `include ActiveModel::Serializers::JSON`.
     expect(typeof Model.prototype.asJson).toBe("function");
   });
 });

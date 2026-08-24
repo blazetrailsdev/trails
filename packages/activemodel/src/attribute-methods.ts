@@ -869,9 +869,6 @@ export function defineMethodAttribute(
               `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
             );
           }
-          // `def name; attribute("name"); end` (attribute_methods.rb:333-346,
-          // attributes.rb:161-163) — never `_read_attribute`, which in
-          // ActiveModel dispatches back through this very reader.
           return this.attribute(canonicalName);
         },
         set(this: ReadWriteHost, value: unknown) {

@@ -8,9 +8,6 @@ describe("As", () => {
       const attr = new Table("users").get("id");
       const as = attr.as(sql("foo"));
       expect(as.left).toBe(attr);
-      // Ruby's SqlLiteral is a String subclass, so `assert_equal "foo", as.right`
-      // compares string values (sql_literal.rb:6-11); the TS node carries the
-      // text in `value`.
       expect((as.right as Nodes.SqlLiteral).value).toBe("foo");
     });
 

@@ -30,13 +30,15 @@ export class ConfirmationValidator extends EachValidator {
     this.setupBang(options.class);
   }
 
+  /**
+   * Mirrors: confirmation.rb:11-18. The pair is read through the reader
+   * `setup!` installs — `record.public_send("#{attribute}_confirmation")`
+   * (:12) — which is a zero-arg Ruby method, so trails' `public_send` of it is
+   * a property read (CLAUDE.md § "Generated attribute readers are properties").
+   */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
-    // `record.public_send("#{attribute}_confirmation")` (confirmation.rb:12) —
-    // the reader `setup!` installs is a zero-arg Ruby method, so trails'
-    // `public_send` of it is a property read (CLAUDE.md § "Generated attribute
-    // readers are properties").
     const confirmed = rec[confirmationAttr];
     if (confirmed == null) return;
     if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {

@@ -16,10 +16,12 @@ export class SqlLiteral extends Node {
   // Mirrors `attr_reader :retryable` (sql_literal.rb:11).
   readonly retryable: boolean;
 
-  // Ruby's SqlLiteral IS a String, so `SqlLiteral.new(other)` is `String.new`
-  // (sql_literal.rb:6): handed a SqlLiteral it yields a String with the same
-  // content, never a nested literal. `as(Arel.sql("foo"))` relies on that
-  // (alias_predication.rb:6).
+  /**
+   * Ruby's SqlLiteral IS a String, so `SqlLiteral.new(other)` is `String.new`
+   * (sql_literal.rb:6): handed a SqlLiteral it yields a String with the same
+   * content, never a nested literal. `as(Arel.sql("foo"))` relies on that
+   * (alias_predication.rb:6).
+   */
   constructor(value: string | SqlLiteral, options?: { retryable?: boolean }) {
     super();
     this.value = value instanceof SqlLiteral ? value.value : value;

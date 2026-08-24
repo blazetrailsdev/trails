@@ -17,17 +17,6 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "../attribute-assignment.js";
-
-function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function describeJsonShape(v: unknown): string {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "array";
-  return typeof v;
-}
 
 /**
  * JSON serializer mixin host.
@@ -127,24 +116,10 @@ export class JSON {
     const ctor = this.constructor as typeof JSON;
     const root = includeRoot ?? ctor.includeRootInJson;
     let hash = globalThis.JSON.parse(json) as unknown;
-    // Rails' `self.attributes = hash` routes through `assign_attributes`,
-    // which raises `ArgumentError` when the argument isn't hash-like
-    // (attribute_assignment.rb:29-30). Surface the same class loudly instead
-    // of silently writing `undefined` into `attributes`.
-    if (!isPlainJsonObject(hash)) {
-      throw new ArgumentError(`fromJson expected a JSON object, got ${describeJsonShape(hash)}`);
-    }
-    // Rails truthiness: false/nil skip; everything else (including
-    // empty string and any string root key) triggers unwrap via
-    // `hash.values.first` unconditionally — Rails ignores the configured
-    // root key on the read path (json.rb:146-147).
+    // Ruby truthiness: only `false`/`nil` skip the unwrap, and Rails ignores
+    // the configured root key on the read path (json.rb:146-147).
     if (root !== false && root != null) {
-      hash = Object.values(hash)[0];
-      if (!isPlainJsonObject(hash)) {
-        throw new ArgumentError(
-          `fromJson root payload must be a JSON object, got ${describeJsonShape(hash)}`,
-        );
-      }
+      hash = Object.values(hash as object)[0];
     }
     void this.setAttributes(hash);
     return this;
