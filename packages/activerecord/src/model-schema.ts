@@ -1441,6 +1441,17 @@ function warmColumnsHashSync(
  * guard is an own-property check — a plain read would hand a subclass on
  * another table its base's name.
  *
+ * The `reset_column_information if connected?` call runs before the store, so
+ * the caches it drops are the OLD table's, as in Rails (model_schema.rb:273-281,
+ * :523-529). Its lazy rewarm ({@link rewarmDataSourceCache}) is started rather
+ * than discarded, which Rails has no counterpart for and needs none: there
+ * `clear_data_source_cache!` is invisible because the next reader re-reflects
+ * on access under a checkout, while trails' sync readers answer only from a
+ * warm cache, so a dropped rewarm leaves the old table permanently cold for
+ * every other model on it. Starting it restores exactly the state Rails' next
+ * access would produce — measured: without it, `base_test.rb`'s "find multiple
+ * ordered last" inserts a declared-but-uncolumned attribute into `users`.
+ *
  * Two of the writer's clears have no code below them. `@arel_table = nil`:
  * `arelTable` builds a fresh Table per call (core.ts:835), so there is no memo
  * to clear. `@sequence_name = nil unless @explicit_sequence_name`: a non-null
@@ -1454,9 +1465,6 @@ export function tableName(this: SchemaHost, value?: string | null): string {
     if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
       if (value === this._tableName) return this._tableName ?? "";
       if (connectedQ.call(this as unknown as typeof Base)) {
-        // It runs before the store, so the caches it drops are the OLD table's,
-        // as in Rails. Its data-source rewarm is the one async tail — Rails'
-        // `reset_column_information` has none — and nothing here awaits it.
         void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
       }
     }
