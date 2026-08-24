@@ -19,7 +19,12 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
-import { threadedConnectionFor, connectionPool, withConnection } from "./connection-handling.js";
+import {
+  threadedConnectionFor,
+  connectionPool,
+  withConnection,
+  connectedQ,
+} from "./connection-handling.js";
 
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
@@ -68,39 +73,31 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the table name for a model class.
- * Inferred from class name if not explicitly set. STI subclasses
- * inherit the base class's table name.
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#compute_table_name
+ * (model_schema.rb:604-618)
  *
- * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name
- *
- * Also folds in `reset_table_name` (model_schema.rb:290-300), whose arms Rails
- * evaluates eagerly at `inherited` time and trails evaluates lazily here (the
- * `table_name` reader routes through this function, not through
- * `resetTableName`): `self == Base` is nil, and an abstract class takes
- * `superclass.table_name` rather than a name computed from its own class name.
+ * The `base === this` guard on the STI arm has no Rails counterpart: there
+ * `base_class? == false` is exactly `base_class != self` (inheritance.rb:119-121),
+ * while trails reaches the two answers through separate memos (`isBaseClass` /
+ * `baseClass`, inheritance.ts), so the guard stops a self-call recursing
+ * forever if they ever disagree.
  *
  * @internal
  */
-export function resolveTableName(this: typeof Base): string {
-  if ((this as any)._tableName != null) return (this as any)._tableName;
-  if (this.name === "Base") return "";
-  if ((this as any).abstractClass) {
-    const superclass = Object.getPrototypeOf(this) as typeof Base | null;
-    return superclass ? resolveTableName.call(superclass) : "";
+function computeTableName(this: typeof Base): string {
+  if (isBaseClass(this)) {
+    // Nested classes are prefixed with singular parent table name.
+    const contained = containedTableNamePrefix.call(this);
+    const pluralizes = (this as any).pluralizeTableNames ?? true;
+    return `${fullTableNamePrefix.call(this as any)}${contained}${undecoratedTableName(
+      String(this.modelName),
+      pluralizes,
+    )}${fullTableNameSuffix.call(this as any)}`;
   }
-  // Rails compute_table_name: non-base subclasses always use base_class.table_name.
-  // This covers both STI hierarchies and any subclass of a non-abstract AR model.
-  if (!isBaseClass(this)) {
-    const base = baseClass.call(this);
-    if (base !== this) return resolveTableName.call(base);
-  }
-  const prefix = fullTableNamePrefix.call(this as any);
-  const suffix = fullTableNameSuffix.call(this as any);
-  const contained = containedTableNamePrefix.call(this as any);
-  const pluralizes = (this as any).pluralizeTableNames ?? true;
-  const inferred = undecoratedTableName(String(this.modelName), pluralizes);
-  return `${prefix}${contained}${inferred}${suffix}`;
+  // STI subclasses always use their superclass's table.
+  const base = baseClass.call(this);
+  if (base === this) return "";
+  return base.tableName;
 }
 
 /**
@@ -489,7 +486,7 @@ function sqlTypeFor(typeName: string, adapterName?: string): string {
  * Mirrors: used by test infrastructure, not a direct Rails API
  */
 export async function createTable(this: typeof Base): Promise<void> {
-  const table = resolveTableName.call(this);
+  const table = this.tableName;
   const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
   const adapterName = this.connection.adapterName;
   const isMysql = adapterName === "mysql2";
@@ -619,17 +616,28 @@ export function quotedTableName(this: SchemaHost): string {
 }
 
 /**
- * Rails: resets and recomputes table name, handling abstract classes
- * and STI inheritance.
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#reset_table_name
+ * (model_schema.rb:289-300)
+ *
+ * Reaches its value by assigning through `table_name=`, so a first read gets
+ * the writer's cache invalidation exactly where Rails has it. Rails' `self ==
+ * Base` is spelled through the own-property sentinel `setBaseClass` tests for
+ * the same thing (inheritance.ts).
  */
 export function resetTableName(this: SchemaHost): string {
-  this._tableName = null;
-  if (this.name === "Base") {
-    return "";
-  }
-  const name = resolveTableName.call(this as any);
-  this._tableName = name;
-  return name;
+  const klass = this as unknown as typeof Base;
+  const superclass = Object.getPrototypeOf(klass) as typeof Base | null;
+  tableName.call(
+    this,
+    Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
+      ? null
+      : klass.abstractClass
+        ? (superclass?.tableName ?? null)
+        : superclass?.abstractClass
+          ? superclass.tableName || computeTableName.call(klass)
+          : computeTableName.call(klass),
+  );
+  return this._tableName ?? "";
 }
 
 export function fullTableNamePrefix(this: SchemaHost): string {
@@ -1375,39 +1383,104 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   const table = host.tableName;
   // Gate on `_columnsHash` (the map we read) rather than `isCached`/`_columns`,
   // so an out-of-sync `_columns` entry can't pass the guard and yield undefined.
-  const hash = cache.getCachedColumnsHash(table);
+  let hash = cache.getCachedColumnsHash(table);
+  if (!hash) hash = warmColumnsHashSync(adapter, cache, table);
   if (!hash) return false;
   applyColumnsHash(host, hash);
   return true;
 }
 
-export function tableName(this: SchemaHost, value?: string): string {
-  if (value !== undefined) {
-    const changed = this._tableName !== value;
-    this._tableName = value;
-    if (changed) {
-      // Rails table_name= runs `reset_column_information if connected?`, which
-      // resets the predicate builder and (via initialize_find_by_cache) the
-      // find_by statement cache. We have no connection-pool `connected?`
-      // gate, so we clear these two caches eagerly and directly (rather than
-      // routing through the heavier resetColumnInformation/schema reload) so
-      // the next query rebuilds against the new table.
-      (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
-      (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
-      // Rails reset_column_information also reloads the schema so the new
-      // table's columns are re-reflected. A subclass created with a different
-      // table_name (e.g. `Class.new(Minimalistic) { self.table_name = "aircraft" }`)
-      // inherits the parent's `_schemaLoaded = true` through the prototype
-      // chain and would otherwise never reflect its own table. Shadow the
-      // inherited flag with an own `false` so the next load re-reflects.
-      (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
-      // Rails' reset_column_information also nils @attribute_names (on the
-      // class and, recursively, its descendants); drop the memos now so reads
-      // before the next load don't see the old table's names.
-      clearAttributeNamesMemo(this);
-    }
+/**
+ * Rails' `schema_cache.columns_hash` is synchronous, so `load_schema!` reflects
+ * a cold table right where it stands (model_schema.rb:534-546). trails' cache
+ * read is async, which leaves this path with nothing to reflect and — before
+ * this — silently yielding an empty attribute set for any model whose columns
+ * never came from a query, e.g. `Contact`, whose columns come from the fake
+ * adapter's `merge_column` (test/models/contact.rb:30-32).
+ *
+ * An adapter whose `columns` answers synchronously is exactly that case, so
+ * reflect and warm the cache here. A real adapter's `columns` returns a
+ * promise; drop it (with its rejection handled) and leave the cold-cache
+ * fallback below to run, so DB-backed models are unaffected.
+ *
+ * @noRailsEquivalent Bridges trails' async `SchemaCache#columns_hash` back to
+ * the synchronous read Rails has; retire it when the cache read can block.
+ */
+function warmColumnsHashSync(
+  adapter: NonNullable<SchemaHost["connection"]>,
+  cache: {
+    setColumns?: (table: string, cols: any[]) => void;
+    getCachedColumnsHash: (table: string) => Record<string, unknown> | undefined;
+  },
+  table: string,
+): Record<string, unknown> | undefined {
+  if (typeof adapter.columns !== "function" || typeof cache.setColumns !== "function") {
+    return undefined;
   }
-  return resolveTableName.call(this as any);
+  let cols: unknown;
+  try {
+    cols = adapter.columns(table);
+  } catch {
+    return undefined;
+  }
+  if (cols != null && typeof (cols as any).then === "function") {
+    void (cols as Promise<unknown>).catch(() => {});
+    return undefined;
+  }
+  if (!Array.isArray(cols) || cols.length === 0) return undefined;
+  cache.setColumns(table, cols);
+  return cache.getCachedColumnsHash(table);
+}
+
+/**
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name (model_schema.rb:260-263)
+ * and #table_name= (model_schema.rb:270-282).
+ *
+ * The reader is lazy and memoizes into `_tableName` via `reset_table_name`.
+ * Ruby class ivars are not inherited but JS statics are, so the `defined?`
+ * guard is an own-property check — a plain read would hand a subclass on
+ * another table its base's name.
+ *
+ * The `reset_column_information if connected?` call runs before the store, so
+ * the caches it drops are the OLD table's, as in Rails (model_schema.rb:273-281,
+ * :523-529). Its lazy rewarm ({@link rewarmDataSourceCache}) is started rather
+ * than discarded, which Rails has no counterpart for and needs none: there
+ * `clear_data_source_cache!` is invisible because the next reader re-reflects
+ * on access under a checkout, while trails' sync readers answer only from a
+ * warm cache, so a dropped rewarm leaves the old table permanently cold for
+ * every other model on it. Starting it restores exactly the state Rails' next
+ * access would produce — measured: without it, `base_test.rb`'s "find multiple
+ * ordered last" inserts a declared-but-uncolumned attribute into `users`.
+ *
+ * Two of the writer's clears have no code below them. `@arel_table = nil`:
+ * `arelTable` builds a fresh Table per call (core.ts:835), so there is no memo
+ * to clear. `@sequence_name = nil unless @explicit_sequence_name`: a non-null
+ * `_sequenceName` IS `@explicit_sequence_name` — only `sequence_name=` sets it
+ * and `reset_sequence_name` nils it — so the clear is a no-op on every
+ * reachable state.
+ */
+export function tableName(this: SchemaHost, value?: string | null): string {
+  if (value !== undefined) {
+    value = value == null ? null : String(value);
+    if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
+      if (value === this._tableName) return this._tableName ?? "";
+      if (connectedQ.call(this as unknown as typeof Base)) {
+        void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
+      }
+    }
+    this._tableName = value;
+    (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
+    // Rails reset_column_information also reloads the schema so the new
+    // table's columns are re-reflected. A subclass created with a different
+    // table_name (e.g. `Class.new(Minimalistic) { self.table_name = "aircraft" }`)
+    // inherits the parent's `_schemaLoaded = true` through the prototype
+    // chain and would otherwise never reflect its own table. Shadow the
+    // inherited flag with an own `false` so the next load re-reflects.
+    (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
+    return this._tableName ?? "";
+  }
+  if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
+  return this._tableName ?? "";
 }
 
 export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {
@@ -1425,14 +1498,35 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
   return this._inheritanceColumn ?? "type";
 }
 
+/**
+ * Mirrors: ActiveRecord::ModelSchema::ClassMethods#sequence_name
+ * (model_schema.rb:371-377) and #sequence_name= (:398-401).
+ *
+ * A non-base class answers its own `@sequence_name` if it has one and the base
+ * class's otherwise; only a base class computes one.
+ *
+ * The writer stores `value.to_s` and sets `@explicit_sequence_name` — a
+ * non-null `_sequenceName` IS that flag here, since only this writer sets it
+ * and `reset_sequence_name` nils it — so `sequence_name = nil` stores an
+ * explicit `""` (Ruby's `nil.to_s`, not JS `String(null)`) rather than falling
+ * back to the computed name, exactly as Rails does.
+ *
+ * Rails memoizes `reset_sequence_name`, which reaches the default through
+ * `with_connection { |c| c.default_sequence_name(...) }` (model_schema.rb:379-382)
+ * — async in trails, and this reader is synchronous — so the conventional name
+ * every adapter builds is spelled here instead.
+ */
 export function sequenceName(this: SchemaHost, value?: string | null): string | null {
   if (value !== undefined) {
-    this._sequenceName = value;
-    return value;
+    this._sequenceName = value == null ? "" : String(value);
+    return this._sequenceName;
   }
-  const pk = this.primaryKey;
-  if (Array.isArray(pk)) return this._sequenceName;
-  return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+  if (isBaseClass(this as unknown as typeof Base)) {
+    const pk = this.primaryKey;
+    if (Array.isArray(pk)) return this._sequenceName;
+    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+  }
+  return this._sequenceName ?? baseClass.call(this as unknown as typeof Base).sequenceName;
 }
 
 export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
@@ -1481,7 +1575,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
  * mixin surface colocated with the implementations.
  *
  * Not included:
- * - `resolveTableName`, `buildPkWhere`, `buildPkWhereNode` — internal helpers
+ * - `computeTableName`, `buildPkWhere`, `buildPkWhereNode` — internal helpers
  *   that back the `tableName` getter and the underscore-prefixed
  *   `_buildPkWhere*` accessors. They use the `this:` convention for internal
  *   consistency but aren't Rails-style class methods.
@@ -1540,11 +1634,6 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 /** @internal */
 export function isSchemaLoaded(this: SchemaHost): boolean {
   return ownSchemaMemo(this, "_schemaLoaded") ?? false;
-}
-
-/** @internal */
-function computeTableName(this: SchemaHost): string {
-  return resolveTableName.call(this as any);
 }
 
 /** @internal */

@@ -12,15 +12,14 @@ import type { Project } from "./project.js";
 import { registerModel } from "../../associations.js";
 import { registerModuleTableNamePrefix, registerModuleTableNameSuffix } from "../../inheritance.js";
 import { Base } from "../../base.js";
-import { Company } from "./company.js";
 
 // module MyApplication::Business::Prefixed { def self.table_name_prefix; "prefixed_"; end }
 registerModuleTableNamePrefix("MyApplication::Business::Prefixed", "prefixed_");
 // module MyApplication::Business::Suffixed { def self.table_name_suffix; "_suffixed"; end }
 registerModuleTableNameSuffix("MyApplication::Business::Suffixed", "_suffixed");
 
-// MyApplication::Business::Company < ::Company
-export class MyAppBusinessCompany extends Company {
+// MyApplication::Business::Company
+export class MyAppBusinessCompany extends Base {
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Company";
 }

@@ -5,6 +5,7 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
+import { isSchemaLoaded } from "./model-schema.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
@@ -309,8 +310,14 @@ export class InsertAll {
   /** @internal */
   private verifyAttributeNamesAreKnown(): void {
     // Rails raises UnknownAttributeError in extract_types_from_columns_on against
-    // schema_cache.columns_hash; we mirror the same intent against the model's
-    // declared attribute set so the error surfaces before any SQL is built.
+    // schema_cache.columns_hash (insert_all.rb:306-313); we mirror the same
+    // intent against the model's declared attribute set so the error surfaces
+    // before any SQL is built. Rails reads that hash through a blocking
+    // reflect, so it never judges a model whose schema is not loaded — this
+    // check must not either, or a table_name= that reset the schema
+    // (`Book.table_name = "db.books"`, insert_all_test.rb) would raise on a
+    // column the reflect is about to produce.
+    if (!isSchemaLoaded.call(this.model as never)) return;
     const known = new Set(this.model.attributeNames());
     if (known.size === 0) return;
     for (const pk of this.primaryKeys()) known.add(pk);

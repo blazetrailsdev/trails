@@ -76,9 +76,3 @@ export class ContactSti extends Base {
 
 await extended(ContactSti);
 ContactSti.column("type", "string");
-
-// Rails reflects the fake adapter's columns lazily, on the first `columns`
-// read. trails' synchronous reflection sees only an already-warm schema cache,
-// so warm it here — after the last `column` call — while we can still await.
-await Contact.loadSchema();
-await ContactSti.loadSchema();

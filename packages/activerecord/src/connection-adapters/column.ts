@@ -163,13 +163,20 @@ export class Column {
    * carries no tag, so the tag is written as a key and `rehydrateColumn`
    * dispatches on it.
    *
-   * The subclass overrides below then go one step further than Rails and encode
-   * their own state too. That is a deliberate deviation, not an oversight:
-   * Rails' data loss is invisible because Rails only ever compares a reflected
-   * cache against another reflected one, while trails' fixtures warm compares a
-   * dump-loaded cache against a reflected one — dropping `array` / `serial` /
-   * `rowid` & co. reds `base_test.rb`'s `test_clear_cache!`. Tracked by RFC
-   * 0096 `converge-column-subclass-state-out-of-encode-with`.
+   * Rails' own subclasses carry part of their state through the coder too —
+   * `PostgreSQL::Column` writes `serial` / `identity` / `generated`
+   * (`postgresql/column.rb:50-61`) and `SQLite3::Column` writes
+   * `auto_increment` (`sqlite3/column.rb:36-44`); `MySQL::Column` writes
+   * nothing, because its `extra` lives in `MySQL::TypeMetadata` and rides
+   * along inside `sql_type_metadata`. trails' overrides go further still,
+   * encoding the state Rails either derives (`array` from the `[]` suffix) or
+   * holds in an adapter `TypeMetadata` trails has not ported (`oid` / `fmod` /
+   * `extra`), plus the `rowid` / `generated_type` Rails genuinely loses. That
+   * last one is load-bearing here and not upstream: Rails only ever compares a
+   * reflected cache against another reflected one, while trails' fixtures warm
+   * compares a dump-loaded cache against a reflected one, so dropping them reds
+   * `base_test.rb`'s `test_clear_cache!`. Tracked by RFC 0096
+   * `converge-column-subclass-state-out-of-encode-with`.
    */
   encodeWith(coder: ColumnCoder): void {
     coder["class"] = "Column";
