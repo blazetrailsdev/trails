@@ -26,7 +26,7 @@ import { UnknownAttributeError } from "./errors.js";
  * already done it. It answers a promise only when a send owed I/O.
  */
 export function assignAttributes(
-  model: AttributeAssignment,
+  this: AttributeAssignment,
   newAttributes: unknown,
 ): Promise<void> | void {
   if (!respondToEachPair(newAttributes)) {
@@ -36,16 +36,16 @@ export function assignAttributes(
   }
   if (isMassAssignmentEmpty(newAttributes)) return;
 
-  return model._assignAttributes(model.sanitizeForMassAssignment(newAttributes));
+  return this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
 }
 
 /** @internal Rails-private helper. */
 export function _assignAttributes(
-  model: AttributeAssignment,
+  this: AttributeAssignment,
   attributes: Record<string, unknown>,
 ): void {
   for (const [k, v] of Object.entries(attributes)) {
-    void model._assignAttribute(k, v);
+    void this._assignAttribute(k, v);
   }
 }
 
@@ -58,18 +58,18 @@ export function _assignAttributes(
  * Rails name in a `setX()` method (CLAUDE.md § "Fidelity is the job").
  */
 export function setAttributes(
-  model: AttributeAssignment,
+  this: AttributeAssignment,
   newAttributes: unknown,
 ): Promise<void> | void {
-  return assignAttributes(model, newAttributes);
+  return assignAttributes.call(this, newAttributes);
 }
 
 export function attributeWriterMissing(
-  model: AttributeAssignment,
+  this: AttributeAssignment,
   name: string,
   _value: unknown,
 ): void {
-  throw new UnknownAttributeError(model, name);
+  throw new UnknownAttributeError(this, name);
 }
 
 /**
@@ -108,31 +108,31 @@ export function attributeWriterMissing(
  * @internal Rails-private helper.
  */
 export function _assignAttribute(
-  model: AttributeAssignment,
+  this: AttributeAssignment,
   k: string,
   v: unknown,
 ): Promise<void> | void {
   const setter = `${k}=`;
   try {
-    const method = publicMethod(model, setter);
+    const method = publicMethod(this, setter);
     if (method) {
-      const result: unknown = method.call(model, v);
+      const result: unknown = method.call(this, v);
       return result instanceof Promise ? (result as Promise<void>) : undefined;
     }
-    const match = model.matchedAttributeMethod(setter);
+    const match = this.matchedAttributeMethod(setter);
     if (match) {
-      model.attributeMissing(match, v);
+      this.attributeMissing(match, v);
       return;
     }
     throw new NoMethodError(
-      `undefined method '${setter}' for an instance of ${model.constructor.name}`,
+      `undefined method '${setter}' for an instance of ${this.constructor.name}`,
     );
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
-    if (publicMethod(model, setter)) {
+    if (publicMethod(this, setter)) {
       throw error;
     } else {
-      model.attributeWriterMissing(k, v);
+      this.attributeWriterMissing(k, v);
     }
   }
 }
