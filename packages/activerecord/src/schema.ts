@@ -4,6 +4,7 @@ import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 
 /**
  * Info hash accepted by `Schema.define`. Mirrors the Ruby
@@ -64,39 +65,46 @@ export class Schema extends Current {
     const { info, fn }: { info: SchemaDefineInfo; fn: (s: Schema) => void | Promise<void> } =
       typeof infoOrFn === "function" ? { info: {}, fn: infoOrFn } : { info: infoOrFn, fn: fnOpt! };
 
-    const schema = new Schema(adapter);
-    await fn(schema);
+    // schema.rb:59 `connection_pool.with_connection do |connection|` — the
+    // whole definition runs inside one lease. The port is handed the adapter
+    // rather than taking the block's leased `connection`, so the lease is
+    // scoped around the same work without re-binding the DDL receiver.
+    const connectionPool = adapter.pool as ConnectionPool;
+    await connectionPool.withConnection(async () => {
+      const schema = new Schema(adapter);
+      await fn(schema);
 
-    // Mirrors Rails' Schema::Definition#define post-block work:
-    //   connection_pool.schema_migration.create_table
-    //   connection.assume_migrated_upto_version(info[:version]) if info[:version]
-    //   connection_pool.internal_metadata.create_table_and_set_flags(env)
-    const schemaMigration = new SchemaMigration(adapter.pool);
-    await schemaMigration.createTable();
-    if (info.version !== undefined) {
-      // Go through SchemaStatements#assumeMigratedUptoVersion (reached
-      // via the inherited Migration.connection getter) so the known
-      // migration list is pulled from pool.migrationContext.migrations
-      // — matches Rails' `connection.assume_migrated_upto_version`
-      // (see connection-adapters/abstract/schema-statements.ts:1157).
-      // Bypassing that path and calling SchemaMigration directly would
-      // only record the target version without backfilling the
-      // migrations between.
-      await schema.connection.assumeMigratedUptoVersion(info.version);
-    }
-    // Environment fallback chain: explicit info.environment → TRAILS_ENV
-    // → NODE_ENV (one-release fallback) → DatabaseConfigurations.defaultEnv
-    // (defaults to "development" but can be overridden by the app, e.g. via
-    // trailties boot). Using defaultEnv over a hard-coded literal
-    // keeps Schema.define consistent with how Migrator and other
-    // migration-stack pieces resolve the current environment.
-    const currentEnvironment =
-      info.environment ??
-      getEnv("TRAILS_ENV") ??
-      getEnv("NODE_ENV") ??
-      DatabaseConfigurations.defaultEnv;
-    const internalMetadata = new InternalMetadata(adapter.pool);
-    await internalMetadata.createTableAndSetFlags(currentEnvironment);
+      // Mirrors Rails' Schema::Definition#define post-block work:
+      //   connection_pool.schema_migration.create_table
+      //   connection.assume_migrated_upto_version(info[:version]) if info[:version]
+      //   connection_pool.internal_metadata.create_table_and_set_flags(env)
+      const schemaMigration = new SchemaMigration(connectionPool);
+      await schemaMigration.createTable();
+      if (info.version !== undefined) {
+        // Go through SchemaStatements#assumeMigratedUptoVersion (reached
+        // via the inherited Migration.connection getter) so the known
+        // migration list is pulled from pool.migrationContext.migrations
+        // — matches Rails' `connection.assume_migrated_upto_version`
+        // (see connection-adapters/abstract/schema-statements.ts:1157).
+        // Bypassing that path and calling SchemaMigration directly would
+        // only record the target version without backfilling the
+        // migrations between.
+        await schema.connection.assumeMigratedUptoVersion(info.version);
+      }
+      // Environment fallback chain: explicit info.environment → TRAILS_ENV
+      // → NODE_ENV (one-release fallback) → DatabaseConfigurations.defaultEnv
+      // (defaults to "development" but can be overridden by the app, e.g. via
+      // trailties boot). Using defaultEnv over a hard-coded literal
+      // keeps Schema.define consistent with how Migrator and other
+      // migration-stack pieces resolve the current environment.
+      const currentEnvironment =
+        info.environment ??
+        getEnv("TRAILS_ENV") ??
+        getEnv("NODE_ENV") ??
+        DatabaseConfigurations.defaultEnv;
+      const internalMetadata = new InternalMetadata(connectionPool);
+      await internalMetadata.createTableAndSetFlags(currentEnvironment);
+    });
   }
 
   constructor(adapter: DatabaseAdapter) {

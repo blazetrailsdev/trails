@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { any } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
@@ -69,18 +70,18 @@ export class Default {
     }
 
     const scopes: DefaultScope[] = this.defaultScopes ?? [];
-    if (scopes.length === 0) return undefined;
-
-    return evaluateDefaultScope.call(this, () => {
-      let combinedScope = relation;
-      for (const scopeObj of scopes) {
-        if (isExecuteScope(allQueries, scopeObj)) {
-          const result = scopeObj.scope(combinedScope);
-          if (result != null) combinedScope = result;
+    if (any(scopes)) {
+      return evaluateDefaultScope.call(this, () => {
+        let combinedScope = relation;
+        for (const scopeObj of scopes) {
+          if (isExecuteScope(allQueries, scopeObj)) {
+            const result = scopeObj.scope(combinedScope);
+            if (result != null) combinedScope = result;
+          }
         }
-      }
-      return combinedScope;
-    });
+        return combinedScope;
+      });
+    }
   }
 
   /**

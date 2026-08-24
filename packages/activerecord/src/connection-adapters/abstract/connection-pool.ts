@@ -744,7 +744,8 @@ export class ConnectionPool implements ReapablePool {
 
     const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
     const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
-    const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
+    // connection_pool.rb:326 — `@pinned_connection ||= (connection_lease&.connection || checkout)`.
+    const connection = pin?.connection ?? leasedConnection ?? (await this.checkout());
     const newlyCheckedOut = !pin && leasedConnection == null;
 
     if (!pin) {
@@ -863,37 +864,19 @@ export class ConnectionPool implements ReapablePool {
   // the method NAME + semantics (per-checkout verify/self-heal), NOT the sync
   // return type — do not "converge back" to a sync return. See RFC
   // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
+  /**
+   * @missingRailsCall lock — PERMANENT: connection_pool.rb:550 wraps the pinned
+   *   branch in `@pinned_connection.lock.synchronize { synchronize { ... } }`.
+   *   A Monitor guards a connection against concurrent *threads*; JS has none,
+   *   and `_resolvePinnedConnection` resolves the pin in the same tick, so
+   *   there is no TypeScript spelling of the lock to call.
+   */
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
     // Rails' guard clause: `return checkout_and_verify(acquire_connection(
-    // checkout_timeout)) unless @pinned_connection` (connection_pool.rb:551).
-    // The acquire is inlined here rather than living on `acquire_connection`,
-    // which in trails does not block on the queue.
+    // checkout_timeout)) unless @pinned_connection` (connection_pool.rb:548).
     if (!pinned) {
-      const conn = this._tryAcquire();
-      if (conn) {
-        return checkoutAndVerify(this, conn);
-      }
-
-      const t = timeout ?? this.checkoutTimeout;
-      if (!this._available) {
-        throw new ConnectionNotEstablished("Connection pool has been discarded");
-      }
-      let c: DatabaseAdapter;
-      try {
-        const result = this._available.poll(t);
-        c = result instanceof Promise ? await result : result;
-      } catch (err) {
-        if (err instanceof ConnectionTimeoutError) {
-          err.setPool(this);
-        }
-        throw err;
-      }
-      if (this.isDiscarded()) {
-        throw new ConnectionNotEstablished("Connection pool has been discarded");
-      }
-      this._checkedOut.add(c);
-      return checkoutAndVerify(this, c);
+      return checkoutAndVerify(this, await this.acquireConnection(timeout ?? this.checkoutTimeout));
     }
 
     // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
@@ -1058,6 +1041,11 @@ export class ConnectionPool implements ReapablePool {
     const draining: Array<Promise<void>> = [];
     this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
       for (const conn of this._connections ?? []) {
+        // connection_pool.rb:456-459 — `if conn.in_use? then conn.steal!; checkin conn`.
+        if (conn.inUse) {
+          conn.stealBang();
+          this.checkin(conn);
+        }
         (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
         const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         if (drain) draining.push(drain);
@@ -1164,7 +1152,6 @@ export class ConnectionPool implements ReapablePool {
   private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
     this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
-      const ctx = String(executionContextId());
       const reloadable = new Set<DatabaseAdapter>();
       for (const conn of this._connections ?? []) {
         if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
@@ -1172,16 +1159,13 @@ export class ConnectionPool implements ReapablePool {
         }
       }
       for (const conn of this._connections ?? []) {
-        // Mirrors Rails: `if conn.in_use? then conn.steal!; checkin conn`.
+        // connection_pool.rb:509-512 — `if conn.in_use? then conn.steal!; checkin conn`.
         // The exclusive acquisition above leased every conn to us; release
         // them now so survivors are eligible to re-enter _available via
         // withNewConnectionsBlocked's reseed.
-        if (this._checkedOut.has(conn)) {
-          this._checkedOut.delete(conn);
-          this._leases?._peek(ctx)?.clear(conn);
-          // Mirror Rails' `checkin` (which calls `expire`): clear the in-use
-          // flag so a survivor re-entering `_available` can be re-leased.
-          (conn as unknown as { expire?: () => void }).expire?.();
+        if (conn.inUse) {
+          conn.stealBang();
+          this.checkin(conn);
         }
         if (reloadable.has(conn)) {
           (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
@@ -1871,7 +1855,9 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   this.adoptConnection(conn);
   this._checkedOut.add(conn);
   (conn as unknown as PoolManagedConnection).lease?.();
-  return checkoutAndVerify(this, conn);
+  // connection_pool.rb:885-899 — `try_to_checkout_new_connection` returns the
+  // leased connection; `checkout_and_verify` is the caller's (`checkout`) job.
+  return conn;
 }
 
 /**

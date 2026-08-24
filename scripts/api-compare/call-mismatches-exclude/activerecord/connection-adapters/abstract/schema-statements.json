@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "columns",
-    "call": "column_definitions",
-    "reason": "RFC 0106: the TS `columns` switches on `adapterName` instead of Rails' per-adapter overrides, so `column_definitions`/`new_column_from_field` have no seam yet — the adapter-layout deviation tracked by RFC 0023 (schema_statements.rb:107-113). Tracked by story `converge-schema-statements-adapter-layout-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "columns",
-    "call": "new_column_from_field",
-    "reason": "RFC 0106: see the column_definitions row — the `adapterName` switch in TS `columns` has no per-adapter hook to call (schema_statements.rb:107-113). Tracked by story `converge-schema-statements-adapter-layout-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "generate_index_name",
     "call": "limit",
     "reason": "RFC 0106: Ruby String#limit (byte-truncation) — the port truncates by JS UTF-16 length; the byte-aware convergence is RFC 0082 idiom work (schema_statements.rb:1606-1609). Tracked by story `converge-schema-statements-ruby-idiom-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
@@ -26,12 +12,5 @@
     "rubyName": "index_algorithm",
     "call": "fetch",
     "reason": "RFC 0106: Ruby Hash#fetch with a raising block — the port throws inline off a Map lookup; converging needs the Hash#fetch idiom class of RFC 0082 (schema_statements.rb:1504-1508). Tracked by story `converge-schema-statements-ruby-idiom-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "primary_key",
-    "call": "primary_keys",
-    "reason": "RFC 0106: the TS `primaryKey` switches on `adapterName` instead of delegating to a per-adapter `primaryKeys` — the adapter-layout deviation tracked by RFC 0023 (schema_statements.rb:145-149). Tracked by story `converge-schema-statements-adapter-layout-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
   }
 ]

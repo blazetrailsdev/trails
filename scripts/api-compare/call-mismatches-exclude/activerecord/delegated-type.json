@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "delegated-type.ts",
-    "rubyName": "define_delegated_type_methods",
-    "call": "define_method",
-    "reason": "delegated_type.rb:246, :250, :254, :265, :269, :273 — `define_method \"#{role}_class\"` and its siblings. Ruby's `define_method` is `Object.defineProperty` on the prototype in JS, so the generated methods now live in this body (the decomposition converged) but there is no `defineMethod` to call. Kept as a row rather than a `@missingRailsCall` receipt: RFC 0106 ruled this file CONVERGEABLE and its rows non-migratable. Tracked by story `converge-delegated-type-and-default-scope-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
-  }
-]

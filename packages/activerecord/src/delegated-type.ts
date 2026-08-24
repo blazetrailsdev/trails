@@ -102,6 +102,21 @@ export function delegatedType(
 }
 
 /**
+ * Mirrors: Ruby's `Module#define_method` — installs `body` as a method on
+ * `mixin`. The three generated readers Rails defines with it
+ * (`#{role}_class`, `#{role}_name`, `singular`, `#{singular}_#{primary_key}`)
+ * are zero-arg Ruby readers, so they port as accessor properties instead
+ * (CLAUDE.md, "Generated attribute readers are properties").
+ */
+function defineMethod(mixin: any, methodName: string, body: (...args: any[]) => any): void {
+  Object.defineProperty(mixin, methodName, {
+    value: body,
+    writable: true,
+    configurable: true,
+  });
+}
+
+/**
  * Define all accessor methods for a delegated type role on the given model class.
  * Called by `delegatedType`, which is the public entry point.
  *
@@ -164,8 +179,10 @@ export function defineDelegatedTypeMethods(
   // the currently-set foreign_type and assigns it via the polymorphic
   // belongs_to writer (which also fills foreign_type/foreign_key).
   // Rails: define_method "build_#{role}" { |*params| public_send("#{role}=", public_send("#{role}_class").new(*params)) }
-  Object.defineProperty(modelClass.prototype, `build${camelize(role, true)}`, {
-    value: function (this: Base, attrs: Record<string, unknown> = {}): Base {
+  defineMethod(
+    modelClass.prototype,
+    `build${camelize(role, true)}`,
+    function (this: Base, attrs: Record<string, unknown> = {}): Base {
       const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) {
         throw new Error(`Cannot build${camelize(role, true)}: ${roleType} is not set`);
@@ -178,9 +195,7 @@ export function defineDelegatedTypeMethods(
       (this as unknown as Record<string, unknown>)[role] = instance;
       return instance;
     },
-    writable: true,
-    configurable: true,
-  });
+  );
 
   // For each type, add predicates, scopes, and accessors.
   // Rails: scope_name = type.tableize.tr("/", "_"); singular = scope_name.singularize
@@ -199,12 +214,9 @@ export function defineDelegatedTypeMethods(
     (modelClass as any).scope(scopeName, (rel: any) => rel.where({ [roleType]: typeName }));
 
     // Type predicate: isMessage(), isAccessNoticeMessage()
-    Object.defineProperty(modelClass.prototype, `is${predicateSuffix}`, {
-      value: function (this: Base): boolean {
-        return this.readAttribute(roleType) === typeName;
-      },
-      writable: true,
-      configurable: true,
+    // delegated_type.rb:265 `define_method(query) { public_send(role_type) == type }`
+    defineMethod(modelClass.prototype, `is${predicateSuffix}`, function (this: Base): boolean {
+      return this.readAttribute(roleType) === typeName;
     });
 
     // Accessor: entry.message → returns the associated record via the

@@ -1115,8 +1115,12 @@ describe("checkout/checkin callbacks", () => {
       expect(againAgain).toBe(pinned);
       expect(spy).toHaveBeenCalledTimes(2);
       // Rails' pinned branch (connection_pool.rb:553-559) does not run
-      // checkout_and_verify, so no Store is attached on the pinned path.
-      expect((pinned as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+      // checkout_and_verify itself, but `pin_connection!` acquires the
+      // connection through `checkout` (connection_pool.rb:326), which does — so
+      // the Store attached at pin time survives every later pinned handout.
+      expect((pinned as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
+        Store,
+      );
     } finally {
       // Always unpin so an early assertion failure can't leak the pinned
       // connection into the rest of this file's run.
