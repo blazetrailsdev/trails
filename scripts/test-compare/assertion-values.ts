@@ -179,9 +179,6 @@ export function assertionValueMismatch(
     if (!r || !t || r.total !== t.total) continue;
     // Some expected argument was a non-literal on either side — can't compare.
     if (r.captured.length < r.total || t.captured.length < t.total) continue;
-    // Both multisets are fully-literal and equal-count (r.total === t.total), so
-    // an element-wise compare of the sorted token lists is exact multiset
-    // equality — not a joined string, since a token can itself contain spaces.
     const mismatch =
       r.loose.size > 0 ? looseMismatch(r, t.captured) : exactMismatch(r.captured, t.captured);
     if (mismatch) deltas.push({ kind, ...mismatch });
@@ -189,7 +186,12 @@ export function assertionValueMismatch(
   return deltas.length > 0 ? deltas : null;
 }
 
-/** Multiset equality over two fully-literal, equal-length token lists. */
+/**
+ * Multiset equality over two fully-literal, equal-length token lists. Both are
+ * equal-count by the caller's guard, so an element-wise compare of the sorted
+ * lists is exact multiset equality — not a joined string, since a token can
+ * itself contain spaces.
+ */
 function exactMismatch(rails: string[], trails: string[]): Omit<ValueDelta, "kind"> | null {
   const rs = [...rails].sort();
   const ts = [...trails].sort();
