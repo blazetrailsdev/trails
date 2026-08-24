@@ -31,6 +31,26 @@ describe("templateSchemaCache", () => {
   });
 
   /**
+   * The warm installs the dump by *replacing* the pool's cache object, as
+   * Rails' `load_cache` does (`schema_cache.rb:116-139`). Every adapter-side
+   * consumer has to see it through that swap — `AbstractAdapter#schemaCache`
+   * and `#internalSchemaCache`, and `TypeCaster::Connection` via
+   * `poolConfig.schemaCache` — which is only true because each reads the
+   * reflection's slot live rather than holding a cache by identity. The
+   * installed cache is not the shared module-scoped dump either: each pool gets
+   * its own dup, as Rails gets for free from `_load_from` running per reflection
+   * (`schema_cache.rb:116-121`).
+   */
+  it("is one object, reached by every adapter-side consumer after the swap", () => {
+    const conn = Base.connection;
+    const installed = conn.pool.schemaReflection.loadedCache;
+    expect(installed).not.toBeNull();
+    expect(conn.internalSchemaCache).toBe(installed);
+    expect(Base.connectionPool().poolConfig.schemaCache).toBe(installed);
+    expect(installed).not.toBe(templateSchemaCache());
+  });
+
+  /**
    * The boot fingerprint is the baseline the replay compares against, but it is
    * not an invariant of a running worker: a file that alters a canonical table
    * and leaves it altered is exactly the case the guard exists for, and the

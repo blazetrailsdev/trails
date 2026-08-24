@@ -152,7 +152,15 @@ function conciseOptions<T>(
 export interface SchemaSource {
   /** @internal */
   tables(): string[] | Promise<string[]>;
-  columns(tableName: string): ColumnInfo[] | Promise<ColumnInfo[]>;
+  /**
+   * `pkNames` is the authoritative primary key for `tableName`, which the
+   * dumper has already fetched (`@connection.primary_key(table)`). Columns
+   * carry no primary-key flag of their own — Rails' Column classes have none —
+   * so a source that builds `ColumnInfo` from real columns uses this rather
+   * than issuing the key query a second time. Optional: mock sources that
+   * hand back `ColumnInfo` directly set `primaryKey` themselves.
+   */
+  columns(tableName: string, pkNames?: readonly string[]): ColumnInfo[] | Promise<ColumnInfo[]>;
   /** @internal */
   indexes(tableName: string): IndexInfo[] | Promise<IndexInfo[]>;
   /**
@@ -285,8 +293,23 @@ class AdapterSchemaSource implements SchemaSource {
     );
   }
 
-  async columns(tableName: string): Promise<ColumnInfo[]> {
+  /** @internal The authoritative primary key for `tableName`, as column names. */
+  private async _primaryKeyNames(tableName: string): Promise<string[]> {
+    const adapter = this._adapter as {
+      primaryKeys?: (t: string) => Promise<string[] | null | undefined>;
+    };
+    if (typeof adapter.primaryKeys !== "function") return [];
+    try {
+      return (await adapter.primaryKeys(tableName)) ?? [];
+    } catch {
+      // Live introspection is best-effort, as it is in SchemaDumper#table.
+      return [];
+    }
+  }
+
+  async columns(tableName: string, pkNames?: readonly string[]): Promise<ColumnInfo[]> {
     const cols = await this._adapter.columns(tableName);
+    const pk = new Set(pkNames ?? (await this._primaryKeyNames(tableName)));
     return cols.map((col) => {
       // Generated/virtual columns: carry the flag through so the dialect dumper's
       // schemaTypeWithVirtual / prepareColumnOptions emit `t.virtual` with
@@ -313,7 +336,7 @@ class AdapterSchemaSource implements SchemaSource {
         sqlType: col.sqlType ?? undefined,
         oid: (col as any).oid ?? undefined,
         fmod: (col as any).fmod ?? undefined,
-        primaryKey: col.primaryKey,
+        primaryKey: pk.has(col.name),
         null: col.null,
         // A virtual column has no user-visible default (Rails Column#has_default?
         // is false); clear it so schemaDefault doesn't emit a `default:` alongside
@@ -842,7 +865,7 @@ export abstract class SchemaDumper {
     }
     this.tableName = table;
     try {
-      const columns = await this._source.columns(table);
+      const columns = await this._source.columns(table, this.primaryKeyOrderCache[table]);
       const rawIndexes = await this._source.indexes(table);
       const indexes = await this.filterIndexesForDump(table, rawIndexes);
       const adapterTableOpts = await this.fetchTableOptions(table);

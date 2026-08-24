@@ -5,12 +5,12 @@
  */
 
 import { Column as BaseColumn } from "../column.js";
-import type { ColumnJSON } from "../column.js";
+import type { ColumnCoder } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class Column extends BaseColumn {
-  readonly autoIncrement: boolean;
-  readonly rowid: boolean;
+  autoIncrement: boolean;
+  rowid: boolean;
   private _generatedType: "stored" | "virtual" | null;
 
   constructor(
@@ -27,7 +27,6 @@ export class Column extends BaseColumn {
     options: {
       collation?: string | null;
       defaultFunction?: string | null;
-      primaryKey?: boolean;
       autoIncrement?: boolean;
       rowid?: boolean;
       generatedType?: "stored" | "virtual" | null;
@@ -43,7 +42,6 @@ export class Column extends BaseColumn {
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
-      primaryKey: options.primaryKey,
     });
     this.autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
@@ -72,58 +70,19 @@ export class Column extends BaseColumn {
     );
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT: the schema-cache dump. Rails dumps through
-   *   YAML/Marshal, which round-trips the adapter's Column subclass and its
-   *   state on its own (`schema_cache.rb:406`); trails' dump is JSON, so the
-   *   subclass has to spell out what it carries and tag itself for
-   *   `rehydrateColumn`. Mirrors MySQL::Column's pair.
-   */
-  override toJSON(): Sqlite3ColumnJSON {
-    return {
-      ...super.toJSON(),
-      __sqlite3: true,
-      autoIncrement: this.autoIncrement,
-      rowid: this.rowid,
-      generatedType: this._generatedType,
-    };
+  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
+  override initWith(coder: ColumnCoder): void {
+    super.initWith(coder);
+    this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
+    this.rowid = (coder["rowid"] as boolean) ?? false;
+    this._generatedType = (coder["generated_type"] as "stored" | "virtual" | null) ?? null;
   }
 
-  static override fromJSON(data: ColumnJSON): BaseColumn {
-    const s = data as Sqlite3ColumnJSON;
-    return new Column(
-      s.name,
-      s.default,
-      {
-        sqlType: s.sqlTypeMetadata?.sqlType,
-        type: s.sqlTypeMetadata?.type,
-        limit: s.sqlTypeMetadata?.limit ?? null,
-        precision: s.sqlTypeMetadata?.precision ?? null,
-        scale: s.sqlTypeMetadata?.scale ?? null,
-      },
-      s.null,
-      {
-        collation: s.collation,
-        defaultFunction: s.defaultFunction,
-        primaryKey: s.primaryKey,
-        autoIncrement: s.autoIncrement,
-        rowid: s.rowid,
-        generatedType: s.generatedType,
-      },
-    );
+  override encodeWith(coder: ColumnCoder): void {
+    super.encodeWith(coder);
+    coder["class"] = "SQLite3::Column";
+    coder["auto_increment"] = this.autoIncrement;
+    coder["rowid"] = this.rowid;
+    coder["generated_type"] = this._generatedType;
   }
-}
-
-/**
- * A dumped SQLite3::Column. Rails' schema-cache dump is YAML/Marshal, which
- * round-trips the adapter's Column subclass on its own; a JSON dump has to
- * carry the discriminator and the subclass' own state explicitly, or a cache
- * loaded from disk would answer `auto_increment?` and `virtual?` `false` for
- * every column (`schema_cache.rb:406`, `schema_cache.rb:228`).
- */
-export interface Sqlite3ColumnJSON extends ColumnJSON {
-  __sqlite3: true;
-  autoIncrement: boolean;
-  rowid: boolean;
-  generatedType: "stored" | "virtual" | null;
 }

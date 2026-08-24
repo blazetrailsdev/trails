@@ -317,8 +317,8 @@ export class DatabaseTasks {
    * @param version Exact-version *filter* — only the migration with this
    *   version runs (`db:migrate:up` / `:down` semantics). Rails' `db:migrate`
    *   rake task never passes it. "Migrate up to here" is
-   *   `ENV["TRAILS_MIGRATION_VERSION"]`, read through {@link targetVersion},
-   *   exactly as Rails reads `ENV["VERSION"]` (`database_tasks.rb:268-269`).
+   *   `ENV["VERSION"]`, read through {@link targetVersion}, exactly as Rails
+   *   reads it (`database_tasks.rb:268-269`).
    */
   static async migrate(options?: { skipInitialize?: boolean }): Promise<void>;
   static async migrate(
@@ -495,22 +495,27 @@ export class DatabaseTasks {
    *   `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes
    *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
    *   nothing in the TS body was dropped.
+   *
+   * {@link checkTargetVersion} reads this method rather than the env directly,
+   * so the pair is single-source over `ENV["VERSION"]` exactly as Rails'
+   * `check_target_version` / `target_version` are (`database_tasks.rb:317-325`).
+   *
+   * The `to_i` is Rails'
+   * (`ENV["VERSION"].to_i`, database_tasks.rb:323-325) and never fails —
+   * `"unknown"` is `0`, which is truthy in Ruby and is exactly what lets
+   * {@link checkTargetVersion} reach its format check for a malformed VERSION.
    */
   static targetVersion(): number | null {
-    // TRAILS_MIGRATION_VERSION is canonical; VERSION is the legacy fallback (one-release window).
-    const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    if (!version) return null;
-    const str = version.trim();
-    if (str === "" || !/^\d+$/.test(str)) return null;
-    return parseInt(str, 10);
+    const version = getEnv("VERSION");
+    if (version === undefined || version === "") return null;
+    const match = version.match(/^\s*(-?\d+)/);
+    return match ? Number(match[1]) : 0;
   }
 
-  static checkTargetVersion(version?: number | string): void {
-    const v = version ?? getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    if (v === undefined || v === null || String(v) === "") return;
-    const str = String(v);
-    if (!Migration.isValidVersionFormat(str)) {
-      throw new Error(`Invalid format of target version: \`VERSION=${str}\``);
+  static checkTargetVersion(): void {
+    const version = getEnv("VERSION");
+    if (this.targetVersion() !== null && !Migration.isValidVersionFormat(version ?? "")) {
+      throw new Error(`Invalid format of target version: \`VERSION=${version}\``);
     }
   }
 
@@ -1017,20 +1022,28 @@ export class DatabaseTasks {
     await this.seedLoader.loadSeed();
   }
 
+  /**
+   * Mirrors: `ActiveRecord::Tasks::DatabaseTasks#migrate_status`
+   * (`database_tasks.rb:302-315`), which `databases.rake:230-232` calls rather
+   * than inlining.
+   *
+   * The missing-table arm is Rails' `Kernel.abort` (`:304`) as a throw:
+   * `Kernel.abort` exits the process, which a library method has no business
+   * doing here, so the CLI's own error-to-exit-code path carries it. Same shape
+   * {@link checkSchemaFile} already takes for the same Ruby call.
+   */
   static async migrateStatus(): Promise<void> {
-    const pool = this.migrationConnectionPool();
-    if (!(await pool.schemaMigration.tableExists())) {
+    if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
     }
-    const rows = await pool.migrationContext.migrationsStatus();
-    const dbName = pool.dbConfig.database ?? ":memory:";
+    const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();
     const center = (s: string, w: number) => {
       const pad = w - s.length;
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
     const puts = (s = "") => stdout.write(s + "\n");
-    puts(`\ndatabase: ${dbName}\n`);
+    puts(`\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n`);
     puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
     puts("-".repeat(50));
     for (const row of rows) {

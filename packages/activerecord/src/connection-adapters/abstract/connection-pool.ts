@@ -477,18 +477,29 @@ export class ConnectionPool implements ReapablePool {
     return this.poolConfig.schemaReflection;
   }
 
+  /**
+   * Mirrors: `ActiveRecord::ConnectionAdapters::ConnectionPool#schema_reflection=`
+   * (`connection_pool.rb:289-292`) — swap the underlying reflection and bust the
+   * cached `BoundSchemaReflection` so the next `schemaCache` access wraps the new
+   * reflection, not the stale one. Assigning a reflection constructed *with* a
+   * cache (`SchemaReflection.new(path, cache)`, `schema_cache.rb:16-19`) is how
+   * Rails installs an already-loaded dump; a caller holding an adapter reaches it
+   * through `adapter.pool`.
+   *
+   * The lazy-load guards reset too, so the new reflection's on-disk cache path
+   * gets loaded on the next first-connection event where the old reflection had
+   * already tripped them. The raw cache needs no reset: `poolConfig.schemaCache`
+   * reads through to the reflection's own slot, so a reflection arriving without
+   * a cache already reads null — and nulling it blindly would discard a
+   * preloaded one.
+   */
   set schemaReflection(value: SchemaReflection) {
     this.poolConfig.schemaReflection = value;
-    // Matches Rails' `schema_reflection=`: swap the underlying
-    // reflection AND bust the cached BoundSchemaReflection so the
-    // next schemaCache access wraps the new reflection, not the
-    // stale one.
     this._boundSchemaCache = undefined;
     this._lazyLoadTriggered = false;
     this._lazyLoadPromise = null;
     this._eagerWarmTriggered = false;
     this._eagerWarmPromise = null;
-    this.poolConfig.schemaCache = null;
   }
 
   /**

@@ -59,8 +59,6 @@ describe("SQLite3Adapter schema introspection", () => {
     const name = cols.find((c) => c.name === "name");
     expect(name?.null).toBe(false);
     expect(name?.sqlType).toBe("TEXT");
-    const id = cols.find((c) => c.name === "id");
-    expect(id?.primaryKey).toBe(true);
   });
 
   it("columns reflects a STORED generated column's expression as default_function", async () => {

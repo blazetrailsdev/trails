@@ -87,9 +87,20 @@ Files to migrate:
 | `schema.ts:114`                      | 1     | `process.env.NODE_ENV`                           | `getEnv("TRAILS_ENV", "development")`                     |
 | `database-configurations.ts:254,269` | 2     | `NODE_ENV`, `DATABASE_URL`                       | `TRAILS_ENV`; `DATABASE_URL` stays                        |
 | `migration.ts:1461,1931`             | 2     | `NODE_ENV`, `DISABLE_DATABASE_ENVIRONMENT_CHECK` | `TRAILS_ENV`, `TRAILS_DISABLE_DATABASE_ENVIRONMENT_CHECK` |
-| `tasks/database-tasks.ts:350,358`    | 2     | `VERSION`                                        | `TRAILS_MIGRATION_VERSION`                                |
+| `tasks/database-tasks.ts:350,358`    | 2     | `VERSION`                                        | `VERSION` — reverted, see below                           |
 
 `DATABASE_URL` is an industry standard and stays unchanged.
+
+**`VERSION` is an exception, reverted in #6980.** BC-2 renamed it to
+`TRAILS_MIGRATION_VERSION`, but `DatabaseTasks.target_version` /
+`check_target_version` are a single-source pair over `ENV["VERSION"]`
+(`database_tasks.rb:317-325`) that the `db:migrate:up` / `:down` rake tasks
+read and require directly (`databases.rake:170`), and RFC 0051 converges that
+pair on Rails' shape. The prefixed name lost to Rails fidelity here; `VERSION`
+is the only key `targetVersion()` reads, and it is what `trails db migrate:up`
+/ `:down` and `ar db:migrate --version` publish. This is a per-variable
+exception, not a reversal of the `TRAILS_` policy — `TRAILS_ENV` and
+`TRAILS_DISABLE_DATABASE_ENVIRONMENT_CHECK` are unaffected.
 
 **Implementation note (shipped in #1251):** The original spec called for the full
 `EnvAdapter` / `registerEnvAdapter` / `getEnvAdapter` pattern mirroring `getFs`.

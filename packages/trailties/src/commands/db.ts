@@ -571,21 +571,20 @@ async function withMigrationTasksForDb(
 }
 
 /**
- * Runs `fn` with `TRAILS_MIGRATION_VERSION` set to `targetVersion`, so
- * `DatabaseTasks.target_version` sees it exactly as it sees Rails'
- * `ENV["VERSION"]` (`tasks/database_tasks.rb:268`).
+ * Runs `fn` with `VERSION` set to `targetVersion`, the env var
+ * `DatabaseTasks.targetVersion` reads (`tasks/database_tasks.rb:268`, `:323`).
  */
 async function withTargetVersionEnv(
   targetVersion: string | null,
   fn: () => Promise<void>,
 ): Promise<void> {
   if (targetVersion === null) return fn();
-  const was = env.TRAILS_MIGRATION_VERSION;
-  setEnv("TRAILS_MIGRATION_VERSION", targetVersion);
+  const was = env.VERSION;
+  setEnv("VERSION", targetVersion);
   try {
     await fn();
   } finally {
-    setEnv("TRAILS_MIGRATION_VERSION", was);
+    setEnv("VERSION", was);
   }
 }
 
@@ -827,6 +826,18 @@ export function dbCommand(): Command {
       });
     });
 
+  /**
+   * `db:migrate:up` / `db:migrate:down` — `check_target_version` then
+   * `migration_context.run(:up | :down, target_version)`
+   * (`railties/databases.rake:165-208`). Both of those read `ENV["VERSION"]`
+   * themselves (`database_tasks.rb:317-325`), so the `--version` flag is
+   * published as the env var rather than threaded through the predicate, and
+   * `migration_context.run` is handed `target_version` read back off it — one
+   * source, as in the rake task.
+   *
+   * Commander's `requiredOption` is the CLI form of the rake task's
+   * `raise "VERSION is required"` guard (`databases.rake:169`, `:198`).
+   */
   cmd
     .command("migrate:up")
     .description("Run a specific migration up (by version)")
@@ -835,8 +846,13 @@ export function dbCommand(): Command {
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          DatabaseTasks.checkTargetVersion(opts.version);
-          await DatabaseTasks.migrationConnectionPool().migrationContext.run("up", opts.version);
+          await withTargetVersionEnv(opts.version, async () => {
+            DatabaseTasks.checkTargetVersion();
+            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
+              "up",
+              DatabaseTasks.targetVersion()!,
+            );
+          });
         });
       });
     });
@@ -849,8 +865,13 @@ export function dbCommand(): Command {
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(ctx, async () => {
-          DatabaseTasks.checkTargetVersion(opts.version);
-          await DatabaseTasks.migrationConnectionPool().migrationContext.run("down", opts.version);
+          await withTargetVersionEnv(opts.version, async () => {
+            DatabaseTasks.checkTargetVersion();
+            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
+              "down",
+              DatabaseTasks.targetVersion()!,
+            );
+          });
         });
       });
     });

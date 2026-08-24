@@ -11,7 +11,10 @@ describe("PostgreSQL::Column JSON round-trip", () => {
       { serial: false, identity: "a", generated: "s" },
     );
 
-    const back = Column.fromJSON(col.toJSON()) as Column;
+    const coder: Record<string, unknown> = {};
+    col.encodeWith(coder);
+    const back = Object.create(Column.prototype) as Column;
+    back.initWith(JSON.parse(JSON.stringify(coder)));
 
     expect(back).toBeInstanceOf(Column);
     expect(back.isArray()).toBe(true);

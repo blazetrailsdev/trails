@@ -2,20 +2,21 @@ import { describe, it, expect } from "vitest";
 import { Column as MysqlColumn } from "./column.js";
 
 describe("MysqlColumn", () => {
-  it("round-trips autoIncrement / unsigned / virtual through toJSON/fromJSON", () => {
+  it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
     const original = new MysqlColumn(
       "id",
       null,
       { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
       false,
-      { primaryKey: true, autoIncrement: true, unsigned: true, virtual: false },
+      { autoIncrement: true, unsigned: true, virtual: false },
     );
-    const json = JSON.parse(JSON.stringify(original.toJSON()));
-    const restored = MysqlColumn.fromJSON(json);
+    const coder: Record<string, unknown> = {};
+    original.encodeWith(coder);
+    const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
+    restored.initWith(JSON.parse(JSON.stringify(coder)));
     expect(restored.autoIncrement).toBe(true);
     expect(restored.unsigned).toBe(true);
     expect(restored.virtual).toBe(false);
-    expect(restored.primaryKey).toBe(true);
     expect(restored.sqlType).toBe("bigint(20) unsigned");
   });
 });
