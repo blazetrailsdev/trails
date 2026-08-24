@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import { Types, ValueType } from "../index.js";
 
 describe("TimeTypeTrails", () => {
@@ -82,5 +84,36 @@ describe("TimeType Helpers::TimeValue ancestry", () => {
     expect(
       Object.prototype.hasOwnProperty.call(Types.TimeType.prototype, "userInputInTimeZone"),
     ).toBe(true);
+  });
+});
+
+describe("TimeType userInputInTimeZone", () => {
+  const type = new Types.TimeType();
+
+  it("user input in time zone wraps plain time in Time.zone", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = type.userInputInTimeZone("14:30:00") as TimeWithZone;
+      expect(result).toBeInstanceOf(TimeWithZone);
+      expect(result.hour).toBe(14);
+      expect(result.timeZone.tzinfo.identifier).toBe("America/New_York");
+    });
+  });
+
+  it("user input in time zone answers a zoneless value when Time.zone is unset", () => {
+    const result = type.userInputInTimeZone("14:30:00") as Temporal.ZonedDateTime;
+    expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect(result.hour).toBe(14);
+  });
+
+  it("user input in time zone returns null for null", () => {
+    expect(type.userInputInTimeZone(null)).toBe(null);
+    expect(type.userInputInTimeZone("")).toBe(null);
+    expect(type.userInputInTimeZone("ABC")).toBe(null);
+    expect(type.userInputInTimeZone(" ".repeat(129))).toBe(null);
+  });
+
+  it("user input in time zone passthrough for ZonedDateTime", () => {
+    const zdt = Temporal.ZonedDateTime.from("2024-01-15T14:30:00[America/New_York]");
+    expect(type.userInputInTimeZone(zdt)).toBe(zdt);
   });
 });
