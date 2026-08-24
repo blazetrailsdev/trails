@@ -13,7 +13,11 @@ import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 
-import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import {
+  humanAttributeName,
+  lookupAncestors,
+  raiseOnMissingTranslations as translationRaise,
+} from "./translation.js";
 import { HelperMethods as AbsenceHelperMethods } from "./validations/absence.js";
 import { HelperMethods as AcceptanceHelperMethods } from "./validations/acceptance.js";
 import { HelperMethods as ComparisonHelperMethods } from "./validations/comparison.js";
@@ -27,6 +31,7 @@ import { HelperMethods as PresenceHelperMethods } from "./validations/presence.j
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackFn, CallbackConditions } from "./callbacks.js";
 import {
+  defineModelCallbacks,
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
   _defineAfterModelCallback as _defineAfterModelCallbackImpl,
@@ -124,11 +129,14 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
  */
 export class Validations {
   /**
-   * Rails' `included do` block (validations.rb:40-50). The Naming / Callbacks /
-   * Translation `extend`s at :41-43 reach modules `model.ts` wires in its own
-   * `include ActiveModel::API` order; the rest is issued here.
+   * Rails' `included do` block (validations.rb:40-50). `extend ActiveModel::Naming`
+   * (:41) is the one line not issued here: its `model_name` is a zero-arg reader,
+   * so it ports as an accessor property, which `extend()` cannot carry off a
+   * plain module object — `model.ts` keeps it in the class body.
    */
   static [included](base: IncludingClass): void {
+    extend(base, { defineModelCallbacks });
+    extend(base, { humanAttributeName, lookupAncestors });
     extend(base, HelperMethods);
     include(base, HelperMethods);
     defineCallbacks(base.prototype, "validate", { scope: ["name"] });
@@ -250,6 +258,10 @@ export interface ValidationsClassHost {
   ): void;
   setCallback(name: string, fn: (record: object) => unknown, options: CallbackConditions): void;
   resetCallbacks(name: string): void;
+  /** @internal */
+  predicateForValidationContext(
+    context: string | string[],
+  ): (model: ValidationsContextHost) => boolean;
 }
 
 /** Mirrors: ActiveModel::Validations::ClassMethods (validations.rb:57). */
@@ -314,7 +326,7 @@ export const ClassMethods = {
     let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
 
     if (options.on !== undefined) {
-      const pred = predicateForValidationContext(options.on);
+      const pred = this.predicateForValidationContext(options.on);
       ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
     }
 
@@ -371,6 +383,33 @@ export const ClassMethods = {
    */
   validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
     return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
+  },
+
+  /**
+   * Build the `if`-predicate that gates a validator on a validation context.
+   * Mirrors Rails' private `predicate_for_validation_context(context)`
+   * (validations.rb:296-306), memoized in the module-level
+   * `@@predicates_for_validation_contexts` (:294).
+   *
+   * @internal Rails-private helper.
+   */
+  predicateForValidationContext(
+    context: string | string[],
+  ): (model: ValidationsContextHost) => boolean {
+    const arr = Array.isArray(context) ? [...context].sort() : [context];
+    const key = JSON.stringify(arr);
+    let cached = _predicatesForValidationContexts.get(key);
+    if (!cached) {
+      cached = (model: ValidationsContextHost): boolean => {
+        const mc = model.validationContext;
+        if (Array.isArray(mc)) {
+          return mc.some((c) => arr.includes(c));
+        }
+        return mc !== null && mc !== undefined && arr.includes(mc);
+      };
+      _predicatesForValidationContexts.set(key, cached);
+    }
+    return cached;
   },
 };
 
@@ -541,35 +580,6 @@ export function raiseValidationError<TBase extends object = object>(this: {
 export interface ContextForValidationHost {
   _validationContext: string | string[] | null;
   _contextForValidation?: ValidationContext;
-}
-
-/**
- * Build a predicate that returns whether a model's
- * `validationContext` matches one of the supplied contexts. Used by
- * `validates(..., on: :create)` to gate a validator on the active
- * context. Mirrors Rails
- * `predicate_for_validation_context(context)`
- * (activemodel/lib/active_model/validations.rb:296-306).
- *
- * @internal Rails-private helper.
- */
-export function predicateForValidationContext(
-  context: string | string[],
-): (model: ValidationsContextHost) => boolean {
-  const arr = Array.isArray(context) ? [...context].sort() : [context];
-  const key = JSON.stringify(arr);
-  let cached = _predicatesForValidationContexts.get(key);
-  if (!cached) {
-    cached = (model: ValidationsContextHost): boolean => {
-      const mc = model.validationContext;
-      if (Array.isArray(mc)) {
-        return mc.some((c) => arr.includes(c));
-      }
-      return mc !== null && mc !== undefined && arr.includes(mc);
-    };
-    _predicatesForValidationContexts.set(key, cached);
-  }
-  return cached;
 }
 
 /**

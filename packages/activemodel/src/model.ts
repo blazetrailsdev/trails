@@ -9,7 +9,6 @@ import {
   contextForValidation as validationsContextForValidation,
   runValidationsBang as validationsRunValidationsBang,
   raiseValidationError as validationsRaiseValidationError,
-  predicateForValidationContext as validationsPredicateForValidationContext,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
@@ -29,10 +28,7 @@ import {
   Module,
   classAttribute,
 } from "@blazetrails/activesupport";
-import {
-  humanAttributeName as translationHumanAttributeName,
-  lookupAncestors as translationLookupAncestors,
-} from "./translation.js";
+import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
@@ -42,7 +38,7 @@ import {
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
-import { defineModelCallbacks } from "./callbacks.js";
+import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
 import {
   serializableHash,
   SerializeOptions,
@@ -385,9 +381,14 @@ export class Model {
    *
    * Mirrors: ActiveModel::Callbacks.define_model_callbacks
    */
-  static defineModelCallbacks = defineModelCallbacks;
+  /**
+   * Define custom model callbacks — `extend ActiveModel::Callbacks`
+   * (validations.rb:42), issued from `Validations.[included]`.
+   */
+  declare static defineModelCallbacks: typeof defineModelCallbacksImpl;
 
-  static humanAttributeName = translationHumanAttributeName;
+  /** `extend ActiveModel::Translation` (validations.rb:43). */
+  declare static humanAttributeName: typeof translationHumanAttributeName;
 
   /**
    * The i18n scope for translation lookups.
@@ -478,14 +479,10 @@ export class Model {
    */
   _initializingAttributes = false;
 
-  /**
-   * Build the `if`-predicate that gates a validator on a validation
-   * context. Mirrors Rails `predicate_for_validation_context`
-   * (validations.rb:296-306).
-   *
-   * @internal Rails-private helper.
-   */
-  static predicateForValidationContext = validationsPredicateForValidationContext;
+  /** @internal Rails-private helper (validations.rb:296-306). */
+  declare static predicateForValidationContext: Extended<
+    typeof ValidationsClassMethods
+  >["predicateForValidationContext"];
 
   /**
    * Default option keys recognized by `validates(...)`. Subclasses
@@ -1149,9 +1146,6 @@ extend(Model, {
   _validatesDefaultKeys: Validates._validatesDefaultKeys,
   _parseValidatesOptions: Validates._parseValidatesOptions,
 });
-
-// Ruby `extend ActiveModel::Translation` (translation.rb:22, via naming.rb).
-extend(Model, { lookupAncestors: translationLookupAncestors });
 
 // Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
 extend(Model, {
