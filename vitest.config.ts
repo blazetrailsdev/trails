@@ -175,10 +175,6 @@ const alias = {
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
-  "@blazetrails/activemodel/attribute-registration": path.resolve(
-    __dirname,
-    "packages/activemodel/src/attribute-registration.ts",
-  ),
   "@blazetrails/activemodel/yaml": path.resolve(
     __dirname,
     "packages/activemodel/src/attribute-set/codecs/yaml.ts",
