@@ -201,17 +201,28 @@ export function _defineAfterModelCallback(klass: CallbackHost, callback: string)
  * Ruby's `**options` capture in the three generated macros (callbacks.rb:130,
  * :137, :144): the keyword arguments, split off from the `*args` filter list.
  *
- * @noRailsEquivalent PERMANENT: TypeScript has no keyword arguments, so the
- *   trailing options bag is an ordinary positional and has to be told apart
- *   from a trailing CallbackObject filter at runtime — a distinction Ruby gets
- *   for free from `**`. The rule is the one ActiveSupport's own
- *   `extract_options!` discriminator uses (`isCallbackOptions`,
- *   activesupport/src/callbacks.ts): a plain object whose only function-valued
- *   keys are `if` and `unless`, the two option values Rails lets be callable
- *   (callbacks.rb:747, :752); any other callable key is the method an
- *   ObjectCall would dispatch to, so the object is a filter. Not exported, and
- *   deliberately not reached for by importing that helper — Rails keeps
- *   `normalize_callback_params` private to `ClassMethods` (callbacks.rb:676-682).
+ * @noRailsEquivalent PERMANENT: this is not a second copy of
+ *   `normalize_callback_params` — ActiveSupport's `setCallback` still owns that
+ *   parse, and the filter list reaches it untouched. It exists because Rails
+ *   separates the macro's kwargs from its `*args` *before* `set_callback` is
+ *   ever called: `_define_after_model_callback` receives `**options`
+ *   (callbacks.rb:144), sets `:prepend` and appends the value conditional to
+ *   `:if` (:147-150), and only then calls `set_callback` (:151). The mutation
+ *   provably precedes the parse, so the parse cannot supply it. TypeScript has
+ *   no `**`, so that separation has to happen at runtime, and the trailing
+ *   options bag must be told apart from a trailing CallbackObject filter — a
+ *   distinction Ruby gets from the argument's class. The rule is the one
+ *   ActiveSupport's own `extract_options!` discriminator uses
+ *   (`isCallbackOptions`, activesupport/src/callbacks.ts): a plain object whose
+ *   only function-valued keys are `if` and `unless`, the two option values
+ *   Rails lets be callable (callbacks.rb:747, :752); any other callable key is
+ *   the method an ObjectCall would dispatch to, so the object is a filter.
+ *   Module-private, so it is not measured surface — `parity:api:extra` reports
+ *   `callbacks.ts` at 0 novel, inside the story's `<= 1` budget. Importing
+ *   ActiveSupport's helper instead was tried and reverted: Rails keeps
+ *   `normalize_callback_params` private to `ClassMethods`
+ *   (callbacks.rb:676-682), so exporting it would trade a private ActiveModel
+ *   function for a public ActiveSupport one.
  */
 function extractMacroOptions(
   args: FilterListEntry[],
