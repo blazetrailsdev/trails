@@ -75,6 +75,16 @@ export namespace Delegation {
    * answer at all still raises: Rails converts the generated body's
    * `NoMethodError` to a `DelegationError` only when `_` is nil, and otherwise
    * re-raises it (`:132-140`).
+   *
+   * Two arms of the receiver step (`:36-58`) read differently in TS. The `self.`
+   * Ruby prepends to a `RESERVED_METHOD_NAMES` receiver (`:58`) disambiguates a
+   * keyword from a method call in the source it compiles; a JS member read is
+   * never ambiguous, so the generated body reads the same member with or without
+   * it — the prefix survives only where Rails also shows it, in the
+   * `DelegationError` message (`:135`). And `prefix: true` with a Module target
+   * raises here: Ruby reaches `TypeError` from `/^[^a-z_]/.match?(to)` (`:27`)
+   * because a Module has no implicit String conversion, where TS has to test the
+   * type itself, so it raises the `ArgumentError` that line is guarding for.
    */
   export function generate<T extends object>(
     owner: T,
@@ -114,9 +124,6 @@ export namespace Delegation {
     }
     if (RESERVED_METHOD_NAMES.has(receiver)) receiver = `self.${receiver}`;
 
-    // The `self.` Ruby prepends is a parser disambiguation for a keyword-named
-    // method; a JS member read is never ambiguous, so the generated body reads
-    // the same member either way.
     const receiverName = receiver.startsWith("self.") ? receiver.slice("self.".length) : receiver;
 
     const methodNames: string[] = [];
