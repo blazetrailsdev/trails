@@ -2811,31 +2811,13 @@ export class Migrator {
   }
 
   /**
-   * Read-only variant of {@link pendingMigrations}: does not create the
-   * schema_migrations / ar_internal_metadata tables. Treats a missing
-   * schema_migrations as "no applied versions", so every known migration
-   * is considered pending.
-   *
-   * Matches Rails' `pending_migration_versions` (built from
-   * `get_all_versions`, which checks `table_exists?` and returns [] on
-   * miss).
-   */
-  async pendingMigrationsReadOnly(): Promise<MigrationProxy[]> {
-    const applied = (await this._schemaMigration.tableExists())
-      ? await this._appliedVersions()
-      : new Set<number>();
-    return this.migrations.filter((m) => !applied.has(m.version));
-  }
-
-  /**
    * Get pending (unapplied) migrations.
    *
    * Mirrors: ActiveRecord::Migrator#pending_migrations
    */
   async pendingMigrations(): Promise<MigrationProxy[]> {
-    await this._ensureSchemaTable();
-    const applied = await this.migrated();
-    return this.migrations.filter((m) => !applied.has(m.version));
+    const alreadyMigrated = await this.migrated();
+    return this.migrations.filter((m) => !alreadyMigrated.has(m.version));
   }
 
   /**

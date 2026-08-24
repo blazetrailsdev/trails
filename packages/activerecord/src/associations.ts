@@ -571,13 +571,16 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
+  // A collection inverse takes the same single Rails inverse write as the
+  // singular arm — `set_inverse_instance` → `inversed_from`
+  // (association.rb:132-137, 153-155), whose `self.target = record` lands on
+  // `CollectionAssociation#target=` (collection_association.rb:284-295).
+  // `_explicitTarget` is deliberately NOT raised here: `setInverseInstance`
+  // skips it for a collection too, and only `_loadedSingularTarget` reads it.
   const existing = record._associationInstances.get(assocName) as
-    | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
+    | { inversedFrom(record: Base | null): void }
     | undefined;
-  if (existing) {
-    existing._setTargetFromLoader(target);
-    existing._explicitTarget = true;
-  }
+  existing?.inversedFrom(target);
 }
 
 /**
