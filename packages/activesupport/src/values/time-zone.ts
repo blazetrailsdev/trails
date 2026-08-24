@@ -433,18 +433,6 @@ function toDate(at: Date | Temporal.Instant | Time): Date {
   return new Date(at.epochMilliseconds);
 }
 
-/**
- * The `::Time` TZInfo's readers take, for a UTC instant trails carries as a
- * `Date`.
- *
- * @noRailsEquivalent CONVERGEABLE — Ruby hands these readers a `::Time`
- * throughout; the `Date`-seated callers left inside this file converge as the
- * `TimeZone` seat itself moves onto `Time` (RFC 0098).
- */
-function utcTimeFrom(at: Date | Temporal.Instant): Time {
-  return Time.at(new Rational(toDate(at).getTime(), 1000)).getutc();
-}
-
 function getZoneInfo(
   ianaName: string,
   date: Date,
@@ -691,9 +679,9 @@ export class Timezone {
     const candidates = [...new Set(around)].sort((a, b) => b - a);
     const periods: TimezonePeriod[] = [];
     for (const offset of candidates) {
-      const utc = new Date(localMs - offset * 1000);
-      if (getZoneInfo(this.identifier, utc).utcOffsetSeconds === offset) {
-        periods.push(this.periodForUtc(utcTimeFrom(utc)));
+      const utc = Time.at(new Rational(localMs - offset * 1000, 1000)).getutc();
+      if (getZoneInfo(this.identifier, toDate(utc)).utcOffsetSeconds === offset) {
+        periods.push(this.periodForUtc(utc));
       }
     }
     return periods;
@@ -742,10 +730,10 @@ export class Timezone {
    * (time_zone.rb:551-552) passes none — an ambiguity `dst` cannot resolve
    * raises {@link AmbiguousTime} rather than being settled for the caller.
    */
-  localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
+  localToUtc(time: Time, dst: boolean | null = true): Time {
     const localMs = toDate(time).getTime();
-    const period = this.periodForLocal(utcTimeFrom(time), dst);
-    return new Date(localMs - period.observedUtcOffset * 1000);
+    const period = this.periodForLocal(time, dst);
+    return Time.at(new Rational(localMs - period.observedUtcOffset * 1000, 1000)).getutc();
   }
 }
 
@@ -929,13 +917,6 @@ export class TimeZone {
    * inlines exactly what that constructor path does, over the same ported
    * members — no second search lives here.
    *
-   * @missingRailsCall utc — CONVERGEABLE (story
-   *   time-zone-local-builds-its-wall-clock-through-time). `Time.utc(*args)` (time_zone.rb:363-366). trails'
-   *   `local` builds the wall clock as `new Date(Date.UTC(...))` rather than
-   *   through a `Time` value, so the `Time.utc` call has no receiver here;
-   *   converging is the TimeZone-seat port, not this call. Pre-existing:
-   *   surfaced only once `DateTime#utc` (date_time/calculations.rb:184) was
-   *   ported and `utc` entered the population.
    */
   local(
     year: number,
@@ -946,19 +927,19 @@ export class TimeZone {
     second = 0,
     millisecond = 0,
   ): TimeWithZone {
-    let time = new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
+    let time = Time.utc(year, month, day, hour, minute, second, millisecond * 1000);
     let period: TimezonePeriod;
     for (;;) {
       try {
-        period = this.periodForLocal(utcTimeFrom(time));
+        period = this.periodForLocal(time);
         break;
       } catch (error) {
         if (!(error instanceof PeriodNotFound)) throw error;
-        time = new Date(time.getTime() + 3_600_000);
+        time = Time.at(new Rational(toDate(time).getTime() + 3_600_000, 1000)).getutc();
       }
     }
     return new TimeWithZone(
-      instantFrom(new Date(time.getTime() - period.observedUtcOffset * 1000)),
+      instantFrom(new Date(toDate(time).getTime() - period.observedUtcOffset * 1000)),
       this,
     );
   }
@@ -1097,7 +1078,7 @@ export class TimeZone {
    * Adjust the given time to the simultaneous time in UTC
    * (`local_to_utc`, time_zone.rb:550-552) — `tzinfo.local_to_utc(time, dst)`.
    */
-  localToUtc(time: Date | Temporal.Instant, dst: boolean | null = true): Date {
+  localToUtc(time: Time, dst: boolean | null = true): Time {
     return this.tzinfo.localToUtc(time, dst);
   }
 

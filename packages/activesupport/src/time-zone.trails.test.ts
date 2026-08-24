@@ -159,12 +159,12 @@ describe("TimeZoneLocalPeriodsTest", () => {
   });
 
   it("local_to_utc raises for an ambiguity dst does not resolve", () => {
-    expect(() => zone().localToUtc(new Date(Date.UTC(2006, 9, 29, 1, 30)), null)).toThrow(
-      AmbiguousTime,
-    );
-    expect(zone().localToUtc(new Date(Date.UTC(2006, 9, 29, 1, 30)))).toEqual(
-      new Date(Date.UTC(2006, 9, 29, 5, 30)),
-    );
+    expect(() => zone().localToUtc(Time.utc(2006, 10, 29, 1, 30), null)).toThrow(AmbiguousTime);
+    expect(
+      zone()
+        .localToUtc(Time.utc(2006, 10, 29, 1, 30))
+        .toS(),
+    ).toBe(Time.utc(2006, 10, 29, 5, 30).toS());
   });
 
   it("iso8601 and rfc3339 keep sub-millisecond digits", () => {
