@@ -583,13 +583,8 @@ async function withMigrationTasksForDb(
     await withRegisteredConfiguration(ctx.config, operation);
   });
   if (opts?.afterPending) {
-    const migrator = new Migrator(
-      "up",
-      discoverMigrations(await migrationsDirsForConfig(ctx.raw)),
-      new SchemaMigration(ctx.adapter.pool),
-      new InternalMetadata(ctx.adapter.pool),
-    );
-    opts.afterPending((await migrator.pendingMigrations()).length);
+    const migrationContext = DatabaseTasks.migrationConnectionPool().migrationContext;
+    opts.afterPending((await migrationContext.pendingMigrationVersions()).length);
   }
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
