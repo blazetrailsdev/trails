@@ -85,7 +85,10 @@ export class AttributeMethodPattern {
    * mutator, not a reader, so its `parameters: false` becomes an empty
    * parameter list — a zero-arg METHOD — rather than the accessor property
    * `defineCall` gives a zero-arg reader (CLAUDE.md, "Generated attribute
-   * readers are properties").
+   * readers are properties"). The bang survives in `proxy_target`, spelled
+   * `Bang` — Ruby dispatches `name_will_change!` to `attribute_will_change!`
+   * and `restore_name!` to `restore_attribute!` (dirty.rb:409,414), both bang
+   * methods.
    */
   constructor({
     prefix = "",
@@ -96,7 +99,9 @@ export class AttributeMethodPattern {
     this.prefix = prefix;
     this.suffix = bang ? suffix.slice(0, -1) : suffix;
     this.parameters = parameters == null ? "..." : bang && parameters === false ? "" : parameters;
-    this.proxyTarget = `${prefix}${this.camelJoined ? "Attribute" : "attribute"}${this.suffix}`;
+    this.proxyTarget = `${prefix}${this.camelJoined ? "Attribute" : "attribute"}${this.suffix}${
+      bang ? "Bang" : ""
+    }`;
   }
 
   match(method: string): { attr: string } | null {
