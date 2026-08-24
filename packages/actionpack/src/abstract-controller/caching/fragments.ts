@@ -109,15 +109,14 @@ class NoMethodError extends NameError {
 
 /**
  * Ruby's implicit string conversion (`Object#to_str`), which only String — and
- * objects that opt in by defining `to_str` — answer. `write_fragment` relies on
- * it to reject a non-string-like body (fragments.rb:85).
+ * objects that opt in by defining `to_str`, such as `ActionView::OutputBuffer`
+ * (`toStr()` here) — answer. `write_fragment` relies on it to reject a
+ * non-string-like body (fragments.rb:85).
  */
 function toStr(content: unknown): string {
   if (typeof content === "string") return content;
-  const toStrMethod = (content as { to_str?: unknown } | null)?.to_str;
-  if (typeof toStrMethod === "function") {
-    return (toStrMethod as () => string).call(content);
-  }
+  const toStrMethod = (content as { toStr?: unknown } | null)?.toStr;
+  if (typeof toStrMethod === "function") return (toStrMethod as () => string).call(content);
   throw new NoMethodError(`undefined method 'to_str' for ${String(content)}`);
 }
 

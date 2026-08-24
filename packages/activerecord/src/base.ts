@@ -3352,7 +3352,7 @@ export class Base extends Model {
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
-        if (!assoc || assoc.isLoaded?.()) continue;
+        if (!assoc || assoc.isLoaded()) continue;
         if (useSavepoint) {
           await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
         } else {

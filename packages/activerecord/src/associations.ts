@@ -834,11 +834,11 @@ export class Associations {
     if (!ownWrappedNames.has(name)) {
       ownWrappedNames.add(name);
       self.prototype.destroyAssociations = async function (this: {
-        association(n: string): { handleDependency(): Promise<void>; reset?(): void };
+        association(n: string): { handleDependency(): Promise<void>; reset(): void };
         _collectionProxies?: { delete(n: string): void };
       }): Promise<void> {
         await this.association(middleName).handleDependency();
-        this.association(name).reset?.();
+        this.association(name).reset();
         // Rails' `association(:name).reset` only clears the Association
         // instance's loaded state. In this codebase, collection readers are
         // additionally memoized in `_collectionProxies` (see associations.ts
@@ -1672,10 +1672,10 @@ export function associationInstanceGet(this: Base, name: string): unknown {
     _collectionProxies?: Map<string, unknown>;
   };
   const existing = record._associationInstances.get(name) as
-    | { isLoaded?(): boolean; target?: unknown }
+    | { isLoaded(): boolean; target?: unknown }
     | undefined;
   if (typeof record.association !== "function") {
-    return existing?.isLoaded?.() ? existing : null;
+    return existing?.isLoaded() ? existing : null;
   }
   // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
   // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
@@ -1694,13 +1694,13 @@ export function associationInstanceGet(this: Base, name: string): unknown {
     !!proxy?.loaded ||
     proxyHasBuiltRecords ||
     existingHasBuiltRecords ||
-    !!existing?.isLoaded?.();
+    !!existing?.isLoaded();
   if (!hasCachedData) return null;
   try {
     const inst = record.association(name) as
-      | { isLoaded?(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
+      | { isLoaded(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
       | undefined;
-    if (inst?.isLoaded?.()) return inst;
+    if (inst?.isLoaded()) return inst;
     if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
       inst._writeTargetStore?.(proxy.target);
       return inst;

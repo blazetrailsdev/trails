@@ -138,7 +138,7 @@ describe("read/write/expire fragment", () => {
 
   it("write_fragment converts the body with to_str and raises for a non-string body", () => {
     // fragments.rb:85 — `content = content.to_str` inside the instrument block.
-    const stringLike = { to_str: () => "converted" };
+    const stringLike = { toStr: () => "converted" };
     expect(writeFragment.call(host, "n", stringLike as unknown as string)).toBe("converted");
     expect(readFragment.call(host, "n")).toBe("converted");
     expect(() => writeFragment.call(host, "m", 42 as unknown as string)).toThrow(
