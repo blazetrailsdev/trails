@@ -361,9 +361,6 @@ export class DatabaseTasks {
       } else if (scope !== undefined && scope.trim() !== "") {
         filter = (m) => m.scope === scope;
       }
-      // Rails: `migration_connection_pool.migration_context.migrate(target_version) { |m| ... }`
-      // (`database_tasks.rb:270`) — the context reads the pool's own
-      // `db_config.migrations_paths` (`connection_pool.rb:294-299`).
       const ran = await pool.migrationContext.migrate(effectiveVersion ?? null, filter);
       if (scope && scope.trim() !== "" && ran.length === 0 && Migration.verbose) {
         // Rails: `Migration.write("No migrations ran. ...")` — write puts to
@@ -1063,7 +1060,6 @@ export class DatabaseTasks {
 
   static async migrateStatus(): Promise<void> {
     const pool = this.migrationConnectionPool();
-    await pool.leaseConnection();
     if (!(await pool.schemaMigration.tableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
     }
@@ -1093,7 +1089,6 @@ export class DatabaseTasks {
    */
   static async currentVersion(): Promise<number> {
     const pool = this.migrationConnectionPool();
-    await pool.leaseConnection();
     return (await pool.migrationContext.currentVersion()) ?? 0;
   }
 
@@ -1149,7 +1144,6 @@ export class DatabaseTasks {
         for (const dbConfig of dbConfigs) {
           if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
           await this.withTemporaryPool(dbConfig, async (pool) => {
-            await pool.leaseConnection();
             await pool.migrationContext.migrate(version ?? null);
           });
         }

@@ -6,9 +6,7 @@ import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 
-// Rails' `MIGRATIONS_ROOT` (`test/cases/migration_test.rb`); `10_urban` holds
-// one self-contained migration, so `migrate_all` has something to run without
-// depending on the canonical schema.
+// Rails' `MIGRATIONS_ROOT` (`test/cases/migration_test.rb`).
 const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {

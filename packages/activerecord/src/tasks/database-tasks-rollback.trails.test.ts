@@ -8,30 +8,26 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
 
-/**
- * Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) reading
- * the pool's own `db_config.migrations_paths` (`connection_pool.rb:294-299`),
- * so a migration these tests can watch has to be a file under such a path —
- * the shape Rails' own `DatabaseTasksMigrationTestCase` uses
- * (`test/cases/tasks/database_tasks_test.rb:1036-1039`). `reverted` is the
- * revert log the generated `down` bodies append to.
- */
-declare global {
-  var __trailsRollbackReverted: string[] | undefined;
-}
+// Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) reading
+// the pool's own `db_config.migrations_paths` (`connection_pool.rb:294-299`),
+// so a migration these tests can watch has to be a file under such a path — the
+// shape Rails' `DatabaseTasksMigrationTestCase` uses
+// (`test/cases/tasks/database_tasks_test.rb:1036-1039`). A generated `down`
+// appends its name to the revert log the test then reads.
+const REVERT_LOG = "__trailsRollbackReverted";
 
-const reverted = (): string[] => (globalThis.__trailsRollbackReverted ??= []);
+const reverted = (): string[] =>
+  ((globalThis as Record<string, unknown>)[REVERT_LOG] as string[] | undefined) ?? [];
 
 async function writeMigration(dir: string, version: number, name: string): Promise<void> {
-  const className = name;
   const fileName = name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
   await writeFile(
     join(dir, `${version}_${fileName}.ts`),
     `import { Migration } from "${new URL("../migration.js", import.meta.url).pathname}";
-export class ${className} extends Migration {
+export class ${name} extends Migration {
   async up() {}
   async down() {
-    (globalThis.__trailsRollbackReverted ??= []).push("${name}");
+    (globalThis.${REVERT_LOG} ??= []).push("${name}");
   }
 }
 `,
@@ -42,7 +38,7 @@ describe("DatabaseTasksRollbackTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    globalThis.__trailsRollbackReverted = undefined;
+    delete (globalThis as Record<string, unknown>)[REVERT_LOG];
     DatabaseTasks.databaseConfiguration = null;
     try {
       Base.removeConnection();
