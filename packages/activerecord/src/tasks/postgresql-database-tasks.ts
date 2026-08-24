@@ -210,14 +210,18 @@ export class PostgreSQLDatabaseTasks {
     }
   }
 
+  /**
+   * `File.foreach` streams the file line by line, newline included; the fs
+   * adapter is read-whole-file, so the same lines come from a lookbehind split
+   * that keeps each terminator where `foreach` leaves it. And Ruby leaves the
+   * tempfile's removal to its finalizer, which JS has no equivalent of, so the
+   * non-block form is unlinked explicitly once the copy has been made.
+   */
   private async removeSqlHeaderComments(filename: string): Promise<void> {
     const fs = getFs();
     let removingComments = true;
     const tempfile = await Tempfile.open("uncommented_structure.sql");
     try {
-      // `File.foreach` streams the file line by line, newline included; the fs
-      // adapter is read-whole-file, so the same lines come from a lookbehind
-      // split that keeps each terminator where `foreach` leaves it.
       for (const line of fs.readFileSync(filename, "utf8").split(/(?<=\n)/)) {
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
           tempfile.write(line);
@@ -228,8 +232,6 @@ export class PostgreSQLDatabaseTasks {
       await tempfile.close();
     }
     fs.copyFileSync(tempfile.path!, filename);
-    // Ruby leaves removal to Tempfile's finalizer; JS has none, so the
-    // non-block form is unlinked explicitly once the copy has been made.
     await tempfile.unlink();
   }
 

@@ -14,7 +14,10 @@ const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
  * Ruby yields candidate names and retries on `Errno::EEXIST`, which is what
  * makes the name unique. The fs adapter exposes no exclusive-create flag, so
  * the candidate is placed inside a fresh `mkdtemp` directory instead and the
- * `EEXIST` retry loop has nothing left to retry.
+ * `EEXIST` retry loop has nothing left to retry — which is also why
+ * {@link Tempfile.unlink} removes a directory Ruby's has no counterpart for.
+ * Ruby's second name component is `$$`, the process id; trails has no
+ * `process.*`, so it is a second draw from the `RANDOM.next` generator.
  *
  * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
  *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
@@ -38,8 +41,6 @@ async function createTmpname(basename: TempfileBasename, tmpdir?: string): Promi
   // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is a
   // filename component, not a modelled instant.
   const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  // Ruby's second component is `$$`, the process id; trails has no `process.*`,
-  // so it is a second draw from the same generator as `RANDOM.next`.
   return path.join(
     await fs.mkdtemp(path.join(tmpdir, "tempfile-")),
     `${prefix}${t}-${random()}-${random()}${suffix ?? ""}`,
@@ -79,15 +80,14 @@ export class Tempfile {
   /**
    * `Tempfile.new(basename = "", tmpdir = nil)` (`tempfile.rb:150-166`).
    *
-   * Ruby's `initialize` opens the file; a TypeScript constructor cannot await,
-   * so the Ruby name lives on the static factory instead.
+   * Ruby's `initialize` opens the file at `opts[:perm] = 0600`
+   * (`tempfile.rb:159`); a TypeScript constructor cannot await, so the Ruby
+   * name lives on the static factory instead.
    */
   static async new(basename: TempfileBasename = "", tmpdir?: string): Promise<Tempfile> {
+    const fs = await getFsAsync();
     const tmpname = await createTmpname(basename, tmpdir);
-    // `opts[:perm] = 0600` (`tempfile.rb:159`).
-    await (
-      await getFsAsync()
-    ).writeFile!(tmpname, "", { mode: 0o600 });
+    await fs.writeFile!(tmpname, "", { mode: 0o600 });
     return new Tempfile(tmpname);
   }
 
@@ -177,9 +177,8 @@ export class Tempfile {
   /** `IO#flush` — writes the buffered bytes through to the file. */
   async flush(): Promise<void> {
     if (this.flushed) return;
-    await (
-      await getFsAsync()
-    ).writeFile!(this.tmpname, this.buffer, { mode: 0o600 });
+    const fs = await getFsAsync();
+    await fs.writeFile!(this.tmpname, this.buffer, { mode: 0o600 });
     this.flushed = true;
   }
 
@@ -193,7 +192,10 @@ export class Tempfile {
     if (unlinkNow) await this.unlink();
   }
 
-  /** `Tempfile#unlink` (`tempfile.rb:252-265`) — removes the file. */
+  /**
+   * `Tempfile#unlink` (`tempfile.rb:252-265`) — removes the file, and with it
+   * the `mkdtemp` directory `createTmpname` put it in.
+   */
   async unlink(): Promise<void> {
     if (this.unlinked) return;
     const fs = await getFsAsync();
@@ -201,12 +203,8 @@ export class Tempfile {
     try {
       await fs.unlink!(this.tmpname);
     } catch (error) {
-      // `rescue Errno::ENOENT` (`tempfile.rb:256`).
       if ((error as { code?: string }).code !== "ENOENT") throw error;
     }
-    // The name came from a dedicated `mkdtemp` directory (see
-    // `createTmpname`), so removing the file leaves that directory to remove
-    // too; Ruby has no such directory and so no counterpart line.
     await fs.rmdir!(path.dirname(this.tmpname));
     this.unlinked = true;
   }

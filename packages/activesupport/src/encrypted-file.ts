@@ -142,6 +142,10 @@ export class EncryptedFile {
   // ---- private ----
 
   /**
+   * `Tempfile.create` defaults to mode 0600, which is load-bearing here: the
+   * temp file holds plaintext secrets between the editor write and the
+   * re-encrypt step, so it must not be world-readable.
+   *
    * @missingRailsArgs chomp — PERMANENT. encrypted_file.rb:89
    *   `content_path.basename.to_s.chomp(".enc")` — trails ports Ruby's String
    *   methods as free functions rather than String.prototype patches, so the
@@ -151,6 +155,7 @@ export class EncryptedFile {
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,
   ): Promise<void> {
+    const fs = await getFsAsync();
     const path = await getPathAsync();
     const contentPath = await this.resolveContentPath();
 
@@ -159,16 +164,11 @@ export class EncryptedFile {
       path.dirname(contentPath),
       async (tmpFile) => {
         const tmpPath = tmpFile.path!;
-        // Rails uses Ruby `Tempfile.create`, which defaults to mode 0600.
-        // The temp file holds plaintext secrets between the editor write and
-        // the re-encrypt step, so it must not be world-readable.
-        await (
-          await getFsAsync()
-        ).writeFile!(tmpPath, contents, { mode: 0o600 });
+        await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
 
         await block(tmpPath);
 
-        const updatedContents = await (await getFsAsync()).readFile!(tmpPath, "utf8");
+        const updatedContents = await fs.readFile!(tmpPath, "utf8");
 
         if (updatedContents !== contents) await this.write(updatedContents);
       },
