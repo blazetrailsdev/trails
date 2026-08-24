@@ -9,8 +9,6 @@ import {
   raiseValidationError as validationsRaiseValidationError,
   predicateForValidationContext as validationsPredicateForValidationContext,
   _mergeAttributes as validationsMergeAttributes,
-  _validatesDefaultKeys as validationsValidatesDefaultKeys,
-  _parseValidatesOptions as validationsParseValidatesOptions,
   VALID_OPTIONS_FOR_VALIDATE,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
@@ -63,7 +61,7 @@ import {
 } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
-import type { ConditionalOptions, ConditionFn } from "./validations.js";
+import type { ConditionalOptions } from "./validations.js";
 import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,
@@ -96,6 +94,7 @@ import { FormatValidator } from "./validations/format.js";
 import { AcceptanceValidator } from "./validations/acceptance.js";
 import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
+import * as Validates from "./validations/validates.js";
 import {
   type AttributeDefinition,
   Attributes,
@@ -280,128 +279,18 @@ export class Model {
   }
 
   /**
-   * Mirrors: ActiveModel::Validations::ClassMethods#validates (validates.rb:111-133).
-   * `validations` is `defaults.slice!(*_validates_default_keys)` — a validator key
-   * with a falsy value still counts here; `next unless options` (validates.rb:127)
-   * is what skips building it.
+   * Mirrors: ActiveModel::Validations::ClassMethods#validates
+   * (validations/validates.rb:111-133), mixed on by the
+   * `extend(Model, Validates)` at the bottom of this file.
    */
-  static validates(...args: [...attributes: string[], rules: Record<string, unknown>]): void {
-    const rules = args[args.length - 1] as Record<string, unknown>;
-    const attributes = args.slice(0, -1) as string[];
+  declare static validates: Extended<typeof Validates>["validates"];
 
-    const validations = Object.keys(rules).filter((k) => !this._validatesDefaultKeys().includes(k));
-
-    if (attributes.length === 0) {
-      throw new ArgumentError("You need to supply at least one attribute");
-    }
-    if (validations.length === 0) {
-      throw new ArgumentError("You need to supply at least one validation");
-    }
-
-    const onContext = rules.on as string | undefined;
-    const exceptOnContext = rules.exceptOn as string | string[] | undefined;
-    const ifCond = rules.if as ConditionFn | ConditionFn[] | undefined;
-    const unlessCond = rules.unless as ConditionFn | ConditionFn[] | undefined;
-    const isStrict = rules.strict as boolean | undefined;
-    const sharedAllowNil = rules.allowNil as boolean | undefined;
-    const sharedAllowBlank = rules.allowBlank as boolean | undefined;
-
-    const shared: Record<string, unknown> = {};
-    if (onContext !== undefined) shared.on = onContext;
-    if (exceptOnContext !== undefined) shared.exceptOn = exceptOnContext;
-    if (ifCond !== undefined) shared.if = ifCond;
-    if (unlessCond !== undefined) shared.unless = unlessCond;
-    if (isStrict) shared.strict = true;
-
-    const validatorSpecs: Array<{
-      klass: new (options: Record<string, unknown>) => ValidatorBase;
-      opts: Record<string, unknown>;
-    }> = [];
-
-    if (rules.presence) {
-      const opts = rules.presence === true ? {} : (rules.presence as Record<string, unknown>);
-      validatorSpecs.push({ klass: PresenceValidator, opts });
-    }
-
-    if (rules.absence) {
-      const opts = rules.absence === true ? {} : (rules.absence as Record<string, unknown>);
-      validatorSpecs.push({ klass: AbsenceValidator, opts });
-    }
-
-    if (rules.length) {
-      const opts = { ...(rules.length as Record<string, unknown>) };
-      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
-        opts.allowNil = sharedAllowNil;
-      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
-        opts.allowBlank = sharedAllowBlank;
-      validatorSpecs.push({ klass: LengthValidator, opts });
-    }
-
-    if (rules.numericality) {
-      const opts =
-        rules.numericality === true ? {} : { ...(rules.numericality as Record<string, unknown>) };
-      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
-        opts.allowNil = sharedAllowNil;
-      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
-        opts.allowBlank = sharedAllowBlank;
-      validatorSpecs.push({ klass: NumericalityValidator, opts });
-    }
-
-    if (rules.inclusion) {
-      const opts = { ...(rules.inclusion as Record<string, unknown>) };
-      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
-        opts.allowNil = sharedAllowNil;
-      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
-        opts.allowBlank = sharedAllowBlank;
-      validatorSpecs.push({ klass: InclusionValidator, opts });
-    }
-
-    if (rules.exclusion) {
-      const opts = { ...(rules.exclusion as Record<string, unknown>) };
-      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
-        opts.allowNil = sharedAllowNil;
-      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
-        opts.allowBlank = sharedAllowBlank;
-      validatorSpecs.push({ klass: ExclusionValidator, opts });
-    }
-
-    if (rules.format) {
-      const opts = { ...(rules.format as Record<string, unknown>) };
-      if (sharedAllowNil !== undefined && opts.allowNil === undefined)
-        opts.allowNil = sharedAllowNil;
-      if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
-        opts.allowBlank = sharedAllowBlank;
-      validatorSpecs.push({ klass: FormatValidator, opts });
-    }
-
-    if (rules.acceptance) {
-      const opts = rules.acceptance === true ? {} : (rules.acceptance as Record<string, unknown>);
-      validatorSpecs.push({ klass: AcceptanceValidator, opts });
-    }
-
-    if (rules.confirmation) {
-      const opts =
-        rules.confirmation === true ? {} : (rules.confirmation as Record<string, unknown>);
-      validatorSpecs.push({ klass: ConfirmationValidator, opts });
-    }
-
-    if (rules.comparison) {
-      validatorSpecs.push({
-        klass: ComparisonValidator,
-        opts: rules.comparison as Record<string, unknown>,
-      });
-    }
-
-    for (const { klass, opts } of validatorSpecs) {
-      this.validatesWith(klass, { ...opts, attributes, ...shared });
-    }
-  }
-
-  static validatesBang(...args: [...attributes: string[], rules: Record<string, unknown>]): void {
-    const rules = args[args.length - 1] as Record<string, unknown>;
-    const attributes = args.slice(0, -1) as string[];
-    this.validates(...attributes, { ...rules, strict: true });
-  }
+  /**
+   * Mirrors: ActiveModel::Validations::ClassMethods#validates!
+   * (validations/validates.rb:153-157), mixed on by the
+   * `extend(Model, Validates)` at the bottom of this file.
+   */
+  declare static validatesBang: Extended<typeof Validates>["validatesBang"];
 
   static clearValidatorsBang(): void {
     // Rails: `_validators.clear` (activemodel/lib/active_model/validations.rb:248).
@@ -985,7 +874,7 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  static _validatesDefaultKeys = validationsValidatesDefaultKeys;
+  declare static _validatesDefaultKeys: Extended<typeof Validates>["_validatesDefaultKeys"];
 
   /**
    * Normalize a validator option value into the option hash the
@@ -994,7 +883,7 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  static _parseValidatesOptions = validationsParseValidatesOptions;
+  declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   /**
    * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
@@ -1819,6 +1708,15 @@ classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default:
 classAttribute.call(Model, "attributeMethodPatterns", {
   instanceWriter: false,
   default: [new AttributeMethodPattern()],
+});
+
+// Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
+// friends (validations/validates.rb:111-178) onto the class.
+extend(Model, {
+  validates: Validates.validates,
+  validatesBang: Validates.validatesBang,
+  _validatesDefaultKeys: Validates._validatesDefaultKeys,
+  _parseValidatesOptions: Validates._parseValidatesOptions,
 });
 
 // Ruby `extend ActiveModel::Translation` (translation.rb:22, via naming.rb).

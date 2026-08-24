@@ -311,10 +311,7 @@ describe("ValidationsTest (trails)", () => {
 
       static {
         this.attribute("name", "string");
-        this.validates("name", {
-          presence: true,
-          uniqueness: true,
-        });
+        this.validates("name", { presence: true });
       }
 
       override async isValid(): Promise<boolean> {

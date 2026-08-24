@@ -1,5 +1,3 @@
-import { Range } from "@blazetrails/activesupport";
-
 import { Errors } from "./errors.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
@@ -446,35 +444,4 @@ export interface ConditionalOptions {
   exceptOn?: string | string[];
   /** Register ahead of the already-registered validate callbacks. */
   prepend?: boolean;
-}
-
-/**
- * The default option keys recognized by `validates(...)`. Subclasses
- * override to add custom keys. Mirrors Rails
- * `_validates_default_keys`
- * (activemodel/lib/active_model/validations/validates.rb:162-164).
- *
- * @internal Rails-private helper.
- */
-export function _validatesDefaultKeys(): string[] {
-  return ["if", "unless", "on", "allowBlank", "allowNil", "strict", "exceptOn"];
-}
-
-/**
- * Normalize a validator option value into the option hash the
- * validator constructor expects. Mirrors Rails
- * `_parse_validates_options(options)`
- * (activemodel/lib/active_model/validations/validates.rb:166-177):
- * `true` → `{}`, plain hash → unchanged, Range or Array → `{ in: options }`,
- * anything else → `{ with: options }`.
- *
- * @internal Rails-private helper.
- */
-export function _parseValidatesOptions(options: unknown): Record<string, unknown> {
-  if (options === true) return {};
-  if (options !== null && typeof options === "object" && options.constructor === Object) {
-    return options as Record<string, unknown>;
-  }
-  if (options instanceof Range || Array.isArray(options)) return { in: options };
-  return { with: options };
 }
