@@ -107,14 +107,15 @@ export const ClassMethods = {
       const validator = new klass({ ...options }, block);
 
       // Ruby's `_validators[key] << validator` (with.rb:95-101) mutates the
-      // Hash the `inherited` hook (validations.rb:287-291) already dupped onto
-      // this class. `inherited` is the one Ruby hook with no TS equivalent
-      // (CLAUDE.md, _Module mixins_): nothing fires when a subclass is defined,
-      // so the dup is deferred to here, the first write. `class_attribute`'s
-      // writer is local to the class (core_ext/class/attribute.rb:86), so
-      // assigning a copy is what keeps a subclass's registrations off its
-      // parent. Residual gap, and the only one: a subclass defined before a
-      // later parent registration copies that registration too. The
+      // Hash the `inherited` hook (validations.rb:286-290) already dupped onto
+      // this class. Rails needs both halves — `class_attribute` (:50) gives
+      // write-locality, `inherited` gives the per-subclass dup of the mutable
+      // default — and `inherited` is the one Ruby hook with no TS equivalent
+      // (CLAUDE.md, _Module mixins_): nothing fires when a subclass is defined.
+      // So the dup is deferred to the first own touch, gated on the class-local
+      // `class_attribute` writer (core_ext/class/attribute.rb:86) — the same
+      // stand-in the other three `inherited` ports use (activerecord
+      // attributes.ts:106, attribute-methods.ts:453, core.ts:803). The
       // `Hash.new { [] }` default proc is spelled out because a `Map` has none.
       const _validators = new Map(this._validators);
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
