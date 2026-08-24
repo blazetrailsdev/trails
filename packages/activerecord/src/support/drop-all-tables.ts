@@ -8,7 +8,7 @@ import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
  * schema: Rails' own migration bookkeeping, which migrator tests manage per-test
  * and rely on the reset clearing. Dropped like any non-boot-laid table.
  */
-const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
+export const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
   "schema_migrations",
   "ar_internal_metadata",
 ]);

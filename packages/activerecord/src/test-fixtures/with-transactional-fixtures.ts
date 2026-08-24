@@ -10,6 +10,14 @@ import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
+import type { SchemaCache } from "../connection-adapters/schema-cache.js";
+import {
+  dumpedTables,
+  fingerprintOf,
+  schemaShapes,
+  templateSchemaCache,
+  templateSchemaFingerprint,
+} from "../support/schema-cache-dump.js";
 
 interface TxnHost {
   transactionManager: {
@@ -52,6 +60,16 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * adapters without a pool, and reflection failures are swallowed (the cache
  * simply stays cold for that table, falling back to the synthesized branch).
  *
+ * The introspection is **not** re-done per test file. `SchemaCache#add` issues
+ * four queries per table (`dataSourceExists` / `primaryKeys` / `columns` /
+ * `indexes`), which over the ~200 canonical tables is ~800 queries and ~0.3s of
+ * every file's runtime. globalSetup reflects the template database once and
+ * dumps it (`support/schema-cache-dump.ts`), and this loads the dump — Rails'
+ * `db:schema:cache:dump` plus `ActiveRecord.schema_cache_path`: dump once
+ * (`schema_cache.rb:406`), `SchemaCache._load_from` per process
+ * (`schema_cache.rb:228`). Only a run without a boot dump falls back to
+ * reflecting the database itself.
+ *
  * @internal
  */
 async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Promise<void> {
@@ -59,10 +77,53 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   if (!sc || pool === null) return;
   try {
+    const dumped = templateSchemaCache();
+    if (dumped && (await replaySchemaCacheDump(adapter, pool, sc, dumped))) return;
     await sc.addAll(pool);
   } catch {
     // best-effort warm
   }
+}
+
+/**
+ * Load the boot dump into `sc` if the live database still matches the schema it
+ * describes, and report whether it was used.
+ *
+ * The dump describes the template as globalSetup laid it, and every worker
+ * database is a clone of that template — but the between-file reset truncates
+ * the canonical tables rather than re-laying them, so a file that leaves an
+ * `addColumn` / `changeColumn` / `renameColumn` behind changes a canonical
+ * table's shape without changing the table *set*. The guard is therefore the
+ * boot fingerprint over the dumped tables' live shapes, which whole-database
+ * queries answer (`support/schema-cache-dump.ts`): any change to a table the
+ * dump describes falls back to reflecting the database. Tables the live
+ * database has and the dump does not — the bespoke table a file lays in its own
+ * `beforeAll` — are reflected individually, a handful of `add`s rather than
+ * ~200.
+ *
+ * Rails installs a loaded dump by replacing the cache object
+ * (`schema_cache.rb:139`, whose `load_cache` returns the new cache for
+ * `SchemaReflection` to hold). This loads into the cache the pool already
+ * handed out instead, because trails' adapter-side consumers hold
+ * `internalSchemaCache` by identity — the same reason `ConnectionPool` assigns
+ * a loaded cache back onto `poolConfig.schemaCache` rather than letting the two
+ * diverge (`connection-pool.ts` lazy-load).
+ */
+async function replaySchemaCacheDump(
+  adapter: TransactionalFixturesAdapter,
+  pool: ConnectionPool,
+  sc: NonNullable<TransactionalFixturesAdapter["internalSchemaCache"]>,
+  dumped: SchemaCache,
+): Promise<boolean> {
+  const marshalled = dumped.marshalDump();
+  const cached = dumpedTables(marshalled);
+  const shapes = await schemaShapes(adapter);
+  if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
+  sc.marshalLoad(marshalled);
+  for (const table of shapes.keys()) {
+    if (!cached.has(table)) await sc.add(pool, table);
+  }
+  return true;
 }
 
 /**
