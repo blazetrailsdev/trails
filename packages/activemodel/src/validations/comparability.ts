@@ -53,13 +53,18 @@ export interface Comparability {
  * (ComparisonValidator's Temporal/string/number mix) pass their `<=>`
  * result against `0`, exactly as Ruby's Comparable defines the operators.
  *
+ * `:==` / `:!=` are JS `==` / `!=`, not `===` / `!==`: Ruby's `==` is value
+ * equality across Integer and Float (`1 == 1.0`), which for a mixed
+ * number/bigint pair — numericality carries a bigint for an Integer past 2^53
+ * — only the loose operators express.
+ *
  * @noRailsEquivalent PERMANENT: TypeScript has no `public_send` and no operator
  * methods, so a Ruby comparison-operator Symbol cannot be dispatched off the value
  */
 export function compareOperator(
   op: (typeof COMPARE_CHECKS)[CompareKey],
-  a: number,
-  b: number,
+  a: number | bigint,
+  b: number | bigint,
 ): boolean {
   switch (op) {
     case ":>":
@@ -67,12 +72,12 @@ export function compareOperator(
     case ":>=":
       return a >= b;
     case ":==":
-      return a === b;
+      return a == b;
     case ":<":
       return a < b;
     case ":<=":
       return a <= b;
     case ":!=":
-      return a !== b;
+      return a != b;
   }
 }

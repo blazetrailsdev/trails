@@ -431,17 +431,11 @@ describe("NumericalityValidationTest", () => {
     assertPredicate(await topic.isValid(), (valid) => valid);
   });
 
-  // PERMANENT-SKIP: the assertion needs exact integer arithmetic past 2^53.
-  // Ruby's `"10000000000000001".to_i` is an arbitrary-precision Integer that
-  // compares greater than 10_000_000_000_000_000; every JS number is a double,
-  // so both sides round to the same 1e16 and the value is (correctly, for a
-  // double) less-than-or-equal. Only a BigInt-typed parse pipeline through
-  // Comparability could express this, which no other option needs.
-  it.skip("validates numericality with exponent number", async () => {
+  it("validates numericality with exponent number", async () => {
     const base = 10_000_000_000_000_000;
     Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: base });
     const topic = new Topic();
-    topic.approved = String(base + 1);
+    topic.approved = String(BigInt(base) + 1n);
 
     assertPredicate(await topic.isInvalid(), (invalid) => invalid);
   });
