@@ -169,14 +169,14 @@ export class Column {
    * `auto_increment` (`sqlite3/column.rb:36-44`); `MySQL::Column` writes
    * nothing, because its `extra` lives in `MySQL::TypeMetadata` and rides
    * along inside `sql_type_metadata`. trails' overrides go further still,
-   * encoding the state Rails either derives (`array` from the `[]` suffix) or
-   * holds in an adapter `TypeMetadata` trails has not ported (`oid` / `fmod` /
-   * `extra`), plus the `rowid` / `generated_type` Rails genuinely loses. That
-   * last one is load-bearing here and not upstream: Rails only ever compares a
-   * reflected cache against another reflected one, while trails' fixtures warm
-   * compares a dump-loaded cache against a reflected one, so dropping them reds
-   * `base_test.rb`'s `test_clear_cache!`. Tracked by RFC 0096
-   * `converge-column-subclass-state-out-of-encode-with`.
+   * encoding the state Rails either derives from `sql_type` (`array`, from the
+   * `[]` suffix — `postgresql/column.rb:37-40`) or reaches through
+   * `sql_type_metadata`, which the base coder already persists (`oid` / `fmod`,
+   * `postgresql/column.rb:7`; MySQL's `extra`, `mysql/column.rb:7-24`), plus
+   * the `rowid` / `generated_type` Rails genuinely loses. Dropping the keys
+   * today leaves those fields `undefined`, which flips the `x !== null` guards
+   * the subclasses port Ruby's `nil?` / `present?` as. Tracked by RFC 0096
+   * `converge-column-subclass-coders-to-rails-per-subclass-key-sets`.
    */
   encodeWith(coder: ColumnCoder): void {
     coder["class"] = "Column";
