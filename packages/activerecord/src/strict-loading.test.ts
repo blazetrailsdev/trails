@@ -28,28 +28,9 @@ import { Interest } from "./test-helpers/models/interest.js";
 // `Preloader` does — `setTarget(...)` + the preload provenance flag — so the
 // reader short-circuits without a lazy load (and thus no strict-loading raise).
 function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
-  let holder: any;
-  try {
-    holder = (record as any).association(name);
-  } catch {
-    holder = undefined;
-  }
-  if (holder) {
-    holder.setTarget(value);
-    holder._loadedFromPreload = true;
-    return;
-  }
-  (record as any)._associationInstances.set(name, {
-    target: value,
-    loaded: true,
-    _loadedFromPreload: true,
-    isLoaded() {
-      return true;
-    },
-    setTarget(this: { target: unknown }, t: unknown) {
-      this.target = t;
-    },
-  });
+  const holder = (record as any).association(name);
+  holder.setTarget(value);
+  holder._loadedFromPreload = true;
 }
 
 async function withStrictLoadingByDefault<T>(model: typeof Base, fn: () => Promise<T>): Promise<T> {

@@ -144,6 +144,10 @@ describe("read/write/expire fragment", () => {
     expect(readFragment.call(host, "m")).toBeNull();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("forwards options to exist?, delete and delete_matched", () => {
     const store = HostClass.cacheStore!;
     const exist = vi.spyOn(store, "exist");
