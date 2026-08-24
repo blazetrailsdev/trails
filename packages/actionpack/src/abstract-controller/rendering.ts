@@ -50,8 +50,11 @@ export interface RenderOptions {
 export interface RenderingHost {
   responseBody: unknown;
   renderToBody(options: RenderOptions): unknown;
+  /** @internal */
   _setHtmlContentType?(): void;
+  /** @internal */
   _setRenderedContentType?(format: unknown): void;
+  /** @internal */
   _setVaryHeader?(): void;
   renderedFormat?(): unknown;
 }
@@ -152,7 +155,11 @@ export function _normalizeRender(...args: unknown[]): RenderOptions {
   return _normalizeOptions(options);
 }
 
-/** Hook — subclasses override to handle `:variant` option. */
+/**
+ * Hook — subclasses override to handle `:variant` option.
+ *
+ * @internal
+ */
 export function _processVariant(_options: RenderOptions): void {
   // Empty in the abstract layer.
 }

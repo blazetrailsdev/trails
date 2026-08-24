@@ -120,9 +120,10 @@ export function packageSrcDir(pkg: string): string {
 
 /**
  * The api-compare packages `scripts/build-rails-privates-manifest.ts` projects
- * Rails visibility onto. Deliberately a subset of `PACKAGES`: the gem ports
- * (`rack`, `globalid`, `i18n`, `did-you-mean`) have no entry yet, so their
- * `@internal` tags are unvalidatable in both directions — tracked by
+ * Rails visibility onto — every api-compared package of a Rails framework,
+ * actionpack's four included. Deliberately still a subset of `PACKAGES`: the
+ * gem ports (`rack`, `globalid`, `i18n`, `did-you-mean`) have no entry yet, so
+ * their `@internal` tags are unvalidatable in both directions — tracked by
  * `rails-privates-manifest-missing-gem-packages`.
  */
 export const MANIFEST_PACKAGES = [
@@ -132,6 +133,8 @@ export const MANIFEST_PACKAGES = [
   "activesupport",
   "actiondispatch",
   "actioncontroller",
+  "abstractcontroller",
+  "actionpackversion",
   "actionview",
   "trailties",
 ] as const;

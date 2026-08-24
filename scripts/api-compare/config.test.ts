@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect } from "vitest";
 
-import { MANIFEST_PACKAGES, PACKAGE_DIRS, ROOT_DIR } from "./config.js";
+import { DIR_TO_PACKAGES, MANIFEST_PACKAGES, PACKAGE_DIRS, ROOT_DIR } from "./config.js";
 
 const manifestPath = path.join(ROOT_DIR, "eslint/rails-private-methods.json");
 const manifest: { files: Record<string, string[]> } = fs.existsSync(manifestPath)
@@ -20,10 +20,18 @@ describe("PACKAGE_DIRS", () => {
   it.each([
     ["actiondispatch", "packages/actionpack/src/action-dispatch"],
     ["actioncontroller", "packages/actionpack/src/action-controller"],
+    ["abstractcontroller", "packages/actionpack/src/abstract-controller"],
+    ["actionpackversion", "packages/actionpack/src/action-pack"],
     ["arel", "packages/arel/src"],
     ["trailties", "packages/trailties/src"],
   ])("spells %s's src dir the way the repo does", (pkg, dir) => {
     expect(PACKAGE_DIRS[pkg]).toBe(dir);
+  });
+
+  it("covers every api-compared package sharing the actionpack dir", () => {
+    expect([...(DIR_TO_PACKAGES.actionpack ?? [])].sort()).toEqual(
+      [...(DIR_TO_PACKAGES.actionpack ?? [])].filter((p) => p in PACKAGE_DIRS).sort(),
+    );
   });
 
   it("covers exactly the manifest packages", () => {

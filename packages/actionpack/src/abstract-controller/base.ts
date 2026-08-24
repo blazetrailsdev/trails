@@ -283,6 +283,8 @@ export class AbstractController {
    * dispatcher in `callbacks.ts`, which then invokes `_dispatchAction` as
    * the inner step (mirrors Rails AC::Callbacks#process_action overriding
    * Base#process_action with a `run_callbacks { super }` wrapper).
+   *
+   * @internal
    */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
     this.actionName = action;
