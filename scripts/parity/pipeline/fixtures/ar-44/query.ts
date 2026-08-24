@@ -1,3 +1,3 @@
 import { Book } from "./models.js";
 
-export default Book.leftOuterJoins("author");
+export default Book.leftOuterJoins(":author");
