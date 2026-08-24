@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const aliases = {
+  "@blazetrails/activesupport/": path.resolve(__dirname, "../activesupport/src") + "/",
   "@blazetrails/activesupport": path.resolve(__dirname, "../activesupport/src/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "../arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "../arel/src/index.ts"),

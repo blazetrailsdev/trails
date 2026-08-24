@@ -12,7 +12,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/user.ts",
         "test/models/user.test.ts",
-        "db/migrations/*_create_users.ts",
+        "db/migrate/*_create_users.ts",
       ],
     },
     {
@@ -21,7 +21,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/folder.ts",
         "test/models/folder.test.ts",
-        "db/migrations/*_create_folders.ts",
+        "db/migrate/*_create_folders.ts",
       ],
     },
     {
@@ -30,7 +30,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/document.ts",
         "test/models/document.test.ts",
-        "db/migrations/*_create_documents.ts",
+        "db/migrate/*_create_documents.ts",
       ],
     },
   ] satisfies GeneratorFixture[],
@@ -42,7 +42,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/artist.ts",
         "test/models/artist.test.ts",
-        "db/migrations/*_create_artists.ts",
+        "db/migrate/*_create_artists.ts",
       ],
     },
     {
@@ -51,7 +51,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/album.ts",
         "test/models/album.test.ts",
-        "db/migrations/*_create_albums.ts",
+        "db/migrate/*_create_albums.ts",
       ],
     },
     {
@@ -61,7 +61,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/track.ts",
         "test/models/track.test.ts",
-        "db/migrations/*_create_tracks.ts",
+        "db/migrate/*_create_tracks.ts",
       ],
     },
     {
@@ -70,7 +70,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/genre.ts",
         "test/models/genre.test.ts",
-        "db/migrations/*_create_genres.ts",
+        "db/migrate/*_create_genres.ts",
       ],
     },
   ] satisfies GeneratorFixture[],
@@ -82,7 +82,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/account.ts",
         "test/models/account.test.ts",
-        "db/migrations/*_create_accounts.ts",
+        "db/migrate/*_create_accounts.ts",
       ],
     },
     {
@@ -91,7 +91,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/category.ts",
         "test/models/category.test.ts",
-        "db/migrations/*_create_categories.ts",
+        "db/migrate/*_create_categories.ts",
       ],
     },
     {
@@ -101,7 +101,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/transaction.ts",
         "test/models/transaction.test.ts",
-        "db/migrations/*_create_transactions.ts",
+        "db/migrate/*_create_transactions.ts",
       ],
     },
     {
@@ -111,7 +111,7 @@ export const fixtures = {
       expectedFiles: [
         "src/app/models/budget.ts",
         "test/models/budget.test.ts",
-        "db/migrations/*_create_budgets.ts",
+        "db/migrate/*_create_budgets.ts",
       ],
     },
   ] satisfies GeneratorFixture[],

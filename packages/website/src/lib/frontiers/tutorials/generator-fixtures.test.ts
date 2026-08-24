@@ -51,7 +51,7 @@ describe("generator fixtures", () => {
       expect(fileExists("src/config/database.ts")).toBe(true);
       expect(fileExists("src/app/models/application-record.ts")).toBe(true);
       expect(fileExists("src/app/controllers/application-controller.ts")).toBe(true);
-      expect(fileExists("db/migrations/.gitkeep")).toBe(true);
+      expect(fileExists("db/migrate/.gitkeep")).toBe(true);
       expect(fileExists("db/seeds.ts")).toBe(true);
     });
 
@@ -79,7 +79,7 @@ describe("generator fixtures", () => {
     });
 
     it("creates migration file", () => {
-      const migFile = files.find((f) => f.startsWith("db/migrations/"));
+      const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
       expect(content).toContain("class CreateUsers extends Migration");
@@ -112,7 +112,7 @@ describe("generator fixtures", () => {
     });
 
     it("creates migration with correct columns", () => {
-      const migFile = files.find((f) => f.startsWith("db/migrations/"));
+      const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
       expect(content).toContain("class CreateFolders extends Migration");
@@ -147,7 +147,7 @@ describe("generator fixtures", () => {
     });
 
     it("creates migration with correct columns", () => {
-      const migFile = files.find((f) => f.startsWith("db/migrations/"));
+      const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
       expect(content).toContain("class CreateDocuments extends Migration");
@@ -195,7 +195,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("name", "string")');
       expect(content).toContain('this.attribute("bio", "text")');
 
-      const mig = findMigration(artistFiles, /db\/migrations\/.+_create_artists\.ts$/);
+      const mig = findMigration(artistFiles, /db\/migrate\/.+_create_artists\.ts$/);
       expect(mig).toContain('t.string("name")');
       expect(mig).toContain('t.text("bio")');
     });
@@ -207,7 +207,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("artist_id", "integer")');
       expect(content).toContain('this.attribute("release_date", "date")');
 
-      const mig = findMigration(albumFiles, /db\/migrations\/.+_create_albums\.ts$/);
+      const mig = findMigration(albumFiles, /db\/migrate\/.+_create_albums\.ts$/);
       expect(mig).toContain('t.integer("artist_id")');
       expect(mig).toContain('t.date("release_date")');
     });
@@ -219,7 +219,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("track_number", "integer")');
       expect(content).toContain('this.attribute("duration", "integer")');
 
-      const mig = findMigration(trackFiles, /db\/migrations\/.+_create_tracks\.ts$/);
+      const mig = findMigration(trackFiles, /db\/migrate\/.+_create_tracks\.ts$/);
       expect(mig).toContain('t.integer("track_number")');
       expect(mig).toContain('t.integer("duration")');
     });
@@ -229,7 +229,7 @@ describe("generator fixtures", () => {
       const content = readFile("src/app/models/genre.ts");
       expect(content).toContain("class Genre extends Base");
 
-      const mig = findMigration(genreFiles, /db\/migrations\/.+_create_genres\.ts$/);
+      const mig = findMigration(genreFiles, /db\/migrate\/.+_create_genres\.ts$/);
       expect(mig).toContain('t.string("name")');
     });
   });
@@ -272,7 +272,7 @@ describe("generator fixtures", () => {
       expect(content).toContain("class Account extends Base");
       expect(content).toContain('this.attribute("balance", "decimal")');
 
-      const mig = findMigration(accountFiles, /db\/migrations\/.+_create_accounts\.ts$/);
+      const mig = findMigration(accountFiles, /db\/migrate\/.+_create_accounts\.ts$/);
       expect(mig).toContain('t.decimal("balance")');
     });
 
@@ -282,7 +282,7 @@ describe("generator fixtures", () => {
       expect(content).toContain("class Category extends Base");
       expect(content).toContain('this.attribute("parent_id", "integer")');
 
-      const mig = findMigration(categoryFiles, /db\/migrations\/.+_create_categories\.ts$/);
+      const mig = findMigration(categoryFiles, /db\/migrate\/.+_create_categories\.ts$/);
       expect(mig).toContain('t.integer("parent_id")');
     });
 
@@ -294,7 +294,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("account_id", "integer")');
       expect(content).toContain('this.attribute("category_id", "integer")');
 
-      const mig = findMigration(transactionFiles, /db\/migrations\/.+_create_transactions\.ts$/);
+      const mig = findMigration(transactionFiles, /db\/migrate\/.+_create_transactions\.ts$/);
       expect(mig).toContain('t.decimal("amount")');
       expect(mig).toContain('t.integer("account_id")');
       expect(mig).toContain('t.date("date")');
@@ -307,7 +307,7 @@ describe("generator fixtures", () => {
       expect(content).toContain('this.attribute("period_start", "date")');
       expect(content).toContain('this.attribute("period_end", "date")');
 
-      const mig = findMigration(budgetFiles, /db\/migrations\/.+_create_budgets\.ts$/);
+      const mig = findMigration(budgetFiles, /db\/migrate\/.+_create_budgets\.ts$/);
       expect(mig).toContain('t.date("period_start")');
       expect(mig).toContain('t.date("period_end")');
     });
@@ -346,7 +346,7 @@ describe("exported fixtures", () => {
   beforeAll(async () => {
     fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-fixture-validation-"));
     fs.writeFileSync(path.join(fixtureDir, "tsconfig.json"), "{}");
-    fs.mkdirSync(path.join(fixtureDir, "db/migrations"), { recursive: true });
+    fs.mkdirSync(path.join(fixtureDir, "db/migrate"), { recursive: true });
 
     const allFixtures = [...fixtures.docs, ...fixtures.music, ...fixtures.finances];
     for (const fixture of allFixtures) {
