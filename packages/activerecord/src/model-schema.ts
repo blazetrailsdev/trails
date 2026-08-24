@@ -1615,10 +1615,17 @@ export const ClassMethods = {
 
 /**
  * Mirrors: `delegate :type_for_attribute, :column_for_attribute, to: :class`
- * (model_schema.rb:183). Only `column_for_attribute` is here — the instance
- * `type_for_attribute` delegate still lives on `ActiveModel::Model`.
+ * (model_schema.rb:183) — the instance-side delegates ActiveRecord adds. Neither
+ * exists on `ActiveModel::Model`, where `type_for_attribute` is defined only in
+ * `AttributeRegistration::ClassMethods` (attribute_registration.rb:43).
  */
 export const InstanceMethods = {
+  typeForAttribute(this: { constructor: unknown }, name: string, block?: () => Type): Type {
+    return (
+      this.constructor as { typeForAttribute(n: string, b?: () => Type): Type }
+    ).typeForAttribute(name, block);
+  },
+
   columnForAttribute(this: { constructor: unknown }, name: string): unknown {
     return (this.constructor as { columnForAttribute(n: string): unknown }).columnForAttribute(
       name,
