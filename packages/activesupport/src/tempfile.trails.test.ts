@@ -14,7 +14,7 @@ describe("Tempfile", () => {
   it("create unlinks the file on block exit", async () => {
     let path = "";
     await Tempfile.create("foo", undefined, (tmpfile) => {
-      path = tmpfile.path;
+      path = tmpfile.path!;
     });
     expect(path).not.toBe("");
     expect(await exists(path)).toBe(false);
@@ -24,7 +24,7 @@ describe("Tempfile", () => {
     let path = "";
     await expect(
       Tempfile.create("foo", undefined, (tmpfile) => {
-        path = tmpfile.path;
+        path = tmpfile.path!;
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
@@ -33,7 +33,7 @@ describe("Tempfile", () => {
 
   it("create accepts a prefix and suffix pair", async () => {
     await Tempfile.create(["pre", "-post.yml"], undefined, (tmpfile) => {
-      const basename = tmpfile.path.split(/[\\/]/).pop()!;
+      const basename = tmpfile.path!.split(/[\\/]/).pop()!;
       expect(basename.startsWith("pre")).toBe(true);
       expect(basename.endsWith("-post.yml")).toBe(true);
     });
@@ -42,8 +42,8 @@ describe("Tempfile", () => {
   it("create awaits an async block before unlinking", async () => {
     let path = "";
     const value = await Tempfile.create("foo", undefined, async (tmpfile) => {
-      path = tmpfile.path;
-      await tmpfile.write("hello");
+      path = tmpfile.path!;
+      tmpfile.write("hello");
       expect(await exists(path)).toBe(true);
       return (await tmpfile.read()).toString("utf8");
     });
@@ -51,20 +51,20 @@ describe("Tempfile", () => {
     expect(await exists(path)).toBe(false);
   });
 
-  it("write appends to the file", async () => {
-    const contents = await Tempfile.create("foo", undefined, async (tmpfile) => {
-      await tmpfile.write("a");
-      await tmpfile.write("b");
-      return (await tmpfile.read()).toString("utf8");
-    });
-    expect(contents).toBe("ab");
+  it("write appends and close flushes to the file", async () => {
+    const tempfile = await Tempfile.open("foo");
+    expect(tempfile.write("a")).toBe(1);
+    tempfile.write("b");
+    await tempfile.close();
+    expect((await (await getFsAsync()).readFile!(tempfile.path!, "utf8")).toString()).toBe("ab");
+    await tempfile.unlink();
   });
 
   it("open leaves the file in place on block exit", async () => {
     let path = "";
-    const value = await Tempfile.open("bar", undefined, async (tmpfile) => {
-      path = tmpfile.path;
-      await tmpfile.write("hi");
+    const value = await Tempfile.open("bar", undefined, (tempfile) => {
+      path = tempfile.path!;
+      tempfile.write("hi");
       return 7;
     });
     expect(value).toBe(7);
@@ -73,16 +73,22 @@ describe("Tempfile", () => {
     await (
       await getFsAsync()
     ).unlink!(path);
-    const tmpfile = await Tempfile.open("bar");
-    expect(tmpfile.path).not.toBe(path);
-    await tmpfile.unlink();
   });
 
   it("without a block returns the open temp file", async () => {
     const tmpfile = await Tempfile.create("baz");
-    expect(await exists(tmpfile.path)).toBe(true);
-    await tmpfile.close();
-    await tmpfile.unlink();
-    expect(await exists(tmpfile.path)).toBe(false);
+    expect(await exists(tmpfile.path!)).toBe(true);
+    const path = tmpfile.path!;
+    await tmpfile.close(true);
+    expect(await exists(path)).toBe(false);
+    expect(tmpfile.path).toBeNull();
+  });
+
+  it("new gives each temp file a distinct name", async () => {
+    const a = await Tempfile.new("dup");
+    const b = await Tempfile.new("dup");
+    expect(a.path).not.toBe(b.path);
+    await a.unlink();
+    await b.unlink();
   });
 });

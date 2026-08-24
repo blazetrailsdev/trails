@@ -2,16 +2,63 @@ import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { ArgumentError } from "./hash-utils.js";
 import { getOsAsync } from "./os-adapter.js";
 
-/**
- * A basename is either a String, or a `[prefix, suffix]` pair
- * (`tempfile.rb:224-230`).
- */
+/** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */
 export type TempfileBasename = string | [string, string];
+
+/** `Dir::Tmpname::UNUSABLE_CHARS` (`tmpdir.rb:122`), as the complement class it names. */
+const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
+
+/**
+ * `Dir::Tmpname.create(basename, tmpdir = nil)` (`tmpdir.rb:139-163`).
+ *
+ * Ruby yields candidate names and retries on `Errno::EEXIST`, which is what
+ * makes the name unique. The fs adapter exposes no exclusive-create flag, so
+ * the candidate is placed inside a fresh `mkdtemp` directory instead and the
+ * `EEXIST` retry loop has nothing left to retry.
+ *
+ * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
+ *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
+ */
+async function createTmpname(basename: TempfileBasename, tmpdir?: string): Promise<string> {
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+
+  if (!fs.mkdtemp || !fs.writeFile) {
+    throw new ArgumentError(
+      "Tempfile requires FsAdapter.mkdtemp and FsAdapter.writeFile. " +
+        "The configured FsAdapter does not provide them.",
+    );
+  }
+
+  tmpdir ??= (await getOsAsync()).tmpdir();
+  let [prefix, suffix] = typeof basename === "string" ? [basename, undefined] : basename;
+  prefix = prefix.replace(UNUSABLE_CHARS, "");
+  suffix &&= suffix.replace(UNUSABLE_CHARS, "");
+
+  // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is a
+  // filename component, not a modelled instant.
+  const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  // Ruby's second component is `$$`, the process id; trails has no `process.*`,
+  // so it is a second draw from the same generator as `RANDOM.next`.
+  return path.join(
+    await fs.mkdtemp(path.join(tmpdir, "tempfile-")),
+    `${prefix}${t}-${random()}-${random()}${suffix ?? ""}`,
+  );
+}
+
+/** `Dir::Tmpname::RANDOM.next` (`tmpdir.rb:126-136`) — up to 6 base-36 bytes. */
+function random(): string {
+  return Math.floor(Math.random() * 36 ** 6).toString(36);
+}
 
 /**
  * Ruby's `Tempfile` (stdlib `tempfile.rb`), which Rails calls from
  * `encrypted_file.rb:90`, `postgresql_database_tasks.rb:132` and
  * `core_ext/file/atomic.rb:24`.
+ *
+ * Writes are buffered in memory and flushed by {@link close} and {@link read},
+ * the way Ruby's `IO` buffers them behind the descriptor: the fs adapter is
+ * open-write-close per call, so there is no descriptor to hold between writes.
  *
  * @noRailsEquivalent CONVERGEABLE — `Tempfile` is Ruby stdlib rather than
  *   Rails, so it has no `vendor/rails` anchor and no natural package. It lives
@@ -20,21 +67,66 @@ export type TempfileBasename = string | [string, string];
  *   (`corelib-primitives`) reactivates and re-homes them together.
  */
 export class Tempfile {
-  readonly path: string;
+  private readonly tmpname: string;
+  private unlinked = false;
+  private buffer: Buffer = Buffer.alloc(0);
+  private flushed = true;
 
-  /** The `mkdtemp` directory this temp file was created in; removed by {@link unlink}. */
-  private readonly dir: string;
-
-  private constructor(path: string, dir: string) {
-    this.path = path;
-    this.dir = dir;
+  private constructor(tmpname: string) {
+    this.tmpname = tmpname;
   }
 
   /**
-   * `Tempfile.create(basename = "", tmpdir = nil)` (`tempfile.rb:342-374`).
-   * With a block, yields the file, then closes AND unlinks it — on the raising
-   * path too — and returns the block's value. Without a block, returns the
-   * open temp file, which the caller closes and unlinks itself.
+   * `Tempfile.new(basename = "", tmpdir = nil)` (`tempfile.rb:150-166`).
+   *
+   * Ruby's `initialize` opens the file; a TypeScript constructor cannot await,
+   * so the Ruby name lives on the static factory instead.
+   */
+  static async new(basename: TempfileBasename = "", tmpdir?: string): Promise<Tempfile> {
+    const tmpname = await createTmpname(basename, tmpdir);
+    // `opts[:perm] = 0600` (`tempfile.rb:159`).
+    await (
+      await getFsAsync()
+    ).writeFile!(tmpname, "", { mode: 0o600 });
+    return new Tempfile(tmpname);
+  }
+
+  /**
+   * `Tempfile.open(*args)` (`tempfile.rb:366-380`). With a block, yields the
+   * file and closes it on block exit, returning the block's value; without one,
+   * returns the open file. Unlike {@link create} it does not unlink — Ruby
+   * leaves removal to the finalizer, which JS has no equivalent of, so a
+   * caller of this form removes the file itself.
+   */
+  static open(basename?: TempfileBasename, tmpdir?: string): Promise<Tempfile>;
+  static open<T>(
+    basename: TempfileBasename | undefined,
+    tmpdir: string | undefined,
+    block: (tempfile: Tempfile) => T | Promise<T>,
+  ): Promise<T>;
+  static async open<T>(
+    basename?: TempfileBasename,
+    tmpdir?: string,
+    block?: (tempfile: Tempfile) => T | Promise<T>,
+  ): Promise<T | Tempfile> {
+    const tempfile = await Tempfile.new(basename, tmpdir);
+
+    if (block) {
+      try {
+        return await block(tempfile);
+      } finally {
+        await tempfile.close();
+      }
+    } else {
+      return tempfile;
+    }
+  }
+
+  /**
+   * `Tempfile.create(basename = "", tmpdir = nil)` (`tempfile.rb:438-465`).
+   * With a block, yields the file, then closes and unlinks it — on the raising
+   * path too — and returns the block's value; without one, returns the open
+   * file, which the caller closes and unlinks itself.
    */
   static create(basename?: TempfileBasename, tmpdir?: string): Promise<Tempfile>;
   static create<T>(
@@ -42,120 +134,80 @@ export class Tempfile {
     tmpdir: string | undefined,
     block: (tmpfile: Tempfile) => T | Promise<T>,
   ): Promise<T>;
-  static create<T>(
+  static async create<T>(
     basename?: TempfileBasename,
     tmpdir?: string,
     block?: (tmpfile: Tempfile) => T | Promise<T>,
   ): Promise<T | Tempfile> {
-    return Tempfile.mktmp(basename, tmpdir, block, true);
-  }
+    const tmpfile = await Tempfile.new(basename, tmpdir);
 
-  /**
-   * `Tempfile.open(*args)` (`tempfile.rb:307-321`). With a block, yields the
-   * file, closes it on block exit and returns the block's value; unlike
-   * {@link create} it does NOT unlink — Ruby leaves removal to the finalizer.
-   */
-  static open(basename?: TempfileBasename, tmpdir?: string): Promise<Tempfile>;
-  static open<T>(
-    basename: TempfileBasename | undefined,
-    tmpdir: string | undefined,
-    block: (tmpfile: Tempfile) => T | Promise<T>,
-  ): Promise<T>;
-  static open<T>(
-    basename?: TempfileBasename,
-    tmpdir?: string,
-    block?: (tmpfile: Tempfile) => T | Promise<T>,
-  ): Promise<T | Tempfile> {
-    return Tempfile.mktmp(basename, tmpdir, block, false);
-  }
-
-  private static async mktmp<T>(
-    basename: TempfileBasename = "",
-    tmpdir: string | undefined,
-    block: ((tmpfile: Tempfile) => T | Promise<T>) | undefined,
-    unlink: boolean,
-  ): Promise<T | Tempfile> {
-    const tmpfile = await Tempfile.make(basename, tmpdir);
-
-    if (!block) return tmpfile;
-
-    try {
-      return await block(tmpfile);
-    } finally {
-      await tmpfile.close();
-      if (unlink) await tmpfile.unlink();
+    if (block) {
+      try {
+        return await block(tmpfile);
+      } finally {
+        await tmpfile.close();
+        await tmpfile.unlink();
+      }
+    } else {
+      return tmpfile;
     }
   }
 
-  private static async make(basename: TempfileBasename, tmpdir?: string): Promise<Tempfile> {
+  /**
+   * `Tempfile#path` (`tempfile.rb:268-270`) — nil once {@link unlink} has run.
+   */
+  get path(): string | null {
+    return this.unlinked ? null : this.tmpname;
+  }
+
+  /** `IO#write` — appends, and returns the number of bytes written. */
+  write(contents: string | Buffer | Uint8Array): number {
+    const chunk = typeof contents === "string" ? Buffer.from(contents, "utf8") : contents;
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    this.flushed = false;
+    return chunk.length;
+  }
+
+  /** `IO#read` — the whole file. */
+  async read(): Promise<Buffer> {
+    await this.flush();
+    return (await getFsAsync()).readFile!(this.tmpname);
+  }
+
+  /** `IO#flush` — writes the buffered bytes through to the file. */
+  async flush(): Promise<void> {
+    if (this.flushed) return;
+    await (
+      await getFsAsync()
+    ).writeFile!(this.tmpname, this.buffer, { mode: 0o600 });
+    this.flushed = true;
+  }
+
+  /**
+   * `Tempfile#close(unlink_now = false)` (`tempfile.rb:208-211`). Ruby's
+   * `_close` releases the descriptor; there is none to release here, so what
+   * closing does is flush the buffered writes.
+   */
+  async close(unlinkNow = false): Promise<void> {
+    await this.flush();
+    if (unlinkNow) await this.unlink();
+  }
+
+  /** `Tempfile#unlink` (`tempfile.rb:252-265`) — removes the file. */
+  async unlink(): Promise<void> {
+    if (this.unlinked) return;
     const fs = await getFsAsync();
     const path = await getPathAsync();
-
-    if (!fs.mkdtemp || !fs.writeFile) {
-      throw new ArgumentError(
-        "Tempfile requires FsAdapter.mkdtemp and FsAdapter.writeFile. " +
-          "The configured FsAdapter does not provide them.",
-      );
-    }
-
-    const [prefix, suffix] = typeof basename === "string" ? [basename, ""] : basename;
-    tmpdir ??= (await getOsAsync()).tmpdir();
-
-    // Ruby gets uniqueness from `Dir::Tmpname.create`, which retries an
-    // `O_EXCL` open against a name built from the pid and a random suffix. The
-    // fs adapter exposes no exclusive-create flag, so the unique seat is an
-    // `mkdtemp` directory holding a file with Ruby's basename shape.
-    const dir = await fs.mkdtemp(path.join(tmpdir, "tempfile-"));
-    const file = path.join(dir, `${prefix}${Tempfile.stamp()}${suffix}`);
-    await fs.writeFile(file, "", { mode: 0o600 });
-    return new Tempfile(file, dir);
-  }
-
-  /** The `%Y%m%d-#{pid}-#{rand}` middle of Ruby's temp basename (`tmpdir.rb:127-136`). */
-  private static stamp(): string {
-    // boundary: Ruby builds the basename from `Time.now.strftime("%Y%m%d")`;
-    // the stamp is a filename component, not a modelled instant.
-    const now = new Date();
-    const date =
-      `${now.getUTCFullYear()}` +
-      `${now.getUTCMonth() + 1}`.padStart(2, "0") +
-      `${now.getUTCDate()}`.padStart(2, "0");
-    return `${date}-${Math.floor(Math.random() * 1000000).toString(36)}`;
-  }
-
-  /** `Tempfile#write` — appends to the file, like the Ruby IO. */
-  async write(contents: string | Buffer | Uint8Array): Promise<void> {
-    const fs = await getFsAsync();
-    const existing = await fs.readFile!(this.path);
-    const chunk = typeof contents === "string" ? Buffer.from(contents, "utf8") : contents;
-    await fs.writeFile!(this.path, Buffer.concat([existing, Buffer.from(chunk)]), { mode: 0o600 });
-  }
-
-  /** `Tempfile#read` — the whole file, as Ruby's `IO#read` returns it. */
-  async read(): Promise<Buffer> {
-    return (await getFsAsync()).readFile!(this.path);
-  }
-
-  /**
-   * `Tempfile#close` (`tempfile.rb:243-252`). Every read and write opens and
-   * closes the file itself, so there is no descriptor left to release.
-   */
-  close(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  /** `Tempfile#unlink` (`tempfile.rb:262-275`) — removes the file. */
-  async unlink(): Promise<void> {
-    const fs = await getFsAsync();
     try {
-      await fs.unlink!(this.path);
-    } catch {
-      /* already gone */
+      await fs.unlink!(this.tmpname);
+    } catch (error) {
+      // `rescue Errno::ENOENT` (`tempfile.rb:256`).
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
     }
-    try {
-      await fs.rmdir!(this.dir);
-    } catch {
-      /* already gone */
-    }
+    // The name came from a dedicated `mkdtemp` directory (see
+    // `createTmpname`), so removing the file leaves that directory to remove
+    // too; Ruby has no such directory and so no counterpart line.
+    await fs.rmdir!(path.dirname(this.tmpname));
+    this.unlinked = true;
   }
 }

@@ -158,7 +158,7 @@ export class EncryptedFile {
       ["", "-" + chomp(path.basename(contentPath), ".enc")],
       path.dirname(contentPath),
       async (tmpFile) => {
-        const tmpPath = tmpFile.path;
+        const tmpPath = tmpFile.path!;
         // Rails uses Ruby `Tempfile.create`, which defaults to mode 0600.
         // The temp file holds plaintext secrets between the editor write and
         // the re-encrypt step, so it must not be world-readable.

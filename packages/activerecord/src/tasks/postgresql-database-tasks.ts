@@ -220,14 +220,14 @@ export class PostgreSQLDatabaseTasks {
       // split that keeps each terminator where `foreach` leaves it.
       for (const line of fs.readFileSync(filename, "utf8").split(/(?<=\n)/)) {
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
-          await tempfile.write(line);
+          tempfile.write(line);
           removingComments = false;
         }
       }
     } finally {
       await tempfile.close();
     }
-    fs.copyFileSync(tempfile.path, filename);
+    fs.copyFileSync(tempfile.path!, filename);
     // Ruby leaves removal to Tempfile's finalizer; JS has none, so the
     // non-block form is unlinked explicitly once the copy has been made.
     await tempfile.unlink();
