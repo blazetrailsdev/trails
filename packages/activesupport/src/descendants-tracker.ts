@@ -31,7 +31,7 @@ export namespace DescendantsTracker {
       this._addsSinceCompact = 0;
     }
 
-    includes(object: T): boolean {
+    isInclude(object: T): boolean {
       return this._map.has(object);
     }
 
