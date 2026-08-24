@@ -7,7 +7,7 @@ import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
-type NumericValue = number | ((record: ValidatableRecord) => number) | string;
+type NumericValue = number | bigint | ((record: ValidatableRecord) => number) | string;
 
 /**
  * Mirrors: ActiveModel::Validations::NumericalityValidator (numericality.rb)
@@ -98,7 +98,7 @@ export class NumericalityValidator extends EachValidator {
 
     // Rails reassigns `value` (numericality.rb:47), so every filtered_options
     // below interpolates the PARSED value, not the raw input.
-    const num = parseAsNumber(value, precision, scale) as number;
+    const num = parseAsNumber(value, precision, scale) as number | bigint;
     value = num;
 
     // Rails uses filtered_options(value).merge!(count: option_value)
@@ -121,7 +121,7 @@ export class NumericalityValidator extends EachValidator {
       if (option in NUMBER_CHECKS) {
         // Rails: value.to_i.public_send(NUMBER_CHECKS[option]) — TS has no
         // public_send, so the check Symbol selects the parity test.
-        const odd = Math.trunc(num) % 2 !== 0;
+        const odd = typeof num === "bigint" ? num % 2n !== 0n : Math.trunc(num) % 2 !== 0;
         if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
           record.errors.add(attribute, `:${option}`, this.filteredOptions(value));
         }
@@ -129,7 +129,7 @@ export class NumericalityValidator extends EachValidator {
         // Rails: value.public_send(:in?, range) — Object#in? delegates to
         // Range#include?, and :count interpolates the range's own to_s.
         const range = optionValue as unknown as Range<number>;
-        if (!range.isInclude(num)) {
+        if (!range.isInclude(num as number)) {
           record.errors.add(attribute, `:${option}`, withCount(range.toS()));
         }
       } else if (option in COMPARE_CHECKS) {
@@ -195,7 +195,7 @@ export function optionAsNumber(
   optionValue: unknown,
   precision: number,
   scale?: number,
-): number | undefined {
+): number | bigint | undefined {
   return parseAsNumber(this.resolveValue(record, optionValue), precision, scale);
 }
 
@@ -218,6 +218,12 @@ export function optionAsNumber(
  * implicit-nil from the `elsif` chain falling through, and the
  * `rescue ArgumentError, TypeError` around `Kernel.Float` in `is_number?`).
  *
+ * Ruby's `String#to_i` is an arbitrary-precision Integer, so the `is_integer?`
+ * branch answers a bigint once the digits fall outside the safe-integer range —
+ * `"10000000000000001"` has to stay greater than `10_000_000_000_000_000`,
+ * which a double cannot express. Inside that range it answers a plain number,
+ * leaving every float arm untouched.
+ *
  * Ruby's Float-vs-Integer split has no JS counterpart — both are `number` —
  * so integrality stands in for it: a non-integral number takes the `Float`
  * branch, an integral one the `Numeric` (pass-through) branch. That is what
@@ -234,7 +240,7 @@ export function parseAsNumber(
   rawValue: unknown,
   precision: number,
   scale?: number,
-): number | undefined {
+): number | bigint | undefined {
   if (typeof rawValue === "number") {
     // Ruby `Float::NAN.to_d` raises, so the chain yields no number.
     if (Number.isNaN(rawValue)) return undefined;
@@ -243,7 +249,12 @@ export function parseAsNumber(
     return rawValue % 1 === 0 ? rawValue : parseFloat(rawValue, precision, scale);
   }
   if (rawValue instanceof BigDecimal) return round(Number(rawValue.toString("F")), scale);
-  if (isInteger(rawValue)) return Number.parseInt(String(rawValue), 10);
+  if (isInteger(rawValue)) {
+    const int = BigInt(String(rawValue));
+    return int >= BigInt(Number.MIN_SAFE_INTEGER) && int <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(int)
+      : int;
+  }
   if (!isHexadecimalLiteral(rawValue)) {
     const float = kernelFloat(rawValue);
     if (float === undefined) return undefined;
@@ -252,9 +263,12 @@ export function parseAsNumber(
   return undefined;
 }
 
-/** Ruby's `value.is_a?(Numeric)` over the two numeric types trails carries. */
+/**
+ * Ruby's `value.is_a?(Numeric)` over the numeric types trails carries — a
+ * bigint among them, since it is how an Integer past 2^53 is spelled here.
+ */
 function isNumeric(value: unknown): boolean {
-  return typeof value === "number" || value instanceof BigDecimal;
+  return typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal;
 }
 
 /** Ruby's `value.is_a?(Symbol)` — a colon-prefixed string in trails. */

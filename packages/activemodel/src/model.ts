@@ -170,7 +170,16 @@ export interface Model {
    * (RFC 0063), so these settle where Ruby's return straight away.
    */
   validatesPresenceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesAbsenceOf(...attrNames: AttrNameArg[]): Promise<void>;
   validatesLengthOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesSizeOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesNumericalityOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesInclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesExclusionOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesFormatOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesAcceptanceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesConfirmationOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesComparisonOf(...attrNames: AttrNameArg[]): Promise<void>;
 
   /**
    * `ActiveModel::Attributes#attribute_names` (attributes.rb:146-148),
