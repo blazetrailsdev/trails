@@ -69,7 +69,7 @@ export class PostgreSQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     collector.append("( ");
-    this.visit(o.expr, collector);
+    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
     collector.append(" )");
     return collector;
   }
@@ -133,10 +133,7 @@ export class PostgreSQL extends ToSql {
    * (postgresql.rb:88-96). A bare `expr` — a single GroupingElement handed to
    * `Cube.new` — is visited as-is, so it supplies its own parentheses.
    */
-  protected groupingArrayOrGroupingElement(
-    o: Nodes.GroupingElement,
-    collector: SQLString,
-  ): SQLString {
+  protected groupingArrayOrGroupingElement(o: Nodes.Unary, collector: SQLString): SQLString {
     if (Array.isArray(o.expr)) {
       collector.append("( ");
       this.visit(o.expr, collector);
