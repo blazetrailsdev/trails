@@ -1141,11 +1141,11 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 
 describe("DatabaseTasksMigrateErrorTest", () => {
   it("migrate raise error on invalid version format", async () => {
-    setEnv("TRAILS_MIGRATION_VERSION", "abc");
+    setEnv("VERSION", "abc");
     try {
       await expect(DatabaseTasks.migrate()).rejects.toThrow(/Invalid format/);
     } finally {
-      setEnv("TRAILS_MIGRATION_VERSION", undefined);
+      setEnv("VERSION", undefined);
     }
   });
 

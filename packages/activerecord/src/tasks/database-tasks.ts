@@ -317,8 +317,8 @@ export class DatabaseTasks {
    * @param version Exact-version *filter* — only the migration with this
    *   version runs (`db:migrate:up` / `:down` semantics). Rails' `db:migrate`
    *   rake task never passes it. "Migrate up to here" is
-   *   `ENV["TRAILS_MIGRATION_VERSION"]`, read through {@link targetVersion},
-   *   exactly as Rails reads `ENV["VERSION"]` (`database_tasks.rb:268-269`).
+   *   `ENV["VERSION"]`, read through {@link targetVersion}, exactly as Rails
+   *   reads it (`database_tasks.rb:268-269`).
    */
   static async migrate(options?: { skipInitialize?: boolean }): Promise<void>;
   static async migrate(
@@ -496,17 +496,9 @@ export class DatabaseTasks {
    *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
    *   nothing in the TS body was dropped.
    *
-   * The env key is `TRAILS_MIGRATION_VERSION`, not Rails' bare `VERSION`, with
-   * `VERSION` kept as a legacy fallback (one-release window). That is a
-   * deliberate repo-wide deviation, not a local choice: BC-2 renamed AR's
-   * process env vars under a `TRAILS_` prefix — `NODE_ENV` → `TRAILS_ENV`,
-   * `VERSION` → `TRAILS_MIGRATION_VERSION`
-   * (`docs/infrastructure/browser-compat-plan.md`, shipped in #1251) — and the
-   * trails-prefixed name outranks the unprefixed one wherever both are read.
    * {@link checkTargetVersion} reads this method rather than the env directly,
-   * so the pair stays single-source over that one key exactly as Rails'
-   * `check_target_version` / `target_version` are single-source over
-   * `ENV["VERSION"]` (`database_tasks.rb:317-325`).
+   * so the pair is single-source over `ENV["VERSION"]` exactly as Rails'
+   * `check_target_version` / `target_version` are (`database_tasks.rb:317-325`).
    *
    * The `to_i` is Rails'
    * (`ENV["VERSION"].to_i`, database_tasks.rb:323-325) and never fails —
@@ -514,14 +506,14 @@ export class DatabaseTasks {
    * {@link checkTargetVersion} reach its format check for a malformed VERSION.
    */
   static targetVersion(): number | null {
-    const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
+    const version = getEnv("VERSION");
     if (version === undefined || version === "") return null;
     const match = version.match(/^\s*(-?\d+)/);
     return match ? Number(match[1]) : 0;
   }
 
   static checkTargetVersion(): void {
-    const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
+    const version = getEnv("VERSION");
     if (this.targetVersion() !== null && !Migration.isValidVersionFormat(version ?? "")) {
       throw new Error(`Invalid format of target version: \`VERSION=${version}\``);
     }

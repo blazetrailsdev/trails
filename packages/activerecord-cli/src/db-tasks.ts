@@ -110,8 +110,8 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   // `ENV["VERSION"]`, which `migrate_all` reads back through `target_version`;
   // `--version` is the CLI spelling of that env var, not an extra argument.
   const version = flagValue(args, "--version");
-  const previousVersion = getEnv("TRAILS_MIGRATION_VERSION");
-  if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", version);
+  const previousVersion = getEnv("VERSION");
+  if (version !== undefined) setEnv("VERSION", version);
   try {
     await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env);
     return 0;
@@ -119,7 +119,7 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
     console.error(`ar: db:migrate failed — ${String(err)}`);
     return 1;
   } finally {
-    if (version !== undefined) setEnv("TRAILS_MIGRATION_VERSION", previousVersion);
+    if (version !== undefined) setEnv("VERSION", previousVersion);
   }
 }
 

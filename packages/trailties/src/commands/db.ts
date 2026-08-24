@@ -571,21 +571,20 @@ async function withMigrationTasksForDb(
 }
 
 /**
- * Runs `fn` with `TRAILS_MIGRATION_VERSION` set to `targetVersion`, so
- * `DatabaseTasks.target_version` sees it exactly as it sees Rails'
- * `ENV["VERSION"]` (`tasks/database_tasks.rb:268`).
+ * Runs `fn` with `VERSION` set to `targetVersion`, the env var
+ * `DatabaseTasks.targetVersion` reads (`tasks/database_tasks.rb:268`, `:323`).
  */
 async function withTargetVersionEnv(
   targetVersion: string | null,
   fn: () => Promise<void>,
 ): Promise<void> {
   if (targetVersion === null) return fn();
-  const was = env.TRAILS_MIGRATION_VERSION;
-  setEnv("TRAILS_MIGRATION_VERSION", targetVersion);
+  const was = env.VERSION;
+  setEnv("VERSION", targetVersion);
   try {
     await fn();
   } finally {
-    setEnv("TRAILS_MIGRATION_VERSION", was);
+    setEnv("VERSION", was);
   }
 }
 
@@ -834,9 +833,7 @@ export function dbCommand(): Command {
    * themselves (`database_tasks.rb:317-325`), so the `--version` flag is
    * published as the env var rather than threaded through the predicate, and
    * `migration_context.run` is handed `target_version` read back off it — one
-   * source, as in the rake task. The key published is trails'
-   * `TRAILS_MIGRATION_VERSION` rather than Rails' bare `VERSION`; see
-   * `DatabaseTasks.targetVersion` for why that rename is repo-wide.
+   * source, as in the rake task.
    *
    * Commander's `requiredOption` is the CLI form of the rake task's
    * `raise "VERSION is required"` guard (`databases.rake:169`, `:198`).
