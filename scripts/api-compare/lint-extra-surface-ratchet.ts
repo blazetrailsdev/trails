@@ -42,6 +42,7 @@ import {
   measure,
   staleMarks,
   tightened,
+  unmarkedPackages,
   unmeasuredPackages,
   writeMarks,
 } from "./extra-surface-mark.js";
@@ -73,6 +74,19 @@ async function main(tighten: boolean): Promise<number> {
   }
 
   const marks = await loadMarks();
+
+  const unmarked = unmarkedPackages(marks);
+  if (unmarked.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${unmarked.length} gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
+        "A gated package with no mark is skipped by every comparison, so the gate\n" +
+        "would pass on it silently rather than half-enabling. Seed it from a clean\n" +
+        "measurement before gating:\n" +
+        "  pnpm parity:api:extra --package <pkg>\n",
+    );
+    return 1;
+  }
+
   const grew = exceedances(marks, current);
   const stale = staleMarks(marks, current);
 

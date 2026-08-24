@@ -5,6 +5,7 @@ import {
   measure,
   staleMarks,
   tightened,
+  unmarkedPackages,
   unmeasuredPackages,
   type SurfaceMarks,
 } from "./extra-surface-mark.js";
@@ -24,16 +25,28 @@ describe("extra-surface mark", () => {
     });
   });
 
-  // A gated package with no committed mark makes `exceedances` and `staleMarks`
-  // skip it — the gate would pass silently on the package it was just widened
-  // to cover. Adding a name to GATED_PACKAGES without seeding its mark is
-  // therefore a disarm, not a no-op.
-  it("does not gate a package whose mark was never seeded", () => {
-    expect(exceedances(marks, { arel: { novel: 0, total: 63 } })).toEqual([]);
+  it("names a gated package the mark file never seeded", () => {
+    expect(unmarkedPackages({ arel: { novel: 0, total: 63 } })).toEqual(["activerecord"]);
+    expect(unmarkedPackages({})).toEqual([...GATED_PACKAGES]);
+    expect(
+      unmarkedPackages({
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 399, total: 1424 },
+      }),
+    ).toEqual([]);
+  });
+
+  it("skips a package with no mark rather than gating it, which is why the seed is checked", () => {
     expect(
       exceedances(marks, {
         arel: { novel: 0, total: 63 },
         activerecord: { novel: 9999, total: 9999 },
+      }),
+    ).toEqual([]);
+    expect(
+      staleMarks(marks, {
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 1, total: 1 },
       }),
     ).toEqual([]);
   });

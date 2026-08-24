@@ -138,6 +138,17 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
   return GATED_PACKAGES.filter((name) => current[name] === undefined);
 }
 
+/**
+ * A package the gate covers but the mark file never committed. {@link exceedances},
+ * {@link staleMarks} and {@link tightened} all skip a package with no mark, so
+ * adding a name to {@link GATED_PACKAGES} without seeding its numbers disarms
+ * the gate for that package instead of half-enabling it. The mark-side twin of
+ * {@link unmeasuredPackages}.
+ */
+export function unmarkedPackages(marks: SurfaceMarks): string[] {
+  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
+}
+
 export async function loadMarks(): Promise<SurfaceMarks> {
   return JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as SurfaceMarks;
 }
