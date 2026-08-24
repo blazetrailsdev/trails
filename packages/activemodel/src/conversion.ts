@@ -19,7 +19,32 @@ import {
 interface ConversionRecord {
   isPersisted(): boolean;
   respondTo(method: string): boolean;
-  _readAttribute(name: string): unknown;
+}
+
+/**
+ * Class-level cache for toPartialPath.
+ *
+ * Mirrors: ActiveModel::Conversion::ClassMethods#_to_partial_path
+ */
+export function _toPartialPath(this: ConversionHost): string {
+  if (!this._cachedToPartialPath) {
+    if (this.modelName != null) {
+      const mn = this.modelName;
+      this._cachedToPartialPath = `${mn.collection}/${mn.element}`;
+    } else {
+      // Rails `_to_partial_path` fallback
+      // (activemodel/lib/active_model/conversion.rb:110-118):
+      //   element    = underscore(demodulize(name))
+      //   collection = tableize(name)
+      // Using `underscore(this.name)` without `demodulize` would produce
+      // a path-shape element like "blog/post" for a namespaced class name
+      // — keeping the fallback Rails-faithful: demodulize first.
+      const element = underscore(demodulize(this.name));
+      const collection = tableize(this.name);
+      this._cachedToPartialPath = `${collection}/${element}`;
+    }
+  }
+  return this._cachedToPartialPath;
 }
 
 export class Conversion {
@@ -49,10 +74,8 @@ export class Conversion {
    * Mirrors: ActiveModel::Conversion#to_key (conversion.rb:67-70)
    */
   toKey(): unknown[] | null {
-    // conversion.rb:67-70 — `key = respond_to?(:id) && id; key ? Array(key) : nil`.
-    // `Array(key)` is what keeps a composite `id` from being double-wrapped.
     const self = this as unknown as ConversionRecord;
-    const key = self.respondTo("id") ? self._readAttribute("id") : false;
+    const key = self.respondTo("id") ? publicSend(this, "id") : false;
     return key != null && key !== false ? wrap(key) : null;
   }
 
@@ -91,27 +114,12 @@ interface ConversionHost {
 }
 
 /**
- * Class-level cache for toPartialPath.
- *
- * Mirrors: ActiveModel::Conversion::ClassMethods#_to_partial_path
+ * Ruby `public_send(method)` with no arguments. A generated attribute reader
+ * ports as an accessor property (CLAUDE.md § "Generated attribute readers are
+ * properties"), so reading the member is the whole send for one; a member that
+ * is a function is a `def` and Ruby's send invokes it.
  */
-export function _toPartialPath(this: ConversionHost): string {
-  if (!this._cachedToPartialPath) {
-    if (this.modelName != null) {
-      const mn = this.modelName;
-      this._cachedToPartialPath = `${mn.collection}/${mn.element}`;
-    } else {
-      // Rails `_to_partial_path` fallback
-      // (activemodel/lib/active_model/conversion.rb:110-118):
-      //   element    = underscore(demodulize(name))
-      //   collection = tableize(name)
-      // Using `underscore(this.name)` without `demodulize` would produce
-      // a path-shape element like "blog/post" for a namespaced class name
-      // — keeping the fallback Rails-faithful: demodulize first.
-      const element = underscore(demodulize(this.name));
-      const collection = tableize(this.name);
-      this._cachedToPartialPath = `${collection}/${element}`;
-    }
-  }
-  return this._cachedToPartialPath;
+function publicSend(obj: object, method: string): unknown {
+  const value = (obj as Record<string, unknown>)[method];
+  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }

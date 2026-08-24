@@ -469,7 +469,12 @@ export class Model {
   declare static moduleName?: string;
 
   /**
-   * Mirrors Rails `model_name` (naming.rb:270-277). The namespace is the
+   * Mirrors Rails `model_name` (naming.rb:270-277), which a host gains by
+   * `extend ActiveModel::Naming` (api.rb:66) — it stays a `model.ts` body only
+   * until `naming.ts` can carry `def model_name` separately from its `def
+   * self.*` module functions (naming.rb:283-348), which trails' `extend()`
+   * would otherwise copy onto the host too; tracked by
+   * 0115/relocate-model-name-to-naming-module. The namespace is the
    * enclosing module, carried as `moduleName` because a JS class has no module
    * path; `@_model_name ||=` is a per-class ivar, so the memo is an own
    * property rather than an inherited one.
