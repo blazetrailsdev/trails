@@ -157,6 +157,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
+    m.changesApplied();
     expect(m.attributeChanged("name")).toBe(false);
   });
 
@@ -178,6 +179,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
+    m.changesApplied();
     m._writeAttribute("name", "test");
     expect(m.attributeChanged("name")).toBe(false);
   });
@@ -189,6 +191,7 @@ describe("AttributeTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
+    m.changesApplied();
     expect(m.attributeChanged("name")).toBe(false);
   });
 

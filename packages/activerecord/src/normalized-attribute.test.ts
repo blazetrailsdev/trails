@@ -72,7 +72,16 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("normalizes changed-in-place value before validation", async () => {
-    aircraft._attributes.set("name", "fly high");
+    // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
+    // mutates the cast value the `Attribute` holds. JS strings are immutable,
+    // and writing through the set yields a `WithCastValue`, whose
+    // `changed_in_place?` is false by definition (attribute.rb:243-245).
+    const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
+      _value: unknown;
+      _hasValue: boolean;
+    };
+    nameAttr._value = "fly high";
+    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     await aircraft.isValid();
@@ -80,7 +89,16 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("normalizes value on demand", () => {
-    aircraft._attributes.set("name", "fly high");
+    // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
+    // mutates the cast value the `Attribute` holds. JS strings are immutable,
+    // and writing through the set yields a `WithCastValue`, whose
+    // `changed_in_place?` is false by definition (attribute.rb:243-245).
+    const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
+      _value: unknown;
+      _hasValue: boolean;
+    };
+    nameAttr._value = "fly high";
+    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     aircraft.normalizeAttribute("name");

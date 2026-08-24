@@ -1140,7 +1140,8 @@ interface ReloadRecord {
   _attributes: unknown;
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
-  _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
+  _mutationsBeforeLastSave: unknown;
+  _mutationsFromDatabase: unknown;
   _associationInstances: Map<string, { owner: unknown }>;
   _collectionProxies: Map<string, unknown>;
   _resetAssociationCaches(): void;
@@ -1199,8 +1200,8 @@ export async function reload<T extends ReloadRecord>(
   defineDynamicSelectReaders(this as unknown as import("./base.js").Base);
   this._newRecord = false;
   this._previouslyNewRecord = false;
-  this._dirty.snapshot(this._attributes);
-  this._dirty.clearChangesInformation();
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
 
   // Rails reload replaces `@association_cache` wholesale from the freshly
   // fetched object, then re-points each adopted association's owner back to
@@ -1262,7 +1263,7 @@ interface BecomesRecord {
   _attributes: { reverseMergeBang(target: unknown): unknown };
   _newRecord: boolean;
   _destroyed: boolean;
-  _dirty: unknown;
+  _mutationsFromDatabase: unknown;
   errors: unknown;
 }
 
@@ -1316,12 +1317,9 @@ export function becomes<
       becoming._attributes = this._attributes;
       becoming._newRecord = this._newRecord;
       becoming._destroyed = this._destroyed;
-      // Rails: `becoming.instance_variable_set(:@mutations_from_database, ...)`
-      // — share the original's dirty tracker by reference so the became record
-      // reports the same change-set (the throwaway `new klass({})`
-      // construction-time changes, e.g. the STI `type` column, are discarded
-      // with its private attribute set).
-      becoming._dirty = this._dirty;
+      // Mirrors: `becoming.instance_variable_set(:@mutations_from_database,
+      // @mutations_from_database ||= nil)` (persistence.rb:493).
+      becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
       // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
       // errors across the class swap. Noop if the errors object doesn't expose
       // a `copy!` method (defensive for hosts that stub errors differently).
@@ -1416,7 +1414,6 @@ type PersistenceInstanceChainHost = {
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
   _attributes: any;
-  _dirty: { deferNewRecordChanges(attributes: unknown, skip: Set<string>): void };
   readAttribute(name: string): unknown;
   isWillSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
@@ -1608,24 +1605,6 @@ export async function _createRecord(
   attributeNames?: string[],
 ): Promise<unknown> {
   const ctor = this.constructor;
-  // Queue the constructor-assigned attrs for dirtiness derivation BEFORE the
-  // insert. Rails new records are dirty from construction, so partial_inserts'
-  // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
-  // correctly includes attrs the user set to a non-default value — e.g. an
-  // hstore column with a DB default of "" that was assigned {key: null}.
-  // Running this after the insert would leave the dirty set empty at column-
-  // selection time and wrongly drop such columns. Only a *null* PK column is
-  // skipped: that's the auto-populated key, tracked via
-  // _writeAttribute(pk, insertedId) below. A user-assigned
-  // (non-null) PK column — e.g. a composite key — must stay dirty so it's
-  // inserted; otherwise the row is written with a missing key and
-  // find/destroy by that key raises RecordNotFound.
-  const _pk = ctor.primaryKey;
-  const _pkSet = new Set(
-    (Array.isArray(_pk) ? _pk : [_pk]).filter((n: string) => this._readAttribute?.(n) == null),
-  );
-  this._dirty.deferNewRecordChanges(this._attributes, _pkSet);
-
   // Initialize the locking column from its schema default so a new record's
   // lock value is never nil at insert time. Rails reflects the column
   // (default 0) into every new record's attributes at class load, so the
@@ -1656,10 +1635,9 @@ export async function _createRecord(
   const selfNames =
     attributeNames ?? Object.keys(attrs).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
-  // attribute_names_for_partial_inserts (dirty.rb). The dirty set is populated
-  // before the INSERT by deferNewRecordChanges (above),
-  // so for a new record changedAttributeNamesToSave holds the attrs assigned
-  // away from their schema defaults — exactly as Rails' construction-time dirty.
+  // attribute_names_for_partial_inserts (dirty.rb:207-217), which reads
+  // `changed_attribute_names_to_save` — derived from the `Attribute` graph, so
+  // a new record's assignments are already in it.
   let names: string[];
   if (ctor.partialInserts) {
     const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;

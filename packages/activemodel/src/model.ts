@@ -33,8 +33,6 @@ import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import {
   Dirty,
-  DirtyTracker,
-  _writeAttribute as dirtyWriteAttribute,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
@@ -491,7 +489,6 @@ export class Model {
 
   _attributes: AttributeSet = new AttributeSet();
   errors!: Errors<this>;
-  _dirty!: DirtyTracker;
 
   /**
    * True only while the constructor is assigning its initial attribute bag
@@ -574,8 +571,6 @@ export class Model {
     } finally {
       this._initializingAttributes = false;
     }
-
-    this._dirty.snapshot(this._attributes);
 
     // Fire after_initialize callbacks. ActiveRecord intentionally uses the
     // duck-typed `_suppressInitializeCallback` hook during DB hydration so it
@@ -919,7 +914,6 @@ include(Model, {
 // only `include()`'s class branch carries the accessor descriptors the module's
 // zero-arg readers port to.
 include(Model, Dirty);
-prepend(Model.prototype, { _writeAttribute: dirtyWriteAttribute });
 
 // Its `included do` block (dirty.rb:241-245).
 // The Ruby affixes are snake_case fragments of the generated name, trails' the

@@ -399,13 +399,6 @@ export function rememberTransactionRecordState(this: Base): void {
   // each savepoint. Mirrors Rails' @_start_transaction_state ||= {...}; level += 1.
   if (!r._startTransactionState) {
     const snapshotAttrs = r._attributes.deepDup();
-    // Revert any pre-TX dirty changes so the snapshot holds DB baseline values.
-    // On rollback, _dirty.snapshot(state.attributes) will then establish the
-    // correct original baseline, and redetectChanges will show the right diff.
-    const dirtyChanges = r._dirty.changes as Record<string, [unknown, unknown]>;
-    for (const [name, [original]] of Object.entries(dirtyChanges)) {
-      snapshotAttrs.writeFromUser(name, original);
-    }
     r._startTransactionState = {
       newRecord: r._newRecord,
       destroyed: r._destroyed,
@@ -464,17 +457,6 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
           r._attributes.writeFromUser(primaryKey as string, restoreState.id);
         }
       }
-
-      // trails' dirty state lives in an external `DirtyTracker`, not in each
-      // `Attribute`'s `original_attribute`, so the `map` above cannot by itself
-      // move the changed-set the way nulling Rails' two mutation trackers does.
-      // Seed the tracker from the pre-TX snapshot and re-derive the diff against
-      // the rebuilt set to reach the same `changes()`. Order matters:
-      // `redetectChanges` only sets entries, never deletes them, so the primary
-      // key has to be restored (above) before it runs.
-      r._dirty.snapshot(restoreState.attributes);
-      r._dirty.clearChangesInformation();
-      r._dirty.redetectChanges(r._attributes);
 
       if (restoreState.frozen) r._attributes.freeze();
     }

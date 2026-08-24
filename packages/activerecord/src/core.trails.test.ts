@@ -225,7 +225,9 @@ describe("init_internals / initialize_dup super chain", () => {
     expect(topic._triggerDestroyCallback).toBe(null);
     // AttributeMethods::Dirty (attribute_methods/dirty.rb:196-201)
     expect(topic._mutationsBeforeLastSave).toBe(null);
-    expect(topic._mutationsFromDatabase).toBe(null);
+    // `_mutationsFromDatabase` is nil'd by the same link, but Topic's own
+    // after_initialize asks `will_save_change_to_title?`, so the lazy tracker
+    // (dirty.rb:382-388) is already rebuilt when the constructor returns.
     expect(topic._touchAttrNames).toBe(null);
     expect(topic._skipDirtyTracking).toBe(null);
     // Timestamp (timestamp.rb:102-105)

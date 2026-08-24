@@ -4434,7 +4434,7 @@ describe("ChangedForAutosaveTest", () => {
     (parent as any)._newRecord = false;
     const child = new Child({ id: 10, name: "original" });
     (child as any)._newRecord = false;
-    (child as any)._dirty.snapshot(child._attributes);
+    (child as any).changesApplied();
     child.writeAttribute("name", "modified");
 
     parent.association("children").setTarget([child] as any);
@@ -4496,10 +4496,10 @@ describe("ChangedForAutosaveTest", () => {
 
     const a = new A({ id: 1 });
     (a as any)._newRecord = false;
-    (a as any)._dirty.snapshot(a._attributes);
+    (a as any).changesApplied();
     const b = new B({ id: 2 });
     (b as any)._newRecord = false;
-    (b as any)._dirty.snapshot(b._attributes);
+    (b as any).changesApplied();
 
     a.association("b").setTarget(b as any);
     b.association("a").setTarget(a as any);

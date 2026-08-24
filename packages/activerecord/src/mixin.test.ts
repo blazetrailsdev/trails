@@ -36,7 +36,7 @@ describe("TouchTest", () => {
 
     // Mirror lft_will_change! — force-marks lft dirty without changing its value,
     // the way attributeWillChangeBang does.
-    (stamped as any)._dirty.forceChange("lft", (stamped as any)._attributes.fetchValue("lft"));
+    (stamped as any).attributeWillChangeBang("lft");
     await stamped.save();
 
     expect(stamped.readAttribute("updated_at")).toEqual(currentTimeInstant());

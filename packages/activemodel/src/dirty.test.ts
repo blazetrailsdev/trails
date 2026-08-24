@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { Model, DirtyTracker, AttributeSet } from "./index.js";
+import { Model } from "./index.js";
 
+/**
+ * Rails' `DirtyModel` (dirty_test.rb:6-43) includes `ActiveModel::API` + `Dirty`
+ * with plain `attr_reader`s, so its `initialize` seeds the attributes without
+ * dirtying them. trails' `Model` reaches its attributes through
+ * `ActiveModel::Attributes`, where constructor assignment IS a `FromUser` write
+ * and is dirty (dirty.rb:382-388 → attribute.rb:139-141), so each fixture takes
+ * that seeding as its baseline with `changes_applied` (dirty.rb:271-278).
+ */
 describe("DirtyTest", () => {
   it("changes accessible through both strings and symbols", () => {
     class Person extends Model {
@@ -9,6 +17,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.changes["name"]).toEqual(["Alice", "Bob"]);
   });
@@ -20,6 +29,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     expect(p.previousChanges["name"]).toEqual(["Alice", "Bob"]);
@@ -34,6 +44,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 25 });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p._writeAttribute("age", 30);
     p.clearAttributeChanges(["name"]);
@@ -51,12 +62,14 @@ describe("DirtyTest", () => {
 
   it("setting attribute will result in change", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.isChanged).toBe(true);
   });
 
   it("list of changed attribute keys", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.changed).toContain("name");
     expect(p.changed).not.toContain("age");
@@ -64,17 +77,20 @@ describe("DirtyTest", () => {
 
   it("changes to attribute values", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.attributeChange("name")).toEqual(["Alice", "Bob"]);
   });
 
   it("attributeChange returns null when attribute is unchanged", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     expect(p.attributeChange("name")).toBeNull();
   });
 
   it("checking if an attribute has changed to a particular value", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.attributeChanged("name", { to: "Bob" })).toBe(true);
     expect(p.attributeChanged("name", { to: "Charlie" })).toBe(false);
@@ -82,12 +98,14 @@ describe("DirtyTest", () => {
 
   it("setting color to same value should not result in change being recorded", () => {
     const p = new DirtyPerson({ color: "red" });
+    p.changesApplied();
     p._writeAttribute("color", "red");
     expect(p.isChanged).toBe(false);
   });
 
   it("saving should reset model's changed status", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.isChanged).toBe(true);
     p.changesApplied();
@@ -96,6 +114,7 @@ describe("DirtyTest", () => {
 
   it("saving should preserve previous changes", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
@@ -103,6 +122,7 @@ describe("DirtyTest", () => {
 
   it("setting new attributes should not affect previous changes", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     p._writeAttribute("name", "Charlie");
@@ -111,6 +131,7 @@ describe("DirtyTest", () => {
 
   it("saving should preserve model's previous changed status", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     expect(p.attributePreviouslyChanged("name")).toBe(true);
@@ -118,6 +139,7 @@ describe("DirtyTest", () => {
 
   it("checking if an attribute was previously changed to a particular value", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     expect(p.attributePreviouslyChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
@@ -126,6 +148,7 @@ describe("DirtyTest", () => {
 
   it("previous value is preserved when changed after save", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     expect(p.changedAttributes).toEqual({});
     p._writeAttribute("name", "Bob");
     // Rails asserts `changed_attributes` — a name->old-value hash.
@@ -139,6 +162,7 @@ describe("DirtyTest", () => {
 
   it("changing the same attribute multiple times retains the correct original value", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p._writeAttribute("name", "Charlie");
     expect(p.attributeChange("name")).toEqual(["Alice", "Charlie"]);
@@ -146,6 +170,7 @@ describe("DirtyTest", () => {
 
   it("clear_changes_information should reset all changes", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     p._writeAttribute("name", "Charlie");
@@ -156,6 +181,7 @@ describe("DirtyTest", () => {
 
   it("restore_attributes should restore all previous data", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p._writeAttribute("age", 30);
     p.restoreAttributes();
@@ -166,6 +192,7 @@ describe("DirtyTest", () => {
 
   it("resetting attribute", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.isChanged).toBe(true);
     p._writeAttribute("name", "Alice");
@@ -188,24 +215,28 @@ describe("DirtyTest", () => {
 
   it("to_json should work on model", () => {
     const p = new Person({ name: "Alice", age: 25 });
+    p.changesApplied();
     const json = p.toJSON();
     expect(JSON.parse(json)).toEqual({ name: "Alice", age: 25 });
   });
 
   it("to_json should work on model with :except string option", () => {
     const p = new Person({ name: "Alice", age: 25 });
+    p.changesApplied();
     const json = p.toJSON({ except: ["age"] });
     expect(JSON.parse(json)).toEqual({ name: "Alice" });
   });
 
   it("to_json should work on model with :except array option", () => {
     const p = new Person({ name: "Alice", age: 25 });
+    p.changesApplied();
     const json = p.toJSON({ except: ["name", "age"] });
     expect(JSON.parse(json)).toEqual({});
   });
 
   it("to_json should work on model after save", () => {
     const p = new Person({ name: "Alice", age: 25 });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
     const json = p.toJSON();
@@ -219,6 +250,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
+    p.changesApplied();
     expect(p.isChanged).toBe(false);
     p._writeAttribute("name", "Bob");
     expect(p.isChanged).toBe(true);
@@ -232,6 +264,7 @@ describe("DirtyTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
+    p.changesApplied();
     p._writeAttribute("name", "Bob");
     expect(p.attributeChanged("name")).toBe(true);
     expect(p.attributeWas("name")).toBe("Alice");
@@ -247,12 +280,14 @@ describe("Dirty Tracking", () => {
 
   it("not changed initially", () => {
     const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
     expect(p.isChanged).toBe(false);
     expect(p.changed).toEqual([]);
   });
 
   it("setting attribute will result in change", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     expect(p.isChanged).toBe(true);
     expect(p.changed).toContain("name");
@@ -260,18 +295,21 @@ describe("Dirty Tracking", () => {
 
   it("attributeWas returns original value", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     expect(p.attributeWas("name")).toBe("dean");
   });
 
   it("changes to attribute values", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     expect(p.attributeChange("name")).toEqual(["dean", "sam"]);
   });
 
   it("list of changed attribute keys", () => {
     const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     p._writeAttribute("age", 31);
     expect(p.changes).toEqual({
@@ -282,12 +320,14 @@ describe("Dirty Tracking", () => {
 
   it("setting color to same value should not result in change being recorded", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "dean");
     expect(p.isChanged).toBe(false);
   });
 
   it("resetting attribute", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     expect(p.isChanged).toBe(true);
     p._writeAttribute("name", "dean");
@@ -296,6 +336,7 @@ describe("Dirty Tracking", () => {
 
   it("changing the same attribute multiple times retains the correct original value", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     p._writeAttribute("name", "bob");
     expect(p.attributeChange("name")).toEqual(["dean", "bob"]);
@@ -303,6 +344,7 @@ describe("Dirty Tracking", () => {
 
   it("restore_attributes should restore all previous data", () => {
     const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     p._writeAttribute("age", 99);
     p.restoreAttributes();
@@ -313,6 +355,7 @@ describe("Dirty Tracking", () => {
 
   it("saving should preserve previous changes", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     p.changesApplied();
     expect(p.isChanged).toBe(false);
@@ -321,6 +364,7 @@ describe("Dirty Tracking", () => {
 
   it("setting new attributes should not affect previous changes", () => {
     const p = new Person({ name: "dean" });
+    p.changesApplied();
     p._writeAttribute("name", "sam");
     p.changesApplied();
     p._writeAttribute("name", "bob");
@@ -335,6 +379,7 @@ describe("Dirty Tracking", () => {
       }
     }
     const s = new Sized({ size: "2" });
+    s.changesApplied();
     s._writeAttribute("size", "2.3");
     expect(s.isChanged).toBe(false);
     s._writeAttribute("size", "5.1");
@@ -402,7 +447,7 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio");
+    m.attributeWillChangeBang("ratio");
     expect(m.changed).toContain("ratio");
 
     m.clearAttributeChanges(["ratio"]);
@@ -505,6 +550,7 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
       }
     }
     const u = new User({ name: "Alice" });
+    u.changesApplied();
     u._writeAttribute("name", "Bob");
     u.changesApplied();
     expect(u.attributePreviouslyChanged("name")).toBe(true);
@@ -517,6 +563,7 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
       }
     }
     const u = new User({ name: "Alice" });
+    u.changesApplied();
     u._writeAttribute("name", "Bob");
     u.changesApplied();
     expect(u.attributePreviouslyChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
@@ -530,6 +577,7 @@ describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
       }
     }
     const u = new User({ name: "Alice" });
+    u.changesApplied();
     u._writeAttribute("name", "Bob");
     u.changesApplied();
     expect(u.attributePreviouslyWas("name")).toBe("Alice");
@@ -561,7 +609,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio");
+    m.attributeWillChangeBang("ratio");
     expect(m.changed).toContain("ratio");
 
     m.restoreAttributes();
@@ -579,7 +627,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio");
+    m.attributeWillChangeBang("ratio");
     expect(m.changed).toContain("ratio");
 
     m.changesApplied();
@@ -597,7 +645,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio");
+    m.attributeWillChangeBang("ratio");
     m._writeAttribute("ratio", NaN);
     expect(m.changed).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,
@@ -648,67 +696,5 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changed).toContain("ratio");
     m._writeAttribute("ratio", NaN);
     expect(m.changed).not.toContain("ratio");
-  });
-});
-
-describe("DirtyTracker#redetectChanges", () => {
-  class Subject extends Model {
-    static {
-      this.attribute("title", "string");
-      this.attribute("score", "integer");
-    }
-  }
-
-  it("marks attributes as dirty where the post-rollback value differs from the restored baseline", () => {
-    const m = new Subject({ title: "original", score: 0 });
-    m.changesApplied();
-
-    const postTxAttrs = (m as any)._attributes.deepDup();
-    (postTxAttrs as AttributeSet).writeFromUser("title", "tx-edit");
-
-    const restored = (m as any)._attributes;
-    const dirty: DirtyTracker = (m as any)._dirty;
-    dirty.snapshot(restored);
-    dirty.clearChangesInformation();
-    dirty.redetectChanges(postTxAttrs);
-
-    expect(dirty.attributeChanged("title")).toBe(true);
-    expect(dirty.attributeWas("title")).toBe("original");
-    expect(dirty.changes).toEqual({ title: ["original", "tx-edit"] });
-
-    expect(dirty.attributeChanged("score")).toBe(false);
-  });
-
-  it("leaves no dirty state when post-rollback values match the restored baseline", () => {
-    const m = new Subject({ title: "same", score: 1 });
-    m.changesApplied();
-
-    const postTxAttrs = (m as any)._attributes.deepDup();
-
-    const restored = (m as any)._attributes;
-    const dirty: DirtyTracker = (m as any)._dirty;
-    dirty.snapshot(restored);
-    dirty.clearChangesInformation();
-    dirty.redetectChanges(postTxAttrs);
-
-    expect(dirty.changed).toBe(false);
-    expect(dirty.changes).toEqual({});
-  });
-
-  it("detects number_to_non_number? via valueBeforeTypeCast — score=1 written as `true` is dirty vs numeric baseline", () => {
-    const m = new Subject({ title: "t", score: 1 });
-    m.changesApplied();
-
-    const postTxAttrs = (m as any)._attributes.deepDup();
-    (postTxAttrs as AttributeSet).writeFromUser("score", true);
-
-    const restored = (m as any)._attributes;
-    const dirty: DirtyTracker = (m as any)._dirty;
-    dirty.snapshot(restored);
-    dirty.clearChangesInformation();
-    dirty.redetectChanges(postTxAttrs);
-
-    expect(dirty.attributeChanged("score")).toBe(true);
-    expect(dirty.changes).toEqual({ score: [1, 1] });
   });
 });

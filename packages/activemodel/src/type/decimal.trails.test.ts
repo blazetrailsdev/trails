@@ -50,6 +50,7 @@ describe("DecimalTypeTrails", () => {
       }
     }
     const m = new MyModel({ price: "1.0" });
+    m.changesApplied();
     m._writeAttribute("price", "1.0");
     expect(m.attributeChanged("price")).toBe(false);
   });
