@@ -1,11 +1,9 @@
 /**
- * Mirrors: ActiveModel::Callbacks
- * (activemodel/lib/active_model/callbacks.rb)
+ * Mirrors: ActiveModel::Callbacks (activemodel/lib/active_model/callbacks.rb)
  *
  * Ruby's `include ActiveSupport::Callbacks` (callbacks.rb:87) supplies
  * `set_callback` / `run_callbacks` and the whole chain engine; trails gets the
- * same members from `@blazetrails/activesupport`, so this file carries only
- * `define_model_callbacks` and its three private generators.
+ * same members from `@blazetrails/activesupport`.
  */
 
 import { NoMethodError } from "./attribute-assignment.js";
@@ -142,91 +140,67 @@ export interface TransactionalCallbackConditions<
 }
 
 /**
- * Mirrors: ActiveModel::Callbacks#_define_before_model_callback
- * (activemodel/lib/active_model/callbacks.rb:129-134)
+ * Mirrors: ActiveModel::Callbacks#_define_before_model_callback (callbacks.rb:129-134)
  *
  * @internal Rails-private helper.
  */
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
-  defineSingletonMethod(
-    klass,
-    `before${capitalize(callback)}`,
-    function (
+  Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
+    value: function (
       this: { prototype: object },
       fn: CallbackFn | CallbackObject | string,
-      options?: CallbackConditions,
+      options: CallbackConditions = {},
     ) {
-      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "before", fn, options ?? {});
+      assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
+      setCallback(this.prototype, callback, "before", fn, options);
     },
-  );
+    writable: true,
+    configurable: true,
+  });
 }
 
 type CallbackHost = object;
 
 /**
- * Mirrors: ActiveModel::Callbacks#_define_around_model_callback
- * (activemodel/lib/active_model/callbacks.rb:136-141)
+ * Mirrors: ActiveModel::Callbacks#_define_around_model_callback (callbacks.rb:136-141)
  *
  * @internal Rails-private helper.
  */
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
-  defineSingletonMethod(
-    klass,
-    `around${capitalize(callback)}`,
-    function (
+  Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
+    value: function (
       this: { prototype: object },
       fn: AroundCallbackFn | CallbackObject | string,
-      options?: CallbackConditions,
+      options: CallbackConditions = {},
     ) {
-      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "around", fn, options ?? {});
+      assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
+      setCallback(this.prototype, callback, "around", fn, options);
     },
-  );
+    writable: true,
+    configurable: true,
+  });
 }
 
 /**
- * Mirrors: ActiveModel::Callbacks#_define_after_model_callback
- * (activemodel/lib/active_model/callbacks.rb:143-153)
+ * Mirrors: ActiveModel::Callbacks#_define_after_model_callback (callbacks.rb:143-153)
  *
  * @internal Rails-private helper.
  */
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
-  defineSingletonMethod(
-    klass,
-    `after${capitalize(callback)}`,
-    function (
+  Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
+    value: function (
       this: { prototype: object },
       fn: CallbackFn | CallbackObject | string,
-      options?: CallbackConditions,
+      options: CallbackConditions = {},
     ) {
-      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
+      assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       options = { ...options };
       options.prepend = true;
-      // callbacks.rb:148-151 — an after model callback is skipped when the
-      // wrapped block returned `false`, which is what `env.value` carries.
       const conditional = new Value((v) => v !== false);
       options.if = [...(kernelArray(options.if) as CallbackConditionFilter[]), conditional];
       setCallback(this.prototype, callback, "after", fn, options);
     },
-  );
-}
-
-/**
- * @noRailsEquivalent PERMANENT: Ruby's `define_singleton_method` (callbacks.rb:130,
- *   :137, :144) with the writable/configurable descriptor a redefinition on a
- *   subclass needs. Not exported.
- */
-function defineSingletonMethod(klass: CallbackHost, name: string, value: unknown): void {
-  Object.defineProperty(klass, name, { value, writable: true, configurable: true });
-}
-
-/**
- * @noRailsEquivalent PERMANENT: Ruby interpolates the event straight into the
- *   method name (`"before_#{callback}"`, callbacks.rb:130); the trails spelling
- *   of that name is camelCase, so the event has to be capitalized first. Not
- *   exported.
- */
-function capitalize(callback: string): string {
-  return callback.charAt(0).toUpperCase() + callback.slice(1);
+    writable: true,
+    configurable: true,
+  });
 }

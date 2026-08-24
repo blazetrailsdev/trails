@@ -145,7 +145,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    await runCallbacks(p, "create", undefined, undefined, "after");
+    await runCallbacks(p, "create");
     expect(log).toEqual(["first", "second"]);
   });
 
@@ -709,9 +709,9 @@ describe("unified sync/async runner", () => {
   it("strict: 'sync' throws when an after callback returns a Promise", () => {
     const Klass = modelWith("initialize");
     Klass.afterInitialize(async () => {});
-    expect(() =>
-      runCallbacks(new Klass(), "initialize", undefined, { strict: "sync" }, "after"),
-    ).toThrow(/Async callback on sync chain "initialize"/);
+    expect(() => runCallbacks(new Klass(), "initialize", undefined, { strict: "sync" })).toThrow(
+      /Async callback on sync chain "initialize"/,
+    );
   });
 
   it("async validator function registered via Model.validate runs and awaits", async () => {
@@ -1036,8 +1036,7 @@ describe("defineModelCallbacks()", () => {
     });
 
     const p = new Payment({ amount: 100 });
-    await runCallbacks(p, "process", undefined, undefined, "before");
-    await runCallbacks(p, "process", undefined, undefined, "after");
+    await runCallbacks(p, "process");
     expect(log).toEqual(["before_process", "after_process"]);
   });
 
@@ -1073,7 +1072,7 @@ describe("callbacks with prepend option", () => {
     );
 
     const u = new User({ name: "Alice" });
-    await runCallbacks(u, "save", undefined, undefined, "before");
+    await runCallbacks(u, "save");
     expect(order).toEqual(["prepended", "first"]);
   });
 });
@@ -1113,7 +1112,7 @@ describe("skipCallback with CallbackObject (mixin-level)", () => {
     Klass.beforeSave(obj);
     Klass.beforeSave(() => log.push("fn"));
     Klass.skipCallback("save", "before", obj);
-    await runCallbacks(new Klass(), "save", undefined, undefined, "before");
+    await runCallbacks(new Klass(), "save");
     expect(log).toEqual(["fn"]);
   });
 });

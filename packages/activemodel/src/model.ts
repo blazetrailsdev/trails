@@ -1045,7 +1045,7 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
+      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
   }
 
@@ -1188,7 +1188,7 @@ export class Model {
   /** @internal */
   async _runValidateCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Model;
-    await runCallbacks(this, "validate", undefined, undefined, "before");
+    await runCallbacks(this, "validate");
   }
 
   /**

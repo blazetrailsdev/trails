@@ -325,7 +325,7 @@ export function setCallback<T extends typeof Model>(
  */
 export async function beforeCommittedBang(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  await runCallbacks(record, "before_commit", undefined, undefined, "before");
+  await runCallbacks(record, "before_commit");
 }
 
 /**
@@ -343,7 +343,7 @@ export async function committedBang(
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
       const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "commit", undefined, undefined, "after");
+      await runCallbacks(this, "commit");
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -367,7 +367,7 @@ export async function rolledbackBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "rollback", undefined, undefined, "after");
+      await runCallbacks(this, "rollback");
     }
   } finally {
     restoreTransactionRecordState.call(this, forceRestoreState);

@@ -135,7 +135,7 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   // `else true end` no-op). This is how a `has_one ..., touch: true` on a model
   // that itself has no timestamps still propagates the touch to its child.
   if (touchCols.length === 0) {
-    await runCallbacks(this, "touch", undefined, undefined, "after");
+    await runCallbacks(this, "touch");
     return true;
   }
 
@@ -249,7 +249,7 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
     self._skipDirtyTracking = null;
   }
 
-  await runCallbacks(this, "touch", undefined, undefined, "after");
+  await runCallbacks(this, "touch");
   return true;
 }
 

@@ -2866,8 +2866,8 @@ export class Base extends Model {
     // callbacks, so an `after_find` hook already sees the inverse set.
     block?.(record);
     // strict:"sync" guarantees synchronous completion — void the settled result.
-    void runCallbacks(record, "find", undefined, { strict: "sync" }, "after");
-    void runCallbacks(record, "initialize", undefined, { strict: "sync" }, "after");
+    void runCallbacks(record, "find", undefined, { strict: "sync" });
+    void runCallbacks(record, "initialize", undefined, { strict: "sync" });
     return record;
   }
 
@@ -3084,7 +3084,7 @@ export class Base extends Model {
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
         // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
+        void runCallbacks(this, "initialize", undefined, { strict: "sync" });
       }
     } else {
       // For the regular (non-multiparameter) path, mirror the multiparameter
@@ -3168,7 +3168,7 @@ export class Base extends Model {
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
         // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
+        void runCallbacks(this, "initialize", undefined, { strict: "sync" });
       }
     }
     // Suppressed-callback fallback: parent caller fires after_initialize, so

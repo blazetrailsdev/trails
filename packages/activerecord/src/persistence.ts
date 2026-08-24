@@ -544,7 +544,7 @@ export async function incrementBang<T extends CounterBangRecord>(
   // counter). The class-level `updateCounters` above only emits SQL.
   if (options.touch != null) {
     const ctor = this.constructor as unknown as { prototype: object };
-    await runCallbacks(this, "touch", undefined, undefined, "after");
+    await runCallbacks(this, "touch");
   }
   return this;
 }
