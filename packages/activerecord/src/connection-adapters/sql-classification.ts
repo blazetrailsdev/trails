@@ -6,10 +6,6 @@
  * duplicating the logic.
  */
 
-// Shared read-only statement allowlist used for cross-adapter SQL
-// classification, including adapter-specific additions such as PostgreSQL
-// cursor operations. CLOSE/DECLARE/FETCH/MOVE read or manage cursors — not
-// data writes.
 const READ_ONLY_STATEMENTS =
   /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL|CLOSE|DECLARE|FETCH|MOVE)$/;
 
@@ -45,7 +41,6 @@ export function isWriteQuerySql(sql: string): boolean {
   if (READ_ONLY_STATEMENTS.test(stmt)) return false;
   if (stmt !== "WITH") return true;
 
-  // CTE: check the statement after the WITH clause
   const afterWith = stripped.replace(/^\s*WITH\b/i, "").replace(/\([^)]*\)/g, "");
   const innerMatch = afterWith.match(/\b(SELECT|INSERT|UPDATE|DELETE|MERGE)\b/i);
   return !innerMatch || innerMatch[1].toUpperCase() !== "SELECT";

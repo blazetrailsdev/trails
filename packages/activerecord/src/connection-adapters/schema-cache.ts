@@ -16,10 +16,6 @@ import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 
-// ---------------------------------------------------------------------------
-// Helper: run callback inside pool.withConnection if available
-// ---------------------------------------------------------------------------
-
 async function withConnection<T>(
   pool: unknown,
   callback: (connection: any) => T | Promise<T>,
@@ -30,14 +26,8 @@ async function withConnection<T>(
   return callback(pool);
 }
 
-// ---------------------------------------------------------------------------
-// Helper: rehydrate a column from plain JSON or pass through if already Column
-// ---------------------------------------------------------------------------
-
 function serializeColumn(col: any): ColumnJSON {
   if (typeof col.toJSON === "function") return col.toJSON();
-  // Fallback for adapter-specific Column classes (e.g. PostgreSQL::Column)
-  // that don't extend the base Column
   return {
     name: col.name,
     default: col.default,
@@ -126,10 +116,6 @@ function rehydrateIndex(data: unknown): IndexDefinition {
     },
   );
 }
-
-// ---------------------------------------------------------------------------
-// SchemaCache
-// ---------------------------------------------------------------------------
 
 export class SchemaCache {
   private _columns = new Map<string, Column[]>();
@@ -434,10 +420,6 @@ export class SchemaCache {
     if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
     const cols = this._columns.get(tableName);
     if (!cols) return undefined;
-    // Composite-PK ordering follows reflected column order. That matches the
-    // constraint order for the canonical fixtures; a table whose PK columns are
-    // declared out of column order would need the async `primaryKeys` query
-    // (which sorts by the constraint's key ordinal) to disambiguate.
     const pkCols = cols.filter((c) => c.primaryKey).map((c) => c.name);
     if (pkCols.length === 0) return undefined;
     return pkCols.length === 1 ? pkCols[0] : pkCols;
@@ -686,10 +668,6 @@ export class SchemaCache {
   }
 }
 
-// ---------------------------------------------------------------------------
-// SchemaReflection
-// ---------------------------------------------------------------------------
-
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection
  */
@@ -887,10 +865,8 @@ export class SchemaReflection {
   private async cache(pool: unknown): Promise<SchemaCache> {
     if (this._cache) return this._cache;
 
-    // Memoize in-flight load so concurrent callers share one disk read
     if (!this._cachePromise) {
       const promise = this.loadCache(pool).then((loaded) => {
-        // Guard against clearBang() racing with an in-flight load
         if (this._cachePromise === promise) {
           this._cache = loaded ?? this.emptyCache();
           this._cachePromise = null;
@@ -963,10 +939,6 @@ export class SchemaReflection {
     return newCache;
   }
 }
-
-// ---------------------------------------------------------------------------
-// BoundSchemaReflection
-// ---------------------------------------------------------------------------
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::BoundSchemaReflection
@@ -1058,10 +1030,6 @@ export class BoundSchemaReflection {
     return this._schemaReflection.dumpTo(this._pool, filename);
   }
 }
-
-// ---------------------------------------------------------------------------
-// FakePool
-// ---------------------------------------------------------------------------
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::BoundSchemaReflection::FakePool

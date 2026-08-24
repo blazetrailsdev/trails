@@ -39,8 +39,5 @@ export function abandonRawSocket(rawConnection: unknown): void {
   try {
     socket.removeAllListeners?.();
     socket.unref?.();
-  } catch {
-    // Best-effort: a partially torn-down socket may throw. Abandoning it
-    // (the reference is already dropped by the caller) is still correct.
-  }
+  } catch {}
 }

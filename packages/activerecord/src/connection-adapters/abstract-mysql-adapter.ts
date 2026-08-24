@@ -125,14 +125,8 @@ import {
  * (float64 cannot distinguish 2^63 from 2^63-1: Number(2^63n) === Number((2^63-1)n)).
  */
 class MysqlBigInteger extends BigIntegerType {
-  // MySQL schema introspection uses castType.name to derive the column type string.
-  // BigIntegerType.name is "big_integer"; override to "integer" so columns()
-  // reports the same type as IntegerType({limit:8}) would.
   override readonly name: string = "integer";
 
-  // Re-establish the 8-byte signed bound that BigIntegerType drops
-  // (max_value = Infinity). IntegerType's isInRange/isSerializable already
-  // compare in BigInt space, so an exactly-2^63 value is detected out of range.
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
   }
@@ -217,11 +211,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * @internal
    */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
-    // Strip caller-supplied adapter/adapterName (abstract SchemaStatements#createTable forwards
-    // a bare SchemaQuoter shape) and substitute `this` — the full MySQL adapter — so the
-    // TableDefinition carries a host-aware schema quoter when the SchemaCreation visitor
-    // accepts it. Matches the PG sibling (postgresql-adapter.ts) so the dispatch is symmetric
-    // across dialects.
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
     return new MysqlTableDefinition(name, { ...rest, adapter: this });
   }
@@ -994,9 +983,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         }
         expression = this.stripWhitespaceCharacters(expression);
         if (!(await this.isMariadb())) {
-          // MySQL returns check constraints expression in an already escaped form.
-          // This leads to duplicate escaping later (e.g. when the expression is
-          // used in the SchemaDumper).
           expression = expression.replace(/\\'/g, "'");
         }
         return new CheckConstraintDefinition(tableName, expression, options);
@@ -1007,8 +993,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async tableOptions(tableName: string): Promise<Record<string, string>> {
     const createInfo = await this.createTableInfo(tableName);
     if (!createInfo) return {};
-    // Check only the options tail (after column defs) so per-column COMMENT clauses
-    // don't trigger an extra tableComment() round-trip.
     const tail = createInfo.replace(/[\s\S]*\n\) ?/, "");
     const comment = /COMMENT='/.test(tail) ? await this.tableComment(tableName) : null;
     return parseTableOptions(createInfo, comment);
@@ -1139,12 +1123,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *   pass.
    */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    // Can use any column as it will be assigned to itself.
     const [first] = insert.keys;
     const noOpColumn = first !== undefined ? this.quoteColumnName(first) : undefined;
 
-    // MySQL 8.0.19 replaces `VALUES(<expression>)` clauses with row and column alias names, see https://dev.mysql.com/worklog/task/?id=6312 .
-    // then MySQL 8.0.20 deprecates the `VALUES(<expression>)` see https://dev.mysql.com/worklog/task/?id=13325 .
     let sql: string;
     if (await this.supportsInsertRawAliasSyntax()) {
       const quotedTableName = insert.model.quotedTableName();
@@ -1432,8 +1413,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     message: string;
     sql: string;
   }): Partial<MismatchedForeignKeyOptions> {
-    // Extract the referencing column name from MySQL's error message when
-    // available (MySQL 8+ includes it: "Referencing column 'x' and referenced")
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
     const fkPat = fkFromMsg ?? "\\w+";
 
@@ -1456,8 +1435,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       primary_key: primaryKey,
     } = match.groups;
 
-    // Return the parsed names; _enrichMismatchedForeignKey does the async
-    // column type lookup so the full human-readable message can be built.
     return { table, foreignKey, targetTable, primaryKey };
   }
 
@@ -1562,11 +1539,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         case ER_CLIENT_INTERACTION_TIMEOUT:
           return new ConnectionFailed(msg, { sql, binds, connectionPool: this.pool });
         default:
-          // Driver errors expose a positive MySQL errno and usually a
-          // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
-          // an `errno`, often negative, so gate on a positive numeric
-          // errno to avoid re-tagging network failures as
-          // StatementInvalid (which would attach misleading sql/binds).
           return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
             ? new StatementInvalid(msg, { sql, binds, connectionPool: this.pool })
             : e;
@@ -1958,7 +1930,6 @@ export function parseTableOptions(
 
   const opts: Record<string, string> = {};
 
-  // Extract DEFAULT CHARSET and optional COLLATE, then remove from raw.
   const charsetMatch = / DEFAULT CHARSET=(?<charset>\w+)(?: COLLATE=(?<collation>\w+))?/.exec(raw);
   if (charsetMatch) {
     raw = raw.slice(0, charsetMatch.index) + raw.slice(charsetMatch.index + charsetMatch[0].length);
@@ -1969,7 +1940,6 @@ export function parseTableOptions(
   // Strip AUTO_INCREMENT — mirrors Rails: sub!(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, '\1')
   raw = raw.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
 
-  // Strip COMMENT= and use the pre-fetched comment value for accuracy.
   if (/ COMMENT='/.test(raw)) {
     raw = raw.replace(/ COMMENT='.+'/, "");
     if (tableComment != null) opts["comment"] = tableComment;
@@ -2002,8 +1972,6 @@ export interface MysqlPreparedStatement {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::StatementPool
  */
-// Named to avoid collision with the base StatementPool import — consumers
-// can import this under the AbstractMysqlAdapter namespace.
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
   private _counter = 0;
 

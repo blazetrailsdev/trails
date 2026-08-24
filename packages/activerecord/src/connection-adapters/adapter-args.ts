@@ -139,18 +139,8 @@ export function buildAdapterArg(
   const url = configuration.url as string | undefined;
   const database = configuration.database as string | undefined;
   if (normalized === "sqlite") {
-    // Remote libsql URLs (`libsql://`, `https://`, etc.) in `url` take
-    // precedence over `database` — the URL is the connection endpoint, not a
-    // local filename. For local adapters, prefer `database` over `url` so
-    // caller-mutated configs (e.g. autoConnect per-worker slots) win.
     const resolvedUrl = url !== undefined && isRemoteLibsqlUrl(url) ? url : undefined;
-    // Use `||` (not `??`) so empty-string database/url values fall through to
-    // the next candidate, matching the pre-existing behaviour of this function.
     const filename = parseSqliteUrl(resolvedUrl || database || url || ":memory:");
-    // Keep only the SQLite3Adapter constructor's `options` keys so we don't
-    // forward unrelated database.yml entries (pool, host, etc.) into the
-    // options object. The adapter ignores unknown keys today but accepting
-    // them here would lock in a foot-gun.
     const {
       readonly,
       driver,
@@ -181,11 +171,6 @@ export function buildAdapterArg(
     if (statementLimit !== undefined) options.statementLimit = statementLimit;
     if (preparedStatements !== undefined) options.preparedStatements = preparedStatements;
     if (driverOptions !== undefined) options.driverOptions = driverOptions;
-    // Merge authToken into any pre-existing driverOptions so callers that pass
-    // both { authToken, driverOptions: { tls: true } } don't lose the latter.
-    // syncUrl (embedded-replica mode) and authToken both belong in
-    // driverOptions; merge so callers that also pass a driverOptions object
-    // keep its keys.
     if (authToken !== undefined || syncUrl !== undefined) {
       const merged = { ...(options.driverOptions as Record<string, unknown> | undefined) };
       if (authToken !== undefined) merged.authToken = authToken;
@@ -223,8 +208,6 @@ export function buildAdapterArg(
   // shadowing the constructor entirely. Mysql2Adapter#constructor owns the
   // single `socket` -> `socketPath` mapping; forward Rails' spelling untouched.
   if (normalized === "mysql") {
-    // The host default must still look at BOTH spellings — a `socket`-only
-    // config is socket-bound even though `socketPath` is not set yet.
     if (adapterConfig.host === undefined && !adapterConfig.socketPath && !adapterConfig.socket) {
       adapterConfig.host = "localhost";
     }
