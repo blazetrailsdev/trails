@@ -129,10 +129,14 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
  */
 export class Validations {
   /**
-   * Rails' `included do` block (validations.rb:40-50). `extend ActiveModel::Naming`
-   * (:41) is the one line not issued here: its `model_name` is a zero-arg reader,
-   * so it ports as an accessor property, which `extend()` cannot carry off a
-   * plain module object — `model.ts` keeps it in the class body.
+   * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-43
+   * install what their modules already export: `define_model_callbacks`
+   * (callbacks.rb:72) and Translation's `human_attribute_name` /
+   * `lookup_ancestors` (translation.rb:44, :58). `model_name` (naming.rb:270)
+   * and `i18n_scope` (translation.rb:28) are still `Model` class bodies, so
+   * there is nothing to extend from yet; relocating those two is the
+   * `fan-out-model-serialization-conversion-access-naming-surface` story, whose
+   * member table owns them.
    */
   static [included](base: IncludingClass): void {
     extend(base, { defineModelCallbacks });
