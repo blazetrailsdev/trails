@@ -144,27 +144,66 @@ describe("stale story references", () => {
   // well as in every agent worktree (start-worktree.sh symlinks the same path).
   // loadStories throws rather than skipping when that checkout is missing.
   //
-  // The scans below are pure reads, so they run once here rather than per case,
-  // and the hook carries its own timeout: under host load they overrun vitest's
-  // 5s default, and a per-case timeout there reads like a stale citation.
+  // The scans below are pure reads, so they run once here rather than per case.
+  // Each carries its own named deadline: they overrun vitest's 5s default under
+  // host load, and a bare "Test timed out" reads exactly like the stale citation
+  // this gate exists to catch. `scanFailure` carries the named error onto the
+  // case that needed the scan, so the failure never arrives as an anonymous
+  // hook timeout.
+  const SCAN_TIMEOUT_MS = 120_000;
+
+  async function scan<T>(what: string, run: () => Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const overran = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          new Error(
+            `${what} did not finish within ${SCAN_TIMEOUT_MS}ms. That is scan contention ` +
+              `on a loaded host, not a stale story citation.`,
+          ),
+        );
+      }, SCAN_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([run(), overran]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   let treeStories: IndexStory[];
   let treeRefs: Awaited<ReturnType<typeof scanStoryReferences>>;
   let frozenFiles: string[];
   let frozenRefs: Awaited<ReturnType<typeof scanFrozenStoryReferences>>;
+  let scanFailure: Error | undefined;
 
   beforeAll(async () => {
-    treeStories = await loadStories(resolveTasksDir(REPO_ROOT));
-    treeRefs = await scanStoryReferences(REPO_ROOT);
-    frozenFiles = await collectFrozenMarkdownFiles(REPO_ROOT);
-    frozenRefs = await scanFrozenStoryReferences(REPO_ROOT);
-  }, 120_000);
+    try {
+      treeStories = await scan("loadStories over the tasks checkout", () =>
+        loadStories(resolveTasksDir(REPO_ROOT)),
+      );
+      treeRefs = await scan("scanStoryReferences over the trails tree", () =>
+        scanStoryReferences(REPO_ROOT),
+      );
+      frozenFiles = await scan("collectFrozenMarkdownFiles over the frozen tree", () =>
+        collectFrozenMarkdownFiles(REPO_ROOT),
+      );
+      frozenRefs = await scan("scanFrozenStoryReferences over the frozen tree", () =>
+        scanFrozenStoryReferences(REPO_ROOT),
+      );
+    } catch (error) {
+      scanFailure = error as Error;
+    }
+  }, 5 * SCAN_TIMEOUT_MS);
 
   it("no comment or markdown paragraph in the tree names a story that has already landed", () => {
+    if (scanFailure) throw scanFailure;
     const stale = staleStoryReferences(treeRefs, treeStories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
   });
 
   it("inventories stale citations in the frozen tree without gating on them", () => {
+    if (scanFailure) throw scanFailure;
     expect(frozenFiles).toContain(path.join("docs", "activerecord", "parity-verification.md"));
     const stale = staleStoryReferences(frozenRefs, treeStories);
     if (stale.length > 0) {
@@ -177,6 +216,7 @@ describe("stale story references", () => {
   });
 
   it("reads each story's status from its own frontmatter", () => {
+    if (scanFailure) throw scanFailure;
     expect(
       treeStories.find((story) => story.id === "activesupport-json-encoding-time-precision"),
     ).toEqual({ id: "activesupport-json-encoding-time-precision", status: "done" });
