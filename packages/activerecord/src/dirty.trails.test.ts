@@ -49,4 +49,12 @@ describe("Dirty restore of an in-place mutation", () => {
     expect(topic.content).toEqual({ a: "a" });
     expect(topic.isChanged).toBe(false);
   });
+
+  it("attributeChangedInPlace is true for a serialized attribute mutated in place", async () => {
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+
+    (topic.content as Record<string, string>)["b"] = "b";
+
+    expect(topic.attributeChangedInPlace("content")).toBe(true);
+  });
 });

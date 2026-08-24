@@ -467,20 +467,26 @@ export class DirtyTracker {
    * Mirrors: ActiveModel::AttributeMutationTracker#changed_in_place?
    * (attribute_mutation_tracker.rb:50-52).
    *
-   * @missingRailsCall changed_in_place? — PERMANENT: Language shortcoming.
-   * Ruby's body is `attributes[attr_name].changed_in_place?`, and Ruby reaches
-   * an in-place change by mutating the cast value the `Attribute` already
-   * holds — `aircraft.name.downcase!` (normalized_attribute_test.rb:36), which
-   * leaves the same `Attribute` in the set with a different value. JS strings,
-   * Numbers and Dates are immutable, so the only way to reach that state here
-   * is to write a new cast value onto the set, which yields an
-   * `Attribute::WithCastValue` whose `changed_in_place?` is `false` by
-   * definition (attribute.rb:243-245). Asking the `Attribute` would therefore
-   * answer `false` for every in-place change the port can express, so this body
-   * compares the before and after values itself — the comparison
-   * `Type::Value#changed_in_place?` (attribute.rb:70) would have made.
+   * Ruby's whole body is `attributes[attr_name].changed_in_place?`
+   * (attribute.rb:70). That is the leading guard, and for a type whose cast
+   * value JS can mutate in place — a serialized Hash or Array — it is the whole
+   * answer, exactly as in Ruby.
+   *
+   * @missingRailsCall changed_in_place? — PERMANENT: Language shortcoming, for
+   * the immutable half only. Ruby reaches an in-place change by mutating the
+   * cast value the `Attribute` already holds (`aircraft.name.downcase!`,
+   * normalized_attribute_test.rb:36), leaving the same `Attribute` in the set.
+   * JS strings, Numbers and Dates are immutable, so for one of those the port
+   * can only reach that state by writing a new cast value onto the set, which
+   * yields an `Attribute::WithCastValue` whose `changed_in_place?` is `false`
+   * by definition (attribute.rb:243-245). The fallback therefore makes the
+   * before/after comparison `Type::String#changed_in_place?`
+   * (type/string.rb:31-35) would have made, and an assignment still answers
+   * `false` there because `changes` records the assigned value as the `to`
+   * half.
    */
   changedInPlace(name: string): boolean {
+    if (this._isInPlaceMutableChange(name)) return true;
     const current = this.fetchValue(name);
     const recorded = this.changes[name];
     if (recorded) return current !== recorded[1];
