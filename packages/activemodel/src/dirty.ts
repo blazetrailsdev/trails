@@ -185,7 +185,7 @@ export class Dirty {
    * @internal
    */
   forgetAttributeAssignments(): void {
-    this._attributes.forgetAssignmentsBang();
+    this._attributes = this._attributes.map((attr) => attr.forgettingAssignment());
     this._dirty.forgetAttributeAssignments(this._attributes);
   }
 

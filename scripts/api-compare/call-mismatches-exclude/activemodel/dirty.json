@@ -16,13 +16,6 @@
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
-    "rubyName": "forget_attribute_assignments",
-    "call": "map",
-    "reason": "Rails dirty.rb:390-392 REBINDS `@attributes = @attributes.map(&:forgetting_assignment)`; trails' AttributeSet spells the same rebuild `forgetAssignmentsBang()`, an in-place mutator (attribute-set.ts:459-475), because `becomes()` and the DirtyTracker's own `_attrs` alias the one AttributeSet instance and a rebind would strand them on the pre-forget copy. Same per-attribute `forgettingAssignment()` call, no `map` call site."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
     "rubyName": "restore_attribute!",
     "call": "attribute_changed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
