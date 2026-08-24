@@ -456,21 +456,4 @@ export class AttributeSet {
     const next = attr.forgettingAssignment();
     if (next !== attr) this._attributes.set(name, next);
   }
-
-  /**
-   * Apply `forgettingAssignment()` to each attribute in place so that shared
-   * references (as in `becomes()`) see the updated baseline.
-   *
-   * Mirrors: ActiveModel::AttributeSet#map(&:forgetting_assignment) assigned
-   * back to `@attributes` in `forget_attribute_assignments`.
-   *
-   * @internal
-   */
-  forgetAssignmentsBang(): void {
-    this.assertNotFrozen();
-    for (const [name, attr] of this._attributes) {
-      const next = attr.forgettingAssignment();
-      if (next !== attr) this._attributes.set(name, next);
-    }
-  }
 }

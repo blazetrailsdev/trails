@@ -301,7 +301,7 @@ describe("DirtyTest", () => {
     expect(pirate.catchphrase).toBe("Ahoy!");
     expect(pirate.attributeChange("catchphrase")).toEqual(["Yar!", "Ahoy!"]);
 
-    pirate.restoreAttribute("catchphrase");
+    pirate.restoreAttributeBang("catchphrase");
 
     expect(pirate.attributeChange("catchphrase")).toBeNull();
     expect(pirate.catchphrase).toBe("Yar!");
@@ -474,7 +474,7 @@ describe("DirtyTest", () => {
 
   it("virtual attribute will change", async () => {
     const parrot = (await Parrot.create({ name: "Ruby" })) as Rec;
-    (parrot as any).attributeWillChange("cancelSaveFromCallback");
+    (parrot as any).attributeWillChangeBang("cancelSaveFromCallback");
     expect(parrot.hasChangesToSave).toBe(true);
   });
 
@@ -609,7 +609,7 @@ describe("DirtyTest", () => {
   it("dup objects should not copy dirty flag from creator", async () => {
     const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
     const pirateDup = pirate.dup();
-    pirateDup.restoreAttribute("catchphrase");
+    pirateDup.restoreAttributeBang("catchphrase");
     pirate.catchphrase = "I love Rum";
     expect(pirate.attributeChanged("catchphrase")).toBe(true);
     expect(pirateDup.attributeChanged("catchphrase")).toBe(false);

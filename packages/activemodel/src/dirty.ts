@@ -8,34 +8,267 @@ export interface DirtyOptions {
 }
 
 /**
- * Dirty mixin contract — tracks attribute changes on a model.
+ * `ActiveModel::Dirty` — the instance half of the module, mixed onto a model
+ * by `include(Model, Dirty)`.
  *
- * Mirrors: ActiveModel::Dirty
+ * A class module rather than a plain-object one because only `include()`'s
+ * class branch copies accessor descriptors, and every Ruby body here that is a
+ * zero-arg reader ports as an accessor property (CLAUDE.md, "Generated
+ * attribute readers are properties"); an object literal is read by value and
+ * would flatten each getter into a data property.
  *
- * Model implements this interface via DirtyTracker delegation.
+ * Mirrors: ActiveModel::Dirty (dirty.rb:123-421)
  */
-export interface Dirty {
-  readonly isChanged: boolean;
-  readonly changed: string[];
-  readonly changedAttributes: Record<string, unknown>;
-  readonly changes: Record<string, [unknown, unknown]>;
-  readonly previousChanges: Record<string, [unknown, unknown]>;
-  readonly mutationsFromDatabase: Record<string, [unknown, unknown]>;
-  readonly mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
-  attributeChanged(name: string, options?: DirtyOptions): boolean;
-  attributeWas(name: string): unknown;
-  attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean;
-  attributePreviouslyWas(name: string): unknown;
-  restoreAttributes(attrNames?: string[]): void;
-  changesApplied(): void;
-  clearChangesInformation(): void;
-  clearAttributeChanges(attributes: string[]): void;
-  attributeChangedInPlace(name: string): boolean;
+export class Dirty {
+  /** The mutation tracker `mutations_from_database` returns (dirty.rb:379-386). */
+  declare _dirty: DirtyTracker;
+  declare _attributes: AttributeSet;
   /** @internal */
-  forgetAttributeAssignments(): void;
   /** @internal */
-  clearAttributeChange(name: string): void;
+
+  /**
+   * Mirrors: ActiveModel::Dirty#changes_applied (dirty.rb:272-279)
+   */
+  changesApplied(): void {
+    this._dirty.changesApplied(this._attributes);
+    this.forgetAttributeAssignments();
+  }
+
+  /**
+   * Returns `true` if any of the attributes has unsaved changes.
+   *
+   * Mirrors: ActiveModel::Dirty#changed? (dirty.rb:286-288)
+   */
+  get isChanged(): boolean {
+    return this._dirty.changed;
+  }
+
+  /**
+   * Returns an array with the name of the attributes with unsaved changes.
+   *
+   * Mirrors: ActiveModel::Dirty#changed (dirty.rb:295-297)
+   */
+  get changed(): string[] {
+    return this._dirty.changedAttributeNames;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Dirty#attribute_changed? (dirty.rb:300-302) —
+   * `mutations_from_database.changed?(attr_name.to_s, **options)`.
+   */
+  attributeChanged(name: string, options?: DirtyOptions): boolean {
+    return this._dirty.attributeChanged(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+      options,
+    );
+  }
+
+  /**
+   * Mirrors: ActiveModel::Dirty#attribute_was (dirty.rb:305-307)
+   */
+  attributeWas(name: string): unknown {
+    return this._dirty.attributeWas(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
+
+  /**
+   * Check if a specific attribute changed in the last save.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_previously_changed?
+   * (dirty.rb:310-312)
+   */
+  attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean {
+    return this._dirty.attributePreviouslyChanged(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+      options,
+    );
+  }
+
+  /**
+   * Get the value of an attribute before the last save.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_previously_was (dirty.rb:315-317)
+   */
+  attributePreviouslyWas(name: string): unknown {
+    return this._dirty.originalValue(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
+
+  /**
+   * Restore all previous data of the provided attributes.
+   *
+   * Mirrors: ActiveModel::Dirty#restore_attributes (dirty.rb:320-322)
+   */
+  restoreAttributes(attrNames: string[] = this.changed): void {
+    attrNames.forEach((attrName) => this.restoreAttributeBang(attrName));
+  }
+
+  /**
+   * Clears all dirty data: current changes and previous changes.
+   *
+   * Mirrors: ActiveModel::Dirty#clear_changes_information (dirty.rb:325-329)
+   */
+  clearChangesInformation(): void {
+    this._dirty.clearChangesInformation();
+    this.forgetAttributeAssignments();
+  }
+
+  /**
+   * Mirrors: ActiveModel::Dirty#clear_attribute_changes (dirty.rb:331-335)
+   */
+  clearAttributeChanges(attrNames: string[]): void {
+    attrNames.forEach((attrName) => this.clearAttributeChange(attrName));
+  }
+
+  /**
+   * Map of each changed attribute's name to its old (pre-change) value.
+   *
+   * Mirrors: ActiveModel::Dirty#changed_attributes (dirty.rb:343-345)
+   */
+  get changedAttributes(): Record<string, unknown> {
+    return this._dirty.changedAttributes;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Dirty#changes (dirty.rb:353-355)
+   */
+  get changes(): Record<string, [unknown, unknown]> {
+    return this._dirty.changes;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Dirty#previous_changes (dirty.rb:363-365)
+   */
+  get previousChanges(): Record<string, [unknown, unknown]> {
+    return this._dirty.previousChanges;
+  }
+
+  /**
+   * Check if an attribute value has changed in-place (by identity).
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_changed_in_place? (dirty.rb:367-369)
+   */
+  attributeChangedInPlace(name: string): boolean {
+    return this._dirty.changedInPlace(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
+
+  /**
+   * Drop a single attribute's pending change without reverting its value.
+   *
+   * Mirrors: ActiveModel::Dirty#clear_attribute_change (dirty.rb:378-380)
+   *
+   * @internal
+   */
+  clearAttributeChange(name: string): void {
+    this._dirty.forgetChange(this._attributes, name);
+  }
+
+  /**
+   * Pending changes diff against the values loaded from the database.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_from_database (dirty.rb:382-388)
+   *
+   * @internal
+   */
+  get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
+    return this._dirty.mutationsFromDatabase;
+  }
+
+  /**
+   * Drop all pending assignment tracking without reverting values.
+   *
+   * Mirrors: ActiveModel::Dirty#forget_attribute_assignments (dirty.rb:390-392)
+   *
+   * @internal
+   */
+  forgetAttributeAssignments(): void {
+    this._attributes = this._attributes.map((attr) => attr.forgettingAssignment());
+    this._dirty.forgetAttributeAssignments(this._attributes);
+  }
+
+  /**
+   * Snapshot of the pending changes at the moment of the last save.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_before_last_save (dirty.rb:394-396)
+   *
+   * @internal
+   */
+  get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
+    return this._dirty.mutationsBeforeLastSave;
+  }
+
+  /**
+   * Dispatch target for `*_change` per-attribute methods.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_change (dirty.rb:399-401)
+   *
+   * @internal
+   */
+  attributeChange(name: string): [unknown, unknown] | null {
+    return this._dirty.attributeChange(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
+
+  /**
+   * Dispatch target for `*_previous_change` per-attribute methods.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_previous_change (dirty.rb:404-406)
+   *
+   * @internal
+   */
+  attributePreviousChange(name: string): [unknown, unknown] | undefined {
+    return this._dirty.previousChanges[
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name)
+    ];
+  }
+
+  /**
+   * Dispatch target for `*_will_change!` per-attribute methods. Force-marks an
+   * attribute as changed for in-place mutations (e.g. array push) where the
+   * object reference stays the same but the content has changed.
+   *
+   * Returns the forced value, mirroring Rails where `attribute_will_change!`
+   * returns `mutations_from_database.force_change(...)` — a truthy value relied
+   * on by `assert pirate.catchphrase_will_change!` (dirty_test.rb:317).
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_will_change! (dirty.rb:409-411)
+   *
+   * @internal
+   */
+  attributeWillChangeBang(name: string): unknown {
+    return this._dirty.forceChange(
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
+
+  /**
+   * Dispatch target for `restore_*!` per-attribute methods. Restores the
+   * attribute to its pre-change value and clears the dirty entry.
+   *
+   * Mirrors: ActiveModel::Dirty#restore_attribute! (dirty.rb:414-420)
+   *
+   * @internal
+   */
+  restoreAttributeBang(name: string): void {
+    this._dirty.restoreAttribute(
+      this._attributes,
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
+    );
+  }
 }
+
+/**
+ * The class half a `Dirty` body self-sends: Ruby's `attr_name.to_s` sits
+ * alongside the alias resolution `AttributeMethods::ClassMethods#resolve_attribute_name`
+ * (attribute_methods.rb:396-398) does, and a module body cannot name the
+ * including class.
+ */
+type DirtyClass = { resolveAttributeName(name: string): string };
 
 /**
  * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
@@ -98,20 +331,6 @@ export function initInternals(this: DirtyInternalsHost, super_: () => void): voi
 }
 
 /**
- * Mirrors: ActiveModel::Dirty#attribute_previous_change
- *
- * Dispatch target for `*_previous_change` per-attribute methods.
- *
- * @internal Rails-private helper.
- */
-export function attributePreviousChange(
-  this: DirtyDispatchHost,
-  attrName: string,
-): [unknown, unknown] | undefined {
-  return this._dirty.previousChanges[attrName];
-}
-
-/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
@@ -133,6 +352,13 @@ export class DirtyTracker {
   private _originalHas: Set<string> = new Set();
   private _changedAttributes: Map<string, [unknown, unknown]> = new Map();
   private _previousChanges: Map<string, [unknown, unknown]> = new Map();
+  /**
+   * Rails' `@mutations_before_last_save` is nil until `changes_applied` assigns
+   * the pre-save tracker (dirty.rb:276), and `mutations_before_last_save`
+   * substitutes the `NullMutationTracker` while it is (dirty.rb:394-396). One
+   * tracker holds both change sets here, so that nil is this flag.
+   */
+  private _hasMutationsBeforeLastSave = false;
   /** Names explicitly force-dirtied via attribute_will_change!. @internal */
   private _forcedNames: Set<string> = new Set();
   /** Live AttributeSet reference — set on first snapshot, used to detect changedInPlace(). */
@@ -180,6 +406,7 @@ export class DirtyTracker {
     copy._originalAttributes = attrs.snapshotValues();
     copy._originalHas = new Set(copy._originalAttributes.keys());
     copy._previousChanges = new Map(this._previousChanges);
+    copy._hasMutationsBeforeLastSave = this._hasMutationsBeforeLastSave;
     copy._attrs = attrs;
     copy._pendingNames = new Set(attrs.keys());
     return copy;
@@ -202,6 +429,7 @@ export class DirtyTracker {
       }
     });
     this._previousChanges = snapshot;
+    this._hasMutationsBeforeLastSave = true;
     if (currentAttributes instanceof Map) {
       this._originalAttributes = new Map(currentAttributes);
       this._originalHas = new Set(currentAttributes.keys());
@@ -236,6 +464,38 @@ export class DirtyTracker {
   }
 
   /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed_in_place?
+   * (attribute_mutation_tracker.rb:50-52).
+   *
+   * Ruby's whole body is `attributes[attr_name].changed_in_place?`
+   * (attribute.rb:70). That is the leading guard, and for a type whose cast
+   * value JS can mutate in place — a serialized Hash or Array — it is the whole
+   * answer, exactly as in Ruby.
+   *
+   * @missingRailsCall changed_in_place? — PERMANENT: Language shortcoming, for
+   * the immutable half only. Ruby reaches an in-place change by mutating the
+   * cast value the `Attribute` already holds (`aircraft.name.downcase!`,
+   * normalized_attribute_test.rb:36), leaving the same `Attribute` in the set.
+   * JS strings, Numbers and Dates are immutable, so for one of those the port
+   * can only reach that state by writing a new cast value onto the set, which
+   * yields an `Attribute::WithCastValue` whose `changed_in_place?` is `false`
+   * by definition (attribute.rb:243-245). The fallback therefore makes the
+   * before/after comparison `Type::String#changed_in_place?`
+   * (type/string.rb:31-35) would have made, and an assignment still answers
+   * `false` there because `changes` records the assigned value as the `to`
+   * half.
+   */
+  changedInPlace(name: string): boolean {
+    if (this._isInPlaceMutableChange(name)) return true;
+    const current = this.fetchValue(name);
+    const recorded = this.changes[name];
+    if (recorded) return current !== recorded[1];
+    const original = this.attributeWas(name);
+    if (original === undefined) return false;
+    return original !== current;
+  }
+
+  /**
    * Mirrors: ActiveModel::AttributeMutationTracker#changed?
    * (attribute_mutation_tracker.rb:44-48) — the one body every
    * `attribute_changed?` / `attribute_previously_changed?` /
@@ -267,9 +527,35 @@ export class DirtyTracker {
     return resolveValue(this._originalAttributes.get(name));
   }
 
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#original_value
+   * (attribute_mutation_tracker.rb:59-61) over `mutations_before_last_save`.
+   * {@link attributeWas} is the same Ruby method read off
+   * `mutations_from_database`; one object holds both change sets here, so the
+   * two readings cannot share the Ruby name until DirtyTracker splits into two
+   * `AttributeMutationTracker`s (story `0023-surfaced-deviations/
+   * dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`).
+   *
+   * Before the first save Rails' `mutations_before_last_save` is the
+   * `NullMutationTracker`, whose `original_value` returns nil
+   * (attribute_mutation_tracker.rb:186-187, dirty.rb:394-396); this tracker
+   * holds both change sets in one object, so `_hasMutationsBeforeLastSave` is
+   * where the nil-vs-real-tracker distinction lives. Otherwise the answer is
+   * the pre-save value: the recorded change's `from` for an attribute the save
+   * changed, and the snapshot baseline `changes_applied` left behind for one
+   * it did not.
+   */
+  originalValue(name: string): unknown {
+    if (!this._hasMutationsBeforeLastSave) return undefined;
+    const change = this._previousChanges.get(name);
+    if (change) return change[0];
+    return resolveValue(this._originalAttributes.get(name));
+  }
+
   clearChangesInformation(): void {
     this._clearChanges();
     this._previousChanges.clear();
+    this._hasMutationsBeforeLastSave = false;
   }
 
   clearAttributeChanges(attributes: string[]): void {
@@ -343,8 +629,8 @@ export class DirtyTracker {
    * the current value, so a later write reports `[current, next]` instead
    * of `[originalFromFirstSnapshot, next]`.
    *
-   * Mirrors: ActiveModel::Dirty#clear_attribute_change
-   * -> `mutation_tracker.forget_change(name)`, whose body is
+   * Mirrors: ActiveModel::AttributeMutationTracker#forget_change
+   * (attribute_mutation_tracker.rb:54-57), whose body is
    * `attributes[name] = attributes[name].forgetting_assignment`
    * (attribute_mutation_tracker.rb:33-35) — so the assigned value becomes the
    * new from-database seat and `original_value_for_database` moves with it, not
@@ -353,7 +639,7 @@ export class DirtyTracker {
    *
    * @internal
    */
-  clearAttributeChange(
+  forgetChange(
     attributes:
       | Map<string, unknown>
       | { has(name: string): boolean; fetchValue(name: string): unknown }
@@ -761,34 +1047,6 @@ export class DirtyTracker {
   }
 }
 
-/**
- * Mirrors: ActiveModel::Dirty#attribute_will_change!
- *
- * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
- * an attribute as changed for in-place mutations (e.g. array push) where
- * the object reference stays the same but the content has changed.
- *
- * @internal Rails-private helper.
- */
-export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
-  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
-  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
-  // Record-shaped reader over it, not the tracker itself.
-  return this._dirty.forceChange(attrName);
-}
-
-/**
- * Mirrors: ActiveModel::Dirty#restore_attribute!
- *
- * Dispatch target for `restore_*!` per-attribute methods. Restores the
- * attribute to its pre-change value and clears the dirty entry.
- *
- * @internal Rails-private helper.
- */
-export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string): void {
-  this._dirty.restoreAttribute(this._attributes, attrName);
-}
-
 export function initializeDup(
   this: DirtyDupHost,
   super_: (other: unknown) => void,
@@ -801,12 +1059,3 @@ export function initializeDup(
 function resolveValue(value: unknown): unknown {
   return AttributeSet.resolveSnapshotValue(value);
 }
-
-type DirtyDispatchHost = {
-  _dirty: DirtyTracker;
-  _attributes: AttributeSet;
-  restoreAttribute?(name: string): void;
-  attributeWas?(name: string): unknown;
-  writeAttribute?(name: string, value: unknown): void;
-  clearAttributeChange?(name: string): void;
-};
