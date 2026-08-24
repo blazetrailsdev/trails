@@ -31,13 +31,13 @@ describe("templateSchemaCache", () => {
 
   it("fingerprints the live schema as the boot dump's", async () => {
     const shapes = await schemaShapes(Base.connection);
-    expect(fingerprintOf(shapes, dumpedTables(templateSchemaCache()!))).toBe(
+    expect(fingerprintOf(shapes, dumpedTables(templateSchemaCache()!.marshalDump()))).toBe(
       templateSchemaFingerprint(),
     );
   });
 
   it("stops matching once a canonical table is altered, so no file replays a stale dump", async () => {
-    const cached = dumpedTables(templateSchemaCache()!);
+    const cached = dumpedTables(templateSchemaCache()!.marshalDump());
     await Base.connection.addColumn("topics", "boot_dump_probe", "string");
     try {
       expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(
@@ -52,7 +52,7 @@ describe("templateSchemaCache", () => {
   });
 
   it("still matches when a table the dump never described is added", async () => {
-    const cached = dumpedTables(templateSchemaCache()!);
+    const cached = dumpedTables(templateSchemaCache()!.marshalDump());
     await Base.connection.createTable("boot_dump_bespoke", {}, (t) => {
       t.string("name");
     });
@@ -74,7 +74,7 @@ describe("templateSchemaCache", () => {
   it.skipIf(activeLane() === "sqlite")(
     "stops matching once a canonical column's comment changes",
     async () => {
-      const cached = dumpedTables(templateSchemaCache()!);
+      const cached = dumpedTables(templateSchemaCache()!.marshalDump());
       await Base.connection.addColumn("topics", "boot_dump_probe", "string");
       const before = fingerprintOf(await schemaShapes(Base.connection), cached);
       try {
@@ -93,7 +93,7 @@ describe("templateSchemaCache", () => {
   );
 
   it("stops matching once an index is added to a canonical table", async () => {
-    const cached = dumpedTables(templateSchemaCache()!);
+    const cached = dumpedTables(templateSchemaCache()!.marshalDump());
     await Base.connection.addIndex("topics", "title", { name: "boot_dump_probe_index" });
     try {
       expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(

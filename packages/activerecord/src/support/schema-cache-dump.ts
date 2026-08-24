@@ -66,14 +66,16 @@ export async function dumpTemplateSchemaCache(
   cache.dumpTo(filename);
   return {
     filename,
-    fingerprint: fingerprintOf(await schemaShapes(adapter), dumpedTables(cache)),
+    fingerprint: fingerprintOf(await schemaShapes(adapter), dumpedTables(cache.marshalDump())),
   };
 }
 
-/** The table names a cache describes — its `@data_sources` (`schema_cache.rb:416`). */
-export function dumpedTables(cache: SchemaCache): ReadonlySet<string> {
-  const dataSources = cache.marshalDump()[4] as Record<string, boolean>;
-  return new Set(Object.keys(dataSources ?? {}));
+/**
+ * The table names a dump describes — `marshal_dump`'s fifth element, its
+ * `@data_sources` hash (`schema_cache.rb:416-418`).
+ */
+export function dumpedTables(marshalled: unknown[]): ReadonlySet<string> {
+  return new Set(Object.keys((marshalled[4] as Record<string, boolean>) ?? {}));
 }
 
 /**
@@ -136,7 +138,14 @@ const MISSING_TABLE = "missing-table";
  * `PostgreSQL::Column` stores. MySQL's is `SHOW FULL FIELDS`
  * (`abstract-mysql-adapter.ts:1904`) read out of `information_schema`, whose
  * `COLLATION_NAME` / `EXTRA` / `COLUMN_COMMENT` are its `Collation` / `Extra` /
- * `Comment`.
+ * `Comment`. Its index rows carry `STATISTICS.COLLATION` because that is where
+ * `IndexDefinition#orders` comes from — `"D"` is a descending column
+ * (`mysql/schema_statements.rb:43`, `:47`) — alongside `SUB_PART`
+ * (`lengths`) and `INDEX_TYPE` (`using`); MySQL 8's `EXPRESSION` is left out
+ * because MariaDB's `STATISTICS` has no such column, and the canonical schema
+ * has no functional index for it to describe. PostgreSQL and sqlite
+ * need no such spelling out: `pg_indexes.indexdef` and `sqlite_master.sql` are
+ * the index's own DDL, `DESC` and all.
  */
 const SHAPE_QUERIES: Record<string, string[]> = {
   sqlite: [
@@ -181,7 +190,9 @@ const SHAPE_QUERIES: Record<string, string[]> = {
      WHERE TABLE_SCHEMA = DATABASE()
      ORDER BY TABLE_NAME, ORDINAL_POSITION`,
     `SELECT TABLE_NAME AS name,
-            CONCAT(INDEX_NAME, ' ', SEQ_IN_INDEX, ' ', COLUMN_NAME, ' ', NON_UNIQUE) AS col
+            CONCAT(INDEX_NAME, ' ', SEQ_IN_INDEX, ' ', COLUMN_NAME, ' ', NON_UNIQUE, ' ',
+                   COALESCE(COLLATION, ''), ' ', COALESCE(SUB_PART, ''), ' ',
+                   INDEX_TYPE, ' ', COALESCE(INDEX_COMMENT, '')) AS col
      FROM information_schema.STATISTICS
      WHERE TABLE_SCHEMA = DATABASE()
      ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX`,

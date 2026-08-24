@@ -94,12 +94,20 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
  * the canonical tables rather than re-laying them, so a file that leaves an
  * `addColumn` / `changeColumn` / `renameColumn` behind changes a canonical
  * table's shape without changing the table *set*. The guard is therefore the
- * boot fingerprint over the dumped tables' live shapes
- * (`support/schema-cache-dump.ts`), which one query answers: any drop, add,
- * rename or type change to a table the dump describes falls back to reflecting
- * the database. Tables the live database has and the dump does not — the
- * bespoke table a file lays in its own `beforeAll` — are reflected
- * individually, a handful of `add`s rather than ~200.
+ * boot fingerprint over the dumped tables' live shapes, which whole-database
+ * queries answer (`support/schema-cache-dump.ts`): any change to a table the
+ * dump describes falls back to reflecting the database. Tables the live
+ * database has and the dump does not — the bespoke table a file lays in its own
+ * `beforeAll` — are reflected individually, a handful of `add`s rather than
+ * ~200.
+ *
+ * Rails installs a loaded dump by replacing the cache object
+ * (`schema_cache.rb:139`, whose `load_cache` returns the new cache for
+ * `SchemaReflection` to hold). This loads into the cache the pool already
+ * handed out instead, because trails' adapter-side consumers hold
+ * `internalSchemaCache` by identity — the same reason `ConnectionPool` assigns
+ * a loaded cache back onto `poolConfig.schemaCache` rather than letting the two
+ * diverge (`connection-pool.ts` lazy-load).
  */
 async function replaySchemaCacheDump(
   adapter: TransactionalFixturesAdapter,
@@ -107,10 +115,11 @@ async function replaySchemaCacheDump(
   sc: NonNullable<TransactionalFixturesAdapter["internalSchemaCache"]>,
   dumped: SchemaCache,
 ): Promise<boolean> {
-  const cached = dumpedTables(dumped);
+  const marshalled = dumped.marshalDump();
+  const cached = dumpedTables(marshalled);
   const shapes = await schemaShapes(adapter);
   if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
-  sc.marshalLoad(dumped.marshalDump());
+  sc.marshalLoad(marshalled);
   for (const table of shapes.keys()) {
     if (!cached.has(table)) await sc.add(pool, table);
   }
