@@ -71,11 +71,6 @@ function normalizeRawConfig(raw: RawConfig): RawConfig {
   return normalized as RawConfig;
 }
 
-async function migrationsDir(): Promise<string> {
-  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
-  return path.resolve(fs.cwd(), Migrator.migrationsPaths[0]);
-}
-
 /**
  * Resolve the migrations directories for a named database config.
  * Mirrors Rails' per-DB migrations_paths: the user can set `migrationsPaths`
