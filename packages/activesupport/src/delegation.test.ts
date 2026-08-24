@@ -153,4 +153,20 @@ describe("Delegation.generateMethodMissing", () => {
     });
     expect(obj.greet).toBeUndefined();
   });
+
+  it("prefixes a reserved target with self.", () => {
+    const obj = Delegation.generateMethodMissing({ args: null } as any, "args");
+    expect(() => obj.greet).toThrow("greet delegated to self.args, but self.args is nil");
+  });
+
+  it("prefixes a target named __target with self.", () => {
+    const obj = Delegation.generateMethodMissing({ __target: null } as any, "__target");
+    expect(() => obj.greet).toThrow("greet delegated to self.__target, but self.__target is nil");
+  });
+
+  it("reads a reserved target's member through the unprefixed name", () => {
+    const obj = Delegation.generateMethodMissing({ args: { name: "David" } } as any, "args");
+    expect(obj.name).toBe("David");
+    expect("name" in obj).toBe(true);
+  });
 });
