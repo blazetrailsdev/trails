@@ -234,6 +234,33 @@ describe("reconcileFileText", () => {
     expect(reconcileFileText("quoting.ts", first, expectations, reason).text).toBeNull();
   });
 
+  it("leaves a mixed-family comment alone in either kind", () => {
+    // Observed on `encryption/cipher/aes256-gcm.ts` `encrypt`: 0 rows migrated,
+    // 1 file rewritten (RFC 0106).
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * @missingRailsCall generate_iv — PERMANENT: the IV is a constructor",
+      "   *   argument in Node, so the two calls necessarily swap order.",
+      "   *",
+      "   * Ruby's `clear_text` is a byte String, whose JS pair is a Buffer.",
+      "   *",
+      "   * @missingRailsArgs generate_iv — PERMANENT: no cipher object exists at",
+      "   *   that point.",
+      "   *",
+      "   * The `authTagLength` option carries what Rails reads off the receiver.",
+      "   */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    const calls = new Map([anyClass("bar", ["bar"], new Set(["generate_iv"]))]);
+    const reason = () => "PERMANENT: x";
+    expect(reconcileFileText("foo.ts", src, calls, reason).text).toBeNull();
+    expect(
+      reconcileFileText("foo.ts", src, calls, reason, undefined, undefined, ARGS_TAG).text,
+    ).toBeNull();
+  });
+
   it("lets a class of the file-module's name keep its own key", () => {
     // `relation.ts` declares `class Relation`, whose name IS the synthesized
     // file-module name: a top-level function of the same name must not claim

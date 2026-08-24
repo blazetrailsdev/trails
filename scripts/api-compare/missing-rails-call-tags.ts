@@ -149,9 +149,11 @@ export function parseJsdoc(
   comment: string,
   origin?: JsdocOrigin,
   tag: string = TAG,
-): { rest: string[]; entries: TagEntry[] } {
+): { rest: string[]; entries: TagEntry[]; slot?: number } {
   const rest: string[] = [];
   const entries: TagEntry[] = [];
+  // Index in `rest` where this family's tags began — see `renderJsdoc`'s `at`.
+  let slot: number | undefined;
   const tagLineOf = new Map<TagEntry, number>();
   let open: TagEntry | null = null;
   const at = (sourceIndex: number): string =>
@@ -170,6 +172,7 @@ export function parseJsdoc(
       // em-dash, so trailing whitespace would otherwise read as a non-empty
       // reason and slide past the empty-reason gate below. `rawLines` keeps
       // the line verbatim, so idempotency is unaffected.
+      slot ??= rest.length;
       open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: synthetic ? [] : [line] };
       entries.push(open);
       tagLineOf.set(open, sourceIndex);
@@ -192,7 +195,7 @@ export function parseJsdoc(
         `\`${entry.call}\` is not made here.`,
     );
   }
-  return { rest, entries };
+  return { rest, entries, slot };
 }
 
 /** True when a tag's reason argues the deviation, rather than standing in for

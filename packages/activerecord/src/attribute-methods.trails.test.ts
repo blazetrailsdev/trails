@@ -369,6 +369,23 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(false);
   });
 
+  it("aliasAttribute generates the alias when mass generation already ran", () => {
+    // attribute_methods.rb:66-74 — aliases are lazily generated (:76-78), so
+    // once `@alias_attributes_mass_generated` is set the override's own batch
+    // is the only thing that generates an alias declared afterwards.
+    class Late extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Late.generateAliasAttributes();
+
+    Late.aliasAttribute("heading", "title");
+
+    expect("heading" in (Late.prototype as object)).toBe(true);
+    expect(new Late({ title: "t" }).heading).toBe("t");
+  });
+
   it("an inherited generated dirty accessor does not suppress the subclass's own generation", () => {
     class Middle extends Base {
       static {

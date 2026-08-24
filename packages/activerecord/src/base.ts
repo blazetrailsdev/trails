@@ -196,6 +196,7 @@ import {
   ClassMethods as AttributeMethodsClassMethods,
   isAttributeMethod as _isAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
+  aliasAttribute as _aliasAttribute,
   undefineAttributeMethods as _undefineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
   GeneratedAttributeMethods,
@@ -1459,6 +1460,7 @@ export class Base extends Model {
   // the class's methods were generated.
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
   declare static undefineAttributeMethods: typeof _undefineAttributeMethods;
+  declare static aliasAttribute: typeof _aliasAttribute;
   declare static generateAliasAttributes: typeof _generateAliasAttributes;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
   /** @internal */
@@ -4664,6 +4666,7 @@ extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
   undefineAttributeMethods: _undefineAttributeMethods,
+  aliasAttribute: _aliasAttribute,
   initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,

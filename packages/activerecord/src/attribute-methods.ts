@@ -10,6 +10,7 @@ import {
   missingAttribute,
   type AttributeMethodPattern,
   isInstanceMethodAlreadyImplemented as _amInstanceMethodAlreadyImplemented,
+  aliasAttribute as amAliasAttribute,
   defineAttributeMethods as amDefineAttributeMethods,
   undefineAttributeMethods as amUndefineAttributeMethods,
   type InstanceHost as AttributeMethodsInstanceHost,
@@ -30,9 +31,8 @@ import {
   serializableHash as _serializableHash,
   attributeNamesForSerialization as _attrNamesForSerialization,
 } from "./serialization.js";
-// ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
-// aliasAttribute delegates via the prototype chain. defineAttributeMethods
-// is implemented here since AM doesn't expose it as a static on Model.
+// defineAttributeMethods is implemented here since AM doesn't expose it as a
+// static on Model.
 
 /**
  * The AttributeMethods module interface.
@@ -344,17 +344,27 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
 }
 
 /**
- * Delegates to ActiveModel::AttributeMethods#alias_attribute which
- * handles aliases, getter/setter generation, and pattern-based methods.
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#alias_attribute
+ * (attribute_methods.rb:66-74). `super` is ActiveModel's
+ * (activemodel/attribute_methods.rb:203-209), called directly rather than
+ * through the prototype chain: for a subclass that chain reaches `Base`, whose
+ * static IS this function.
+ *
+ * The `@alias_attributes_mass_generated` arm re-generates an alias declared
+ * AFTER the class's mass generation already ran. The ivar is per-class, so only
+ * an *own* truthy flag counts as generated (an inherited `true` belongs to the
+ * parent).
  */
 export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
-  // Delegate to ActiveModel's aliasAttribute via prototype chain
-  const amFn = Object.getPrototypeOf(this)?.aliasAttribute;
-  if (typeof amFn === "function") {
-    amFn.call(this, newName, oldName);
-  } else {
-    if (!this.attributeAliases) this.attributeAliases = {};
-    this.attributeAliases[newName] = oldName;
+  amAliasAttribute.call(this as never, newName, oldName);
+
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
+    this._aliasAttributesMassGenerated
+  ) {
+    CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
+      generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
+    });
   }
 }
 

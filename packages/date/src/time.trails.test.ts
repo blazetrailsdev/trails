@@ -330,6 +330,43 @@ describe("Time", () => {
     });
   });
 
+  describe("Time#plus", () => {
+    it("moves the receiver forward by that many seconds, keeping its zone", () => {
+      const t = Time.utc(2020, 1, 1);
+
+      expect(t.plus(1).isUtc()).toBe(true);
+      expect(t.plus(1).toS()).toBe("2020-01-01 00:00:01 UTC");
+      expect(new Time(2020, 1, 1, 0, 0, 0, "+05:00").plus(60).utcOffset).toBe(18000);
+    });
+
+    it("takes the Integer, Float or Rational `num_exact` takes", () => {
+      const t = Time.utc(2020, 1, 1);
+
+      expect(t.plus(new Rational(1, 3)).nsec).toBe(333333333);
+      expect(t.plus(-0.5).nsec).toBe(500000000);
+      expect(t.plus(-0.5).sec).toBe(59);
+    });
+
+    it("raises TypeError on a Time argument", () => {
+      expect(() => Time.utc(2020, 1, 1).plus(Time.utc(2020, 1, 1))).toThrow(
+        new TypeError("time + time?"),
+      );
+    });
+  });
+
+  describe("Time#minus", () => {
+    it("answers the seconds between two Times", () => {
+      expect(Time.utc(2020, 1, 1).minus(Time.utc(2019, 12, 31))).toBe(86400.0);
+    });
+
+    it("moves the receiver back by a numeric, keeping its zone", () => {
+      const t = new Time(2020, 1, 1, 0, 0, 0, "+05:00");
+
+      expect((t.minus(60) as Time).toS()).toBe("2019-12-31 23:59:00 +0500");
+      expect((t.minus(60) as Time).utcOffset).toBe(18000);
+    });
+  });
+
   describe("Time#getlocal", () => {
     it("answers the same instant in the local system zone", () => {
       const t = Time.utc(2020, 1, 1, 12, 0, 0);
