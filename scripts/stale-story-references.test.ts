@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -143,17 +143,33 @@ describe("stale story references", () => {
   // job, so this gate compares the tree against real story statuses there as
   // well as in every agent worktree (start-worktree.sh symlinks the same path).
   // loadStories throws rather than skipping when that checkout is missing.
-  it("no comment or markdown paragraph in the tree names a story that has already landed", async () => {
-    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
-    const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), stories);
+  //
+  // The whole-tree scans are pure reads, so they run once in a beforeAll shared
+  // by both cases rather than once per case. They still walk the entire repo
+  // plus the tasks checkout, which takes ~2s idle and several times that on a
+  // loaded host, so the hook carries its own timeout instead of inheriting
+  // vitest's 5s default — a timeout there names the scan that overran rather
+  // than surfacing as a bare per-test timeout that reads like a stale citation.
+  let treeStories: IndexStory[];
+  let treeRefs: Awaited<ReturnType<typeof scanStoryReferences>>;
+  let frozenFiles: string[];
+  let frozenRefs: Awaited<ReturnType<typeof scanFrozenStoryReferences>>;
+
+  beforeAll(async () => {
+    treeStories = await loadStories(resolveTasksDir(REPO_ROOT));
+    treeRefs = await scanStoryReferences(REPO_ROOT);
+    frozenFiles = await collectFrozenMarkdownFiles(REPO_ROOT);
+    frozenRefs = await scanFrozenStoryReferences(REPO_ROOT);
+  }, 120_000);
+
+  it("no comment or markdown paragraph in the tree names a story that has already landed", () => {
+    const stale = staleStoryReferences(treeRefs, treeStories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
   });
 
-  it("inventories stale citations in the frozen tree without gating on them", async () => {
-    const files = await collectFrozenMarkdownFiles(REPO_ROOT);
-    expect(files).toContain(path.join("docs", "activerecord", "parity-verification.md"));
-    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
-    const stale = staleStoryReferences(await scanFrozenStoryReferences(REPO_ROOT), stories);
+  it("inventories stale citations in the frozen tree without gating on them", () => {
+    expect(frozenFiles).toContain(path.join("docs", "activerecord", "parity-verification.md"));
+    const stale = staleStoryReferences(frozenRefs, treeStories);
     if (stale.length > 0) {
       console.warn(
         `frozen-tree stale story citations (not gated):\n${stale
@@ -163,10 +179,9 @@ describe("stale story references", () => {
     }
   });
 
-  it("reads each story's status from its own frontmatter", async () => {
-    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
+  it("reads each story's status from its own frontmatter", () => {
     expect(
-      stories.find((story) => story.id === "activesupport-json-encoding-time-precision"),
+      treeStories.find((story) => story.id === "activesupport-json-encoding-time-precision"),
     ).toEqual({ id: "activesupport-json-encoding-time-precision", status: "done" });
   });
 

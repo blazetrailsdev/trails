@@ -170,24 +170,36 @@ export namespace Delegation {
    * `marshal_dump` / `_dump` exemption is Rails' and belongs to
    * `respond_to_missing?` alone (`:167`, `:186`): an explicit call still
    * forwards, because `method_missing` does not repeat the check.
+   *
+   * The receiver step (`:162`) reads the same way it does in `generate`: the
+   * `self.` Ruby prepends to a `RESERVED_METHOD_NAMES` target — or to one
+   * literally named `__target`, which Ruby has to disambiguate from the local
+   * its generated body binds (`:164`, `:185`) — shapes the source it compiles,
+   * and a JS member read is never ambiguous, so the traps read the same member
+   * either way. The prefix survives where Rails also shows it, in the
+   * `DelegationError` message (`:176`, `:196`).
    */
   export function generateMethodMissing<T extends object>(
     owner: T,
     target: string,
     { allowNil }: { allowNil?: boolean } = {},
   ): T {
+    if (RESERVED_METHOD_NAMES.has(target) || target === "__target") target = `self.${target}`;
+
+    const targetName = target.startsWith("self.") ? target.slice("self.".length) : target;
+
     return new Proxy(owner, {
       has(obj, prop) {
         if (prop === "marshal_dump" || prop === "_dump") return false;
         if (Reflect.has(obj, prop)) return true;
-        const __target = (obj as Record<string, unknown>)[target];
+        const __target = (obj as Record<string, unknown>)[targetName];
         return __target != null && prop in Object(__target);
       },
       get(obj, prop, receiver) {
         if (prop in obj || typeof prop === "symbol") {
           return Reflect.get(obj, prop, receiver);
         }
-        const __target = (obj as Record<string, unknown>)[target];
+        const __target = (obj as Record<string, unknown>)[targetName];
         if (__target == null) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(globalThis.String(prop), target);
