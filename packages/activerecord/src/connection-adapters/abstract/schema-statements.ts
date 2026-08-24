@@ -401,8 +401,10 @@ export class SchemaStatements {
       this.validateTableLengthBang(tableName);
     }
 
-    if (force && options.ifNotExists) {
-      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
+    if (force && "ifNotExists" in options) {
+      throw new ArgumentError(
+        "Options `:force` and `:if_not_exists` cannot be used simultaneously.",
+      );
     }
 
     const td = this.buildCreateTableDefinition(

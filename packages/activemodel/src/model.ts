@@ -126,7 +126,7 @@ export interface Model extends Dirty {
   isAttributeMethod(attrName: string): boolean;
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
   missingAttribute(attrName: string, stack?: string): never;
-  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+  isRespondToWithoutAttributes(method: string): boolean;
   respondTo(method: string, includePrivateMethods?: boolean): boolean;
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;

@@ -803,6 +803,11 @@ describe("MigrationTest", () => {
 
   it("create table with force and if not exists", async () => {
     const adapter = Base.connection;
+    // Rails raises ArgumentError here (schema_statements.rb:297-299), which is
+    // what migration_test.rb:207 rescues.
+    await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
+      ArgumentError,
+    );
     await expect(adapter.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
       /cannot be used simultaneously/i,
     );

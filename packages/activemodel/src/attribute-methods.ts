@@ -221,16 +221,13 @@ export function attributeMissing(
  * `respond_to?(method, include_private_methods = false)` signature and answers
  * whether the receiver responds to `method` at all — including attribute
  * accessors exposed as getter/setter properties, not just plain functions. The
- * `in` check mirrors Ruby `respond_to?` across the prototype chain; trails has
- * no Ruby-private methods, so `includePrivateMethods` is accepted for signature
- * fidelity but does not change the answer.
+ * `in` check mirrors Ruby `respond_to?` across the prototype chain.
+ *
+ * Rails' `include_private_methods` parameter is dropped: a JS receiver has no
+ * string-named private methods for it to reveal, so it could never change the
+ * answer. See {@link respondTo} for the branch that drops with it.
  */
-export function isRespondToWithoutAttributes(
-  this: object,
-  method: string,
-  includePrivateMethods: boolean = false,
-): boolean {
-  void includePrivateMethods;
+export function isRespondToWithoutAttributes(this: object, method: string): boolean {
   return method in (this as Record<string, unknown>);
 }
 
@@ -685,7 +682,7 @@ export function defineCall(
 export type InstanceHost = {
   _attributes?: { has(name: string): boolean };
   attributes: Record<string, unknown>;
-  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+  isRespondToWithoutAttributes(method: string): boolean;
   attributeMethodPatterns?: AttributeMethodPattern[];
   constructor: AttributeMethodHost;
 };
@@ -701,7 +698,7 @@ type InstanceMethods = InstanceHost & {
 
 /** The receiver `respond_to?` (attribute_methods.rb:528-539) self-sends to. */
 type RespondToHost = {
-  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+  isRespondToWithoutAttributes(method: string): boolean;
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
 };
 
@@ -720,18 +717,26 @@ type RespondToHost = {
  *
  * Ruby's `super` here is the aliased original, which trails names
  * {@link isRespondToWithoutAttributes} — TS has no `super` for a module
- * outside the prototype chain, so the two `super` sends are spelled as sends
- * to that alias, in the same positions.
+ * outside the prototype chain, so the `super` send is spelled as a send to
+ * that alias, in the same position.
+ *
+ * @missingRailsCall super — PERMANENT: the middle arm (`elsif !include_private_methods
+ * && super(method, true)`, attribute_methods.rb:531-535) is omitted. It answers
+ * `false` for a name that exists ONLY as a Ruby-private method; a JS receiver
+ * has no string-named private methods, so `super(method, true)` and `super`
+ * always agree and the arm can never be taken. Porting it means porting a
+ * branch that reads as live and cannot run. `includePrivateMethods` stays in
+ * the signature — it is what Rails' callers pass — but no longer selects
+ * anything.
  */
 export function respondTo(
   this: RespondToHost,
   method: string,
   includePrivateMethods: boolean = false,
 ): boolean {
-  if (this.isRespondToWithoutAttributes(method, includePrivateMethods)) {
+  void includePrivateMethods;
+  if (this.isRespondToWithoutAttributes(method)) {
     return true;
-  } else if (!includePrivateMethods && this.isRespondToWithoutAttributes(method, true)) {
-    return false;
   } else {
     return this.matchedAttributeMethod(String(method)) !== null;
   }
