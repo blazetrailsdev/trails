@@ -35,7 +35,7 @@ const PROXY_B = {
 describe("PendingMigrationsTest", () => {
   let err: string[];
   let out: string[];
-  let withTemporaryConnectionSpy: ReturnType<typeof vi.fn>;
+  let withTemporaryPoolForEachSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     out = [];
@@ -43,9 +43,9 @@ describe("PendingMigrationsTest", () => {
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
-    withTemporaryConnectionSpy = vi.fn();
-    vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(
-      withTemporaryConnectionSpy,
+    withTemporaryPoolForEachSpy = vi.fn();
+    vi.spyOn(DatabaseTasks, "withTemporaryPoolForEach").mockImplementation(
+      withTemporaryPoolForEachSpy,
     );
   });
 
@@ -56,23 +56,23 @@ describe("PendingMigrationsTest", () => {
   });
 
   it("db:abort_if_pending_migrations exits 0 when no pending migrations", async () => {
-    withTemporaryConnectionSpy.mockImplementation(
-      async (_config: unknown, fn: (adapter: unknown) => Promise<void>) => {
-        await fn({});
+    withTemporaryPoolForEachSpy.mockImplementation(
+      async (_opts: unknown, fn: (pool: unknown) => Promise<void>) => {
+        await fn({ migrationContext: new MigrationContext([], null!, null!) });
       },
     );
-    vi.spyOn(Migrator.prototype, "pendingMigrationsReadOnly").mockResolvedValue([]);
+    vi.spyOn(Migrator.prototype, "pendingMigrations").mockResolvedValue([]);
     expect(await run(["db:abort_if_pending_migrations"], await makeFakeProject())).toBe(0);
     expect(err).toHaveLength(0);
   });
 
   it("db:abort_if_pending_migrations exits 1 and lists pending versions", async () => {
-    withTemporaryConnectionSpy.mockImplementation(
-      async (_config: unknown, fn: (adapter: unknown) => Promise<void>) => {
-        await fn({});
+    withTemporaryPoolForEachSpy.mockImplementation(
+      async (_opts: unknown, fn: (pool: unknown) => Promise<void>) => {
+        await fn({ migrationContext: new MigrationContext([], null!, null!) });
       },
     );
-    vi.spyOn(Migrator.prototype, "pendingMigrationsReadOnly").mockResolvedValue([PROXY_A, PROXY_B]);
+    vi.spyOn(Migrator.prototype, "pendingMigrations").mockResolvedValue([PROXY_A, PROXY_B]);
     const code = await run(["db:abort_if_pending_migrations"], await makeFakeProject());
     expect(code).toBe(1);
     const output = err.join("\n");
@@ -82,12 +82,12 @@ describe("PendingMigrationsTest", () => {
   });
 
   it("db:abort_if_pending_migrations exits 1 with a single pending migration", async () => {
-    withTemporaryConnectionSpy.mockImplementation(
-      async (_config: unknown, fn: (adapter: unknown) => Promise<void>) => {
-        await fn({});
+    withTemporaryPoolForEachSpy.mockImplementation(
+      async (_opts: unknown, fn: (pool: unknown) => Promise<void>) => {
+        await fn({ migrationContext: new MigrationContext([], null!, null!) });
       },
     );
-    vi.spyOn(Migrator.prototype, "pendingMigrationsReadOnly").mockResolvedValue([PROXY_A]);
+    vi.spyOn(Migrator.prototype, "pendingMigrations").mockResolvedValue([PROXY_A]);
     const code = await run(["db:abort_if_pending_migrations"], await makeFakeProject());
     expect(code).toBe(1);
     const output = err.join("\n");
@@ -102,12 +102,12 @@ describe("PendingMigrationsTest", () => {
   });
 
   it("checkPendingMigrations resolves pending list from cwd", async () => {
-    withTemporaryConnectionSpy.mockImplementation(
-      async (_config: unknown, fn: (adapter: unknown) => Promise<void>) => {
-        await fn({});
+    withTemporaryPoolForEachSpy.mockImplementation(
+      async (_opts: unknown, fn: (pool: unknown) => Promise<void>) => {
+        await fn({ migrationContext: new MigrationContext([], null!, null!) });
       },
     );
-    vi.spyOn(Migrator.prototype, "pendingMigrationsReadOnly").mockResolvedValue([PROXY_A]);
+    vi.spyOn(Migrator.prototype, "pendingMigrations").mockResolvedValue([PROXY_A]);
     const dir = await makeFakeProject();
     const pending = await checkPendingMigrations(dir);
     expect(pending).toHaveLength(1);
@@ -115,12 +115,12 @@ describe("PendingMigrationsTest", () => {
   });
 
   it("checkPendingMigrations returns empty array when no pending migrations", async () => {
-    withTemporaryConnectionSpy.mockImplementation(
-      async (_config: unknown, fn: (adapter: unknown) => Promise<void>) => {
-        await fn({});
+    withTemporaryPoolForEachSpy.mockImplementation(
+      async (_opts: unknown, fn: (pool: unknown) => Promise<void>) => {
+        await fn({ migrationContext: new MigrationContext([], null!, null!) });
       },
     );
-    vi.spyOn(Migrator.prototype, "pendingMigrationsReadOnly").mockResolvedValue([]);
+    vi.spyOn(Migrator.prototype, "pendingMigrations").mockResolvedValue([]);
     const dir = await makeFakeProject();
     const pending = await checkPendingMigrations(dir);
     expect(pending).toHaveLength(0);

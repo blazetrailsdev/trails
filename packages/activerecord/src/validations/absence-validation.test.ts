@@ -7,7 +7,6 @@ import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
-import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 fixtures({});
 
@@ -33,9 +32,13 @@ describe("AbsenceValidationTest", () => {
     }
     Boy.validatesAbsenceOf("face");
 
+    // Rails `boy_klass.new(face: Face.new)` — the has_one writer, which on an
+    // unsaved owner only sets the target (has_one_association.rb:59-66).
     const boy = new Boy();
     const face = new Face();
-    seedAssociationCache(boy, "face", face);
+    await (boy as unknown as { association(n: string): { writer(v: unknown): unknown } })
+      .association("face")
+      .writer(face);
     expect(await boy.isValid()).toBe(false);
     expect(boy.errors.messagesFor("face").length).toBe(1);
 

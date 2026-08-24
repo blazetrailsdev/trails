@@ -13,26 +13,21 @@ import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";
 import { Speedometer } from "../test-helpers/models/speedometer.js";
 import { Dashboard } from "../test-helpers/models/dashboard.js";
-import { seedAssociationCache } from "../support/seed-association-cache.js";
 
 // Rails `class Boy < Human; end` — a plain subclass sharing the humans table.
 class Boy extends Human {
   static name = "Boy";
 }
 
-// In-memory has_one / belongs_to assignment, mirroring Rails' `record.face = f`
-// / `s.dashboard = dash`. These canonical models are schema-introspected and
-// expose no generated `face=` / `dashboard=` *property* accessor (unlike
-// has_many, which yields a real CollectionProxy — see test 4), so a plain
-// `record.face = f` would set an own data property the validator never reads.
-// The only real setters are the association writers (`association(name).writer`),
-// but those issue a findBy + save against the target table, side effects Rails'
-// in-memory setter skips for a brand-new (unsaved, null-PK) owner. Writing the
-// association cache directly — the same idiom autosave-association.test.ts uses
-// via its `cacheAssoc` helper — is the faithful in-memory mirror: presence
-// reads it through read_attribute_for_validation's `_associationCache` lookup.
-function setAssoc(record: Base, name: string, value: unknown) {
-  seedAssociationCache(record, name, value);
+// Rails' `record.face = f` / `s.dashboard = dash`. These canonical models are
+// schema-introspected and expose no generated `face=` / `dashboard=` *property*
+// accessor, so a plain `record.face = f` would set an own data property the
+// validator never reads; the association writer is what that property forwards
+// to (builder/association.rb:110-116).
+function setAssoc(record: Base, name: string, value: unknown): unknown {
+  return (record as unknown as { association(n: string): { writer(v: unknown): unknown } })
+    .association(name)
+    .writer(value);
 }
 
 describe("PresenceValidationTest", () => {
@@ -77,7 +72,7 @@ describe("PresenceValidationTest", () => {
     Boy.validatesPresenceOf("face");
     const b = new Boy();
     const f = new Face();
-    setAssoc(b, "face", f);
+    await setAssoc(b, "face", f);
     expect(await b.isValid()).toBe(true);
 
     f.markForDestruction();
@@ -109,7 +104,7 @@ describe("PresenceValidationTest", () => {
 
     const dash = new Dashboard();
     const s = new speedometer();
-    setAssoc(s, "dashboard", dash);
+    await setAssoc(s, "dashboard", dash);
 
     // Rails defines `def dash.to_a; …; end` to prove presence validation never
     // coerces a single associated record through `to_a`. Our AR PresenceValidator

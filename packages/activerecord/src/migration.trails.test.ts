@@ -31,6 +31,22 @@ describe("MigrationTest", () => {
   // leasing a standing sidecar pool).
   fixtures({}, { useTransactionalTests: false });
 
+  // `respond_to?(direction)` (migration.rb:965) is answered by Migration's own
+  // instance `up`/`down` (migration.rb:951, 957), so this still runs both ways.
+  it("migrate runs a change-only migration in both directions", async () => {
+    class ChangeOnly extends Migration {
+      directions: string[] = [];
+      override write(): void {}
+      override async change(): Promise<void> {
+        this.directions.push(this.isReverting() ? "down" : "up");
+      }
+    }
+    const m = new ChangeOnly();
+    await m.migrate("up");
+    await m.migrate("down");
+    expect(m.directions).toEqual(["up", "down"]);
+  });
+
   it("migration.connection returns _connectionOverride when set", async () => {
     class M extends Migration {
       async up() {}

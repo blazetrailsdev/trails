@@ -1447,6 +1447,129 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
   });
 });
 
+describe("buildReport — reopened modules", () => {
+  it("allows a method whose Ruby file reopens a module declared elsewhere", () => {
+    // Rails: `ActiveModel::Validations` is first declared in validations.rb and
+    // REOPENED in validations/with.rb, which is where `validates_with` and the
+    // `ClassMethods` arm actually live (activemodel/lib/active_model/
+    // validations/with.rb:6-79). The TS port puts them in validations/with.ts.
+    const withMethod: MethodInfo = { ...method("validates_with"), file: "validations/with.rb" };
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "ActiveModel::Validations": {
+              ...rubyClass({ name: "Validations", file: "validations.rb" }),
+              instanceMethods: [{ ...method("valid?"), file: "validations.rb" }, withMethod],
+              classMethods: [],
+            },
+            "ActiveModel::Validations::ClassMethods": {
+              ...rubyClass({ name: "ClassMethods", file: "validations.rb" }),
+              instanceMethods: [withMethod],
+            },
+            "ActiveModel::Validations::WithValidator": rubyClass({
+              name: "WithValidator",
+              file: "validations/with.rb",
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            WithValidator: {
+              name: "WithValidator",
+              file: "validations/with.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+          modules: {
+            ClassMethods: {
+              name: "ClassMethods",
+              file: "validations/with.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("validatesWith")],
+              classMethods: [],
+            },
+          },
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("does not widen the allow-set beyond the methods the reopening file declares", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "ActiveModel::Validations": {
+              ...rubyClass({ name: "Validations", file: "validations.rb" }),
+              instanceMethods: [
+                { ...method("valid?"), file: "validations.rb" },
+                { ...method("validates_with"), file: "validations/with.rb" },
+              ],
+              classMethods: [],
+            },
+            "ActiveModel::Validations::WithValidator": rubyClass({
+              name: "WithValidator",
+              file: "validations/with.rb",
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            WithValidator: {
+              name: "WithValidator",
+              file: "validations/with.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("isValid")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles[0].extras.map((e) => [e.name, e.kind])).toEqual([
+      ["isValid", "moved"],
+    ]);
+  });
+});
+
 describe("buildReport — declaration names", () => {
   const run = (ruby: ApiManifest, ts: ApiManifest) =>
     buildReport(ruby, ts, {

@@ -5,7 +5,6 @@ import { registerModel, StrictLoadingViolationError } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
-import { seedAssociationCache } from "./support/seed-association-cache.js";
 
 describe("strict loading — sync singular reader (Phase R.3)", () => {
   const { developers, ships } = fixtures(["developers", "ships"]);
@@ -116,8 +115,8 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     const ship = await Ship.create({ name: "Cached Ship", developer_id: developers("david").id });
     ship.strictLoadingBang();
     const developer = new Developer({ id: developers("david").id });
-    // Cache the singular target on the holder (as _cacheSingularTarget does).
-    seedAssociationCache(ship as any, "developer", developer);
+    // The belongs_to writer caches the target (belongs_to_association.rb:95).
+    (ship as any).association("developer").writer(developer);
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
   });

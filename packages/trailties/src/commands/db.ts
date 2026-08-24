@@ -392,11 +392,6 @@ async function runMigrate(
   options: RunOptions = {},
 ): Promise<void> {
   const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
-  if (migrations.length === 0) {
-    console.log("No migrations found.");
-    return;
-  }
-
   const migrator = createMigrator(adapter, migrations);
   await migrator.migrate(targetVersion ?? null);
 
@@ -582,25 +577,14 @@ async function withMigrationTasksForDb(
     config: HashConfig;
   },
   operation: () => Promise<void>,
-  opts?: { afterPending?: (pending: number) => void; runWhenEmpty?: boolean },
+  opts?: { afterPending?: (pending: number) => void },
 ): Promise<void> {
-  const mDirs = await migrationsDirsForConfig(ctx.raw);
-  const migrations = discoverMigrations(mDirs);
-  if (migrations.length === 0 && !opts?.runWhenEmpty) {
-    console.log(`${ctx.prefix}No migrations found.`);
-    return;
-  }
   await withPrefixedStdout(ctx.prefix, async () => {
     await withRegisteredConfiguration(ctx.config, operation);
   });
   if (opts?.afterPending) {
-    const migrator = new Migrator(
-      "up",
-      migrations,
-      new SchemaMigration(ctx.adapter.pool),
-      new InternalMetadata(ctx.adapter.pool),
-    );
-    opts.afterPending((await migrator.pendingMigrations()).length);
+    const migrationContext = DatabaseTasks.migrationConnectionPool().migrationContext;
+    opts.afterPending((await migrationContext.pendingMigrationVersions()).length);
   }
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
@@ -639,10 +623,6 @@ async function runMigrateAll(): Promise<void> {
   for (const { name, raw } of entries) {
     const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
     migrationsFor.set(name, migrations);
-  }
-  if ([...migrationsFor.values()].every((m) => m.length === 0)) {
-    console.log("No migrations found.");
-    return;
   }
 
   // Rails' `load_config` leaves the primary connection established, which is
@@ -884,14 +864,10 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(
-          ctx,
-          async () => {
-            DatabaseTasks.checkTargetVersion(opts.version);
-            await DatabaseTasks.migrationConnectionPool().migrationContext.run("up", opts.version);
-          },
-          { runWhenEmpty: true },
-        );
+        await withMigrationTasksForDb(ctx, async () => {
+          DatabaseTasks.checkTargetVersion(opts.version);
+          await DatabaseTasks.migrationConnectionPool().migrationContext.run("up", opts.version);
+        });
       });
     });
 
@@ -902,17 +878,10 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(
-          ctx,
-          async () => {
-            DatabaseTasks.checkTargetVersion(opts.version);
-            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
-              "down",
-              opts.version,
-            );
-          },
-          { runWhenEmpty: true },
-        );
+        await withMigrationTasksForDb(ctx, async () => {
+          DatabaseTasks.checkTargetVersion(opts.version);
+          await DatabaseTasks.migrationConnectionPool().migrationContext.run("down", opts.version);
+        });
       });
     });
 
@@ -1051,11 +1020,6 @@ export function dbCommand(): Command {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(raw);
         const migrations = discoverMigrations(mDirs);
-        if (migrations.length === 0) {
-          console.log(`${prefix}No migrations found.`);
-          return;
-        }
-
         const migrator = createMigrator(adapter, migrations);
         const statuses = await migrator.migrationsStatus();
 

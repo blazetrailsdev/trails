@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
+import { association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
-import { seedAssociationCache } from "../support/seed-association-cache.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 import { Reply } from "../test-helpers/models/reply.js";
 
@@ -59,9 +59,10 @@ describe("I18nValidationTest", () => {
       }
     }
     registerModel("I18nAssociatedTopic", Topic);
+    // Rails' `replied_topic`: `topic.replies << Reply.new` (i18n_validation_test.rb:29-35).
     const replies = [new FakeReply()];
     const topic = new Topic({ title: "topic" });
-    seedAssociationCache(topic, "replies", replies);
+    await association(topic, "replies").concat(...replies);
 
     const spy = vi.spyOn(ActiveModelError, "generateMessage");
     await topic.isValid();
@@ -90,7 +91,7 @@ describe("I18nValidationTest", () => {
     }
     registerModel("I18nCustomKeyTopic", Topic);
     const topic = new Topic({ title: "topic" });
-    seedAssociationCache(topic, "replies", [new FakeReply()]);
+    await association(topic, "replies").concat(new FakeReply());
 
     await topic.isValid();
     expect([...new Set(topic.errors.messagesFor("replies"))]).toEqual(["custom message"]);
@@ -110,7 +111,7 @@ describe("I18nValidationTest", () => {
     }
     registerModel("I18nGlobalKeyTopic", Topic);
     const topic = new Topic({ title: "topic" });
-    seedAssociationCache(topic, "replies", [new FakeReply()]);
+    await association(topic, "replies").concat(new FakeReply());
 
     await topic.isValid();
     expect(topic.errors.messagesFor("replies")).toEqual(["global message"]);
