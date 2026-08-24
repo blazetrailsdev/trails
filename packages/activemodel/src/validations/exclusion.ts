@@ -1,6 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include } from "@blazetrails/activesupport";
+import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
 import {
   checkValidityBang,
   type Clusivity,
@@ -51,3 +52,14 @@ include(ExclusionValidator, {
   inclusionMethod,
   isInclude,
 });
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (exclusion.rb:45-47) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ */
+export const HelperMethods = {
+  validatesExclusionOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(ExclusionValidator, this._mergeAttributes(attrNames));
+  },
+};

@@ -5,6 +5,7 @@ import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.j
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
+import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 
@@ -507,3 +508,14 @@ NumericalityValidator.prototype.filteredOptions = filteredOptions;
 NumericalityValidator.prototype.isAllowOnlyInteger = isAllowOnlyInteger;
 NumericalityValidator.prototype.prepareValueForValidation = prepareValueForValidation;
 NumericalityValidator.prototype.isRecordAttributeChangedInPlace = isRecordAttributeChangedInPlace;
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (numericality.rb:230-232) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ */
+export const HelperMethods = {
+  validatesNumericalityOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
+  },
+};

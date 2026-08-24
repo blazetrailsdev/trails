@@ -6,6 +6,7 @@ import { isBlank, underscore } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
+import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
 
 /** Ruby `Comparable`'s `<=>`, spelled `compareTo` in trails. */
 function hasCompareTo(value: unknown): value is { compareTo(other: unknown): number | null } {
@@ -100,3 +101,14 @@ export class ComparisonValidator extends EachValidator {
     throw new ArgumentError(comparisonFailed(a, b));
   }
 }
+
+/**
+ * Mirrors: ActiveModel::Validations::HelperMethods (comparison.rb:79-81) — Ruby reopens the
+ * one `HelperMethods` module here, so the TS half of it lives here too and
+ * `validations.ts` reassembles them.
+ */
+export const HelperMethods = {
+  validatesComparisonOf(this: HelperMethodsHost, ...attrNames: AttrNameArg[]): void {
+    return this.validatesWith(ComparisonValidator, this._mergeAttributes(attrNames));
+  },
+};

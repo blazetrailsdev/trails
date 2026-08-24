@@ -3,13 +3,13 @@ import {
   ValidationContext,
   Validations,
   ClassMethods as ValidationsClassMethods,
+  HelperMethods,
   initInternals as validationsInitInternals,
   initializeDup as validationsInitializeDup,
   contextForValidation as validationsContextForValidation,
   runValidationsBang as validationsRunValidationsBang,
   raiseValidationError as validationsRaiseValidationError,
   predicateForValidationContext as validationsPredicateForValidationContext,
-  _mergeAttributes as validationsMergeAttributes,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
@@ -52,7 +52,7 @@ import {
 } from "./serialization.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
-import type { ConditionalOptions } from "./validations.js";
+import type { AttrNameArg, ConditionalOptions } from "./validations.js";
 import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,
@@ -74,16 +74,6 @@ import {
   type ValidationCallbackFilter,
   type ValidationCallbackOptions,
 } from "./validations/callbacks.js";
-import { PresenceValidator } from "./validations/presence.js";
-import { AbsenceValidator } from "./validations/absence.js";
-import { LengthValidator } from "./validations/length.js";
-import { NumericalityValidator } from "./validations/numericality.js";
-import { InclusionValidator } from "./validations/inclusion.js";
-import { ExclusionValidator } from "./validations/exclusion.js";
-import { FormatValidator } from "./validations/format.js";
-import { AcceptanceValidator } from "./validations/acceptance.js";
-import { ConfirmationValidator } from "./validations/confirmation.js";
-import { ComparisonValidator } from "./validations/comparison.js";
 import * as Validates from "./validations/validates.js";
 import {
   ClassMethods as WithClassMethods,
@@ -176,6 +166,14 @@ export interface Model {
   _runValidateCallbacks(): Promise<void>;
   /** @internal */
   sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+
+  /**
+   * The instance halves of `include HelperMethods` (validations.rb:46) that a
+   * `validate do … end` body calls; the instance `validates_with` is async
+   * (RFC 0063), so these settle where Ruby's return straight away.
+   */
+  validatesPresenceOf(...attrNames: AttrNameArg[]): Promise<void>;
+  validatesLengthOf(...attrNames: AttrNameArg[]): Promise<void>;
 
   /**
    * `ActiveModel::Attributes#attribute_names` (attributes.rb:146-148),
@@ -338,106 +336,24 @@ export class Model {
   /** List all validators used to validate one attribute (validations.rb:266-270). */
   declare static validatorsOn: Extended<typeof ValidationsClassMethods>["validatorsOn"];
 
-  // -- Individual validator helper methods --
-  // These mirror the Rails validates_*_of shorthand methods
+  // The `validates_*_of` shorthands, mixed on by `Validations.[included]`'s
+  // `extend HelperMethods` / `include HelperMethods` (validations.rb:45-46).
+  // Declared here only for their types; each body lives in the `.ts` matching
+  // the `.rb` that reopens the module.
+  declare static validatesPresenceOf: Extended<typeof HelperMethods>["validatesPresenceOf"];
+  declare static validatesAbsenceOf: Extended<typeof HelperMethods>["validatesAbsenceOf"];
+  declare static validatesLengthOf: Extended<typeof HelperMethods>["validatesLengthOf"];
+  declare static validatesSizeOf: Extended<typeof HelperMethods>["validatesSizeOf"];
+  declare static validatesNumericalityOf: Extended<typeof HelperMethods>["validatesNumericalityOf"];
+  declare static validatesInclusionOf: Extended<typeof HelperMethods>["validatesInclusionOf"];
+  declare static validatesExclusionOf: Extended<typeof HelperMethods>["validatesExclusionOf"];
+  declare static validatesFormatOf: Extended<typeof HelperMethods>["validatesFormatOf"];
+  declare static validatesAcceptanceOf: Extended<typeof HelperMethods>["validatesAcceptanceOf"];
+  declare static validatesConfirmationOf: Extended<typeof HelperMethods>["validatesConfirmationOf"];
+  declare static validatesComparisonOf: Extended<typeof HelperMethods>["validatesComparisonOf"];
 
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_presence_of
-   *   validates_with PresenceValidator, _merge_attributes(attr_names)
-   */
-  static validatesPresenceOf(...attrNames: unknown[]): void {
-    this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_absence_of
-   *   validates_with AbsenceValidator, _merge_attributes(attr_names)
-   */
-  static validatesAbsenceOf(...attrNames: unknown[]): void {
-    this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_length_of
-   *   validates_with LengthValidator, _merge_attributes(attr_names)
-   */
-  static validatesLengthOf(...attrNames: unknown[]): void {
-    this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_numericality_of
-   *   validates_with NumericalityValidator, _merge_attributes(attr_names)
-   */
-  static validatesNumericalityOf(...attrNames: unknown[]): void {
-    this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_inclusion_of
-   *   validates_with InclusionValidator, _merge_attributes(attr_names)
-   */
-  static validatesInclusionOf(...attrNames: unknown[]): void {
-    this.validatesWith(InclusionValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_exclusion_of
-   *   validates_with ExclusionValidator, _merge_attributes(attr_names)
-   */
-  static validatesExclusionOf(...attrNames: unknown[]): void {
-    this.validatesWith(ExclusionValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_format_of
-   *   validates_with FormatValidator, _merge_attributes(attr_names)
-   */
-  static validatesFormatOf(...attrNames: unknown[]): void {
-    this.validatesWith(FormatValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_acceptance_of
-   *   validates_with AcceptanceValidator, _merge_attributes(attr_names)
-   *
-   * `validatesWith` injects the host class and invokes the validator's
-   * `setupBang` (Rails' `setup!(options[:class])`), which materializes the
-   * virtual acceptance accessors on the prototype; the constructor's
-   * setter-dispatch mass-assignment honors them.
-   */
-  static validatesAcceptanceOf(...attrNames: unknown[]): void {
-    this.validatesWith(AcceptanceValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_confirmation_of
-   *   validates_with ConfirmationValidator, _merge_attributes(attr_names)
-   *
-   * As with acceptance, `validatesWith` invokes the validator's `setupBang`
-   * (Rails' `setup!`), which defines the `${attr}Confirmation` accessors on
-   * the prototype; the constructor's setter-dispatch mass-assignment accepts
-   * them.
-   */
-  static validatesConfirmationOf(...attrNames: unknown[]): void {
-    this.validatesWith(ConfirmationValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods.validates_comparison_of
-   *   validates_with ComparisonValidator, _merge_attributes(attr_names)
-   */
-  static validatesComparisonOf(...attrNames: unknown[]): void {
-    this.validatesWith(ComparisonValidator, this._mergeAttributes(attrNames));
-  }
-
-  /**
-   * Mirrors: ActiveModel::Validations::HelperMethods `alias_method
-   * :validates_size_of, :validates_length_of` (length.rb:128).
-   */
-  static validatesSizeOf(...attrNames: unknown[]): void {
-    this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-  }
+  /** @internal Rails-private helper (helper_methods.rb:7-11). */
+  declare static _mergeAttributes: Extended<typeof HelperMethods>["_mergeAttributes"];
 
   // The `ActiveModel::Validations::Callbacks::ClassMethods` half
   // (validations/callbacks.rb:32-110), mixed on by the `extend(Model, …)` at
@@ -572,17 +488,6 @@ export class Model {
   static predicateForValidationContext = validationsPredicateForValidationContext;
 
   /**
-   * Normalize the trailing options hash from a `validates_each`
-   * argument list and stamp `attributes:` onto it. Mirrors Rails
-   * `Validations::HelperMethods#_merge_attributes`.
-   *
-   * @internal Rails-private helper.
-   */
-  static _mergeAttributes(attrNames: unknown[]): Record<string, unknown> {
-    return validationsMergeAttributes(attrNames);
-  }
-
-  /**
    * Default option keys recognized by `validates(...)`. Subclasses
    * override to add custom keys. Mirrors Rails
    * `_validates_default_keys` (validations/validates.rb:162-164).
@@ -711,26 +616,6 @@ export class Model {
    * @internal
    */
   _contextForValidation?: ValidationContext;
-
-  /**
-   * Mirrors: HelperMethods#validates_presence_of (validations/presence.rb:34-36).
-   * Rails both `extend`s and `include`s `HelperMethods` (validations.rb:45-46), so
-   * the helpers run on the spot on an instance — what a `validate do…end` calls.
-   */
-  async validatesPresenceOf(...attrNames: unknown[]): Promise<void> {
-    await this.validatesWith(
-      PresenceValidator,
-      (this.constructor as typeof Model)._mergeAttributes([...attrNames]),
-    );
-  }
-
-  /** Mirrors: HelperMethods#validates_length_of (validations/length.rb:123-125). */
-  async validatesLengthOf(...attrNames: unknown[]): Promise<void> {
-    await this.validatesWith(
-      LengthValidator,
-      (this.constructor as typeof Model)._mergeAttributes([...attrNames]),
-    );
-  }
 
   /**
    * Freeze this model instance. Mirrors Rails
