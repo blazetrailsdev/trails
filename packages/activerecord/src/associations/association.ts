@@ -842,6 +842,16 @@ export class Association {
     // Rails' block is one literal shared by both construction paths
     // (association.rb:384-387); ours needs it twice because of the plain-`new`
     // fallback below, so it is bound once here.
+    //
+    // Rails yields inside `build_record`, so the block has run by the time
+    // `build_record` returns and `set_new_record`/`save` follow
+    // (singular_association.rb:29-32, :67-70). When `_assignAttributes` defers
+    // — `scope_for_create`'s `create_with` half can name an association writer
+    // (relation.rb:1231-1235) — a JS constructor cannot await it back into this
+    // synchronous return, so the block is yielded from the continuation
+    // instead; the writes drain on save (RFC 0087). Converging this needs an
+    // awaited `buildRecord` across all seven call sites: story
+    // 0023-surfaced-deviations/build-record-await-deferred-initialize.
     const initializeAndYield = (record: Base): void => {
       const pending = this.initializeAttributes(record, attributes);
       if (pending) {
