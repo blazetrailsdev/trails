@@ -69,6 +69,7 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
 import {
+  ANY_TAG_LINE,
   TAG as MISSING_RAILS_CALL_TAG,
   suppressedCallReasonsIn,
   suppressedCallsIn,
@@ -1724,7 +1725,9 @@ function taggedCommentOf<T>(
  * the tag is its only marker; consumers filter on `internal: true`.
  */
 export function hasInternalJsDocTag(node: ts.Node): boolean {
-  return ts.getJSDocTags(node).some((tag) => tag.tagName.text === "internal");
+  return ts
+    .getJSDocTags(node)
+    .some((tag) => tag.tagName.text === "internal" && isLineLeadingJsDocTag(tag));
 }
 
 /**
@@ -1746,7 +1749,7 @@ export function hasInternalJsDocTag(node: ts.Node): boolean {
  */
 export function noRailsEquivalentReason(node: ts.Node): string | undefined {
   for (const tag of ts.getJSDocTags(node)) {
-    if (tag.tagName.text !== "noRailsEquivalent") continue;
+    if (tag.tagName.text !== "noRailsEquivalent" || !isLineLeadingJsDocTag(tag)) continue;
     const reason = (ts.getTextOfJSDocComment(tag.comment) ?? "").replace(/\s+/g, " ").trim();
     if (reason === "") {
       const sf = node.getSourceFile();
@@ -1833,13 +1836,37 @@ function proseTagAfter(tag: ts.JSDocTag): { name: string; lineLeading: boolean }
   return undefined;
 }
 
-/** True when only comment-frame padding (`*`, spaces, tabs) precedes `pos` on its line. */
+/**
+ * True when a JSDoc tag OPENS its line, by the shared `ANY_TAG_LINE`
+ * (`missing-rails-call-tags.ts`) — the single anchor every tag reader here
+ * shares with the raw-text parser.
+ *
+ * TypeScript parses `@word` as a real tag wherever it appears, including
+ * mid-sentence inside another tag's reason prose. A curated
+ * `@missingRailsCall` reason naming another tag family — the reasons arguing a
+ * language shortcoming routinely name `@noRailsEquivalent` — therefore minted a
+ * PHANTOM tag on the enclosing declaration, with whatever prose followed it as
+ * its "reason" (hit for real in trails#6898). `missing-rails-call-tags.ts`
+ * already ends a reason only at a LINE-leading tag, so without this the two
+ * halves of one tag family disagreed about what counts as a tag; a mid-line
+ * mention is prose to both of them now.
+ */
+export function isLineLeadingJsDocTag(tag: ts.JSDocTag): boolean {
+  return isLineLeading(tag.getSourceFile().text, tag.getStart());
+}
+
+/**
+ * True when a tag at `pos` opens its line, by `ANY_TAG_LINE` — the rule
+ * `missing-rails-call-tags.ts` already applies to the raw comment text, shared
+ * rather than re-derived, so `*   @foo` is a continuation to both readers.
+ *
+ * The one normalization is the `/**` opener of a one-line comment, rewritten to
+ * the `*` frame `ANY_TAG_LINE` expects: `splitCommentLines` lifts a one-line
+ * comment's tags the same way before the parser walks them.
+ */
 function isLineLeading(text: string, pos: number): boolean {
-  for (let i = pos - 1; i >= 0 && text[i] !== "\n"; i--) {
-    const ch = text[i];
-    if (ch !== " " && ch !== "\t" && ch !== "*") return false;
-  }
-  return true;
+  const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+  return ANY_TAG_LINE.test(text.slice(lineStart, pos + 2).replace(/^(\s*)\/\*\*/, "$1*"));
 }
 
 /**

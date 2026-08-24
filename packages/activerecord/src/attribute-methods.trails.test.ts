@@ -37,7 +37,7 @@ const generatable = (cls: unknown): Generatable => cls as Generatable;
 describe("AttributeMethodsTest (trails)", () => {
   fixtures([]);
 
-  it("initializeGeneratedModules replaces a module ActiveModel built first", async () => {
+  it("a class-body attribute and aliasAttribute leave one GeneratedAttributeMethods", async () => {
     class Legacy extends Base {
       static {
         this.attribute("title", "string");
@@ -48,6 +48,23 @@ describe("AttributeMethodsTest (trails)", () => {
 
     expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
     expect(new Legacy({ title: "t" }).heading).toBe("t");
+  });
+
+  it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {
+    class Middle extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Leaf extends Middle {}
+
+    (
+      Leaf as unknown as { isInstanceMethodAlreadyImplemented(name: string): boolean }
+    ).isInstanceMethodAlreadyImplemented("title");
+
+    expect(Object.prototype.hasOwnProperty.call(Leaf, "_generatedAttributeMethods")).toBe(true);
+    expect(Leaf._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+    expect(Leaf._generatedAttributeMethods!.inspect()).toBe("Leaf::GeneratedAttributeMethods");
   });
 
   it("defineAttributeMethods cascades to the superclass", async () => {

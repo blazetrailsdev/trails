@@ -1092,6 +1092,21 @@ function getColumnsHash(host: SchemaHost): Record<string, unknown> {
  *
  * `host` is always the class the load was triggered on: every class reflects
  * its OWN `table_name` (model_schema.rb:587-597).
+ *
+ * Rails drops `@default_attributes` / `@attribute_types` only in
+ * `reload_schema_from_cache` (attributes.rb:267-270,
+ * activemodel/attribute_registration.rb:88-95) — never in `load_schema!` — and
+ * gets away with it because `_default_attributes` (attributes.rb:241-252) reads
+ * `columns_hash` through the SYNCHRONOUS `load_schema` (model_schema.rb:530-546),
+ * which re-raises after resetting when the load fails. A Ruby memo is therefore
+ * built from the loaded columns by construction.
+ *
+ * trails' load is `async` (`loadSchemaFromAdapter` below), so a caller can force
+ * `_defaultAttributes` before the columns land and latch a memo built without
+ * them, which no later load would replace. The two memos are dropped here for
+ * that reason alone. Removing this reset is what CI caught: Topic's cold memo
+ * survived its load and every attribute read raised
+ * `UnknownAttributeError: unknown attribute 'title'`.
  */
 function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void {
   const ignored = new Set(host._ignoredColumns ?? []);
