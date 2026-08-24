@@ -5,7 +5,7 @@
 
 import * as path from "path";
 import * as ts from "typescript";
-import { normalizeTrailsKind } from "./assertion-kinds.js";
+import { NON_ASSERTION_TRAILS_HELPERS, normalizeTrailsKind } from "./assertion-kinds.js";
 import { VALUE_BEARING_KINDS } from "./assertion-values.js";
 import {
   ADAPTER_GATE_WRAPPERS,
@@ -18,9 +18,6 @@ import {
 import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
-
-/** `must*`-prefixed trails helpers that are normalizers, not assertions. */
-const NON_ASSERTION_MUST_HELPERS = new Set(["mustBeLike"]);
 
 /**
  * Does a call's callee identifier name it an assertion? The camelCase twin of
@@ -35,15 +32,11 @@ const NON_ASSERTION_MUST_HELPERS = new Set(["mustBeLike"]);
  * `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier callee,
  * so each chain counts once.
  *
- * `mustBeLike` is the one `must*` name that is NOT an assertion: Rails'
- * `must_be_like` squeezes whitespace and then defers to `must_equal`
- * (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13), and the trails
- * port keeps only the squeezing half — a pure string normalizer used on BOTH
- * sides of a native `expect(mustBeLike(a)).toBe(mustBeLike(b))`. Counting it
- * would score one Rails assertion as three.
+ * NON_ASSERTION_TRAILS_HELPERS (assertion-kinds.ts) carves out the `must*`
+ * names that are normalizers rather than assertions; see it for why.
  */
 function isAssertionCallee(name: string): boolean {
-  if (NON_ASSERTION_MUST_HELPERS.has(name)) return false;
+  if (NON_ASSERTION_TRAILS_HELPERS.has(name)) return false;
   return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
 }
 
