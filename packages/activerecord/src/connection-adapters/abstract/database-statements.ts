@@ -212,8 +212,6 @@ export class DatabaseStatementsBase {
   }
 }
 
-// --- Query conversion ---
-
 /**
  * Compile an Arel node to a SQL string with its bind values inlined via the
  * connection's own `quote`. Mirrors Rails' `to_sql` under
@@ -252,7 +250,6 @@ export function toSql(
 ): string {
   if (typeof arel === "string") return arel;
 
-  // Unwrap TreeManager → Node
   let node = arel;
   if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
     node = (node as any).ast;
@@ -305,7 +302,6 @@ export function toSqlAndBinds(
     node = (node as any).ast;
   }
 
-  // Arel node — compile via adapter visitor when available, else generic toSql()
   if (node instanceof Nodes.Node || (node && typeof (node as any).toSql === "function")) {
     if (binds.length > 0) {
       throw new Error(
@@ -382,13 +378,11 @@ export function cacheableQuery(
   const host = this as DatabaseStatementsHost;
   const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
 
-  // Unwrap TreeManager → Node
   let node = arel;
   if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
     node = (node as any).ast;
   }
 
-  // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
     const [sql, binds] = visitor.compile(node, host.collector!() as Collectors.Composite) as [
       string,
@@ -406,12 +400,10 @@ export function cacheableQuery(
     return [klass.partialQuery(parts), collectedBinds];
   }
 
-  // Fallback: compile to SQL string
   let sql: string;
   if (typeof arel === "string") {
     sql = arel;
   } else if (visitor && node instanceof Nodes.Node) {
-    // Returns empty binds below, so inline any BindParams into the SQL string.
     [sql] = compileInlined(visitor, node, host);
   } else {
     sql = (node as any).toSql?.() ?? String(node);
@@ -423,8 +415,6 @@ export function cacheableQuery(
   const queryObj = klass.query ? klass.query(sql) : sql;
   return [queryObj, []];
 }
-
-// --- Query execution ---
 
 /**
  * Returns a single value via internal_exec_query.
@@ -505,8 +495,6 @@ export function explain(_arel: unknown, _binds?: unknown[], _options?: unknown[]
   throw new Error("explain must be implemented by adapter subclass");
 }
 
-// --- Data modification ---
-
 /**
  * Executes a TRUNCATE statement.
  *
@@ -570,8 +558,6 @@ export async function truncateTables(
   }
 }
 
-// --- Transaction ---
-
 /**
  * Runs the given block in a database transaction.
  * Supports nested transactions via savepoints, isolation levels,
@@ -586,8 +572,6 @@ export async function transaction<T>(
 ): Promise<T | undefined> {
   const { requiresNew, isolation, joinable = true } = options;
 
-  // Check if we can join the current transaction.
-  // joinable may be a boolean property or a function — support both.
   const currentTxn = this.currentTransaction?.();
   const currentTxnJoinable =
     typeof currentTxn?.joinable === "function" ? currentTxn.joinable() : currentTxn?.joinable;
@@ -614,7 +598,6 @@ export async function transaction<T>(
     }
   }
 
-  // Fallback: simple begin/commit/rollback — delegate through this, preserving context
   if (isolation) {
     await beginDeferredTransaction.call(this, isolation);
   } else {
@@ -640,8 +623,6 @@ export async function transaction<T>(
     }
   }
 }
-
-// --- Transaction lifecycle ---
 
 /**
  * The transaction manager for this connection.
@@ -748,9 +729,7 @@ export function addTransactionRecord(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#begin_db_transaction
  */
-export async function beginDbTransaction(): Promise<void> {
-  // No-op in abstract base
-}
+export async function beginDbTransaction(): Promise<void> {}
 
 /**
  * Begins a deferred transaction, optionally with an isolation level.
@@ -806,18 +785,14 @@ export async function beginIsolatedDbTransaction(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#reset_isolation_level
  */
-export function resetIsolationLevel(): void {
-  // No-op in abstract base
-}
+export function resetIsolationLevel(): void {}
 
 /**
  * Commits the database transaction. No-op in abstract base.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#commit_db_transaction
  */
-export async function commitDbTransaction(): Promise<void> {
-  // No-op in abstract base
-}
+export async function commitDbTransaction(): Promise<void> {}
 
 /**
  * Rolls back the database transaction.
@@ -836,9 +811,7 @@ export async function rollbackDbTransaction(this: DatabaseStatementsHost | void)
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_rollback_db_transaction
  */
-export async function execRollbackDbTransaction(): Promise<void> {
-  // No-op in abstract base
-}
+export async function execRollbackDbTransaction(): Promise<void> {}
 
 /**
  * Restarts the database transaction (ROLLBACK + BEGIN).
@@ -857,9 +830,7 @@ export async function restartDbTransaction(this: DatabaseStatementsHost | void):
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#exec_restart_db_transaction
  */
-export async function execRestartDbTransaction(): Promise<void> {
-  // No-op in abstract base
-}
+export async function execRestartDbTransaction(): Promise<void> {}
 
 /**
  * Rolls back to a savepoint.
@@ -875,8 +846,6 @@ export async function rollbackToSavepoint(
     await host.execRollbackToSavepoint(name);
   }
 }
-
-// --- Utility methods ---
 
 /**
  * Returns the default sequence name for a table/column pair.
@@ -896,9 +865,7 @@ export async function resetSequenceBang(
   _table: string,
   _column: string,
   _sequence?: string | null,
-): Promise<void> {
-  // No-op by default. Implement for PostgreSQL, Oracle, etc.
-}
+): Promise<void> {}
 
 /**
  * Inserts a single fixture row into a table.
@@ -993,8 +960,6 @@ export async function insertFixturesSet(
     }
   };
 
-  // The wrapped block only touches the fixture tables and the delete targets, so
-  // scope the trigger toggle to that set rather than the whole catalog.
   const affectedTables = [...new Set([...Object.keys(fixtureSet), ...tablesToDelete])];
 
   // Rails wraps fixture loading in a transaction with requires_new: true
@@ -1068,8 +1033,6 @@ function integerFromString(str: string): number {
     radix = { x: 16, b: 2, o: 8, d: 10 }[prefix[1].toLowerCase()]!;
     body = body.slice(2);
   } else if (/^0./.test(body)) {
-    // A bare leading `0` is the octal prefix, and like the lettered prefixes it
-    // may be followed by an `_` separator: `Integer("0_1") # => 1`.
     radix = 8;
     body = body.slice(1).replace(/^_/, "");
   }
@@ -1222,13 +1185,10 @@ export async function internalExecQuery(
       "internalExecQuery requires internalExecute on the adapter when binds are provided",
     );
   }
-  // Fallback: delegate through this.execute only when there are no binds
   const doExecute = this?.execute?.bind(this) ?? execute;
   const result = await doExecute(sql, [], name);
   return normalizeResult(result);
 }
-
-// --- Private helpers ---
 
 function normalizeResult(result: unknown): Result {
   if (result instanceof Result) return result;
@@ -1953,7 +1913,6 @@ export function select(
       );
     }
 
-    // We make sure to run query transformers on the original thread
     sql = this.preprocessQuery ? this.preprocessQuery(sql) : sql;
     const futureResult = new (async as FutureResultClass)(
       this.pool as unknown as FutureResultPool,

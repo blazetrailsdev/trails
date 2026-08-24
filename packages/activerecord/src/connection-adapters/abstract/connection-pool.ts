@@ -473,8 +473,6 @@ export class ConnectionPool implements ReapablePool {
     return this.inspect();
   }
 
-  // --- Delegation to PoolConfig ---
-
   get schemaReflection(): SchemaReflection {
     return this.poolConfig.schemaReflection;
   }
@@ -486,14 +484,6 @@ export class ConnectionPool implements ReapablePool {
     // next schemaCache access wraps the new reflection, not the
     // stale one.
     this._boundSchemaCache = undefined;
-    // Also reset the lazy-load guard AND the raw cache so the new
-    // reflection's on-disk cache path gets loaded on the next first-
-    // connection event. Without resetting _lazyLoadTriggered the
-    // guard would still be true from the old reflection; without
-    // resetting poolConfig.schemaCache the `!this.poolConfig.schemaCache`
-    // guard in newConnection would prevent the new lazy-load from
-    // triggering, and adapter-side consumers would keep seeing stale
-    // cache data from the old reflection.
     this._lazyLoadTriggered = false;
     this._lazyLoadPromise = null;
     this._eagerWarmTriggered = false;
@@ -528,8 +518,6 @@ export class ConnectionPool implements ReapablePool {
   get connectionDescriptor(): ConnectionDescriptor {
     return this.poolConfig.connectionDescriptor;
   }
-
-  // --- Migration / Schema ---
 
   private _adapterProxy?: DatabaseAdapter;
 
@@ -646,8 +634,6 @@ export class ConnectionPool implements ReapablePool {
     this._cacheConfig.clearQueryCache();
   }
 
-  // --- Pool state ---
-
   get activeConnection(): DatabaseAdapter | null {
     return this.connectionLease().connection;
   }
@@ -664,15 +650,11 @@ export class ConnectionPool implements ReapablePool {
     return this._connections === null;
   }
 
-  // --- Install executor hooks ---
-
   static installExecutorHooks(
     executor: { registerHook(hooks: typeof ExecutorHooks): void } = Executor,
   ): void {
     executor.registerHook(ExecutorHooks);
   }
-
-  // --- Lease management ---
 
   // Async for the same reason as `checkout` (see its comment): the pinned-reuse
   // path routes through `checkout`, which awaits `verifyBang`. Intentional
@@ -735,8 +717,6 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  // --- Pin / Unpin ---
-
   async pinConnectionBang(_lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
     // Accept `pinConnectionBang(true)` (Rails-compat boolean), `pinConnectionBang()`,
     // and `pinConnectionBang({ fixture: true })`. The boolean form is retained for
@@ -751,19 +731,11 @@ export class ConnectionPool implements ReapablePool {
     let pin: { connection: DatabaseAdapter; depth: number } | undefined =
       slot === "fixture" ? (this._fixturePin ?? undefined) : this._pinnedConnections.get(ctxId);
 
-    // Fixture pins can't rely on the per-context lease — vitest's
-    // beforeEach/it/afterEach often run in different AsyncLocalStorage
-    // contexts, so the current context's lease may be empty even when
-    // another context already leased the only connection. Reuse the first
-    // established connection in fixture mode so pool size 1 doesn't trip
-    // ConnectionTimeoutError on `_acquireConnection`.
     const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
     const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
     const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
     const newlyCheckedOut = !pin && leasedConnection == null;
 
-    // Record the pin before any async work to prevent concurrent
-    // pinConnectionBang calls in the same context from double-acquiring.
     if (!pin) {
       pin = { connection, depth: 0 };
       if (slot === "fixture") {
@@ -870,8 +842,6 @@ export class ConnectionPool implements ReapablePool {
 
     return clean;
   }
-
-  // --- Checkout / Checkin ---
 
   // `checkout` is async in trails even though Rails' `ConnectionPool#checkout`
   // (connection_pool.rb:547) is synchronous. This is an intentional, documented
@@ -980,9 +950,6 @@ export class ConnectionPool implements ReapablePool {
       const expireBlock = () => c.expire?.();
       if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
       else {
-        // Defensive fallback for a connection without the callback runner.
-        // Mirror the registry order: block (expire) first, then the `:after`
-        // unset_query_cache! teardown.
         expireBlock();
         QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
       }
@@ -1027,8 +994,6 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  // --- Pool statistics ---
-
   numWaitingInQueue(): number {
     return this._available?.numWaiting() ?? 0;
   }
@@ -1058,8 +1023,6 @@ export class ConnectionPool implements ReapablePool {
       checkoutTimeout: this.checkoutTimeout,
     };
   }
-
-  // --- Lifecycle ---
 
   /**
    * Converges Rails' `ConnectionPool#disconnect`: tears down synchronously, then
@@ -1339,8 +1302,6 @@ export class ConnectionPool implements ReapablePool {
     await Promise.all(this._pendingCloseDrains);
   }
 
-  // --- Connection creation ---
-
   /**
    * Mirrors Rails:
    *
@@ -1402,39 +1363,16 @@ export class ConnectionPool implements ReapablePool {
       !this.poolConfig.schemaCache
     ) {
       this._lazyLoadTriggered = true;
-      // Use BoundSchemaReflection.forLoneConnection so the version-
-      // check in loadCache routes through a FakePool that yields the
-      // just-created connection — never re-enters the real pool's
-      // checkout. Without this, pool size=1 would deadlock: loadCache
-      // calls pool.withConnection to query schemaVersion(), which tries
-      // to checkout a second connection that doesn't exist.
-      //
-      // The loneRef shares the same SchemaReflection as `this.schemaCache`,
-      // so a successful load populates both.
       const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
       this._lazyLoadPromise = loneRef
         .loadBang()
         .then(() => {
-          // Propagate the loaded SchemaCache into poolConfig.schemaCache
-          // so adapter-side consumers (AbstractAdapter.schemaCache,
-          // TypeCaster::Connection) see the preloaded data.
           const loaded = this.schemaReflection.loadedCache;
           if (loaded) {
-            // Always assign: poolConfig.schemaCache may have been
-            // populated with an empty SchemaCache during the in-flight
-            // load (e.g., AbstractAdapter.schemaCache accessed
-            // synchronously by TypeCaster::Connection before the
-            // promise resolved). Overwriting that empty cache with the
-            // fully-populated one is the correct outcome — the preloaded
-            // data should win.
             this.poolConfig.schemaCache = loaded;
           }
         })
         .catch((err) => {
-          // loadCache swallows read/parse/version errors internally;
-          // this is a belt-and-suspenders guard. Log enough context to
-          // diagnose if a future change adds an unexpected rejection.
-
           console.warn(
             `[trails] Failed to lazily load schema cache for pool ` +
               `${this.poolConfig.connectionSpecName}: ` +
@@ -1574,8 +1512,6 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  // --- Private ---
-
   private _isConnectionPinned(conn: DatabaseAdapter): boolean {
     if (this._fixturePin?.connection === conn) return true;
     for (const pin of this._pinnedConnections.values()) {
@@ -1595,10 +1531,6 @@ export class ConnectionPool implements ReapablePool {
    * @internal
    */
   private _resolvePinnedConnection(): DatabaseAdapter | undefined {
-    // Pool-level fixture pin (set by `pinConnectionBang({ fixture: true })`)
-    // wins across all execution contexts — that's the whole point of the
-    // fixture slot. Falls back to the per-context map for production
-    // request-scoped pins.
     if (this._fixturePin) return this._fixturePin.connection;
     if (this._pinnedConnections.size === 0) return undefined;
     return this._pinnedConnections.get(executionContextId())?.connection;
@@ -1730,7 +1662,6 @@ function attemptToCheckoutAllExistingConnections(
       if (this._checkedOut.has(conn)) continue;
       try {
         if (this._available && this._available.delete(conn) === undefined) {
-          // Not idle — fall back to a generic checkout to surface a timeout.
           const acquired = checkoutForExclusiveAccess(this, this.checkoutTimeout);
           if (acquired) newlyCheckedOut.push(acquired);
           continue;
@@ -1776,17 +1707,6 @@ function attemptToCheckoutAllExistingConnections(
  */
 function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
   try {
-    // Synchronous acquisition: this is the exclusive-access sweep on the sync
-    // disconnect/discard lifecycle path, which cannot await. `checkout` is now
-    // async (it awaits verifyBang), so we call the sync `_acquireConnection`
-    // directly. This fallback only exists to grab ownership / surface a timeout
-    // for a busy connection — the acquired connection is immediately blocked and
-    // discarded by the sweep, so it deliberately skips checkout_and_verify's
-    // clean!/query-cache wiring (running it here regresses disconnect/discard
-    // tests). The sweep only reaches here when connections are busy, so
-    // acquisition raises `ConnectionTimeoutError` (converted below).
-    // (Lifecycle-path async convergence is tracked by
-    // `converge-connection-pool-lifecycle-exclusive-access-async`.)
     return pool._acquireConnection();
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {
@@ -1865,7 +1785,7 @@ function acquireConnection(
     let conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
     conn = this.tryToCheckoutNewConnection() ?? undefined;
-    if (conn) return conn; // tryToCheckoutNewConnection already adds to _checkedOut
+    if (conn) return conn;
     this.reap();
     conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
@@ -1953,9 +1873,6 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
  * @internal
  */
 function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
-  // Only AbstractAdapter has a `pool` slot reserved for this back-reference;
-  // concrete driver adapters use `pool` for their own driver pool. Mirror the
-  // gate already used by ConnectionPool#newConnection.
   if (conn instanceof AbstractAdapter) {
     (conn as unknown as { pool?: ConnectionPool }).pool = this;
   }
@@ -2022,10 +1939,6 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
   } catch (err) {
     pool.remove(c);
     (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
-    // disconnectBang on an async-only driver fires a promise-returning close it
-    // can't await under its sync contract; stash it on the pool so a caller can
-    // drain it (pool.drainPendingCloses) before re-opening the same DB. Sync
-    // drivers contribute a resolved no-op.
     pool._trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
     throw err;
   }

@@ -73,8 +73,6 @@ describe("quotedTime", () => {
   });
 
   it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
-    // Override quotedDate to prove the self-dispatch chain is live; the prefix
-    // is then stripped by quotedTime's date-removal regex.
     const host = quotingHost({ quotedDate: () => "2000-01-01 11:22:33" });
     const v = Temporal.PlainTime.from("11:22:33");
     expect(quotedTime.call(host, v)).toBe("11:22:33");
@@ -167,8 +165,9 @@ describe("quote dispatches through quoted_binary", () => {
     const expected = `'${bytes.map((b) => String.fromCharCode(b)).join("")}'`;
     expect(quotedBinary(new BinaryData(new Uint8Array(bytes)))).toBe(expected);
     expect(quotedBinary(new Uint8Array(bytes))).toBe(expected);
-    expect(Array.from(quotedBinary(new Uint8Array(bytes)).slice(1, -1), (c) => c.charCodeAt(0))) //
-      .toEqual(bytes);
+    expect(
+      Array.from(quotedBinary(new Uint8Array(bytes)).slice(1, -1), (c) => c.charCodeAt(0)),
+    ).toEqual(bytes);
   });
 });
 
@@ -216,11 +215,6 @@ describe("quote_table_name dispatches through quote_column_name", () => {
   });
 
   it("raises on a receiver with no quoter rather than answering with ANSI quotes", () => {
-    // rb:141-143 is an unconditional `quote_column_name(table_name)`, so a
-    // receiver that defines no quoter raises from the abstract
-    // `quote_column_name` (rb:61). It must NOT fall back to a module-level
-    // default and hand back a plausible-but-wrong `"people"` — that silent
-    // degradation is what the retired `dispatch*` probes produced.
     expect(() => quoteTableName.call(quotingHost(), "people")).toThrow(NotImplementedError);
   });
 });

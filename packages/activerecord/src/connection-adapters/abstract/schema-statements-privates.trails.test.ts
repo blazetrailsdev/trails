@@ -39,9 +39,6 @@ function makeStatements(
     schemaCache: { clearDataSourceCacheBang: vi.fn().mockResolvedValue(undefined) },
     ...adapterOverrides,
   };
-  // Real hosts reflect through `internal_exec_query(sql, "SCHEMA")`. Route the
-  // stub's through whichever `execute` this call installed so reflection probes
-  // stay visible to per-test `execute` spies.
   adapter["internalExecQuery"] ??= async (
     sql: string,
     _name?: string | null,
@@ -66,11 +63,7 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
-  // Real hosts override AbstractAdapter#native_database_types (the abstract one
-  // is `{}`); the stub answers with SQLite's table so typeToSql resolves.
   adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
-  // The catalog probes go through data_source_sql; the stub answers with a
-  // simple catalog query unless a test installs its own.
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null
       ? "SELECT name FROM catalog"
@@ -83,8 +76,6 @@ function makeStatements(
     )(sql, binds, "SCHEMA")) as Record<string, unknown>[];
     return rows.map((row) => Object.values(row)[0]);
   };
-  // The bodies under test are prototype methods mixed into the adapter, so
-  // give the stub adapter that prototype and call them the way production does.
   return Object.setPrototypeOf(adapter, Statements.prototype) as SchemaStatements;
 }
 
@@ -193,7 +184,7 @@ describe("SchemaStatements privates (PR 8)", () => {
   it("indexNameForRemove applies the generate_index_name length/hash fallback to a long expression", async () => {
     const longExpr = `lower(${"a".repeat(80)})`;
     const expected = makeStatements().generateIndexName("users", `lower_${"a".repeat(80)}`);
-    expect(expected).toMatch(/_[0-9a-f]{10}$/); // fallback fired
+    expect(expected).toMatch(/_[0-9a-f]{10}$/);
     const ss = makeStatements({
       indexes: vi.fn().mockResolvedValue([{ name: expected, columns: ["x"], unique: false }]),
     });
@@ -256,8 +247,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintName("users", { expression: "age > 0" })).toMatch(
       /^chk_rails_[0-9a-f]{10}$/,
     );
-    // The inner `options.fetch(:expression)` is the same rule: a stored nil
-    // interpolates as "" ("users__chk"), and only an ABSENT key raises.
     expect(ss.checkConstraintName("users", { expression: undefined })).toBe(
       ss.checkConstraintName("users", { expression: "" }),
     );
@@ -341,7 +330,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     ).toBe(false);
   });
 
-  // PR 8b helpers
   it("validateIndexLengthBang throws when name too long", () => {
     const ss = makeStatements();
     expect(() => ss.validateIndexLengthBang("users", "a".repeat(65))).toThrow(/too long/);
@@ -513,7 +501,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     );
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
 
-    // A distinct array instance with the same elements must still match.
     expect(
       await ss.foreignKeyExists("astronauts", "rockets", {
         column: ["rocket_tenant_id", "rocket_id"],
@@ -545,7 +532,6 @@ describe("SchemaStatements privates (PR 8)", () => {
       ifNotExists: true,
     });
 
-    // The composite column matches by value, so no ALTER TABLE is issued.
     expect(executeMutation).not.toHaveBeenCalled();
   });
 

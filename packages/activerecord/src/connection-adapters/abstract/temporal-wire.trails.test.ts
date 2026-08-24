@@ -25,8 +25,6 @@ describe("parsePostgresInstant", () => {
   });
 
   it("truncates sub-nanosecond digits beyond 9", () => {
-    // No DB emits >9 fractional digits, but guard against corrupt input
-    // shifting the slice boundaries. "1234567899" → treat as "123456789".
     const result = parsePostgresInstant("2026-04-26 14:23:55.1234567899+00") as Temporal.Instant;
     const zdt = result.toZonedDateTimeISO("UTC");
     expect(zdt.millisecond).toBe(123);
@@ -58,10 +56,8 @@ describe("parsePostgresInstant", () => {
   });
 
   it("parses a BC timestamp", () => {
-    // Postgres 0044-03-15 BC = ISO year -43
     const result = parsePostgresInstant("0044-03-15 12:00:00+00 BC") as Temporal.Instant;
     expect(result.epochNanoseconds).toBeLessThan(0n);
-    // year -43 in proleptic Gregorian = 44 BC
     const zdt = result.toZonedDateTimeISO("UTC");
     expect(zdt.year).toBe(-43);
     expect(zdt.month).toBe(3);
@@ -209,12 +205,9 @@ describe("naive parsers honor ActiveRecord.default_timezone", () => {
 
   it("naive parsers + formatInstantForSql round-trip symmetrically under default_timezone=local", () => {
     ActiveRecord.defaultTimezone = "local";
-    // Pick a wall-clock that is unambiguous in any timezone.
     const wireString = "2026-06-15 12:00:00";
     const parsed = parsePostgresTimestampAsInstant(wireString) as Temporal.Instant;
     expect(parsed).toBeInstanceOf(Temporal.Instant);
-    // Symmetry: formatting the parsed instant under the same default_timezone
-    // setting must yield the original wire string.
     expect(formatInstantForSql(parsed)).toBe(wireString);
   });
 

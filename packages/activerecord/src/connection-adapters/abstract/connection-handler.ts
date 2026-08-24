@@ -28,9 +28,6 @@ import {
 } from "../../connection-adapters.js";
 import { buildAdapterArg } from "../adapter-args.js";
 
-// Register the resolvers/builder so DatabaseConfig#adapterClass and
-// #newConnection work for any consumer that imports ConnectionHandler —
-// even those that don't pull in connection-handling.ts.
 _setAdapterClassResolver(
   (adapterName) => resolveConnectionAdapter(adapterName),
   (adapterName) => resolveConnectionAdapterSync(adapterName),

@@ -264,7 +264,6 @@ export class SchemaCreation {
     try {
       o.sqlType ??= this.typeToSql(o.type, o.options);
     } catch (e) {
-      // typeToSql lacks the column name; re-throw with it for a diagnosable message.
       if (e instanceof Error && /empty or blank type/.test(e.message)) {
         throw new Error(
           `Column ${JSON.stringify(o.name)} has an empty or blank type — specify a valid SQL type`,

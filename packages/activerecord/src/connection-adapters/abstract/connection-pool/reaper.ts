@@ -93,10 +93,6 @@ export class Reaper {
         const p = ref.deref();
         if (p) {
           p.reap?.();
-          // Reaper runs on an unref'd timer with nothing awaiting it, so the
-          // async flush drains idle adapters' `driver.close()` best-effort; a
-          // rejected drain is swallowed rather than surfaced as an unhandled
-          // rejection that could crash the process.
           void p.flush?.()?.catch(() => {});
         }
       }

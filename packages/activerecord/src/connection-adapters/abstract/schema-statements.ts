@@ -325,9 +325,6 @@ export class SchemaStatements {
 
   /** Mirrors: SchemaStatements#schema_creation — `SchemaCreation.new(self)`. */
   get schemaCreation(): SchemaCreation {
-    // `SchemaStatements` types its host as `DatabaseAdapter & SchemaQuoter`,
-    // which does not surface the capability probes; every runtime `this` is an
-    // AbstractAdapter, which defines all of them (abstract-adapter.ts:1576-1962).
     return new SchemaCreation(this as unknown as SchemaCreationConn);
   }
 
@@ -765,10 +762,6 @@ export class SchemaStatements {
     // foreign_key_exists? matches via foreign_keys(from).detect { defined_for? },
     // scoping on to_table plus column when one is given.
     if (options.ifNotExists === true) {
-      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
-      // compares `column` element-wise, so composite (array) columns match by
-      // value rather than by array identity (a bare `===` is always false for
-      // distinct array instances).
       if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
@@ -981,7 +974,6 @@ export class SchemaStatements {
     newName = String(newName);
     this.validateIndexLengthBang(tableName, newName);
 
-    // this is a naive implementation; some DBs may support this more efficiently (PostgreSQL, for instance)
     const oldIndexDef = (await this.indexes(tableName)).find((i) => i.name === oldName);
     if (!oldIndexDef) return;
     await this.addIndex(tableName, oldIndexDef.columns, {
@@ -1182,16 +1174,8 @@ export class SchemaStatements {
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     switch (this.adapterName as AdapterName) {
       case "sqlite":
-        // Share the concrete SQLite3 introspection so this fallback arm
-        // produces the same result shape (skips `sqlite_*` auto-indexes,
-        // recovers partial-index WHERE clauses and expression/DESC columns
-        // from the index SQL) rather than a lower-fidelity subset.
         return sqliteIndexes(this as unknown as DatabaseAdapter, tableName);
       case "postgres": {
-        // The LEFT JOIN on pg_attribute (below) is deliberate: an expression
-        // key has attnum 0 with no pg_attribute row, so an inner join would drop
-        // the entire index. LEFT JOIN keeps the row (attname NULL) so the
-        // has_expressions arm can substitute the raw pg_get_indexdef expression.
         const rows = (
           await this.internalExecQuery(
             `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
@@ -1209,9 +1193,6 @@ export class SchemaStatements {
           )
         ).toArray();
         return rows.map((row: any) => {
-          // Recover the partial-index WHERE predicate and per-column DESC
-          // directions from the index definition, mirroring the concrete
-          // PostgreSQL::SchemaStatements#indexes parsing.
           const def = (row.definition as string) ?? "";
           const defMatch = def.match(
             / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
@@ -1713,7 +1694,6 @@ export class SchemaStatements {
       await this.execute(`INSERT INTO ${smTable} (version) VALUES (${this.quote(version)})`);
     }
 
-    // Insert all known migration versions below the target that haven't been run
     const inserting = allVersions.filter((v) => v < version && !migrated.includes(v));
     if (inserting.length > 0) {
       const duplicate = inserting.find((v) => inserting.filter((x) => x === v).length > 1);
@@ -2418,9 +2398,6 @@ export class SchemaStatements {
 
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, _internal = false): void {
-    // Resolve through the adapter (which carries the DatabaseLimits mixin) so an
-    // adapter overriding indexNameLength/maxIdentifierLength propagates here,
-    // falling back to the DatabaseLimits base default for a bare adapter.
     const adapter = this as unknown as { indexNameLength?(): number };
     const limit = adapter.indexNameLength ? adapter.indexNameLength() : maxIdentifierLength();
     if (newName.length > limit) {

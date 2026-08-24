@@ -19,9 +19,6 @@ import {
 import { quote as quoteFn, typeCast as typeCastFn } from "./quoting.js";
 import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
 
-// `quote` / `typeCast` self-send `quoted_date` / `quoted_time`, so they need a
-// receiver that defines them; an override-free adapter host routes date/time
-// values through the abstract module helpers.
 const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(quotingHost(), value);
 
@@ -52,8 +49,6 @@ describe("formatInstantForSql", () => {
   });
 
   it("converts a non-UTC instant to UTC when default_timezone is utc (the default)", () => {
-    // defaultTimezone is "utc" in tests; local-tz path is
-    // integration-tested in PR 7 (timestamp.test.ts with time-travel).
     const v = Temporal.Instant.from("2026-04-26T16:23:55+02:00");
     expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
   });
@@ -86,10 +81,6 @@ describe("formatPlainDateForSql", () => {
   });
 
   it("formats a negative (BCE) year the way the date gem's %Y does", () => {
-    // year -43 = 44 BC in proleptic Gregorian. `to_fs(:db)` is
-    // `strftime("%Y-%m-%d")`, and the gem's `%Y` pads the digits to four behind
-    // the sign (`Date.new(-43, 3, 15).to_fs(:db)` → "-0043-03-15"), so routing
-    // this through packages/date drops the old unpadded "-43-03-15".
     expect(formatPlainDateForSql(Temporal.PlainDate.from({ year: -43, month: 3, day: 15 }))).toBe(
       "-0043-03-15",
     );
@@ -112,7 +103,6 @@ describe("formatPlainTimeForSql", () => {
   });
 
   it("pads to a fixed 6-digit microsecond field", () => {
-    // millisecond only — padded out to 6 digits
     expect(formatPlainTimeForSql(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100000");
   });
 });
@@ -213,8 +203,6 @@ describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for PlainTime", (
   });
 });
 
-// abstract quote() / typeCast() — used by the Postgres adapter which has no
-// adapter-specific override for datetime quoting.
 describe("abstract quote() with Temporal (Postgres path)", () => {
   it("quotes an Instant", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");

@@ -75,10 +75,6 @@ export type ColumnType =
   | "char"
   | "primary_key"
   | "uuid"
-  // Accept arbitrary adapter-specific type strings (e.g. "timestamptz",
-  // "inet", custom PG enum names) emitted by SchemaDumper's
-  // `t.column(name, sqlType, ...)` fallback. The `& {}` preserves
-  // literal autocomplete for the known types above.
   | (string & {});
 
 export type PrimaryKeyType = "uuid";
@@ -150,9 +146,6 @@ export class ColumnDefinition {
   ];
 
   sqlType?: string;
-  // PostgreSQL only: physical storage type ("timestamp" / "timestamptz") for
-  // datetime-family columns, recorded at creation time so the schema dumper
-  // can re-derive the dumped type against the live datetime_type.
   datetimePhysicalType?: string;
   constructor(
     readonly name: string,
@@ -331,12 +324,6 @@ export class ForeignKeyDefinition {
     // leave it absent), driving the fetch-fallback in isDefinedFor.
     this.storesValidate = validate !== undefined;
     this.validate = this.storesValidate ? (validate as boolean | null) : true;
-    // Default: every generic key is stored, matching the DB-introspection paths
-    // (pg/mysql/sqlite `foreignKeys`) whose options hash always carries
-    // column/name/primaryKey/onDelete/onUpdate/deferrable — present even when
-    // nil, so an unset action still compares as `Array(nil) => []`. When a
-    // caller knows exactly which keys were explicitly set (e.g. the hand-built
-    // DSL path), it passes `storedOptionKeys` to slice the comparison.
     this.storedOptionKeys = new Set(
       storedOptionKeys ?? ["column", "name", "primaryKey", "onDelete", "onUpdate", "deferrable"],
     );
@@ -409,8 +396,6 @@ export class ForeignKeyDefinition {
       // introspection, or an add/DSL path that didn't pass it), the fetch falls
       // back to the lookup value, so the comparison is trivially true.
       (options.validate == null || !this.storesValidate || options.validate === this.validate) &&
-      // Generic key compare, mirroring defined_for?'s `options.all?` over the
-      // remaining stored option keys (column, name, primary_key, on_delete, …).
       (options.column === undefined ||
         !stored("column") ||
         optionEqual(options.column, this.column)) &&
@@ -1671,8 +1656,6 @@ export class Table {
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
     const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
-    // `remove_index(column_name = nil, **options)`: an options-only call leaves
-    // column_name nil rather than passing the hash as the column.
     const columnName = isColumn ? columnOrOptions : undefined;
     // Ruby's `**options` collects the hash from either position, so an explicit
     // nil column with the options behind it keeps them.
@@ -1710,8 +1693,6 @@ export class Table {
   ): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     const { index: indexOpt, ...colOpts } = options;
-    // `@base.add_column(name, column_name, type, **options)` passes no fourth
-    // argument when `options` is empty, and CommandRecorder records args verbatim.
     if (Object.keys(colOpts).length === 0) {
       await this._schema.addColumn(this.name, columnName, type);
     } else {
