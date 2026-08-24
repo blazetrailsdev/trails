@@ -331,8 +331,7 @@ export function initInternals(this: DirtyInternalsHost, super_: () => void): voi
 }
 
 /**
- * @internal
- * @noRailsEquivalent PERMANENT. Rails' `ActiveModel::Dirty` derives its answers by asking
+ * Rails' `ActiveModel::Dirty` derives its answers by asking
  * the mutation tracker built lazily over `@attributes`
  * (dirty.rb:200-206 `mutations_from_database`,
  * attribute_mutation_tracker.rb:20-31 `changed?`), so no write path has to
@@ -344,6 +343,8 @@ export function initInternals(this: DirtyInternalsHost, super_: () => void): voi
  * and must stay usable without Dirty. `prepend()` is the Ruby
  * `include ActiveModel::Dirty` layering: the wrapper runs, `super_` is the
  * `Attributes` definition below it.
+ *
+ * @internal
  */
 export function _writeAttribute(
   this: DirtyInternalsHost,
