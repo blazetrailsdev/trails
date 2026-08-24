@@ -51,21 +51,20 @@ export interface ValidatesHost {
  */
 export function validates(
   this: ValidatesHost,
-  ...attributes: [...attributes: string[], rules: Record<string, unknown>]
+  ...args: [...attributes: string[], rules: Record<string, unknown>]
 ): void {
-  const [rest, extracted] = extractOptionsBang(attributes as unknown[]);
-  const attrs = rest as string[];
+  const [attributes, extracted] = extractOptionsBang(args as unknown[]);
   const defaults = { ...extracted };
   const validations = sliceBang(defaults, ...this._validatesDefaultKeys());
 
-  if (attrs.length === 0) {
+  if (attributes.length === 0) {
     throw new ArgumentError("You need to supply at least one attribute");
   }
   if (Object.keys(validations).length === 0) {
     throw new ArgumentError("You need to supply at least one validation");
   }
 
-  defaults.attributes = attrs;
+  defaults.attributes = attributes;
 
   for (const [rawKey, options] of Object.entries(validations)) {
     const key = `${camelize(rawKey)}Validator`;
@@ -87,11 +86,11 @@ export function validates(
  */
 export function validatesBang(
   this: ValidatesHost,
-  ...attributes: [...attributes: string[], rules: Record<string, unknown>]
+  ...args: [...attributes: string[], rules: Record<string, unknown>]
 ): void {
-  const [rest, options] = extractOptionsBang(attributes as unknown[]);
+  const [attributes, options] = extractOptionsBang(args as unknown[]);
   options.strict = true;
-  this.validates(...(rest as string[]), options);
+  this.validates(...(attributes as string[]), options);
 }
 
 /**
