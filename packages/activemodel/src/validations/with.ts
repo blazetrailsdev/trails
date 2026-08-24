@@ -108,11 +108,14 @@ export const ClassMethods = {
 
       // Ruby's `_validators[key] << validator` (with.rb:95-101) mutates the
       // Hash the `inherited` hook (validations.rb:287-291) already dupped onto
-      // this class. JS has no `inherited`, so the dup happens here instead:
-      // `class_attribute`'s writer is local to the class
-      // (core_ext/class/attribute.rb:86), so assigning a copy is what keeps a
-      // subclass's registrations off its parent. The `Hash.new { [] }` default
-      // proc is spelled out for the same reason it always is — a `Map` has none.
+      // this class. `inherited` is the one Ruby hook with no TS equivalent
+      // (CLAUDE.md, _Module mixins_): nothing fires when a subclass is defined,
+      // so the dup is deferred to here, the first write. `class_attribute`'s
+      // writer is local to the class (core_ext/class/attribute.rb:86), so
+      // assigning a copy is what keeps a subclass's registrations off its
+      // parent. Residual gap, and the only one: a subclass defined before a
+      // later parent registration copies that registration too. The
+      // `Hash.new { [] }` default proc is spelled out because a `Map` has none.
       const _validators = new Map(this._validators);
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {

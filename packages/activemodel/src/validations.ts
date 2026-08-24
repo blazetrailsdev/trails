@@ -1,4 +1,10 @@
-import { kernelArray, runCallbacks } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  defineCallbacks,
+  included,
+  kernelArray,
+  runCallbacks,
+} from "@blazetrails/activesupport";
 
 import { Errors } from "./errors.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
@@ -101,6 +107,16 @@ export function contextForValidation(this: ContextForValidationHost): Validation
  * accessor property, and only a prototype carries accessors across `include()`.
  */
 export class Validations {
+  /**
+   * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-46
+   * reach modules `model.ts` wires in its own `include ActiveModel::API` order,
+   * so this issues the two lines that are Validations' own state.
+   */
+  static [included](base: { prototype: object }): void {
+    defineCallbacks(base.prototype, "validate", { scope: ["name"] });
+    classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+  }
+
   declare errors: Errors;
   /** @internal */
   declare contextForValidation: () => ValidationContext;

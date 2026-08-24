@@ -1328,10 +1328,9 @@ include(Model, ASCallbacks.InstanceMethods);
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
-// Ruby `include ActiveModel::Validations`' `included do` block
-// (validations.rb:48-50).
-defineCallbacks(Model.prototype, "validate", { scope: ["name"] });
-classAttribute.call(Model, "_validators", { instanceWriter: false, default: new Map() });
+// Ruby `include ActiveModel::Validations` (validations.rb:52); its `included do`
+// block (:40-50) runs from the module's own `[included]` hook.
+include(Model, Validations);
 
 defineCallbacks(Model.prototype, "validation", {
   skipAfterCallbacksIfTerminated: true,
@@ -1340,9 +1339,8 @@ defineCallbacks(Model.prototype, "validation", {
 
 include(Model, ToJsonWithActiveSupportEncoder);
 
-// Ruby `include ActiveModel::Validations` (validations.rb:52) and
-// `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
-include(Model, Validations);
+// The remaining `include ActiveModel::Validations` members (validations.rb:52)
+// and `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
 include(Model, {
   contextForValidation: validationsContextForValidation,
   runValidationsBang: validationsRunValidationsBang,
