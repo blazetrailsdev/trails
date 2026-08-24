@@ -45,6 +45,13 @@ describe("FileStore atomic write and inspect", () => {
     const iterations = 100;
     try {
       const store = new FileStore(dir);
+      // Seed the key first: `lock_file` yields UNLOCKED when the file does not
+      // exist (file_store.rb:148-158) and `modify_value` is what creates it
+      // (:228), so Rails itself loses an increment when two writers race the
+      // seeding write. The mutual exclusion under test is the existing-file
+      // arm, and racing the create instead made this assert a guarantee Rails
+      // does not make — it dropped exactly one increment in CI.
+      store.write("counter", 0);
       const worker = new Worker(new URL("./file-store-lock-worker.trails.mjs", import.meta.url), {
         workerData: { dir, iterations },
         execArgv: [

@@ -114,7 +114,18 @@ jobs:
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
           RACK_PKGS_RE='^packages/(rack|activesupport|date)/'
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|date|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|tasks-shim|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|non-transactional-row-writes|generate-canonical-zone-identifiers|generate-tzdata-isdst)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          # `packages/`, `scripts/` and `eslint/` are listed whole rather than
+          # enumerated, because several tests in this lane report on the WHOLE
+          # tree rather than on their own package: stale-story-references
+          # scans exactly those three SOURCE_ROOTS
+          # (scripts/stale-story-references.ts:31), as do
+          # non-transactional-row-writes and mixin-declaration-drift. Listing
+          # only the packages whose own tests live here let a citation under
+          # packages/activerecord/ invalidate a guard result in a lane that
+          # never ran — #6980 closed a story cited in
+          # connection-adapters/column.ts, and the red surfaced a push later
+          # on main against an unrelated diff (#6989).
+          UNIT_TESTS_PKGS_RE='^(packages/|scripts/|eslint/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|date|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/src/test-helpers(/|\.ts$)|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           WEBSITE_PKGS_RE='^packages/website/'
