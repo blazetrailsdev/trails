@@ -1,3 +1,9 @@
+/**
+ * Serialization tests — TS-only coverage with no counterpart in
+ * vendor/rails/activemodel/test/cases/serialization_test.rb. Relocated here
+ * verbatim under RFC 0115 so serialization.test.ts holds Rails test names only
+ * and a renamed or split Rails test stays visible in review.
+ */
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
@@ -14,13 +20,9 @@ function setAssociationAccessors(record: unknown, entries: Record<string, unknow
   }
 }
 
-// TS-only coverage that has no counterpart in
-// vendor/rails/activemodel/test/cases/serialization_test.rb. It lives here so
-// serialization.test.ts holds Rails test names only and a renamed or split
-// Rails test stays visible in review.
-describe("Serialization (trails)", () => {
-  // Duplicated from serialization.test.ts, where it sits beside the Rails
-  // tests that also use it.
+describe("Serialization — trails-only coverage", () => {
+  // Duplicated from serialization.test.ts rather than moved: the Rails tests
+  // there use it too.
   class Post extends Model {
     static {
       this.attribute("title", "string");

@@ -97,14 +97,15 @@ export class CommandRecorder {
    * Returns the inverse command and args for the given command.
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#inverse_of
-   * (command_recorder.rb:114-123). The `methodName in this` test is Ruby's
-   * `respond_to?(method, true)` guard (command_recorder.rb:116): membership is
-   * tested before the read, because a name the recorder does not answer takes
-   * the proxy's `method_missing` arm.
+   * (command_recorder.rb:114-123). The `method in this` test is Ruby's
+   * `respond_to?(method, true)` (command_recorder.rb:116), routed through the
+   * `methodMissingProxy` `has` trap; membership is tested before the read,
+   * because a name the recorder does not answer reads back as the proxy's
+   * `NoMethodError`-raising function rather than `undefined`.
    */
   inverseOf(cmd: string, args: unknown[]): { cmd: string; args: unknown[] } {
     const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
-    if (!(method in this) || typeof this[method] !== "function") {
+    if (!(method in this)) {
       throw new IrreversibleMigration(
         `This migration uses ${cmd}, which is not automatically reversible.\n` +
           `To make the migration reversible you can either:\n` +
