@@ -452,12 +452,15 @@ export abstract class SchemaDumper {
   private _version?: string;
   private _ignoreTables: (string | RegExp)[];
 
-  /** @internal */
+  /**
+   * Rails' dumper takes the connection itself as its dump source
+   * (`schema_dumper.rb:41`); trails' dumpers read a `SchemaSource`, so an
+   * adapter is bridged onto that duck type here — the one place every
+   * `create` / `new` path funnels through.
+   *
+   * @internal
+   */
   constructor(connection: SchemaSource | DatabaseAdapter, options: Record<string, unknown> = {}) {
-    // Rails' dumper takes the connection itself as its dump source
-    // (`schema_dumper.rb:41`); trails' dumpers read a `SchemaSource`, so an
-    // adapter is bridged onto that duck type here — the one place every
-    // `create`/`new` path funnels through.
     this._source = isDatabaseAdapter(connection) ? new AdapterSchemaSource(connection) : connection;
     this._options = options;
     const lang =

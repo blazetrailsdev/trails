@@ -201,7 +201,7 @@ export function beforeCommit<T extends typeof Base>(
   ...args: TransactionCallbackArgs<T>
 ): void {
   setOptionsForCallbacksBang(args);
-  setCallback.call(this, "before_commit", "before", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "before_commit", "before", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
@@ -210,7 +210,7 @@ export function afterCommit<T extends typeof Model>(
   ...args: TransactionCallbackArgs<T>
 ): void {
   setOptionsForCallbacksBang(args, prependOption());
-  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
@@ -222,7 +222,7 @@ export function afterSaveCommit<T extends typeof Base>(
     on: ["create", "update"],
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
@@ -234,7 +234,7 @@ export function afterCreateCommit<T extends typeof Base>(
     on: "create",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
@@ -246,7 +246,7 @@ export function afterUpdateCommit<T extends typeof Base>(
     on: "update",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
@@ -258,7 +258,7 @@ export function afterDestroyCommit<T extends typeof Base>(
     on: "destroy",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
@@ -267,7 +267,7 @@ export function afterRollback<T extends typeof Model>(
   ...args: TransactionCallbackArgs<T>
 ): void {
   setOptionsForCallbacksBang(args, prependOption());
-  setCallback.call(this, "rollback", "after", ...(args as FilterListEntry<any>[]));
+  setCallback.call(this, "rollback", "after", ...args);
 }
 
 /**
@@ -465,8 +465,7 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
  * scheduling.
  *
  * Mirrors: ActiveRecord::Transactions#with_transaction_returning_status
- */
-/**
+ *
  * @missingRailsArgs connection.transaction — CONVERGEABLE: `transactions.rb:413`
  * opens the transaction on the yielded `connection`; the connection-level
  * `DatabaseStatements#transaction` exists in trails
@@ -655,21 +654,21 @@ const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 /**
  * Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
  *
- * Ruby mutates `args` in place; TS returns the merged option hash instead —
- * the callers bind it straight back into the `set_callback` call, so the
- * mutation is not observable. `on:` is dropped from the returned hash rather
- * than left in place as Ruby leaves it: ActiveModel's chain validates `on:`
- * itself and has no ActiveRecord `transaction_include_any_action?` to build,
- * so a surviving `on:` would be re-validated against the `before_commit`
+ * Ruby's `args << options` mutates the caller's splat array, and so does this;
+ * the filters are copied out first because `extractOptionsBang` answers `args`
+ * itself when the last element is not a Hash. `on:` is dropped from the options
+ * rather than left in place as Ruby leaves it: ActiveModel's chain validates
+ * `on:` itself and has no ActiveRecord `transaction_include_any_action?` to
+ * build, so a surviving `on:` would be re-validated against the `before_commit`
  * event and rejected.
  *
  * @internal
  *
  * @missingRailsCall merge! — PERMANENT: Reviewed (RFC 0106 wave 4c): Ruby's
  *   `args.extract_options!.merge!(enforced_options)` mutates the extracted hash
- *   in place; TS returns a fresh merged object via spread because the caller
- *   binds the result straight into `set_callback`, so there is no in-place
- *   `merge!` to name.
+ *   in place; TS builds the merged object with a spread rather than writing the
+ *   enforced keys into the caller's own options literal, so there is no
+ *   in-place `merge!` to name.
  */
 export function setOptionsForCallbacksBang(
   args: unknown[],
@@ -677,9 +676,6 @@ export function setOptionsForCallbacksBang(
 ): void {
   const [rest, extracted] = extractOptionsBang(args);
   const options: Record<string, unknown> = { ...extracted, ...enforcedOptions };
-  // `extractOptionsBang` answers `args` itself when the last element is not a
-  // Hash, so the filters are copied out before `args` — Ruby's `args << options`
-  // mutates the caller's splat array — is rewritten.
   const filterList = [...rest];
   args.length = 0;
   args.push(...filterList, options);
