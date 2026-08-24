@@ -1,6 +1,679 @@
 import { describe, it, expect } from "vitest";
+import { Base } from "../../base.js";
 import { MysqlSchemaStatements } from "./schema-statements.js";
 import { Table as MysqlTable } from "./schema-definitions.js";
+
+import {
+  isRowFormatDynamicByDefault,
+  defaultRowFormat,
+  createTableDefinition,
+  defaultType,
+  newColumnFromField,
+  type MysqlColumnReflectionHost,
+  fetchTypeMetadata,
+  extractForeignKeyAction,
+  dataSourceSql,
+  quotedScope,
+  tableAliasLength,
+  extractSchemaQualifiedName,
+  typeWithSizeToSql,
+  limitToSize,
+  integerToSql,
+  foreignKeys,
+  parseMysqlName,
+} from "./schema-statements.js";
+import type { RowFormatHost } from "./schema-statements.js";
+import { Version } from "../abstract-adapter.js";
+import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
+import { Result } from "../../result.js";
+
+// `quotedScope` / `dataSourceSql` / `foreignKeys` self-send `quote`
+// (mysql/schema_statements.rb), and MySQL — which has no `quote` override — self-sends
+// `quote_string` from the inherited abstract `quote` (abstract/quoting.rb:76). So the
+// receiver has to be a real MySQL adapter, as it is in Rails, not an object carrying a
+// pre-bound `quote`.
+const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
+  Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
+
+function fkHost(rows: Record<string, unknown>[]) {
+  return mysqlAdapterHost({
+    internalExecQuery: async () => Result.fromRowHashes(rows),
+    extractForeignKeyAction,
+  });
+}
+
+const quoteHost = mysqlAdapterHost();
+
+function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
+  const queries: string[] = [];
+  return {
+    isMariadb: async () => isMariadb,
+    databaseVersion: Promise.resolve(new Version(version)),
+    queryValue: async (sql: string) => {
+      queries.push(sql);
+      return probeResult;
+    },
+    queries,
+  } satisfies RowFormatHost & { queries: string[] };
+}
+
+describe("MySQL::SchemaStatements", () => {
+  it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.2"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.10.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.1"))).toBe(false);
+  });
+
+  it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.9"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.11.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.8"))).toBe(false);
+  });
+
+  it("defaultRowFormat: null when dynamic by default", async () => {
+    const host = rowFormatHost(false, "8.0.0", 1);
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(host.queries).toEqual([]);
+  });
+
+  it("defaultRowFormat: ROW_FORMAT=DYNAMIC when innodb settings set", async () => {
+    expect(await defaultRowFormat.call(rowFormatHost(false, "5.6.0", 1))).toBe(
+      "ROW_FORMAT=DYNAMIC",
+    );
+    expect(await defaultRowFormat.call(rowFormatHost(false, "5.6.0", 0))).toBeNull();
+  });
+
+  it("defaultRowFormat: memoizes the innodb probe, including a null answer", async () => {
+    const host = rowFormatHost(false, "5.6.0", 0);
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(host.queries).toEqual([
+      "SELECT @@innodb_file_per_table = 1 AND @@innodb_file_format = 'Barracuda'",
+    ]);
+  });
+
+  it("validPrimaryKeyOptions includes unsigned and autoIncrement", () => {
+    const opts = MysqlSchemaStatements.prototype.validPrimaryKeyOptions.call(
+      Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements,
+    );
+    expect(opts).toContain("unsigned");
+    expect(opts).toContain("autoIncrement");
+    expect(opts).toContain("limit");
+  });
+
+  it("createTableDefinition returns MySQL TableDefinition", async () => {
+    const conn = await Base.leaseConnection();
+    expect(createTableDefinition.call(conn as never, "users").name).toBe("users");
+  });
+
+  const reflectionHost = (
+    createTableInfo: string | null = null,
+    lookupCastType?: MysqlColumnReflectionHost["lookupCastType"],
+  ): MysqlColumnReflectionHost => ({
+    createTableInfo: () => Promise.resolve(createTableInfo),
+    ...(lookupCastType ? { lookupCastType } : {}),
+  });
+
+  it("defaultType: parses string/integer/function defaults", async () => {
+    expect(
+      await defaultType.call(reflectionHost("`name` varchar(255) DEFAULT 'admin'"), "t", "name"),
+    ).toBe("string");
+    expect(await defaultType.call(reflectionHost("`count` int DEFAULT 42"), "t", "count")).toBe(
+      "integer",
+    );
+    expect(
+      await defaultType.call(
+        reflectionHost("`updated_at` datetime DEFAULT NOW"),
+        "t",
+        "updated_at",
+      ),
+    ).toBe("function");
+    expect(await defaultType.call(reflectionHost(null), "t", "name")).toBeUndefined();
+  });
+
+  it("newColumnFromField: builds Column from SHOW COLUMNS field hash", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "users",
+      {
+        Field: "name",
+        Type: "varchar(255)",
+        Null: "YES",
+        Default: "Dean",
+        Extra: "",
+        Collation: "utf8_general_ci",
+      },
+      [],
+    );
+    expect(col.name).toBe("name");
+    expect(col.default).toBe("Dean");
+    expect(col.null).toBe(true);
+    expect(col.collation).toBe("utf8_general_ci");
+  });
+
+  it("newColumnFromField: CURRENT_TIMESTAMP default becomes defaultFunction on timestamp (alias for datetime)", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "updated_at",
+        Type: "timestamp",
+        Null: "NO",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
+  });
+
+  it("newColumnFromField: CURRENT_TIMESTAMP default becomes defaultFunction on datetime", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "created_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
+  });
+
+  it("newColumnFromField: NOW() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "created_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "now()",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(now())");
+  });
+
+  it("newColumnFromField: UUID() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "items",
+      {
+        Field: "uid",
+        Type: "char(36)",
+        Null: "NO",
+        Default: "uuid()",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(uuid())");
+  });
+
+  it("newColumnFromField: CURRENT_DATE via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "items",
+      {
+        Field: "due_on",
+        Type: "date",
+        Null: "YES",
+        Default: "CURRENT_DATE",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(CURRENT_DATE)");
+  });
+
+  it("newColumnFromField: DEFAULT_GENERATED extra becomes defaultFunction", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "orders",
+      {
+        Field: "total",
+        Type: "decimal(10,2)",
+        Null: "YES",
+        Default: "price * qty",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(price * qty)");
+  });
+
+  it("newColumnFromField: text default strips surrounding quotes", async () => {
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "users",
+      {
+        Field: "bio",
+        Type: "text",
+        Null: "YES",
+        Default: "'hello world'",
+        Extra: "",
+      },
+      [],
+    );
+    expect(col.default).toBe("hello world");
+  });
+
+  it("fetchTypeMetadata: fallback strips unsigned/zerofill modifiers", () => {
+    expect(fetchTypeMetadata("bigint unsigned").type).toBe("bigint");
+    expect(fetchTypeMetadata("int unsigned zerofill").type).toBe("int");
+  });
+
+  it("fetchTypeMetadata wraps sqlType with MySQL TypeMetadata", () => {
+    const meta = fetchTypeMetadata("varchar(255)", "auto_increment");
+    expect(meta.sqlType).toBe("varchar(255)");
+    expect(meta.extra).toBe("auto_increment");
+    expect(fetchTypeMetadata("int").extra).toBe("");
+  });
+
+  it("fetchTypeMetadata: uses lookupCastType for limit/precision/scale", () => {
+    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
+    const meta = fetchTypeMetadata("bigint unsigned", "", lookup);
+    expect(meta.type).toBe("integer");
+    expect(meta.limit).toBe(8);
+  });
+
+  it("newColumnFromField: limit from lookupCastType is preserved on Column", async () => {
+    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
+    const col = await newColumnFromField.call(
+      reflectionHost(null, lookup),
+      "t",
+      {
+        Field: "id",
+        Type: "bigint",
+        Null: "NO",
+        Default: null,
+        Extra: "",
+      },
+      [],
+    );
+    expect(col.sqlTypeMetadata?.limit).toBe(8);
+  });
+
+  it("fetchTypeMetadata: lookupCastType boolean mapping (tinyint(1) emulation)", () => {
+    const lookup = (s: string) => ({ name: "boolean", limit: null, precision: null, scale: null });
+    const meta = fetchTypeMetadata("tinyint(1)", "", lookup);
+    expect(meta.type).toBe("boolean");
+  });
+
+  it("extractForeignKeyAction: RESTRICT → undefined, others normalized", () => {
+    expect(extractForeignKeyAction("RESTRICT")).toBeUndefined();
+    expect(extractForeignKeyAction("CASCADE")).toBe("cascade");
+    expect(extractForeignKeyAction("SET NULL")).toBe("nullify");
+  });
+
+  const schemaStatements = (sortOrderSupported = true) =>
+    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+      supportsIndexSortOrder: async () => sortOrderSupported,
+    });
+
+  it("addIndexLength appends (N) prefix length to column", () => {
+    const cols = new Map([
+      ["name", "`name`"],
+      ["email", "`email`"],
+    ]);
+    const result = schemaStatements().addIndexLength(cols, { length: { email: 20 } });
+    expect(result.get("name")).toBe("`name`");
+    expect(result.get("email")).toBe("`email`(20)");
+  });
+
+  it("addIndexLength applies scalar length to all columns", () => {
+    const cols = new Map([
+      ["name", "`name`"],
+      ["email", "`email`"],
+    ]);
+    const result = schemaStatements().addIndexLength(cols, { length: 10 });
+    expect(result.get("name")).toBe("`name`(10)");
+    expect(result.get("email")).toBe("`email`(10)");
+  });
+
+  it("addOptionsForIndexColumns: applies length and per-column order", async () => {
+    const cols = new Map([["name", "`name`"]]);
+    expect(
+      (
+        await schemaStatements().addOptionsForIndexColumns(cols, {
+          length: { name: 5 },
+          order: { name: "desc" },
+        })
+      ).get("name"),
+    ).toBe("`name`(5) DESC");
+  });
+
+  it("addOptionsForIndexColumns: string order applies to all columns", async () => {
+    const cols = new Map([
+      ["a", "`a`"],
+      ["b", "`b`"],
+    ]);
+    const result = await schemaStatements().addOptionsForIndexColumns(cols, { order: "asc" });
+    expect(result.get("a")).toBe("`a` ASC");
+    expect(result.get("b")).toBe("`b` ASC");
+  });
+
+  it("addOptionsForIndexColumns: drops order when sort order is unsupported", async () => {
+    const cols = new Map([["name", "`name`"]]);
+    const result = await schemaStatements(false).addOptionsForIndexColumns(cols, {
+      length: { name: 5 },
+      order: { name: "desc" },
+    });
+    expect(result.get("name")).toBe("`name`(5)");
+  });
+
+  it("extractSchemaQualifiedName splits schema.table", () => {
+    expect(extractSchemaQualifiedName("mydb.users")).toEqual(["mydb", "users"]);
+    expect(extractSchemaQualifiedName("`mydb`.`users`")).toEqual(["mydb", "users"]);
+    expect(extractSchemaQualifiedName("users")).toEqual([null, "users"]);
+    expect(extractSchemaQualifiedName(null)).toEqual([null, null]);
+  });
+
+  it("dataSourceSql: generates information_schema query", () => {
+    const sql = dataSourceSql.call(quoteHost);
+    expect(sql).toContain("SELECT table_name FROM information_schema.tables");
+    expect(sql).toContain("WHERE table_schema = database()");
+    expect(dataSourceSql.call(quoteHost, "users")).toContain("AND table_name = 'users'");
+    expect(dataSourceSql.call(quoteHost, undefined, { type: "BASE TABLE" })).toContain(
+      "AND table_type = 'BASE TABLE'",
+    );
+    const qualified = dataSourceSql.call(quoteHost, "mydb.users");
+    expect(qualified).toContain("table_schema = 'mydb'");
+    expect(qualified).toContain("table_name = 'users'");
+  });
+
+  it("quotedScope builds scope hash", () => {
+    expect(quotedScope.call(quoteHost).schema).toBe("database()");
+    expect(quotedScope.call(quoteHost, "users").name).toBe("'users'");
+    const q = quotedScope.call(quoteHost, "mydb.users");
+    expect(q.schema).toBe("'mydb'");
+    expect(q.name).toBe("'users'");
+    expect(quotedScope.call(quoteHost, undefined, { type: "BASE TABLE" }).type).toBe(
+      "'BASE TABLE'",
+    );
+  });
+
+  it("typeWithSizeToSql: builds prefixed type names", () => {
+    expect(typeWithSizeToSql("text", undefined)).toBe("text");
+    expect(typeWithSizeToSql("text", "tiny")).toBe("tinytext");
+    expect(typeWithSizeToSql("text", "medium")).toBe("mediumtext");
+    expect(typeWithSizeToSql("blob", "long")).toBe("longblob");
+    expect(() => typeWithSizeToSql("text", "huge")).toThrow("invalid :size value");
+  });
+
+  it("limitToSize: maps byte limits for text/blob/binary", () => {
+    expect(limitToSize(255, "text")).toBe("tiny");
+    expect(limitToSize(null, "text")).toBeUndefined();
+    expect(limitToSize(65536, "text")).toBe("medium");
+    expect(limitToSize(16777216, "text")).toBe("long");
+    expect(limitToSize(4, "integer")).toBeUndefined();
+    expect(() => limitToSize(5_000_000_000, "text")).toThrow();
+  });
+
+  it("integerToSql: maps limit to MySQL int types", () => {
+    expect(integerToSql(1)).toBe("tinyint");
+    expect(integerToSql(2)).toBe("smallint");
+    expect(integerToSql(3)).toBe("mediumint");
+    expect(integerToSql(null)).toBe("int");
+    expect(integerToSql(4)).toBe("int");
+    expect(integerToSql(8)).toBe("bigint");
+    expect(() => integerToSql(9)).toThrow("No integer type has byte size");
+  });
+
+  it("foreignKeys: single-column key returns scalar column and primaryKey", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "rockets",
+          primary_key: "id",
+          column: "rocket_id",
+          name: "fk_1",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "CASCADE",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks).toHaveLength(1);
+    expect(fks[0].column).toBe("rocket_id");
+    expect(fks[0].primaryKey).toBe("id");
+    expect(fks[0].toTable).toBe("rockets");
+    expect(fks[0].onDelete).toBe("cascade");
+    expect(fks[0].onUpdate).toBeUndefined();
+  });
+
+  it("test_add_composite_foreign_key_infers_column", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "rockets",
+          primary_key: "tenant_id",
+          column: "rocket_tenant_id",
+          name: "fk_2",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+        {
+          to_table: "rockets",
+          primary_key: "id",
+          column: "rocket_id",
+          name: "fk_2",
+          position: 2,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks).toHaveLength(1);
+    expect(fks[0].column).toEqual(["rocket_tenant_id", "rocket_id"]);
+    expect(fks[0].primaryKey).toEqual(["tenant_id", "id"]);
+  });
+
+  it("foreignKeys: unquotes backtick-quoted column and to_table identifiers", async () => {
+    const fks = await foreignKeys.call(
+      fkHost([
+        {
+          to_table: "`roc``kets`",
+          primary_key: "id",
+          column: "`rocket_id`",
+          name: "fk_3",
+          position: 1,
+          on_update: "RESTRICT",
+          on_delete: "RESTRICT",
+        },
+      ]),
+      "astronauts",
+    );
+    expect(fks[0].column).toBe("rocket_id");
+    expect(fks[0].toTable).toBe("roc`kets");
+  });
+
+  const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
+    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+      internalExecQuery: async () => Result.fromRowHashes(rows),
+      quoteTableName: (n: string) => `\`${n}\``,
+      supportsIndexSortOrder: async () => sortOrderSupported,
+    });
+
+  it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_title",
+        Column_name: "title",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: 10,
+        Collation: "A",
+      },
+    ]).indexes("pages");
+    expect(idx).toHaveLength(1);
+    expect(idx[0].lengths).toBe(10);
+    expect(idx[0].orders).toEqual({});
+  });
+
+  it("indexes: surfaces desc orders when Collation is D", async () => {
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_title",
+        Column_name: "title",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "D",
+      },
+    ]).indexes("pages");
+    expect(idx[0].orders).toBe("desc");
+    expect(idx[0].lengths).toEqual({});
+  });
+
+  it("indexes: surfaces desc orders for descending functional indexes", async () => {
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title",
+        Column_name: null,
+        Expression: "lower(`title`)",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "D",
+      },
+    ]).indexes("pages");
+    // Mirrors Rails' final `.map`: a functional index collapses its columns
+    // into a single SQL string via add_options_for_index_columns, with the
+    // DESC order baked inline and no separate orders/lengths Records.
+    expect(idx[0].columns).toBe("(lower(`title`)) DESC");
+    expect(idx[0].orders).toEqual({});
+    expect(idx[0].lengths).toEqual({});
+  });
+
+  it("indexes: collapses functional-index columns into a single SQL string", async () => {
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title_and_pos",
+        Column_name: null,
+        Expression: "lower(`title`)",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "A",
+      },
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title_and_pos",
+        Column_name: "position",
+        Expression: null,
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: 4,
+        Collation: "D",
+      },
+    ]).indexes("pages");
+    expect(idx[0].columns).toBe("(lower(`title`)), `position`(4) DESC");
+    expect(idx[0].orders).toEqual({});
+    expect(idx[0].lengths).toEqual({});
+  });
+
+  it("indexes: omits functional-index order when sort order is unsupported", async () => {
+    // Mirrors Rails' add_options_for_index_columns super gate on
+    // supports_index_sort_order? — false on MariaDB < 10.8.1 / MySQL < 8.0.1,
+    // which drops the DESC/ASC suffix even when Collation="D". Prefix length
+    // (via MySQL's add_index_length, ungated) is still baked in.
+    const idx = await indexHost(
+      [
+        {
+          Table: "pages",
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: null,
+          Expression: "lower(`title`)",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: null,
+          Collation: "D",
+        },
+        {
+          Table: "pages",
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: "position",
+          Expression: null,
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: 4,
+          Collation: "D",
+        },
+      ],
+      false,
+    ).indexes("pages");
+    expect(idx[0].columns).toBe("(lower(`title`)), `position`(4)");
+  });
+});
+
+// parseMysqlName is a trails-specific guard (no Rails counterpart): MySQL has no
+// nested-catalog concept, so an identifier must be exactly "table" or
+// "schema.table". Every introspection helper routes table names through it
+// before COALESCE(?, database()); a malformed name that lexed leniently would
+// silently scan a different catalog/table than the caller intended.
+describe("parseMysqlName", () => {
+  it("accepts a bare table name", () => {
+    expect(parseMysqlName("widgets")).toEqual({ table: "widgets" });
+  });
+
+  it("accepts schema-qualified names, quoted or unquoted", () => {
+    expect(parseMysqlName("mydb.widgets")).toEqual({ schema: "mydb", table: "widgets" });
+    expect(parseMysqlName("`mydb`.`widgets`")).toEqual({ schema: "mydb", table: "widgets" });
+  });
+
+  it("permits whitespace inside a backtick-quoted identifier", () => {
+    expect(parseMysqlName("`not a real table`")).toEqual({ table: "not a real table" });
+  });
+
+  it("rejects three-part identifiers instead of silently truncating", () => {
+    expect(() => parseMysqlName("a.b.c")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects identifiers with empty segments", () => {
+    expect(() => parseMysqlName(".widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("a..b")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("db.widgets.")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects unquoted identifiers containing whitespace", () => {
+    expect(() => parseMysqlName("db .widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("db. widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("wid gets")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects empty quoted identifiers that unquote to an empty string", () => {
+    expect(() => parseMysqlName("``")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("``.widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("`db`.``")).toThrow(/Invalid MySQL identifier/);
+  });
+});
+
+describe("MySQL::SchemaStatements#tableAliasLength", () => {
+  it("table alias length", () => {
+    // mysql/schema_statements.rb:135 — 256, not max_identifier_length (64).
+    expect(tableAliasLength()).toBe(256);
+  });
+});
 
 describe("MysqlSchemaStatements#changeTable", () => {
   it("yields the MySQL Table subclass", async () => {
