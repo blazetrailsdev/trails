@@ -105,6 +105,16 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    * signature (`DisableJoinsAssociationScope#scope` at
    * disable_joins_association_scope.rb:6-15) without the boxing
    * workaround our async pluck would otherwise force.
+   *
+   * @missingRailsCall add_constraints — PERMANENT: this body calls it at Rails'
+   * call site (disable_joins_association_scope.rb:13), spelled
+   * `_addConstraintsDj`. Rails' subclass shadows `AssociationScope#add_constraints`
+   * with a different arity, which Ruby permits; TypeScript rejects a derived
+   * declaration of a name the base declares `private` (TS2415) and the two
+   * signatures are not override-compatible, so the `Dj` suffix is the only
+   * spelling available. The landed `add-leading-underscore-call-candidate-to-conventions`
+   * candidate (PR #6825) does not reach it: that candidate is `"_" + camel`, and
+   * this name carries the `Dj` suffix on top of the underscore.
    */
   override scope(association: AssociationScopeable): unknown {
     const sourceReflection = association.reflection;

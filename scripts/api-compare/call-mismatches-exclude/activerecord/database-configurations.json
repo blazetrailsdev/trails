@@ -4,6 +4,6 @@
     "tsFile": "database-configurations.ts",
     "rubyName": "default_env",
     "call": "call",
-    "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s` (`database_configurations.rb:189`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; porting it is filed as `port-connection-handling-default-env-proc`."
+    "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s` (`database_configurations.rb:189`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; porting it is filed as `converge-establish-connection-default-env-funnel`. (RFC 0106 exit ledger, 2026-08-24: repointed off the closed predecessor story onto this live successor.)"
   }
 ]

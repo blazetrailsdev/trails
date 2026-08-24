@@ -4,13 +4,13 @@
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "last_insert_id_result",
     "call": "internal_exec_query",
-    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/database_statements.rb's `last_insert_id_result` is `internal_exec_query(\"SELECT currval(...)\")`; trails reads the sequence value through the same adapter entry point spelled `queryValue`, which is `internal_exec_query` plus `.rows.first.first` — the row extraction is folded in."
+    "reason": "Per-site verified (RFC 0106 wave 4b): postgresql/database_statements.rb's `last_insert_id_result` is `internal_exec_query(\"SELECT currval(...)\")`; trails reads the sequence value through the same adapter entry point spelled `queryValue`, which is `internal_exec_query` plus `.rows.first.first` — the row extraction is folded in. Tracked by story `converge-postgresql-database-statements-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Per-site verified (RFC 0106 wave 4b): `result.rows.first` is `result.rows[0]` on a JS array; `Array#first` is not a ported method name."
+    "reason": "Per-site verified (RFC 0106 wave 4b): `result.rows.first` is `result.rows[0]` on a JS array; `Array#first` is not a ported method name. Tracked by story `converge-postgresql-database-statements-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
   }
 ]
