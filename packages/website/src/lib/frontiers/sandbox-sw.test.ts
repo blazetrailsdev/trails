@@ -4,6 +4,9 @@ import { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VirtualFS } from "./virtual-fs.js";
 import { CompiledCache } from "./compiled-cache.js";
 import { resolveVfsPath } from "./vfs-resolve.js";
+// Imported statically: the trails-cli graph pulls in activerecord, and
+// transforming it lazily inside the test blew the 5s per-test timeout.
+import { createTrailsCLI } from "./trails-cli.js";
 
 // ── resolveVfsPath ─────────────────────────────────────────────────────
 
@@ -178,7 +181,6 @@ describe("sandbox-sw message handling", () => {
 
   describe("CLI execution", () => {
     it("trail-cli accepts generate model command", async () => {
-      const { createTrailsCLI } = await import("./trails-cli.js");
       const migrations: any[] = [];
       const cli = createTrailsCLI({
         vfs,

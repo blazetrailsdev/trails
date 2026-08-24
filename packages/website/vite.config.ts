@@ -3,13 +3,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { packageEntries, resolveEntries } from "./aliases.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function pkgAlias(name: string, entry: string) {
+function pkgAlias(name: string, replacement: string) {
   return {
     find: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
-    replacement: path.resolve(__dirname, entry),
+    replacement,
   };
 }
 
@@ -29,24 +30,7 @@ function stubActivesupportYaml() {
 export default defineConfig({
   plugins: [stubActivesupportYaml(), tailwindcss(), sveltekit()],
   resolve: {
-    alias: [
-      pkgAlias("@blazetrails/activesupport", "../activesupport/src/index.ts"),
-      pkgAlias("@blazetrails/arel", "../arel/src/index.ts"),
-      pkgAlias("@blazetrails/activemodel", "../activemodel/src/index.ts"),
-      pkgAlias("@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"),
-      pkgAlias("@blazetrails/activerecord", "../activerecord/src/index.ts"),
-      pkgAlias("@blazetrails/rack", "../rack/src/index.ts"),
-      pkgAlias("@blazetrails/actionview", "../actionview/src/index.ts"),
-      pkgAlias("@blazetrails/tse-compiler", "../tse-compiler/src/index.ts"),
-      pkgAlias("@blazetrails/actionpack", "../actionpack/src/index.ts"),
-      pkgAlias("@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"),
-      pkgAlias("@blazetrails/globalid/wire", "../globalid/src/wire.ts"),
-      pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"),
-      pkgAlias("@blazetrails/globalid", "../globalid/src/index.ts"),
-      pkgAlias("@blazetrails/date", "../date/src/index.ts"),
-      pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"),
-      pkgAlias("@blazetrails/i18n", "../i18n/src/index.ts"),
-    ],
+    alias: resolveEntries(packageEntries).map(([name, entry]) => pkgAlias(name, entry)),
   },
   build: {
     rollupOptions: {

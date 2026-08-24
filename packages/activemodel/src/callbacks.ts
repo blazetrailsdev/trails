@@ -18,7 +18,38 @@ import {
   type DefineCallbacksOptions,
   defineCallbacks,
   setCallback,
+  Callbacks as ASCallbacks,
+  extend,
+  include,
+  extended,
 } from "@blazetrails/activesupport";
+
+/** The `base` a Ruby `extended` hook receives: the class doing the extending. */
+type AnyClass = new (...args: never[]) => object;
+
+/**
+ * Mirrors: ActiveModel::Callbacks (callbacks.rb:65-158) — the module itself.
+ * A class module (see CLAUDE.md "Module mixins"): `extend(base, Callbacks)`
+ * copies these statics onto `base` and then fires the `extended` hook.
+ */
+export class Callbacks {
+  /**
+   * Mirrors: ActiveModel::Callbacks.extended (callbacks.rb:66-70) —
+   * `base.class_eval { include ActiveSupport::Callbacks }`.
+   */
+  static [extended](base: AnyClass): void {
+    extend(base, ASCallbacks.ClassMethods);
+    include(base, ASCallbacks.InstanceMethods);
+  }
+
+  static defineModelCallbacks = defineModelCallbacks;
+  /** @internal */
+  static _defineBeforeModelCallback = _defineBeforeModelCallback;
+  /** @internal */
+  static _defineAroundModelCallback = _defineAroundModelCallback;
+  /** @internal */
+  static _defineAfterModelCallback = _defineAfterModelCallback;
+}
 
 /**
  * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
@@ -98,8 +129,6 @@ export interface CallbacksClassMethods {
     ...args: [string, ...string[]] | [string, ...string[], DefineModelCallbacksOptions]
   ): void;
 }
-
-export type Callbacks = CallbacksClassMethods;
 
 export type CallbackTiming = CallbackKind;
 export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;

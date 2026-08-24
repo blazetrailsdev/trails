@@ -378,8 +378,8 @@ export class Model {
   /**
    * The `ActiveSupport::Callbacks::ClassMethods` half (callbacks.rb:733-820),
    * which Rails gets from `include ActiveSupport::Callbacks` (callbacks.rb:66-69);
-   * mixed on by the `extend(Model, Callbacks.ClassMethods)` at the bottom of
-   * this file, and typed from that module object rather than restated here.
+   * mixed on by `ActiveModel::Callbacks`' `extended` hook (callbacks.rb:66-70),
+   * which `Validations.[included]` reaches with `extend(base, Callbacks)`, and typed from that module object rather than restated here.
    */
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
@@ -1131,7 +1131,7 @@ export class Model {
 
   /**
    * `run_callbacks` (callbacks.rb:96-104), mixed on by the
-   * `include(Model, Callbacks.InstanceMethods)` at the bottom of this file.
+   * `ActiveModel::Callbacks`' `extended` hook (callbacks.rb:66-70).
    */
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
@@ -1208,11 +1208,6 @@ Model.attributeMethodSuffix("Change", "WillChange!", "Was", { parameters: false 
 Model.attributeMethodSuffix("PreviousChange", "PreviouslyWas", { parameters: false });
 Model.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
 Model.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
-
-// Ruby `include ActiveSupport::Callbacks` (callbacks.rb:733 ClassMethods, :96
-// run_callbacks), which every ActiveModel callback module includes.
-extend(Model, ASCallbacks.ClassMethods);
-include(Model, ASCallbacks.InstanceMethods);
 
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).

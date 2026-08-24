@@ -2,33 +2,13 @@ import { defineConfig } from "vitest/config";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import path from "path";
 import { fileURLToPath } from "url";
+import { packageEntries, resolveEntries, subpathPrefixes } from "./aliases.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const aliases = {
-  "@blazetrails/activesupport/": path.resolve(__dirname, "../activesupport/src") + "/",
-  "@blazetrails/activesupport": path.resolve(__dirname, "../activesupport/src/index.ts"),
-  "@blazetrails/arel/src": path.resolve(__dirname, "../arel/src"),
-  "@blazetrails/arel": path.resolve(__dirname, "../arel/src/index.ts"),
-  "@blazetrails/activemodel": path.resolve(__dirname, "../activemodel/src/index.ts"),
-  "@blazetrails/activerecord/migration": path.resolve(
-    __dirname,
-    "../activerecord/src/migration.ts",
-  ),
-  "@blazetrails/activerecord/base": path.resolve(__dirname, "../activerecord/src/base.ts"),
-  "@blazetrails/activerecord/migrator": path.resolve(__dirname, "../activerecord/src/migrator.ts"),
-  "@blazetrails/activerecord/schema": path.resolve(__dirname, "../activerecord/src/schema.ts"),
-  "@blazetrails/activerecord": path.resolve(__dirname, "../activerecord/src/index.ts"),
-  "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
-  "@blazetrails/actionview": path.resolve(__dirname, "../actionview/src/index.ts"),
-  "@blazetrails/tse-compiler": path.resolve(__dirname, "../tse-compiler/src/index.ts"),
-  "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),
-  "@blazetrails/date": path.resolve(__dirname, "../date/src/index.ts"),
-  "@blazetrails/did-you-mean": path.resolve(__dirname, "../did-you-mean/src/index.ts"),
-  "@blazetrails/trailties/generators": path.resolve(
-    __dirname,
-    "../trailties/src/generators/index.ts",
-  ),
+const aliases: Record<string, string> = {
+  ...Object.fromEntries(resolveEntries(subpathPrefixes)),
+  ...Object.fromEntries(resolveEntries(packageEntries)),
   $frontiers: path.resolve(__dirname, "src/lib/frontiers"),
 };
 
