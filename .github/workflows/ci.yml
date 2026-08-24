@@ -600,6 +600,7 @@ jobs:
           packages/arel
           packages/activemodel
           packages/activesupport
+          packages/date
           packages/i18n
           scripts/guides-typecheck
           scripts/tasks
@@ -733,6 +734,7 @@ jobs:
           packages/arel
           packages/activemodel
           packages/activesupport
+          packages/date
           packages/did-you-mean
           packages/globalid
           packages/i18n

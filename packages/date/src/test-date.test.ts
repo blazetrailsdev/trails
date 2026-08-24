@@ -133,7 +133,11 @@ describe("TestDate", () => {
     expect(dt).toBeInstanceOf(DateTimeSub);
 
     expect(DateSub.today()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTimeSub.now()).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect(DateTimeSub.now()).toBeInstanceOf(
+      Temporal.Now.zonedDateTimeISO().offsetNanoseconds === 0
+        ? Temporal.PlainDateTime
+        : Temporal.ZonedDateTime,
+    );
 
     expect(d.toS()).toEqual("-4712-01-01");
     expect(dt.toS()).toEqual("-4712-01-01T00:00:00+00:00");

@@ -496,6 +496,7 @@ let seatedTime: {
   zoned: Temporal.ZonedDateTime;
   instant: Temporal.Instant;
   timeZoneId: string | null;
+  tzmodeUtc: boolean;
 } | null = null;
 
 export class Time {
@@ -518,6 +519,14 @@ export class Time {
   #instant: Temporal.Instant;
   /** @internal The receiver's zone, or `null` when it was built from an offset. */
   #timeZoneId: string | null;
+  /**
+   * @internal MRI's `TZMODE_UTC` bit (`time.c`), which is set by `Time.utc` and
+   * by a zone argument naming UTC — and NOT by the local zone, even where that
+   * zone IS UTC: `TZ=UTC Time.now.utc?` is `false` and its `#to_s` prints
+   * `+0000` rather than `UTC`. The zone identifier alone cannot tell the two
+   * apart, so the mode is carried rather than re-derived from it.
+   */
+  #tzmodeUtc: boolean;
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   #utcOffsetMemo: number | null;
 
@@ -627,11 +636,20 @@ export class Time {
    * disambiguation picks the earlier offset for the repeated hour after a DST
    * fall-back — so `Time.at(t)` could answer an instant an hour from `t`.
    */
-  static #atInstant(instant: Temporal.Instant, zone: string | number | null = null): Time {
+  static #atInstant(
+    instant: Temporal.Instant,
+    zone: string | number | null = null,
+    tzmodeUtc?: boolean,
+  ): Time {
     const timeZoneId =
       zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
     const zoned = instant.toZonedDateTimeISO(timeZoneId);
-    seatedTime = { zoned, instant, timeZoneId: typeof zone === "number" ? null : timeZoneId };
+    seatedTime = {
+      zoned,
+      instant,
+      timeZoneId: typeof zone === "number" ? null : timeZoneId,
+      tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
+    };
     return new Time(0);
   }
 
@@ -658,7 +676,11 @@ export class Time {
       if (microsecondsWithFrac !== 0) {
         throw new TypeError("can't convert Time into an exact number");
       }
-      return Time.#atInstant(seconds.#instant, seconds.#timeZoneId ?? seconds.#utcOffset);
+      return Time.#atInstant(
+        seconds.#instant,
+        seconds.#timeZoneId ?? seconds.#utcOffset,
+        seconds.#tzmodeUtc,
+      );
     }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
@@ -768,7 +790,7 @@ export class Time {
   static #mktimeIsdst(time: Time, isdst: boolean | null): Time {
     if (isdst == null || time.#timeZoneId == null || time.isdst === isdst) return time;
     const earlier = time.#plain.toZonedDateTime(time.#timeZoneId, { disambiguation: "earlier" });
-    const candidate = Time.#atInstant(earlier.toInstant(), time.#timeZoneId);
+    const candidate = Time.#atInstant(earlier.toInstant(), time.#timeZoneId, time.#tzmodeUtc);
     return candidate.isdst === isdst ? candidate : time;
   }
 
@@ -836,6 +858,7 @@ export class Time {
       this.#zoned = seat.zoned;
       this.#instant = seat.instant;
       this.#timeZoneId = seat.timeZoneId;
+      this.#tzmodeUtc = seat.tzmodeUtc;
       return;
     }
     year = obj2vint(year);
@@ -873,6 +896,7 @@ export class Time {
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? nowTimeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
+    this.#tzmodeUtc = zone != null && this.#timeZoneId === "UTC";
     // MRI's `find_time_t` (`time.c`) settles a wall clock a DST fall-back
     // repeats on the STANDARD-time occurrence when `isdst` is `nil`:
     // `TZ=America/New_York Time.local(2005, 10, 30, 1, 0, 0)` is `-0500`, where
@@ -1131,12 +1155,12 @@ export class Time {
   /**
    * Ruby `Time#utc?` (`ruby/time.c` `time_utc_p`, not vendored — the gem's
    * `lib/time.rb` and `date_core.c` both duck-type it), true for the times
-   * `Time.utc` builds. A time built from an offset is not a UTC time even when
-   * the offset is zero, which is the distinction `#to_s` and `#xmlschema`
-   * print.
+   * `Time.utc` builds. Neither a time built from an offset nor one built in the
+   * local zone is a UTC time even when that offset or zone is UTC, which is the
+   * distinction `#to_s` and `#xmlschema` print.
    */
   isUtc(): boolean {
-    return this.#timeZoneId === "UTC";
+    return this.#tzmodeUtc;
   }
 
   /**
