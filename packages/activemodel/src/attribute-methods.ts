@@ -8,7 +8,14 @@
  * can mix them onto a host class (see the bottom of model.ts) — no delegation
  * wrappers needed.
  */
-import { camelize, CodeGenerator, include, Module } from "@blazetrails/activesupport";
+import {
+  camelize,
+  classAttribute,
+  CodeGenerator,
+  include,
+  included,
+  Module,
+} from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
   attributeMissing(match: AttributeMethodMatch, ...args: unknown[]): unknown;
@@ -263,14 +270,10 @@ export function missingAttribute(this: InstanceHost, attrName: string, stack?: s
 export function _readAttribute(
   this: InstanceHost & {
     _attributes?: { fetchValue(name: string, block?: (name: string) => unknown): unknown };
-    _readAttribute?(name: string, block?: (name: string) => unknown): unknown;
   },
   attr: string,
   block?: (name: string) => unknown,
 ): unknown {
-  if (typeof this._readAttribute === "function" && this._readAttribute !== _readAttribute) {
-    return this._readAttribute(attr, block);
-  }
   return this._attributes?.fetchValue(attr, block) ?? null;
 }
 
@@ -413,12 +416,6 @@ export function defineAttributeMethod(
   this._patternsGeneratedFor!.set(as, this.attributeMethodPatterns);
 }
 
-// ---------------------------------------------------------------------------
-// Class-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
-
 /**
  * Mirrors: ClassMethods#define_attribute_method_pattern
  *
@@ -479,6 +476,12 @@ export function defineAttributeMethodPattern(
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Class-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
 
 export function undefineAttributeMethods(this: ClassMethods): void {
   const mod = this.generatedAttributeMethods();
@@ -621,25 +624,6 @@ export function buildMangledName(name: string): string {
   return `__temp__${hex}`;
 }
 
-// ---------------------------------------------------------------------------
-// Instance-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-export type InstanceHost = {
-  _attributes?: { has(name: string): boolean };
-  attributeMethodPatterns?: AttributeMethodPattern[];
-  constructor: AttributeMethodHost;
-};
-
-/**
- * A record with the module's own instance methods included — the
- * `include(Model, …)` at the bottom of model.ts.
- */
-type InstanceMethods = InstanceHost & {
-  isAttributeMethod(attrName: string): boolean;
-  constructor: ClassMethods;
-};
-
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#define_call
  *
@@ -684,6 +668,63 @@ export function defineCall(
       });
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Instance-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+export type InstanceHost = {
+  _attributes?: { has(name: string): boolean };
+  attributeMethodPatterns?: AttributeMethodPattern[];
+  constructor: AttributeMethodHost;
+};
+
+/**
+ * A record with the module's own instance methods included — the
+ * `include(Model, …)` at the bottom of model.ts.
+ */
+type InstanceMethods = InstanceHost & {
+  isAttributeMethod(attrName: string): boolean;
+  constructor: ClassMethods;
+};
+
+/** The receiver `respond_to?` (attribute_methods.rb:528-539) self-sends to. */
+type RespondToHost = {
+  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+  matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
+};
+
+/**
+ * Mirrors: attribute_methods.rb:528-539
+ *
+ *   def respond_to?(method, include_private_methods = false)
+ *     if super
+ *       true
+ *     elsif !include_private_methods && super(method, true)
+ *       false
+ *     else
+ *       !matched_attribute_method(method.to_s).nil?
+ *     end
+ *   end
+ *
+ * Ruby's `super` here is the aliased original, which trails names
+ * {@link isRespondToWithoutAttributes} — TS has no `super` for a module
+ * outside the prototype chain, so the two `super` sends are spelled as sends
+ * to that alias, in the same positions.
+ */
+export function respondTo(
+  this: RespondToHost,
+  method: string,
+  includePrivateMethods: boolean = false,
+): boolean {
+  if (this.isRespondToWithoutAttributes(method, includePrivateMethods)) {
+    return true;
+  } else if (!includePrivateMethods && this.isRespondToWithoutAttributes(method, true)) {
+    return false;
+  } else {
+    return this.matchedAttributeMethod(String(method)) !== null;
+  }
 }
 
 /**
@@ -843,3 +884,30 @@ export function _resurrectAttributeMethods(klass: ClassMethods): void {
     .map(([attrName]) => attrName);
   if (stale.length > 0) klass.defineAttributeMethods(...stale);
 }
+
+/**
+ * The instance half of `ActiveModel::AttributeMethods`, plus the module's
+ * `included do` block (attribute_methods.rb:70-73):
+ *
+ *   included do
+ *     class_attribute :attribute_aliases, instance_writer: false, default: {}
+ *     class_attribute :attribute_method_patterns, instance_writer: false,
+ *       default: [ ClassMethods::AttributeMethodPattern.new ]
+ *   end
+ */
+export const InstanceMethods = {
+  [included](base: object): void {
+    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "attributeMethodPatterns", {
+      instanceWriter: false,
+      default: [new AttributeMethodPattern()],
+    });
+  },
+  respondTo,
+  attributeMissing,
+  isAttributeMethod,
+  matchedAttributeMethod,
+  missingAttribute,
+  isRespondToWithoutAttributes,
+  _readAttribute,
+};

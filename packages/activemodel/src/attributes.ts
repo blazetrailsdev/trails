@@ -30,47 +30,33 @@ export function attributes(attrs: AttributeSet): Record<string, unknown> {
   return attrs.toHash();
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names
+ * (attributes.rb:74-76) — `attribute_types.keys`.
+ */
+export function attributeNames(this: { attributeTypes(): Record<string, Type> }): string[] {
+  return Object.keys(this.attributeTypes());
+}
+
+type AttributeInstanceHost = { _attributes: AttributeSet };
+
+/**
+ * Mirrors: ActiveModel::Attributes#_write_attribute (attributes.rb:156-158) —
+ * `@attributes.write_from_user(attr_name, value)`.
+ *
+ * Rails computes nothing here: `write_from_user` builds a `FromUser` whose
+ * `@value` stays uncomputed, so `has_been_read?` is false after a write and
+ * `accessed_fields` is empty on a freshly built record
+ * (attribute_methods_test.rb:1308).
+ *
+ * @internal Rails-private helper.
+ */
 export function _writeAttribute(
   this: AttributeInstanceHost,
   attrName: string,
   value: unknown,
 ): void {
   this._attributes.writeFromUser(attrName, value);
-}
-
-/**
- * Mirrors: ActiveModel::Attributes#_write_attribute
- *
- * Writes a value into the attribute store via the user-write path (casts
- * through the type's `cast` method before storing).
- *
- * @internal Rails-private helper.
- */
-type AttributeInstanceHost = { _attributes: AttributeSet };
-
-/**
- * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-62)
- * — `super; define_attribute_method(name)`. The `super` is
- * `AttributeRegistration::ClassMethods#attribute`
- * (attribute_registration.rb:12-20); TS has no `super` for a module outside the
- * prototype chain, so the registration half is called through its import alias.
- *
- * A name the class already answers (`toJSON`, `freeze`, `attributes`)
- * gets no accessor, because `define_attribute_method_pattern`'s
- * `instance_method_already_implemented?` arm rejects it; such an attribute still
- * round-trips through `readAttribute` / `writeAttribute`.
- *
- * @internal
- */
-export function attribute(
-  this: AttributeRegistrationHost & { defineAttributeMethod(attrName: string): void },
-  name: string,
-  typeName?: string | Type | AttributeOptions,
-  options?: AttributeOptions,
-): void {
-  registrationAttribute.call(this, name, typeName, options);
-  this.defineAttributeMethod(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +84,30 @@ export interface AttributeOptions {
    */
   array?: boolean;
   range?: boolean;
+}
+
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute (attributes.rb:59-62)
+ * — `super; define_attribute_method(name)`. The `super` is
+ * `AttributeRegistration::ClassMethods#attribute`
+ * (attribute_registration.rb:12-20); TS has no `super` for a module outside the
+ * prototype chain, so the registration half is called through its import alias.
+ *
+ * A name the class already answers (`toJSON`, `freeze`, `attributes`)
+ * gets no accessor, because `define_attribute_method_pattern`'s
+ * `instance_method_already_implemented?` arm rejects it; such an attribute still
+ * round-trips through `readAttribute` / `writeAttribute`.
+ *
+ * @internal
+ */
+export function attribute(
+  this: AttributeRegistrationHost & { defineAttributeMethod(attrName: string): void },
+  name: string,
+  typeName?: string | Type | AttributeOptions,
+  options?: AttributeOptions,
+): void {
+  registrationAttribute.call(this, name, typeName, options);
+  this.defineAttributeMethod(name);
 }
 
 /**

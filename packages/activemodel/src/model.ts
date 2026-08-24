@@ -26,7 +26,6 @@ import {
   type Extended,
   type CodeGenerator,
   Module,
-  classAttribute,
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { Type } from "./type/value.js";
@@ -35,6 +34,7 @@ import { ModelLike, ModelName } from "./naming.js";
 import {
   Dirty,
   DirtyTracker,
+  _writeAttribute as dirtyWriteAttribute,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
@@ -57,14 +57,8 @@ import {
   defineMethodAttribute,
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
-import {
-  _assignAttribute as attrAssignOne,
-  assignAttributes as attrAssign,
-  setAttributes as attrSetAttributes,
-  attributeWriterMissing as defaultAttributeWriterMissing,
-  isMassAssignmentEmpty,
-  ArgumentError,
-} from "./attribute-assignment.js";
+import * as AttributeAssignment from "./attribute-assignment.js";
+import { isMassAssignmentEmpty, ArgumentError } from "./attribute-assignment.js";
 import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
 import {
   ClassMethods as ValidationsCallbacksClassMethods,
@@ -80,7 +74,9 @@ import {
   type AttributeDefinition,
   Attributes,
   attribute,
+  attributeNames,
   setDefineMethodAttribute,
+  _writeAttribute,
   freeze as attributesFreeze,
   initializeDup as attributesInitializeDup,
 } from "./attributes.js";
@@ -93,7 +89,6 @@ import {
   resetDefaultAttributesBang as _resetDefaultAttributesBangHelper,
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
-  type AttributeHostInternals,
 } from "./attribute-registration.js";
 import { _toPartialPath } from "./conversion.js";
 
@@ -102,11 +97,8 @@ import { _toPartialPath } from "./conversion.js";
  * class half `include ActiveModel::Attributes` contributes, mixed onto `Model`
  * by the `extend()` at the bottom of this file.
  *
- * `attribute_names` (attributes.rb:73-75) is not carried: `Model` defines its
- * own in the class body, and where Ruby's ancestry lets a class-body method
- * outrank the module's, `extend()` would overwrite it.
  */
-const AttributesClassMethods = { attribute, setDefineMethodAttribute };
+const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeNames };
 
 /**
  * Anything `validates_with` accepts: a full `Validator`/`EachValidator`
@@ -138,6 +130,34 @@ export interface Model extends Dirty {
   matchedAttributeMethod(methodName: string): { proxyTarget: string; attrName: string } | null;
   missingAttribute(attrName: string, stack?: string): never;
   isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
+  respondTo(method: string, includePrivateMethods?: boolean): boolean;
+  /** @internal */
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
+
+  /**
+   * The instance half of Ruby `include ActiveModel::Attributes` (api.rb:15) —
+   * `_write_attribute` (attributes.rb:156-158) and the `attribute=` alias it
+   * carries (attributes.rb:159), installed by the `include(Model, …)` at the
+   * bottom of this file.
+   *
+   * @internal
+   */
+  _writeAttribute(name: string, value: unknown): void;
+  /** @internal */
+  "attribute="(name: string, value: unknown): void;
+
+  /**
+   * The instance half of Ruby `include ActiveModel::AttributeAssignment`
+   * (api.rb:14), installed by the `include(Model, AttributeAssignment)` at the
+   * bottom of this file.
+   */
+  assignAttributes(newAttributes: unknown): Promise<void> | void;
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+  attributeWriterMissing(name: string, value: unknown): void;
+  /** @internal */
+  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  /** @internal */
+  _assignAttribute(k: string, v: unknown): Promise<void> | void;
 
   /**
    * The instance halves of Ruby `include ActiveModel::Validations`
@@ -237,12 +257,17 @@ export class Model {
   declare static setDefineMethodAttribute: Extended<
     typeof AttributesClassMethods
   >["setDefineMethodAttribute"];
-  static defineMethodAttribute = defineMethodAttribute;
-  static _defaultAttributes = _defaultAttributes;
-  static decorateAttributes = decorateAttributes;
-  static attributeTypes = attributeTypes;
-  static typeForAttribute = staticTypeForAttribute;
   static _toPartialPath = _toPartialPath;
+
+  /** @internal Rails-private helper (CLAUDE.md § "Generated attribute readers are properties"). */
+  declare static defineMethodAttribute: typeof defineMethodAttribute;
+
+  /** @internal Rails-private helper. */
+  declare static _defaultAttributes: typeof _defaultAttributes;
+
+  declare static decorateAttributes: typeof decorateAttributes;
+  declare static attributeTypes: typeof attributeTypes;
+  declare static typeForAttribute: typeof staticTypeForAttribute;
 
   /** @internal Rails-private helper. */
   declare static pendingAttributeModifications: typeof _pendingAttributeModificationsHelper;
@@ -263,21 +288,10 @@ export class Model {
   declare static resolveTypeName: typeof _resolveTypeNameHelper;
 
   /** @internal Rails-private helper. */
-  static hookAttributeType(
-    attribute: string,
-    type: import("./type/value.js").Type,
-  ): import("./type/value.js").Type {
-    return _hookAttributeTypeHelper.call(
-      this as unknown as AttributeHostInternals,
-      attribute,
-      type,
-    );
-  }
+  declare static hookAttributeType: typeof _hookAttributeTypeHelper;
 
-  /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-75). */
-  static attributeNames(): string[] {
-    return Object.keys(this.attributeTypes());
-  }
+  /** Mirrors: ActiveModel::Attributes::ClassMethods#attribute_names (attributes.rb:74-76). */
+  declare static attributeNames: Extended<typeof AttributesClassMethods>["attributeNames"];
 
   /**
    * Mirrors: ActiveModel::Validations::ClassMethods#validates
@@ -553,7 +567,9 @@ export class Model {
     this._initializingAttributes = true;
     try {
       if (!isMassAssignmentEmpty(attrs)) {
-        this._assignAttributes(this.sanitizeForMassAssignment(attrs));
+        // AR's override can owe I/O; Rails' `initialize` does not await it
+        // either — the deferred writes drain on save (RFC 0087).
+        void this._assignAttributes(this.sanitizeForMassAssignment(attrs));
       }
     } finally {
       this._initializingAttributes = false;
@@ -569,38 +585,6 @@ export class Model {
     if (callbackSuppressor._suppressInitializeCallback !== true) {
       void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
-  }
-
-  /**
-   * @internal
-   * Mirrors AR `_read_attribute(attr_name, &block)` — reads directly from the
-   * attribute store, optionally yielding a known-but-unselected column's name to
-   * `block` (which the generated getters / `[]` use to raise
-   * MissingAttributeError). Without a block, an unselected column reads as nil,
-   * matching plain `read_attribute`/`_read_attribute`.
-   */
-  _readAttribute(name: string, block?: (name: string) => unknown): unknown {
-    return this._attributes.fetchValue(name, block) ?? null;
-  }
-
-  /** Mirrors: ActiveModel::Attributes `alias :attribute= :_write_attribute` (attributes.rb:159). */
-  "attribute="(name: string, value: unknown): void {
-    this._writeAttribute(name, value);
-  }
-
-  /**
-   * Rails computes nothing here: `write_from_user` builds a `FromUser` whose
-   * `@value` stays uncomputed, so `has_been_read?` is false after a write and
-   * `accessed_fields` is empty on a freshly built record
-   * (attribute_methods_test.rb:1308). The write is recorded against the
-   * tracker without casting: the cast reaches `type.changed?` from
-   * `Attribute#changed?` (attribute.rb:155-160) when someone asks.
-   *
-   * @internal
-   */
-  _writeAttribute(name: string, value: unknown): void {
-    this._attributes.writeFromUser(name, value);
-    this._dirty.attributeWritten(name);
   }
 
   /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
@@ -770,38 +754,6 @@ export class Model {
   }
 
   /**
-   * Assign multiple attributes at once without saving.
-   *
-   * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
-   */
-  assignAttributes(newAttributes: unknown): Promise<void> | void {
-    return attrAssign(this, newAttributes);
-  }
-
-  /**
-   * Mirrors: `alias attributes= assign_attributes` (attribute_assignment.rb:36).
-   */
-  setAttributes(newAttributes: unknown): Promise<void> | void {
-    return attrSetAttributes(this, newAttributes);
-  }
-
-  /**
-   * @internal Rails-private helper.
-   */
-  _assignAttributes(attributes: Record<string, unknown>): void {
-    for (const [k, v] of Object.entries(attributes)) {
-      void this._assignAttribute(k, v);
-    }
-  }
-
-  /**
-   * @internal Rails-private helper.
-   */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void {
-    return attrAssignOne(this, k, v);
-  }
-
-  /**
    * @internal Rails-private helper.
    */
   sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
@@ -830,17 +782,6 @@ export class Model {
     return serializationReadAttributeForSerialization(this as unknown as SerializationRecord, key);
   }
 
-  /**
-   * Hook invoked when assignAttributes encounters an unknown attribute
-   * that causes writeAttribute to throw UnknownAttributeError.
-   * Override to customize behavior (e.g. log instead of raise).
-   *
-   * Mirrors: ActiveModel::AttributeAssignment#attribute_writer_missing
-   */
-  attributeWriterMissing(name: string, value: unknown): void {
-    defaultAttributeWriterMissing(this, name, value);
-  }
-
   toParam(): string | null {
     if (!this.isPersisted()) return null;
     const key = this.toKey();
@@ -851,17 +792,6 @@ export class Model {
 
   toPartialPath(): string {
     return (this.constructor as typeof Model)._toPartialPath();
-  }
-
-  /**
-   * Check if this model instance responds to a method/attribute.
-   *
-   * Mirrors: ActiveModel::AttributeMethods#respond_to?
-   */
-  respondTo(method: string): boolean {
-    if (typeof (this as unknown as Record<string, unknown>)[method] === "function") return true;
-    if (this._attributes.has(method)) return true;
-    return false;
   }
 
   /**
@@ -917,13 +847,6 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-// Rails' `included do` block (attribute_methods.rb:70-73).
-classAttribute.call(Model, "attributeAliases", { instanceWriter: false, default: {} });
-classAttribute.call(Model, "attributeMethodPatterns", {
-  instanceWriter: false,
-  default: [new AttributeMethodPattern()],
-});
-
 // Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
 // friends (validations.rb:57-307, validations/validates.rb:111-178) onto the
 // class; `with.rb:87` reopens the same `ClassMethods`, hence the second extend.
@@ -940,9 +863,14 @@ extend(Model, {
 
 // Ruby `include ActiveModel::AttributeRegistration` (attribute_registration.rb:8).
 extend(Model, {
+  decorateAttributes,
+  attributeTypes,
+  typeForAttribute: staticTypeForAttribute,
+  _defaultAttributes,
   pendingAttributeModifications: _pendingAttributeModificationsHelper,
   resetDefaultAttributesBang: _resetDefaultAttributesBangHelper,
   resolveTypeName: _resolveTypeNameHelper,
+  hookAttributeType: _hookAttributeTypeHelper,
 });
 // `include ActiveModel::AttributeMethods` lands after AttributeRegistration
 // (model.rb:12-14), so its alias-resolving `resolve_attribute_name` override
@@ -965,24 +893,33 @@ extend(Model, {
   attributeMethodPatternsCache: AttributeMethods.attributeMethodPatternsCache,
   attributeMethodPatternsMatching: AttributeMethods.attributeMethodPatternsMatching,
 });
-include(Model, {
-  attributeMissing: AttributeMethods.attributeMissing,
-  isAttributeMethod: AttributeMethods.isAttributeMethod,
-  matchedAttributeMethod: AttributeMethods.matchedAttributeMethod,
-  missingAttribute: AttributeMethods.missingAttribute,
-  isRespondToWithoutAttributes: AttributeMethods.isRespondToWithoutAttributes,
-});
+// Its `included do` block (attribute_methods.rb:70-73) rides along, issued from
+// the module's own `[included]` hook.
+include(Model, AttributeMethods.InstanceMethods);
 
 // `include ActiveModel::Attributes` (attributes.rb:29) — its `included` hook
 // issues `attribute_method_suffix "=", parameters: "value"` (attributes.rb:35),
 // so it has to run after the `attributeMethodPatterns` class attribute exists.
 extend(Model, AttributesClassMethods);
+extend(Model, { defineMethodAttribute });
 include(Model, Attributes);
+// attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
+include(Model, { _writeAttribute, "attribute=": _writeAttribute });
+
+// Ruby `include ActiveModel::AttributeAssignment` (api.rb:14).
+include(Model, {
+  assignAttributes: AttributeAssignment.assignAttributes,
+  setAttributes: AttributeAssignment.setAttributes,
+  attributeWriterMissing: AttributeAssignment.attributeWriterMissing,
+  _assignAttributes: AttributeAssignment._assignAttributes,
+  _assignAttribute: AttributeAssignment._assignAttribute,
+});
 
 // Ruby `include ActiveModel::Dirty` (model.rb:12-14) — a class module, since
 // only `include()`'s class branch carries the accessor descriptors the module's
 // zero-arg readers port to.
 include(Model, Dirty);
+prepend(Model.prototype, { _writeAttribute: dirtyWriteAttribute });
 
 // Its `included do` block (dirty.rb:241-245).
 // The Ruby affixes are snake_case fragments of the generated name, trails' the

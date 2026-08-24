@@ -331,6 +331,32 @@ export function initInternals(this: DirtyInternalsHost, super_: () => void): voi
 }
 
 /**
+ * Rails' `ActiveModel::Dirty` derives its answers by asking
+ * the mutation tracker built lazily over `@attributes`
+ * (dirty.rb:200-206 `mutations_from_database`,
+ * attribute_mutation_tracker.rb:20-31 `changed?`), so no write path has to
+ * notify it and `Attributes#_write_attribute` (attributes.rb:156-158) is the
+ * bare `@attributes.write_from_user`. trails' {@link DirtyTracker} is
+ * push-based instead, so the notification has to happen on write — and it
+ * belongs to the module that owns the tracker, not to `Attributes`, which
+ * includes only AttributeRegistration and AttributeMethods (attributes.rb:30-33)
+ * and must stay usable without Dirty. `prepend()` is the Ruby
+ * `include ActiveModel::Dirty` layering: the wrapper runs, `super_` is the
+ * `Attributes` definition below it.
+ *
+ * @internal
+ */
+export function _writeAttribute(
+  this: DirtyInternalsHost,
+  super_: (attrName: string, value: unknown) => void,
+  attrName: string,
+  value: unknown,
+): void {
+  super_(attrName, value);
+  this._dirty.attributeWritten(attrName);
+}
+
+/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
