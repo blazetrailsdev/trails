@@ -1733,15 +1733,16 @@ export class SchemaStatements {
 
   /**
    * @missingRailsCall fetch — PERMANENT: `index_algorithms.fetch(algorithm) { raise ... }`
-   *   (schema_statements.rb:1504-1506). A JS object has no `fetch`, and Hash#fetch's
-   *   block-on-miss arm has no JS call analogue, so the key-presence test and the raise
-   *   are spelled inline at Rails' site.
+   *   (schema_statements.rb:1504-1506). Hash#fetch is a Ruby core method with no JS
+   *   analogue: a plain object has no `fetch`, and there is no ported receiver to call
+   *   either — ActiveSupport's `core_ext/hash` defines no `fetch`, so a trails helper
+   *   would be surface Rails does not have. The key-presence test and the block's raise
+   *   are spelled inline at Rails' site, with Rails' arguments and message.
    */
   indexAlgorithm(algorithm?: string): string | undefined {
-    if (!algorithm) return undefined;
+    if (algorithm == null) return undefined;
     const indexAlgorithms = this.indexAlgorithms();
-    const normalized = algorithm.toLowerCase();
-    if (normalized in indexAlgorithms) return indexAlgorithms[normalized] || undefined;
+    if (algorithm in indexAlgorithms) return indexAlgorithms[algorithm];
     throw new ArgumentError(
       `Algorithm must be one of the following: ${Object.keys(indexAlgorithms)
         .map((a) => `:${a}`)
