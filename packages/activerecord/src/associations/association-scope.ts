@@ -10,6 +10,7 @@ import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { JoinDependency } from "./join-dependency.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
+import { drop } from "../ruby-drop.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -465,10 +466,6 @@ export class AssociationScope {
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#get_chain
    * (association_scope.rb:112-122).
-   *
-   * @missingRailsCall drop — PERMANENT: Ruby Array#drop:
-   *   `reflection.chain.drop(1)` (association_scope.rb:115) ports to
-   *   `reflection.chain.slice(1)`.
    */
   protected getChain(
     reflection: AssociationReflection,
@@ -481,7 +478,7 @@ export class AssociationScope {
     const chain: Array<AbstractReflection | ReflectionProxy> = [
       new RuntimeReflection(reflection, association),
     ];
-    const tail = reflection.chain.slice(1);
+    const tail = drop(reflection.chain, 1);
     const name = reflection.name;
     for (const refl of tail) {
       const klass = (refl as unknown as { klass?: typeof Base }).klass;

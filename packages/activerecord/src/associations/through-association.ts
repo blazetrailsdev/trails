@@ -6,6 +6,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
+import { drop } from "../ruby-drop.js";
 
 /**
  * Shared module for through associations (has_many :through, has_one :through).
@@ -280,13 +281,6 @@ export const ThroughAssociation = {
   //
   // Mirrors: ActiveRecord::Associations::ThroughAssociation#target_scope
   // (through_association.rb:34-42).
-  /**
-   * @missingRailsCall drop — CONVERGEABLE (story
-   *   port-ruby-array-drop-for-chain-call-sites): Ruby's `Enumerable#drop(1)` over
-   *   `reflection.chain` (through_association.rb:36) is spelled `chain.slice(1)`
-   *   here because trails ports no `Array#drop` yet — the sibling of
-   *   `ruby-empty.ts` / `ruby-first.ts` that story adds.
-   */
   targetScope(this: ThroughAssociationHost): any {
     let scope = super.targetScope();
     if (!scope) return scope;
@@ -299,8 +293,7 @@ export const ThroughAssociation = {
       | undefined;
     const chain = refl?.chain;
     if (!chain) return scope;
-    // Ruby's `chain.drop(1)`: a JS array has no `drop`.
-    for (const reflection of chain.slice(1)) {
+    for (const reflection of drop(chain, 1)) {
       let relation = reflection?.klass?.scopeForAssociation?.();
       // Rails: `relation.except(:select, :create_with, :includes, :preload,
       //   :eager_load, :joins, :left_outer_joins)` — strip query parts that
