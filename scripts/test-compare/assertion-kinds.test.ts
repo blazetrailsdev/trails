@@ -30,11 +30,13 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("must_be_instance_of")).toBe("instanceOf");
     expect(normalizeRailsKind("must_be_nil")).toBe("nil");
     expect(normalizeRailsKind("must_be_empty")).toBe("empty");
+    expect(normalizeRailsKind("wont_be_empty")).toBe("notEmpty");
     expect(normalizeRailsKind("must_be_same_as")).toBe("same");
     expect(normalizeRailsKind("wont_be_same_as")).toBe("notSame");
     expect(normalizeRailsKind("wont_be_nil")).toBe("notNil");
     expect(normalizeRailsKind("must_be")).toBe("operator");
     expect(normalizeRailsKind("must_be_within_delta")).toBe("inDelta");
+    expect(normalizeRailsKind("must_be_close_to")).toBe("inDelta");
   });
 
   it("maps the arel-local must_be_like and assert_edge helpers", () => {
