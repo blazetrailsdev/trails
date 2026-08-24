@@ -25,9 +25,30 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("wont_equal")).toBe("notEqual");
   });
 
+  it("maps the must_be_* spec family, which the prefix rewrite alone cannot reach", () => {
+    expect(normalizeRailsKind("must_be_kind_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("must_be_instance_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("must_be_nil")).toBe("nil");
+    expect(normalizeRailsKind("must_be_empty")).toBe("empty");
+    expect(normalizeRailsKind("wont_be_empty")).toBe("notEmpty");
+    expect(normalizeRailsKind("must_be_same_as")).toBe("same");
+    expect(normalizeRailsKind("wont_be_same_as")).toBe("notSame");
+    expect(normalizeRailsKind("wont_be_nil")).toBe("notNil");
+    expect(normalizeRailsKind("must_be")).toBe("operator");
+    expect(normalizeRailsKind("must_be_within_delta")).toBe("inDelta");
+    expect(normalizeRailsKind("must_be_close_to")).toBe("inDelta");
+  });
+
+  it("maps the arel-local must_be_like and assert_edge helpers", () => {
+    expect(normalizeRailsKind("must_be_like")).toBe("equal");
+    expect(normalizeRailsKind("assert_edge")).toBe("match");
+  });
+
   it("returns null for an unmapped assertion helper", () => {
     expect(normalizeRailsKind("assert_queries_count")).toBeNull();
     expect(normalizeRailsKind("assert_cycle")).toBeNull();
+    expect(normalizeRailsKind("must_be_frobnicated")).toBeNull();
+    expect(normalizeRailsKind("wont_be_kind_of")).toBeNull();
   });
 });
 

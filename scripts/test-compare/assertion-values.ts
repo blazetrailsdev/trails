@@ -71,6 +71,13 @@ interface SideKind {
   total: number;
   /** the literal tokens captured (length ≤ total; < total means some non-literal) */
   captured: string[];
+  /**
+   * Indices into `captured` whose assertion compares whitespace-insensitively
+   * (see LOOSE_RAILS_KINDS). Tracked per assertion, not per test case: a test
+   * that mixes `must_be_like` with a plain `must_equal` must still compare the
+   * `must_equal` operand verbatim.
+   */
+  loose: Set<number>;
 }
 
 /**
@@ -92,12 +99,15 @@ function collectSide(
     if (!kind || !VALUE_BEARING_KINDS.has(kind)) continue;
     let entry = map.get(kind);
     if (!entry) {
-      entry = { total: 0, captured: [] };
+      entry = { total: 0, captured: [], loose: new Set() };
       map.set(kind, entry);
     }
     entry.total++;
     const value = values?.[i];
-    if (value != null) entry.captured.push(foldSymbolToken(value));
+    if (value != null) {
+      if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
+      entry.captured.push(foldSymbolToken(value));
+    }
   }
   return map;
 }
@@ -113,6 +123,27 @@ function collectSide(
  */
 function foldSymbolToken(token: string): string {
   return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
+}
+
+/**
+ * Rails-side assertion helpers that compare their operands with runs of
+ * whitespace collapsed, so their captured value token must be compared the same
+ * way. Keyed on the RAW kind token, which is what makes the fold per-assertion:
+ * only the operand of this helper call is squeezed, never a sibling
+ * `must_equal` in the same test.
+ */
+const LOOSE_RAILS_KINDS: ReadonlySet<string> = new Set(["must_be_like"]);
+
+/**
+ * Arel's `must_be_like` (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13)
+ * squeezes runs of whitespace and strips both operands before delegating to
+ * `must_equal`, so `%{\n  SELECT id FROM "users"\n}` and `SELECT id FROM
+ * "users"` are the SAME assertion. Its value token must be compared the same
+ * way, on both sides — the Ruby heredoc keeps its indentation and the ported
+ * string literal does not, and that is formatting, not a fidelity divergence.
+ */
+function squeezeToken(token: string): string {
+  return token.startsWith("s:") ? `s:${token.slice(2).replace(/\s+/g, " ").trim()}` : token;
 }
 
 /**
@@ -148,12 +179,51 @@ export function assertionValueMismatch(
     if (!r || !t || r.total !== t.total) continue;
     // Some expected argument was a non-literal on either side — can't compare.
     if (r.captured.length < r.total || t.captured.length < t.total) continue;
-    // Both multisets are fully-literal and equal-count (r.total === t.total), so
-    // an element-wise compare of the sorted token lists is exact multiset
-    // equality — not a joined string, since a token can itself contain spaces.
-    const rs = [...r.captured].sort();
-    const ts = [...t.captured].sort();
-    if (rs.some((tok, i) => tok !== ts[i])) deltas.push({ kind, rails: rs, trails: ts });
+    const mismatch =
+      r.loose.size > 0 ? looseMismatch(r, t.captured) : exactMismatch(r.captured, t.captured);
+    if (mismatch) deltas.push({ kind, ...mismatch });
   }
   return deltas.length > 0 ? deltas : null;
+}
+
+/**
+ * Multiset equality over two fully-literal, equal-length token lists. Both are
+ * equal-count by the caller's guard, so an element-wise compare of the sorted
+ * lists is exact multiset equality — not a joined string, since a token can
+ * itself contain spaces.
+ */
+function exactMismatch(rails: string[], trails: string[]): Omit<ValueDelta, "kind"> | null {
+  const rs = [...rails].sort();
+  const ts = [...trails].sort();
+  return rs.some((tok, i) => tok !== ts[i]) ? { rails: rs, trails: ts } : null;
+}
+
+/**
+ * Multiset equality where SOME of the Rails tokens compare whitespace-insensitively
+ * (their assertion was a LOOSE_RAILS_KINDS helper) and the rest compare verbatim.
+ * The strict tokens are matched first and must find an exact partner, so a plain
+ * `must_equal` sitting beside a `must_be_like` still catches a whitespace-only
+ * divergence. Whatever the strict pass leaves over is then squeezed and compared
+ * against the squeezed loose tokens.
+ *
+ * The trails side carries no such attribution — vitest spells both as `toEqual` —
+ * so a strict token that could equally have partnered a loose one is consumed by
+ * the strict pass. Where that guesses wrong it yields a false MISMATCH, never a
+ * false match, which is the safe direction (the same rule TRAILS_MAP applies to
+ * `toBe`).
+ */
+function looseMismatch(rails: SideKind, trails: string[]): Omit<ValueDelta, "kind"> | null {
+  const strict = rails.captured.filter((_tok, i) => !rails.loose.has(i));
+  const loose = rails.captured.filter((_tok, i) => rails.loose.has(i)).map(squeezeToken);
+  const remaining = [...trails];
+  const matched: string[] = [];
+  let unmatched = 0;
+  for (const tok of strict) {
+    const at = remaining.indexOf(tok);
+    if (at < 0) unmatched++;
+    else matched.push(...remaining.splice(at, 1));
+  }
+  const squeezed = remaining.map(squeezeToken);
+  if (unmatched === 0 && exactMismatch(loose, squeezed) === null) return null;
+  return { rails: [...strict, ...loose].sort(), trails: [...matched, ...squeezed].sort() };
 }

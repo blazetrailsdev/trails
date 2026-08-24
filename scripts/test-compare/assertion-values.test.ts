@@ -122,4 +122,66 @@ describe("assertionValueMismatch", () => {
     ).toBeNull();
     expect(assertionValueMismatch(undefined, undefined, ["toEqual"], ["n:4"], false)).toBeNull();
   });
+
+  it("folds whitespace for must_be_like, which squeezes both operands", () => {
+    expect(
+      assertionValueMismatch(
+        ["must_be_like"],
+        ['s:\n            SELECT id FROM "users"\n          '],
+        ["toEqual"],
+        ['s:SELECT id FROM "users"'],
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("still flags a must_be_like pair whose SQL actually differs", () => {
+    expect(
+      assertionValueMismatch(
+        ["must_be_like"],
+        ['s: SELECT id FROM "users" '],
+        ["toEqual"],
+        ['s:SELECT * FROM "users"'],
+        false,
+      ),
+    ).toEqual([
+      { kind: "equal", rails: ['s:SELECT id FROM "users"'], trails: ['s:SELECT * FROM "users"'] },
+    ]);
+  });
+
+  it("does not fold whitespace for an ordinary must_equal pair", () => {
+    expect(
+      assertionValueMismatch(["must_equal"], ["s:a  b"], ["toEqual"], ["s:a b"], false),
+    ).toEqual([{ kind: "equal", rails: ["s:a  b"], trails: ["s:a b"] }]);
+  });
+
+  it("squeezes only the must_be_like operand, not a must_equal beside it", () => {
+    expect(
+      assertionValueMismatch(
+        ["must_be_like", "must_equal"],
+        ['s: SELECT id FROM "users" ', "s:a  b"],
+        ["toEqual", "toEqual"],
+        ['s:SELECT id FROM "users"', "s:a b"],
+        false,
+      ),
+    ).toEqual([
+      {
+        kind: "equal",
+        rails: ['s:SELECT id FROM "users"', "s:a  b"],
+        trails: ['s:SELECT id FROM "users"', "s:a b"],
+      },
+    ]);
+  });
+
+  it("passes a mixed pair when the must_equal operand matches verbatim", () => {
+    expect(
+      assertionValueMismatch(
+        ["must_be_like", "must_equal"],
+        ['s:\n  SELECT id FROM "users"\n', "s:a  b"],
+        ["toEqual", "toEqual"],
+        ["s:a  b", 's:SELECT id FROM "users"'],
+        false,
+      ),
+    ).toBeNull();
+  });
 });
