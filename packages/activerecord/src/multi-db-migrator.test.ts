@@ -13,6 +13,11 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
+// Rails' `@path_a` / `@path_b` (multi_db_migrator_test.rb:33-34).
+const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
+const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
+const PATH_B = [`${MIGRATIONS_ROOT}/to_copy`];
+
 function sensor(
   version: number,
   name: string,
@@ -145,8 +150,11 @@ describe("MultiDbMigratorTest", () => {
     await schemaMigrationA.createVersion("2");
     await schemaMigrationA.createVersion("10");
 
-    const migratorA = new Migrator("up", migrationsA, schemaMigrationA, internalMetadataA);
-    const statusA = await migratorA.migrationsStatus();
+    const statusA = await new MigrationContext(
+      PATH_A,
+      schemaMigrationA,
+      internalMetadataA,
+    ).migrationsStatus();
     expect(statusA).toEqual([
       { status: "down", version: "001", name: "Valid people have last names" },
       { status: "up", version: "002", name: "We need reminders" },
@@ -155,8 +163,11 @@ describe("MultiDbMigratorTest", () => {
     ]);
 
     await schemaMigrationB.createVersion("4");
-    const migratorB = new Migrator("up", migrationsB, schemaMigrationB, internalMetadataB);
-    const statusB = await migratorB.migrationsStatus();
+    const statusB = await new MigrationContext(
+      PATH_B,
+      schemaMigrationB,
+      internalMetadataB,
+    ).migrationsStatus();
     expect(statusB).toEqual([
       { status: "down", version: "001", name: "People have hobbies" },
       { status: "down", version: "002", name: "People have descriptions" },

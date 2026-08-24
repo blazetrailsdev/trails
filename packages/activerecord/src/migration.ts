@@ -2081,15 +2081,13 @@ export class MigrationContext<
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
-    return this._migrateWithMigrator(
-      new Migrator(
-        "up",
-        selectedMigrations,
-        this.schemaMigration,
-        this.internalMetadata,
-        targetVersion,
-      ),
-    );
+    return new Migrator(
+      "up",
+      selectedMigrations,
+      this.schemaMigration,
+      this.internalMetadata,
+      targetVersion,
+    ).migrate();
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
@@ -2099,28 +2097,13 @@ export class MigrationContext<
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
-    return this._migrateWithMigrator(
-      new Migrator(
-        "down",
-        selectedMigrations,
-        this.schemaMigration,
-        this.internalMetadata,
-        targetVersion,
-      ),
-    );
-  }
-
-  /**
-   * @internal `Migrator#migrate` is `use_advisory_lock? ? with_advisory_lock
-   * { migrate_without_lock } : migrate_without_lock` (`migration.rb:1452-1458`).
-   * It is spelled out here because trails' `Migrator#migrate` still carries the
-   * MigrationContext-shaped `(targetVersion, block)` signature its remaining
-   * callers pass; `migrator-run-surface-caller-migration` collapses it.
-   */
-  private async _migrateWithMigrator(migrator: Migrator): Promise<MigrationProxy[]> {
-    return migrator.isUseAdvisoryLock()
-      ? migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
-      : migrator.migrateWithoutLock();
+    return new Migrator(
+      "down",
+      selectedMigrations,
+      this.schemaMigration,
+      this.internalMetadata,
+      targetVersion,
+    ).migrate();
   }
 
   /**
@@ -2151,16 +2134,13 @@ export class MigrationContext<
     direction: "up" | "down",
     targetVersion: number | string,
   ): Promise<number | undefined> {
-    const migrator = new Migrator(
+    return new Migrator(
       direction,
       this.migrations,
       this.schemaMigration,
       this.internalMetadata,
       targetVersion,
-    );
-    return migrator.isUseAdvisoryLock()
-      ? migrator.withAdvisoryLock(() => migrator.runWithoutLock())
-      : migrator.runWithoutLock();
+    ).run();
   }
 
   /**
@@ -2334,8 +2314,12 @@ export class MigrationContext<
    * one way a single migration can be present twice, as a `.ts` source beside
    * the `.js` its build emitted. Rails has no such twin, so it loads once:
    * `.ts` beats `.js`, source over compiled output.
+   *
+   * `protected`, not `private`: Ruby's `private` still lets a subclass override
+   * the method, which is how a context over a non-filesystem source (the
+   * browser CLI's virtual FS) names its own files.
    */
-  private migrationFiles(): string[] {
+  protected migrationFiles(): string[] {
     const { readdirSync, existsSync } = getFs();
     const { join } = getPath();
     const files: string[] = [];
@@ -2375,7 +2359,7 @@ export class MigrationContext<
    *   result (migration.rb:1375) is a method; JS reads the first match off the
    *   `String#match` result by index, which records no callee.
    */
-  private parseMigrationFilename(filename: string): [string, string, string] | null {
+  protected parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "");
     const m = base.match(/^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/);
     if (!m) return null;
@@ -2527,64 +2511,16 @@ export class Migrator {
   }
 
   /**
-   * Run all pending migrations up, or migrate to a specific version.
-   *
-   * Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`) — the
-   * advisory-lock gate. A target equal to the current version runs `up`, so an
-   * unapplied migration below an already-applied target still runs. The target
-   * is rejected up front because Ruby compares it against `current_version`
-   * directly, while it may reach us as a string.
-   *
-   * Rails' `#migrate` takes no arguments; the `(targetVersion, block)`
-   * signature its callers still pass is what
-   * `migrator-run-surface-caller-migration` collapses. Until then the direction
-   * choice `MigrationContext#migrate` (`migration.rb:1228-1238`) makes is made
-   * here, on a per-run `Migrator` built the way Rails builds one.
+   * @internal Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`)
+   * — the advisory-lock gate over `migrate_without_lock`. The direction and
+   * target version are the ones this Migrator was constructed with; the
+   * `target_version.nil? / == 0 / >` dispatch belongs to
+   * {@link MigrationContext.migrate} (`migration.rb:1228-1238`).
    */
-  async migrate(
-    targetVersion?: number | string | null,
-    block?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
-    // With no target this is Rails' `Migrator#migrate`, which runs the
-    // direction this Migrator was built with; with one it is
-    // `MigrationContext#migrate`'s dispatch (`migration.rb:1228-1238`).
-    let direction: "up" | "down" = this._direction;
-    if (targetVersion != null) {
-      direction = "up";
-      if (this._invalidTarget(targetVersion)) {
-        throw new UnknownMigrationVersionError(targetVersion);
-      }
-      const target = BigInt(targetVersion);
-      const current = BigInt(await this.currentVersion());
-      if (current === BigInt(0) && target === BigInt(0)) return [];
-      if (current > target) direction = "down";
-    }
-
-    const migrator = new Migrator(
-      direction,
-      block ? this._migrations.filter(block) : this._migrations,
-      this._schemaMigration,
-      this._internalMetadata,
-      targetVersion ?? null,
-    );
-    try {
-      return migrator.isUseAdvisoryLock()
-        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
-        : await migrator.migrateWithoutLock();
-    } finally {
-      this._invalidateMigrated();
-    }
-  }
-
-  /**
-   * Rails builds a fresh `Migrator` for every `up` / `down` / `run`, so the
-   * caller's own `@migrated_versions` memo can never go stale. Our `Migrator`
-   * doubles as `MigrationContext` and is read again after delegating, so the
-   * memo has to be dropped once a per-run migrator has changed
-   * schema_migrations underneath it.
-   */
-  private _invalidateMigrated(): void {
-    this._migratedVersions = undefined;
+  async migrate(): Promise<MigrationProxy[]> {
+    return this.isUseAdvisoryLock()
+      ? this.withAdvisoryLock(() => this.migrateWithoutLock())
+      : this.migrateWithoutLock();
   }
 
   /**
@@ -2655,10 +2591,9 @@ export class Migrator {
     return applied.has(proxy.version);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? */
+  /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? (`migration.rb:1523-1525`) */
   isInvalidTarget(): boolean {
-    if (this._targetVersion === null) return false;
-    return this._invalidTarget(this._targetVersion);
+    return this._targetVersion !== null && this._targetVersion !== 0 && !this.target();
   }
 
   /**
@@ -2757,112 +2692,10 @@ export class Migrator {
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 
-  /**
-   * Get the current schema version.
-   *
-   * Mirrors: ActiveRecord::Migrator.current_version
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#current_version (`migration.rb:1435-1437`) */
   async currentVersion(): Promise<number> {
-    const versions = await this.getAllVersions();
-    return versions.length > 0 ? Math.max(...versions) : 0;
-  }
-
-  /**
-   * Get all applied migration versions.
-   *
-   * Mirrors: ActiveRecord::Migrator.get_all_versions
-   */
-  async getAllVersions(): Promise<number[]> {
-    await this._ensureSchemaTable();
-    const applied = await this._appliedVersions();
-    return [...applied].sort((a, b) => a - b);
-  }
-
-  /**
-   * Read-only check for whether `schema_migrations` already exists.
-   * Used by `db prepare` to decide whether the DB is fresh (should run
-   * seeds) vs. already-initialized (just run pending migrations).
-   *
-   * Mirrors Rails' `initialize_database` which checks
-   * `schema_migration.table_exists?` for the same purpose.
-   */
-  async schemaMigrationTableExists(): Promise<boolean> {
-    return this._schemaMigration.tableExists();
-  }
-
-  /**
-   * Read-only variant of {@link currentVersion}: returns 0 when the
-   * schema_migrations table doesn't yet exist, without creating it.
-   *
-   * Matches Rails' `current_version` exactly (it calls `get_all_versions`
-   * which checks `schema_migration.table_exists?` and returns [] on miss).
-   * The regular {@link currentVersion} keeps the legacy auto-create path
-   * to stay compatible with internal callers that rely on it.
-   */
-  async currentVersionReadOnly(): Promise<number> {
-    if (!(await this._schemaMigration.tableExists())) return 0;
-    const applied = await this._appliedVersions();
-    let max = BigInt(0);
-    for (const v of applied) {
-      const bv = BigInt(v);
-      if (bv > max) max = bv;
-    }
-    return Number(max);
-  }
-
-  /**
-   * Get pending (unapplied) migrations.
-   *
-   * Mirrors: ActiveRecord::Migrator#pending_migrations
-   */
-  async pendingMigrations(): Promise<MigrationProxy[]> {
-    const alreadyMigrated = await this.migrated();
-    return this.migrations.filter((m) => !alreadyMigrated.has(m.version));
-  }
-
-  /**
-   * Get status of all migrations.
-   *
-   * Mirrors: ActiveRecord::Migrator#migrations_status
-   */
-  async migrationsStatus(): Promise<
-    Array<{ status: "up" | "down"; version: string; name: string }>
-  > {
-    await this._ensureSchemaTable();
-    // Mirrors Rails: db_list uses schema_migration.normalized_versions and file
-    // versions go through schema_migration.normalize_migration_number before
-    // matching (migration.rb:1319-1328 / schema_migration.rb:69-70).
-    const applied = new Set(await this._schemaMigration.normalizedVersions());
-
-    const fileList = this._migrations.map((m) => {
-      const normV = SchemaMigration.normalizeMigrationNumber(String(m.version));
-      const isUp = applied.delete(normV);
-      return {
-        status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
-        version: normV,
-        // Mirrors Rails: `(name + scope).humanize` — the snake-case filename
-        // part concatenated with the scope suffix, humanized (migration.rb:1330).
-        // Our proxy carries the camelized class name, so underscore it back
-        // before appending the (already snake-case) scope and humanizing.
-        name: humanize(underscore(m.name) + (m.scope ?? "")),
-      };
-    });
-
-    // Mirrors Rails Migrator#migrations_status: applied versions with no
-    // matching file get a placeholder name. Combined list sorts numerically.
-    const dbList = [...applied].map((version) => ({
-      status: "up" as const,
-      version,
-      name: "********** NO FILE **********",
-    }));
-
-    // Rails sorts by `version.to_i` — non-numeric rows coerce to 0 rather
-    // than raising.
-    return [...dbList, ...fileList].sort((a, b) => {
-      const va = toInteger(a.version);
-      const vb = toInteger(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    const migrated = await this.migrated();
+    return migrated.size > 0 ? Math.max(...migrated) : 0;
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
@@ -2910,39 +2743,11 @@ export class Migrator {
     return new Set(await this._schemaMigration.integerVersions());
   }
 
-  /**
-   * Mirrors Rails' `Migrator#invalid_target?`: a target version is invalid when
-   * it is given, is not 0, and does not correspond to any known migration.
-   */
-  private _invalidTarget(targetVersion: number | string): boolean {
-    const key = toInteger(String(targetVersion));
-    if (key === 0) return false;
-    return !this._migrations.some((m) => m.version === key);
-  }
-
-  /**
-   * Run exactly one migration (identified by `targetVersion`) in the given
-   * direction. Used by the `db:migrate:up` / `db:migrate:down` CLI paths
-   * where the user supplies a specific VERSION.
-   *
-   * Mirrors: ActiveRecord::MigrationContext#run (which builds a Migrator
-   * scoped to `target_version` and calls `#run`).
-   */
-  async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
-    const migrator = new Migrator(
-      direction,
-      this._migrations,
-      this._schemaMigration,
-      this._internalMetadata,
-      targetVersion,
-    );
-    try {
-      return migrator.isUseAdvisoryLock()
-        ? await migrator.withAdvisoryLock(() => migrator.runWithoutLock())
-        : await migrator.runWithoutLock();
-    } finally {
-      this._invalidateMigrated();
-    }
+  /** @internal Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
+  async run(): Promise<number | undefined> {
+    return this.isUseAdvisoryLock()
+      ? this.withAdvisoryLock(() => this.runWithoutLock())
+      : this.runWithoutLock();
   }
 
   /**
@@ -3014,6 +2819,13 @@ export class Migrator {
     return kept;
   }
 
+  /** @internal Mirrors: ActiveRecord::Migrator#pending_migrations (`migration.rb:1475-1478`) */
+  async pendingMigrations(): Promise<MigrationProxy[]> {
+    const alreadyMigrated = await this.migrated();
+    return this.migrations.filter((m) => !alreadyMigrated.has(m.version));
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#migrated (`migration.rb:1480-1482`) */
   async migrated(): Promise<Set<number>> {
     return this._migratedVersions ?? this.loadMigrated();
   }

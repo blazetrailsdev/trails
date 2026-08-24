@@ -13,6 +13,7 @@ import {
 } from "vitest";
 import { stdout } from "@blazetrails/activesupport";
 import {
+  MigrationContext,
   Migrator,
   CheckPending,
   PendingMigrationError,
@@ -45,6 +46,19 @@ function withMigrationConnection(adapter: DatabaseAdapter): void {
 /** The env name `record_environment` stamps: `connection.pool.db_config.env_name`. */
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
+}
+
+/**
+ * Rails' `migrator_class` (`migrator_test.rb:229-238`): a `MigrationContext`
+ * subclass whose `#migrations` answers an in-memory list, so the path argument
+ * is never read.
+ */
+function migrationContext(migrations: MigrationProxy[]): MigrationContext {
+  return new (class extends MigrationContext {
+    override get migrations(): MigrationProxy[] {
+      return migrations;
+    }
+  })(["db/migrate"], schemaMigration, internalMetadata);
 }
 
 function makeMigration(
@@ -160,13 +174,13 @@ describe("Migrator trails extensions", () => {
     // (migration.rb:1503-1505); target 0 stays valid.
     const list = (): MigrationProxy[] => [makeMigration(1, "M1"), makeMigration(2, "M2")];
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).migrate(3),
+      new Migrator("up", list(), schemaMigration, internalMetadata, 3).migrate(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("down", list(), schemaMigration, internalMetadata).migrate(3),
+      new Migrator("down", list(), schemaMigration, internalMetadata, 3).migrate(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("down", list(), schemaMigration, internalMetadata).migrate(0),
+      new Migrator("down", list(), schemaMigration, internalMetadata, 0).migrate(),
     ).resolves.toEqual([]);
   });
 
@@ -185,7 +199,7 @@ describe("Migrator trails extensions", () => {
     expect(ran).toEqual(["2"]);
 
     ran.length = 0;
-    await new Migrator("up", [m1(), m2()], schemaMigration, internalMetadata).migrate(2);
+    await migrationContext([m1(), m2()]).migrate(2);
     expect(ran).toEqual(["1"]);
   });
 
@@ -205,36 +219,26 @@ describe("Migrator trails extensions", () => {
 
   it("migrate returns [] when both the current and target version are 0", async () => {
     const ran: string[] = [];
-    const migrator = new Migrator(
-      "up",
-      [
-        makeMigration(0, "M0", async () => {
-          ran.push("0");
-        }),
-      ],
-      schemaMigration,
-      internalMetadata,
-    );
-    await expect(migrator.migrate(0)).resolves.toEqual([]);
+    const migrationContextForTest = migrationContext([
+      makeMigration(0, "M0", async () => {
+        ran.push("0");
+      }),
+    ]);
+    await expect(migrationContextForTest.migrate(0)).resolves.toEqual([]);
     expect(ran).toEqual([]);
   });
 
   it("migrate applies its block by selecting the migrations handed to the per-run Migrator", async () => {
     const ran: string[] = [];
-    const migrator = new Migrator(
-      "up",
-      [
-        makeMigration(1, "M1", async () => {
-          ran.push("1");
-        }),
-        makeMigration(2, "M2", async () => {
-          ran.push("2");
-        }),
-      ],
-      schemaMigration,
-      internalMetadata,
-    );
-    await migrator.migrate(null, (m) => m.version === 2);
+    const migrationContextForTest = migrationContext([
+      makeMigration(1, "M1", async () => {
+        ran.push("1");
+      }),
+      makeMigration(2, "M2", async () => {
+        ran.push("2");
+      }),
+    ]);
+    await migrationContextForTest.migrate(null, (m) => m.version === 2);
     expect(ran).toEqual(["2"]);
   });
 
@@ -251,10 +255,7 @@ describe("Migrator trails extensions", () => {
     ];
 
     await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate();
-    await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate(
-      1,
-      (m) => m.version !== 3,
-    );
+    await migrationContext(migrations()).migrate(1, (m) => m.version !== 3);
     expect(reverted).toEqual(["2"]);
   });
 
@@ -419,8 +420,9 @@ describe("Migrator advisory lock wrapping", () => {
       [makeMigration(1, "M1")],
       schemaMigration,
       internalMetadata,
+      1,
     );
-    await migrator.run("up", 1);
+    await migrator.run();
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
@@ -466,7 +468,13 @@ describe("Migrator advisory lock wrapping", () => {
     );
     await migrator.migrate();
     lockLog.length = 0;
-    await migrator.migrate(0);
+    await new Migrator(
+      "down",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+      0,
+    ).migrate();
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
@@ -754,7 +762,7 @@ describe("Migrator runnable direction awareness", () => {
 
   it("runnable going up returns only unapplied migrations", async () => {
     const migrations = three();
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(2);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 2).migrate();
 
     const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([3]);
@@ -762,7 +770,7 @@ describe("Migrator runnable direction awareness", () => {
 
   it("runnable going up stops at the target version", async () => {
     const migrations = three();
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
 
     const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 2);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([2]);
@@ -786,7 +794,7 @@ describe("Migrator runnable direction awareness", () => {
 
   it("runnable going down ignores migrations that never ran", async () => {
     const migrations = three();
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(2);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 2).migrate();
 
     const migrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([2, 1]);
