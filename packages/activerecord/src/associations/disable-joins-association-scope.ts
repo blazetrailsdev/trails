@@ -107,7 +107,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    * workaround our async pluck would otherwise force.
    *
    * @missingRailsCall add_constraints — PERMANENT: this body calls it at Rails'
-   * call site (disable_joins_association_scope.rb:13), spelled
+   * call site (disable_joins_association_scope.rb:14), spelled
    * `_addConstraintsDj`. Rails' subclass shadows `AssociationScope#add_constraints`
    * with a different arity, which Ruby permits; TypeScript rejects a derived
    * declaration of a name the base declares `private` (TS2415) and the two
