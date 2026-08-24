@@ -23,6 +23,7 @@ import { getEnv, getOsAsync, hexdigest } from "@blazetrails/activesupport";
 import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { SchemaCache } from "../connection-adapters/schema-cache.js";
+import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
 
 /** Env var: absolute path of the boot-produced schema-cache dump. */
@@ -62,6 +63,15 @@ export async function dumpTemplateSchemaCache(
   const cache = adapter.internalSchemaCache;
   if (!cache) return null;
   await cache.addAll(pool);
+  // `resetTestTables` drops `schema_migrations` / `ar_internal_metadata`
+  // unconditionally between files and lets whoever needs them recreate them
+  // (`drop-all-tables.ts`), so a dump that described them would re-assert a
+  // dropped table as present — the stale `data_source_exists?` entry that
+  // reset's own `clearBang()` exists to prevent (`internal_metadata.rb:108-110`)
+  // — and would fingerprint-fail every file besides.
+  for (const table of BOOKKEEPING_TABLE_NAMES) {
+    cache.clearDataSourceCacheBang(adapter, table);
+  }
   const filename = await schemaCacheDumpPathFor(runToken);
   cache.dumpTo(filename);
   return {

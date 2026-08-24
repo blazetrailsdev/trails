@@ -29,37 +29,43 @@ describe("templateSchemaCache", () => {
     );
   });
 
-  it("fingerprints the live schema as the boot dump's", async () => {
-    const shapes = await schemaShapes(Base.connection);
-    expect(fingerprintOf(shapes, dumpedTables(templateSchemaCache()!.marshalDump()))).toBe(
-      templateSchemaFingerprint(),
+  /**
+   * The boot fingerprint is the baseline the replay compares against, but it is
+   * not an invariant of a running worker: a file that alters a canonical table
+   * and leaves it altered is exactly the case the guard exists for, and the
+   * between-file reset restores rows, not shapes (`drop-all-tables.ts`
+   * `resetTestTables`). So these assert the property the guard actually needs —
+   * that the fingerprint moves for a change to a dumped table and does not move
+   * for anything else — against a baseline taken here, not against boot.
+   */
+  it("recorded a boot fingerprint, and fingerprints a database deterministically", async () => {
+    expect(templateSchemaFingerprint()).toEqual(expect.any(String));
+    const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
+      fingerprintOf(await schemaShapes(Base.connection), cached),
     );
   });
 
   it("stops matching once a canonical table is altered, so no file replays a stale dump", async () => {
     const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+    const before = fingerprintOf(await schemaShapes(Base.connection), cached);
     await Base.connection.addColumn("topics", "boot_dump_probe", "string");
     try {
-      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(
-        templateSchemaFingerprint(),
-      );
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(before);
     } finally {
       await Base.connection.removeColumn("topics", "boot_dump_probe");
     }
-    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
-      templateSchemaFingerprint(),
-    );
+    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(before);
   });
 
   it("still matches when a table the dump never described is added", async () => {
     const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+    const before = fingerprintOf(await schemaShapes(Base.connection), cached);
     await Base.connection.createTable("boot_dump_bespoke", {}, (t) => {
       t.string("name");
     });
     try {
-      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
-        templateSchemaFingerprint(),
-      );
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(before);
     } finally {
       await Base.connection.dropTable("boot_dump_bespoke");
     }
@@ -67,14 +73,15 @@ describe("templateSchemaCache", () => {
 
   /**
    * sqlite has no column comments — `supports_comments?` is false there
-   * (`abstract_adapter.rb:502` returns false and
-   * `sqlite3_adapter.rb` has no override) — so the
-   * comment arm of the fingerprint is only exercisable on PG and MySQL.
+   * (`abstract_adapter.rb:502` returns false and `sqlite3_adapter.rb` has no
+   * override) — so the comment arm of the fingerprint is only exercisable on PG
+   * and MySQL.
    */
   it.skipIf(activeLane() === "sqlite")(
     "stops matching once a canonical column's comment changes",
     async () => {
       const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+      const clean = fingerprintOf(await schemaShapes(Base.connection), cached);
       await Base.connection.addColumn("topics", "boot_dump_probe", "string");
       const before = fingerprintOf(await schemaShapes(Base.connection), cached);
       try {
@@ -86,24 +93,19 @@ describe("templateSchemaCache", () => {
       } finally {
         await Base.connection.removeColumn("topics", "boot_dump_probe");
       }
-      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
-        templateSchemaFingerprint(),
-      );
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(clean);
     },
   );
 
   it("stops matching once an index is added to a canonical table", async () => {
     const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+    const before = fingerprintOf(await schemaShapes(Base.connection), cached);
     await Base.connection.addIndex("topics", "title", { name: "boot_dump_probe_index" });
     try {
-      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(
-        templateSchemaFingerprint(),
-      );
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(before);
     } finally {
       await Base.connection.removeIndex("topics", { name: "boot_dump_probe_index" });
     }
-    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(
-      templateSchemaFingerprint(),
-    );
+    expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(before);
   });
 });
