@@ -540,11 +540,15 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
 }
 
 /**
- * Write a singular (belongs_to / has_one) target onto the record's
- * `SingularAssociation` holder, reached via `record.association(name)` and
- * stored there as `target` — the trails analog of Rails' `@target` living on
- * the association object (`@association_cache[name]`). Only singular inverses
- * get the holder write; a collection inverse name is left to its proxy.
+ * Write an inverse target onto the record's holder for `assocName`, reached
+ * via `record.association(name)` and stored there as `target` — the trails
+ * analog of Rails' `@target` living on the association object
+ * (`@association_cache[name]`). Every write is Rails'
+ * one inverse write, `set_inverse_instance` -> `inversed_from`
+ * (`association.rb:132-137, 153-155`); a collection name reaches
+ * `CollectionAssociation#target=` (`collection_association.rb:284-295`)
+ * through it, and does not raise `_explicitTarget`, which `setInverseInstance`
+ * likewise skips for a collection and only `_loadedSingularTarget` reads.
  *
  * RFC 0022: writers and inverse-of seeders route through the holder, which is
  * the single source of truth — surfaced to readers via `Base#_associationCache`.
@@ -571,13 +575,7 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
-  const existing = record._associationInstances.get(assocName) as
-    | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
-    | undefined;
-  if (existing) {
-    existing._setTargetFromLoader(target);
-    existing._explicitTarget = true;
-  }
+  record._associationInstances.get(assocName)?.inversedFrom(target);
 }
 
 /**

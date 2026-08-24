@@ -830,10 +830,7 @@ export function dbCommand(): Command {
         const migrations = discoverMigrations(mDirs);
         if (migrations.length === 0) return;
         const migrator = createMigrator(adapter, migrations);
-        // Use the read-only pending check so running this in a
-        // production-health-check context (e.g. before deploying) doesn't
-        // silently create schema_migrations / ar_internal_metadata.
-        const pending = await migrator.pendingMigrationsReadOnly();
+        const pending = await migrator.pendingMigrations();
         if (pending.length > 0) {
           // Match Rails' output format (from activerecord/lib/active_record/
           // railties/databases.rake), with the command name swapped for

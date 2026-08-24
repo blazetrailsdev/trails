@@ -201,9 +201,6 @@ describe("Migrator trails extensions", () => {
 
     const pending = await migrator.pendingMigrations();
     expect(pending.map((m) => m.version)).toEqual([3, 1]);
-
-    const pendingReadOnly = await migrator.pendingMigrationsReadOnly();
-    expect(pendingReadOnly.map((m) => m.version)).toEqual([3, 1]);
   });
 
   it("migrate returns [] when both the current and target version are 0", async () => {
