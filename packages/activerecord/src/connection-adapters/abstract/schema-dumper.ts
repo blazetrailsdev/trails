@@ -62,7 +62,6 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
     if (!this.isDefaultPrimaryKey(column)) {
-      // Pre-format the id value as a TS-DSL string literal for formatColspec.
       spec["id"] = JSON.stringify(this.schemaType(column));
     }
     const colOpts = this.prepareColumnOptions(column);
@@ -112,8 +111,6 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaType(column: Column): string {
     if (this.isBigint(column)) return "bigint";
-    // `column.type` is non-null here: `emitTable` runs `validType?` over every
-    // column first and raises on a nil type, so a null never reaches schemaType.
     return column.type ?? "";
   }
 
@@ -279,7 +276,6 @@ export class SchemaDumper extends BaseSchemaDumper {
     const singlePkName = !hasCompositePk && pkColumn ? pkColumn.name : undefined;
     const stripped = this.removePrefixAndSuffix(tableName);
 
-    // All values in tableOpts are pre-formatted TS-DSL text for formatColspec.
     const tableOpts: Record<string, unknown> = {};
     if (hasCompositePk) {
       // Rails (Array case) emits only `primary_key: [...]` — schema_dumper.rb:182.
@@ -290,10 +286,6 @@ export class SchemaDumper extends BaseSchemaDumper {
       // Rails (String case): print `primary_key: <name>` for a non-"id" key, then the
       // column spec unless empty. Mirrors schema_dumper.rb:170-179.
       if (pkColumn.name !== "id") tableOpts["primaryKey"] = JSON.stringify(pkColumn.name);
-      // columnSpecForPrimaryKey returns a FLAT spec (dialect overrides post-process it,
-      // e.g. MySQL deletes auto_increment); wrap into `id: { ... }` here at the call site,
-      // after those overrides, so the PK's own `comment:` doesn't collide with the
-      // table-level `comment:`.
       const pkSpec = this.columnSpecForPrimaryKey(pkColumn);
       if (Object.keys(pkSpec).length > 0) {
         if (Object.keys(pkSpec).every((k) => k === "id" || k === "default")) {
@@ -330,7 +322,6 @@ export class SchemaDumper extends BaseSchemaDumper {
       } else if ((col as any).isEnum && typeName === "enum") {
         stream.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
       } else {
-        // Generic fallback: pass arbitrary SQL type verbatim via t.column.
         const colType = typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
         stream.push(
           `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(colType)}${optStr});`,

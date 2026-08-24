@@ -71,9 +71,6 @@ const log: NonNullable<DatabaseStatementsHost["log"]> = async (
   }
 };
 
-// `typeCastedBinds` is likewise mixed in on every adapter by
-// `include(AbstractAdapter, QuotingMixin)` (abstract-adapter.ts), so it is a
-// required member of DatabaseStatementsHost rather than an optional one.
 const typeCastedBinds: DatabaseStatementsHost["typeCastedBinds"] = (binds) => binds ?? [];
 
 describe("DatabaseStatements", () => {
@@ -509,7 +506,6 @@ describe("DatabaseStatements", () => {
         "users",
       ]);
 
-      // Union of fixture keys and delete targets, de-duplicated.
       expect(scopedTables && [...scopedTables].sort()).toEqual(["old_table", "posts", "users"]);
     });
   });
@@ -532,7 +528,6 @@ describe("DatabaseStatements", () => {
         quoteTableName: (n: string) => `"${n}"`,
       };
 
-      // schema_migrations / ar_internal_metadata are filtered out before scoping.
       await truncateTables.call(host, "users", "posts", "schema_migrations");
 
       expect(scopedTables).toEqual(["users", "posts"]);
@@ -553,7 +548,6 @@ describe("DatabaseStatements", () => {
         pool,
         typeCastedBinds,
         async execute(sql: string, _binds?: unknown[], name?: string | null) {
-          // captures `this` to verify receiver is preserved
           executed.push({ sql, name, receiver: this });
         },
         quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
@@ -611,9 +605,6 @@ describe("DatabaseStatements", () => {
 
     it("sanitize limit with string integer", () => {
       expect(sanitizeLimit("10")).toBe(10);
-      // `Integer(str)` parses with base detection, not as plain decimal: a bare
-      // leading `0` is octal, `0x`/`0b`/`0o`/`0d` set the radix, and `_`
-      // separates digits. Every pair below was taken from `ruby -e`.
       expect(sanitizeLimit("012")).toBe(10);
       expect(sanitizeLimit("0x1f")).toBe(31);
       expect(sanitizeLimit("0b101")).toBe(5);
@@ -739,8 +730,6 @@ describe("preprocessQuery", () => {
         [
           {
             call(sql) {
-              // A transformer that issues its own query on the same connection
-              // must reuse the already-transformed SQL, not re-comment it.
               nested = preprocessQuery.call(host, "SELECT inner");
               return `${sql} /*outer*/`;
             },
@@ -995,10 +984,6 @@ describe("returningColumnValues", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Fixture / truncate builders
-// ---------------------------------------------------------------------------
-
 describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) / combineMultiStatements", () => {
   type FixtureHost = DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">;
@@ -1069,7 +1054,6 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     });
 
     it("single-row: strips missing columns (DEFAULT-strip optimisation)", () => {
-      // Two-column union but only one fixture row — missing column must be omitted
       const sql = buildFixtureSql.call(makeHost(), [{ name: "Alice" }], "users");
       expect(sql).toContain('"name"');
       expect(sql).not.toContain("DEFAULT");

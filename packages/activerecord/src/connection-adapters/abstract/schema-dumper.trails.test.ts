@@ -140,8 +140,6 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   });
 
   it("still dumps the table normally when every column type is a valid native type", async () => {
-    // The valid_type? gate must not over-reject: a table whose columns all map
-    // to native types dumps its create_table body unchanged.
     const validSource = {
       tables: () => ["widgets"],
       columns: (_t: string) => [

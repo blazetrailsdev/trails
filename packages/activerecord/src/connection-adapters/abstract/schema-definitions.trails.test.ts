@@ -377,7 +377,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   it("treats an unset stored option as Array(nil) => [], not a 'undefined' string", () => {
     const noActions = new ForeignKeyDefinition("astronauts", "rockets", "rocket_id", "id", "fk_x");
     expect(noActions.onDelete).toBeUndefined();
-    // [] vs ["cascade"] => false, mirroring Array(nil).map(&:to_s) == ["cascade"]
     expect(noActions.isDefinedFor({ onDelete: "cascade" })).toBe(false);
   });
 
@@ -427,8 +426,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     const fkDef = new TableDefinition("astronauts", {
       adapter: conn,
     }).newForeignKeyDefinition("rockets");
-    // primaryKey/onDelete/onUpdate/deferrable were not passed, so they are not
-    // stored — a lookup on them is sliced out and matches.
     expect(fkDef.isDefinedFor({ primaryKey: "wrong" })).toBe(true);
     expect(fkDef.isDefinedFor({ onDelete: "cascade" })).toBe(true);
     expect(fkDef.isDefinedFor({ onUpdate: "cascade" })).toBe(true);
@@ -437,7 +434,6 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     // so they still compare.
     expect(fkDef.isDefinedFor({ column: "rocket_id" })).toBe(true);
     expect(fkDef.isDefinedFor({ column: "wrong_id" })).toBe(false);
-    // An explicitly-set key is stored and compared.
     const withPk = new TableDefinition("astronauts", {
       adapter: conn,
     }).newForeignKeyDefinition("rockets", {

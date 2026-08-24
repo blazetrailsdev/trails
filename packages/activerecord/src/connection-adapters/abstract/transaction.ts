@@ -593,9 +593,7 @@ export class Transaction {
     }
   }
 
-  async restart(): Promise<void> {
-    // No-op: subclasses (RealTransaction, SavepointTransaction) override with actual restart logic
-  }
+  async restart(): Promise<void> {}
 
   isFullRollback(): boolean {
     return true;
@@ -789,19 +787,10 @@ export class RestartParentTransaction extends Transaction {
   }
 
   /** @internal */
-  override incompleteBang(): void {
-    // RestartParentTransaction has no own instrumentation lifecycle —
-    // materializeBang() delegates to parent, so _instrumenter is never started.
-  }
+  override incompleteBang(): void {}
 
   /** @internal */
-  override async restoreBang(): Promise<void> {
-    // No-op: RestartParentTransaction delegates materializeBang() to the parent.
-    // The base restoreBang() calls materializeBang() after clearing _materialized,
-    // which would invoke the parent's _instrumenter.start() a second time while it
-    // is already running — raising InstrumentationAlreadyStartedError during
-    // retry-on-deadlock.
-  }
+  override async restoreBang(): Promise<void> {}
 
   override isFullRollback(): boolean {
     return false;
@@ -1056,9 +1045,7 @@ export class TransactionManager {
         this._connection.supportsLazyTransactions?.() &&
         this.isLazyTransactionsEnabled() &&
         _lazy &&
-        !isolation // isolated transactions must materialize eagerly so the
-        // snapshot is taken before the first read (mirrors Rails' per-query
-        // materialize_transactions call in with_raw_connection)
+        !isolation
       ) {
         this._hasUnmaterializedTransactions = true;
       } else {

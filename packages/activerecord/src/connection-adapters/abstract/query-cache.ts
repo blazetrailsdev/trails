@@ -68,7 +68,6 @@ export class Store {
     if (!this.enabled) return undefined;
     const entry = this._map.get(key);
     if (entry) {
-      // Move to end (LRU)
       this._map.delete(key);
       this._map.set(key, entry);
     }
@@ -555,12 +554,6 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
  * @internal
  */
 function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
-  // Mirror `each_connection_pool { pool.clear_query_cache }`: clear the pool's
-  // per-thread Store directly, NOT `pool.active_connection.clear_query_cache`.
-  // A pool whose connection is currently checked in still holds this thread's
-  // cached rows in its registry (they survive checkin, keyed by execution
-  // context), so a re-read after checkout would hit stale results unless the
-  // Store itself is cleared here.
   const cleared = new Set<Store>();
   ExecutorHooks.connectionHandler()?.eachConnectionPool((pool) => {
     const p = pool as unknown as QueryCachePool & { queryCache?: Store };

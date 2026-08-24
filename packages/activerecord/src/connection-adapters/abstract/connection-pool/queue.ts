@@ -118,8 +118,6 @@ export class BiasedConditionVariable implements Cond {
   }
 
   wait(timeout: number): Promise<void> {
-    // Node is single-threaded, so a waiter reaching here always belongs to the
-    // context that entered `withABiasFor` — `Thread.current == @preferred_thread`.
     let cond: Cond;
     if (this._preferredThread != null) {
       this._numWaitingOnRealCond += 1;

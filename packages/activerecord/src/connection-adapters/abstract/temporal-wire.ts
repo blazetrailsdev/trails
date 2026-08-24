@@ -41,10 +41,6 @@ function naiveIsoToInstant(iso: string): Temporal.Instant {
   return Temporal.PlainDateTime.from(iso).toZonedDateTime(defaultSqlTimezone()).toInstant();
 }
 
-// ---------------------------------------------------------------------------
-// Postgres
-// ---------------------------------------------------------------------------
-
 /**
  * Parse a Postgres `timestamptz` wire string to `Temporal.Instant`.
  *
@@ -98,9 +94,6 @@ export function parsePostgresDate(
   if (trimmed === "-infinity") return DateNegativeInfinity;
   const { iso, bc } = extractBcSuffix(trimmed);
   if (!bc) return Temporal.PlainDate.from(iso);
-  // Parse components directly — do not construct an intermediate PlainDate from
-  // the CE year string. "0005-02-29 BC" is Feb 29, ISO year -4 (a leap year),
-  // but year 5 CE is not; Temporal.PlainDate.from("0005-02-29") would throw.
   const m = /^(\d+)-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) throw new RangeError(`Cannot parse BC date: ${JSON.stringify(text)}`);
   return Temporal.PlainDate.from(
@@ -108,10 +101,6 @@ export function parsePostgresDate(
     { overflow: "reject" },
   );
 }
-
-// ---------------------------------------------------------------------------
-// MySQL
-// ---------------------------------------------------------------------------
 
 /**
  * Parse a MySQL `TIMESTAMP` wire string to `Temporal.Instant`.
@@ -125,7 +114,6 @@ export function parsePostgresDate(
  */
 export function parseMysqlInstant(text: string): Temporal.Instant | null {
   const trimmed = text.trim();
-  // MySQL can emit zero timestamps from legacy schemas even on TIMESTAMP columns.
   if (isZeroDatetime(trimmed)) return null;
   const iso = clampFraction(trimmed.replace(" ", "T") + "Z");
   return Temporal.Instant.from(iso);
@@ -156,10 +144,6 @@ export function parseMysqlDate(text: string): Temporal.PlainDate | null {
   if (isZeroDate(trimmed)) return null;
   return Temporal.PlainDate.from(trimmed);
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Normalize a Postgres `timestamptz` string (no BC suffix) to strict
@@ -203,7 +187,6 @@ function bcYearToIso(pgYear: number): number {
  * Input has already had " BC" stripped.
  */
 function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
-  // e.g. "0044-03-15 12:00:00.123456+00" or "0044-03-15 12:00:00+02:30"
   const match =
     /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([-+]\d{2}(?::\d{2})?)$/.exec(
       withoutBc,
@@ -236,7 +219,6 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
  * Input has already had " BC" stripped.
  */
 function parseBcTimestampAsInstant(withoutBc: string): Temporal.Instant {
-  // e.g. "0044-03-15 12:00:00.123456" or "0044-03-15 12:00:00"
   const match = /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(withoutBc);
   if (!match) throw new RangeError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac] = match;
@@ -270,9 +252,6 @@ function parseFraction(frac: string | undefined): {
   nanosecond: number;
 } {
   if (!frac) return { millisecond: 0, microsecond: 0, nanosecond: 0 };
-  // Clamp to 9 digits before padding so extra digits don't silently corrupt
-  // the slice boundaries (e.g. a 10-digit input would shift microsecond into
-  // the nanosecond slot without this guard).
   const clamped = frac.slice(0, 9).padEnd(9, "0");
   return {
     millisecond: Number(clamped.slice(0, 3)),
@@ -294,7 +273,5 @@ function isZeroDate(text: string): boolean {
 }
 
 function isZeroDatetime(text: string): boolean {
-  // Match "0000-00-00 00:00:00" / "0000-00-00T00:00:00" and the fractional
-  // variants emitted by DATETIME(N) columns, e.g. "0000-00-00 00:00:00.000000".
   return /^0000-00-00[T ]00:00:00(\.\d+)?$/.test(text);
 }

@@ -17,7 +17,6 @@ describe("ConnectionPool::Queue", () => {
     q.add(c2);
     expect(q.length).toBe(2);
 
-    // poll without timeout returns LIFO (pop)
     const out = q.poll();
     expect(out).toBe(c2);
     expect(q.length).toBe(1);
@@ -36,7 +35,6 @@ describe("ConnectionPool::Queue", () => {
     expect(q.isAnyWaiting()).toBe(true);
     expect(q.numWaiting()).toBe(1);
 
-    // add resolves the waiting poll via signal
     q.add(c);
     const result = await promise;
     expect(result).toBe(c);
@@ -60,15 +58,12 @@ describe("ConnectionPool::Queue", () => {
     const q = new Queue();
     const c = fakeConn();
 
-    // Start a waiter
     const promise = q.poll(1) as Promise<DatabaseAdapter>;
     expect(q.numWaiting()).toBe(1);
 
-    // Add a connection — it is pushed and the waiter is signalled
     q.add(c);
     expect(q.length).toBe(1);
 
-    // A no-wait poll should get nothing — the waiter is ahead in line
     expect(q.poll()).toBeUndefined();
 
     await promise;
@@ -137,7 +132,6 @@ describe("ConnectionPool::Queue", () => {
 });
 
 describe("ConnectionPool::BiasedConditionVariable", () => {
-  // The plain `@lock.new_cond` a Queue starts with — the leaf `@other_cond`.
   function newCond(): any {
     return (new Queue() as any)._cond;
   }
@@ -216,11 +210,9 @@ describe("ConnectionPool::BiasableQueue", () => {
 
     q.withABiasFor("ctx", () => {
       innerCond = (q as any)._cond;
-      // innerCond is the temporary biased cond
       expect(innerCond).not.toBe(outerCond);
     });
 
-    // After withABiasFor, cond should be restored to the original
     expect((q as any)._cond).toBe(outerCond);
   });
 
@@ -233,8 +225,6 @@ describe("ConnectionPool::BiasableQueue", () => {
       innerPromise = q.poll(5) as Promise<DatabaseAdapter>;
     });
 
-    // The waiter was on the biased cond, but should have been
-    // transferred to the restored cond. An add() should reach it.
     q.add(c);
     const result = await innerPromise!;
     expect(result).toBe(c);
@@ -251,12 +241,10 @@ describe("ConnectionPool::BiasableQueue", () => {
         innerPromise = q.poll(5) as Promise<DatabaseAdapter>;
       });
 
-      // Attach rejection handler BEFORE advancing timers to avoid unhandled rejection
       const rejection = expect(innerPromise!).rejects.toBeInstanceOf(ConnectionTimeoutError);
       await vi.advanceTimersByTimeAsync(6000);
       await rejection;
 
-      // A subsequent add should go to the queue, not a stale waiter
       q.add(c);
       expect(q.poll()).toBe(c);
     } finally {

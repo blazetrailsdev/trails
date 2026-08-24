@@ -16,9 +16,7 @@ import { fixtures } from "../../test-fixtures.js";
 const migrationsDir = (name: string) =>
   new URL(`../../test-helpers/migrations/${name}`, import.meta.url).pathname;
 
-// versions 1, 2, 3
 const VALID = migrationsDir("valid");
-// versions 230, 231, 20210716122844, 20210716123013
 const OLD_AND_NEW_VERSIONS = migrationsDir("old_and_new_versions");
 
 /** `assumeMigratedUptoVersion` is mixed onto the adapter by `SchemaStatements`. */

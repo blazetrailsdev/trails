@@ -22,8 +22,6 @@ describe("DatabaseStatements select async kwarg", () => {
     return Base.connection as unknown as AbstractAdapter;
   }
 
-  // Spy on the instance, not the prototype: the fixture harness restores its
-  // own property and would shadow a prototype spy so it never fires.
   const spySelectAll = () => vi.spyOn(conn(), "selectAll");
 
   afterEach(() => {

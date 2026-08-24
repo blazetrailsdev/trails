@@ -369,10 +369,6 @@ export function unquotedFalse(): boolean {
  */
 export function toBytes(value: unknown): Uint8Array | null {
   if (value instanceof BinaryData) return value.bytes;
-  // `ArrayBuffer.isView` (#4868) rather than `instanceof Uint8Array`: it also
-  // catches a DataView or a non-byte typed array, and threading
-  // byteOffset/byteLength keeps a subarray view from reading its whole backing
-  // buffer. A bare ArrayBuffer is not a view, so it needs its own branch.
   if (ArrayBuffer.isView(value)) {
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   }
@@ -549,10 +545,6 @@ function typeCastedBinds(
   binds: unknown[] | null | undefined,
 ): unknown[] | undefined {
   return binds?.map((value: any) => {
-    // Attribute detection is duck-typed rather than `instanceof ModelAttribute`:
-    // when the dep tree resolves two copies of `@blazetrails/activemodel` the
-    // instanceof check silently misses and the raw Attribute object reaches
-    // `typeCast`, which throws "can't cast Attribute".
     if (
       value instanceof ModelAttribute ||
       (value && typeof value === "object" && "valueForDatabase" in value)

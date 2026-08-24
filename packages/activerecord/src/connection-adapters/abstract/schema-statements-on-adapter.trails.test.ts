@@ -114,8 +114,6 @@ class SqliteCapturingAdapter extends AbstractAdapter {
 }
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
-  // Non-transactional: MySQL's implicit commit on DDL would otherwise commit
-  // the fixture transaction mid-test.
   fixtures([], { useTransactionalTests: false });
 
   it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
@@ -136,9 +134,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
     await sqlite.columns('a"b');
     expect(sqlite.lastSql).toBe('PRAGMA table_info("a""b")');
-    // Converged with SQLite3Adapter: a schema-qualified name uses the
-    // `PRAGMA schema.table_info(table)` prefix form (works for ATTACHed DBs),
-    // NOT `PRAGMA table_info("schema"."table")` which returns zero rows.
     await sqlite.columns("aux.widgets");
     expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
   });
@@ -154,7 +149,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
-    // First call is index_list; surface one index whose name has a quote.
     const sqlite = new SqliteCapturingAdapter([{ name: 'idx"x', unique: 1 }]);
     await sqlite.indexes("things");
     // Converged with SQLite3Adapter: between index_list and index_info the
@@ -171,8 +165,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("indexes() sqlite arm carries the schema prefix into the index_info PRAGMA", async () => {
-    // The index lives in the table's schema, so index_info must use the same
-    // prefix as index_list — not query the default schema for the index name.
     const sqlite = new SqliteCapturingAdapter([{ name: "idx_widgets_name", unique: 0 }]);
     await sqlite.indexes("aux.widgets");
     expect(sqlite.allSql).toEqual([
@@ -197,8 +189,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await stub.columns("myschema.things");
     expect(stub.lastSql).toContain("c.table_schema = $3");
     expect(stub.lastSql).not.toContain("current_schemas(false)");
-    // bare name for table_name match ($1), qualified name for to_regclass ($2),
-    // schema bound as $3.
     expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
   });
 
@@ -210,9 +200,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("columnExists() postgres fallback scopes table_schema to an explicit schema.table", async () => {
-    // columnExists delegates to columns(), so the schema.table qualification is
-    // resolved there: bare name ($1), qualified name for to_regclass ($2),
-    // schema bound as $3.
     const stub = new CapturingAdapter("postgres");
     await stub.columnExists("myschema.things", "name");
     expect(stub.lastSql).toContain("c.table_schema = $3");
