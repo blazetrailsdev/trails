@@ -19,7 +19,12 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
-import { threadedConnectionFor, connectionPool, withConnection } from "./connection-handling.js";
+import {
+  threadedConnectionFor,
+  connectionPool,
+  withConnection,
+  connectedQ,
+} from "./connection-handling.js";
 
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
@@ -1448,17 +1453,12 @@ export function tableName(this: SchemaHost, value?: string | null): string {
     value = value == null ? null : String(value);
     if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
       if (value === this._tableName) return this._tableName ?? "";
-      // Rails table_name= runs `reset_column_information if connected?`, which
-      // resets the predicate builder and (via initialize_find_by_cache) the
-      // find_by statement cache. We have no connection-pool `connected?`
-      // gate, so we clear these two caches eagerly and directly (rather than
-      // routing through the heavier resetColumnInformation/schema reload) so
-      // the next query rebuilds against the new table.
-      (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
-      // Rails' reset_column_information also nils @attribute_names (on the
-      // class and, recursively, its descendants); drop the memos now so reads
-      // before the next load don't see the old table's names.
-      clearAttributeNamesMemo(this);
+      if (connectedQ.call(this as unknown as typeof Base)) {
+        // It runs before the store, so the caches it drops are the OLD table's,
+        // as in Rails. Its data-source rewarm is the one async tail — Rails'
+        // `reset_column_information` has none — and nothing here awaits it.
+        void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
+      }
     }
     this._tableName = value;
     (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
