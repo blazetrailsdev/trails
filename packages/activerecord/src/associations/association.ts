@@ -10,6 +10,7 @@ import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
+import { parkNestedReaderLoad } from "../nested-attributes.js";
 import {
   camelize,
   constantize,
@@ -695,7 +696,10 @@ export class Association {
     }
   }
 
-  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
+  initializeAttributes(
+    record: Base,
+    exceptFromScopeAttributes?: Record<string, unknown>,
+  ): Promise<void> | void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
       this.reflection.foreignKey,
@@ -707,7 +711,15 @@ export class Association {
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
     );
-    if (Object.keys(attributes).length > 0) record._assignAttributes(attributes);
+    const pending =
+      Object.keys(attributes).length > 0
+        ? (record._assignAttributes(attributes) as Promise<void> | undefined)
+        : undefined;
+    if (pending) {
+      return pending.then(() => {
+        this.setInverseInstance(record);
+      });
+    }
     this.setInverseInstance(record);
   }
 
@@ -828,16 +840,37 @@ export class Association {
         } | null;
       }
     )._reflectOnAssociation?.(this.reflection.name);
-    if (reflection?.buildAssociation) {
-      return reflection.buildAssociation(attributes ?? {}, (record: Base) => {
-        this.initializeAttributes(record, attributes);
-        if (block) block(record);
-      });
-    }
-    return new (Klass as any)(attributes ?? {}, (record: Base) => {
-      this.initializeAttributes(record, attributes);
+    // Rails' block is one literal shared by both construction paths
+    // (association.rb:384-387); ours needs it twice because of the plain-`new`
+    // fallback below, so it is bound once here.
+    //
+    //
+    // Rails completes `initialize_attributes` before the yield and before
+    // `build_record` returns (association.rb:383-388). When `_assignAttributes`
+    // defers — `scope_for_create`'s `create_with` half can name an association
+    // writer (relation.rb:1231-1235) — TS cannot reproduce that: JS has no
+    // synchronous await, so a sync method cannot complete a promise before
+    // returning. The only shape that could is an awaited `buildRecord`, and
+    // that trades this invisible ordering for a Rails-VISIBLE regression:
+    // `CollectionAssociation#build` returns the record itself
+    // (collection_association.rb:117-122), so `post.comments.build` would
+    // become a promise. Preserving the sync return is the higher fidelity.
+    //
+    // So the assign is parked on the record and drained before any write
+    // (`awaitPendingNestedReaderLoads`, nested-attributes.ts) — the same
+    // deferral `populate_with_current_scope_attributes` takes
+    // (`_applyScopeAttributes`, base.ts:657-681), and the one RFC 0087 ratified
+    // for the constructor itself. The yield and the return keep Rails' order;
+    // only the parked writes settle later, and nothing saves against them.
+    const initializeAndYield = (record: Base): void => {
+      const pending = this.initializeAttributes(record, attributes);
+      if (pending) parkNestedReaderLoad(record, pending);
       if (block) block(record);
-    });
+    };
+    if (reflection?.buildAssociation) {
+      return reflection.buildAssociation(attributes ?? {}, initializeAndYield);
+    }
+    return new (Klass as any)(attributes ?? {}, initializeAndYield);
   }
 
   private inverseAssociationFor(record: Base): Association | null {
