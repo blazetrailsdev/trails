@@ -143,12 +143,32 @@ export class AttributeMutationTracker {
 }
 
 /**
+ * The object Rails hands `ForcedMutationTracker` — the model itself, not an
+ * `AttributeSet` (dirty.rb:385), read through `_read_attribute`
+ * (attribute_mutation_tracker.rb:140-142).
+ */
+export interface ForcedMutationTrackerHost {
+  /** @internal */
+  _readAttribute(attrName: string): unknown;
+}
+
+/**
  * Tracks forced mutations only — used during persistence callbacks.
  *
  * Mirrors: ActiveModel::ForcedMutationTracker
  */
 export class ForcedMutationTracker extends AttributeMutationTracker {
   private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
+
+  /**
+   * Ruby stores the model in the inherited `@attributes` slot (dirty.rb:385).
+   * TypeScript cannot retype an inherited field, so the widening happens once
+   * here: every base member that reads `attributes` as an `AttributeSet` is
+   * overridden below, `fetchValue` included.
+   */
+  constructor(attributes: ForcedMutationTrackerHost) {
+    super(attributes as unknown as AttributeSet);
+  }
 
   changedInPlace(_attrName: string): boolean {
     return false;
@@ -189,6 +209,11 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
 
   protected override attributeChanged(attrName: string): boolean {
     return this.forcedChanges.has(attrName);
+  }
+
+  /** @internal */
+  protected override fetchValue(attrName: string): unknown {
+    return (this.attributes as unknown as ForcedMutationTrackerHost)._readAttribute(attrName);
   }
 
   /** @internal */
