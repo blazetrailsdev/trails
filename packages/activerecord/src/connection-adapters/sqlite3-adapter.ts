@@ -174,15 +174,9 @@ function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
     bindsAsFloat = attr.type instanceof FloatType;
     value = attr.valueForDatabase;
   }
-  // `.call(this)` so date/time dispatch lands on the adapter's quotedDate /
-  // quotedTime overrides (2000-01-01-prefixed times).
   return sqliteTypeCast.call(this, value, bindsAsFloat);
 }
 
-// A structured column default: an array or a plain object literal (`default: {}`
-// / `default: []`). Excludes null, SqlLiteral, Date, and other class instances,
-// which have their own quoting paths and must not be routed through the column
-// type's `serialize`.
 function isStructuredDefault(value: unknown): boolean {
   if (Array.isArray(value)) return true;
   if (value === null || typeof value !== "object" || isSqlLiteral(value)) return false;
@@ -427,8 +421,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           ? options.preparedStatements
           : this.defaultPreparedStatements(),
       );
-    // Apply adapter-level options FIRST so invalid values fail before
-    // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
       void this._statementPool.setMaxSize(
@@ -436,10 +428,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     }
     this.connect();
-    // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;
-    // connect() flags them for the async path instead. See completeAsyncConnect.
-    // Sync-driver path resolves synchronously; the async path is flagged out
-    // above and configured later via completeAsyncConnect. Fire-and-forget here.
     if (!this._asyncConnectPending) void this.configureConnection();
     this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
   }
@@ -504,10 +492,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.ensureConnected();
     await this.materializeTransactions();
 
-    // Type-cast binds to driver-compatible primitives. Phase 2 threads
-    // bind values through the visitor rather than inlining them, so the
-    // `execute` path now receives non-empty bind arrays where it received
-    // empty ones before.
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
     // gated only on materialize_transactions — which this path always does —
@@ -587,8 +571,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return stmt;
   }
 
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // sqlite3/database-statements.ts can reach it through PerformQueryHost.
   async _cachedStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
     // When preparedStatements is off, skip the pool and prepare per call —
@@ -609,9 +591,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return stmt;
   }
 
-  // Enable readBigInts on row-returning statements that expose bigint-declared
-  // columns so the driver returns JS bigint rather than a lossy number.
-  // stmt.reader gates out PRAGMA/EXPLAIN and other non-row statements.
   private _maybeEnableReadBigInts(sql: string, stmt: SqliteStatement): void {
     if (isWriteQuerySql(sql) || !stmt.reader) return;
     const cols = stmt.columns();
@@ -690,11 +669,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         false,
         async (payload) => {
           try {
-            // performQuery fills this in the same synchronous turn it writes
-            // `this._last*`; reading those shared fields back here instead
-            // would race, since a concurrent write's performQuery can overwrite
-            // them before this post-await continuation runs (the Promise.all
-            // insert race). See the `counters` note on performQuery.
             const counters = { affectedRows: 0, insertRowid: 0 as number | bigint };
             await this.performQuery(this.driver, sql, binds, driverBinds, {
               prepare: this.preparedStatements,
@@ -702,16 +676,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
               counters,
             });
             const { affectedRows, insertRowid } = counters;
-            // perform_query reports the returned-row count (0 for a write); this
-            // path has always reported affected rows, and subscribers rely on it.
             payload.row_count = affectedRows;
 
-            // For INSERT, return the last inserted rowid
             if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
               return Number(insertRowid);
             }
 
-            // For UPDATE/DELETE, return affected rows
             return affectedRows;
           } catch (e: any) {
             const translated = this._translateException(e, sql, binds);
@@ -879,7 +849,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async beginTransaction(): Promise<void> {
-    // Force materialization (_lazy: false) so _inTransaction is set immediately.
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
@@ -1001,8 +970,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override typeCast(value: unknown): unknown {
-    // `.call(this)` so the inherited date/time dispatch resolves to this
-    // adapter's `quotedDate` / `quotedTime` (2000-01-01-prefixed times).
     return sqliteTypeCast.call(this, value);
   }
 
@@ -1104,10 +1071,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Close the database connection.
    */
   async close(): Promise<void> {
-    // If disconnectBang() already fired an async driver.close(), drain that
-    // in-flight promise rather than issuing a second close() — a concurrent
-    // double-close could race or throw on drivers that aren't double-close-safe
-    // while the first is still settling. Sync drivers leave _closingDriver null.
     if (this._closingDriver) {
       const closing = this._closingDriver;
       this._closingDriver = null;
@@ -1183,9 +1146,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * is `sqlite3-native-type-map-converges-onto-type-map`.
    */
   lookupCastType(sqlType: string | null): import("@blazetrails/activemodel").Type {
-    // Pass the full sql type to the map so regex registrations (e.g. /decimal/i)
-    // can inspect precision/scale. Fall back to the bare normalized key when
-    // no full-string match is found.
     const lower = sqlType?.toLowerCase().trim() ?? null;
     const full = this._nativeTypeMap.fetch(lower);
     if (full.type() != null) return full;
@@ -1372,8 +1332,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return false;
   }
 
-  // --- Connection lifecycle ---
-
   override isConnected(): boolean {
     return this.driver?.isOpen() ?? false;
   }
@@ -1423,18 +1381,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   private _disconnect(): void {
     super.disconnectBang();
-    // driver is undefined when an async-only connection was never completed
-    // (constructed-but-pending); optional-chain like the `active` getter so a
-    // pre-verifyBang cleanup/error path doesn't throw.
     if (this.driver?.isOpen()) {
-      // driver.close() returns void | Promise<void>; for inProcessSync drivers
-      // (better-sqlite3) this is sync. Async-only drivers return a Promise we
-      // can't await here (sync void contract), so retain it for close() to drain
-      // and chain repeated disconnect cycles so no earlier teardown is lost.
       const closing = this.driver.close();
       if (closing) this._chainClose(closing);
     }
-    // Closing the handle implicitly rolls back any in-flight raw transaction.
     this._inTransaction = false;
   }
 
@@ -1464,14 +1414,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // active transaction raises, which we swallow like Rails does.
       try {
         await this.driver.exec("ROLLBACK");
-      } catch {
-        // no active transaction
-      }
+      } catch {}
     } else {
       this.connect();
-      // connect() defers async-only drivers (leaving the handle undefined); open
-      // it here so the base reconnectBang lifecycle has a live driver before it
-      // runs configure_connection. Sync drivers opened eagerly above no-op here.
       if (this._asyncConnectPending) {
         this._asyncConnectPending = false;
         await this.connectAsync();
@@ -1479,8 +1424,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     this._inTransaction = false;
   }
-
-  // --- Database info ---
 
   // SQLite has no adapter-specific `ColumnMethods` module (sqlite3/schema_definitions.rb
   // defines none), so it inherits the abstract `_columnMethodNames()` list unchanged —
@@ -1617,8 +1560,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return args;
   }
 
-  // --- Schema operations ---
-
   async primaryKeys(tableName: string): Promise<string[]> {
     const pks = (await this.tableStructure(tableName)).filter((f) => Number(f["pk"]) > 0);
     return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
@@ -1745,7 +1686,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     optionsOrModuleName?: unknown,
     values?: unknown,
   ): Promise<void> {
-    // Support both (name, options) and (name, moduleName, values) signatures
     const opts =
       optionsOrModuleName !== null &&
       typeof optionsOrModuleName === "object" &&
@@ -1761,9 +1701,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (!safeIdent.test(mod)) {
       throw new Error("moduleName must be a valid SQLite identifier");
     }
-    // Virtual table module arguments are passed through as-is (e.g. FTS
-    // tokenize='porter', content='posts'). Only the module name is validated
-    // as an identifier since it occupies a SQL keyword position.
     const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
     const rawArgs = args.join(", ");
     await this.execQuery(
@@ -1945,7 +1882,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       group.push(row);
     }
 
-    // Use explicit CONSTRAINT names from DDL when available (PRAGMA doesn't expose them).
     const namesByColumn = await this._parseForeignKeyNames(tableName);
 
     const results: ForeignKeyDefinition[] = [];
@@ -2043,9 +1979,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  // The declared type of a `t.virtual` column comes from its :type option
-  // (SQLite3::TableDefinition resolves :virtual that way; no type when the
-  // option is absent).
   private _baseColumnType(type: string, options?: Record<string, unknown>): string {
     const opts = (options ?? {}) as ColumnOptions;
     if (type !== "virtual") return this.typeToSql(type as ColumnType, opts);
@@ -2091,12 +2024,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (typeof value === "function") return String(value());
     // boundary: defensive Date branch in SQLite adapter literal quoting.
     if (value instanceof globalThis.Date) return `'${sqliteQuoteString(value.toISOString())}'`;
-    // SqlLiteral or objects with toSql
     if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
     return `'${sqliteQuoteString(String(value))}'`;
   }
-
-  // --- Schema introspection (drives SchemaCache.addAll) ---
 
   /**
    * List user tables. Excludes SQLite's internal `sqlite_*` tables and
@@ -2171,7 +2101,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // `table_exists?(nil)` result rather than dereferencing a null name.
     if (name == null) return false;
     if (name.includes(".")) {
-      // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
       const rows = (
         await this.internalExecQuery(
@@ -2256,8 +2185,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
     sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
   }
-
-  // --- FK / Check constraint operations (SQLite requires table rebuild) ---
 
   /**
    * Parse CHECK constraints from the CREATE TABLE SQL.
@@ -2463,9 +2390,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
-    // Schema-qualified names (ATTACHed DBs) must use the `PRAGMA aux.table_info(t)`
-    // prefix form; `PRAGMA table_info("aux"."t")` treats the whole quoted argument
-    // as a bare table name and returns zero rows.
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteTableName(schema)}.` : "";
     const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
@@ -2514,12 +2438,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
     if (!result) return [];
 
-    // Splitting with left parentheses and discarding the first part will return all
-    // columns separated with comma(,).
     const openParens = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
     const partitioned = openParens ? result.slice(openParens.index + openParens[0].length) : "";
-    // column definitions can have a comma in them, so split on commas followed
-    // by a space and a column name in quotes or followed by the keyword CONSTRAINT
     const union =
       columnNames.length > 0
         ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
@@ -2692,11 +2612,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const { bare: bareTo } = this._splitTableName(to);
     for (const idx of idxRows) {
       let name = idx.name;
-      // Compared on the bare names: alter_table's buffer is a TEMPORARY table,
-      // so it is unqualified even when the source is `aux.posts`, and comparing
-      // the qualified names would miss the "a"-prefix relationship — leaving an
-      // index whose name doesn't embed the table name (a custom `name:`) unrenamed
-      // and colliding with the still-live original.
       if (bareTo === `a${bareFrom}`) name = `t${name}`;
       else if (bareFrom === `a${bareTo}`) name = name.slice(1);
       // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
@@ -2733,7 +2648,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     columns: string[],
     rename: Record<string, string> = {},
   ): Promise<void> {
-    // rename maps {srcCol: destCol}; build dest→src for lookup
     const columnMappings: Record<string, string> = Object.fromEntries(
       columns.map((name) => [name, name]),
     );
@@ -2752,9 +2666,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
     const msg = e instanceof Error ? e.message : String(e);
-    // Wrap non-Error throws so translateException always receives an Error.
-    // Preserve the original value as .cause and copy .code so code-based
-    // classification in translateException still works for non-Error throws.
     let exc: Error;
     if (e instanceof Error) {
       exc = e;
@@ -2806,9 +2717,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       }
       return driverOpt;
     }
-    // No driver configured: concrete subclasses (e.g. BetterSQLite3Adapter)
-    // bind their bundled driver via defaultSqliteDriver(). The abstract base
-    // returns undefined and cannot be opened directly.
     const def = this.defaultSqliteDriver();
     if (!def) {
       throw new Error(
@@ -2825,7 +2733,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     try {
       const factory = this.resolveDriverFactory();
       if (!factory.openSync) {
-        // Async-only driver: defer to completeAsyncConnect() / openAsync().
         this._asyncConnectPending = true;
         return;
       }
@@ -2869,8 +2776,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     try {
       const factory = this.resolveDriverFactory();
       const conn = await factory.open(openConfig);
-      // Memoize encoding while we can still await the async pragma, so the sync
-      // `encoding` getter serves a cached value rather than a Promise.
       this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
       this.driver = conn;
     } catch (e) {
@@ -2894,8 +2799,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
-    // Dedupe concurrent callers (e.g. racing pool checkouts) onto one open so we
-    // don't open the database twice and leak the first handle.
     if (!this._connectingPromise) {
       this._connectingPromise = this._doAsyncConnect().finally(() => {
         this._connectingPromise = null;
@@ -2922,11 +2825,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   private async _doAsyncConnect(): Promise<void> {
     await this.connectAsync();
-    // configureConnection() returns a Promise for async-only drivers; await it
-    // so every PRAGMA is applied before the connection is handed out.
     await this.configureConnection();
-    // Clear only after a successful open+configure: a failed attempt leaves the
-    // adapter pending so the next verifyBang() retries rather than no-opping.
     this._asyncConnectPending = false;
   }
 
@@ -2981,8 +2880,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       ];
       for (const [p, v] of defaults) stmts.push([`${p} = ${v}`, `SQLite default pragma '${p}'`]);
     }
-    // DQS for drivers that support it (e.g. node:sqlite). better-sqlite3 builds
-    // with SQLITE_DQS=0 and silently ignores it; others may throw — guarded below.
     const dqsValue = this._strict ? "OFF" : "ON";
     stmts.push(
       [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
@@ -2990,7 +2887,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     );
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
     if (pragmas) {
-      // Validate pragma name/value as safe SQLite identifiers before interpolating.
       const SAFE = /^\w+$/;
       for (const [pragma, value] of Object.entries(pragmas)) {
         if (!SAFE.test(pragma)) {
@@ -3111,13 +3007,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     });
     m.registerType("decimal", new DecimalType());
     m.registerType("boolean", new BooleanType());
-    // Temporal types resolve precision at lookup time via register_class_with_precision,
-    // mirroring AbstractAdapter#initialize_type_map so a raw `datetime(6)` reaches a
-    // precision-parsing factory. Registration order matters: /date/i and /time/i both
-    // match "datetime", so datetime is registered last — reverse-registration lookup
-    // matches it first (mirrors the base-map date/time/datetime ordering). better-sqlite3
-    // returns datetime columns as TEXT; SQLite3DateTime converts offset-less strings
-    // to Temporal.Instant using the configured default_timezone.
     this.registerClassWithPrecision(m, /date/i, DateType);
     this.registerClassWithPrecision(m, /time/i, TimeType);
     this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);

@@ -90,17 +90,6 @@ export class PoolConfig {
       schemaCachePath?: string | null;
     };
     const dbDir = this._resolveDbDir();
-    // Presence-based (not truthy): if the user explicitly set
-    // schemaCachePath — even to "" — that's a deliberate "no cache"
-    // signal. Fall through to defaultSchemaCachePath(dbDir) only when
-    // the user didn't supply a value at all. Matches Phase 6's
-    // resolveSchemaFormat treating empty strings as "explicitly
-    // unset" rather than "use a default".
-    //
-    // Calling defaultSchemaCachePath(dbDir) directly (not
-    // lazySchemaCachePath()) because that HashConfig method takes no
-    // dbDir arg and would hardcode "db", defeating the alignment
-    // with DatabaseTasks.dbDir.
     let raw: string | null | undefined;
     if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
       raw = cfg.schemaCachePath;
@@ -413,8 +402,6 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   // (`sqlite3_adapter.rb:821-826` sets `busy_handler_timeout`).
   timeout?: number | string | false;
   retries?: number | string | false;
-  // Driver-specific options passed through to SqliteOpenConfig.driverOptions.
-  // Used by e.g. libsql-remote to forward `authToken` to the Database constructor.
   driverOptions?: Record<string, unknown>;
 }
 

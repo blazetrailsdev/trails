@@ -65,10 +65,6 @@ class Mysql2StatementPool extends MysqlStatementPool {
   protected override dealloc(stmt: MysqlPreparedStatement): void {
     const conn = this._conn;
     if (!conn) return;
-    // `unprepare` is synchronous in node-mysql2 (it only touches the
-    // client-side cache and queues COM_STMT_CLOSE on the socket), but
-    // wrap in try/catch in case the client was already destroyed —
-    // eviction can't throw or it escapes the base class's loop.
     try {
       (conn as unknown as { unprepare: (sql: string) => void }).unprepare(stmt.sql);
     } catch {
@@ -175,14 +171,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private set _client(value: mysql.Connection | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
-  // Serializes concurrent lazy-connect calls so only one createConnection
-  // is in flight at a time. NOT nulled by disconnectBang() so close() can
-  // still await it for clean teardown.
   private _connectingPromise: Promise<mysql.Connection> | null = null;
-  // Generation of the current _connectingPromise. Incremented by
-  // disconnectBang()/close(); _ensureClient() starts a fresh attempt when the
-  // stored generation no longer matches, without dropping the old promise
-  // reference so close() can await it.
   private _connectGeneration = 0;
   private _connectingPromiseGen = -1;
   // Generations orphaned by discardBang() (Rails' discard!). A connect at one
@@ -191,16 +180,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // server. disconnectBang()/close() bump the generation too but are NOT
   // recorded here, so their stale connects still end() the socket as before.
   private _discardedConnectGenerations = new Set<number>();
-  // Tracks the in-flight _client.end() from disconnectBang() so close() can
-  // await full socket teardown even though _client was already nulled.
   private _endingClient: Promise<void> | null = null;
-  // Set by close() to distinguish permanent teardown from disconnectBang(),
-  // which is reconnectable. _ensureClient() refuses to lazy-reconnect after close().
   private _permanentlyClosed = false;
-  // Set by the _fakeConnection constructor path — prevents _ensureClient() from
-  // lazily creating a real connection when _client is null.
   private _isFakeConnection = false;
-  // Normalized config stored for reconnect.
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _inTransaction = false;
   // Gates the connect-once portion of configureConnection() (super/checkVersion
@@ -213,8 +195,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // down so the next connect re-configures — matching Rails' connect-time
   // `configure_connection`.
   private _connectionConfigured = false;
-  // Per-adapter StatementPool. Single connection → single pool.
-  // Cleared on disconnect/reconnect; re-created on first query after reconnect.
   private _statementPool: Mysql2StatementPool | null = null;
 
   /**
@@ -307,8 +287,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * cache (statement_pool.rb:31-33), so there is nothing for this gate to
    * degrade around.
    */
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // mysql2/database-statements.ts can reach it through PerformQueryHost.
   _shouldPrepare(binds: unknown[]): boolean {
     return this.preparedStatements && binds.length > 0;
   }
@@ -322,14 +300,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * none: its `[]=` raises on the empty cache (statement_pool.rb:31-33), so a
    * limit of 0 is unsupported rather than a caching switch.
    */
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // mysql2/database-statements.ts can reach it through PerformQueryHost.
   _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool(conn);
-    // Use `get` (not `has`) so an already-cached entry is moved to
-    // the MRU end of the LRU. Otherwise a hot statement executed
-    // repeatedly would keep its original insertion position and get
-    // evicted the moment any other distinct query came along.
     if (pool.get(sql)) return;
     void pool.set(sql, { sql, key: pool.nextKey() });
   }
@@ -377,8 +349,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   ): Promise<boolean> {
     const adapter = new Mysql2Adapter(config);
     try {
-      // Any query that requires a real database will trigger ER_BAD_DB_ERROR
-      // if the DB doesn't exist — _ensureClient() already translates it to NoDatabaseError.
       await adapter._ensureClient();
       return true;
     } catch (e) {
@@ -466,13 +436,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         if (wt !== null) {
           const n = parseInt(wt, 10);
           if (Number.isInteger(n)) waitTimeout = n;
-          // Strip from URI so mysql2 doesn't warn about an unknown connection option.
           url.searchParams.delete("wait_timeout");
           uri = url.toString();
         }
-      } catch {
-        // malformed URI — leave _database undefined
-      }
+      } catch {}
       // Mirrors Rails Mysql2Adapter#initialize: always ensure FOUND_ROWS is set.
       this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
       return;
@@ -584,7 +551,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (fake) {
       this._isFakeConnection = true;
     }
-    // Connection is created lazily on first _ensureClient() call.
   }
 
   /**
@@ -659,10 +625,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   private async _ensureClient(): Promise<mysql.Connection> {
     if (this._client) return this._client;
-    // Return the in-flight promise only if it belongs to the current generation.
-    // After disconnectBang() the generation advances, so stale in-flight
-    // promises are bypassed and a fresh attempt is started — without nulling
-    // the old promise so close() can still await it for clean teardown.
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       return this._connectingPromise;
     }
@@ -676,10 +638,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }).then(
       async (conn): Promise<mysql.Connection> => {
         if (this._connectGeneration !== gen) {
-          // disconnectBang()/close() happened while we were connecting. Clear
-          // the promise ref then end the socket as part of this chain so
-          // close() awaiting _connectingPromise can drain the socket cleanly
-          // (rather than a fire-and-forget that close() can't wait on).
           if (this._connectingPromiseGen === gen) this._connectingPromise = null;
           const discardErr = new ConnectionNotEstablished(
             "Mysql2Adapter: connection was closed during connect",
@@ -772,15 +730,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * quoteColumnName(..., "mysql") directly where appropriate.
    */
   private mysqlQuote(sql: string): string {
-    // Replace "identifier" with `identifier`, but not inside single-quoted strings.
-    // Split on single-quoted strings, only transform non-string parts.
     const parts = sql.split(/('(?:[^'\\]|\\.)*')/);
     for (let i = 0; i < parts.length; i += 2) {
       parts[i] = parts[i].replace(/"/g, "`");
     }
     let result = parts.join("");
 
-    // MySQL requires LIMIT when using OFFSET; add a large LIMIT if missing
     if (/\bOFFSET\b/i.test(result) && !/\bLIMIT\b/i.test(result)) {
       result = result.replace(/\bOFFSET\b/i, "LIMIT 18446744073709551615 OFFSET");
     }
@@ -818,8 +773,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   private mysqlBinds(binds: unknown[]): unknown[] {
     return binds.map((v) => {
-      // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading
-      // it yields the unwrapped DB value directly.
       if (v && typeof v === "object" && "valueForDatabase" in v) {
         v = (v as { valueForDatabase: unknown }).valueForDatabase;
       }
@@ -931,11 +884,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
             notificationPayload: payload,
           });
-          // A non-row-returning statement (DML passed to execute) has null rows.
-          // Rebuild hash-keyed row objects from the array-mode positional rows +
-          // field descriptors `perform_query` returns — the same objects a
-          // non-array-mode driver query would have produced (duplicate column
-          // names collapse either way).
           if (raw.rows == null) return [];
           const names = raw.fields.map((f) => f.name);
           return raw.rows.map((row) => {
@@ -987,7 +935,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // (0 for a write) — Rails reports the count only via `affected_rows`.
           const affected = this.affectedRows(raw);
 
-          // For INSERT, return the last inserted ID (or affected rows for multi-row)
           if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
             if (affected > 1) {
               return affected;
@@ -995,7 +942,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             return raw.insertId ?? 0;
           }
 
-          // For UPDATE/DELETE, return affected rows
           return affected;
         });
       } catch (e: any) {
@@ -1014,7 +960,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Begin a transaction. Acquires the persistent connection and issues BEGIN.
    */
   async beginTransaction(): Promise<void> {
-    // Force materialization (_lazy: false) so _inTransaction is set immediately.
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
@@ -1196,8 +1141,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             },
           );
         } catch (e: any) {
-          // The loop already translated for its retry classification; guard
-          // against re-translating an ActiveRecordError (see execute()).
           const translated =
             e instanceof MismatchedForeignKey
               ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
@@ -1261,12 +1204,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return printer.pp(result, elapsed);
   }
 
-  // `quote()` and `typeCast()` are inherited from AbstractMysqlAdapter,
-  // which delegates to `mysql/quoting.ts`. No Mysql2-specific override
-  // needed — they'd be duplicates.
-  //
-  // `buildExplainClause` lives on AbstractMysqlAdapter.
-
   /**
    * Execute raw SQL (for DDL and other non-query statements).
    */
@@ -1327,8 +1264,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // schema to parse, so short-circuit before mysqlParseName (which trims).
     if (!name) return false;
     const { schema, table } = mysqlParseName(name);
-    // Use `schema_placeholder OR database()` via COALESCE so the same
-    // query shape serves qualified + unqualified callers.
     const rows = (
       await this.internalExecQuery(
         `SELECT 1 AS one FROM information_schema.tables
@@ -1447,14 +1382,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors Rails' `Mysql2Adapter#disconnect!`.
    */
   override disconnectBang(): void {
-    // Advance generation — _ensureClient() will bypass the stale
-    // _connectingPromise (gen mismatch) and start a fresh attempt, while
-    // close() can still await the old promise for clean teardown.
     this._connectGeneration++;
-    // Tear the raw handle down FIRST: `_closeRawHandle` reads `_client` to
-    // `end()` the live socket, but `_client` is unified onto the base
-    // `_connection` field, which `super.disconnectBang()` nulls — so ending the
-    // socket must happen before super, or the handle is lost and leaks.
     this._closeRawHandle();
     super.disconnectBang();
   }
@@ -1474,8 +1402,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._statementPool?._detach();
     this._statementPool = null;
     if (this._client) {
-      // Chain onto any in-flight teardown so repeated disconnect/reconnect
-      // cycles don't lose earlier end() promises.
       const ending = this._client.end().catch(() => {});
       this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
       this._client = null;
@@ -1499,19 +1425,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       this._discardedConnectGenerations.add(this._connectGeneration);
     }
-    // Advance generation so any in-flight connect attempt is bypassed by
-    // _ensureClient() rather than adopted onto a discarded adapter.
     this._connectGeneration++;
     super.discardBang();
     this._inTransaction = false;
     this._connectionConfigured = false;
     this._statementPool?._detach();
     this._statementPool = null;
-    // Safe to read `_client` after `super.discardBang()` — unlike
-    // `disconnectBang`, the base `discardBang` (abstract-adapter.ts) is a true
-    // no-op that never touches `_connection`, so the live handle survives here
-    // (`_client` is the unified `_connection` field). No end() — discard! must
-    // not talk to the server; abandonRawSocket neutralizes the fd instead.
     const conn = this._client;
     this._client = null;
     abandonRawSocket(conn);
@@ -1532,20 +1451,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       await this._client.end();
       this._client = null;
     }
-    // Await any in-flight end() from disconnectBang()/reconnectBang() so
-    // callers (e.g. afterEach) can be sure all sockets are drained.
     if (this._endingClient) {
       await this._endingClient;
       this._endingClient = null;
     }
-    // If a connection is still being established, wait for it then close.
     if (this._connectingPromise) {
       try {
         const conn = await this._connectingPromise;
         await conn.end();
-      } catch {
-        // ignore — connection may have failed or was discarded by gen-mismatch
-      }
+      } catch {}
       this._connectingPromise = null;
     }
   }
@@ -1665,25 +1579,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static async newClient(
     config: mysql.PoolOptions & MysqlAdapterOptions,
   ): Promise<mysql.Connection> {
-    // With supportBigNumbers:true, mysql2 returns a decimal string for BIGINT
-    // values with ≥15 digits (i.e. ≥ 10^14) where parseInt would lose precision,
-    // and a JS number for smaller values. Both are handled by BigIntegerType.cast().
-    // Note: the threshold is mysql2's internal digit count (≥15), not
-    // Number.MAX_SAFE_INTEGER (2^53-1 ≈ 9×10^15, 16 digits). Callers may
-    // override via explicit false in config.
-    // Compose our Temporal typeCast with any user-supplied typeCast so callers
-    // can still intercept non-temporal fields (e.g. custom ENUM handling) without
-    // losing Temporal parsing on temporal columns.
-
     const {
       typeCast: userTypeCast,
       strict: _strict,
       waitTimeout: _wt,
       variables: _vars,
-      // Session init SQL is carried on the config (see MysqlAdapterOptions#initSql)
-      // and run below — strip it so it isn't passed to the mysql2 driver.
       initSql,
-      // Strip pool-only options — irrelevant for a single connection.
       connectionLimit: _connLimit,
       queueLimit: _queueLimit,
       waitForConnections: _waitFor,
@@ -1740,7 +1641,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         await conn.query(initSql);
       } catch (err) {
-        // Init SQL failed — close the socket so it isn't leaked, then rethrow.
         conn.end().catch(() => {});
         throw err;
       }
@@ -1759,8 +1659,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...(configVars ?? {}),
     };
 
-    // Validate variable names before interpolating into SQL — matches the pattern used
-    // by PostgreSQLAdapter and SQLite3Adapter to catch misconfigured keys early.
     const SAFE_VAR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     for (const k of Object.keys(vars)) {
       if (!SAFE_VAR_NAME.test(k)) {
@@ -1790,8 +1688,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
     } else {
-      // strict: "default" — sync session to global, counteracting mysql2 Node.js
-      // CLIENT_IGNORE_SPACE flag which otherwise adds IGNORE_SPACE to session sql_mode.
       sqlMode = "@@GLOBAL.sql_mode";
     }
 

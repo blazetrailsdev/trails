@@ -47,7 +47,6 @@ export class StatementPool<T = unknown> {
   get(key: string): T | undefined {
     if (!this.cache.has(key)) return undefined;
     const stmt = this.cache.get(key) as T;
-    // Move to end for LRU
     this.cache.delete(key);
     this.cache.set(key, stmt);
     return stmt;
@@ -146,7 +145,5 @@ export class StatementPool<T = unknown> {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#dealloc
    */
-  protected dealloc(_stmt: T): void | Promise<void> {
-    // Base implementation is a no-op; adapter-specific pools override.
-  }
+  protected dealloc(_stmt: T): void | Promise<void> {}
 }

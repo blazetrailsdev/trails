@@ -754,6 +754,19 @@ export default defineConfig(
     },
   },
 
+  // ── no-freeform-comments, activerecord/connection-adapters top-level: the
+  //    implementation files at the root of the tree are swept; the test files
+  //    beside them are still outstanding (story
+  //    strip-freeform-comments-ar-connection-adapters-toplevel-tests), so they
+  //    are ignored here rather than holding the rule off the whole slice. ──
+  {
+    files: ["packages/activerecord/src/connection-adapters/*.ts"],
+    ignores: ["packages/activerecord/src/connection-adapters/*.test.ts"],
+    rules: {
+      "blazetrails/no-freeform-comments": "error",
+    },
+  },
+
   // ── no-freeform-comments, activerecord/associations: swept a slice at a
   //    time. The implementation files are done; the test files under the same
   //    tree are still outstanding (story

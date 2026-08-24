@@ -232,11 +232,6 @@ export class Version {
 // Rails: `AbstractAdapter` includes `SchemaStatements` so `connection.create_table(...)` works.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter {
-  // --- SchemaStatements (DDL) ---
-  // The abstract base signatures are declared here. Concrete adapter subclasses
-  // that override with dialect-specific variants (PG's createTable callback-first)
-  // carry // @ts-expect-error on those overrides. Callers typed as AbstractAdapter
-  // should use the base call forms; PG-specific forms require a concrete type.
   createTable(
     tableName: string,
     optionsOrFn?:
@@ -407,9 +402,6 @@ export interface AbstractAdapter {
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
   tableExists(tableName: string): Promise<boolean>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
-  // Options SchemaMigration / InternalMetadata pass to `t.string` for their
-  // primary key. Mixed in from SchemaStatements; declared here so those
-  // callers can reach it through the AbstractAdapter type.
   internalStringOptionsForPrimaryKey(): Record<string, unknown>;
   // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
   // match by column `type` and the columnOptionsKeys when given.
@@ -554,14 +546,11 @@ export interface AbstractAdapter {
   /** @internal */
   extractNewCommentValue(defaultOrChanges: CommentOrChanges): string | null;
   tableAliasFor(tableName: string): string;
-  // Provided by the DatabaseLimits mixin (included below); tableAliasFor
-  // resolves it through here rather than a duplicate on SchemaStatements.
   tableAliasLength(): number;
   nativeDatabaseTypes(): Record<string, unknown>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
   dataSourceExists(name: string): Promise<boolean>;
-  // --- DatabaseStatements ---
   /** Mirrors `DatabaseStatements#sanitize_limit` (abstract/database_statements.rb). */
   sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
   /**
@@ -708,9 +697,6 @@ export interface AbstractAdapter {
   /** @internal */
   preprocessQuery(sql: string): string;
 
-  // --- Members previously only on DatabaseAdapter interface ---
-  // Declaring them here makes AbstractAdapter a structural superset of
-  // DatabaseAdapter, prerequisite for collapsing the two types.
   execute(
     sql: string,
     binds?: unknown[],
@@ -767,13 +753,6 @@ export interface AbstractAdapter {
   currentDatabase?(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
-
-  // --- SchemaStatements / DatabaseStatements members provided only by the
-  // SchemaStatements mixin or concrete-adapter subclasses, not the base class.
-  // Declared optional here so a value typed as the base `AbstractAdapter` (the
-  // superset that replaces the deleted `DatabaseAdapter` interface — RFC 0010)
-  // can still reach them with `?.` / `!`. See migration.ts, relation.ts#explain,
-  // and abstract/schema-statements.ts#createTable for the base-typed call sites.
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
@@ -884,11 +863,6 @@ export class AbstractAdapter implements Quoting {
    *   0094 constructor reshape (abstract_adapter.rb:167).
    */
   constructor() {
-    // The module-level `include(...)` / callback / query-cache wiring is applied
-    // lazily on first construction rather than at module-evaluation time. This
-    // avoids a TDZ crash when the adapter graph is imported from a non-runtime
-    // entry point (e.g. `support/schema-types` → SchemaStatements) that
-    // re-enters this module mid-cycle before the mixin classes have initialized.
     ensureAbstractAdapterMixinsApplied();
     // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
     this._visitor = this.arelVisitor();
@@ -1061,7 +1035,6 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  // Return union: awaitable surface (PG's regtype lookup); this base stays sync.
   quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     if (value === undefined) return "";
     if (typeof value === "function") {
@@ -1174,8 +1147,6 @@ export class AbstractAdapter implements Quoting {
   clearQueryCache(): void {
     clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
   }
-
-  // --- End QueryCache mixin ---
 
   get inUse(): boolean {
     return this._inUse;
@@ -1299,8 +1270,6 @@ export class AbstractAdapter implements Quoting {
   get adapterName(): string {
     return "Abstract";
   }
-
-  // --- Identity & lifecycle ---
 
   isConnected(): boolean {
     return this._connection !== null;
@@ -1466,9 +1435,7 @@ export class AbstractAdapter implements Quoting {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#clear_cache!
    */
-  clearCacheBang(_opts: { newConnection?: boolean } = {}): void | Promise<void> {
-    // Subclasses with statement caches override this
-  }
+  clearCacheBang(_opts: { newConnection?: boolean } = {}): void | Promise<void> {}
 
   /**
    * The key under which `sql` is stored in the connection's statement pool.
@@ -1522,8 +1489,6 @@ export class AbstractAdapter implements Quoting {
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
-
-  // --- Capability introspection ---
 
   isValidType(type: string | null | undefined): boolean {
     if (type == null) return false;
@@ -1581,9 +1546,6 @@ export class AbstractAdapter implements Quoting {
    * async `BoundSchemaReflection` can't serve.
    */
   get internalSchemaCache(): SchemaCache {
-    // Same object the bound reflection reads: PoolConfig#schemaCache is backed
-    // by the pool SchemaReflection's cache slot, and the lone-connection
-    // reflection below owns the standalone-adapter one.
     const reflection = this._poolSchemaReflection();
     if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
     return reflection.loadedCache;
@@ -1673,8 +1635,6 @@ export class AbstractAdapter implements Quoting {
   async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
     return false;
   }
-
-  // --- Private helpers ---
 
   protected stripSqlComments(sql: string): string {
     return stripSqlComments(sql);
@@ -1816,7 +1776,6 @@ export class AbstractAdapter implements Quoting {
     let block: (tx?: unknown) => Promise<T> | T;
     if (typeof fnOrOpts === "function") {
       block = fnOrOpts;
-      // Support both (fn) and (fn, opts) — fixture loading uses the latter
       if (fnOrOpts2 && typeof fnOrOpts2 !== "function") opts = fnOrOpts2;
     } else {
       opts = fnOrOpts ?? {};
@@ -1860,8 +1819,6 @@ export class AbstractAdapter implements Quoting {
       return conn;
     });
   }
-
-  // --- Config accessors ---
 
   get connectionRetries(): number {
     const v = this._config.connectionRetries;
@@ -1914,8 +1871,6 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  // --- Lifecycle ---
-
   stealBang(): void {
     if (!this._inUse) {
       throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
@@ -1942,8 +1897,6 @@ export class AbstractAdapter implements Quoting {
     void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
   }
-
-  // --- Capability flags (batch 2) ---
 
   supportsAdvisoryLocks(): boolean {
     return false;
@@ -1983,8 +1936,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  // --- Static utilities ---
-
   static typeCastConfigToInteger(config: unknown): number | unknown {
     if (typeof config === "number") return config;
     if (typeof config === "string" && /^\d+$/.test(config)) return parseInt(config, 10);
@@ -1999,8 +1950,6 @@ export class AbstractAdapter implements Quoting {
   isAsyncEnabled(): boolean {
     return false;
   }
-
-  // --- Capability flags (batch 3) ---
 
   async supportsIndexInclude(): Promise<boolean> {
     return false;
@@ -2105,8 +2054,6 @@ export class AbstractAdapter implements Quoting {
 
   lockThread: boolean = false;
 
-  // --- DDL: extensions, enums, virtual tables ---
-
   async enableExtension(_name: string): Promise<void> {}
 
   async disableExtension(_name: string): Promise<void> {}
@@ -2140,8 +2087,6 @@ export class AbstractAdapter implements Quoting {
 
   async dropVirtualTable(_name: string): Promise<void> {}
 
-  // --- Advisory locks ---
-
   // Mirrors AbstractAdapter#advisory_locks_enabled? (abstract_adapter.rb:603).
   // `supportsAdvisoryLocks()` is false on SQLite, so this returns false there
   // (Rails' `respond_to?`/`supports_advisory_locks?` gate); PG/MySQL combine
@@ -2158,8 +2103,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  // --- Extensions & algorithms ---
-
   extensions(): string[] | Promise<string[]> {
     return [];
   }
@@ -2168,15 +2111,11 @@ export class AbstractAdapter implements Quoting {
     return {};
   }
 
-  // --- Referential integrity & FK validation ---
-
   async disableReferentialIntegrity(fn: () => Promise<void>, _tables?: string[]): Promise<void> {
     await fn();
   }
 
   async checkAllForeignKeysValidBang(): Promise<void> {}
-
-  // --- Connection lifecycle ---
 
   throwAwayBang(): void {
     // Mirrors Rails AbstractAdapter#throw_away! (abstract_adapter.rb:733):
@@ -2205,8 +2144,6 @@ export class AbstractAdapter implements Quoting {
     this._rawConnectionDirty = false;
     this._verified = false;
   }
-
-  // --- Comparison helpers ---
 
   defaultUniquenessComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
     return attribute.eq(value);
@@ -2239,8 +2176,6 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  // --- Insert SQL ---
-
   // Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_insert_sql.
   // The base adapter only knows plain inserts; adapters that support upsert /
   // skip-duplicates override this. `into()` already bundles the VALUES list,
@@ -2254,8 +2189,6 @@ export class AbstractAdapter implements Quoting {
     }
     return `INSERT ${insert.into()}`;
   }
-
-  // --- Version introspection ---
 
   // Rails' `get_database_version` returns whatever the adapter uses to
   // represent a server version. PG returns the `server_version` integer;
@@ -2283,8 +2216,6 @@ export class AbstractAdapter implements Quoting {
     return 0;
   }
 
-  // --- Timezone validation ---
-
   static validateDefaultTimezone(timezone: string): string {
     const valid = ["utc", "local"];
     if (!valid.includes(timezone)) {
@@ -2293,13 +2224,9 @@ export class AbstractAdapter implements Quoting {
     return timezone;
   }
 
-  // --- Query classification ---
-
   buildReadQueryRegexp(): RegExp {
     return /^\s*(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|DESCRIBE|DESC)\b/i;
   }
-
-  // --- Console ---
 
   static findCmdAndExec(_commands: string[]): void {}
 
@@ -2456,10 +2383,6 @@ export class AbstractAdapter implements Quoting {
       // Rails: `connect! if @raw_connection.nil? && reconnect_can_restore_state?`
       // (abstract_adapter.rb:985), and `connect!` is `verify!` (rb:778-781).
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
-      // Drain any deferred connection-readiness work (PostgreSQLAdapter
-      // re-opens a socket a failed reconfigure tore down, and drains orphaned
-      // prepared statements) ONCE here, before any query runs. Pre-loop (not
-      // per-iteration) — a no-op for adapters with no deferred work.
       await this.awaitRawConnectionReady();
       if (materializeTransactions) await this.materializeTransactions();
 
@@ -2758,8 +2681,6 @@ export class AbstractAdapter implements Quoting {
     relation: { name: string | Nodes.SqlLiteral };
     name: string;
   }): Promise<import("./column.js").Column | undefined> {
-    // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
-    // derived table); unwrap to the bare identifier for the schema-cache lookup.
     const tableName = String(attribute.relation.name);
     // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the
     // pool's BoundSchemaReflection, or one bound to this connection when the
@@ -2851,15 +2772,6 @@ export class AbstractAdapter implements Quoting {
   }
 }
 
-// Whether the module-level mixin wiring below has been applied yet. Applying it
-// eagerly at module-evaluation time re-references the mixin classes
-// (SchemaStatements, DatabaseStatements, …) which, on a circular import edge
-// (schema-types → SchemaStatements → schema-dumper → base → abstract-adapter),
-// are still in their temporal dead zone — crashing with a ReferenceError. We
-// therefore defer the whole block into a function run once, lazily, from the
-// first AbstractAdapter construction, by which point every module has finished
-// evaluating. Instance methods only matter on instances, so first-construction
-// is early enough.
 let abstractAdapterMixinsApplied = false;
 
 let abstractTypeMap: TypeMap | undefined;

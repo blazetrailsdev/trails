@@ -181,9 +181,6 @@ function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): 
   return key in hash ? (hash[key] as T) : defaultValue;
 }
 
-// Internal liveness flags node-pg sets on its `pg.Client` (lib/client.js).
-// Not part of pg's public typings, so we narrow the client through this shape
-// to mirror libpq's `PGconn#finished?`. See `rawConnectionFinished()`.
 interface PgClientLiveness {
   _ending?: boolean;
   _ended?: boolean;
@@ -485,9 +482,6 @@ export class PostgreSQLAdapter
   }
 
   private _pgClientOptions: pg.ClientConfig | null = null;
-  // Non-null when a transaction is open on _rawConnection. Always equals
-  // _rawConnection while set — kept as a field for legibility of the
-  // "in TX?" check at call sites that mirror the prior shape.
   private _client: pg.Client | null = null;
   private _inTransaction = false;
   /**
@@ -529,15 +523,7 @@ export class PostgreSQLAdapter
   private _schemaSearchPathMemo: string | null = null;
   private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
-  // Whether _maybeConfigureConnection has run for the current _rawConnection.
-  // Reset on reconnect.
   private _connectionConfigured = false;
-  // Whether the eager load_additional_types pass has run for the current
-  // physical connection. Reset on disconnect/discard (a brand-new socket needs
-  // it) but NOT on resetBang: DISCARD ALL leaves the in-memory type map intact,
-  // and the reset reconfigure runs while the reset holds the connection lock —
-  // routing the pg_type queries back through withRawConnection would re-enter
-  // it needlessly.
   private _typeMapEagerLoaded = false;
   // Rails' `@statements = build_statement_pool` (abstract_adapter.rb:156): one
   // pool per adapter, built in the constructor and never replaced. PG prepared
@@ -549,13 +535,7 @@ export class PostgreSQLAdapter
   // names `@statements`.
   /** @internal */
   _statements!: StatementPool;
-  // True when the next checkout should run DEALLOCATE ALL to drain
-  // orphaned server-side prepared statements (set by clearCacheBang's
-  // reset branch after a rollback).
   private _needsDeallocateAll = false;
-  // True after disconnectBang/discardBang/close until the next reconnect.
-  // Backs the `active` getter so a torn-down adapter reports inactive
-  // even before the next lazy acquire would notice the missing connection.
   private _closed = false;
   private _closingDriver: Promise<void> | null = null;
   // Per-acquire generation. Each _doAcquire captures the current value; a
@@ -567,7 +547,6 @@ export class PostgreSQLAdapter
   // (b) abandons its raw socket instead of `end()`ing or adopting it when it
   // resolves — surviving a later reconnect that would reset a mutable flag.
   private _acquireGeneration = 0;
-  // Generation stamped on the currently-stored `_acquiring` promise.
   private _acquiringGen = -1;
   private _discardedAcquireGenerations = new Set<number>();
   // In-flight connect/configure promise. Concurrent _acquireFreshClient
@@ -575,8 +554,6 @@ export class PostgreSQLAdapter
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
   // postgresql_adapter.rb:349, abstract_adapter.rb:984).
   private _acquiring: Promise<pg.Client> | null = null;
-  // Accumulates PG NOTICE/WARNING messages fired during the current query.
-  // Cleared before each query; processed by handleWarnings after.
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
   /**
    * `database.yml`'s `statement_limit`, which Rails reads as
@@ -666,10 +643,6 @@ export class PostgreSQLAdapter
                 ? pg.types.getTypeParser(OID_INTERVAL, "binary")
                 : (v: unknown) => v;
             }
-            // PG interval[] (OID 1187): pg-types hard-codes parseInterval as
-            // the element parser, bypassing our OID 1186 override. Return the
-            // raw array literal so AR Array.deserialize parses the elements
-            // through Interval.castValue (Duration.parse on ISO 8601).
             if (oid === OID_INTERVAL_ARRAY && format !== "binary") return (v: unknown) => v;
             if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
               return (v: unknown) => v;
@@ -784,10 +757,6 @@ export class PostgreSQLAdapter
                 : (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
-          // PG interval[] (OID 1187): pg-types hard-codes parseInterval as
-          // the element parser, so we must override the array OID too. Raw
-          // array literal is handed to AR Array.deserialize, which routes
-          // each element through Interval.castValue.
           if (oid === OID_INTERVAL_ARRAY && format !== "binary") {
             const fallback = (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
@@ -809,8 +778,6 @@ export class PostgreSQLAdapter
               format === "binary" ? pg.types.getTypeParser(oid, "binary") : (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
-          // For all other OIDs, respect any user-supplied parser first, then
-          // delegate to getTemporalTypeParser which falls back to pg built-ins.
           if (TEMPORAL_OIDS.has(oid) && (format === "text" || !format)) {
             return getTemporalTypeParser(oid, format);
           }
@@ -863,8 +830,6 @@ export class PostgreSQLAdapter
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
     await client.query("SET intervalstyle = iso_8601");
     await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
-    // SET statements from :variables config hash
-    // https://www.postgresql.org/docs/current/static/sql-set.html
     for (const [key, val] of Object.entries(variables)) {
       if (val === null) continue;
       if (val === "default") {
@@ -1127,10 +1092,6 @@ export class PostgreSQLAdapter
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
-    // Release the query client BEFORE any loadAdditionalTypes call —
-    // that path re-enters execute() and acquires its own pooled client,
-    // and holding both would consume 2 connections per query during
-    // type-map warmup.
     interface ArrayQueryResult {
       fields: Array<{ name: string; dataTypeID: number }>;
       rows: unknown[][];
@@ -1194,9 +1155,6 @@ export class PostgreSQLAdapter
     const fields = pgResult.fields ?? [];
     if (fields.length === 0) return Result.fromRowHashes([]);
 
-    // Batch-load any unknown dataTypeIDs in a single pg_type roundtrip.
-    // Without this, a SELECT with N distinct unknown OIDs would trigger
-    // N sequential getOidType → loadAdditionalTypes queries.
     const missing = new Set<number>();
     for (const f of fields) {
       if (!this.typeMap.has(f.dataTypeID)) missing.add(f.dataTypeID);
@@ -1206,11 +1164,6 @@ export class PostgreSQLAdapter
     }
 
     const columns = fields.map((f) => f.name);
-    // Store types under BOTH name and numeric index so Result's
-    // columnType lookup works with duplicate column names. Skip the
-    // name entry when the field name is an integer-like string — JS
-    // object keys are all strings, so `{0: type, "0": other}` would
-    // collide and Result would pick the wrong type for one of them.
     const columnTypes: Record<string | number, Type> = {};
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
@@ -1223,7 +1176,6 @@ export class PostgreSQLAdapter
         columnTypes[f.name] = type;
       }
     }
-    // pgResult.rows is already positional arrays thanks to rowMode.
     const rowArrays = pgResult.rows;
     return new Result(columns, rowArrays, columnTypes as Record<string, Type>);
   }
@@ -1278,9 +1230,6 @@ export class PostgreSQLAdapter
     ].join("\n");
 
     if (oids && oids.length > 0) {
-      // Validate every OID is a finite integer before interpolating
-      // into SQL. loadAdditionalTypes is public, so untrusted input
-      // could reach us.
       const safe = oids.map((oid) => {
         const n = Number(oid);
         if (!Number.isInteger(n) || n < 0) {
@@ -1293,10 +1242,6 @@ export class PostgreSQLAdapter
     }
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
-    // Generated AFTER the prior two yields have been awaited and run,
-    // so the initializer has already registered numeric OIDs via
-    // aliasType. If we computed this up front, the array query would
-    // typically be empty and fall through to `WHERE 1=0`.
     yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
   }
 
@@ -1319,18 +1264,6 @@ export class PostgreSQLAdapter
       }
 
       await this.initializeTypeMap();
-      // A type-map reload signals the database's type universe changed — an
-      // extension or user type (hstore, enum, composite) was created or dropped,
-      // reassigning OIDs. A cached prepared statement that bound or returned one
-      // of those types embeds the now-stale OID in its server-side plan, so
-      // re-executing it raises "cache lookup failed for type <oid>". Drop the
-      // client-side statement map (NOT clearCacheBang) so the next prepare gets a
-      // fresh monotonic name and re-parses against the current OIDs. We
-      // deliberately skip the DEALLOCATE: reloadTypeMap runs mid-DDL-transaction
-      // (e.g. createEnum), and queuing DEALLOCATEs onto the pinned client there
-      // interleaves with the in-flight statement and desyncs the pg protocol.
-      // The orphaned server statements keep their old names — never reused — and
-      // are reclaimed on session reset/close.
       this._statements.reset();
     });
   }
@@ -1359,20 +1292,13 @@ export class PostgreSQLAdapter
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
-    // Fast path: connection already opened and configured, no drain pending.
     if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
       return this._rawConnection;
     }
-    // Reuse the in-flight acquire only if it belongs to the current
-    // generation. A discardBang() bumps the generation, so its orphaned
-    // acquire is bypassed here (a fresh one is opened) rather than adopted
-    // — mirrors mysql2's `_connectingPromiseGen === _connectGeneration`.
     if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
       const acquireGen = this._acquireGeneration;
       const acquiring = this._doAcquire(acquireGen).finally(() => {
         this._discardedAcquireGenerations.delete(acquireGen);
-        // Only clear if we still own the slot — a newer-generation acquire
-        // may have replaced us while this one was in flight.
         if (this._acquiring === acquiring) this._acquiring = null;
       });
       this._acquiring = acquiring;
@@ -1382,10 +1308,6 @@ export class PostgreSQLAdapter
   }
 
   private async _doAcquire(acquireGen: number): Promise<pg.Client> {
-    // Snapshot the connection into a local so a concurrent
-    // disconnectBang / discardBang / reconnect that nulls
-    // _rawConnection between awaits can't smuggle null into the
-    // configure/drain calls or the final return.
     let client = this._rawConnection;
     if (client == null) {
       // Route through newClient so a failed connect is translated to
@@ -1407,18 +1329,7 @@ export class PostgreSQLAdapter
         }
         throw error;
       }
-      // Guard against a close / disconnect / discard / reconnect
-      // that raced with the in-flight connect(). If the adapter was
-      // torn down between the await above and this point, do NOT
-      // publish `newClient` — tear it down instead so we don't leak
-      // a live socket onto a closed adapter.
       const racedDiscard = this._discardedAcquireGenerations.has(acquireGen);
-      // A disconnectBang/close/discardBang bumps _acquireGeneration when this
-      // acquire is in flight, so a mismatch means this acquire was orphaned by
-      // one of them. Checking the captured generation (not the mutable _closed
-      // flag) keeps the decision correct even when a racing reconnect clears
-      // _closed before the connect resolves — otherwise the stale acquire would
-      // adopt/publish its pre-disconnect newClient onto the reconnected adapter.
       const staleGeneration = acquireGen !== this._acquireGeneration;
       if (
         this._closed ||
@@ -1428,33 +1339,12 @@ export class PostgreSQLAdapter
         staleGeneration
       ) {
         this._teardownRacedClient(newClient, acquireGen);
-        // A stale-generation acquire ALWAYS fails, uniformly — even in the
-        // narrow sub-case where a racing reconnect has already published a
-        // valid _rawConnection (i.e. we'd otherwise fall through to adopt it
-        // below). This is a deliberate behavior change: an acquire orphaned by
-        // disconnect!/close/discard! belongs to a connection epoch that was
-        // explicitly torn down, so adopting a POST-teardown connection would
-        // silently paper over the disconnect (the mirror of the adoption bug
-        // this guard fixes). Only same-generation callers that merely lost a
-        // benign open race are allowed to adopt the winner's connection below.
         if (this._closed || this._pgClientOptions == null || racedDiscard || staleGeneration) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }
-        // Another caller raced ahead and already published a
-        // connection — use theirs instead of ours.
         client = this._rawConnection!;
       } else {
-        // Suppress unhandled error events from the idle connection
-        // (e.g. server-side FATAL from pg_terminate_backend). Without
-        // this listener node emits an uncaughtException.
         newClient.on("error", () => {});
-        // Attach the notice listener exactly once per pg.Client. We
-        // can't do this inside _maybeConfigureConnection because
-        // resetBang resets _connectionConfigured to re-run the SET
-        // queries after DISCARD ALL; re-running configure on the same
-        // client would otherwise accumulate notice listeners on every
-        // reset (node-pg's EventEmitter, unlike libpq's
-        // set_notice_receiver, doesn't replace).
         this._attachNoticeListener(newClient);
         this._attachReadyForQueryListener(newClient);
         this._rawConnection = newClient;
@@ -1463,8 +1353,6 @@ export class PostgreSQLAdapter
     }
     try {
       await this.configureConnection();
-      // Re-check teardown after every await: a concurrent reconnect
-      // can null _rawConnection while configure is in flight.
       if (this._closed || this._rawConnection !== client) {
         throw new Error("PostgreSQLAdapter: connection is closed");
       }
@@ -1473,11 +1361,6 @@ export class PostgreSQLAdapter
         throw new Error("PostgreSQLAdapter: connection is closed");
       }
     } catch (error) {
-      // Configure/drain failure (or mid-flight teardown) leaves the
-      // connection in an unknown state — tear it down so the next
-      // caller reconnects cleanly. Only touch shared state if this
-      // local snapshot is still the published connection; otherwise
-      // a concurrent reconnect already swapped in a new one.
       if (this._rawConnection === client) {
         this._rawConnection = null;
         this._connectionConfigured = false;
@@ -1532,18 +1415,9 @@ export class PostgreSQLAdapter
    * @internal
    */
   protected override async awaitRawConnectionReady(): Promise<void> {
-    // If the reset's reconfigure step failed it tore down the socket; re-open
-    // a fresh, configured connection so the loop never yields an unconfigured
-    // (or null) one. connect() throws here only if the server is truly down —
-    // the same pre-loop failure shape as a failed initial connectBang().
     if (!this._closed && this._rawConnection === null && this._pgClientOptions !== null) {
       await this.connect();
     }
-    // Drain server-side prepared statements orphaned by a prior PSCE event
-    // (clearCacheBang's reset branch tagged `_needsDeallocateAll` while the
-    // socket was torn down). When the connection is reopened by connectBang's
-    // `_acquireFreshClient` this already ran; this covers the case where the
-    // live socket survives so the loop never yields it un-drained.
     const client = this._rawConnection;
     if (client && !this._closed) await this._maybeDrainOrphanedPreparedStatements(client);
   }
@@ -1581,9 +1455,6 @@ export class PostgreSQLAdapter
     // normalizer the execQuery path uses.
     const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
-    // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
-    // stores something that can be re-EXPLAIN'd on the same adapter
-    // without re-running rewriteBinds.
     try {
       return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
         try {
@@ -1687,10 +1558,6 @@ export class PostgreSQLAdapter
     const originalBinds = binds;
     binds = this.typeCastedBinds(binds) ?? [];
     const pgSql = this.rewriteBinds(sql, binds);
-    // payload.sql records the rewritten SQL — ExplainSubscriber captures
-    // something that can be re-EXPLAIN'd without re-running rewriteBinds
-    // (and without re-appending RETURNING for bare INSERTs, which isn't
-    // part of the logical query).
     return await this.log(pgSql, name, originalBinds, binds, false, async (payload) => {
       try {
         return await this.withRawConnection(async (conn) => {
@@ -1707,11 +1574,6 @@ export class PostgreSQLAdapter
             const withReturning = `${pgSql} RETURNING id`;
             const useSavepoint = this._inTransaction;
             const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
-            // Update payload.sql to the exact statement we're about to
-            // run so subscribers (LogSubscriber / ExplainSubscriber /
-            // QueryCache keys) see what actually hit pg. The fallback
-            // branch below resets it to pgSql if the RETURNING attempt
-            // fails and we re-run without it.
             payload.sql = withReturning;
             try {
               if (useSavepoint) {
@@ -1761,7 +1623,6 @@ export class PostgreSQLAdapter
             }
           }
 
-          // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
             const result = await this._performQuery(client, pgSql, originalBinds, binds, {
               prepare: this._shouldPrepare(binds),
@@ -1775,7 +1636,6 @@ export class PostgreSQLAdapter
             return affected;
           }
 
-          // For UPDATE/DELETE, return affected rows
           const result = await this._performQuery(client, pgSql, originalBinds, binds, {
             prepare: this._shouldPrepare(binds),
             notificationPayload: payload,
@@ -1795,10 +1655,6 @@ export class PostgreSQLAdapter
    * Begin a transaction. Acquires a dedicated client from the pool.
    */
   async beginTransaction(): Promise<void> {
-    // Force materialization (_lazy: false) so _client is acquired and
-    // _inTransaction is set immediately. createSavepoint() runs on the raw
-    // client which falls back to a fresh connection when _client is null,
-    // causing "SAVEPOINT can only be used in transaction blocks".
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
@@ -1813,9 +1669,6 @@ export class PostgreSQLAdapter
     } catch (error) {
       this._client = null;
       this._inTransaction = false;
-      // Connection-level error on BEGIN poisons the single pg.Client.
-      // Tear down so the next caller gets a fresh connection — mirrors
-      // the pre-collapse PoolClient.release(err) discard.
       if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
@@ -1844,10 +1697,6 @@ export class PostgreSQLAdapter
     try {
       await this.internalExecute("COMMIT", "TRANSACTION");
     } catch (e) {
-      // Connection-level error (08P01, broken socket, etc.) leaves the
-      // single pg.Client unusable. Tear down so the next caller gets a
-      // fresh connection — mirrors the pool-discard safety net the
-      // pre-collapse design got for free via PoolClient.release(err).
       if (PostgreSQLAdapter._isConnectionError(e)) this._discardRawConnection();
       throw e;
     } finally {
@@ -2057,7 +1906,6 @@ export class PostgreSQLAdapter
       processID?: number | null;
       secretKey?: number | null;
     };
-    // connect() and cancel() exist at runtime but are not in @types/pg Connection.
     type PgConnectionWithCancel = pg.Connection & {
       connect(portOrPath: string | number, host?: string): void;
       cancel(processID: number, secretKey: number): void;
@@ -2068,10 +1916,6 @@ export class PostgreSQLAdapter
     }
     if (txClient?.processID == null) return;
     try {
-      // `@raw_connection.cancel` — open a FRESH TCP connection, send the
-      // 16-byte CancelRequest, and wait for the server to close it, exactly as
-      // libpq PQcancel does. Leaves the original transaction socket untouched;
-      // does NOT consume a pool slot.
       await new Promise<void>((resolve, reject) => {
         const cancelCon = new pg.Connection() as PgConnectionWithCancel;
         // A failed PQcancel raises PG::Error in Ruby, so `block` never runs.
@@ -2087,9 +1931,6 @@ export class PostgreSQLAdapter
           cancelCon.connect(port, host);
         }
       });
-      // `@raw_connection.block` — the cancelled command still has to come back.
-      // Returning before it does would leave the cancel's effect (and the
-      // command's own rejection) to land after this chain is gone.
       await this._blockUntilCommandSettles(txClient);
     } catch {
       // cancel is best-effort — a drain failure must not mask the rollback,
@@ -2146,8 +1987,6 @@ export class PostgreSQLAdapter
     } catch (error) {
       this._client = null;
       this._inTransaction = false;
-      // See beginDbTransaction — discard the poisoned client on
-      // connection-level failure so callers can recover.
       if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
@@ -2213,12 +2052,6 @@ export class PostgreSQLAdapter
       const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
       const result = await this.log(runSql, name, binds, bindArray, false, (payload) =>
-        // materializeTransactions is handled above (not delegated to
-        // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
-        // SAVEPOINT — keeps its exact pre-existing materialize semantics. The
-        // loop's own `finally dirtyCurrentTransaction()` does not fire (false is
-        // passed); this method's finally handles it instead. The leaf still gains
-        // the retry/verify/reconnect loop.
         this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
           // Errors propagate raw: withRawConnection translates the driver error to
@@ -2558,8 +2391,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._closed = true;
-    // Bump the in-flight acquire's generation (see disconnectBang) so a stale
-    // connect end()s its socket instead of adopting it onto a racing reconnect.
     if (this._acquiring) this._acquireGeneration++;
     const conn = this._rawConnection;
     this._rawConnection = null;
@@ -2692,8 +2523,6 @@ export class PostgreSQLAdapter
       super.resetBang();
       return;
     }
-    // Capture the live connection so DISCARD ALL still chains onto it even if
-    // a concurrent reconnect later nulls _rawConnection.
     const live = this._rawConnection;
     // DISCARD ALL also resets session-level GUCs (standard_conforming_
     // strings, intervalstyle, client_min_messages, custom variables) —
@@ -2725,11 +2554,6 @@ export class PostgreSQLAdapter
           this._inTransaction = false;
         }
         await live.query("DISCARD ALL");
-        // Guard on socket identity: a concurrent reconnect may have swapped in
-        // a new client, in which case its own acquire handles configuration.
-        // On configure failure, tear down the socket (mirroring _doAcquire's
-        // catch) so awaitRawConnectionReady re-opens a fresh, configured
-        // connection rather than yielding an unconfigured one.
         if (this._rawConnection === live && !this._closed) {
           // Rails' reset! ends in configure_connection via super
           // (postgresql_adapter.rb:380), so the dispatch goes through the
@@ -2745,8 +2569,6 @@ export class PostgreSQLAdapter
             throw error;
           });
         }
-        // DISCARD ALL drops server-side prepared statements — reset the
-        // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
         this._statements.reset();
         // Rails' `super` — clear_cache!(new_connection: true) + reset_transaction
         // (abstract_adapter.rb:728-731) — runs inside the same lock, last
@@ -2876,9 +2698,6 @@ export class PostgreSQLAdapter
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
-    // If a connect is in flight, record its generation so it abandons (not
-    // ends/adopts) its socket when it resolves, then bump so a later
-    // reconnect opens a fresh acquire instead of reusing the orphaned one.
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
     this._acquireGeneration++;
     abandonRawSocket(conn);
@@ -3014,7 +2833,6 @@ export class PostgreSQLAdapter
   // (postgresql_adapter.rb:669-673).
   override async checkVersion(): Promise<void> {
     if ((await this.databaseVersion) < 9_03_00) {
-      // < 9.3
       throw new Error(
         `Your version of PostgreSQL (${await this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
       );
@@ -3248,8 +3066,6 @@ export class PostgreSQLAdapter
    *   name. Nothing to converge.
    */
   override quote(value: unknown): string {
-    // `.call(this)` so the inherited date/time dispatch resolves to this
-    // adapter's `quotedDate` (BC-suffixing), mirroring PG#quote's `super`.
     return pgQuote.call(this, value);
   }
 
@@ -3280,8 +3096,6 @@ export class PostgreSQLAdapter
   }
 
   override typeCast(value: unknown): unknown {
-    // `.call(this)` so the inherited date/time dispatch resolves to this
-    // adapter's `quotedDate` (BC-suffixing), mirroring PG#type_cast's `super`.
     return pgTypeCast.call(this, value);
   }
 
@@ -3325,10 +3139,6 @@ export class PostgreSQLAdapter
           options?: { array?: boolean };
         }
       | undefined;
-    // ColumnDefinition stores `array` under `options`; live PG Column
-    // instances expose it as a top-level boolean. Accept both shapes so
-    // DDL paths (addColumn/changeColumn → ColumnDefinition) and dump/SET
-    // DEFAULT paths (live Column) both fire the array branch.
     const isArray = col?.array === true || col?.options?.array === true;
     const rawSqlType = col?.sqlType ?? col?.type ?? null;
     const self = this;
@@ -3551,7 +3361,6 @@ export class PostgreSQLAdapter
     // on first use; warm the memo so the truncation limit is the real server
     // value rather than the synchronous fallback.
     const maxLen = await this.warmMaxIdentifierLength();
-    // After rename the table lives in the old schema; build the correct name for lookup.
     const renamedName = oldSchema
       ? `${this.quoteColumnName(oldSchema)}.${this.quoteColumnName(unqualifiedNew)}`
       : unqualifiedNew;
@@ -3569,7 +3378,6 @@ export class PostgreSQLAdapter
       await this.exec(
         `ALTER INDEX IF EXISTS ${qualifiedOldIdx} RENAME TO ${this.quoteColumnName(newIdx)}`,
       );
-      // Only rename the sequence when the PK has one (SERIAL/BIGSERIAL; not UUID).
       if (seq) {
         const seqSuffix = `_${pk}_seq`;
         const maxSeqPrefix = maxLen - seqSuffix.length;
@@ -3693,10 +3501,6 @@ export class PostgreSQLAdapter
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
 
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
   /**
    * Mirrors: PostgreSQL::Quoting#quote_table_name_for_assignment
    * (`postgresql/quoting.rb:136`) — PG ignores the table and quotes
@@ -3782,25 +3586,25 @@ export class PostgreSQLAdapter
       const code = (e as { code?: string }).code;
       const msg = e.message;
       switch (code) {
-        case "23505": // unique_violation
+        case "23505":
           return new RecordNotUnique(msg, { sql, binds, connectionPool: this.pool });
-        case "23503": // foreign_key_violation
+        case "23503":
           return new InvalidForeignKey(msg, { sql, binds, connectionPool: this.pool });
-        case "23502": // not_null_violation
+        case "23502":
           return new NotNullViolation(msg, { sql, binds, connectionPool: this.pool });
-        case "22001": // string_data_right_truncation
+        case "22001":
           return new ValueTooLong(msg, { sql, binds, connectionPool: this.pool });
-        case "22003": // numeric_value_out_of_range
+        case "22003":
           return new ActiveRecordRangeError(msg, { sql, binds, connectionPool: this.pool });
-        case "40001": // serialization_failure
+        case "40001":
           return new SerializationFailure(msg, { sql, binds, connectionPool: this.pool });
-        case "40P01": // deadlock_detected
+        case "40P01":
           return new Deadlocked(msg, { sql, binds, connectionPool: this.pool });
-        case "42P04": // duplicate_database
+        case "42P04":
           return new DatabaseAlreadyExists(msg, { sql, binds, connectionPool: this.pool });
-        case "55P03": // lock_not_available
+        case "55P03":
           return new LockWaitTimeout(msg, { sql, binds, connectionPool: this.pool });
-        case "57014": // query_canceled
+        case "57014":
           return new QueryCanceled(msg, { sql, binds, connectionPool: this.pool });
         default:
           // A severed connection (08xxx, "Connection terminated", pg's
@@ -3837,12 +3641,6 @@ export class PostgreSQLAdapter
           if (PostgreSQLAdapter._isConnectionError(e)) {
             return new ConnectionFailed(e, { connectionPool: this.pool });
           }
-          // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
-          // 5-char shape alone isn't enough — Node system errors like
-          // `EPIPE` / `EBADF` also match it, so gating on
-          // instanceof pg.DatabaseError avoids re-tagging socket /
-          // network failures as StatementInvalid with misleading
-          // sql/binds attached.
           if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
             return new StatementInvalid(msg, { sql, binds, connectionPool: this.pool });
           }
@@ -3973,8 +3771,6 @@ export class PostgreSQLAdapter
         string | null,
       ];
     const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
-    // The literal stays a raw String: deserialization is deferred to
-    // Attribute.from_database so *_before_type_cast reads back the raw default.
     const defaultValue = this.extractValueFromDefault(default_);
 
     let defaultFunction: string | null;
@@ -4127,10 +3923,8 @@ export class PostgreSQLAdapter
       return quoted[1].replace(/''/g, "'");
     }
     if (defaultExpr === "true" || defaultExpr === "false") return defaultExpr;
-    // Numeric: optional parens, optional ::bigint cast
     const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
     if (num) return num[1];
-    // Object identifier (bare integer)
     if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
     // Deviation from Rails, which only allows an optional `::bigint` suffix on
     // the numeric branch above and therefore reflects these as *function*
@@ -4189,8 +3983,6 @@ export class PostgreSQLAdapter
    * @internal
    */
   isRetryableQueryError(exception: unknown): boolean {
-    // We cannot retry anything if we're inside a broken transaction; we need to at
-    // least raise until the innermost savepoint is rolled back
     return this.transactionStatus !== PQTRANS_INERROR && super.isRetryableQueryError(exception);
   }
 
@@ -4287,17 +4079,6 @@ export class PostgreSQLAdapter
     const variables = fetch<SessionVariables>(this._config, "variables", {});
     if (variables["timezone"]) return;
     const tz = ActiveRecord.defaultTimezone;
-    // Off the withRawConnection loop. This runs as the first step of
-    // `_performQuery` (the adapter's one perform_query), which is itself the block
-    // executing inside withRawConnection on the same async chain. Re-entering
-    // withRawConnection would NOT deadlock — the adapter's `lock.synchronize` is
-    // reentrant per async chain (the ported MonitorMixin: getStore() === data.owner
-    // passes straight through). It is bypassed because this SET SESSION is a
-    // sub-step of an already-in-flight query on the already-acquired live
-    // handle: re-entering the leaf loop would redundantly re-run its verify /
-    // materialize / dirtyCurrentTransaction bookkeeping for a session variable.
-    // Acquire the raw client directly via _acquireFreshClient(); tear down on a dead
-    // socket so the next caller gets a fresh connection.
     const client = await this._acquireFreshClient();
     try {
       if (tz === "utc") {
@@ -4329,9 +4110,7 @@ export class PostgreSQLAdapter
    * types (Integer, Boolean). Mirrors: PostgreSQLAdapter#add_pg_encoders
    * @internal
    */
-  addPgEncoders(): void {
-    // node-pg handles parameter encoding natively; no extra type map needed.
-  }
+  addPgEncoders(): void {}
 
   /**
    * Update the timestamp decoder after default_timezone changes.
@@ -4356,9 +4135,7 @@ export class PostgreSQLAdapter
    * registered at pool construction. Mirrors: PostgreSQLAdapter#add_pg_decoders
    * @internal
    */
-  addPgDecoders(): void {
-    // node-pg decodes results via getTypeParser registered in the constructor.
-  }
+  addPgDecoders(): void {}
 
   /**
    * Build a type-coder descriptor from a pg_type row and a coder class name.
@@ -4800,10 +4577,6 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
     this._deallocating = this._deallocating
       .then(() => {
-        // Keeps `_commandSettled`'s invariant across the eviction DEALLOCATE,
-        // guarded on the client still being the pinned one: a DEALLOCATE
-        // outliving a reconnect would strand the flag false, since the
-        // ReadyForQuery listener that re-arms it is attached per `pg.Client`.
         if (this._connection._rawConnection === client) this._connection._commandSettled = false;
         return client.query(deallocSql);
       })
