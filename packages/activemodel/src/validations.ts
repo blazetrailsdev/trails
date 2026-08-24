@@ -12,12 +12,9 @@ import { Errors } from "./errors.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
+import { freeze as attributesFreeze, type AttributeInstanceHost } from "./attributes.js";
 
-import {
-  humanAttributeName,
-  lookupAncestors,
-  raiseOnMissingTranslations as translationRaise,
-} from "./translation.js";
+import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackFn, CallbackConditions } from "./callbacks.js";
@@ -122,16 +119,12 @@ export class Validations {
   /**
    * Rails' `included do` block (validations.rb:40-50). The `extend`s at :41-43
    * install what their modules already export: `define_model_callbacks`
-   * (callbacks.rb:72) and Translation's `human_attribute_name` /
-   * `lookup_ancestors` (translation.rb:44, :58). `model_name` (naming.rb:270)
-   * and `i18n_scope` (translation.rb:28) are still `Model` class bodies, so
-   * there is nothing to extend from yet; relocating those two is the
-   * `fan-out-model-serialization-conversion-access-naming-surface` story, whose
-   * member table owns them.
+   * (callbacks.rb:72) and the whole of Translation — `human_attribute_name`,
+   * `lookup_ancestors` and `i18n_scope` (translation.rb:20, :27, :44).
    */
   static [included](base: IncludingClass): void {
     extend(base, Callbacks);
-    extend(base, { humanAttributeName, lookupAncestors });
+    extend(base, Translation);
     extend(base, HelperMethods);
     include(base, HelperMethods);
     defineCallbacks(base.prototype, "validate", { scope: ["name"] });
@@ -542,6 +535,26 @@ export async function runValidationsBang(this: RunValidationsHost): Promise<bool
   return this.errors.empty;
 }
 
+/** Host shape the {@link freeze} link reads through. */
+interface ValidationsFreezeHost {
+  readonly errors: unknown;
+  /** @internal */
+  contextForValidation(): unknown;
+}
+
+/**
+ * Throw `ValidationError` for the current model. Mirrors Rails
+ * `def raise_validation_error; raise(ValidationError.new(self)); end`
+ * (activemodel/lib/active_model/validations.rb:478-480).
+ *
+ * @internal Rails-private helper.
+ */
+export function raiseValidationError<TBase extends object = object>(this: {
+  errors: Errors<TBase>;
+}): never {
+  throw new ValidationError(this);
+}
+
 /**
  * Mirrors Rails `VALID_OPTIONS_FOR_VALIDATE` (validations.rb:92). The keys carry
  * their trails camelCase spelling (`exceptOn` for `:except_on`) — what a caller
@@ -557,16 +570,33 @@ export interface ValidationsContextHost {
 }
 
 /**
- * Throw `ValidationError` for the current model. Mirrors Rails
- * `def raise_validation_error; raise(ValidationError.new(self)); end`
- * (activemodel/lib/active_model/validations.rb:478-480).
+ * Mirrors Rails `ActiveModel::Validations#freeze` (validations.rb:372-377):
  *
- * @internal Rails-private helper.
+ *   def freeze
+ *     errors
+ *     context_for_validation
+ *     super
+ *   end
+ *
+ * Rails pre-touches `@errors` and `@context_for_validation` so frozen models
+ * can still answer `#errors` and `#validation_context` without tripping their
+ * `||=` lazy-init. Trails mirrors that by reading `errors` and calling
+ * `contextForValidation()` to populate its cached `ValidationContext`. The
+ * `validationContext` getter alone is not enough — it doesn't write to
+ * `_contextForValidation`, so a subsequent `contextForValidation()` call on the
+ * frozen instance would throw on the cache assignment.
+ *
+ * `super` reaches `Attributes#freeze` (attributes.rb:150-153) and then Ruby's
+ * `Object#freeze`; TS has no `super` across mixins, so this link runs both, the
+ * way `attributes.freeze` already documents.
  */
-export function raiseValidationError<TBase extends object = object>(this: {
-  errors: Errors<TBase>;
-}): never {
-  throw new ValidationError(this);
+export function freeze<T extends ValidationsFreezeHost>(this: T): T {
+  void this.errors;
+  void this.contextForValidation();
+  // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
+  attributesFreeze.call(this as unknown as AttributeInstanceHost);
+  Object.freeze(this);
+  return this;
 }
 
 /**

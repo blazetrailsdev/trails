@@ -38,7 +38,7 @@ export function attributeNames(this: { attributeTypes(): Record<string, Type> })
   return Object.keys(this.attributeTypes());
 }
 
-type AttributeInstanceHost = { _attributes: AttributeSet };
+export type AttributeInstanceHost = { _attributes: AttributeSet };
 
 /**
  * Mirrors: ActiveModel::Attributes#_write_attribute (attributes.rb:156-158) —

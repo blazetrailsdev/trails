@@ -138,8 +138,23 @@ export function serializableHash(
  *
  * Mirrors: ActiveModel::Serialization
  */
-export interface Serialization {
-  serializableHash(options?: SerializeOptions): Record<string, unknown>;
+export class Serialization {
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_hash (serialization.rb:38-58)
+   */
+  serializableHash(options?: SerializeOptions): Record<string, unknown> {
+    return serializableHash(this as unknown as SerializationRecord, options);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization
+   * (serialization.rb:191 `alias :read_attribute_for_serialization :send`).
+   * Public, overridable hook; dispatches the named reader, falling back to the
+   * attribute store.
+   */
+  readAttributeForSerialization(key: string): unknown {
+    return readAttributeForSerialization(this as unknown as SerializationRecord, key);
+  }
 }
 
 /**
