@@ -567,9 +567,8 @@ export class Model {
     this._initializingAttributes = true;
     try {
       if (!isMassAssignmentEmpty(attrs)) {
-        // ActiveRecord's `_assign_attributes` override can owe I/O, and Rails'
-        // `initialize` does not await it either — the record is built, the
-        // deferred writes drain on save (RFC 0087).
+        // AR's override can owe I/O; Rails' `initialize` does not await it
+        // either — the deferred writes drain on save (RFC 0087).
         void this._assignAttributes(this.sanitizeForMassAssignment(attrs));
       }
     } finally {
