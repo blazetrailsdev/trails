@@ -10,7 +10,8 @@ import { Model } from "../index.js";
 // must expose a per-key reader for every attribute name (`attr_accessor`
 // parity) — the `attributes` hash only names the keys, it is not a value
 // fallback. These test models therefore define per-key getters alongside the
-// `attributes` accessor.
+// `attributes` reader, and the `attributes=` alias `from_json` writes through
+// (json.rb:147) as `setAttributes` (attribute_assignment.rb:36).
 describe("Serializers::JSON host", () => {
   class Person extends JSONHost {
     static {
@@ -33,6 +34,12 @@ describe("Serializers::JSON host", () => {
     }
     _name = "";
     _age = 0;
+    // json.rb's own docstring host declares `def attributes=(hash)`; trails
+    // spells that alias `setAttributes` (attribute_assignment.rb:36).
+    setAttributes(h: { name: string; age: number }) {
+      this._name = h.name;
+      this._age = h.age;
+    }
     get name() {
       return this._name;
     }
@@ -101,6 +108,9 @@ describe("Serializers::JSON host", () => {
         this._x = h.x;
       }
       _x = 0;
+      setAttributes(h: { x: number }) {
+        this._x = h.x;
+      }
       get x() {
         return this._x;
       }
@@ -142,6 +152,9 @@ describe("Serializers::JSON host", () => {
         this._id = h.id;
       }
       _id = 0n;
+      setAttributes(h: { id: bigint }) {
+        this._id = h.id;
+      }
       get id() {
         return this._id;
       }
@@ -172,6 +185,9 @@ describe("Serializers::JSON host", () => {
         this._name = h.name;
       }
       _name = "";
+      setAttributes(h: { name: string }) {
+        this._name = h.name;
+      }
       get name() {
         return this._name;
       }
@@ -212,6 +228,9 @@ describe("Serializers::JSON host", () => {
         this._v = h.v;
       }
       _v = 0;
+      setAttributes(h: { v: number }) {
+        this._v = h.v;
+      }
       get v() {
         return this._v;
       }
@@ -241,6 +260,9 @@ describe("Serializers::JSON host", () => {
         this._v = h.v;
       }
       _v = 0;
+      setAttributes(h: { v: number }) {
+        this._v = h.v;
+      }
       get v() {
         return this._v;
       }
@@ -278,8 +300,8 @@ describe("Serializers::JSON host", () => {
   });
 
   it("Model already implements the same surface ergonomically", () => {
-    // Sanity: the JSON host is the canonical mixin form; Model continues
-    // to compose asJson/fromJson directly (model.ts already mirrors json.rb).
+    // Sanity: `Model` gets this surface from `include(Model, JSON)`, the
+    // direct port of `include ActiveModel::Serializers::JSON`.
     expect(typeof Model.prototype.asJson).toBe("function");
   });
 });

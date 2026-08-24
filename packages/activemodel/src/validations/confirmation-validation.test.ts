@@ -78,7 +78,7 @@ describe("ConfirmationValidationTest", () => {
       }
     }
     const p = new Person({ title: "Hello" });
-    p._attributes.set("titleConfirmation", "hello");
+    (p as any).titleConfirmation = "hello";
     expect(await p.isValid()).toBe(false);
   });
 
@@ -90,7 +90,7 @@ describe("ConfirmationValidationTest", () => {
       }
     }
     const p = new Person({ title: "Hello" });
-    p._attributes.set("titleConfirmation", "hello");
+    (p as any).titleConfirmation = "hello";
     expect(await p.isValid()).toBe(true);
   });
 
@@ -111,7 +111,7 @@ describe("ConfirmationValidationTest", () => {
       }
     }
     const p = new Person({ title: "We the People" });
-    p._attributes.set("titleConfirmation", "We the Robots");
+    (p as any).titleConfirmation = "We the Robots";
     expect(await p.isValid()).toBe(false);
     expect(p.errors.messagesFor("titleConfirmation")[0]).toBe("doesn't match Custom Title");
     resetI18n();
@@ -154,7 +154,7 @@ describe("ConfirmationValidator caseSensitive", () => {
       }
     }
     const u = new User({ title: "Alice" });
-    u._attributes.set("titleConfirmation", "alice");
+    (u as any).titleConfirmation = "alice";
     expect(await u.isValid()).toBe(false);
   });
 
@@ -166,7 +166,7 @@ describe("ConfirmationValidator caseSensitive", () => {
       }
     }
     const u = new User({ title: "Alice" });
-    u._attributes.set("titleConfirmation", "alice");
+    (u as any).titleConfirmation = "alice";
     expect(await u.isValid()).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe("ConfirmationValidator caseSensitive", () => {
       }
     }
     const u = new User({ title: "alice" });
-    u._attributes.set("titleConfirmation", "bob");
+    (u as any).titleConfirmation = "bob";
     expect(await u.isValid()).toBe(false);
   });
 });
@@ -194,7 +194,7 @@ describe("confirmation options pass-through", () => {
       }
     }
     const u = new User({ title: "alice" });
-    u._attributes.set("titleConfirmation", "bob");
+    (u as any).titleConfirmation = "bob";
     await u.isValid();
     expect(u.errors.messagesFor("titleConfirmation")).toContain("must match original");
   });
@@ -207,7 +207,7 @@ describe("confirmation options pass-through", () => {
       }
     }
     const u = new User({ title: "alice" });
-    u._attributes.set("titleConfirmation", "bob");
+    (u as any).titleConfirmation = "bob";
     await u.isValid();
     expect(u.errors.count).toBeGreaterThan(0);
     expect(

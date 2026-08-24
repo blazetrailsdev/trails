@@ -255,7 +255,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ title: "A" });
-    p._attributes.set("titleConfirmation", "B");
+    (p as any).titleConfirmation = "B";
     expect(await p.isValid()).toBe(false);
     expect(p.errors.messagesFor("titleConfirmation")[0]).toMatch(/doesn't match/);
   });

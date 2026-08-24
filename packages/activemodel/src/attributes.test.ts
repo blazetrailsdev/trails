@@ -35,7 +35,7 @@ describe("AttributesTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m._readAttribute("nonexistent")).toBeNull();
+    expect(m.attribute("nonexistent")).toBeNull();
   });
 
   it("attributes with proc defaults can be marshalled", () => {

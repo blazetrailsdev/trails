@@ -126,7 +126,17 @@ export interface Model extends Dirty, Access, Conversion, Serialization, Naming,
   isRespondToWithoutAttributes(method: string): boolean;
   respondTo(method: string, includePrivateMethods?: boolean): boolean;
   /** @internal */
-  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
+  _readAttribute(attr: string): unknown;
+
+  /**
+   * The private instance reader `ActiveModel::Attributes` defines
+   * (attributes.rb:161-163), which the generated bare-pattern reader
+   * dispatches to (attribute_methods.rb:333-346). Installed by the
+   * `include(Model, Attributes)` at the bottom of this file.
+   *
+   * @internal
+   */
+  attribute(attrName: string): unknown;
 
   /**
    * The instance half of Ruby `include ActiveModel::Attributes` (api.rb:15) —

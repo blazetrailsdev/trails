@@ -182,7 +182,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p._readAttribute("unknown")).toBe(null);
+    expect(p.attribute("unknown")).toBe(null);
   });
 
   it("fetch_value returns nil for unknown attributes when types has a default", () => {
@@ -192,7 +192,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p._readAttribute("missing")).toBe(null);
+    expect(p.attribute("missing")).toBe(null);
   });
 
   it("fetch_value uses the given block for uninitialized attributes", () => {

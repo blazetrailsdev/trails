@@ -8,15 +8,12 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = true;
-    try {
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJSON());
-      expect(json["person"]).toBeDefined();
-      expect(json["person"]["name"]).toBe("Alice");
-    } finally {
-      Person.includeRootInJson = false;
-    }
+    // Rails: `@contact.to_json(root: true)` — the `:root` option overrides the
+    // `include_root_in_json` default (json.rb:97-101).
+    const p = new Person({ name: "Alice" });
+    const json = JSON.parse(p.toJSON({ root: true }));
+    expect(json["person"]).toBeDefined();
+    expect(json["person"]["name"]).toBe("Alice");
   });
 
   it("should include custom root in JSON", () => {
@@ -25,15 +22,11 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = "human";
-    try {
-      const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJSON());
-      expect(json["human"]).toBeDefined();
-      expect(json["human"]["name"]).toBe("Alice");
-    } finally {
-      Person.includeRootInJson = false;
-    }
+    // Rails: `@contact.to_json(root: "json_contact")` (json.rb:97-107).
+    const p = new Person({ name: "Alice" });
+    const json = JSON.parse(p.toJSON({ root: "human" }));
+    expect(json["human"]).toBeDefined();
+    expect(json["human"]["name"]).toBe("Alice");
   });
 
   it("methods are called on object", () => {
@@ -69,11 +62,10 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
-    Person.includeRootInJson = "custom_root";
+    // Rails: `@contact.as_json(root: "connection")` (json.rb:97-107).
     const p = new Person({ name: "Alice" });
-    const json = p.asJson();
+    const json = p.asJson({ root: "custom_root" });
     expect(json["custom_root"]).toBeDefined();
-    Person.includeRootInJson = false;
   });
 
   it("as_json should work with include option paired with only filter", () => {
@@ -286,8 +278,9 @@ describe("JsonSerializationTest", () => {
         this.attribute("name", "string");
       }
     }
+    // Rails: `@contact.to_json(root: false)` (json.rb:97-101).
     const c = new Contact({ name: "Konata" });
-    const json = c.toJSON();
+    const json = c.toJSON({ root: false });
     expect(json).not.toMatch(/"contact":/);
     expect(json).toMatch(/"name":"Konata"/);
   });
@@ -311,15 +304,12 @@ describe("JsonSerializationTest", () => {
         this.attribute("age", "integer");
       }
     }
-    Contact.includeRootInJson = true;
-    try {
-      const c = new Contact({ name: "Konata", age: 16 });
-      const json = c.asJson();
-      expect(json.contact).toBeDefined();
-      expect((json.contact as any).name).toBe("Konata");
-    } finally {
-      Contact.includeRootInJson = false;
-    }
+    // Rails: `@contact.as_json(root: true)` — `root == true` resolves to
+    // `model_name.element` (json.rb:102-104).
+    const c = new Contact({ name: "Konata", age: 16 });
+    const json = c.asJson({ root: true });
+    expect(json.contact).toBeDefined();
+    expect((json.contact as any).name).toBe("Konata");
   });
 
   it("as_json should work with methods options", () => {

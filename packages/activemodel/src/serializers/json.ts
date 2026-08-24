@@ -146,14 +146,7 @@ export class JSON {
         );
       }
     }
-    // json.rb:147 — `self.attributes = hash`. `attributes=` is
-    // `alias attributes= assign_attributes` on any AttributeAssignment host
-    // (attribute_assignment.rb:36), and trails spells that alias
-    // `setAttributes` because the write path can owe I/O; Rails' `from_json`
-    // does not await it either.
-    void (this as unknown as { setAttributes(h: Record<string, unknown>): unknown }).setAttributes(
-      hash,
-    );
+    void this.setAttributes(hash);
     return this;
   }
 
@@ -234,6 +227,16 @@ export class JSON {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface JSON {
+  /**
+   * `alias attributes= assign_attributes` (attribute_assignment.rb:36) — the
+   * write half `from_json` uses (json.rb:147), which a host declares just as
+   * json.rb's own docstring host declares `def attributes=(hash)`. A TS `set`
+   * accessor cannot be awaited and the aliased path can owe I/O, so trails
+   * keeps the Rails name in a `setX()` method (CLAUDE.md § "Fidelity is the
+   * job").
+   */
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }

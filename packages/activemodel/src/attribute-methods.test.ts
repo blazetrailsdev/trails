@@ -201,7 +201,7 @@ describe("AttributeMethodsTest", () => {
   it("method missing works correctly even if attributes method is not defined", () => {
     class Bare extends Model {}
     const b = new Bare();
-    expect(b._readAttribute("nonexistent")).toBe(null);
+    expect(b.attribute("nonexistent")).toBe(null);
   });
 
   it("unrelated classes should not share attribute method matchers", () => {
@@ -404,7 +404,7 @@ describe("attributeMissing", () => {
     User.attribute("name", "string");
 
     const u = new User({ name: "Alice" });
-    expect(u._readAttribute("nonexistent")).toBeNull();
+    expect(u.attribute("nonexistent")).toBeNull();
   });
 
   it("can be overridden to provide custom behavior", () => {

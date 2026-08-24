@@ -33,9 +33,11 @@ export class ConfirmationValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
-    const confirmed =
-      (rec._readAttribute as ((a: string) => unknown) | undefined)?.(confirmationAttr) ??
-      rec[confirmationAttr];
+    // `record.public_send("#{attribute}_confirmation")` (confirmation.rb:12) —
+    // the reader `setup!` installs is a zero-arg Ruby method, so trails'
+    // `public_send` of it is a property read (CLAUDE.md § "Generated attribute
+    // readers are properties").
+    const confirmed = rec[confirmationAttr];
     if (confirmed == null) return;
     if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
       const modelClass = rec.constructor as
@@ -65,10 +67,9 @@ interface ConfirmationHost {
  *
  * Defines virtual `${attribute}Confirmation` reader/writer accessors on
  * the host class so the comparison side of the pair is reachable. In
- * trails the validator already falls back to `record[confirmationAttr]`
- * via the existing direct property access path; this helper materializes
- * matching prototype accessors when a host class explicitly opts in,
- * keeping a per-instance backing slot under `_${attr}Confirmation`.
+ * trails, `validate_each` reads the pair through that reader, so this helper
+ * materializes matching prototype accessors on the host class, keeping a
+ * per-instance backing slot under `_${attr}Confirmation`.
  *
  * @internal Rails-private helper.
  */
