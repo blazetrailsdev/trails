@@ -5,7 +5,7 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { zone, isBlank, include, type Included } from "@blazetrails/activesupport";
+import { TimeWithZone, isBlank, include, type Included } from "@blazetrails/activesupport";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -74,17 +74,19 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * `zoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
    * (`date_and_time/zones.rb:20-27`), which is the zoneless
    * `Temporal.PlainDateTime` this returns in that arm, as the helper does.
-   * `in_time_zone` is the tail below: the components
-   * `cast_value` built are read back out of the `::Time` and re-anchored in
-   * that zone, which is what `Time.zone.parse` of the dummy-dated string
-   * answers.
+   * `super` is the tail below: the mixed-in `TimeValue.userInputInTimeZone`,
+   * which is `Time.zone.parse` for the dummy-dated string. Parsing in the zone
+   * is what preserves an offset the string carries — re-anchoring a cast
+   * instant's wall clock instead reads `"…T19:45:54-08:00"` back as hour 3.
    *
    * The `present?` guard is spelled out rather than routed through
    * `isBlank`: Ruby's `blank?` is `respond_to?(:empty?) ? !!empty? : !self`, so
    * a `::Time` is present, while `isBlank` reads any object with no own
    * enumerable keys as blank — which every Temporal value is.
    */
-  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | Temporal.PlainDateTime | null {
+  userInputInTimeZone(
+    value: unknown,
+  ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | null {
     if (value == null || value === false) return null;
     if (typeof value === "string" && isBlank(value)) return null;
 
@@ -97,8 +99,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
         if (!(error instanceof RubyArgumentError)) throw error;
       }
       if (timeHash == null || timeHash.hour == null) return null;
-    } else if (value instanceof Temporal.ZonedDateTime) {
-      return value;
     } else if (value instanceof Temporal.Instant) {
       value = value
         .toZonedDateTimeISO(this.#zoneId())
@@ -106,12 +106,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
         .toInstant();
     }
 
-    const cast = this.cast(value);
-    if (cast === null) return null;
-    const timeZone = zone();
-    const time = cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime();
-    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo.identifier);
-    return time;
+    return TimeValue.userInputInTimeZone.call(this, value);
   }
 
   /**

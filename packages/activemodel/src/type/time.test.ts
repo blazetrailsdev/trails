@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Types } from "../index.js";
-import { useZone } from "@blazetrails/activesupport";
+import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
 
 /** `::Time.utc(...)`, the value Rails' own assertions are written against. */
 function timeUtc(
@@ -44,6 +44,24 @@ describe("TimeTest", () => {
     expect(type.cast("2023-01-01T00:00:00-03:30")).toEqual(timeUtc(2000, 1, 1, 3, 30, 0));
   });
 
+  it("user input in time zone", () => {
+    useZone("Pacific Time (US & Canada)", () => {
+      const type = new Types.TimeType();
+      expect(type.userInputInTimeZone(null)).toBeNull();
+      expect(type.userInputInTimeZone("")).toBeNull();
+      expect(type.userInputInTimeZone("ABC")).toBeNull();
+      expect(type.userInputInTimeZone(" ".repeat(129))).toBeNull();
+
+      const offset = zone()!.formattedOffset();
+      const timeString = `2015-02-09T19:45:54${offset}`;
+
+      expect((type.userInputInTimeZone(timeString) as TimeWithZone).hour).toEqual(19);
+      expect((type.userInputInTimeZone(timeString) as TimeWithZone).formattedOffset()).toEqual(
+        offset,
+      );
+    });
+  });
+
   it("extracts time from full datetime string", () => {
     expect(type.cast("2015-02-09T19:45:54+00:00")).toEqual(timeUtc(2000, 1, 1, 19, 45, 54));
   });
@@ -83,33 +101,6 @@ describe("TimeTest", () => {
   it("PlainDateTime input extracts time (multiparameter support)", () => {
     const pdt = Temporal.PlainDateTime.from("2024-06-15T14:23:55");
     expect(type.cast(pdt)).toEqual(timeUtc(2024, 6, 15, 14, 23, 55));
-  });
-
-  it("user input in time zone wraps plain time in Time.zone", () => {
-    useZone("Eastern Time (US & Canada)", () => {
-      const result = type.userInputInTimeZone("14:30:00");
-      expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
-      expect((result as Temporal.ZonedDateTime).hour).toBe(14);
-      expect((result as Temporal.ZonedDateTime).timeZoneId).toBe("America/New_York");
-    });
-  });
-
-  it("user input in time zone answers a zoneless value when Time.zone is unset", () => {
-    const result = type.userInputInTimeZone("14:30:00");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    expect((result as Temporal.PlainDateTime).hour).toBe(14);
-  });
-
-  it("user input in time zone returns null for null", () => {
-    expect(type.userInputInTimeZone(null)).toBe(null);
-    expect(type.userInputInTimeZone("")).toBe(null);
-    expect(type.userInputInTimeZone("ABC")).toBe(null);
-    expect(type.userInputInTimeZone(" ".repeat(129))).toBe(null);
-  });
-
-  it("user input in time zone passthrough for ZonedDateTime", () => {
-    const zdt = Temporal.ZonedDateTime.from("2024-01-15T14:30:00[America/New_York]");
-    expect(type.userInputInTimeZone(zdt)).toBe(zdt);
   });
 
   it("cast 3pm returns 15:00", () => {
