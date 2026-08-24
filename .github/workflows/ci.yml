@@ -1487,14 +1487,15 @@ jobs:
         # seed PR lands — see the UNSEEDED arm in lint-call-args.ts.
         run: pnpm exec tsx scripts/api-compare/lint-call-args.ts
       - name: Extra-surface ratchet
-        # RFC 0117. Gates arel's extra-surface counts (public TS names in a
-        # Rails-matched file with no Ruby counterpart) against the committed
-        # marks in scripts/api-compare/extra-surface-mark.json. Only-shrink:
-        # fails on any increase in `novel` or `total`, reports a mark left
-        # above the current measurement, and never raises one. Converged
-        # surface? Narrow the mark with `pnpm parity:api:extra:tighten` — there
-        # is no reseed. Scoped to arel deliberately; widening it to
-        # activemodel/activerecord is a separate decision with its own burndown.
+        # RFC 0117. Gates arel's and activerecord's extra-surface counts (public
+        # TS names in a Rails-matched file with no Ruby counterpart) against the
+        # committed marks in scripts/api-compare/extra-surface-mark.json.
+        # Only-shrink: fails on any increase in `novel` or `total`, reports a
+        # mark left above the current measurement, and never raises one.
+        # Converged surface? Narrow the mark with `pnpm parity:api:extra:tighten`
+        # — there is no reseed. activerecord joined under RFC 0119 with the
+        # connection-adapter burndown behind it; activemodel stays ungated until
+        # it has one.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Ratchet baseline reseed drift
         # RFC 0083. The ratchet above only READS the committed baseline, so a

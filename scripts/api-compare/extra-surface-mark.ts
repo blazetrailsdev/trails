@@ -19,9 +19,18 @@
  * inside a flat total without the gate noticing, which is the opposite of what
  * a ratchet is for.
  *
- * Scope is deliberately arel-only (RFC 0117). activemodel and activerecord
- * carry a far larger population and gating them is a separate decision with its
- * own burndown behind it — widening GATED_PACKAGES is not a mechanical step.
+ * Scope was arel-only at RFC 0117. activerecord joined it under RFC 0119
+ * (connection-adapter fidelity): its adapter tree carries 100+ cited, verified
+ * divergences that no gate could see, because the call-set ratchet only detects
+ * a Rails call the TS body OMITS — it is blind to an invented extra branch, a
+ * JS-shaped public API, or an async/sync shape divergence, which is what most
+ * of that population is. Gating the package freezes the surface those stories
+ * burn down. The mark is seeded at the measured 399 novel / 1424 total: a
+ * high-water mark to shrink, NOT a budget to spend.
+ *
+ * activemodel remains ungated. The same reasoning would apply, but it has no
+ * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
+ * the not-mechanical step this comment has always warned about.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception), async fs only, no third-party runtime deps.
@@ -38,7 +47,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * The packages this gate covers. Everything else is measured by
  * `parity:api:extra` and left ungated — see the module comment.
  */
-export const GATED_PACKAGES = ["arel"] as const;
+export const GATED_PACKAGES = ["arel", "activerecord"] as const;
 
 export interface SurfaceMark {
   /**
@@ -127,6 +136,17 @@ export function staleMarks(marks: SurfaceMarks, current: SurfaceMarks): MarkViol
  */
 export function unmeasuredPackages(current: SurfaceMarks): string[] {
   return GATED_PACKAGES.filter((name) => current[name] === undefined);
+}
+
+/**
+ * A package the gate covers but the mark file never committed. {@link exceedances},
+ * {@link staleMarks} and {@link tightened} all skip a package with no mark, so
+ * adding a name to {@link GATED_PACKAGES} without seeding its numbers disarms
+ * the gate for that package instead of half-enabling it. The mark-side twin of
+ * {@link unmeasuredPackages}.
+ */
+export function unmarkedPackages(marks: SurfaceMarks): string[] {
+  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
 }
 
 export async function loadMarks(): Promise<SurfaceMarks> {

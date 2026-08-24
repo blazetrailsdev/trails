@@ -1,4 +1,8 @@
 {
+  "activerecord": {
+    "novel": 399,
+    "total": 1424
+  },
   "arel": {
     "novel": 0,
     "total": 63

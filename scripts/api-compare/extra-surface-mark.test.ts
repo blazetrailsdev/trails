@@ -5,6 +5,7 @@ import {
   measure,
   staleMarks,
   tightened,
+  unmarkedPackages,
   unmeasuredPackages,
   type SurfaceMarks,
 } from "./extra-surface-mark.js";
@@ -15,9 +16,39 @@ describe("extra-surface mark", () => {
   it("measures only the gated packages", () => {
     const measured = measure([
       { package: "arel", totalNovel: 0, totalExtras: 63 },
-      { package: "activerecord", totalNovel: 394, totalExtras: 1424 },
+      { package: "activerecord", totalNovel: 399, totalExtras: 1424 },
+      { package: "activemodel", totalNovel: 12, totalExtras: 34 },
     ]);
-    expect(measured).toEqual({ arel: { novel: 0, total: 63 } });
+    expect(measured).toEqual({
+      arel: { novel: 0, total: 63 },
+      activerecord: { novel: 399, total: 1424 },
+    });
+  });
+
+  it("names a gated package the mark file never seeded", () => {
+    expect(unmarkedPackages({ arel: { novel: 0, total: 63 } })).toEqual(["activerecord"]);
+    expect(unmarkedPackages({})).toEqual([...GATED_PACKAGES]);
+    expect(
+      unmarkedPackages({
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 399, total: 1424 },
+      }),
+    ).toEqual([]);
+  });
+
+  it("skips a package with no mark rather than gating it, which is why the seed is checked", () => {
+    expect(
+      exceedances(marks, {
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 9999, total: 9999 },
+      }),
+    ).toEqual([]);
+    expect(
+      staleMarks(marks, {
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 1, total: 1 },
+      }),
+    ).toEqual([]);
   });
 
   it("passes when both dimensions hold at the mark", () => {
