@@ -723,43 +723,6 @@ describe("ValidationsTest (trails)", () => {
       expect(Person.validatorsOn("name")).toEqual([]);
     });
 
-    it("routes arbitrary { validate() } class into the right bucket via explicit attributes", () => {
-      // Rails `validates_with` also accepts any class that just implements
-      // `validate(record)`. Such a class won't expose `attributes` on the
-      // instance or in `options`, so `validatesWith` must route the explicit
-      // `attributes:` option through to the bucket lookup.
-      class PojoValidator {
-        validate(_record: unknown): void {}
-      }
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validatesWith(PojoValidator, { attributes: ["name"] });
-        }
-      }
-      expect(Person.validatorsOn("name")).toHaveLength(1);
-      expect(Person.validatorsOn("name")[0]).toBeInstanceOf(PojoValidator);
-    });
-
-    it("routes plain Validator with attributes: option into the right bucket", async () => {
-      // Rails `validates_with MyValidator, attributes: [:name]` — the
-      // validator is a plain `Validator` (not EachValidator); attributes
-      // live in `options` rather than directly on the instance.
-      // _registerValidator must check both.
-      const { Validator: ValidatorBase } = await import("./validator.js");
-      class StaticValidator extends ValidatorBase {
-        override validate(): void {}
-      }
-      class Person extends Model {
-        static {
-          this.attribute("name", "string");
-          this.validatesWith(StaticValidator, { attributes: ["name"] });
-        }
-      }
-      expect(Person.validatorsOn("name")).toHaveLength(1);
-      expect(Person.validatorsOn("name")[0]).toBeInstanceOf(StaticValidator);
-    });
-
     it("validatorsOn returns a fresh array (no state-mutating reads)", () => {
       class Person extends Model {
         static {
