@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { delegate } from "../module-ext.js";
+import { registerConstant, unregisterConstant } from "../inflector.js";
 
 describe("ModuleTest", () => {
   it("delegation to index get method", () => {
@@ -115,9 +116,20 @@ describe("ModuleTest", () => {
   });
 
   it("module nesting is empty", () => {
-    class Foo {}
-    expect(Foo.name).toBe("Foo");
-    expect(Foo.name.includes("::")).toBe(false);
+    class Json {
+      static parse(source: string) {
+        return JSON.parse(source);
+      }
+    }
+    registerConstant("Admin::Json", Json);
+    try {
+      class C {}
+      delegate(C, "parse", { to: Json });
+      const c = C as typeof C & { parse(source: string): unknown };
+      expect(c.parse("[1]")).toEqual([1]);
+    } finally {
+      unregisterConstant("Admin::Json", Json);
+    }
   });
 
   it("delegation to methods", () => {
@@ -620,12 +632,19 @@ describe("ModuleTest", () => {
   });
 
   it("delegation unreacheable module", () => {
-    class Container {
-      val: undefined = undefined;
-    }
-    delegate(Container.prototype, "something", { to: "val" });
-    const c = new Container() as Container & { something(): unknown };
-    expect(() => c.something()).toThrow();
+    const anonymousClass = [class {}][0];
+
+    expect(() => {
+      class C {}
+      delegate(C.prototype, "something", { to: anonymousClass });
+    }).toThrow(/Can't delegate to anonymous class or module/);
+
+    Object.defineProperty(anonymousClass, "name", { value: "FakeName" });
+
+    expect(() => {
+      class C {}
+      delegate(C.prototype, "something", { to: anonymousClass });
+    }).toThrow(/Can't delegate to detached class or module: FakeName/);
   });
 
   it("delegation arity to module", () => {
