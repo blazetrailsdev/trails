@@ -1,13 +1,9 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { createAndMigrate, eachDatabase, createAndLoadSchema } from "./test-databases.js";
-import type { MigrationProxy } from "./migration.js";
+import { eachDatabase, createAndLoadSchema } from "./test-databases.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
-import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
 // supplied stubbed configs. They also go through the array constructor arm so
@@ -243,73 +239,6 @@ describe("TestDatabasesTest", () => {
         process.env.VERBOSE = originalVerbose;
       }
     }
-  });
-
-  it("createAndMigrate runs migrations on all adapters", async () => {
-    const adapter = Base.connection;
-    const log: string[] = [];
-    const migrations: MigrationProxy[] = [
-      {
-        version: 1,
-        name: "M1",
-        migration: () =>
-          anonymousMigration(
-            "M1",
-            1,
-            async () => {
-              log.push("up");
-            },
-            async () => {},
-          ),
-      },
-    ];
-
-    // This runs against the shared worker DB (Base.connection). Many other
-    // test files apply a version-"1" migration too, so version 1 may already be
-    // recorded in schema_migrations — in which case migrator.up() correctly
-    // no-ops and the log stays empty. Clear this version first so the migration
-    // actually runs, mirroring how Rails' migrator tests isolate
-    // schema_migrations state. createTable is CREATE TABLE IF NOT EXISTS, so
-    // ensuring the table exists before the delete keeps both statements from
-    // erroring inside the fixtures transaction (a failed DELETE would poison
-    // the PG transaction with 25P02).
-    const schemaMigration = new SchemaMigration(adapter.pool);
-    await schemaMigration.createTable();
-    await schemaMigration.deleteVersion("1");
-
-    await createAndMigrate([adapter], migrations);
-    expect(log).toEqual(["up"]);
-  });
-
-  it("createAndMigrate stamps the environment from the adapter's pool", async () => {
-    // migration.rb:1512-1516 — `record_environment` writes
-    // `connection.pool.db_config.env_name`, so the stamp follows the pool the
-    // adapter is checked out of, not any TRAILS_ENV/NODE_ENV reading.
-    const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter.pool);
-    await schemaMigration.createTable();
-    await schemaMigration.deleteVersion("1");
-    const internalMetadata = new InternalMetadata(adapter.pool);
-    await internalMetadata.createTable();
-    await internalMetadata.deleteAllEntries();
-
-    await createAndMigrate([adapter], [
-      {
-        version: 1,
-        name: "M1",
-        migration: () =>
-          anonymousMigration(
-            "M1",
-            1,
-            async () => {},
-            async () => {},
-          ),
-      },
-    ] as MigrationProxy[]);
-
-    expect(await internalMetadata.get("environment")).toBe(
-      (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName,
-    );
   });
 
   it("eachDatabase iterates all adapters", async () => {

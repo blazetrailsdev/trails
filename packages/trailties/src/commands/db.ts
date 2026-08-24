@@ -993,9 +993,11 @@ export function dbCommand(): Command {
 
         // `DatabaseTasks.migrate_status` aborts before reading
         // schema_migrations when the table is not there yet
-        // (`tasks/database_tasks.rb:303-305`).
+        // (`tasks/database_tasks.rb:303-305`) — `Kernel.abort` writes the
+        // message to stderr and exits non-zero.
         if (!(await migrationContext.schemaMigration.tableExists())) {
-          console.log(`${prefix}Schema migrations table does not exist yet.`);
+          console.error(`${prefix}Schema migrations table does not exist yet.`);
+          setExitCode(1);
           return;
         }
 
