@@ -86,7 +86,7 @@ class VfsMigrationContext extends MigrationContext {
   }
 
   override get migrations(): MigrationProxy[] {
-    return this.migrationFiles().flatMap((path) => {
+    const migrations = this.migrationFiles().flatMap((path) => {
       const parsed = this.parseMigrationFilename(path);
       if (!parsed) return [];
       const [rawVersion, name] = parsed;
@@ -110,6 +110,10 @@ class VfsMigrationContext extends MigrationContext {
         },
       ];
     });
+
+    // `migrations.sort_by(&:version)` (`migration.rb:1315`) — lexicographic
+    // path order puts `10_` before `2_`.
+    return migrations.sort((a, b) => Number(a.version) - Number(b.version));
   }
 }
 
