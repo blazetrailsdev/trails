@@ -4,7 +4,15 @@
  */
 
 import { NameError } from "./core-ext/name-error.js";
+import { constantize, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "./method-missing-proxy.js";
+
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
 
 /**
  * Ruby's `NoMethodError`, raised when the delegator calls a method the target
@@ -30,12 +38,28 @@ export class DelegationError extends Error {
 }
 
 export interface DelegateOptions {
-  to: string;
+  /**
+   * A method name, or the trails spelling of a Ruby Module — a class or module
+   * object, whose registered constant name is the receiver (`delegation.rb:36-47`).
+   */
+  to: string | object;
   prefix?: boolean | string;
   allowNil?: boolean;
 }
 
 export namespace Delegation {
+  // prettier-ignore
+  export const RUBY_RESERVED_KEYWORDS = ["__ENCODING__", "__LINE__", "__FILE__", "alias", "and", "BEGIN", "begin", "break",
+    "case", "class", "def", "defined?", "do", "else", "elsif", "END", "end", "ensure", "false", "for", "if", "in", "module", "next", "nil",
+    "not", "or", "redo", "rescue", "retry", "return", "self", "super", "then", "true", "undef", "unless", "until", "when", "while", "yield"];
+  export const RESERVED_METHOD_NAMES: ReadonlySet<string> = new Set([
+    ...RUBY_RESERVED_KEYWORDS,
+    "_",
+    "arg",
+    "args",
+    "block",
+  ]);
+
   /**
    * Mirrors: `ActiveSupport::Delegation.generate`
    * (`activesupport/lib/active_support/delegation.rb:23-158`). Ruby builds the
@@ -51,11 +75,6 @@ export namespace Delegation {
    * answer at all still raises: Rails converts the generated body's
    * `NoMethodError` to a `DelegationError` only when `_` is nil, and otherwise
    * re-raises it (`:132-140`).
-   *
-   * `to:` accepts only a method name. Rails also takes a `Module`, and prefixes
-   * a `RESERVED_METHOD_NAMES` receiver with `self.` (`:36-58`) — neither is
-   * ported; see story `0106-wide-call-set-direct-burndown/
-   * port-delegation-generate-module-and-reserved-receivers`.
    */
   export function generate<T extends object>(
     owner: T,
@@ -65,18 +84,40 @@ export namespace Delegation {
     const { to, prefix, allowNil } = options;
 
     if (!to) {
-      throw new Error(
+      throw new ArgumentError(
         "Delegation needs a target. Supply a keyword argument 'to' (e.g. delegate :hello, to: :greeter).",
       );
     }
 
-    if (prefix === true && /^[^a-z_]/.test(to)) {
-      throw new Error(
+    if (prefix === true && (typeof to !== "string" || /^[^a-z_]/.test(to))) {
+      throw new ArgumentError(
         "Can only automatically set the delegation prefix when delegating to a method.",
       );
     }
 
-    const methodPrefix = prefix ? `${prefix === true ? to : prefix}_` : "";
+    const methodPrefix = prefix ? `${prefix === true ? String(to) : prefix}_` : "";
+
+    let receiver: string;
+    if (typeof to !== "string") {
+      const name = (to as { name?: string }).name;
+      if (name == null || name === "") {
+        throw new ArgumentError(`Can't delegate to anonymous class or module: ${String(to)}`);
+      }
+
+      if (safeConstantize(name) !== to) {
+        throw new ArgumentError(`Can't delegate to detached class or module: ${name}`);
+      }
+
+      receiver = `::${name}`;
+    } else {
+      receiver = to;
+    }
+    if (RESERVED_METHOD_NAMES.has(receiver)) receiver = `self.${receiver}`;
+
+    // The `self.` Ruby prepends is a parser disambiguation for a keyword-named
+    // method; a JS member read is never ambiguous, so the generated body reads
+    // the same member either way.
+    const receiverName = receiver.startsWith("self.") ? receiver.slice("self.".length) : receiver;
 
     const methodNames: string[] = [];
 
@@ -89,10 +130,12 @@ export namespace Delegation {
         enumerable: false,
         writable: true,
         value(...args: unknown[]) {
-          const _ = (this as Record<string, unknown>)[to];
+          const _ = receiver.startsWith("::")
+            ? constantize(receiver)
+            : (this as Record<string, unknown>)[receiverName];
           if (_ == null) {
             if (allowNil) return undefined;
-            throw DelegationError.nilTarget(methodName, to);
+            throw DelegationError.nilTarget(methodName, receiver);
           }
           if (!(method in Object(_))) {
             throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);

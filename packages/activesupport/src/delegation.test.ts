@@ -93,6 +93,15 @@ describe("Delegation.generate", () => {
       Delegation.generate({}, ["greet"], { to: "" });
     }).toThrow("Delegation needs a target");
   });
+
+  it("prefixes a reserved receiver with self.", () => {
+    class Person {
+      args: null = null;
+    }
+    Delegation.generate(Person.prototype, ["greet"], { to: "args" });
+    const p = new Person() as Person & { greet: () => unknown };
+    expect(() => p.greet()).toThrow("greet delegated to self.args, but self.args is nil");
+  });
 });
 
 describe("Delegation.generateMethodMissing", () => {
