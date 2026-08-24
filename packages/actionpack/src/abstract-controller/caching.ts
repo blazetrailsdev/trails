@@ -152,9 +152,9 @@ export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unk
 export function writeFragment(
   this: FragmentsHost,
   key: unknown,
-  content: string,
+  content: unknown,
   options?: CacheOptions,
-): string {
+): unknown {
   return _writeFragment.call(this, key, content, options);
 }
 

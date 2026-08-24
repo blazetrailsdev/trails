@@ -549,6 +549,11 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
  * RFC 0022: writers and inverse-of seeders route through the holder, which is
  * the single source of truth — surfaced to readers via `Base#_associationCache`.
  *
+ * An inverse name with no declared singular reflection is not cached at all:
+ * `@association_cache` holds only `Association` instances built from a
+ * reflection (associations.rb:290-296), and Rails cannot reach that state —
+ * `inverse_of` resolution yields a reflection or nothing.
+ *
  * @internal
  */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
@@ -566,11 +571,6 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     (assoc as unknown as { _explicitTarget: boolean })._explicitTarget = true;
     return;
   }
-  // Rails' `@association_cache` only ever holds `Association` instances built
-  // from a reflection (`associations.rb:290-296`), and `set_inverse_instance`
-  // writes through `inversed_from` on such an instance. An inverse name with
-  // no declared singular reflection has no association to write to, and Rails
-  // cannot reach that state at all, so nothing is cached for it here.
   const existing = record._associationInstances.get(assocName) as
     | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
     | undefined;

@@ -123,9 +123,9 @@ function toStr(content: unknown): string {
 export function writeFragment(
   this: FragmentsHost,
   key: unknown,
-  content: string,
+  content: unknown,
   options?: CacheOptions,
-): string {
+): unknown {
   if (!cacheConfigured(this)) return content;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   instrumentFragmentCache(this, "write_fragment", key, () => {

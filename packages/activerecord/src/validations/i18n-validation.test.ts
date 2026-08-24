@@ -54,9 +54,6 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        // Rails' Topic (test/models/topic.rb:49) declares the association the
-        // validator reads; `@association_cache` only ever holds an
-        // `Association` built from a reflection.
         this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }
@@ -87,9 +84,6 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        // Rails' Topic (test/models/topic.rb:49) declares the association the
-        // validator reads; `@association_cache` only ever holds an
-        // `Association` built from a reflection.
         this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }
@@ -110,9 +104,6 @@ describe("I18nValidationTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        // Rails' Topic (test/models/topic.rb:49) declares the association the
-        // validator reads; `@association_cache` only ever holds an
-        // `Association` built from a reflection.
         this.hasMany("replies", { className: "Reply", dependent: "destroy", inverseOf: "topic" });
         this.validatesAssociated("replies");
       }

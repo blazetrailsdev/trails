@@ -137,18 +137,14 @@ describe("read/write/expire fragment", () => {
   });
 
   it("write_fragment converts the body with to_str and raises for a non-string body", () => {
-    // fragments.rb:85 — `content = content.to_str` inside the instrument block.
     const stringLike = { toStr: () => "converted" };
-    expect(writeFragment.call(host, "n", stringLike as unknown as string)).toBe("converted");
+    expect(writeFragment.call(host, "n", stringLike)).toBe("converted");
     expect(readFragment.call(host, "n")).toBe("converted");
-    expect(() => writeFragment.call(host, "m", 42 as unknown as string)).toThrow(
-      "undefined method 'to_str' for 42",
-    );
+    expect(() => writeFragment.call(host, "m", 42)).toThrow("undefined method 'to_str' for 42");
     expect(readFragment.call(host, "m")).toBeNull();
   });
 
   it("forwards options to exist?, delete and delete_matched", () => {
-    // fragments.rb:110,137,139 — `options` reaches all three store calls.
     const store = HostClass.cacheStore!;
     const exist = vi.spyOn(store, "exist");
     const del = vi.spyOn(store, "delete");
