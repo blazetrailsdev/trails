@@ -11,7 +11,13 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { SchemaCache } from "../connection-adapters/schema-cache.js";
-import { templateSchemaCache } from "../support/schema-cache-dump.js";
+import {
+  dumpedTables,
+  fingerprintOf,
+  schemaShapes,
+  templateSchemaCache,
+  templateSchemaFingerprint,
+} from "../support/schema-cache-dump.js";
 
 interface TxnHost {
   transactionManager: {
@@ -80,18 +86,20 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
 }
 
 /**
- * Load the boot dump into `sc` if the live database still agrees with it, and
- * report whether it was used.
+ * Load the boot dump into `sc` if the live database still matches the schema it
+ * describes, and report whether it was used.
  *
- * The dump describes the template as it was laid, and every worker database is
- * a clone of that template whose canonical tables are rebuilt to their laid
- * shape between files — but a file that drops a table must not make the next
- * file read a schema that is no longer there. So the dump is checked against
- * one `dataSources()` query (the call `add_all` makes first anyway, so it is
- * not an extra round trip): every dumped table must still exist, or the pool
- * reflects from scratch. Tables the live database has and the dump does not —
- * the bespoke table a previous file created — are reflected individually, a
- * handful of `add`s rather than ~200.
+ * The dump describes the template as globalSetup laid it, and every worker
+ * database is a clone of that template — but the between-file reset truncates
+ * the canonical tables rather than re-laying them, so a file that leaves an
+ * `addColumn` / `changeColumn` / `renameColumn` behind changes a canonical
+ * table's shape without changing the table *set*. The guard is therefore the
+ * boot fingerprint over the dumped tables' live shapes
+ * (`support/schema-cache-dump.ts`), which one query answers: any drop, add,
+ * rename or type change to a table the dump describes falls back to reflecting
+ * the database. Tables the live database has and the dump does not — the
+ * bespoke table a file lays in its own `beforeAll` — are reflected
+ * individually, a handful of `add`s rather than ~200.
  */
 async function replaySchemaCacheDump(
   adapter: TransactionalFixturesAdapter,
@@ -99,14 +107,11 @@ async function replaySchemaCacheDump(
   sc: NonNullable<TransactionalFixturesAdapter["internalSchemaCache"]>,
   dumped: SchemaCache,
 ): Promise<boolean> {
-  const marshalled = dumped.marshalDump();
-  const cached = new Set(Object.keys((marshalled[4] as Record<string, boolean>) ?? {}));
-  const live = new Set(await adapter.dataSources());
-  for (const table of cached) {
-    if (!live.has(table)) return false;
-  }
-  sc.marshalLoad(marshalled);
-  for (const table of live) {
+  const cached = dumpedTables(dumped);
+  const shapes = await schemaShapes(adapter);
+  if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
+  sc.marshalLoad(dumped.marshalDump());
+  for (const table of shapes.keys()) {
     if (!cached.has(table)) await sc.add(pool, table);
   }
   return true;

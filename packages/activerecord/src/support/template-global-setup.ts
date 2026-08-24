@@ -23,7 +23,11 @@ import { PoolConfig } from "../connection-adapters/pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
-import { SCHEMA_CACHE_DUMP_ENV, dumpTemplateSchemaCache } from "./schema-cache-dump.js";
+import {
+  SCHEMA_CACHE_DUMP_ENV,
+  SCHEMA_CACHE_FINGERPRINT_ENV,
+  dumpTemplateSchemaCache,
+} from "./schema-cache-dump.js";
 import {
   TEMPLATE_PATH_ENV,
   isSqliteRun,
@@ -104,7 +108,9 @@ async function dumpSchemaCacheOnce(
   runToken: string,
 ): Promise<void> {
   _schemaCacheDump ??= dumpTemplateSchemaCache(adapter, pool, runToken).then((dump) => {
-    if (dump) process.env[SCHEMA_CACHE_DUMP_ENV] = dump;
+    if (!dump) return;
+    process.env[SCHEMA_CACHE_DUMP_ENV] = dump.filename;
+    process.env[SCHEMA_CACHE_FINGERPRINT_ENV] = dump.fingerprint;
   });
   await _schemaCacheDump;
 }
