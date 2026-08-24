@@ -49,7 +49,7 @@ describe("DestroyCommand", () => {
   });
 
   it("destroy migration anchors the filename match", async () => {
-    const migrationsDir = path.join(tmpDir, "db", "migrations");
+    const migrationsDir = path.join(tmpDir, "db", "migrate");
     fs.mkdirSync(migrationsDir, { recursive: true });
     const target = path.join(migrationsDir, "20260101000000_create_posts.ts");
     const decoy = path.join(migrationsDir, "20260202000000_add_create_posts_flag.ts");

@@ -26,7 +26,7 @@ function readModel(name: string): string {
 }
 
 function findMigration(files: string[]): string {
-  const migFile = files.find((f) => f.startsWith("db/migrations/"));
+  const migFile = files.find((f) => f.startsWith("db/migrate/"));
   expect(migFile).toBeDefined();
   return fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
 }
@@ -61,7 +61,7 @@ describe("ModelGeneratorTest", () => {
     const files = gen.run("Account", [], { parent: "Admin::Account" });
     const content = readModel("account");
     expect(content).toContain("class Account extends AdminAccount");
-    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
+    expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
   it.skip("model with database option", () => {
@@ -80,7 +80,7 @@ describe("ModelGeneratorTest", () => {
     const gen = makeGen();
     const files = gen.run("Account", ["name:string"], { migration: false });
     expect(files).toContain("src/app/models/account.ts");
-    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
+    expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
   it.skip("model with parent option database option and no migration option", () => {
@@ -114,7 +114,7 @@ describe("ModelGeneratorTest", () => {
   it("migration", () => {
     const gen = makeGen();
     const files = gen.run("Account", ["name:string", "age:integer"]);
-    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    const migFile = files.find((f) => f.startsWith("db/migrate/"));
     expect(migFile).toBeDefined();
     const content = fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
     expect(content).toContain("class CreateAccounts extends Migration");
@@ -143,7 +143,7 @@ describe("ModelGeneratorTest", () => {
   it("migration is skipped", () => {
     const gen = makeGen();
     const files = gen.run("Account", ["name:string"], { migration: false });
-    expect(files.find((f) => f.startsWith("db/migrations/"))).toBeUndefined();
+    expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
   it("migration with attributes", () => {
@@ -448,7 +448,7 @@ describe("ModelGenerator (JavaScript project)", () => {
   it("generates .js migration file", () => {
     const gen = makeJsGen();
     const files = gen.run("User", ["name:string"]);
-    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    const migFile = files.find((f) => f.startsWith("db/migrate/"));
     expect(migFile).toMatch(/\.js$/);
   });
 

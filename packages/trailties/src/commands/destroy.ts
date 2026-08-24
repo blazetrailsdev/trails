@@ -24,7 +24,7 @@ export function destroyCommand(): Command {
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
       // Find and remove migration
-      const migrationsDir = path.join(cwd, "db", "migrations");
+      const migrationsDir = path.join(cwd, "db", "migrate");
       if (fs.existsSync(migrationsDir)) {
         // Escape the user-derived tableName so regex metacharacters can't
         // widen the match.
@@ -35,7 +35,7 @@ export function destroyCommand(): Command {
         const pattern = new RegExp(`^\\d+_create_${escaped}\\.(ts|js)$`);
         for (const f of fs.readdirSync(migrationsDir)) {
           if (pattern.test(f)) {
-            removeFile(cwd, `db/migrations/${f}`);
+            removeFile(cwd, `db/migrate/${f}`);
           }
         }
       }
@@ -58,7 +58,7 @@ export function destroyCommand(): Command {
     .argument("<name>", "Migration name")
     .action((name: string) => {
       const cwd = getCwd();
-      const migrationsDir = path.join(cwd, "db", "migrations");
+      const migrationsDir = path.join(cwd, "db", "migrate");
       if (!fs.existsSync(migrationsDir)) return;
 
       // Anchor on `^<timestamp>_<name>\.(ts|js)$` so a name like
@@ -70,7 +70,7 @@ export function destroyCommand(): Command {
       const pattern = new RegExp(`^\\d+_${underscored}\\.(ts|js)$`);
       for (const f of fs.readdirSync(migrationsDir)) {
         if (pattern.test(f)) {
-          removeFile(cwd, `db/migrations/${f}`);
+          removeFile(cwd, `db/migrate/${f}`);
         }
       }
     });
@@ -94,13 +94,13 @@ export function destroyCommand(): Command {
       removeFile(cwd, `test/controllers/${tableName}-controller.test.ts`);
 
       // Migration
-      const migrationsDir = path.join(cwd, "db", "migrations");
+      const migrationsDir = path.join(cwd, "db", "migrate");
       if (fs.existsSync(migrationsDir)) {
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const pattern = new RegExp(`^\\d+_create_${escaped}\\.(ts|js)$`);
         for (const f of fs.readdirSync(migrationsDir)) {
           if (pattern.test(f)) {
-            removeFile(cwd, `db/migrations/${f}`);
+            removeFile(cwd, `db/migrate/${f}`);
           }
         }
       }

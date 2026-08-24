@@ -57,7 +57,7 @@ describe("DbMigrateTest", () => {
     loadSchemaCurrentSpy = vi.fn().mockResolvedValue(undefined);
     loadSeedSpy = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "migrate").mockImplementation(migrateSpy);
-    vi.spyOn(DatabaseTasks, "rollback").mockImplementation(rollbackSpy);
+    vi.spyOn(MigrationContext.prototype, "rollback").mockImplementation(rollbackSpy);
     vi.spyOn(DatabaseTasks, "loadSchemaCurrent").mockImplementation(loadSchemaCurrentSpy);
     vi.spyOn(DatabaseTasks, "loadSeed").mockImplementation(loadSeedSpy);
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);

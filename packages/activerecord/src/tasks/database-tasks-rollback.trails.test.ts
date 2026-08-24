@@ -8,6 +8,10 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
 
+// `rake db:rollback` inlines
+// `DatabaseTasks.migration_connection_pool.migration_context.rollback(step)`
+// (`railties/databases.rake:269`), which is what these exercise.
+//
 // Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) reading
 // the pool's own `db_config.migrations_paths` (`connection_pool.rb:294-299`),
 // so a migration these tests can watch has to be a file under such a path — the
@@ -85,7 +89,7 @@ describe("DatabaseTasksRollbackTest", () => {
     await schemaMigration.createTable();
     await schemaMigration.createVersion("2");
 
-    await DatabaseTasks.rollback();
+    await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(1);
 
     expect(reverted()).toEqual(["PrimaryOnly"]);
     expect(await schemaMigration.versions()).toEqual([]);
@@ -106,7 +110,7 @@ describe("DatabaseTasksRollbackTest", () => {
     await schemaMigration.createVersion("1");
     await schemaMigration.createVersion("3");
 
-    await DatabaseTasks.rollback(2);
+    await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(2);
 
     expect(reverted()).toEqual(["Third"]);
     expect(await schemaMigration.versions()).toEqual(["1"]);
@@ -126,7 +130,9 @@ describe("DatabaseTasksRollbackTest", () => {
     await schemaMigration.createTable();
     await schemaMigration.createVersion("999");
 
-    await expect(DatabaseTasks.rollback()).rejects.toThrow(UnknownMigrationVersionError);
+    await expect(
+      DatabaseTasks.migrationConnectionPool().migrationContext.rollback(1),
+    ).rejects.toThrow(UnknownMigrationVersionError);
   });
 
   it("rolls back off the ambient pool when no configurations are loaded", async () => {
@@ -143,7 +149,7 @@ describe("DatabaseTasksRollbackTest", () => {
     await schemaMigration.createTable();
     await schemaMigration.createVersion("1");
 
-    await DatabaseTasks.rollback();
+    await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(1);
 
     expect(reverted()).toEqual(["Ambient"]);
     expect(await schemaMigration.versions()).toEqual([]);

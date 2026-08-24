@@ -47,7 +47,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     expect(files.some((f) => f.includes("test/models/product-line.test.ts"))).toBe(true);
 
-    const migration = files.find((f) => f.startsWith("db/migrations/"))!;
+    const migration = files.find((f) => f.startsWith("db/migrate/"))!;
     const migContent = readFile(migration);
     expect(migContent).toContain('t.references("product"');
     expect(migContent).toContain('t.boolean("approved")');
@@ -130,7 +130,7 @@ describe("ScaffoldGeneratorTest", () => {
     expect(model).toContain('this.belongsTo("product")');
     expect(model).toContain('this.belongsTo("cart")');
 
-    const migration = files.find((f) => f.startsWith("db/migrations/"))!;
+    const migration = files.find((f) => f.startsWith("db/migrate/"))!;
     const migContent = readFile(migration);
     expect(migContent).toContain('t.references("product"');
     expect(migContent).toContain('t.references("cart"');
@@ -209,7 +209,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     const files = gen.run("Post", ["title:string"]);
     expect(files).toContain("src/app/controllers/posts-controller.js");
     expect(files).toContain("src/app/models/post.js");
-    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    const migFile = files.find((f) => f.startsWith("db/migrate/"));
     expect(migFile).toMatch(/\.js$/);
   });
 

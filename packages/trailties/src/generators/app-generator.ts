@@ -717,7 +717,7 @@ export const filterParameters = [
   }
 
   private createDbFiles(): void {
-    this.createFile("db/migrations/.gitkeep", "");
+    this.createFile("db/migrate/.gitkeep", "");
 
     this.createFile(
       "db/seeds.ts",

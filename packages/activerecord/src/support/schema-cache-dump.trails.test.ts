@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { activeLane } from "./connection.js";
 import { fixtures } from "../test-fixtures.js";
+import { itIfSupports } from "./supports.js";
 import {
   dumpedTables,
   fingerprintOf,
@@ -108,4 +109,35 @@ describe("templateSchemaCache", () => {
     }
     expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(before);
   });
+
+  /**
+   * A functional index reports no column at all on MySQL —
+   * `information_schema.STATISTICS.COLUMN_NAME` is NULL and the expression sits
+   * in `EXPRESSION`, which is what `SHOW KEYS`' `Expression` feeds
+   * `IndexDefinition#columns` from (`mysql/schema_statements.rb:36-52`). So an
+   * expression that changed with the column set unchanged is the one index
+   * edit that could leave the fingerprint intact. MariaDB has no such column
+   * and no functional indexes at all, hence the capability gate.
+   */
+  itIfSupports(
+    "expression_index",
+    "stops matching once a canonical functional index's expression changes",
+    async () => {
+      const cached = dumpedTables(templateSchemaCache()!.marshalDump());
+      const clean = fingerprintOf(await schemaShapes(Base.connection), cached);
+      await Base.connection.addIndex("topics", "(lower(title))", { name: "boot_dump_probe_index" });
+      try {
+        const before = fingerprintOf(await schemaShapes(Base.connection), cached);
+        expect(before).not.toBe(clean);
+        await Base.connection.removeIndex("topics", { name: "boot_dump_probe_index" });
+        await Base.connection.addIndex("topics", "(upper(title))", {
+          name: "boot_dump_probe_index",
+        });
+        expect(fingerprintOf(await schemaShapes(Base.connection), cached)).not.toBe(before);
+      } finally {
+        await Base.connection.removeIndex("topics", { name: "boot_dump_probe_index" });
+      }
+      expect(fingerprintOf(await schemaShapes(Base.connection), cached)).toBe(clean);
+    },
+  );
 });

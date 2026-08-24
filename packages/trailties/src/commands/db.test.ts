@@ -1032,7 +1032,7 @@ describe("db subcommand CLI actions", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-cli-"));
     originalCwd = process.cwd();
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -1096,7 +1096,7 @@ describe("db subcommand CLI actions", () => {
 
   it("db abort_if_pending_migrations exits 1 and prints each pending", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1116,7 +1116,7 @@ export class CreatePosts extends Migration {
 
   it("db version reports the highest applied version after migrate", async () => {
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1150,7 +1150,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1202,7 +1202,7 @@ export class CreatePosts extends Migration {
       ["20260101000002", "authors", "CreateAuthors"],
     ]) {
       fs.writeFileSync(
-        path.join(tmpDir, "db", "migrations", `${version}_create_${table}.ts`),
+        path.join(tmpDir, "db", "migrate", `${version}_create_${table}.ts`),
         `import { Migration } from "@blazetrails/activerecord";
 export class ${cls} extends Migration {
   async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("title"); }); }
@@ -1237,7 +1237,7 @@ export class ${cls} extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -1692,7 +1692,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_widgets.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_widgets.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateWidgets extends Migration {
   async up() { await this.createTable("widgets", (t) => { t.string("name"); }); }
@@ -1736,17 +1736,17 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(testPrimaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(testAnimalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(testAnimalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1754,7 +1754,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -1833,7 +1833,7 @@ export class CreateDogs extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1885,17 +1885,17 @@ export class CreateFixtures extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb + ".test")} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb + ".test")} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb + ".test")}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -1903,7 +1903,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2077,18 +2077,18 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    // Primary migrations in db/migrations; animals in db/migrations_animals.
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    // Primary migrations in db/migrations; animals in db/migrate_animals.
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2096,7 +2096,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2161,17 +2161,17 @@ export class CreateDogs extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2179,7 +2179,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2209,17 +2209,17 @@ export class CreateDogs extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2227,7 +2227,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2263,15 +2263,15 @@ export class CreateDogs extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     const migration = (cls: string, table: string) =>
       `import { Migration } from "@blazetrails/activerecord";
 export class ${cls} extends Migration {
@@ -2279,19 +2279,19 @@ export class ${cls} extends Migration {
   async down() { await this.dropTable(${JSON.stringify(table)}); }
 }`;
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000001_one_migration.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000001_one_migration.ts"),
       migration("OneMigration", "ones"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000002_two_migration.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000002_two_migration.ts"),
       migration("TwoMigration", "twos"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000003_three_migration.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000003_three_migration.ts"),
       migration("ThreeMigration", "threes"),
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000004_four_migration.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000004_four_migration.ts"),
       migration("FourMigration", "fours"),
     );
 
@@ -2335,17 +2335,17 @@ export class ${cls} extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
-    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2353,7 +2353,7 @@ export class CreateUsers extends Migration {
 }`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations_animals", "20260101000001_create_dogs.ts"),
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateDogs extends Migration {
   async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
@@ -2389,7 +2389,7 @@ export class CreateDogs extends Migration {
 
   it("db migrate respects migrationsPaths config override", async () => {
     // A named DB can set migrationsPaths to override the default
-    // db/migrations_<name> convention. Verify the CLI discovers
+    // an explicit migrationsPaths convention. Verify the CLI discovers
     // migrations from the configured path instead.
     const primaryDb = path.join(tmpDir, "mp-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "mp-animals.sqlite3");
@@ -2409,7 +2409,7 @@ export class CreateDogs extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_users.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateUsers extends Migration {
   async up() { await this.createTable("users", (t) => { t.string("name"); }); }
@@ -2453,11 +2453,11 @@ export class CreateCats extends Migration {
       `export default {
   development: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
   test: {
     primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
-    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: "db/migrate_animals" },
   },
 };`,
     );
@@ -2609,7 +2609,7 @@ export class CreateCats extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_things.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_things.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateThings extends Migration {
   async up() { await this.createTable("things", (t) => { t.string("name"); }); }
@@ -2639,7 +2639,7 @@ export class CreateThings extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_posts.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_posts.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
@@ -2696,7 +2696,7 @@ export class CreatePosts extends Migration {
 };`,
     );
     fs.writeFileSync(
-      path.join(tmpDir, "db", "migrations", "20260101000000_create_things.ts"),
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_things.ts"),
       `import { Migration } from "@blazetrails/activerecord";
 export class CreateThings extends Migration {
   async up() { await this.createTable("things", (t) => { t.string("name"); }); }

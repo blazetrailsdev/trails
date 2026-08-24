@@ -134,7 +134,12 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
   const step = parseStep(args, 1);
 
   try {
-    await withEnvironmentConnection(() => DatabaseTasks.rollback(step), DatabaseTasks.env);
+    await withEnvironmentConnection(
+      // Rails: `migration_connection_pool.migration_context.rollback(step)`
+      // (`railties/databases.rake:269`).
+      () => DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step),
+      DatabaseTasks.env,
+    );
     return 0;
   } catch (err) {
     console.error(`ar: db:rollback failed — ${String(err)}`);
@@ -338,7 +343,10 @@ export async function dbVersion(cwd: string, args: string[]): Promise<number> {
     const dbName = config.database ?? config.envName ?? "(unknown)";
     try {
       await DatabaseTasks.withTemporaryPool(config, async () => {
-        const version = await DatabaseTasks.currentVersion();
+        // Rails: `puts "Current version: #{pool.migration_context.current_version}"`
+        // (`railties/databases.rake:311`).
+        const version =
+          (await DatabaseTasks.migrationConnectionPool().migrationContext.currentVersion()) ?? 0;
         if (all) console.log(`${dbName}: Current version: ${version}`);
         else console.log(`Current version: ${version}`);
       });

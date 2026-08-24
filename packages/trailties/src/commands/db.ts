@@ -73,18 +73,21 @@ function normalizeRawConfig(raw: RawConfig): RawConfig {
 
 async function migrationsDir(): Promise<string> {
   const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
-  return path.join(fs.cwd(), "db", "migrations");
+  return path.resolve(fs.cwd(), Migrator.migrationsPaths[0]);
 }
 
 /**
  * Resolve the migrations directories for a named database config.
- * Mirrors Rails' per-DB migrations_paths: the user can set
- * `migrationsPaths` (string or string[]) in config/database.ts;
- * otherwise primary defaults to `db/migrations` and named DBs
- * default to `db/migrations_<name>`. Returns an array because
- * Rails supports multiple directories per config.
+ * Mirrors Rails' per-DB migrations_paths: the user can set `migrationsPaths`
+ * (string or string[]) in config/database.ts (`HashConfig#migrations_paths`,
+ * `database_configurations/hash_config.rb:50-53`); otherwise every config,
+ * primary or named, falls back to `Migrator.migrations_paths` — `db/migrate`
+ * (`migration.rb:1419`) — which is the fallback a pool applies when its config
+ * names none (`connection_adapters/abstract/connection_pool.rb:299`). Rails has
+ * no per-name default. Returns an array because Rails supports multiple
+ * directories per config.
  */
-async function migrationsDirsForConfig(name: string, config: RawConfig): Promise<string[]> {
+async function migrationsDirsForConfig(config: RawConfig): Promise<string[]> {
   const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
   const cwd = fs.cwd();
   const raw = (config as { migrationsPaths?: string | string[] }).migrationsPaths;
@@ -93,8 +96,7 @@ async function migrationsDirsForConfig(name: string, config: RawConfig): Promise
     const dirs = [...new Set(raw.filter((p) => p.length > 0).map((p) => path.resolve(cwd, p)))];
     if (dirs.length > 0) return dirs;
   }
-  if (name === "primary") return [path.join(cwd, "db", "migrations")];
-  return [path.join(cwd, "db", `migrations_${name}`)];
+  return Migrator.migrationsPaths.map((p) => path.resolve(cwd, p));
 }
 
 /**
@@ -155,7 +157,7 @@ async function taskableDatabaseEntries(
   const all = await Promise.all(
     allConfigs.map(async ({ name, config: rawConfig }) => {
       const raw = normalizeRawConfig(rawConfig);
-      raw.migrationsPaths = await migrationsDirsForConfig(name, raw);
+      raw.migrationsPaths = await migrationsDirsForConfig(raw);
       return {
         name,
         raw,
@@ -587,7 +589,7 @@ async function withMigrationTasksForDb(
   operation: () => Promise<void>,
   opts?: { afterPending?: (pending: number) => void; runWhenEmpty?: boolean },
 ): Promise<void> {
-  const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
+  const mDirs = await migrationsDirsForConfig(ctx.raw);
   const migrations = discoverMigrations(mDirs);
   if (migrations.length === 0 && !opts?.runWhenEmpty) {
     console.log(`${ctx.prefix}No migrations found.`);
@@ -640,7 +642,7 @@ async function runMigrateAll(): Promise<void> {
   const entries = await taskableDatabaseEntries({}, envName);
   const migrationsFor = new Map<string, MigrationProxy[]>();
   for (const { name, raw } of entries) {
-    const migrations = discoverMigrations(await migrationsDirsForConfig(name, raw));
+    const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
     migrationsFor.set(name, migrations);
   }
   if ([...migrationsFor.values()].every((m) => m.length === 0)) {
@@ -766,7 +768,11 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.rollback(step));
+        await withMigrationTasksForDb(ctx, async () => {
+          // Rails: `migration_connection_pool.migration_context.rollback(step)`
+          // (`railties/databases.rake:269`).
+          await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
+        });
       });
     });
 
@@ -783,7 +789,11 @@ export function dbCommand(): Command {
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.forward(step));
+        await withMigrationTasksForDb(ctx, async () => {
+          // Rails: `migration_connection_pool.migration_context.forward(step)`
+          // (`railties/databases.rake:279`).
+          await DatabaseTasks.migrationConnectionPool().migrationContext.forward(step);
+        });
       });
     });
 
@@ -845,7 +855,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(raw);
         const migrations = discoverMigrations(mDirs);
         if (migrations.length === 0) return;
         const migrator = createMigrator(adapter, migrations);
@@ -883,9 +893,17 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("up", opts.version), {
-          runWhenEmpty: true,
-        });
+        await withMigrationTasksForDb(
+          ctx,
+          async () => {
+            // Rails: `check_target_version` then
+            // `migration_connection_pool.migration_context.run(:up, target_version)`
+            // (`railties/databases.rake:172-177`).
+            DatabaseTasks.checkTargetVersion(opts.version);
+            await DatabaseTasks.migrationConnectionPool().migrationContext.run("up", opts.version);
+          },
+          { runWhenEmpty: true },
+        );
       });
     });
 
@@ -896,9 +914,20 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("down", opts.version), {
-          runWhenEmpty: true,
-        });
+        await withMigrationTasksForDb(
+          ctx,
+          async () => {
+            // Rails: `check_target_version` then
+            // `migration_connection_pool.migration_context.run(:down, target_version)`
+            // (`railties/databases.rake:203-208`).
+            DatabaseTasks.checkTargetVersion(opts.version);
+            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
+              "down",
+              opts.version,
+            );
+          },
+          { runWhenEmpty: true },
+        );
       });
     });
 
@@ -1035,7 +1064,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(raw);
         const migrations = discoverMigrations(mDirs);
         if (migrations.length === 0) {
           console.log(`${prefix}No migrations found.`);
@@ -1072,7 +1101,10 @@ export function dbCommand(): Command {
         await withMigrationTasksForDb(
           ctx,
           async () => {
-            await DatabaseTasks.rollback(step);
+            // Rails `db:migrate:redo` invokes `db:rollback` then `db:migrate`
+            // (`railties/databases.rake:216-227`), i.e. the same inline
+            // `migration_context.rollback(step)` as `db:rollback` (`:269`).
+            await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
             await DatabaseTasks.migrate();
           },
           {

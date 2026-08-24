@@ -384,47 +384,6 @@ export class DatabaseTasks {
     }
   }
 
-  /**
-   * @internal Rails has no `DatabaseTasks.rollback`; `rake db:rollback`
-   * (`railties/databases.rake:269`) inlines
-   * `DatabaseTasks.migration_connection_pool.migration_context.rollback(step)`.
-   * The body lives here rather than in the CLI because the pool handle is
-   * here — otherwise this is the rake task: the pool it is handed, no
-   * `configurations` lookup and no early return.
-   */
-  static async rollback(steps: number = 1): Promise<void> {
-    await this._stepMigrations("rollback", steps);
-  }
-
-  /** @internal Same deviation as {@link rollback}, for `db:forward` (`databases.rake:279`). */
-  static async forward(steps: number = 1): Promise<void> {
-    await this._stepMigrations("forward", steps);
-  }
-
-  /**
-   * @internal Same deviation as {@link rollback}: `db:migrate:up` /
-   * `db:migrate:down` (`railties/databases.rake:174-177`, `:205-208`) inline
-   * `migration_connection_pool.migration_context.run(direction, target_version)`.
-   * The body lives here because the CLI has no pool handle of its own.
-   */
-  static async runMigration(direction: "up" | "down", version: number | string): Promise<void> {
-    this.checkTargetVersion(version);
-    const pool = this.migrationConnectionPool();
-    const adapter = await pool.leaseConnection();
-    await pool.migrationContext.run(direction, version);
-    adapter.schemaCache.clearBang();
-  }
-
-  private static async _stepMigrations(
-    direction: "rollback" | "forward",
-    steps: number,
-  ): Promise<void> {
-    const pool = this.migrationConnectionPool();
-    const adapter = await pool.leaseConnection();
-    await pool.migrationContext[direction](steps);
-    adapter.schemaCache.clearBang();
-  }
-
   private static async _migrationAdapter(): Promise<
     import("../connection-adapters/abstract-adapter.js").AbstractAdapter
   > {
@@ -1078,18 +1037,6 @@ export class DatabaseTasks {
       puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
     }
     puts();
-  }
-
-  /**
-   * Return the highest applied migration version, or 0 if no migrations
-   * have been run (or the schema_migrations table does not yet exist).
-   *
-   * Mirrors: `ActiveRecord::Base.connection_pool.migration_context.current_version`
-   * (called by `rails db:version`).
-   */
-  static async currentVersion(): Promise<number> {
-    const pool = this.migrationConnectionPool();
-    return (await pool.migrationContext.currentVersion()) ?? 0;
   }
 
   static async migrateAll(): Promise<void> {
