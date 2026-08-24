@@ -69,6 +69,8 @@ export class ConfigMethods {
 /**
  * Mirrors `AbstractController::Caching::ConfigMethods#cache_configured?`.
  * Truthy when caching is on AND a store is wired up.
+ *
+ * @internal
  */
 export function cacheConfigured(host: CachingHost): boolean {
   const cls = host.constructor;

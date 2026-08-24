@@ -42,6 +42,7 @@ export async function takeFailedScreenshot(this: ScreenshotHelperHost): Promise<
   }
 }
 
+/** @internal */
 function htmlFromEnv(): boolean {
   return (
     env("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1" ||
@@ -86,15 +87,18 @@ export function screenshotsDir(): string {
   return env("CAPYBARA_SAVE_PATH") || "tmp/screenshots";
 }
 
+/** @internal */
 function absolutePath(this: ScreenshotHelperHost): string {
   const { join } = getPath();
   return join(projectRoot(), screenshotsDir(), imageName.call(this));
 }
 
+/** @internal */
 function absoluteImagePath(this: ScreenshotHelperHost): string {
   return `${absolutePath.call(this)}.png`;
 }
 
+/** @internal */
 function relativeImagePath(this: ScreenshotHelperHost): string {
   const { relative } = getPath();
   const abs = absolutePath.call(this);
@@ -102,6 +106,7 @@ function relativeImagePath(this: ScreenshotHelperHost): string {
   return `${relative!(root, abs)}.png`;
 }
 
+/** @internal */
 function absoluteHtmlPath(this: ScreenshotHelperHost): string {
   return `${absolutePath.call(this)}.html`;
 }
@@ -167,10 +172,12 @@ export function inlineBase64(str: string): string {
   return Buffer.from(str).toString("base64");
 }
 
+/** @internal */
 function show(message: string): void {
   console.log(message);
 }
 
+/** @internal */
 function failed(this: ScreenshotHelperHost): boolean {
   return this._testFailed === true;
 }

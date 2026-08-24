@@ -67,6 +67,7 @@ export class RoutesProxy implements UrlForHost {
   urlFor = urlFor;
   fullUrlFor = fullUrlFor;
   routeFor = routeFor;
+  /** @internal */
   optimizeRoutesGeneration = optimizeRoutesGeneration;
   /** @internal Rails: `private def _with_routes` */
   _withRoutes = _withRoutes;

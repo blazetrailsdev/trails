@@ -45,6 +45,7 @@ export class AssertionResponse {
   }
 }
 
+/** @internal */
 function codeFromName(name: string): string | undefined {
   if (Object.hasOwn(GENERIC_RESPONSE_CODES, name)) return GENERIC_RESPONSE_CODES[name];
   try {
@@ -54,6 +55,7 @@ function codeFromName(name: string): string | undefined {
   }
 }
 
+/** @internal */
 function nameFromCode(code: number): string | undefined {
   // Faithful Rails behavior: GENERIC_RESPONSE_CODES.invert keys are
   // Strings ("2XX", "404", ...) and we look up by Integer, which

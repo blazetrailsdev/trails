@@ -381,7 +381,9 @@ export class Response {
   declare strongEtag: (validators: unknown) => void;
   declare isWeakEtag: () => boolean;
   declare isStrongEtag: () => boolean;
+  /** @internal */
   declare handleConditionalGetBang: () => void;
+  /** @internal */
   declare mergeAndNormalizeCacheControlBang: (cacheControl: CacheControlHash) => void;
   /**
    * Parsed `Cache-Control` directives as a hash, mirroring Rails'
@@ -617,17 +619,29 @@ export class Response {
 
   // --- ETag generators (delegated to cache module) ---
 
-  /** Rails: `generate_weak_etag(validators)`. */
+  /**
+   * Rails: `generate_weak_etag(validators)`.
+   *
+   * @internal
+   */
   generateWeakEtag(validators: unknown): string {
     return _generateWeakEtag(validators);
   }
 
-  /** Rails: `generate_strong_etag(validators)`. */
+  /**
+   * Rails: `generate_strong_etag(validators)`.
+   *
+   * @internal
+   */
   generateStrongEtag(validators: unknown): string {
     return _generateStrongEtag(validators);
   }
 
-  /** Rails: `prepare_cache_control!` private. */
+  /**
+   * Rails: `prepare_cache_control!` private.
+   *
+   * @internal
+   */
   prepareCacheControlBang(): CacheControlHash {
     return _prepareCacheControlBang.call(this);
   }

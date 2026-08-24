@@ -116,6 +116,7 @@ export function _helpers(
  */
 const helperMethodsByClass = new WeakMap<HelpersClassMethods, HelperMethodsModule>();
 
+/** @internal */
 export function defineHelpersModule(
   cls: HelpersClassMethods,
   helpers?: HelperMethodsModule | null,
@@ -388,6 +389,8 @@ export async function helperModulesFromPaths(
  * `NameError` for the specific missing constant; we swallow only the
  * matching `uninitialized constant` error raised by
  * `modulesForHelpers`, so unrelated resolver failures still propagate.
+ *
+ * @internal
  */
 export function defaultHelperModuleBang(
   cls: HelpersClassMethods,
