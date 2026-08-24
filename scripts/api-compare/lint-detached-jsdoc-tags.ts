@@ -56,6 +56,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import * as ts from "typescript";
 import { ROOT_DIR } from "./config.js";
+import { isLineLeadingJsDocTag } from "./extract-ts-api.js";
 import { listSourceFiles } from "./lint-missing-rails-call-reasons.js";
 import { COMMITTED_TS_FILES, walkTsFiles } from "./ts-file-walk.js";
 
@@ -86,6 +87,7 @@ export interface Detachment {
 
 function significantTags(block: ts.JSDoc): string[] {
   return (block.tags ?? [])
+    .filter((tag) => isLineLeadingJsDocTag(tag))
     .map((tag) => tag.tagName.text)
     .filter((name) => SIGNIFICANT_TAGS.has(name));
 }

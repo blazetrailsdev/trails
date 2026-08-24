@@ -2131,6 +2131,51 @@ describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
   });
 });
 
+describe("mid-line tag mentions in reason prose", () => {
+  it("mints no @noRailsEquivalent from a mention inside a @missingRailsCall reason", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @missingRailsCall has_attribute? — PERMANENT: trails generates the readers at the
+         *   end of every schema load (tagged @noRailsEquivalent against CLAUDE.md's
+         *   "Generated attribute readers are properties").
+         */
+        aliasAttributeMethodDefinition(): void {}
+      }
+    `);
+    const method = info.instanceMethods.find((m) => m.name === "aliasAttributeMethodDefinition")!;
+    expect(method.noRailsEquivalent).toBeUndefined();
+  });
+
+  it("mints no @internal from a mention inside a @missingRailsCall reason", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @missingRailsCall attribute_types — PERMANENT: the seam this replaces is
+         *   the wiring one, which is why it carries @internal rather than a name.
+         */
+        registerModel(): void {}
+      }
+    `);
+    const method = info.instanceMethods.find((m) => m.name === "registerModel")!;
+    expect(method.internal).toBeUndefined();
+  });
+
+  it("mints no @missingRailsArgs from a mention inside a @missingRailsCall reason", () => {
+    const info = extractFromSource(`
+      class Foo {
+        /**
+         * @missingRailsCall type_for_attribute — PERMANENT: the shape differs, but a
+         *   tag of the @missingRailsArgs family would be the wrong one here.
+         */
+        typeForAttribute(): void {}
+      }
+    `);
+    const method = info.instanceMethods.find((m) => m.name === "typeForAttribute")!;
+    expect(method.missingRailsArgs).toBeUndefined();
+  });
+});
+
 describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
   it("records the reason on a tagged class member and leaves its sibling bare", () => {
     const info = extractFromSource(`

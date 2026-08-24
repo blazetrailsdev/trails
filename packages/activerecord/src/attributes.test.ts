@@ -733,6 +733,32 @@ describe("DefineAttributeSTITest", () => {
   });
 });
 
+describe("DefineAttributeBeforeSchemaLoadTest", () => {
+  fixtures([]);
+
+  // Rails drops `@default_attributes` only in `reload_schema_from_cache`
+  // (attributes.rb:267-270), which `reset_column_information` calls — never an
+  // ordinary `load_schema!` (model_schema.rb:587-597). So an eager
+  // `define_attribute` write outlives the model's first reflection, and is
+  // dropped by `reset_column_information`.
+  it("define_attribute before the first schema load survives the load", async () => {
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+      }
+    }
+    Post.defineAttribute("legacy_score", intType, { default: 7 });
+
+    await loadSchemaFromAdapter.call(Post as any);
+
+    const defaults = (Post as any)._defaultAttributes();
+    expect(defaults.keys()).toContain("legacy_score");
+    expect(defaults.getAttribute("legacy_score").value).toBe(7);
+    expect(defaults.keys()).toContain("title");
+  });
+});
+
 describe("ResetDefaultAttributesCascadeTest", () => {
   it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
     class Post extends Base {

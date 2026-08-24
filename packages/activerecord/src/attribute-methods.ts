@@ -612,11 +612,23 @@ function instanceMethodOwner(klass: any, name: string): unknown {
  *
  * `Base` is found by the `_isActiveRecordBase` own-property sentinel rather
  * than imported, which would close a module-init cycle.
+ *
+ * Seeds the generated-methods module for the same reason {@link aliasAttribute}
+ * does, and closes the last hole in that seeding: both arms below reach
+ * ActiveModel's lazy `generated_attribute_methods`
+ * (activemodel/attribute_methods.rb:400-402), which would seat a bare `Module`
+ * for a class that declares nothing of its own — an empty
+ * `class Leaf extends Middle {}`. Rails cannot get there: its `inherited` hook
+ * (attribute_methods.rb:265-272) has already seated a `GeneratedAttributeMethods`
+ * for every class from the moment it exists.
  */
 export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost,
   methodName: string,
 ): boolean {
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
   if (isDangerousAttributeMethod.call(this, methodName)) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,

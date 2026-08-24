@@ -1101,19 +1101,22 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     filteredHash[name] = column;
   }
 
+  // Rails' `load_schema!` settles `@columns_hash` and nothing else
+  // (model_schema.rb:587-597); `@default_attributes` / `@attribute_types` are
+  // dropped ONLY by `reload_schema_from_cache` (attributes.rb:267-270,
+  // activemodel/attribute_registration.rb:88-95) — i.e. by
+  // `reset_column_information`, never by an ordinary load. So an eager
+  // `define_default_attribute` write (attributes.rb:277-291) survives the
+  // model's first reflection here, exactly as it does in Ruby.
   type CacheBag = {
     _attributesBuilder?: unknown;
     _yamlEncoder?: unknown;
-    _cachedDefaultAttributes?: unknown;
-    _cachedAttributeTypes?: unknown;
     _columnsHash?: unknown;
     _columns?: unknown;
   };
   const bag = host as CacheBag;
   bag._attributesBuilder = undefined;
   bag._yamlEncoder = undefined;
-  bag._cachedDefaultAttributes = null;
-  bag._cachedAttributeTypes = null;
   bag._columns = undefined;
   host._columnsHash = filteredHash;
 
