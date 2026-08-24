@@ -72,18 +72,6 @@ export type { ModelLike } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
 export { initAttributes as dirtyInitAttributes } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
-export {
-  _registerCallbackOnProto,
-  hasCallbackOnProto,
-  hasBeforeOrAroundCallbackOnProto,
-  beforeOrAroundCallbackSources,
-  skipCallbackOnProto,
-  runAllCallbacks,
-  runBeforeCallbacksOnProto,
-  runAfterCallbacksOnProto,
-  snapshotCallbacksOnProto,
-  restoreCallbacksOnProto,
-} from "./callbacks.js";
 export type {
   CallbackConditions,
   CallbackObject,

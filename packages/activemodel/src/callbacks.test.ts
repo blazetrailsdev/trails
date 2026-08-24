@@ -1,14 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { throwAbort, withOptions } from "@blazetrails/activesupport";
-import { Model } from "./index.js";
 import {
-  type CallbackConditions,
-  _registerCallbackOnProto,
-  skipCallbackOnProto,
-  runAllCallbacks,
-  runBeforeCallbacksOnProto,
-  runAfterCallbacksOnProto,
-} from "./callbacks.js";
+  Callbacks as ASCallbacks,
+  extend,
+  runCallbacks,
+  throwAbort,
+  withOptions,
+} from "@blazetrails/activesupport";
+import { Model } from "./index.js";
+import { type CallbackConditions, defineModelCallbacks } from "./callbacks.js";
+
+/**
+ * A throwaway class carrying the macros `define_model_callbacks` generates, so
+ * a test registers through the same `before_save` / `after_save` surface user
+ * code does. The Rails-model equivalent of the bare prototypes these tests used
+ * to build by hand.
+ */
+function modelWith(...events: string[]): any {
+  class Klass {}
+  extend(Klass, ASCallbacks.ClassMethods);
+  (defineModelCallbacks as (this: unknown, ...a: string[]) => void).apply(Klass, events);
+  return Klass;
+}
 
 /**
  * `define_model_callbacks` generates its macros with `define_singleton_method`
@@ -133,7 +145,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    await runAfterCallbacksOnProto((p.constructor as typeof Model).prototype, "create", p);
+    await runCallbacks(p, "create", undefined, undefined, "after");
     expect(log).toEqual(["first", "second"]);
   });
 
@@ -384,12 +396,12 @@ describe("CallbacksTest", () => {
 
 describe("CallbackChain.run", () => {
   it("runs after callbacks only after the block completes", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after");
     });
-    await runAllCallbacks(proto, "save", {}, () => {
+    await runCallbacks(new Klass(), "save", () => {
       log.push("block:start");
       log.push("block:end");
     });
@@ -397,32 +409,32 @@ describe("CallbackChain.run", () => {
   });
 
   it("around callbacks wrap the block", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "around", "save", (_record: any, proceed: () => void) => {
+    Klass.aroundSave((_record: any, proceed: () => void) => {
       log.push("around:before");
       proceed();
       log.push("around:after");
     });
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after");
     });
-    await runAllCallbacks(proto, "save", {}, () => {
+    await runCallbacks(new Klass(), "save", () => {
       log.push("block");
     });
     expect(log).toEqual(["around:before", "block", "around:after", "after"]);
   });
 
   it("after callbacks run in registration order", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after1");
     });
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after2");
     });
-    await runAllCallbacks(proto, "save", {}, () => {
+    await runCallbacks(new Klass(), "save", () => {
       log.push("block");
     });
     expect(log).toEqual(["block", "after1", "after2"]);
@@ -567,16 +579,6 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     expect(log).toEqual(["fn", "block"]);
   });
 
-  it("CallbackChain.register accepts on: for commit/rollback events", () => {
-    const proto = Object.create(null);
-    expect(() =>
-      _registerCallbackOnProto(proto, "after", "commit", () => {}, { on: "create" }),
-    ).not.toThrow();
-    expect(() =>
-      _registerCallbackOnProto(proto, "after", "rollback", () => {}, { on: "update" }),
-    ).not.toThrow();
-  });
-
   it("resetCallbacks clears CallbackObject-registered callbacks too", async () => {
     const log: string[] = [];
     class Thing extends Model {
@@ -636,15 +638,15 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
 describe("unified sync/async runner", () => {
   it("returns a boolean synchronously when all callbacks and block are sync", () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", () => {
+    Klass.beforeSave(() => {
       log.push("before");
     });
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after");
     });
-    const result = runAllCallbacks(proto, "save", {}, () => {
+    const result = runCallbacks(new Klass(), "save", () => {
       log.push("block");
       return true;
     });
@@ -653,16 +655,16 @@ describe("unified sync/async runner", () => {
   });
 
   it("returns a Promise when a before callback is async", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", async () => {
+    Klass.beforeSave(async () => {
       await Promise.resolve();
       log.push("before");
     });
-    _registerCallbackOnProto(proto, "after", "save", () => {
+    Klass.afterSave(() => {
       log.push("after");
     });
-    const result = runAllCallbacks(proto, "save", {}, () => {
+    const result = runCallbacks(new Klass(), "save", () => {
       log.push("block");
       return true;
     });
@@ -672,11 +674,11 @@ describe("unified sync/async runner", () => {
   });
 
   it("returns a Promise when the block is async", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", () => log.push("before"));
-    _registerCallbackOnProto(proto, "after", "save", () => log.push("after"));
-    const result = runAllCallbacks(proto, "save", {}, async () => {
+    Klass.beforeSave(() => log.push("before"));
+    Klass.afterSave(() => log.push("after"));
+    const result = runCallbacks(new Klass(), "save", async () => {
       await Promise.resolve();
       log.push("block");
       return true;
@@ -687,29 +689,29 @@ describe("unified sync/async runner", () => {
   });
 
   it("awaits async callbacks in order", async () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "save", async () => {
+    Klass.beforeSave(async () => {
       await Promise.resolve();
       log.push("b1");
     });
-    _registerCallbackOnProto(proto, "before", "save", () => {
+    Klass.beforeSave(() => {
       log.push("b2");
     });
-    _registerCallbackOnProto(proto, "after", "save", async () => {
+    Klass.afterSave(async () => {
       await Promise.resolve();
       log.push("a1");
     });
-    await runAllCallbacks(proto, "save", {}, () => log.push("block"));
+    await runCallbacks(new Klass(), "save", () => log.push("block"));
     expect(log).toEqual(["b1", "b2", "block", "a1"]);
   });
 
   it("strict: 'sync' throws when an after callback returns a Promise", () => {
-    const proto = Object.create(null);
-    _registerCallbackOnProto(proto, "after", "initialize", async () => {});
-    expect(() => runAfterCallbacksOnProto(proto, "initialize", {}, { strict: "sync" })).toThrow(
-      /Async callback on sync chain "initialize"/,
-    );
+    const Klass = modelWith("initialize");
+    Klass.afterInitialize(async () => {});
+    expect(() =>
+      runCallbacks(new Klass(), "initialize", undefined, { strict: "sync" }, "after"),
+    ).toThrow(/Async callback on sync chain "initialize"/);
   });
 
   it("async validator function registered via Model.validate runs and awaits", async () => {
@@ -789,14 +791,13 @@ describe("unified sync/async runner", () => {
   });
 
   it("strict: 'sync' allows fully-sync chains", () => {
-    const proto = Object.create(null);
+    const Klass = modelWith("validation");
     const log: string[] = [];
-    _registerCallbackOnProto(proto, "before", "validation", () => log.push("before"));
-    _registerCallbackOnProto(proto, "after", "validation", () => log.push("after"));
-    const result = runAllCallbacks(
-      proto,
+    Klass.beforeValidation(() => log.push("before"));
+    Klass.afterValidation(() => log.push("after"));
+    const result = runCallbacks(
+      new Klass(),
       "validation",
-      {},
       () => {
         log.push("block");
         return true;
@@ -1035,8 +1036,8 @@ describe("defineModelCallbacks()", () => {
     });
 
     const p = new Payment({ amount: 100 });
-    await runBeforeCallbacksOnProto(Payment.prototype, "process", p);
-    await runAfterCallbacksOnProto(Payment.prototype, "process", p);
+    await runCallbacks(p, "process", undefined, undefined, "before");
+    await runCallbacks(p, "process", undefined, undefined, "after");
     expect(log).toEqual(["before_process", "after_process"]);
   });
 
@@ -1072,7 +1073,7 @@ describe("callbacks with prepend option", () => {
     );
 
     const u = new User({ name: "Alice" });
-    await runBeforeCallbacksOnProto(User.prototype, "save", u);
+    await runCallbacks(u, "save", undefined, undefined, "before");
     expect(order).toEqual(["prepended", "first"]);
   });
 });
@@ -1100,19 +1101,19 @@ describe("withOptions()", () => {
   });
 });
 
-describe("skipCallbackOnProto with CallbackObject (mixin-level)", () => {
+describe("skipCallback with CallbackObject (mixin-level)", () => {
   it("removes a CallbackObject from the chain by reference", async () => {
     const log: string[] = [];
-    const proto = Object.create(null);
+    const Klass = modelWith("save");
     const obj = {
       beforeSave() {
         log.push("obj");
       },
     };
-    _registerCallbackOnProto(proto, "before", "save", obj);
-    _registerCallbackOnProto(proto, "before", "save", () => log.push("fn"));
-    expect(skipCallbackOnProto(proto, "save", "before", obj)).toBe(true);
-    await runBeforeCallbacksOnProto(proto, "save", {});
+    Klass.beforeSave(obj);
+    Klass.beforeSave(() => log.push("fn"));
+    Klass.skipCallback("save", "before", obj);
+    await runCallbacks(new Klass(), "save", undefined, undefined, "before");
     expect(log).toEqual(["fn"]);
   });
 });

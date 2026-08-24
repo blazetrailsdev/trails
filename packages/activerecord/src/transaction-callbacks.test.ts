@@ -13,7 +13,6 @@ import {
   Rollback,
   registerModel,
 } from "./index.js";
-import { skipCallbackOnProto } from "@blazetrails/activemodel";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { fixtures } from "./test-fixtures.js";
@@ -1520,12 +1519,7 @@ describe("TransactionCallbacksTest", () => {
       const expectedHistory = ["after_commit_on_update_2", "after_commit_on_update_1"];
       expect(history).toEqual(expectedHistory);
 
-      skipCallbackOnProto(
-        TopicWithCallbacksOnUpdate.prototype,
-        "commit",
-        "after",
-        afterCommitOnUpdate2,
-      );
+      TopicWithCallbacksOnUpdate.skipCallback("commit", "after", afterCommitOnUpdate2);
       await topic.update({ title: "Updated topic 2" });
       expectedHistory.push("after_commit_on_update_1");
       expect(history).toEqual(expectedHistory);

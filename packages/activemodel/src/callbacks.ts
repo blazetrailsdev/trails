@@ -1,32 +1,24 @@
 /**
- * Thin wrapper over @blazetrails/activesupport's callback engine.
- *
  * Mirrors: ActiveModel::Callbacks
  * (activemodel/lib/active_model/callbacks.rb)
+ *
+ * Ruby's `include ActiveSupport::Callbacks` (callbacks.rb:87) supplies
+ * `set_callback` / `run_callbacks` and the whole chain engine; trails gets the
+ * same members from `@blazetrails/activesupport`, so this file carries only
+ * `define_model_callbacks` and its three private generators.
  */
 
-import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
+import { NoMethodError } from "./attribute-assignment.js";
 import {
-  Callback,
   Value,
   kernelArray,
-  CallbackChain as ASCallbackChain,
-  type BeforeCallback,
-  type AfterCallback,
-  type AroundCallback,
   type CallbackKind,
-  type CallbackObject as ASCallbackObject,
-  type RunCallbacksOptions as ASRunCallbacksOptions,
   assertValidKeys,
   extractOptionsBang,
   type DefineCallbacksOptions,
-  defineCallbacks as asDefineCallbacks,
-  skipCallback as asSkipCallback,
-  getCallbackChains as asGetCallbackChains,
-  peekCallbackChain as asPeekCallbackChain,
+  defineCallbacks,
+  setCallback,
 } from "@blazetrails/activesupport";
-
-type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
 /**
  * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
@@ -63,7 +55,7 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   for (const callback of callbacks as string[]) {
     // `define_callbacks` registers on the prototype, where trails' instances
     // resolve the chain; Ruby's `self` here is the class itself.
-    if (klass.prototype) asDefineCallbacks(klass.prototype, callback, options);
+    if (klass.prototype) defineCallbacks(klass.prototype, callback, options);
 
     for (const type of types) {
       const methodName = `_define_${String(type)}_model_callback`;
@@ -133,6 +125,7 @@ export interface RunCallbacksOptions {
  */
 export type CallbackConditionFilter<TRecord = CallbackRecord> =
   | { _(record: TRecord, value?: unknown): boolean }["_"]
+  | Value
   | string;
 
 export interface CallbackConditions<TRecord = CallbackRecord> {
@@ -150,362 +143,90 @@ export interface TransactionalCallbackConditions<
 
 /**
  * Mirrors: ActiveModel::Callbacks#_define_before_model_callback
+ * (activemodel/lib/active_model/callbacks.rb:129-134)
+ *
  * @internal Rails-private helper.
  */
-export function _defineBeforeModelCallback(klass: CallbackHost, event: string): void {
-  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
-  Object.defineProperty(klass, `before${capitalizedEvent}`, {
-    value: function (
-      fnOrObject: CallbackFn | CallbackObject | string,
-      conditions?: CallbackConditions,
+export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
+  defineSingletonMethod(
+    klass,
+    `before${capitalize(callback)}`,
+    function (
+      this: { prototype: object },
+      fn: CallbackFn | CallbackObject | string,
+      options?: CallbackConditions,
     ) {
-      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
-      _registerCallbackOnProto(this.prototype, "before", event, fnOrObject, conditions);
+      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
+      setCallback(this.prototype, callback, "before", fn, options ?? {});
     },
-    writable: true,
-    configurable: true,
-  });
+  );
 }
 
 type CallbackHost = object;
 
 /**
  * Mirrors: ActiveModel::Callbacks#_define_around_model_callback
+ * (activemodel/lib/active_model/callbacks.rb:136-141)
+ *
  * @internal Rails-private helper.
  */
-export function _defineAroundModelCallback(klass: CallbackHost, event: string): void {
-  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
-  Object.defineProperty(klass, `around${capitalizedEvent}`, {
-    value: function (
-      fnOrObject: AroundCallbackFn | CallbackObject | string,
-      conditions?: CallbackConditions,
+export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
+  defineSingletonMethod(
+    klass,
+    `around${capitalize(callback)}`,
+    function (
+      this: { prototype: object },
+      fn: AroundCallbackFn | CallbackObject | string,
+      options?: CallbackConditions,
     ) {
-      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
-      _registerCallbackOnProto(this.prototype, "around", event, fnOrObject, conditions);
+      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
+      setCallback(this.prototype, callback, "around", fn, options ?? {});
     },
-    writable: true,
-    configurable: true,
-  });
+  );
 }
 
 /**
  * Mirrors: ActiveModel::Callbacks#_define_after_model_callback
+ * (activemodel/lib/active_model/callbacks.rb:143-153)
+ *
  * @internal Rails-private helper.
  */
-export function _defineAfterModelCallback(klass: CallbackHost, event: string): void {
-  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
-  Object.defineProperty(klass, `after${capitalizedEvent}`, {
-    value: function (
-      fnOrObject: CallbackFn | CallbackObject | string,
-      conditions?: CallbackConditions,
+export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
+  defineSingletonMethod(
+    klass,
+    `after${capitalize(callback)}`,
+    function (
+      this: { prototype: object },
+      fn: CallbackFn | CallbackObject | string,
+      options?: CallbackConditions,
     ) {
-      assertValidKeys((conditions ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
-      _registerCallbackOnProto(this.prototype, "after", event, fnOrObject, conditions);
+      assertValidKeys((options ?? {}) as Record<string, unknown>, ["if", "unless", "prepend"]);
+      options = { ...options };
+      options.prepend = true;
+      // callbacks.rb:148-151 — an after model callback is skipped when the
+      // wrapped block returned `false`, which is what `env.value` carries.
+      const conditional = new Value((v) => v !== false);
+      options.if = [...(kernelArray(options.if) as CallbackConditionFilter[]), conditional];
+      setCallback(this.prototype, callback, "after", fn, options);
     },
-    writable: true,
-    configurable: true,
-  });
-}
-
-function isThenable(v: unknown): v is PromiseLike<unknown> {
-  return (
-    v !== null &&
-    (typeof v === "object" || typeof v === "function") &&
-    typeof (v as { then?: unknown }).then === "function"
   );
 }
 
-function _resolveCallbackObject(
-  obj: ASCallbackObject,
-  timing: CallbackTiming,
-  event: string,
-): AnyCallback {
-  const rec = obj as Record<string, unknown>;
-  const camelMethod = `${timing}${event.charAt(0).toUpperCase()}${event.slice(1)}`;
-  const method = rec[camelMethod];
-  if (typeof method !== "function") {
-    throw new ArgumentError(`Callback object must implement ${camelMethod}`);
-  }
-  if (timing === "around") {
-    return ((record: CallbackRecord, proceed: () => void | Promise<void>) =>
-      (method as (r: CallbackRecord, p: () => void | Promise<void>) => void).call(
-        obj,
-        record,
-        proceed,
-      )) as AnyCallback;
-  }
-  return ((record: CallbackRecord) =>
-    (method as (r: CallbackRecord) => unknown).call(obj, record)) as AnyCallback;
+/**
+ * @noRailsEquivalent PERMANENT: Ruby's `define_singleton_method` (callbacks.rb:130,
+ *   :137, :144) with the writable/configurable descriptor a redefinition on a
+ *   subclass needs. Not exported.
+ */
+function defineSingletonMethod(klass: CallbackHost, name: string, value: unknown): void {
+  Object.defineProperty(klass, name, { value, writable: true, configurable: true });
 }
 
 /**
- * Register a callback directly in activesupport's Symbol-keyed chain storage
- * on `proto`. Called by the generated `beforeX`/`afterX`/`aroundX` methods
- * from `defineModelCallbacks` and by Model's callback registration helpers.
- *
- * Resolves `CallbackObject` instances using our own resolver (which looks up
- * the camelCase method name, e.g. `beforeSave`) before inserting into the
- * chain, while still storing the original object as `originalObject` so
- * `skip`-by-reference works.
- *
- * After callbacks are stored with `prepend: true` so the compiled sequence's
- * `invokeAfter` produces FIFO execution order — same as Rails'
- * `_define_after_model_callback prepend: true`.
- *
- * @internal
+ * @noRailsEquivalent PERMANENT: Ruby interpolates the event straight into the
+ *   method name (`"before_#{callback}"`, callbacks.rb:130); the trails spelling
+ *   of that name is camelCase, so the event has to be capitalized first. Not
+ *   exported.
  */
-/**
- * Build the `:if` conditions for a registered callback, prepending ActiveModel's
- * after-model-callback conditional (`v != false`) when applicable.
- *
- * Mirrors ActiveModel::Callbacks#_define_after_model_callback, which does
- * `options[:if] = Array(options[:if]) + [Conditionals::Value.new { |v| v != false }]`
- * for every after callback defined via define_model_callbacks. Events that Rails
- * registers via a plain define_callbacks (no such conditional) are excluded:
- *   - validation: ActiveModel::Validations::Callbacks (validations/callbacks.rb)
- *     — after_validation runs even when validations fail.
- *   - commit / rollback: ActiveRecord::Transactions (transactions.rb:11,
- *     `define_callbacks :commit, :rollback, ...`) — after_commit/after_rollback
- *     get no value conditional.
- *
- * Returns a fresh array (never mutates the caller's `if` array).
- *
- * @internal
- */
-const PLAIN_DEFINE_CALLBACKS_EVENTS = new Set(["validation", "commit", "rollback"]);
-
-function _buildAfterModelIfConditions(
-  timing: CallbackTiming,
-  event: string,
-  userIf: CallbackConditions["if"] | undefined,
-): CallbackConditions["if"] | Value | Array<CallbackConditionFilter | Value> {
-  const userIfs = kernelArray(userIf) as Array<CallbackConditionFilter | Value>;
-  if (timing !== "after" || PLAIN_DEFINE_CALLBACKS_EVENTS.has(event)) {
-    return userIf;
-  }
-  return [...userIfs, new Value((v) => v !== false)];
-}
-
-export function _registerCallbackOnProto(
-  proto: object,
-  timing: CallbackTiming,
-  event: string,
-  fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
-  conditions?: CallbackConditions | TransactionalCallbackConditions,
-): void {
-  asDefineCallbacks(proto, event, { skipAfterCallbacksIfTerminated: true });
-  const chains = asGetCallbackChains(proto);
-  const chain = chains.get(event)!;
-  const isObj = typeof fn === "object" && fn !== null;
-  const resolved: AnyCallback = isObj
-    ? _resolveCallbackObject(fn as unknown as ASCallbackObject, timing, event)
-    : (fn as AnyCallback);
-  // Mirrors ActiveModel::Callbacks#_define_after_model_callback: every after
-  // callback registered through define_model_callbacks gets an extra `:if`
-  // condition `v != false`, so a run_callbacks block returning false skips the
-  // after callbacks (callbacks_test.rb "after callbacks are not executed if the
-  // block returns false"). The `value` arg is env.value, threaded by the engine.
-  // ActiveModel::Validations::Callbacks defines before/after_validation via a
-  // plain define_callbacks (validations/callbacks.rb) WITHOUT this conditional,
-  // so after_validation must keep running even when validations fail — exclude it.
-  const ifConditions = _buildAfterModelIfConditions(timing, event, conditions?.if);
-  const entry = new Callback(
-    event,
-    resolved,
-    timing,
-    {
-      if: ifConditions,
-      unless: conditions?.unless as ((t: object) => boolean) | undefined,
-    },
-    chain.config,
-    isObj ? (fn as unknown as ASCallbackObject) : undefined,
-  );
-  const isTransactional = event === "commit" || event === "rollback";
-  const prepend = !!conditions?.prepend || (timing === "after" && !isTransactional);
-  if (prepend) chain.prepend(entry);
-  else chain.append(entry);
-}
-
-/**
- * True when `proto` has any `before` or `around` callback registered for
- * `event`. Unlike `hasCallbackOnProto`, this matches by timing alone — it
- * does not require a specific filter — so callers can ask "could a user
- * before/around callback run for this event?" without knowing the filters.
- *
- * @internal
- */
-export function hasBeforeOrAroundCallbackOnProto(proto: object, event: string): boolean {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return false;
-  return chain.entries.some((e) => e.kind === "before" || e.kind === "around");
-}
-
-/**
- * Source-text of every `before`/`around` callback registered for `event` whose
- * filter is a plain function (so it can be introspected via
- * `Function.prototype.toString`). `opaque` is true when any before/around entry
- * is an object/method-name filter whose body cannot be read from here.
- *
- * Callers use this to approximate Rails' lazy association loading: a synchronous
- * destroy callback only forces the `belongs_to` targets it actually
- * dereferences, so scanning the callback source for association names lets us
- * skip loading targets the callback never reads. When `opaque` is true the
- * caller must fall back to a conservative load (it cannot tell what the callback
- * touches) — this covers object/method-name filters and bound/native functions,
- * whose bodies are not introspectable. The returned `sources` are only the outer
- * filter bodies; a caller that must resolve reads reached through helper methods
- * has to expand them itself (the callback source alone won't name those).
- *
- * @internal
- */
-export function beforeOrAroundCallbackSources(
-  proto: object,
-  event: string,
-): { sources: string[]; opaque: boolean } {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return { sources: [], opaque: false };
-  const sources: string[] = [];
-  let opaque = false;
-  for (const e of chain.entries) {
-    if (e.kind !== "before" && e.kind !== "around") continue;
-    if (typeof e.filter !== "function") {
-      opaque = true;
-      continue;
-    }
-    const src = e.filter.toString();
-    if (src.includes("[native code]")) opaque = true;
-    else sources.push(src);
-  }
-  return { sources, opaque };
-}
-
-/**
- * @internal
- */
-export function hasCallbackOnProto(
-  proto: object,
-  event: string,
-  timing: CallbackTiming,
-  filter: CallbackFn | AroundCallbackFn | CallbackObject,
-): boolean {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return false;
-  const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-  return chain.entries.some((e) => e.matches(timing, asFilter));
-}
-
-/**
- * @internal
- */
-export function skipCallbackOnProto(
-  proto: object,
-  event: string,
-  timing: CallbackTiming,
-  filter: CallbackFn | AroundCallbackFn | CallbackObject,
-): boolean {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return false;
-  const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-  if (!chain.entries.some((e) => e.matches(timing, asFilter))) return false;
-  asSkipCallback(proto, event, timing, asFilter);
-  return true;
-}
-
-/**
- * Snapshot the registered callbacks for `event` on `proto` so they can be
- * restored later. Returns the chain's current entries (a shallow copy of the
- * array; the Callback entries themselves are immutable) or `undefined` when no
- * chain exists for the event. Mirrors Rails' test helper capturing
- * `klass._<kind>_callbacks.dup` before a block that mutates the chain.
- *
- * @internal
- */
-export function snapshotCallbacksOnProto(proto: object, event: string): Callback[] | undefined {
-  const chain = asPeekCallbackChain(proto, event);
-  return chain ? [...chain.entries] : undefined;
-}
-
-/**
- * Restore the callbacks for `event` on `proto` to a previously captured
- * `snapshotCallbacksOnProto` value, discarding any registered since. Mirrors
- * Rails' `klass._<kind>_callbacks = old` in the `ensure` of its reset helper.
- *
- * @internal
- */
-export function restoreCallbacksOnProto(
-  proto: object,
-  event: string,
-  snapshot: Callback[] | undefined,
-): void {
-  const chains = asGetCallbackChains(proto);
-  const chain = chains.get(event);
-  if (!chain) return;
-  chain.clear();
-  if (snapshot) for (const entry of snapshot) chain.append(entry);
-}
-
-/**
- * Run the full callback chain (before + around + after) for `event` on `proto`.
- * Uses a read-only peek (no COW) so subclass isolation is not disturbed.
- *
- * @internal
- */
-export function runAllCallbacks(
-  proto: object,
-  event: string,
-  record: CallbackRecord,
-  block?: () => unknown,
-  opts?: RunCallbacksOptions,
-): unknown {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) {
-    // Rails run_callbacks with an empty chain: `yield if block_given?`.
-    // NOTE: the activesupport sibling additionally throws on a thenable block
-    // under `strict: "sync"`. That guard is a trails invention with no Rails
-    // counterpart, and it survives lint only via the rails-error-parity
-    // grandfather list; it is deliberately not propagated here.
-    return block?.();
-  }
-  return chain.compile().invoke(record, block, opts as ASRunCallbacksOptions);
-}
-
-/**
- * Run only the `before` callbacks for `event` on `proto`.
- *
- * @internal
- */
-export function runBeforeCallbacksOnProto(
-  proto: object,
-  event: string,
-  record: CallbackRecord,
-  opts?: RunCallbacksOptions,
-): unknown {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return true;
-  const tmp = new ASCallbackChain(event, chain.config);
-  for (const e of chain.entries) {
-    if (e.kind === "before") tmp.append(e);
-  }
-  return tmp.compile().invoke(record, undefined, opts as ASRunCallbacksOptions);
-}
-
-/**
- * Run only the `after` callbacks for `event` on `proto`.
- *
- * @internal
- */
-export function runAfterCallbacksOnProto(
-  proto: object,
-  event: string,
-  record: CallbackRecord,
-  opts?: RunCallbacksOptions,
-): void | Promise<void> {
-  const chain = asPeekCallbackChain(proto, event);
-  if (!chain) return;
-  const tmp = new ASCallbackChain(event, chain.config);
-  for (const e of chain.entries) {
-    if (e.kind === "after") tmp.append(e);
-  }
-  const result = tmp.compile().invoke(record, undefined, opts as ASRunCallbacksOptions);
-  if (isThenable(result)) return Promise.resolve(result).then(() => undefined);
+function capitalize(callback: string): string {
+  return callback.charAt(0).toUpperCase() + callback.slice(1);
 }

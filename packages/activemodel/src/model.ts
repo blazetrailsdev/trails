@@ -19,6 +19,8 @@ import {
   Callbacks as ASCallbacks,
   defineCallbacks,
   resetCallbacks as asResetCallbacks,
+  setCallback,
+  runCallbacks,
   extend,
   include,
   prepend,
@@ -45,15 +47,7 @@ import {
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
-import {
-  CallbackFn,
-  CallbackConditions,
-  defineModelCallbacks,
-  _registerCallbackOnProto,
-  runAllCallbacks,
-  runBeforeCallbacksOnProto,
-  runAfterCallbacksOnProto,
-} from "./callbacks.js";
+import { CallbackFn, CallbackConditions, defineModelCallbacks } from "./callbacks.js";
 import {
   serializableHash,
   SerializeOptions,
@@ -485,7 +479,7 @@ export class Model {
       ];
     }
 
-    _registerCallbackOnProto(this.prototype, "before", "validate", fn, {
+    setCallback(this.prototype, "validate", fn, {
       ...(ifConds.length > 0 ? { if: ifConds } : {}),
       ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
       ...(options.prepend ? { prepend: true } : {}),
@@ -1051,7 +1045,7 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      void runAfterCallbacksOnProto(ctor.prototype, "initialize", this, { strict: "sync" });
+      void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
     }
   }
 
@@ -1180,7 +1174,7 @@ export class Model {
     try {
       // Rails: `run_validations!` is the block, and its truthy return becomes
       // run_callbacks' value; `false` here means the chain halted.
-      const completed = await runAllCallbacks(ctor.prototype, "validation", this, async () => {
+      const completed = await runCallbacks(this, "validation", async () => {
         await this.runValidationsBang();
         return true;
       });
@@ -1194,7 +1188,7 @@ export class Model {
   /** @internal */
   async _runValidateCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Model;
-    await runBeforeCallbacksOnProto(ctor.prototype, "validate", this);
+    await runCallbacks(this, "validate", undefined, undefined, "before");
   }
 
   /**
@@ -1884,6 +1878,10 @@ include(Model, ASCallbacks.InstanceMethods);
 // Ruby `include ActiveModel::Validations::Callbacks`'s ClassMethods half
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
+// Ruby `include ActiveModel::Validations`' `included do` block
+// (validations.rb:48).
+defineCallbacks(Model.prototype, "validate", { scope: ["name"] });
+
 defineCallbacks(Model.prototype, "validation", {
   skipAfterCallbacksIfTerminated: true,
   scope: ["kind", "name"],

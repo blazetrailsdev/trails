@@ -128,9 +128,6 @@ import {
   InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
-  runAllCallbacks as cbRunAll,
-  runAfterCallbacksOnProto as cbRunAfter,
-  beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   type DirtyOptions,
@@ -184,6 +181,8 @@ import {
   singularize as _singularize,
   type Included,
   type ParameterFilter,
+  peekCallbackChain,
+  runCallbacks,
 } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
@@ -552,6 +551,38 @@ async function performClassUpdate(
  */
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   return ctor.isScopeAttributes();
+}
+
+/**
+ * Source-text of every `before`/`around` callback registered for `event` whose
+ * filter is a plain function (so it can be introspected via
+ * `Function.prototype.toString`). `opaque` is true when any before/around entry
+ * is an object/method-name filter whose body cannot be read from here.
+ *
+ * @noRailsEquivalent CONVERGEABLE: Rails loads a `belongs_to` target lazily, at
+ *   the moment a callback body dereferences it; trails has to decide up front
+ *   which targets to await, and reads the registered filter bodies to narrow
+ *   that set. See `_preloadBelongsToForDestroyCallbacks`. Not exported.
+ */
+function beforeOrAroundCallbackSources(
+  proto: object,
+  event: string,
+): { sources: string[]; opaque: boolean } {
+  const chain = peekCallbackChain(proto, event);
+  if (!chain) return { sources: [], opaque: false };
+  const sources: string[] = [];
+  let opaque = false;
+  for (const e of chain.entries) {
+    if (e.kind !== "before" && e.kind !== "around") continue;
+    if (typeof e.filter !== "function") {
+      opaque = true;
+      continue;
+    }
+    const src = e.filter.toString();
+    if (src.includes("[native code]")) opaque = true;
+    else sources.push(src);
+  }
+  return { sources, opaque };
 }
 
 /**
@@ -2835,8 +2866,8 @@ export class Base extends Model {
     // callbacks, so an `after_find` hook already sees the inverse set.
     block?.(record);
     // strict:"sync" guarantees synchronous completion — void the settled result.
-    void cbRunAfter(this.prototype, "find", record, { strict: "sync" });
-    void cbRunAfter(this.prototype, "initialize", record, { strict: "sync" });
+    void runCallbacks(record, "find", undefined, { strict: "sync" }, "after");
+    void runCallbacks(record, "initialize", undefined, { strict: "sync" }, "after");
     return record;
   }
 
@@ -3053,7 +3084,7 @@ export class Base extends Model {
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
         // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
+        void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
       }
     } else {
       // For the regular (non-multiparameter) path, mirror the multiparameter
@@ -3137,7 +3168,7 @@ export class Base extends Model {
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
         // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
+        void runCallbacks(this, "initialize", undefined, { strict: "sync" }, "after");
       }
     }
     // Suppressed-callback fallback: parent caller fires after_initialize, so
@@ -3237,7 +3268,7 @@ export class Base extends Model {
     // Rails: Callbacks#create_or_update wraps super in run_callbacks(:save) { ... }.
     // Around_save callbacks correctly wrap the _createRecord/_updateRecord calls which
     // themselves run their own run_callbacks(:create/:update) { ... } chains.
-    const saveOk = await cbRunAll(ctor.prototype, "save", this, async () => {
+    const saveOk = await runCallbacks(this, "save", async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
         const createOk = await this._createRecord(block);
@@ -3412,7 +3443,7 @@ export class Base extends Model {
     await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
-    const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {
+    const destroyResult = await runCallbacks(this, "destroy", async () => {
       // Mirrors Rails Persistence#destroy: `destroy_associations` runs inside the
       // destroy callback chain — after before_destroy, before the row delete.
       // The base hook is a no-op; HABTM overrides it to clean up join rows.
