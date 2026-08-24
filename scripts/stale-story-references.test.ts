@@ -144,12 +144,9 @@ describe("stale story references", () => {
   // well as in every agent worktree (start-worktree.sh symlinks the same path).
   // loadStories throws rather than skipping when that checkout is missing.
   //
-  // The whole-tree scans are pure reads, so they run once in a beforeAll shared
-  // by both cases rather than once per case. They still walk the entire repo
-  // plus the tasks checkout, which takes ~2s idle and several times that on a
-  // loaded host, so the hook carries its own timeout instead of inheriting
-  // vitest's 5s default — a timeout there names the scan that overran rather
-  // than surfacing as a bare per-test timeout that reads like a stale citation.
+  // The scans below are pure reads, so they run once here rather than per case,
+  // and the hook carries its own timeout: under host load they overrun vitest's
+  // 5s default, and a per-case timeout there reads like a stale citation.
   let treeStories: IndexStory[];
   let treeRefs: Awaited<ReturnType<typeof scanStoryReferences>>;
   let frozenFiles: string[];

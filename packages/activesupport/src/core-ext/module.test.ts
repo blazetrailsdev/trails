@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { delegate } from "../module-ext.js";
+import { delegate, delegateMissingTo } from "../module-ext.js";
 import { registerConstant, unregisterConstant } from "../inflector.js";
 
 describe("ModuleTest", () => {
@@ -455,7 +455,18 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to with reserved methods", () => {
-    expect(typeof delegate).toBe("function");
+    class DecoratedReserved {
+      case: { name: string };
+
+      constructor(kase: { name: string }) {
+        this.case = kase;
+      }
+    }
+    const decorated = delegateMissingTo(
+      new DecoratedReserved({ name: "David" }),
+      "case",
+    ) as DecoratedReserved & { name: string };
+    expect(decorated.name).toBe("David");
   });
 
   it("delegate missing to with keyword methods", () => {
