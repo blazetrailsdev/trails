@@ -25,6 +25,11 @@ export interface DirtyOptions {
  */
 export class Dirty {
   declare _attributes: AttributeSet;
+  /**
+   * Rails' `_read_attribute`, the one member `ForcedMutationTracker` reads its
+   * host through (attribute_mutation_tracker.rb:140-142). @internal
+   */
+  declare _readAttribute: (attrName: string) => unknown;
   /** Rails' `@mutations_from_database` (dirty.rb:374). @internal */
   declare _mutationsFromDatabase: AttributeMutationTracker | null;
   /** Rails' `@mutations_before_last_save` (dirty.rb:373). @internal */
@@ -191,7 +196,7 @@ export class Dirty {
     return (this._mutationsFromDatabase ??=
       this._attributes != null
         ? new AttributeMutationTracker(this._attributes)
-        : new ForcedMutationTracker(this as unknown as AttributeSet));
+        : new ForcedMutationTracker(this));
   }
 
   /**

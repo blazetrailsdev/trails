@@ -159,10 +159,18 @@ describe("AttributeMutationTracker", () => {
   });
 });
 
+/**
+ * The shape Rails hands `ForcedMutationTracker` — a `_read_attribute`
+ * answerer (dirty.rb:385), not an `AttributeSet`.
+ */
+function buildHost(set: AttributeSet) {
+  return { _readAttribute: (name: string) => set.fetchValue(name) };
+}
+
 describe("ForcedMutationTracker", () => {
   it("only tracks forced changes", () => {
     const set = buildSet({ name: "Alice" });
-    const tracker = new ForcedMutationTracker(set);
+    const tracker = new ForcedMutationTracker(buildHost(set));
 
     expect(tracker.anyChanges()).toBe(false);
     tracker.forceChange("name");
@@ -171,7 +179,7 @@ describe("ForcedMutationTracker", () => {
 
   it("originalValue returns the forced value", () => {
     const set = buildSet({ name: "Alice" });
-    const tracker = new ForcedMutationTracker(set);
+    const tracker = new ForcedMutationTracker(buildHost(set));
 
     tracker.forceChange("name");
     expect(tracker.originalValue("name")).toBe("Alice");
@@ -182,7 +190,7 @@ describe("ForcedMutationTracker", () => {
 
   it("finalizeChanges captures current state", () => {
     const set = buildSet({ name: "Alice" });
-    const tracker = new ForcedMutationTracker(set);
+    const tracker = new ForcedMutationTracker(buildHost(set));
 
     tracker.forceChange("name");
     set.writeFromUser("name", "Bob");
