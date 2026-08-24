@@ -6,4 +6,4 @@ import { Book } from "./models.js";
 // only the former is pinned by the runner's frozen clock.
 const oneWeekAgo = weeks(1).ago(Temporal.Instant.fromEpochMilliseconds(Date.now()));
 
-export default Book.joins("reviews").where("reviews.created_at > ?", oneWeekAgo);
+export default Book.joins(":reviews").where("reviews.created_at > ?", oneWeekAgo);

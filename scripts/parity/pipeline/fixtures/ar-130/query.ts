@@ -1,7 +1,7 @@
 import { sql } from "@blazetrails/arel";
 import { Author } from "./models.js";
 
-export default Author.joins("books")
+export default Author.joins(":books")
   .joins("INNER JOIN reviews ON reviews.book_id = books.id")
   .where("reviews.rating >= 4")
   .group("authors.id, authors.name")
