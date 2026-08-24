@@ -387,6 +387,7 @@ export type {
   CallbackOptions,
   DefineCallbacksOptions,
   RunCallbacksOptions,
+  FilterListEntry,
   BeforeCallback,
   AfterCallback,
   AroundCallback,

@@ -324,6 +324,7 @@ import {
   afterCommit as _afterCommit,
   afterRollback as _afterRollback,
   setCallback as _txSetCallback,
+  InstanceMethods as TransactionsInstanceMethods,
   afterSaveCommit as _afterSaveCommit,
   afterCreateCommit as _afterCreateCommit,
   afterUpdateCommit as _afterUpdateCommit,
@@ -4232,16 +4233,8 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
   static afterRollback = _afterRollback;
 
-  /** Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback */
-  static override setCallback<T extends typeof Model>(
-    this: T,
-    event: string,
-    timing: "before" | "after" | "around",
-    fn: ((...args: any[]) => any) | string,
-    options?: Record<string, unknown>,
-  ): void {
-    _txSetCallback.call(this, event, timing, fn, options);
-  }
+  /** Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback (transactions.rb:304-318). */
+  static override setCallback = _txSetCallback;
 
   /**
    * Run validations and return self.
@@ -4604,6 +4597,8 @@ extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
 include(Base, CallbacksInstanceMethods);
+// Ruby `include ActiveRecord::Transactions` (transactions.rb:10-14).
+include(Base, TransactionsInstanceMethods);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
 extend(Base, {

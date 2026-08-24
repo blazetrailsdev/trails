@@ -1486,6 +1486,16 @@ export namespace Callbacks {
     }
   }
 
+  /**
+   * Mirrors: ActiveSupport::Callbacks::ClassMethods#skip_callback (callbacks.rb:786-808).
+   *
+   * Rails' `__update_callbacks` writes the chain back to `self` *and* every
+   * descendant, so a subclass that skips nothing still sees callbacks its
+   * superclass registers afterwards. trails has no descendant list and gets the
+   * same reachability from copy-on-write, so the chain is peeked and only
+   * materialised once a filter actually matches — a skip that removed nothing
+   * must not sever the subclass from its superclass' chain.
+   */
   export function skipCallback<T extends object>(
     target: T,
     name: string,
@@ -1497,11 +1507,10 @@ export namespace Callbacks {
     );
     if (!("raise" in options)) options.raise = true;
 
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
+    let chain = peekCallbackChain(target, name);
     if (!chain) return;
     for (const filter of filters) {
-      const callback = chain.entries.find((c) =>
+      let callback = chain.entries.find((c) =>
         c.matches(type, filter as AnyCallback | CallbackObject),
       );
 
@@ -1510,15 +1519,23 @@ export namespace Callbacks {
           `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
         );
       }
+      if (!callback) continue;
 
-      if (callback && ("if" in options || "unless" in options)) {
+      if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
+        chain = getCallbackChains(target).get(name)!;
+        callback = chain.entries.find((c) =>
+          c.matches(type, filter as AnyCallback | CallbackObject),
+        )!;
+      }
+
+      if ("if" in options || "unless" in options) {
         const newCallback = callback.mergeConditionalOptions(chain, {
           ifOption: options.if,
           unlessOption: options.unless,
         });
         chain.insert(chain.index(callback), newCallback);
       }
-      if (callback) chain.delete(callback);
+      chain.delete(callback);
     }
   }
 
@@ -1536,6 +1553,10 @@ export namespace Callbacks {
    * so Ruby's second positional lands after both rather than after `name`.
    * It is forwarded straight into `chain.compile(type)` as it is there: a
    * `type` runs only that kind's callbacks.
+   *
+   * The chain is peeked: Ruby's `__callbacks[name]` is a read, and trails'
+   * copy-on-write materialisation would snapshot an ancestor's chain here and
+   * stop tracking its later changes.
    */
   export function runCallbacks(
     target: object,
@@ -1544,8 +1565,7 @@ export namespace Callbacks {
     opts?: RunCallbacksOptions,
     type?: CallbackKind,
   ): unknown {
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
+    const chain = peekCallbackChain(target, name);
     if (!chain) {
       // Rails: `yield if block_given?` — the block's value, not a boolean.
       const r = block?.();
@@ -1559,6 +1579,61 @@ export namespace Callbacks {
     const sequence = chain.compile(type);
     return sequence.invoke(target, block, opts);
   }
+
+  /**
+   * Mirrors: ActiveSupport::Callbacks::ClassMethods (callbacks.rb:733-820).
+   *
+   * Mixed onto a class with `extend()`. Ruby's `self` here is the class, whose
+   * chains live in its `_#{name}_callbacks` class_attribute; trails keys a chain
+   * on the object its instances resolve it from, which for a class is the
+   * prototype — the translation `define_model_callbacks` already makes
+   * (activemodel/lib/active_model/callbacks.rb:120). The instance half of `module Callbacks`
+   * is `InstanceMethods` below: `include()` copies every function it is handed
+   * onto the prototype, so the two halves cannot share one module object the
+   * way Ruby's `ActiveSupport::Concern` lets them.
+   */
+  export const ClassMethods = {
+    /** Mirrors: ActiveSupport::Callbacks::ClassMethods#set_callback (callbacks.rb:737-749). */
+    setCallback(
+      this: { prototype: object },
+      name: string,
+      ...filterList: FilterListEntry<any>[]
+    ): void {
+      Callbacks.setCallback(this.prototype, name, ...filterList);
+    },
+
+    /** Mirrors: ActiveSupport::Callbacks::ClassMethods#skip_callback (callbacks.rb:786-808). */
+    skipCallback(
+      this: { prototype: object },
+      name: string,
+      ...filterList: FilterListEntry<any>[]
+    ): void {
+      Callbacks.skipCallback(this.prototype, name, ...filterList);
+    },
+
+    /** Mirrors: ActiveSupport::Callbacks::ClassMethods#reset_callbacks (callbacks.rb:811-821). */
+    resetCallbacks(this: { prototype: object }, name: string): void {
+      Callbacks.resetCallbacks(this.prototype, name);
+    },
+  };
+
+  /**
+   * The instance half of `module ActiveSupport::Callbacks` — Ruby defines
+   * `run_callbacks` directly in the module (callbacks.rb:96-104) alongside the
+   * `ClassMethods` above; see that constant for why they are two objects here.
+   */
+  export const InstanceMethods = {
+    /** Mirrors: ActiveSupport::Callbacks#run_callbacks (callbacks.rb:96-104). */
+    runCallbacks(
+      this: object,
+      name: string,
+      block?: () => unknown,
+      opts?: RunCallbacksOptions,
+      type?: CallbackKind,
+    ): unknown {
+      return Callbacks.runCallbacks(this, name, block, opts, type);
+    },
+  };
 }
 
 export function defineCallbacks<T extends object>(
