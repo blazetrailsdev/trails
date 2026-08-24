@@ -22,8 +22,8 @@ class Boy extends Human {
 // Rails' `record.face = f` / `s.dashboard = dash`. These canonical models are
 // schema-introspected and expose no generated `face=` / `dashboard=` *property*
 // accessor, so a plain `record.face = f` would set an own data property the
-// validator never reads; the association writer is the same call that property
-// would forward to (`builder/association.rb:104-108`).
+// validator never reads; the association writer is what that property forwards
+// to (builder/association.rb:110-116).
 function setAssoc(record: Base, name: string, value: unknown): unknown {
   return (record as unknown as { association(n: string): { writer(v: unknown): unknown } })
     .association(name)

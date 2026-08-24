@@ -1328,16 +1328,16 @@ export class Migration {
    * call-time config source rather than an import for the same reason
    * `#connection` does — naming `tasks/database-tasks.js` here would be a
    * load-time edge back into a module that already imports this one.
+   *
+   * The opening `return unless respond_to?(direction)` (`:965`) is answered by
+   * `Migration`'s own instance `up` and `down` (`migration.rb:951, 957`, the
+   * legacy-delegate shape), so it is true for both directions on every
+   * migration, change-only ones included. Resolving it against
+   * SUBCLASS-defined `up`/`down` instead would skip every change-based
+   * migration, which Rails runs.
    */
   async migrate(direction: "up" | "down"): Promise<void> {
-    // `return unless respond_to?(direction)` (migration.rb:965). `Migration`
-    // itself defines instance `up` and `down` (migration.rb:951, 957 — the
-    // legacy-delegate shape), so this answers true for both directions on
-    // every migration, change-only ones included: the guard is ported for the
-    // control flow, not for a behaviour it gates in practice. Resolving it
-    // against SUBCLASS-defined `up`/`down` instead would skip every
-    // change-based migration, which Rails runs.
-    if (typeof (this as unknown as Record<string, unknown>)[direction] !== "function") return;
+    if (typeof this[direction] !== "function") return;
     this.announce(direction === "up" ? "migrating" : "reverting");
     let timeElapsed = 0;
     const pool = migrationArConfig()!.databaseTasks().migrationConnection().pool as ConnectionPool;

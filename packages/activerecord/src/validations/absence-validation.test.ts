@@ -33,7 +33,7 @@ describe("AbsenceValidationTest", () => {
     Boy.validatesAbsenceOf("face");
 
     // Rails `boy_klass.new(face: Face.new)` — the has_one writer, which on an
-    // unsaved owner only sets the target (has_one_association.rb:69-72).
+    // unsaved owner only sets the target (has_one_association.rb:59-66).
     const boy = new Boy();
     const face = new Face();
     await (boy as unknown as { association(n: string): { writer(v: unknown): unknown } })

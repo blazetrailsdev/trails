@@ -1555,6 +1555,13 @@ function buildPackageReport(
   // `uncoveredTsFiles(...)` arm below — scored against an EMPTY allowed set.
   // The methods ARE stamped per-file, so recover the file list from them; the
   // `RUBY_FILE_TS_OVERRIDES` rows are the subset of it found by hand.
+  //
+  // A file already IN `rubyFiles` needs the same pass: a module reopened in it
+  // (`ActiveModel::Validations`, primary site `validations.rb`, declaring
+  // `validates_with` in `validations/with.rb`) is registered under its primary
+  // file only, so its methods score as drift in the very file Rails puts them
+  // in. Those entities enter method-file-filtered, which is what keeps the
+  // allow-set to the methods that Ruby file actually declares.
   const methodDeclarationFiles = new Set<string>();
   for (const info of [...Object.values(rubyPkg.classes), ...Object.values(rubyPkg.modules)]) {
     for (const m of [...info.instanceMethods, ...info.classMethods]) {
@@ -1564,13 +1571,6 @@ function buildPackageReport(
   for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
     const tsFile = rubyFileToTs(rubyFile, pkg);
     const alreadyDeclared = rubyFiles.has(rubyFile);
-    // A file already in `rubyFiles` still needs the reopening pass: an entity
-    // whose PRIMARY declaration site is elsewhere can declare methods here too
-    // (`ActiveModel::Validations#validates_with` is stamped
-    // `validations/with.rb` while the module's primary site is
-    // `validations.rb`), and without this its methods are scored as drift in
-    // exactly the file Rails puts them in. `coveredTsFiles` only guards the
-    // case where this file introduces a NEW TS target.
     if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
     const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
     for (const [fqn, info] of [

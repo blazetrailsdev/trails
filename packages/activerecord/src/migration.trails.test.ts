@@ -31,10 +31,8 @@ describe("MigrationTest", () => {
   // leasing a standing sidecar pool).
   fixtures({}, { useTransactionalTests: false });
 
-  // migration.rb:965's `return unless respond_to?(direction)` is answered by
-  // Migration's own instance `up`/`down` (migration.rb:951, 957), so a
-  // change-only migration still runs in both directions. Resolving the guard
-  // against subclass-defined `up`/`down` would silently skip every one of them.
+  // `respond_to?(direction)` (migration.rb:965) is answered by Migration's own
+  // instance `up`/`down` (migration.rb:951, 957), so this still runs both ways.
   it("migrate runs a change-only migration in both directions", async () => {
     class ChangeOnly extends Migration {
       directions: string[] = [];
