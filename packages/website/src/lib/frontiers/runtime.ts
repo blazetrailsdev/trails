@@ -1,11 +1,11 @@
 import type { SqlJsStatic } from "sql.js";
 import { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VirtualFS } from "./virtual-fs.js";
-import { createTrailCLI, dropUserTables, type CliResult } from "./trail-cli.js";
+import { createTrailsCLI, dropUserTables, type CliResult } from "./trails-cli.js";
 import type { MigrationProxy } from "@blazetrails/activerecord/migration";
 
 export type { VirtualFS, VfsFile } from "./virtual-fs.js";
-export type { CliResult } from "./trail-cli.js";
+export type { CliResult } from "./trails-cli.js";
 
 export interface Runtime {
   adapter: SqlJsAdapter;
@@ -61,7 +61,7 @@ export async function createRuntime(SQL: SqlJsStatic): Promise<Runtime> {
   }
 
   function buildCli() {
-    return createTrailCLI({
+    return createTrailsCLI({
       vfs,
       adapter,
       executeCode,

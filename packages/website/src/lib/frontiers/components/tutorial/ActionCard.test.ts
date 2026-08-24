@@ -4,7 +4,7 @@ import ActionCard from "./ActionCard.svelte";
 import initSqlJs, { type SqlJsStatic } from "sql.js";
 import { SqlJsAdapter } from "../../sql-js-adapter.js";
 import { VirtualFS } from "../../virtual-fs.js";
-import type { CliResult } from "../../trail-cli.js";
+import type { CliResult } from "../../trails-cli.js";
 
 let SQL: SqlJsStatic;
 let vfs: VirtualFS;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
 import CliAction from "./CliAction.svelte";
-import type { CliResult } from "../../trail-cli.js";
+import type { CliResult } from "../../trails-cli.js";
 
 function mockExec(result: Partial<CliResult> = {}): (cmd: string) => Promise<CliResult> {
   return vi.fn().mockResolvedValue({

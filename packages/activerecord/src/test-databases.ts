@@ -5,34 +5,8 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { MigrationProxy } from "./migration.js";
-import { Migrator } from "./migration.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-
-/**
- * Run migrations on each test database adapter.
- *
- * Mirrors: ActiveRecord::TestDatabases.create_and_migrate
- */
-export async function createAndMigrate(
-  adapters: DatabaseAdapter[],
-  migrations: MigrationProxy[],
-): Promise<void> {
-  for (const adapter of adapters) {
-    // Rails' TestDatabases defines no `create_and_migrate`; the Migrator it
-    // builds is the Rails one (`migration.rb:1421-1433`).
-    const migrator = new Migrator(
-      "up",
-      migrations,
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-    );
-    await migrator.migrate();
-  }
-}
 
 /**
  * Iterate over test database adapters, calling the callback for each.

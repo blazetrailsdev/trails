@@ -2,7 +2,7 @@ import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
 import type { Migration, MigrationProxy } from "@blazetrails/activerecord/migration";
-import { Migrator } from "@blazetrails/activerecord/migration";
+import { MigrationContext } from "@blazetrails/activerecord/migration";
 import { InternalMetadata, SchemaMigration } from "@blazetrails/activerecord";
 import {
   camelize,
@@ -51,31 +51,58 @@ const MIGRATION_FILE_PATTERN = /^(\d+)[-_](.+)\.(?:ts|js)$/;
 // (a) evaluate the file in a sandbox that exposes registerMigration, or
 // (b) be changed to return the migration class directly so we can build the
 //     proxy without the registry lookup.
-function discoverMigrations(
-  vfs: VirtualFS,
-  executeCode: (code: string) => Promise<unknown>,
-  getMigrations: () => MigrationProxy[],
-): MigrationProxy[] {
-  return vfs
-    .list()
-    .filter((f) => f.path.startsWith("db/migrate/"))
-    .flatMap((file) => {
-      const basename = file.path.split("/").pop() ?? "";
-      const match = basename.match(MIGRATION_FILE_PATTERN);
-      if (!match) return [];
+/**
+ * The `MigrationContext` every `db:*` command runs through, over the browser's
+ * virtual FS instead of a directory: Rails' `migration_files` /
+ * `parse_migration_filename` (`migration.rb:1369-1376`) are private, and a Ruby
+ * private method is still overridable by a subclass, so discovery is repointed
+ * there and the run surface (`migrate` / `rollback` / `open` /
+ * `migrations_status`) is inherited unchanged.
+ */
+class VfsMigrationContext extends MigrationContext {
+  constructor(
+    private readonly vfs: VirtualFS,
+    private readonly executeCode: (code: string) => Promise<unknown>,
+    private readonly getMigrations: () => MigrationProxy[],
+    schemaMigration: SchemaMigration,
+    internalMetadata: InternalMetadata,
+  ) {
+    super(["db/migrate"], schemaMigration, internalMetadata);
+  }
+
+  protected override migrationFiles(): string[] {
+    return this.vfs
+      .list()
+      .map((f) => f.path)
+      .filter((path) => path.startsWith("db/migrate/") && this.parseMigrationFilename(path))
+      .sort();
+  }
+
+  protected override parseMigrationFilename(filename: string): [string, string, string] | null {
+    const basename = filename.split("/").pop() ?? "";
+    const match = basename.match(MIGRATION_FILE_PATTERN);
+    if (!match) return null;
+    return [match[1], match[2].replace(/-/g, "_"), ""];
+  }
+
+  override get migrations(): MigrationProxy[] {
+    const migrations = this.migrationFiles().flatMap((path) => {
+      const parsed = this.parseMigrationFilename(path);
+      if (!parsed) return [];
+      const [rawVersion, name] = parsed;
       return [
         {
-          version: match[1],
-          name: camelize(match[2].replace(/-/g, "_")),
-          filename: file.path,
+          version: Number(rawVersion),
+          name: camelize(name),
+          filename: path,
           migration: async (): Promise<Migration> => {
-            const content = vfs.read(file.path)?.content;
-            if (!content) throw new Error(`File not found: ${file.path}`);
-            await executeCode(content);
-            const reg = getMigrations().find((r) => r.version === match[1]);
+            const content = this.vfs.read(path)?.content;
+            if (!content) throw new Error(`File not found: ${path}`);
+            await this.executeCode(content);
+            const reg = this.getMigrations().find((r) => r.version === rawVersion);
             if (!reg) {
               throw new Error(
-                `Migration ${match[1]} from ${file.path} did not register after execution`,
+                `Migration ${rawVersion} from ${path} did not register after execution`,
               );
             }
             return reg.migration();
@@ -83,9 +110,14 @@ function discoverMigrations(
         },
       ];
     });
+
+    // `migrations.sort_by(&:version)` (`migration.rb:1315`) — lexicographic
+    // path order puts `10_` before `2_`.
+    return migrations.sort((a, b) => Number(a.version) - Number(b.version));
+  }
 }
 
-export interface TrailCliDeps {
+export interface TrailsCliDeps {
   vfs: VirtualFS;
   adapter: SqlJsAdapter;
   executeCode: (code: string) => Promise<unknown>;
@@ -135,25 +167,27 @@ const browserProcessAdapter: ProcessAdapter = {
   stdin: { isTTY: false, read: async () => null },
 };
 
-export function createTrailCLI(deps: TrailCliDeps) {
+export function createTrailsCLI(deps: TrailsCliDeps) {
   const { vfs, adapter } = deps;
   const output: string[] = [];
   function log(msg: string) {
     output.push(msg);
   }
 
-  async function withMigrator(fn: (migrator: Migrator) => Promise<void>): Promise<void> {
-    const proxies = discoverMigrations(vfs, deps.executeCode, deps.getMigrations);
-    if (proxies.length === 0) {
-      log("No migrations found in db/migrate/.");
-      return;
-    }
-    const migrator = new Migrator(
-      "up",
-      proxies,
+  async function withMigrationContext(
+    fn: (migrationContext: MigrationContext) => Promise<void>,
+  ): Promise<void> {
+    const migrationContext = new VfsMigrationContext(
+      vfs,
+      deps.executeCode,
+      deps.getMigrations,
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
+    if (migrationContext.migrations.length === 0) {
+      log("No migrations found in db/migrate/.");
+      return;
+    }
     // Migration output goes to stdout (Rails' Migration#write is `puts`), and
     // the browser has no process — so the shim's stdout is pointed at this
     // CLI's output buffer for the duration of the run. Any adapter the host
@@ -162,7 +196,7 @@ export function createTrailCLI(deps: TrailCliDeps) {
     registerProcessAdapter(browserProcessAdapter);
     stdoutSink = (chunk) => log(chunk.replace(/\n$/, ""));
     try {
-      await fn(migrator);
+      await fn(migrationContext);
     } finally {
       stdoutSink = () => {};
       if (prevAdapter) registerProcessAdapter(prevAdapter);
@@ -214,9 +248,9 @@ export function createTrailCLI(deps: TrailCliDeps) {
 
       "db:migrate": async (_args, opts) => {
         const version = opts.version && opts.version !== "true" ? opts.version : null;
-        await withMigrator(async (migrator) => {
-          await migrator.migrate(version);
-          const pending = await migrator.pendingMigrations();
+        await withMigrationContext(async (migrationContext) => {
+          await migrationContext.migrate(version);
+          const pending = await migrationContext.open().pendingMigrations();
           log(
             pending.length === 0
               ? "All migrations are up to date."
@@ -228,14 +262,14 @@ export function createTrailCLI(deps: TrailCliDeps) {
       "db:rollback": async (_args, opts) => {
         const parsed = parseInt(opts.step ?? "1", 10);
         const step = Number.isNaN(parsed) ? 1 : parsed;
-        await withMigrator(async (migrator) => {
-          await migrator.rollback(step);
+        await withMigrationContext(async (migrationContext) => {
+          await migrationContext.rollback(step);
         });
       },
 
       "db:migrate:status": async () => {
-        await withMigrator(async (migrator) => {
-          const statuses = await migrator.migrationsStatus();
+        await withMigrationContext(async (migrationContext) => {
+          const statuses = await migrationContext.migrationsStatus();
           log("");
           log(" Status   Migration ID    Migration Name");
           log("--------------------------------------------------");

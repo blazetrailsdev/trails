@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CliResult } from "../../trail-cli.js";
+  import type { CliResult } from "../../trails-cli.js";
 
   interface Props {
     command: string;

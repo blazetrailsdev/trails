@@ -73,11 +73,6 @@ describe("MigratorTest", () => {
   // Rails' migrator_class(count) builds a MigrationContext subclass whose
   // #migrations returns the sensor list; in trails a Migrator carries its own
   // migrations, so this just wraps `sensors`.
-  function migratorClass(count: number): { calls: Array<[string, number]>; migrator: Migrator } {
-    const { calls, migrations } = sensors(count);
-    return { calls, migrator: new Migrator("up", migrations, schemaMigration, internalMetadata) };
-  }
-
   // Rails' migrator_class(count) subclasses MigrationContext and overrides
   // #migrations to return the sensor list, which is why its `.new("valid", ...)`
   // path argument is never read. Same shape here.
@@ -137,19 +132,19 @@ describe("MigratorTest", () => {
     const list = (): MigrationProxy[] => [migration("Foo", 1), migration("Bar", 2)];
 
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).run("up", 3),
+      new Migrator("up", list(), schemaMigration, internalMetadata, 3).run(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).run("up", -1),
+      new Migrator("up", list(), schemaMigration, internalMetadata, -1).run(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).run("up", 0),
+      new Migrator("up", list(), schemaMigration, internalMetadata, 0).run(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).migrate(3),
+      new Migrator("up", list(), schemaMigration, internalMetadata, 3).migrate(),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).migrate(-1),
+      new Migrator("up", list(), schemaMigration, internalMetadata, -1).migrate(),
     ).rejects.toThrow(UnknownMigrationVersionError);
   });
 
@@ -252,9 +247,8 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/valid`;
     await seedVersions(2, 10);
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      [path],
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -270,9 +264,8 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/old_and_new_versions`;
     await seedVersions(230, 231, 20210716122844, 20210716123013);
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      [path],
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -290,9 +283,8 @@ describe("MigratorTest", () => {
     // migration application which should not affect ordering in status.
     await seedVersions(230, 231, 20210716123013);
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      [path],
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -308,9 +300,8 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/valid_with_subdirectories`;
     await seedVersions(2, 10);
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      [path],
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -328,9 +319,8 @@ describe("MigratorTest", () => {
     // as applied.
     await seedVersions(1, 2, 3);
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      [path],
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -348,9 +338,8 @@ describe("MigratorTest", () => {
     ];
     await seedVersions("20100101010101", "20160528010101");
 
-    const status = await new Migrator(
-      "up",
-      new MigrationContext(paths, schemaMigration, internalMetadata).migrations,
+    const status = await new MigrationContext(
+      paths,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -460,11 +449,11 @@ describe("MigratorTest", () => {
   it("migrator one up", async () => {
     const { calls, migrations } = sensors(3);
 
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(2);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 2).migrate();
     expect(calls).toEqual([["up", 2]]);
   });
 
@@ -479,7 +468,7 @@ describe("MigratorTest", () => {
     ]);
     calls.length = 0;
 
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 1).migrate();
     expect(calls).toEqual([
       ["down", 3],
       ["down", 2],
@@ -489,42 +478,43 @@ describe("MigratorTest", () => {
   it("migrator one up one down", async () => {
     const { calls, migrations } = sensors(3);
 
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(0);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
     expect(calls).toEqual([["down", 1]]);
   });
 
   it("migrator double up", async () => {
     const { calls, migrations } = sensors(3);
-    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
+    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
     expect(await migrator.currentVersion()).toBe(0);
 
-    await migrator.migrate(1);
+    await migrator.migrate();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
-    await migrator.migrate(1);
+    await migrator.migrate();
     expect(calls).toEqual([]);
   });
 
   it("migrator double down", async () => {
     const { calls, migrations } = sensors(3);
-    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
+    let migrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
 
     expect(await migrator.currentVersion()).toBe(0);
 
-    await migrator.run("up", 1);
+    await migrator.run();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
-    await migrator.run("down", 1);
+    migrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 1);
+    await migrator.run();
     expect(calls).toEqual([["down", 1]]);
     calls.length = 0;
 
-    await migrator.run("down", 1);
+    await migrator.run();
     expect(calls).toEqual([]);
 
     expect(await migrator.currentVersion()).toBe(0);
@@ -543,14 +533,14 @@ describe("MigratorTest", () => {
       const { migrations } = sensors(3);
 
       Migration.verbose = true;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
-      await upMigrator.migrate(1);
+      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
+      await upMigrator.migrate();
       expect(lines.length).not.toBe(0);
 
       lines.length = 0;
 
-      const downMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
-      await downMigrator.migrate(0);
+      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
+      await downMigrator.migrate();
       expect(lines.length).not.toBe(0);
     } finally {
       spy.mockRestore();
@@ -567,12 +557,12 @@ describe("MigratorTest", () => {
       const { migrations } = sensors(3);
 
       Migration.verbose = false;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
-      await upMigrator.migrate(1);
+      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
+      await upMigrator.migrate();
       expect(lines.length).toBe(0);
 
-      const downMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
-      await downMigrator.migrate(0);
+      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
+      await downMigrator.migrate();
       expect(lines.length).toBe(0);
     } finally {
       spy.mockRestore();
@@ -583,24 +573,24 @@ describe("MigratorTest", () => {
     const { calls, migrations } = sensors(3);
 
     // migrate up to 1
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
     // migrate down to 0
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(0);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
     expect(calls).toEqual([["down", 1]]);
     calls.length = 0;
 
     // migrate down to 0 again
-    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(0);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
     expect(calls).toEqual([]);
   });
 
   it("migrator going down due to version target", async () => {
-    const { calls, migrator } = migratorClass(3);
+    const { calls, context: migrator } = migrationContextClass(3);
 
-    await migrator.migrate(1);
+    await migrator.up(1);
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
@@ -631,7 +621,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator output when running single migration", async () => {
-    const { migrator } = migratorClass(1);
+    const { context: migrator } = migrationContextClass(1);
 
     const result = await migrator.run("up", 1);
 
@@ -658,7 +648,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator db has no schema migrations table", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
 
     await schemaMigration.dropTable();
     expect(await schemaMigration.tableExists()).toBe(false);
@@ -682,7 +672,7 @@ describe("MigratorTest", () => {
     // migrate up to 1
     await seedVersions("1");
 
-    const { calls, migrator } = migratorClass(3);
+    const { calls, context: migrator } = migrationContextClass(3);
     await migrator.migrate();
 
     expect(calls).toEqual([

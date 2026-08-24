@@ -58,7 +58,7 @@ describe("MultiDbMigratorTest (trails)", () => {
 
     await migratorA.migrate();
 
-    expect(await migratorA.getAllVersions()).toEqual([1, 2, 3]);
-    expect(await migratorB.getAllVersions()).toEqual([]);
+    expect(await schemaMigrationA.integerVersions()).toEqual([1, 2, 3]);
+    expect(await schemaMigrationB.integerVersions()).toEqual([]);
   });
 });

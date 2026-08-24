@@ -769,21 +769,22 @@ export class CreatePosts extends Migration {
     const migrations = discoverMigrations(tmpDir);
     const schemaMigration = new SchemaMigration(adapter.pool);
     const internalMetadata = new InternalMetadata(adapter.pool);
-    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
-    // `rollback` lives on MigrationContext (`migration.rb:1240-1242`); it reads
-    // the same bookkeeping tables, over the same discovered migration list.
     const context = migrationContextFor(tmpDir, schemaMigration, internalMetadata);
+    // Rails' `Migrator#initialize` creates the bookkeeping tables
+    // (`migration.rb:1429-1430`) before anything reads them; `migrations_status`
+    // reads `schema_migration.normalized_versions` directly.
+    await schemaMigration.createTable();
 
     // Status before migrate
-    const beforeStatus = await migrator.migrationsStatus();
+    const beforeStatus = await context.migrationsStatus();
     expect(beforeStatus).toHaveLength(1);
     expect(beforeStatus[0].status).toBe("down");
 
     // Migrate up
-    await migrator.migrate();
+    await context.migrate();
 
     // Status after migrate
-    const afterStatus = await migrator.migrationsStatus();
+    const afterStatus = await context.migrationsStatus();
     expect(afterStatus[0].status).toBe("up");
 
     // Verify table exists
@@ -796,7 +797,7 @@ export class CreatePosts extends Migration {
     await context.rollback(1);
 
     // Status after rollback
-    const rollbackStatus = await migrator.migrationsStatus();
+    const rollbackStatus = await context.migrationsStatus();
     expect(rollbackStatus[0].status).toBe("down");
 
     // Verify table is gone
@@ -902,20 +903,18 @@ export class CreateWidgets extends Migration {
 }`,
     );
 
-    const migrations = discoverMigrations(tmpDir);
-    const migrator = new Migrator(
-      "up",
-      migrations,
+    const context = migrationContextFor(
+      tmpDir,
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
 
-    await migrator.run("up", "20260101000000");
+    await context.run("up", "20260101000000");
     expect(
       await adapter.execute(`SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'`),
     ).toHaveLength(1);
 
-    await migrator.run("down", "20260101000000");
+    await context.run("down", "20260101000000");
     expect(
       await adapter.execute(`SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'`),
     ).toHaveLength(0);
@@ -928,13 +927,12 @@ export class CreateWidgets extends Migration {
     adapter = new BetterSQLite3Adapter(":memory:");
     await establishMigrationConnection(adapter);
 
-    const migrator = new Migrator(
-      "up",
-      [],
+    const context = migrationContextFor(
+      "/nonexistent",
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
-    await expect(migrator.run("up", "99999999999999")).rejects.toBeInstanceOf(
+    await expect(context.run("up", "99999999999999")).rejects.toBeInstanceOf(
       UnknownMigrationVersionError,
     );
   });
@@ -954,17 +952,15 @@ export class CreatePosts extends Migration {
 }`,
     );
 
-    const migrations = discoverMigrations(tmpDir);
-    const migrator = new Migrator(
-      "up",
-      migrations,
+    const context = migrationContextFor(
+      tmpDir,
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
     );
 
-    expect((await migrator.pendingMigrations()).length).toBe(1);
-    await migrator.migrate();
-    expect((await migrator.pendingMigrations()).length).toBe(0);
+    expect((await context.open().pendingMigrations()).length).toBe(1);
+    await context.migrate();
+    expect((await context.open().pendingMigrations()).length).toBe(0);
   });
 });
 

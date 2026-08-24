@@ -22,12 +22,10 @@ import {
   InternalMetadata,
   MigrationContext,
   Migrator,
-  NullInternalMetadata,
-  NullSchemaMigration,
   SchemaMigration,
   eachCurrentEnvironment,
 } from "@blazetrails/activerecord";
-import type { DatabaseAdapter, MigrationProxy } from "@blazetrails/activerecord";
+import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
   const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
@@ -92,21 +90,6 @@ async function migrationsDirsForConfig(config: RawConfig): Promise<string[]> {
     if (dirs.length > 0) return dirs;
   }
   return Migrator.migrationsPaths.map((p) => path.resolve(cwd, p));
-}
-
-/**
- * Discover migrations across `dirs`, through the one discovery path there is:
- * `MigrationContext#migrations` (`migration.rb:1303-1315`), which scans every
- * one of its `migrations_paths`. Duplicate-version validation is handled by
- * Migrator (which throws DuplicateMigrationVersionError) so conflicting
- * migrations are surfaced as errors instead of being silently skipped.
- *
- * The context is built with the null collaborators `Migration.copy` uses
- * (`migration.rb:1065-1066`): discovery never reaches the connected half.
- */
-function discoverMigrations(dirs: string[]): MigrationProxy[] {
-  return new MigrationContext(dirs, new NullSchemaMigration(), new NullInternalMetadata())
-    .migrations;
 }
 
 interface DatabaseOpts {
@@ -370,16 +353,15 @@ interface RunOptions {
 }
 
 /**
- * Centralized Migrator construction so every CLI command stamps
- * ar_internal_metadata.environment with the resolved TRAILS_ENV and
- * respects useMetadataTable. Without this, `db migrate:up`,
- * `db migrate:status`, etc. would default to NODE_ENV and potentially
- * stamp a different env than `db migrate`.
+ * The `pool.migration_context` every `databases.rake` task reaches through
+ * (`connection_adapters/abstract/connection_pool.rb:298-300`): a
+ * `MigrationContext` over this config's migration directories, seated with the
+ * pool's own `schema_migration` / `internal_metadata` so each CLI command
+ * stamps ar_internal_metadata.environment with the resolved TRAILS_ENV.
  */
-function createMigrator(adapter: DatabaseAdapter, migrations: MigrationProxy[]): Migrator {
-  return new Migrator(
-    "up",
-    migrations,
+function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): MigrationContext {
+  return new MigrationContext(
+    dirs,
     new SchemaMigration(adapter.pool),
     new InternalMetadata(adapter.pool),
   );
@@ -391,11 +373,10 @@ async function runMigrate(
   targetVersion?: string,
   options: RunOptions = {},
 ): Promise<void> {
-  const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
-  const migrator = createMigrator(adapter, migrations);
-  await migrator.migrate(targetVersion ?? null);
+  const migrationContext = migrationContextFor(adapter, await migrationsDirsForConfig(raw));
+  await migrationContext.migrate(targetVersion ?? null);
 
-  const pending = await migrator.pendingMigrations();
+  const pending = await migrationContext.open().pendingMigrations();
   if (pending.length === 0) console.log("All migrations are up to date.");
 
   if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
@@ -619,10 +600,9 @@ async function withTargetVersionEnv(
 async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
-  const migrationsFor = new Map<string, MigrationProxy[]>();
+  const migrationsDirsFor = new Map<string, string[]>();
   for (const { name, raw } of entries) {
-    const migrations = discoverMigrations(await migrationsDirsForConfig(raw));
-    migrationsFor.set(name, migrations);
+    migrationsDirsFor.set(name, await migrationsDirsForConfig(raw));
   }
 
   // Rails' `load_config` leaves the primary connection established, which is
@@ -652,15 +632,9 @@ async function runMigrateAll(): Promise<void> {
       for (const { name, raw, hashConfig } of entries) {
         const prefix = multiDb ? `[${name}] ` : "";
         await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
-          const migrations = migrationsFor.get(name) ?? [];
           const adapter = await pool.leaseConnection();
-          const migrator = new Migrator(
-            "up",
-            migrations,
-            new SchemaMigration(adapter.pool),
-            new InternalMetadata(adapter.pool),
-          );
-          const pending = await migrator.pendingMigrations();
+          const migrationContext = migrationContextFor(adapter, migrationsDirsFor.get(name) ?? []);
+          const pending = await migrationContext.open().pendingMigrations();
           if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
           await dumpSchemaAfterMigrate(raw, hashConfig);
         });
@@ -774,8 +748,9 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, prefix }) => {
-        const migrator = createMigrator(adapter, []);
-        const version = await migrator.currentVersionReadOnly();
+        // `pool.migration_context.current_version` (`databases.rake:311`),
+        // whose nil — a NoDatabaseError — interpolates to nothing.
+        const version = (await migrationContextFor(adapter, []).currentVersion()) ?? "";
         console.log(`${prefix}Current version: ${version}`);
       });
     });
@@ -827,10 +802,8 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(raw);
-        const migrations = discoverMigrations(mDirs);
-        if (migrations.length === 0) return;
-        const migrator = createMigrator(adapter, migrations);
-        const pending = await migrator.pendingMigrations();
+        const migrationContext = migrationContextFor(adapter, mDirs);
+        const pending = await migrationContext.open().pendingMigrations();
         if (pending.length > 0) {
           // Match Rails' output format (from activerecord/lib/active_record/
           // railties/databases.rake), with the command name swapped for
@@ -1016,9 +989,19 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
         const mDirs = await migrationsDirsForConfig(raw);
-        const migrations = discoverMigrations(mDirs);
-        const migrator = createMigrator(adapter, migrations);
-        const statuses = await migrator.migrationsStatus();
+        const migrationContext = migrationContextFor(adapter, mDirs);
+
+        // `DatabaseTasks.migrate_status` aborts before reading
+        // schema_migrations when the table is not there yet
+        // (`tasks/database_tasks.rb:303-305`) — `Kernel.abort` writes the
+        // message to stderr and exits non-zero.
+        if (!(await migrationContext.schemaMigration.tableExists())) {
+          console.error(`${prefix}Schema migrations table does not exist yet.`);
+          setExitCode(1);
+          return;
+        }
+
+        const statuses = await migrationContext.migrationsStatus();
 
         console.log("");
         console.log(`${prefix}Status   Migration ID    Migration Name`);

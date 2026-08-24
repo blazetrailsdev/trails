@@ -203,7 +203,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await expect(
@@ -212,7 +213,8 @@ describe("MigrationTest", () => {
         [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
         new SchemaMigration(adapter.pool),
         new InternalMetadata(adapter.pool),
-      ).migrate(101),
+        101,
+      ).migrate(),
     ).rejects.toThrow();
   });
 
@@ -350,7 +352,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     // if_not_exists: true must not raise even though the column already exists.
@@ -363,7 +366,8 @@ describe("MigrationTest", () => {
       ],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(101);
+      101,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -610,7 +614,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -618,7 +623,8 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(101);
+      101,
+    ).migrate();
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // Removing a missing column with if_not_exists unset: SQLite removes
@@ -630,8 +636,9 @@ describe("MigrationTest", () => {
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
+      102,
     )
-      .migrate(102)
+      .migrate()
       .catch((e: unknown) => e);
     expect((error as Error | undefined)?.message ?? "").toMatch(
       adapterType === "sqlite"
@@ -762,9 +769,10 @@ describe("MigrationTest", () => {
       migrations,
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
+      "20131219224947",
     );
     expect(await migrator.currentVersion()).toBe(0);
-    await migrator.migrate("20131219224947");
+    await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(20131219224947);
   });
 
@@ -840,7 +848,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -848,7 +857,8 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(101);
+      101,
+    ).migrate();
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // if_exists: true must not raise even though the column is already gone.
@@ -857,7 +867,8 @@ describe("MigrationTest", () => {
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(102);
+      102,
+    ).migrate();
     expect(await personColumnNames(adapter)).not.toContain("last_name");
   });
 
@@ -874,7 +885,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", type))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -882,7 +894,8 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(101);
+      101,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -896,7 +909,8 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(100);
+      100,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -908,7 +922,8 @@ describe("MigrationTest", () => {
       ],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
-    ).migrate(101);
+      101,
+    ).migrate();
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -974,7 +989,7 @@ describe("MigrationTest", () => {
     );
     await expect(migrator.migrate()).rejects.toThrow("Something broke");
     // Migration should not be recorded as applied
-    const versions = await migrator.getAllVersions();
+    const versions = [...(await migrator.migrated())];
     expect(versions).not.toContain(100);
   });
 
@@ -1005,7 +1020,7 @@ describe("MigrationTest", () => {
         new InternalMetadata(adapter.pool),
       );
       await expect(migrator.migrate()).rejects.toThrow("Something broke");
-      const versions = await migrator.getAllVersions();
+      const versions = [...(await migrator.migrated())];
       expect(versions).not.toContain(100);
     },
   );
@@ -1082,7 +1097,7 @@ describe("MigrationTest", () => {
     // which re-runs the failed load and raises out of the rescue itself, so the
     // "all later migrations canceled" wrapper never gets built.
     expect(err).toBe(loadError);
-    const versions = await migrator.getAllVersions();
+    const versions = [...(await migrator.migrated())];
     expect(versions).not.toContain(102);
   });
 
@@ -1519,8 +1534,9 @@ describe("MigrationTest", () => {
         [proxy],
         new SchemaMigration(adapter.pool),
         new InternalMetadata(adapter.pool),
+        100,
       );
-      await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
+      await expect(migrator.run()).rejects.toThrow(ConcurrentMigrationError);
     } finally {
       getSpy.mockRestore();
     }
@@ -1556,7 +1572,7 @@ describe("MigrationTest", () => {
         await migrator.migrate();
         expect(getSpy).toHaveBeenCalledTimes(1);
         expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
-        expect(await migrator.getAllVersions()).toContain(200);
+        expect([...(await migrator.migrated())]).toContain(200);
       } finally {
         getSpy.mockRestore();
         releaseSpy.mockRestore();
