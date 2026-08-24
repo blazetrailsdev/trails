@@ -17,7 +17,7 @@ export interface DirtyOptions {
  * attribute readers are properties"); an object literal is read by value and
  * would flatten each getter into a data property.
  *
- * Mirrors: ActiveModel::Dirty (dirty.rb:105-421)
+ * Mirrors: ActiveModel::Dirty (dirty.rb:123-421)
  */
 export class Dirty {
   /** The mutation tracker `mutations_from_database` returns (dirty.rb:379-386). */
@@ -151,9 +151,8 @@ export class Dirty {
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place? (dirty.rb:367-369)
    */
   attributeChangedInPlace(name: string): boolean {
-    const current = this._readAttribute(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
-    );
+    name = (this.constructor as unknown as DirtyClass).resolveAttributeName(name);
+    const current = this._readAttribute(name);
     const recorded = this._dirty.mutationsFromDatabase[name];
     if (recorded) return current !== recorded[1];
     const original = this._dirty.attributeWas(name);
@@ -220,6 +219,19 @@ export class Dirty {
   }
 
   /**
+   * Dispatch target for `*_previous_change` per-attribute methods.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_previous_change (dirty.rb:404-406)
+   *
+   * @internal
+   */
+  attributePreviousChange(name: string): [unknown, unknown] | undefined {
+    return this._dirty.previousChanges[
+      (this.constructor as unknown as DirtyClass).resolveAttributeName(name)
+    ];
+  }
+
+  /**
    * Dispatch target for `*_will_change!` per-attribute methods. Force-marks an
    * attribute as changed for in-place mutations (e.g. array push) where the
    * object reference stays the same but the content has changed.
@@ -251,19 +263,6 @@ export class Dirty {
       this._attributes,
       (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
     );
-  }
-
-  /**
-   * Dispatch target for `*_previous_change` per-attribute methods.
-   *
-   * Mirrors: ActiveModel::Dirty#attribute_previous_change (dirty.rb:404-406)
-   *
-   * @internal
-   */
-  attributePreviousChange(name: string): [unknown, unknown] | undefined {
-    return this._dirty.previousChanges[
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(name)
-    ];
   }
 }
 
