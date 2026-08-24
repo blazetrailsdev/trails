@@ -1257,21 +1257,21 @@ const CALLBACK_FILTER_TYPES: CallbackKind[] = ["before", "after", "around"];
 /**
  * Mirrors: ActiveSupport::Callbacks::ClassMethods#normalize_callback_params
  */
-export function normalizeCallbackParams<T extends object = object>(
-  filters: FilterListEntry<T>[],
-  block: AnyCallback<T> | null,
-): [CallbackKind, Array<AnyCallback<T> | CallbackObject | string>, CallbackOptions<T>] {
+export function normalizeCallbackParams(
+  filters: Array<CallbackKind | AnyCallback | string | symbol | Record<string, unknown>>,
+  block: AnyCallback | null,
+): [CallbackKind, Array<AnyCallback | string | symbol>, Record<string, unknown>] {
   const rest = [...filters];
   let type: CallbackKind = "before";
   if (rest.length > 0 && CALLBACK_FILTER_TYPES.includes(rest[0] as CallbackKind)) {
     type = rest.shift() as CallbackKind;
   }
-  let options: CallbackOptions<T> = {};
+  let options: Record<string, unknown> = {};
   if (rest.length > 0 && isCallbackOptions(rest[rest.length - 1])) {
-    options = rest.pop() as CallbackOptions<T>;
+    options = rest.pop() as unknown as Record<string, unknown>;
   }
   if (block) rest.unshift(block);
-  return [type, rest as Array<AnyCallback<T> | CallbackObject | string>, { ...options }];
+  return [type, rest as Array<AnyCallback | string | symbol>, { ...options }];
 }
 
 /**
@@ -1472,7 +1472,12 @@ export namespace Callbacks {
     // Rails hands the callback object straight to Callback.build, which compiles
     // it to an ObjectCall honouring the chain scope — no function-wrapping.
     const mapped = filters.map((filter) =>
-      Callback.build(chain, filter as AnyCallback | CallbackObject, type, options),
+      Callback.build(
+        chain,
+        filter as AnyCallback | CallbackObject,
+        type,
+        options as CallbackOptions,
+      ),
     );
     if (options.prepend) {
       chain.prepend(...mapped);

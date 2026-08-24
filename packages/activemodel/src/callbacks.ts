@@ -13,7 +13,7 @@ import {
   type CallbackKind,
   assertValidKeys,
   extractOptionsBang,
-  normalizeCallbackParams,
+  type CallbackOptions,
   type FilterListEntry,
   type DefineCallbacksOptions,
   defineCallbacks,
@@ -149,7 +149,7 @@ export interface TransactionalCallbackConditions<
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [, filters, options] = normalizeCallbackParams(["before", ...args], null);
+      const [filters, options] = extractMacroOptions(args);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       setCallback(this.prototype, callback, "before", ...filters, options);
     },
@@ -168,7 +168,7 @@ type CallbackHost = object;
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [, filters, options] = normalizeCallbackParams(["around", ...args], null);
+      const [filters, options] = extractMacroOptions(args);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       setCallback(this.prototype, callback, "around", ...filters, options);
     },
@@ -185,7 +185,7 @@ export function _defineAroundModelCallback(klass: CallbackHost, callback: string
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [, filters, options] = normalizeCallbackParams(["after", ...args], null);
+      const [filters, options] = extractMacroOptions(args);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       options.prepend = true;
       const conditional = new Value((v) => v !== false);
@@ -195,4 +195,35 @@ export function _defineAfterModelCallback(klass: CallbackHost, callback: string)
     writable: true,
     configurable: true,
   });
+}
+
+/**
+ * Ruby's `**options` capture in the three generated macros (callbacks.rb:130,
+ * :137, :144): the keyword arguments, split off from the `*args` filter list.
+ *
+ * @noRailsEquivalent PERMANENT: TypeScript has no keyword arguments, so the
+ *   trailing options bag is an ordinary positional and has to be told apart
+ *   from a trailing CallbackObject filter at runtime — a distinction Ruby gets
+ *   for free from `**`. The rule is the one ActiveSupport's own
+ *   `extract_options!` discriminator uses (`isCallbackOptions`,
+ *   activesupport/src/callbacks.ts): a plain object whose only function-valued
+ *   keys are `if` and `unless`, the two option values Rails lets be callable
+ *   (callbacks.rb:747, :752); any other callable key is the method an
+ *   ObjectCall would dispatch to, so the object is a filter. Not exported, and
+ *   deliberately not reached for by importing that helper — Rails keeps
+ *   `normalize_callback_params` private to `ClassMethods` (callbacks.rb:676-682).
+ */
+function extractMacroOptions(
+  args: FilterListEntry[],
+): [FilterListEntry[], CallbackOptions & CallbackConditions] {
+  const last = args[args.length - 1];
+  if (
+    typeof last === "object" &&
+    last !== null &&
+    (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null) &&
+    !Object.entries(last).some(([k, v]) => typeof v === "function" && k !== "if" && k !== "unless")
+  ) {
+    return [args.slice(0, -1), { ...(last as CallbackConditions) }];
+  }
+  return [args, {}];
 }
