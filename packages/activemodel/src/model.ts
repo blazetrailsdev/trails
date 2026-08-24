@@ -1,4 +1,4 @@
-import { Errors, StrictValidationFailed } from "./errors.js";
+import { Errors } from "./errors.js";
 import {
   ValidationContext,
   ValidationsContextHost,
@@ -90,6 +90,10 @@ import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
 import * as Validates from "./validations/validates.js";
 import {
+  ClassMethods as WithClassMethods,
+  validatesWith as withValidatesWith,
+} from "./validations/with.js";
+import {
   type AttributeDefinition,
   Attributes,
   attribute,
@@ -131,6 +135,12 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model {
+  /**
+   * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
+   * mixed on by the `include(Model, …)` at the bottom of this file.
+   */
+  validatesWith: typeof withValidatesWith;
+
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 
@@ -402,120 +412,11 @@ export class Model {
    * Validates using a custom validator class instance.
    * The validator must implement validate(record).
    *
-   * Mirrors: ActiveModel::Validations.validates_with (with.rb:88-105), whose
-   * per-class `validate(validator, options)` (with.rb:103) is what applies the
-   * `on:` / `except_on:` merge.
+   * Mirrors: ActiveModel::Validations::ClassMethods#validates_with
+   * (validations/with.rb:88-105), mixed on by the `extend(Model, …)` at the
+   * bottom of this file.
    */
-  static validatesWith(
-    ...args: Array<
-      | {
-          new (
-            options: Record<string, unknown>,
-          ): ValidatorBase | { validate(record: ValidatableRecord): void };
-        }
-      | (ConditionalOptions & { strict?: boolean; [key: string]: unknown })
-    >
-  ): void {
-    const last = args[args.length - 1];
-    const options: ConditionalOptions & { strict?: boolean; [key: string]: unknown } =
-      typeof last === "function"
-        ? {}
-        : ((args.pop() as ConditionalOptions & { strict?: boolean; [key: string]: unknown }) ?? {});
-
-    const {
-      if: ifOpt,
-      unless: unlessOpt,
-      on: onOpt,
-      exceptOn: exceptOnOpt,
-      strict: isStrict,
-      ...rest
-    } = options;
-    const rawExplicit = (rest as { attributes?: unknown }).attributes;
-    const explicitAttributes: string[] | null = Array.isArray(rawExplicit)
-      ? rawExplicit.map(String)
-      : typeof rawExplicit === "string"
-        ? [rawExplicit]
-        : null;
-
-    type ValidatorCheckable = { checkValidityBang?(): void };
-    for (const klass of args as Array<{
-      new (
-        options: Record<string, unknown>,
-      ): ValidatorBase | { validate(record: ValidatableRecord): void };
-    }>) {
-      // Rails `validates_with` sets `options[:class] = self` before calling
-      // `klass.new(options.dup)` (with.rb:88-94), passing the FULL options hash —
-      // condition keys (`if`/`unless`/`on`), `strict`, and custom keys — plus
-      // `:class`; only `Validator#initialize` strips `:class` from its frozen
-      // `options` (validator.rb:107-110; our Validator base does the same),
-      // leaving every standard key visible in `validator.options`.
-      // `with_validation_test.rb:80` pins this: `validates_with(v, if: :cond,
-      // foo: :bar)` calls `new` with `{ foo: :bar, if: :cond, class: Topic }`.
-      // The extracted `ifOpt`/`unlessOpt`/`onOpt`/`isStrict` are used only to
-      // wire the callback (conditions + strict wrapper), NOT withheld from the
-      // validator. Passing `strict` through does not double-raise: a validator
-      // that forwards its options to `errors.add` raises there first
-      // (filteredErrorOptions keeps `strict`; errors.ts:249), matching Rails;
-      // the `isStrict` wrapper below only fires for validators that add errors
-      // without forwarding `strict`, so exactly one raise happens either way.
-      // `options[:class]` lets Acceptance / Confirmation call `setupBang` (Rails
-      // `setup!`), materializing their virtual accessors on the prototype so the
-      // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
-      const validator = new klass({ ...options, class: this });
-      if (!(validator instanceof EachValidator)) {
-        if (typeof (validator as ValidatorCheckable).checkValidityBang === "function") {
-          (validator as ValidatorCheckable).checkValidityBang!();
-        }
-      }
-      this._registerValidator(validator, explicitAttributes);
-
-      let callbackFn: CallbackFn;
-      if (isStrict) {
-        callbackFn = (record: object) => {
-          const r = record as ValidatableRecord & { errors: Errors };
-          const origErrors = r.errors;
-          const tempErrors = new Errors(r);
-          r.errors = tempErrors;
-          const settle = (): void => {
-            r.errors = origErrors;
-            if (tempErrors.any) {
-              throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
-            }
-          };
-          let validateResult: unknown;
-          try {
-            validateResult = validator.validate(r);
-          } catch (e) {
-            r.errors = origErrors;
-            throw e;
-          }
-          if (
-            validateResult != null &&
-            typeof (validateResult as PromiseLike<void>).then === "function"
-          ) {
-            return Promise.resolve(validateResult as PromiseLike<void>).then(
-              () => settle(),
-              (e) => {
-                r.errors = origErrors;
-                throw e;
-              },
-            );
-          }
-          settle();
-          return validateResult as void;
-        };
-      } else {
-        callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
-      }
-
-      this.validate(callbackFn as (record: ValidatableRecord) => unknown, {
-        if: ifOpt,
-        unless: unlessOpt,
-        on: onOpt,
-        exceptOn: exceptOnOpt,
-      });
-    }
-  }
+  declare static validatesWith: Extended<typeof WithClassMethods>["validatesWith"];
 
   /**
    * Return all validators registered on this model.
@@ -682,7 +583,7 @@ export class Model {
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static resetCallbacks: Extended<typeof ASCallbacks.ClassMethods>["resetCallbacks"];
 
-  private static _ensureOwnValidators(): void {
+  static _ensureOwnValidators(): void {
     // Copy-on-first-write dup. Rails' `inherited(base)` hook
     // (activemodel/lib/active_model/validations.rb:287-291) does this
     // eagerly at class-definition time; JS has no such hook, so we defer
@@ -699,39 +600,16 @@ export class Model {
 
   /**
    * Register `validator` under each of its declared attributes (or under
-   * the `null` key when none are declared — Rails matches this in
-   * `validates_with` via `_validators[nil] << validator`).
-   *
-   * `explicitAttributes` wins when the caller already parsed attributes
-   * from options (e.g. `validates_with MyValidator, attributes: [...]`
-   * with a validator class that doesn't store them on the instance).
-   * Otherwise fall back to `validator.attributes` (set by `EachValidator`)
-   * or `validator.options.attributes` (set by plain `Validator`
-   * subclasses). This three-tier lookup covers all three validator
-   * shapes `validates_with` accepts:
-   *   - `EachValidator` subclass (attributes on instance),
-   *   - `Validator` subclass (attributes in `options`),
-   *   - arbitrary class that just implements `validate()` (neither —
-   *     caller must pass attributes explicitly).
+   * the `null` key when none are declared) — the `_validators[...] <<
+   * validator` half of Rails `validates_with` (validations/with.rb:95-101),
+   * reached here from `validates_each`, whose Rails body registers by routing
+   * through `validates_with` itself (validations.rb:190-192).
    */
-  private static _registerValidator(
-    validator: ValidatorLike,
-    explicitAttributes?: readonly string[] | null,
-  ): void {
+  private static _registerValidator(validator: ValidatorLike): void {
     this._ensureOwnValidators();
-    const fromInstance = (validator as { attributes?: unknown }).attributes;
-    const fromOptions = (validator as { options?: { attributes?: unknown } }).options?.attributes;
-    const rawAttrs =
-      explicitAttributes && explicitAttributes.length > 0
-        ? explicitAttributes
-        : Array.isArray(fromInstance) && fromInstance.length > 0
-          ? fromInstance
-          : Array.isArray(fromOptions) && fromOptions.length > 0
-            ? fromOptions
-            : typeof fromOptions === "string"
-              ? [fromOptions]
-              : null;
-    const keys: Array<string | null> = rawAttrs ? rawAttrs.map(String) : [null];
+    const attributes = (validator as { attributes?: readonly string[] }).attributes;
+    const keys: Array<string | null> =
+      Array.isArray(attributes) && attributes.length > 0 ? attributes.map(String) : [null];
     for (const key of keys) {
       let bucket = this._validators.get(key);
       if (!bucket) {
@@ -1098,46 +976,6 @@ export class Model {
    */
   async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
     return !(await this.isValid(context));
-  }
-
-  /**
-   * Passes the record off to the class or classes specified and allows them
-   * to add errors based on more complex conditions, so a `validate :foo` body
-   * can run a validator on the spot:
-   *
-   *   validate :instanceValidations
-   *   instanceValidations() { this.validatesWith(MyValidator); }
-   *
-   * Mirrors: ActiveModel::Validations#validates_with
-   * (activemodel/lib/active_model/validations/with.rb:143-151). Unlike the
-   * class method it registers nothing — each klass is built and run
-   * immediately against `this`. Rails' loop is synchronous; a trails validator
-   * may return a promise (RFC 0063 made validation async), so each run is
-   * awaited in turn, which preserves Rails' one-validator-at-a-time order.
-   */
-  async validatesWith(
-    ...args: Array<
-      | {
-          new (
-            options: Record<string, unknown>,
-          ): ValidatorBase | { validate(record: ValidatableRecord): unknown };
-        }
-      | Record<string, unknown>
-    >
-  ): Promise<void> {
-    const last = args[args.length - 1];
-    const options: Record<string, unknown> =
-      typeof last === "function" ? {} : ((args.pop() as Record<string, unknown>) ?? {});
-    options.class = this.constructor;
-
-    for (const klass of args as Array<{
-      new (
-        options: Record<string, unknown>,
-      ): ValidatorBase | { validate(record: ValidatableRecord): unknown };
-    }>) {
-      const validator = new klass({ ...options });
-      await validator.validate(this as unknown as ValidatableRecord);
-    }
   }
 
   /**
@@ -1706,6 +1544,9 @@ classAttribute.call(Model, "attributeMethodPatterns", {
 
 // Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
 // friends (validations/validates.rb:111-178) onto the class.
+extend(Model, WithClassMethods);
+include(Model, { validatesWith: withValidatesWith });
+
 extend(Model, {
   validates: Validates.validates,
   validatesBang: Validates.validatesBang,
