@@ -12,25 +12,12 @@ const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
  * `Dir::Tmpname::RANDOM.next` (`tmpdir.rb:126-136`) — `Random.urandom(4)` read
  * as a little-endian `L`, modulo `36**6`, in base 36.
  *
- * Ruby's `Random.urandom` is always available; trails' CSPRNG sits behind the
- * crypto adapter, which a host need not have registered by the time a temp file
- * is made — an ESM worker thread has no synchronous resolution path for it. The
- * name's uniqueness comes from {@link createTmpname}'s `EEXIST` retry rather
- * than from this draw, so an unregistered adapter falls back rather than
- * raising where Ruby would have carried on.
- *
  * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
  *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
  */
 function random(): string {
   const MAX = 36 ** 6;
-  let n: number;
-  try {
-    n = getCrypto().randomBytes(4).readUInt32LE(0);
-  } catch {
-    n = Math.floor(Math.random() * 0x100000000);
-  }
-  return (n % MAX).toString(36);
+  return (getCrypto().randomBytes(4).readUInt32LE(0) % MAX).toString(36);
 }
 
 /**
