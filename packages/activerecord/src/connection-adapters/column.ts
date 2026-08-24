@@ -137,9 +137,10 @@ export class Column {
    * that does the allocating is `rehydrateColumn` (`schema-cache.ts`). Because
    * these are Ruby ivars re-assigned here, the fields above cannot be `readonly`.
    *
-   * `primary_key` has no Rails counterpart in this pair: Rails' Column carries
-   * no `@primary_key` ivar at all — the primary key lives on the schema cache's
-   * own map — while trails' Column does.
+   * The key set is Rails' exactly — `primaryKey` is deliberately absent, because
+   * Rails' Column carries no `@primary_key` ivar: primary-key membership lives
+   * in the schema cache's own `@primary_keys` slot (`schema_cache.rb:416`), and
+   * `SchemaCache` derives the trails-only flag back from there on load.
    */
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
@@ -151,13 +152,15 @@ export class Column {
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
     this.collation = (coder["collation"] as string | null) ?? null;
     this.comment = (coder["comment"] as string | null) ?? null;
-    this.primaryKey = (coder["primary_key"] as boolean) ?? false;
   }
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::Column#encode_with
    * (`column.rb:55-63`), the seam `SchemaCache#dump_to` serializes through
    * (`schema_cache.rb:406`).
+   *
+   * The seven keys are Rails' exactly, in Rails' order; `primaryKey` stays out
+   * (see {@link initWith}).
    *
    * `class` is the JSON stand-in for YAML's `!ruby/object:` tag. Rails restores
    * the adapter's Column subclass from that tag and lets `init_with` fill only
@@ -182,7 +185,6 @@ export class Column {
     coder["default_function"] = this.defaultFunction;
     coder["collation"] = this.collation;
     coder["comment"] = this.comment;
-    coder["primary_key"] = this.primaryKey;
   }
 
   deduplicate(): this {

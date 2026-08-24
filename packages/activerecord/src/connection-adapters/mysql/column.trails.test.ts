@@ -17,7 +17,7 @@ describe("MysqlColumn", () => {
     expect(restored.autoIncrement).toBe(true);
     expect(restored.unsigned).toBe(true);
     expect(restored.virtual).toBe(false);
-    expect(restored.primaryKey).toBe(true);
+    expect(coder).not.toHaveProperty("primary_key");
     expect(restored.sqlType).toBe("bigint(20) unsigned");
   });
 });

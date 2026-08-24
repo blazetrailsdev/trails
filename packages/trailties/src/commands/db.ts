@@ -832,7 +832,14 @@ export function dbCommand(): Command {
    * `migration_context.run(:up | :down, target_version)`
    * (`railties/databases.rake:165-208`). Both of those read `ENV["VERSION"]`
    * themselves (`database_tasks.rb:317-325`), so the `--version` flag is
-   * published as the env var rather than threaded through the predicate.
+   * published as the env var rather than threaded through the predicate, and
+   * `migration_context.run` is handed `target_version` read back off it — one
+   * source, as in the rake task. The key published is trails'
+   * `TRAILS_MIGRATION_VERSION` rather than Rails' bare `VERSION`; see
+   * `DatabaseTasks.targetVersion` for why that rename is repo-wide.
+   *
+   * Commander's `requiredOption` is the CLI form of the rake task's
+   * `raise "VERSION is required"` guard (`databases.rake:169`, `:198`).
    */
   cmd
     .command("migrate:up")

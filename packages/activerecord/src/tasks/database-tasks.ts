@@ -496,8 +496,19 @@ export class DatabaseTasks {
    *   arguments since it gained Rails' `async:` kwarg (result.rb:94-100) —
    *   nothing in the TS body was dropped.
    *
-   * `TRAILS_MIGRATION_VERSION` is canonical; `VERSION` is the legacy fallback
-   * (one-release window). The `to_i` is Rails'
+   * The env key is `TRAILS_MIGRATION_VERSION`, not Rails' bare `VERSION`, with
+   * `VERSION` kept as a legacy fallback (one-release window). That is a
+   * deliberate repo-wide deviation, not a local choice: BC-2 renamed AR's
+   * process env vars under a `TRAILS_` prefix — `NODE_ENV` → `TRAILS_ENV`,
+   * `VERSION` → `TRAILS_MIGRATION_VERSION`
+   * (`docs/infrastructure/browser-compat-plan.md`, shipped in #1251) — and the
+   * trails-prefixed name outranks the unprefixed one wherever both are read.
+   * {@link checkTargetVersion} reads this method rather than the env directly,
+   * so the pair stays single-source over that one key exactly as Rails'
+   * `check_target_version` / `target_version` are single-source over
+   * `ENV["VERSION"]` (`database_tasks.rb:317-325`).
+   *
+   * The `to_i` is Rails'
    * (`ENV["VERSION"].to_i`, database_tasks.rb:323-325) and never fails —
    * `"unknown"` is `0`, which is truthy in Ruby and is exactly what lets
    * {@link checkTargetVersion} reach its format check for a malformed VERSION.
