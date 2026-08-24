@@ -531,8 +531,6 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Migration / Schema ---
 
-  private _schemaMigration?: SchemaMigration;
-  private _internalMetadata?: InternalMetadata;
   private _adapterProxy?: DatabaseAdapter;
 
   private _getAdapterProxy(): DatabaseAdapter {
@@ -594,30 +592,15 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get schemaMigration(): SchemaMigration {
-    if (!this._schemaMigration) {
-      this._schemaMigration = new SchemaMigration(this);
-    }
-    return this._schemaMigration;
+    return new SchemaMigration(this);
   }
 
   get internalMetadata(): InternalMetadata {
-    if (!this._internalMetadata) {
-      this._internalMetadata = new InternalMetadata(this);
-    }
-    return this._internalMetadata;
+    return new InternalMetadata(this);
   }
 
-  private _migrationContext?: MigrationContext;
-
   get migrationContext(): MigrationContext {
-    if (!this._migrationContext) {
-      this._migrationContext = new MigrationContext(
-        this.migrationsPaths,
-        this.schemaMigration,
-        this.internalMetadata,
-      );
-    }
-    return this._migrationContext;
+    return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
   // --- Query cache (delegated to ConnectionPoolConfiguration) ---
