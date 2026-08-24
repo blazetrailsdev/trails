@@ -48,9 +48,10 @@ export const DAYS_INTO_WEEK: Record<string, number> = {
 export const WEEKEND_DAYS = [6, 0];
 
 function advance(
-  dateOrTime: DateOrTime,
+  dateOrTime: DateOrTime | Temporal.Instant,
   options: { years?: number; months?: number; weeks?: number; days?: number },
 ): DateOrInstant {
+  dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
     ? time.advance(dateOrTime, options)
@@ -62,7 +63,8 @@ function toDate(dateOrTime: DateOrTime): Temporal.PlainDate {
   return dateOrTime instanceof Date ? time.toDate(dateOrTime) : dateOrTime;
 }
 
-function wday(dateOrTime: DateOrTime): number {
+function wday(dateOrTime: DateOrTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime);
   // `Temporal.PlainDate#dayOfWeek` is ISO (Monday 1 … Sunday 7); Ruby's `wday`
   // counts from Sunday 0, which is what `WEEKEND_DAYS` is written in.
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
@@ -96,7 +98,7 @@ function toInstant(dateOrTime: Comparable): Temporal.Instant {
  * `Date#change` (`date/calculations.rb:143-149`) does.
  */
 function change(
-  dateOrTime: DateOrTime,
+  dateOrTime: DateOrTime | Temporal.Instant,
   options: {
     year?: number;
     month?: number;
@@ -107,6 +109,7 @@ function change(
     nsec?: number;
   },
 ): DateOrInstant {
+  dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
     ? time.change(dateOrTime, options)
@@ -114,12 +117,13 @@ function change(
 }
 
 /**
- * Re-enters the mixin with a value one of its members answered. Ruby's members
- * return the receiver's own class, so a chained call needs no conversion; the
- * `Time` arm here answers a `Temporal.Instant` while its receiver is a JS
- * `Date`, so the chain converts back.
+ * Normalizes a value one of the mixin's members answered back to the receiver
+ * representation the arm dispatch is keyed on. Ruby's members return the
+ * receiver's own class, so a chained call needs no conversion; the `Time` arm
+ * here answers a `Temporal.Instant` while its receiver is a JS `Date`, so the
+ * arm boundary — never the chained call site — converts back.
  */
-function receiver(dateOrTime: DateOrInstant): DateOrTime {
+function receiver(dateOrTime: DateOrTime | Temporal.Instant): DateOrTime {
   // boundary: the `Time` arm's receiver is a JS `Date`, which is what this rebuilds.
   return dateOrTime instanceof Temporal.Instant
     ? new Date(dateOrTime.epochMilliseconds)
@@ -127,17 +131,20 @@ function receiver(dateOrTime: DateOrInstant): DateOrTime {
 }
 
 /** `self.year` / `self.month` / `self.day`, across both arms. */
-function year(dateOrTime: DateOrTime): number {
+function year(dateOrTime: DateOrTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getFullYear() : dateOrTime.year;
 }
 
-function month(dateOrTime: DateOrTime): number {
+function month(dateOrTime: DateOrTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getMonth() + 1 : dateOrTime.month;
 }
 
-function day(dateOrTime: DateOrTime): number {
+function day(dateOrTime: DateOrTime | Temporal.Instant): number {
+  dateOrTime = receiver(dateOrTime);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getDate() : dateOrTime.day;
 }
@@ -275,7 +282,7 @@ export function isFuture(dateOrTime: DateOrTime): boolean {
  *
  * Mirrors: `DateAndTime::Calculations#on_weekend?` (`:57-59`)
  */
-export function isOnWeekend(dateOrTime: DateOrTime): boolean {
+export function isOnWeekend(dateOrTime: DateOrTime | Temporal.Instant): boolean {
   return WEEKEND_DAYS.includes(wday(dateOrTime));
 }
 
@@ -324,7 +331,8 @@ export function daysAgo(dateOrTime: DateOrTime, days: number): DateOrInstant {
  */
 export function daysSince(dateOrTime: Temporal.PlainDate, days: number): Temporal.PlainDate;
 export function daysSince(dateOrTime: Date, days: number): Temporal.Instant;
-export function daysSince(dateOrTime: DateOrTime, days: number): DateOrInstant {
+export function daysSince(dateOrTime: DateOrInstant, days: number): DateOrInstant;
+export function daysSince(dateOrTime: DateOrTime | Temporal.Instant, days: number): DateOrInstant {
   return advance(dateOrTime, { days: days });
 }
 
@@ -373,7 +381,8 @@ export function yearsSince(dateOrTime: DateOrTime, years: number): DateOrInstant
 /** Mirrors: `DateAndTime::Calculations#beginning_of_month` (`:125-127`) */
 export function beginningOfMonth(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function beginningOfMonth(dateOrTime: Date): Temporal.Instant;
-export function beginningOfMonth(dateOrTime: DateOrTime): DateOrInstant {
+export function beginningOfMonth(dateOrTime: DateOrInstant): DateOrInstant;
+export function beginningOfMonth(dateOrTime: DateOrTime | Temporal.Instant): DateOrInstant {
   return firstHour(change(dateOrTime, { day: 1 }));
 }
 
@@ -385,7 +394,7 @@ export function beginningOfQuarter(dateOrTime: Temporal.PlainDate): Temporal.Pla
 export function beginningOfQuarter(dateOrTime: Date): Temporal.Instant;
 export function beginningOfQuarter(dateOrTime: DateOrTime): DateOrInstant {
   const firstQuarterMonth = month(dateOrTime) - ((2 + month(dateOrTime)) % 3);
-  return change(receiver(beginningOfMonth(dateOrTime as Date)), { month: firstQuarterMonth });
+  return change(beginningOfMonth(dateOrTime as Date), { month: firstQuarterMonth });
 }
 
 /** Mirrors: `alias :at_beginning_of_quarter :beginning_of_quarter` (`:143`) */
@@ -396,11 +405,7 @@ export function endOfQuarter(dateOrTime: Temporal.PlainDate): Temporal.PlainDate
 export function endOfQuarter(dateOrTime: Date): Temporal.Instant;
 export function endOfQuarter(dateOrTime: DateOrTime): DateOrInstant {
   const lastQuarterMonth = month(dateOrTime) + ((12 - month(dateOrTime)) % 3);
-  return endOfMonth(
-    receiver(
-      change(receiver(beginningOfMonth(dateOrTime as Date)), { month: lastQuarterMonth }),
-    ) as Date,
-  );
+  return endOfMonth(change(beginningOfMonth(dateOrTime as Date), { month: lastQuarterMonth }));
 }
 
 /** Mirrors: `alias :at_end_of_quarter :end_of_quarter` (`:158`) */
@@ -415,7 +420,7 @@ export function quarter(dateOrTime: DateOrTime): number {
 export function beginningOfYear(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function beginningOfYear(dateOrTime: Date): Temporal.Instant;
 export function beginningOfYear(dateOrTime: DateOrTime): DateOrInstant {
-  return beginningOfMonth(receiver(change(dateOrTime, { month: 1 })) as Date);
+  return beginningOfMonth(change(dateOrTime, { month: 1 }));
 }
 
 /** Mirrors: `alias :at_beginning_of_year :beginning_of_year` (`:182`) */
@@ -438,10 +443,7 @@ export function nextWeek(
   { sameTime = false }: { sameTime?: boolean } = {},
 ): DateOrInstant {
   const result = firstHour(
-    daysSince(
-      receiver(beginningOfWeek(receiver(weeksSince(dateOrTime as Date, 1)) as Date)) as Date,
-      daysSpan(givenDayInNextWeek),
-    ),
+    daysSince(beginningOfWeek(weeksSince(dateOrTime as Date, 1)), daysSpan(givenDayInNextWeek)),
   );
   return sameTime ? copyTimeTo(dateOrTime, result) : result;
 }
@@ -450,7 +452,7 @@ export function nextWeek(
 export function nextWeekday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function nextWeekday(dateOrTime: Date): Temporal.Instant;
 export function nextWeekday(dateOrTime: DateOrTime): DateOrInstant {
-  if (isOnWeekend(receiver(nextDay(dateOrTime)))) {
+  if (isOnWeekend(nextDay(dateOrTime))) {
     return nextWeek(dateOrTime as Date, "monday", { sameTime: true });
   } else {
     return nextDay(dateOrTime);
@@ -481,10 +483,7 @@ export function prevWeek(
   { sameTime = false }: { sameTime?: boolean } = {},
 ): DateOrInstant {
   const result = firstHour(
-    daysSince(
-      receiver(beginningOfWeek(receiver(weeksAgo(dateOrTime as Date, 1)) as Date)) as Date,
-      daysSpan(startDay),
-    ),
+    daysSince(beginningOfWeek(weeksAgo(dateOrTime as Date, 1)), daysSpan(startDay)),
   );
   return sameTime ? copyTimeTo(dateOrTime, result) : result;
 }
@@ -496,7 +495,7 @@ export const lastWeek = prevWeek;
 export function prevWeekday(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function prevWeekday(dateOrTime: Date): Temporal.Instant;
 export function prevWeekday(dateOrTime: DateOrTime): DateOrInstant {
-  if (isOnWeekend(receiver(prevDay(dateOrTime)))) {
+  if (isOnWeekend(prevDay(dateOrTime))) {
     return copyTimeTo(dateOrTime, beginningOfWeek(dateOrTime as Date, "friday"));
   } else {
     return prevDay(dateOrTime);
@@ -532,7 +531,7 @@ export function lastYear(dateOrTime: DateOrTime): DateOrInstant {
 
 /** Mirrors: `DateAndTime::Calculations#days_to_week_start` (`:258-261`) */
 export function daysToWeekStart(
-  dateOrTime: DateOrTime,
+  dateOrTime: DateOrTime | Temporal.Instant,
   startDay: string = date.beginningOfWeek(),
 ): number {
   const startDayNumber = fetch(DAYS_INTO_WEEK, startDay);
@@ -545,8 +544,9 @@ export function beginningOfWeek(
   startDay?: string,
 ): Temporal.PlainDate;
 export function beginningOfWeek(dateOrTime: Date, startDay?: string): Temporal.Instant;
+export function beginningOfWeek(dateOrTime: DateOrInstant, startDay?: string): DateOrInstant;
 export function beginningOfWeek(
-  dateOrTime: DateOrTime,
+  dateOrTime: DateOrTime | Temporal.Instant,
   startDay: string = date.beginningOfWeek(),
 ): DateOrInstant {
   const result = daysAgo(dateOrTime as Date, daysToWeekStart(dateOrTime, startDay));
@@ -586,7 +586,8 @@ export function sunday(dateOrTime: DateOrTime): DateOrInstant {
 /** Mirrors: `DateAndTime::Calculations#end_of_month` (`:296-299`) */
 export function endOfMonth(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function endOfMonth(dateOrTime: Date): Temporal.Instant;
-export function endOfMonth(dateOrTime: DateOrTime): DateOrInstant {
+export function endOfMonth(dateOrTime: DateOrInstant): DateOrInstant;
+export function endOfMonth(dateOrTime: DateOrTime | Temporal.Instant): DateOrInstant {
   const lastDay = time.daysInMonth(month(dateOrTime), year(dateOrTime));
   return lastHour(daysSince(dateOrTime as Date, lastDay - day(dateOrTime)));
 }
@@ -598,7 +599,7 @@ export const atEndOfMonth = endOfMonth;
 export function endOfYear(dateOrTime: Temporal.PlainDate): Temporal.PlainDate;
 export function endOfYear(dateOrTime: Date): Temporal.Instant;
 export function endOfYear(dateOrTime: DateOrTime): DateOrInstant {
-  return endOfMonth(receiver(change(dateOrTime, { month: 12 })) as Date);
+  return endOfMonth(change(dateOrTime, { month: 12 }));
 }
 
 /** Mirrors: `alias :at_end_of_year :end_of_year` (`:307`) */
@@ -682,7 +683,7 @@ function daysSpan(day: string): number {
 
 /** Mirrors: `DateAndTime::Calculations#copy_time_to` (`:370-372`) @internal */
 function copyTimeTo(self: DateOrTime, other: DateOrInstant): DateOrInstant {
-  return change(receiver(other), {
+  return change(other, {
     hour: hour(self),
     min: min(self),
     sec: sec(self),

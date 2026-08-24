@@ -453,8 +453,12 @@ export abstract class SchemaDumper {
   private _ignoreTables: (string | RegExp)[];
 
   /** @internal */
-  constructor(source: SchemaSource, options: Record<string, unknown> = {}) {
-    this._source = source;
+  constructor(connection: SchemaSource | DatabaseAdapter, options: Record<string, unknown> = {}) {
+    // Rails' dumper takes the connection itself as its dump source
+    // (`schema_dumper.rb:41`); trails' dumpers read a `SchemaSource`, so an
+    // adapter is bridged onto that duck type here — the one place every
+    // `create`/`new` path funnels through.
+    this._source = isDatabaseAdapter(connection) ? new AdapterSchemaSource(connection) : connection;
     this._options = options;
     const lang =
       (options.language as SchemaDumpLanguage | undefined) ??
@@ -523,15 +527,15 @@ export abstract class SchemaDumper {
    */
   protected static create<T extends typeof SchemaDumper>(
     this: T,
-    source: SchemaSource,
+    connection: SchemaSource | DatabaseAdapter,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     // The base is abstract (Ruby: no `column_spec`, and `private_class_method :new`),
     // so the construction has to be typed through the concrete `this`.
     return new (this as unknown as new (
-      source: SchemaSource,
+      connection: SchemaSource | DatabaseAdapter,
       options: Record<string, unknown>,
-    ) => InstanceType<T>)(source, options);
+    ) => InstanceType<T>)(connection, options);
   }
 
   /**
@@ -566,7 +570,7 @@ export abstract class SchemaDumper {
       const createDialectDumper = (pool as { createSchemaDumper?: unknown }).createSchemaDumper;
       const dumper =
         (typeof createDialectDumper === "function"
-          ? (createDialectDumper.call(pool, source, options) as SchemaDumper | undefined | null)
+          ? (createDialectDumper.call(pool, options) as SchemaDumper | undefined | null)
           : undefined) ?? this.create(source, options);
       return dumper.dump(stream) as Promise<string[]>;
     }
@@ -593,7 +597,7 @@ export abstract class SchemaDumper {
     // the single emitTable/columnSpec dispatch, never the bare base.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
-      dumper = (source as any).createSchemaDumper(wrappedSource, {}) as SchemaDumper;
+      dumper = (source as any).createSchemaDumper({}) as SchemaDumper;
     } else {
       dumper = this.create(wrappedSource);
     }

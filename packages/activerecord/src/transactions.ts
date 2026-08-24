@@ -166,6 +166,14 @@ type TransactionCallbackFilter<T extends typeof Model> =
   | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
   | CallbackObject
   | string;
+/**
+ * Rails' `*args` on the transaction macros: the filters `set_callback` takes,
+ * optionally closed by the options Hash `set_options_for_callbacks!` extracts.
+ */
+type TransactionCallbackArgs<T extends typeof Model> = (
+  | TransactionCallbackFilter<T>
+  | CallbackOptions
+)[];
 type CallbackOptions = {
   // Rails takes any Symbol here and rejects a bad one at runtime, in
   // `assert_valid_transaction_action` (transactions.rb:344-348) — so the type
@@ -190,89 +198,76 @@ export const InstanceMethods = {
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
 export function beforeCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined);
-  setCallback.call(this, "before_commit", "before", fn, args);
+  setOptionsForCallbacksBang(args);
+  setCallback.call(this, "before_commit", "before", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
 export function afterCommit<T extends typeof Model>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(
-    options as Record<string, unknown> | undefined,
-    prependOption(),
-  );
-  setCallback.call(this, "commit", "after", fn, args);
+  setOptionsForCallbacksBang(args, prependOption());
+  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
 export function afterSaveCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: ["create", "update"],
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
 export function afterCreateCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "create",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
 export function afterUpdateCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "update",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
 export function afterDestroyCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "destroy",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
 export function afterRollback<T extends typeof Model>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(
-    options as Record<string, unknown> | undefined,
-    prependOption(),
-  );
-  setCallback.call(this, "rollback", "after", fn, args);
+  setOptionsForCallbacksBang(args, prependOption());
+  setCallback.call(this, "rollback", "after", ...(args as FilterListEntry<any>[]));
 }
 
 /**
@@ -471,6 +466,17 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
  *
  * Mirrors: ActiveRecord::Transactions#with_transaction_returning_status
  */
+/**
+ * @missingRailsArgs connection.transaction — CONVERGEABLE: `transactions.rb:413`
+ * opens the transaction on the yielded `connection`; the connection-level
+ * `DatabaseStatements#transaction` exists in trails
+ * (`connection-adapters/abstract/database-statements.ts:568`) but does not
+ * establish the `ar_current_transaction` execution-state scope that
+ * `ClassMethods#transaction` above installs, so reaching it directly would drop
+ * `currentTransaction()` inside the block. Converging means moving that scope
+ * down to the connection — tracked as
+ * `converge-current-transaction-scope-onto-connection`.
+ */
 export async function withTransactionReturningStatus<T>(
   this: Base,
   fn: () => Promise<T>,
@@ -489,9 +495,9 @@ export async function withTransactionReturningStatus<T>(
   // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
   // connection is taken from the block parameter rather than re-read off the
   // deprecated `.connection` getter, matching Rails.
-  await modelClass.withConnection(async (adapter) => {
+  await modelClass.withConnection(async (connection) => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
+    const hadOuterTransaction = currentTransaction() !== null || connection.inTransaction;
 
     await transaction(modelClass, async () => {
       // Enroll record with the TransactionManager so it fires committedBang/
@@ -666,25 +672,28 @@ const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
  *   `merge!` to name.
  */
 export function setOptionsForCallbacksBang(
-  options: Record<string, unknown> | undefined,
+  args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
-): Record<string, unknown> {
-  const merged = { ...options, ...enforcedOptions };
+): void {
+  const [rest, extracted] = extractOptionsBang(args);
+  const options: Record<string, unknown> = { ...extracted, ...enforcedOptions };
+  // `extractOptionsBang` answers `args` itself when the last element is not a
+  // Hash, so the filters are copied out before `args` — Ruby's `args << options`
+  // mutates the caller's splat array — is rewritten.
+  const filterList = [...rest];
+  args.length = 0;
+  args.push(...filterList, options);
 
-  if (merged.on !== undefined) {
-    const fireOn = (Array.isArray(merged.on) ? merged.on : [merged.on]) as string[];
+  if (options.on !== undefined) {
+    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
     assertValidTransactionAction(fireOn);
-    const { on: _on, if: existingIf, ...rest } = merged;
-    return {
-      ...rest,
-      if: [
-        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
-        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
-      ],
-    };
+    const existingIf = options.if;
+    delete options.on;
+    options.if = [
+      (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+      ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+    ];
   }
-
-  return merged;
 }
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action

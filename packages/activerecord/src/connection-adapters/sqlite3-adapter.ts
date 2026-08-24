@@ -115,7 +115,6 @@ import { Base } from "../base.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 
 /**
@@ -1641,11 +1640,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
-  createSchemaDumper(
-    source: SchemaSource,
-    options: Record<string, unknown> = {},
-  ): Sqlite3SchemaDumper {
-    return Sqlite3SchemaDumper.create(source, options);
+  createSchemaDumper(options: Record<string, unknown> = {}): Sqlite3SchemaDumper {
+    return Sqlite3SchemaDumper.create(this, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?

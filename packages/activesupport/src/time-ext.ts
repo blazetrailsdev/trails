@@ -355,7 +355,7 @@ export function advance(
   } else if (timeAdvancedByDate instanceof RubyTime) {
     return timeAdvancedByDate.plus(secondsToAdvance);
   } else {
-    return since(new Date(timeAdvancedByDate.epochMilliseconds), secondsToAdvance);
+    return since(timeAdvancedByDate, secondsToAdvance);
   }
 }
 
@@ -434,8 +434,11 @@ export function ago(date: Date, seconds: number): Temporal.Instant {
   return since(date, -seconds);
 }
 
-export function since(date: Date, seconds: number): Temporal.Instant {
-  return instantFrom(new Date(date.getTime() + seconds * 1000));
+export function since(date: Date | Temporal.Instant, seconds: number): Temporal.Instant {
+  // boundary: the `Time` arm's receiver is a JS `Date`, and a chained call — as
+  // `advance` makes below — answers the same moment as a `Temporal.Instant`.
+  const epochMilliseconds = date instanceof Date ? date.getTime() : date.epochMilliseconds;
+  return instantFrom(new Date(epochMilliseconds + seconds * 1000));
 }
 
 // `alias :in :since` — time/calculations.rb:235.

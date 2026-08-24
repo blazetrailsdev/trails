@@ -41,7 +41,6 @@ import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import { Value as TimeValue } from "../type/time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
@@ -1213,11 +1212,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await conn.query(this.mysqlQuote(sql));
   }
 
-  createSchemaDumper(
-    source: SchemaSource,
-    options: Record<string, unknown> = {},
-  ): MysqlSchemaDumper {
-    const dumper = new MysqlSchemaDumper(source, options);
+  createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
+    const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
     dumper.connection = this;
     return dumper;
   }

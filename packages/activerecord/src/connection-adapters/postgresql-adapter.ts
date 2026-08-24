@@ -156,7 +156,6 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
@@ -3715,8 +3714,8 @@ export class PostgreSQLAdapter
    * Mirrors: PostgreSQL::SchemaStatements#create_schema_dumper
    * (postgresql/schema_statements.rb:884-886) — `PostgreSQL::SchemaDumper.create(self, options)`.
    */
-  createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {
-    return PgSchemaDumper.create(source, options);
+  createSchemaDumper(options: Record<string, unknown> = {}): PgSchemaDumper {
+    return PgSchemaDumper.create(this, options);
   }
 
   /** @internal */

@@ -698,7 +698,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`CREATE TABLE wagons (id serial primary key, train_id integer)`);
         await adapter.addForeignKey("wagons", "my_schema.trains");
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).foreignKeys("wagons", lines);
+        await adapter.createSchemaDumper().foreignKeys("wagons", lines);
         const output = lines.join("\n");
         // Default FK name is the Rails fk_rails_<10-hex> hash, which matches the
         // schema-dumper ignore pattern, so the name is omitted from the dump;
@@ -741,7 +741,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`opclass: "text_pattern_ops"`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -756,7 +756,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`opclass: { description: "text_pattern_ops" }`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -775,7 +775,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         const output = lines.join("\n");
         expect(output).toContain(`opclass: "gin_trgm_ops"`);
         expect(output).toContain(`opclass: { position: "text_pattern_ops" }`);
@@ -795,7 +795,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`order: { name: "NULLS FIRST" }`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -810,7 +810,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`order: { name: "DESC NULLS LAST" }`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -977,7 +977,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("schema dumps index included columns", async () => {
       await adapter.getDatabaseVersion();
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "companies");
+      await adapter.createSchemaDumper().dumpTable(lines, "companies");
       const indexLine = lines.find((l) => l.includes("company_include_index"))?.trim();
       expect(indexLine).toBeDefined();
       expect(indexLine).toContain(`"companies", ["firm_id", "type"]`);
@@ -997,7 +997,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain("nullsNotDistinct: true");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -1009,7 +1009,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         if (!(await adapter.supportsNullsNotDistinct())) return;
         await adapter.exec(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).not.toContain("nullsNotDistinct");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -1020,7 +1020,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
         await adapter.exec(`CREATE INDEX trains_name ON trains USING btree(name)`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper().dumpTable(lines, "trains");
         expect(lines.join("\n")).not.toContain("nullsNotDistinct");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -1043,7 +1043,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("kind");
       });
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      await adapter.createSchemaDumper().dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
@@ -1054,7 +1054,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.datetime("created_at", { null: false });
       });
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      await adapter.createSchemaDumper().dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
@@ -1066,7 +1066,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const options = "INHERITS (transportation_modes)";
       await adapter.createTable("trains", { options });
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      await adapter.createSchemaDumper().dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
@@ -1080,7 +1080,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const options = "INHERITS (transportation_modes, vehicles)";
       await adapter.createTable("trains", { options });
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      await adapter.createSchemaDumper().dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
@@ -1089,7 +1089,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("name");
       });
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      await adapter.createSchemaDumper().dumpTable(lines, "trains");
       expect(lines.join("\n")).not.toContain("options:");
     });
   });
@@ -1103,7 +1103,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE commented_table (id serial primary key, name varchar(50))`);
       await adapter.exec(`COMMENT ON TABLE commented_table IS 'a test table'`);
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "commented_table");
+      await adapter.createSchemaDumper().dumpTable(lines, "commented_table");
       expect(lines.join("\n")).toContain(`comment: "a test table"`);
       await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
 

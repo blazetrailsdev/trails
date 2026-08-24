@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await new EnableCitext().execMigration(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
-      const dump = (await adapter.createSchemaDumper(adapter).dump()).join("\n");
+      const dump = (await adapter.createSchemaDumper().dump()).join("\n");
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
     }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {
