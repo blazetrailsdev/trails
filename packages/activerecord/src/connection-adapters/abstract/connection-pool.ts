@@ -488,7 +488,6 @@ export class ConnectionPool implements ReapablePool {
     this._lazyLoadPromise = null;
     this._eagerWarmTriggered = false;
     this._eagerWarmPromise = null;
-    this.poolConfig.schemaCache = null;
   }
 
   /**

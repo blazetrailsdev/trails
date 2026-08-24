@@ -5,16 +5,16 @@
  */
 
 import { Column as BaseColumn } from "../column.js";
-import type { ColumnJSON } from "../column.js";
+import type { ColumnCoder } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class Column extends BaseColumn {
-  readonly serial: boolean;
-  readonly oid: number | null;
-  readonly fmod: number | null;
-  readonly array: boolean;
-  readonly identity: string | null;
-  readonly generated: string | null;
+  serial: boolean;
+  oid: number | null;
+  fmod: number | null;
+  array: boolean;
+  identity: string | null;
+  generated: string | null;
 
   constructor(
     name: string,
@@ -128,67 +128,25 @@ export class Column extends BaseColumn {
     );
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT: the schema-cache dump. Rails dumps through
-   *   YAML/Marshal, which round-trips the adapter's Column subclass and its
-   *   state on its own (`schema_cache.rb:406`); trails' dump is JSON, so the
-   *   subclass has to spell out what it carries and tag itself for
-   *   `rehydrateColumn`. Mirrors MySQL::Column's pair.
-   */
-  override toJSON(): PostgresqlColumnJSON {
-    return {
-      ...super.toJSON(),
-      __postgresql: true,
-      serial: this.serial,
-      oid: this.oid,
-      fmod: this.fmod,
-      array: this.array,
-      identity: this.identity,
-      generated: this.generated,
-    };
+  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
+  override initWith(coder: ColumnCoder): void {
+    super.initWith(coder);
+    this.serial = (coder["serial"] as boolean) ?? false;
+    this.oid = (coder["oid"] as number | null) ?? null;
+    this.fmod = (coder["fmod"] as number | null) ?? null;
+    this.array = (coder["array"] as boolean) ?? false;
+    this.identity = (coder["identity"] as string | null) ?? null;
+    this.generated = (coder["generated"] as string | null) ?? null;
   }
 
-  static override fromJSON(data: ColumnJSON): BaseColumn {
-    const p = data as PostgresqlColumnJSON;
-    return new Column(
-      p.name,
-      p.default,
-      {
-        sqlType: p.sqlTypeMetadata?.sqlType,
-        type: p.sqlTypeMetadata?.type,
-        oid: p.oid ?? undefined,
-        fmod: p.fmod ?? undefined,
-        limit: p.sqlTypeMetadata?.limit ?? null,
-        precision: p.sqlTypeMetadata?.precision ?? null,
-        scale: p.sqlTypeMetadata?.scale ?? null,
-      },
-      p.null,
-      {
-        collation: p.collation,
-        defaultFunction: p.defaultFunction,
-        comment: p.comment,
-        primaryKey: p.primaryKey,
-        serial: p.serial,
-        array: p.array,
-        identity: p.identity,
-        generated: p.generated,
-      },
-    );
+  override encodeWith(coder: ColumnCoder): void {
+    super.encodeWith(coder);
+    coder["class"] = "PostgreSQL::Column";
+    coder["serial"] = this.serial;
+    coder["oid"] = this.oid;
+    coder["fmod"] = this.fmod;
+    coder["array"] = this.array;
+    coder["identity"] = this.identity;
+    coder["generated"] = this.generated;
   }
-}
-
-/**
- * A dumped PostgreSQL::Column — the discriminator and subclass state a JSON
- * dump has to carry where Rails' YAML/Marshal dump round-trips the class
- * itself. Without it a loaded cache reports every column non-`array?`,
- * non-`serial?` and OID-less (`schema_cache.rb:406`, `schema_cache.rb:228`).
- */
-export interface PostgresqlColumnJSON extends ColumnJSON {
-  __postgresql: true;
-  serial: boolean;
-  oid: number | null;
-  fmod: number | null;
-  array: boolean;
-  identity: string | null;
-  generated: string | null;
 }

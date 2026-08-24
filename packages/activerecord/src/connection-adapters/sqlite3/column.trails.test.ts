@@ -50,7 +50,12 @@ describe("SQLite3::Column JSON round-trip", () => {
       generatedType: "stored",
     });
 
-    const back = Column.fromJSON(col.toJSON()) as Column;
+    const coder: Record<string, unknown> = {};
+    col.encodeWith(coder);
+    // Psych's restore step (`column.rb:46-53`): allocate the tagged class, then
+    // fill its ivars from the coder.
+    const back = Object.create(Column.prototype) as Column;
+    back.initWith(JSON.parse(JSON.stringify(coder)));
 
     expect(back).toBeInstanceOf(Column);
     expect(back.autoIncrement).toBe(true);

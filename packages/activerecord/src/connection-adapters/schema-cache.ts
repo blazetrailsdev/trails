@@ -8,7 +8,7 @@
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
-import type { ColumnJSON } from "./column.js";
+import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
@@ -26,41 +26,36 @@ async function withConnection<T>(
   return callback(pool);
 }
 
-function serializeColumn(col: any): ColumnJSON {
-  if (typeof col.toJSON === "function") return col.toJSON();
-  return {
-    name: col.name,
-    default: col.default,
-    sqlTypeMetadata:
-      col.sqlTypeMetadata?.toJSON?.() ??
-      (col.sqlType != null
-        ? {
-            sqlType: col.sqlType,
-            type: col.type ?? col.sqlType,
-            limit: col.limit ?? null,
-            precision: col.precision ?? null,
-            scale: col.scale ?? null,
-          }
-        : null),
-    null: col.null ?? true,
-    defaultFunction: col.defaultFunction ?? null,
-    collation: col.collation ?? null,
-    comment: col.comment ?? null,
-    primaryKey: col.primaryKey ?? false,
-  };
+function serializeColumn(col: Column): ColumnCoder {
+  const coder: ColumnCoder = {};
+  col.encodeWith(coder);
+  return coder;
 }
 
+/**
+ * The Column subclasses a dump can name, keyed by the `class` tag
+ * `Column#encodeWith` writes — JSON's stand-in for YAML's `!ruby/object:` tag.
+ */
+const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
+  Column,
+  "MySQL::Column": MysqlColumn,
+  "PostgreSQL::Column": PostgresqlColumn,
+  "SQLite3::Column": Sqlite3Column,
+};
+
+/**
+ * Psych's restore step: allocate the tagged class, then `init_with` the coder
+ * (`psych/visitors/to_ruby.rb`; `column.rb:46-53`). `Object.create` is the JS
+ * `allocate` — it must not run a constructor, because the coder is the only
+ * source of state.
+ */
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
-  const json = data as ColumnJSON & {
-    __mysql?: boolean;
-    __postgresql?: boolean;
-    __sqlite3?: boolean;
-  };
-  if (json && json.__mysql) return MysqlColumn.fromJSON(json);
-  if (json && json.__postgresql) return PostgresqlColumn.fromJSON(json);
-  if (json && json.__sqlite3) return Sqlite3Column.fromJSON(json);
-  return Column.fromJSON(json);
+  const coder = data as ColumnCoder;
+  const klass = COLUMN_CLASSES[coder["class"] as string] ?? Column;
+  const column = Object.create(klass.prototype) as Column;
+  column.initWith(coder);
+  return column;
 }
 
 /**

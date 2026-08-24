@@ -9,14 +9,16 @@ import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
 
 export class Column {
-  readonly name: string;
-  readonly sqlTypeMetadata: SqlTypeMetadata | null;
-  readonly null: boolean;
-  readonly default: unknown;
-  readonly defaultFunction: string | null;
-  readonly collation: string | null;
-  readonly comment: string | null;
-  readonly primaryKey: boolean;
+  // Ruby ivars, assigned by the constructor and re-assigned by `initWith`
+  // (`column.rb:46-53`), so they cannot be `readonly`.
+  name: string;
+  sqlTypeMetadata: SqlTypeMetadata | null;
+  null: boolean;
+  default: unknown;
+  defaultFunction: string | null;
+  collation: string | null;
+  comment: string | null;
+  primaryKey: boolean;
 
   constructor(
     name: string,
@@ -130,32 +132,57 @@ export class Column {
     return false;
   }
 
-  toJSON(): ColumnJSON {
-    return {
-      name: this.name,
-      default: this.default,
-      sqlTypeMetadata: this.sqlTypeMetadata?.toJSON() ?? null,
-      null: this.null,
-      defaultFunction: this.defaultFunction,
-      collation: this.collation,
-      comment: this.comment,
-      primaryKey: this.primaryKey,
-    };
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#init_with
+   * (`column.rb:46-53`). Rails' YAML/Marshal protocol allocates the class named
+   * by the document's tag and then fills its ivars from the coder; the caller
+   * that does the allocating is `rehydrateColumn` (`schema-cache.ts`).
+   */
+  initWith(coder: ColumnCoder): void {
+    this.name = coder["name"] as string;
+    this.sqlTypeMetadata = coder["sql_type_metadata"]
+      ? SqlTypeMetadata.fromJSON(coder["sql_type_metadata"] as SqlTypeMetadataJSON)
+      : null;
+    this.null = coder["null"] as boolean;
+    this.default = coder["default"];
+    this.defaultFunction = (coder["default_function"] as string | null) ?? null;
+    this.collation = (coder["collation"] as string | null) ?? null;
+    this.comment = (coder["comment"] as string | null) ?? null;
+    // `primary_key` has no Rails counterpart in this pair: Rails' Column has no
+    // `@primary_key` ivar at all (it lives on the schema cache's primary-key
+    // map), while trails' Column carries one.
+    this.primaryKey = (coder["primary_key"] as boolean) ?? false;
   }
 
-  static fromJSON(data: ColumnJSON): Column {
-    return new Column(
-      data.name,
-      data.default,
-      data.sqlTypeMetadata ? SqlTypeMetadata.fromJSON(data.sqlTypeMetadata) : null,
-      data.null,
-      {
-        defaultFunction: data.defaultFunction,
-        collation: data.collation,
-        comment: data.comment,
-        primaryKey: data.primaryKey,
-      },
-    );
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#encode_with
+   * (`column.rb:55-63`), the seam `SchemaCache#dump_to` serializes through
+   * (`schema_cache.rb:406`).
+   *
+   * `class` is the JSON stand-in for YAML's `!ruby/object:` tag. Rails restores
+   * the adapter's Column subclass from that tag and lets `init_with` fill only
+   * the seven base ivars, leaving the subclass' own ivars nil; a JSON document
+   * carries no tag, so the tag is written as a key and `rehydrateColumn`
+   * dispatches on it.
+   *
+   * The subclass overrides below then go one step further than Rails and encode
+   * their own state too. That is a deliberate deviation, not an oversight:
+   * Rails' data loss is invisible because Rails only ever compares a reflected
+   * cache against another reflected one, while trails' fixtures warm compares a
+   * dump-loaded cache against a reflected one — dropping `array` / `serial` /
+   * `rowid` & co. reds `base_test.rb`'s `test_clear_cache!`. Tracked by RFC
+   * 0096 `converge-column-encode-with-init-with`.
+   */
+  encodeWith(coder: ColumnCoder): void {
+    coder["class"] = "Column";
+    coder["name"] = this.name;
+    coder["sql_type_metadata"] = this.sqlTypeMetadata?.toJSON() ?? null;
+    coder["null"] = this.null;
+    coder["default"] = this.default;
+    coder["default_function"] = this.defaultFunction;
+    coder["collation"] = this.collation;
+    coder["comment"] = this.comment;
+    coder["primary_key"] = this.primaryKey;
   }
 
   deduplicate(): this {
@@ -181,16 +208,12 @@ function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): b
   return a.equals(b);
 }
 
-export interface ColumnJSON {
-  name: string;
-  default: unknown;
-  sqlTypeMetadata: SqlTypeMetadataJSON | null;
-  null: boolean;
-  defaultFunction: string | null;
-  collation: string | null;
-  comment: string | null;
-  primaryKey: boolean;
-}
+/**
+ * Psych's `coder` — the untyped key/value bag `encode_with` writes and
+ * `init_with` reads (`column.rb:46-63`). Same shape `SchemaCache#encodeWith`
+ * takes (`schema-cache.ts`).
+ */
+export type ColumnCoder = Record<string, unknown>;
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullColumn

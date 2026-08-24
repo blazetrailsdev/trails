@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Column as MysqlColumn } from "./column.js";
 
 describe("MysqlColumn", () => {
-  it("round-trips autoIncrement / unsigned / virtual through toJSON/fromJSON", () => {
+  it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
     const original = new MysqlColumn(
       "id",
       null,
@@ -10,8 +10,12 @@ describe("MysqlColumn", () => {
       false,
       { primaryKey: true, autoIncrement: true, unsigned: true, virtual: false },
     );
-    const json = JSON.parse(JSON.stringify(original.toJSON()));
-    const restored = MysqlColumn.fromJSON(json);
+    const coder: Record<string, unknown> = {};
+    original.encodeWith(coder);
+    // Psych's restore step (`column.rb:46-53`): allocate the tagged class, then
+    // fill its ivars from the coder.
+    const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
+    restored.initWith(JSON.parse(JSON.stringify(coder)));
     expect(restored.autoIncrement).toBe(true);
     expect(restored.unsigned).toBe(true);
     expect(restored.virtual).toBe(false);

@@ -10,7 +10,7 @@ import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
-import type { SchemaCache } from "../connection-adapters/schema-cache.js";
+import { SchemaReflection, type SchemaCache } from "../connection-adapters/schema-cache.js";
 import {
   dumpedTables,
   fingerprintOf,
@@ -78,7 +78,7 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
   if (!sc || pool === null) return;
   try {
     const dumped = templateSchemaCache();
-    if (dumped && (await replaySchemaCacheDump(adapter, pool, sc, dumped))) return;
+    if (dumped && (await replaySchemaCacheDump(adapter, pool, dumped))) return;
     await sc.addAll(pool);
   } catch {
     // best-effort warm
@@ -101,25 +101,28 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
  * `beforeAll` — are reflected individually, a handful of `add`s rather than
  * ~200.
  *
- * Rails installs a loaded dump by replacing the cache object
- * (`schema_cache.rb:139`, whose `load_cache` returns the new cache for
- * `SchemaReflection` to hold). This loads into the cache the pool already
- * handed out instead, because trails' adapter-side consumers hold
- * `internalSchemaCache` by identity — the same reason `ConnectionPool` assigns
- * a loaded cache back onto `poolConfig.schemaCache` rather than letting the two
- * diverge (`connection-pool.ts` lazy-load).
+ * The install is Rails': `load_cache` returns a freshly built `SchemaCache` and
+ * the `SchemaReflection` holds it (`schema_cache.rb:116-139`, `:16-19`) — the
+ * cache object is *replaced*, never loaded into. `ConnectionPool#schemaReflection=`
+ * (`connection_pool.rb:289-292`) is that replacement reached from a caller that
+ * holds an adapter, and every adapter-side consumer — `AbstractAdapter#schemaCache`,
+ * `#internalSchemaCache`, `TypeCaster::Connection` via `poolConfig.schemaCache` —
+ * reads the reflection's slot live on each access, so they all see the new cache.
+ *
+ * The dump is module-scoped and shared by every pool this file warms, so each
+ * pool installs its own dup: Rails gets that for free from `_load_from` running
+ * per reflection.
  */
 async function replaySchemaCacheDump(
   adapter: TransactionalFixturesAdapter,
   pool: ConnectionPool,
-  sc: NonNullable<TransactionalFixturesAdapter["internalSchemaCache"]>,
   dumped: SchemaCache,
 ): Promise<boolean> {
-  const marshalled = dumped.marshalDump();
-  const cached = dumpedTables(marshalled);
+  const cached = dumpedTables(dumped.marshalDump());
   const shapes = await schemaShapes(adapter);
   if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
-  sc.marshalLoad(marshalled);
+  pool.schemaReflection = new SchemaReflection(null, dumped.initializeDup());
+  const sc = adapter.internalSchemaCache;
   for (const table of shapes.keys()) {
     if (!cached.has(table)) await sc.add(pool, table);
   }

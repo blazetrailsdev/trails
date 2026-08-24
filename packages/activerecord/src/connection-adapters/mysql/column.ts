@@ -5,18 +5,18 @@
  */
 
 import { Column as BaseColumn } from "../column.js";
-import type { ColumnJSON } from "../column.js";
+import type { ColumnCoder } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class Column extends BaseColumn {
-  readonly unsigned: boolean;
-  readonly autoIncrement: boolean;
-  readonly virtual: boolean;
+  unsigned: boolean;
+  autoIncrement: boolean;
+  virtual: boolean;
   /** Raw MySQL `Extra` string (e.g. "VIRTUAL GENERATED", "STORED GENERATED",
    *  "auto_increment"). Mirrors Rails' `MySQL::Column#extra` (delegated from
    *  sql_type_metadata); the schema dumper reads it to distinguish stored from
    *  virtual generated columns. */
-  readonly extra: string;
+  extra: string;
 
   constructor(
     name: string,
@@ -93,48 +93,21 @@ export class Column extends BaseColumn {
     return this.virtual;
   }
 
-  override toJSON(): MysqlColumnJSON {
-    return {
-      ...super.toJSON(),
-      __mysql: true,
-      unsigned: this.unsigned,
-      autoIncrement: this.autoIncrement,
-      virtual: this.virtual,
-      extra: this.extra,
-    };
+  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
+  override initWith(coder: ColumnCoder): void {
+    super.initWith(coder);
+    this.unsigned = (coder["unsigned"] as boolean) ?? false;
+    this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
+    this.virtual = (coder["virtual"] as boolean) ?? false;
+    this.extra = (coder["extra"] as string) ?? "";
   }
 
-  static override fromJSON(data: ColumnJSON): Column {
-    const m = data as MysqlColumnJSON;
-    return new Column(
-      m.name,
-      m.default,
-      {
-        sqlType: m.sqlTypeMetadata?.sqlType,
-        type: m.sqlTypeMetadata?.type,
-        limit: m.sqlTypeMetadata?.limit ?? null,
-        precision: m.sqlTypeMetadata?.precision ?? null,
-        scale: m.sqlTypeMetadata?.scale ?? null,
-      },
-      m.null,
-      {
-        collation: m.collation,
-        comment: m.comment,
-        defaultFunction: m.defaultFunction,
-        primaryKey: m.primaryKey,
-        unsigned: m.unsigned,
-        autoIncrement: m.autoIncrement,
-        virtual: m.virtual,
-        extra: m.extra ?? "",
-      },
-    );
+  override encodeWith(coder: ColumnCoder): void {
+    super.encodeWith(coder);
+    coder["class"] = "MySQL::Column";
+    coder["unsigned"] = this.unsigned;
+    coder["auto_increment"] = this.autoIncrement;
+    coder["virtual"] = this.virtual;
+    coder["extra"] = this.extra;
   }
-}
-
-export interface MysqlColumnJSON extends ColumnJSON {
-  __mysql: true;
-  unsigned: boolean;
-  autoIncrement: boolean;
-  virtual: boolean;
-  extra?: string;
 }

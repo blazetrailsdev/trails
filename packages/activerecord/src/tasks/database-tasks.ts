@@ -499,18 +499,19 @@ export class DatabaseTasks {
   static targetVersion(): number | null {
     // TRAILS_MIGRATION_VERSION is canonical; VERSION is the legacy fallback (one-release window).
     const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    if (!version) return null;
-    const str = version.trim();
-    if (str === "" || !/^\d+$/.test(str)) return null;
-    return parseInt(str, 10);
+    // Rails: `ENV["VERSION"].to_i if ENV["VERSION"] && !ENV["VERSION"].empty?`
+    // (database_tasks.rb:323-325). `to_i` never fails — "unknown" is 0, and 0 is
+    // truthy in Ruby, which is what lets `check_target_version` below reach its
+    // format check for a malformed VERSION.
+    if (version === undefined || version === "") return null;
+    const match = version.match(/^\s*(-?\d+)/);
+    return match ? Number(match[1]) : 0;
   }
 
-  static checkTargetVersion(version?: number | string): void {
-    const v = version ?? getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    if (v === undefined || v === null || String(v) === "") return;
-    const str = String(v);
-    if (!Migration.isValidVersionFormat(str)) {
-      throw new Error(`Invalid format of target version: \`VERSION=${str}\``);
+  static checkTargetVersion(): void {
+    const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
+    if (this.targetVersion() !== null && !Migration.isValidVersionFormat(version ?? "")) {
+      throw new Error(`Invalid format of target version: \`VERSION=${version}\``);
     }
   }
 
@@ -1018,19 +1019,21 @@ export class DatabaseTasks {
   }
 
   static async migrateStatus(): Promise<void> {
-    const pool = this.migrationConnectionPool();
-    if (!(await pool.schemaMigration.tableExists())) {
+    if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
+      // Rails: Kernel.abort "Schema migrations table does not exist yet."
+      // (database_tasks.rb:303-305). Same shape as checkSchemaFile above:
+      // Kernel.abort exits the process, which a library method has no business
+      // doing in trails, so the CLI's own error-to-exit-code path carries it.
       throw new Error("Schema migrations table does not exist yet.");
     }
-    const rows = await pool.migrationContext.migrationsStatus();
-    const dbName = pool.dbConfig.database ?? ":memory:";
+    const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();
     const center = (s: string, w: number) => {
       const pad = w - s.length;
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
     const puts = (s = "") => stdout.write(s + "\n");
-    puts(`\ndatabase: ${dbName}\n`);
+    puts(`\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n`);
     puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
     puts("-".repeat(50));
     for (const row of rows) {
