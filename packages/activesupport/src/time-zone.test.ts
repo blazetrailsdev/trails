@@ -30,23 +30,23 @@ describe("TimeZoneTest", () => {
 
     withUtcToLocalReturnsUtcOffsetTimes(false, () => {
       // standard offset -0500
-      expect(zone.utcToLocal(new Date(Date.UTC(2000, 0, 1)))).toEqual(
-        new Date(Date.UTC(1999, 11, 31, 19)),
+      expect((zone.utcToLocal(Time.utc(2000, 1)) as Time).toS()).toBe(
+        Time.utc(1999, 12, 31, 19).toS(),
       );
       // dst offset -0400
-      expect(zone.utcToLocal(new Date(Date.UTC(2000, 6, 1)))).toEqual(
-        new Date(Date.UTC(2000, 5, 30, 20)),
+      expect((zone.utcToLocal(Time.utc(2000, 7)) as Time).toS()).toBe(
+        Time.utc(2000, 6, 30, 20).toS(),
       );
     });
 
     withUtcToLocalReturnsUtcOffsetTimes(true, () => {
-      const standard = zone.utcToLocal(new Date(Date.UTC(2000, 0, 1))) as Temporal.ZonedDateTime;
+      const standard = zone.utcToLocal(Time.utc(2000, 1)) as Temporal.ZonedDateTime;
       expect([standard.year, standard.month, standard.day, standard.hour]).toEqual([
         1999, 12, 31, 19,
       ]);
       expect(standard.offsetNanoseconds / 1_000_000_000).toBe(-18000);
 
-      const dst = zone.utcToLocal(new Date(Date.UTC(2000, 6, 1))) as Temporal.ZonedDateTime;
+      const dst = zone.utcToLocal(Time.utc(2000, 7)) as Temporal.ZonedDateTime;
       expect([dst.year, dst.month, dst.day, dst.hour]).toEqual([2000, 6, 30, 20]);
       expect(dst.offsetNanoseconds / 1_000_000_000).toBe(-14400);
     });
@@ -56,17 +56,18 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
 
     withUtcToLocalReturnsUtcOffsetTimes(false, () => {
-      expect(zone.utcToLocal(new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1)))).toEqual(
-        new Date(Date.UTC(1999, 11, 31, 19, 0, 0, 1)),
+      expect((zone.utcToLocal(Time.utc(2000, 1, 1, 0, 0, 0, 1000)) as Time).toS()).toBe(
+        Time.utc(1999, 12, 31, 19, 0, 0, 1000).toS(),
       );
-      expect(zone.utcToLocal(new Date(Date.UTC(2000, 6, 1, 0, 0, 0, 1)))).toEqual(
-        new Date(Date.UTC(2000, 5, 30, 20, 0, 0, 1)),
+      expect((zone.utcToLocal(Time.utc(2000, 1, 1, 0, 0, 0, 1000)) as Time).nsec).toBe(1_000_000);
+      expect((zone.utcToLocal(Time.utc(2000, 7, 1, 0, 0, 0, 1000)) as Time).toS()).toBe(
+        Time.utc(2000, 6, 30, 20, 0, 0, 1000).toS(),
       );
     });
 
     withUtcToLocalReturnsUtcOffsetTimes(true, () => {
       const standard = zone.utcToLocal(
-        new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 1)),
+        Time.utc(2000, 1, 1, 0, 0, 0, 1000),
       ) as Temporal.ZonedDateTime;
       expect(standard.millisecond).toBe(1);
       expect(standard.offsetNanoseconds / 1_000_000_000).toBe(-18000);

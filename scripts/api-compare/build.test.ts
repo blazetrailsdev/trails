@@ -261,6 +261,31 @@ describe("reconcileFileText", () => {
     ).toBeNull();
   });
 
+  it("leaves a same-family comment split by prose alone in either kind", () => {
+    // The single `slot` #6958 added is taken at the FIRST tag of the family, so
+    // a second receipt further down was hoisted up next to it — 0 rows
+    // migrated, 1 file rewritten (RFC 0106).
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * @missingRailsCall alpha — PERMANENT: the first receipt.",
+      "   *",
+      "   * Prose sitting between two receipts of the SAME family.",
+      "   *",
+      "   * @missingRailsCall beta — PERMANENT: the second receipt.",
+      "   */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    const calls = new Map([anyClass("bar", ["bar"], new Set(["alpha", "beta"]))]);
+    const reason = () => "PERMANENT: x";
+    expect(reconcileFileText("foo.ts", src, calls, reason).text).toBeNull();
+    const args = src.replace(/@missingRailsCall/g, "@missingRailsArgs");
+    expect(
+      reconcileFileText("foo.ts", args, calls, reason, undefined, undefined, ARGS_TAG).text,
+    ).toBeNull();
+  });
+
   it("lets a class of the file-module's name keep its own key", () => {
     // `relation.ts` declares `class Relation`, whose name IS the synthesized
     // file-module name: a top-level function of the same name must not claim
