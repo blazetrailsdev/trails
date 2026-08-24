@@ -69,15 +69,14 @@ export class TimeType extends ValueType<Temporal.Instant> {
    *   end
    *
    * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
-   * (time_value.rb:44-46). The zone is the thread-local `Time.zone`, read here
-   * through ActiveSupport's `zone()` the way `isUtc()` reads
-   * `zoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
-   * (`date_and_time/zones.rb:20-27`), which is the zoneless
-   * `Temporal.PlainDateTime` this returns in that arm, as the helper does.
-   * `super` is the tail below: the mixed-in `TimeValue.userInputInTimeZone`,
-   * which is `Time.zone.parse` for the dummy-dated string. Parsing in the zone
-   * is what preserves an offset the string carries — re-anchoring a cast
-   * instant's wall clock instead reads `"…T19:45:54-08:00"` back as hour 3.
+   * (time_value.rb:42-44) — `Time.zone.parse` of the dummy-dated string, which
+   * is what preserves an offset the string carries. TypeScript has no `super`
+   * for a mixed-in module, so the tail calls the mixin member on `this`; the
+   * mixin also answers Ruby's fall-through arms, so a value that is neither a
+   * `::String` nor a `::Time` reaches it untouched, as in Rails. The zone is
+   * the thread-local `Time.zone`; with no zone set at all Ruby answers a bare
+   * `to_time` (`date_and_time/zones.rb:20-27`), which the mixin reads in the
+   * system zone.
    *
    * The `present?` guard is spelled out rather than routed through
    * `isBlank`: Ruby's `blank?` is `respond_to?(:empty?) ? !!empty? : !self`, so
