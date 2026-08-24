@@ -8,20 +8,16 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import type { DirtyOptions } from "@blazetrails/activemodel";
+import type {
+  AttributeMutationTracker,
+  DirtyOptions,
+  NullMutationTracker,
+} from "@blazetrails/activemodel";
 
 interface DirtyRecord {
-  mutationsFromDatabase: Record<string, [unknown, unknown]>;
-  mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
+  mutationsFromDatabase: AttributeMutationTracker;
+  mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker;
   readAttribute(name: string): unknown;
-  /** @internal */
-  _dirty: {
-    isChanged(
-      changes: Record<string, [unknown, unknown]>,
-      name: string,
-      options?: DirtyOptions,
-    ): boolean;
-  };
 }
 
 /**
@@ -30,27 +26,26 @@ interface DirtyRecord {
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute?
  * (dirty.rb:86-88) — `mutations_before_last_save.changed?(attr_name.to_s,
  * **options)`.
- *
- * @missingRailsArgs changed? — CONVERGEABLE: trails' single DirtyTracker holds both of Ruby's tracker instances' change sets, so the set Ruby names by receiver is `changed?`'s leading argument here. Story: `0023-surfaced-deviations/dirty-tracker-is-one-object-where-rails-has-two-mutation-trackers`.
  */
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
   options?: DirtyOptions,
 ): boolean {
-  return record._dirty.isChanged(record.mutationsBeforeLastSave, attr, options);
+  return record.mutationsBeforeLastSave.isChanged(attr, options);
 }
 
 /**
  * Return the change for a specific attribute from the last save.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_change_to_attribute
+ * (dirty.rb:98-100)
  */
 export function savedChangeToAttribute(
   record: DirtyRecord,
   attr: string,
 ): [unknown, unknown] | null {
-  return record.mutationsBeforeLastSave[attr] ?? null;
+  return record.mutationsBeforeLastSave.changeToAttribute(attr);
 }
 
 /**
@@ -69,7 +64,7 @@ export function attributeBeforeLastSave(record: DirtyRecord, attr: string): unkn
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#saved_changes?
  */
 export function isSavedChanges(record: DirtyRecord): boolean {
-  return Object.keys(record.mutationsBeforeLastSave).length > 0;
+  return record.mutationsBeforeLastSave.anyChanges();
 }
 
 /**
@@ -78,15 +73,13 @@ export function isSavedChanges(record: DirtyRecord): boolean {
  * Mirrors: ActiveRecord::AttributeMethods::Dirty#will_save_change_to_attribute?
  * (dirty.rb:138-140) — `mutations_from_database.changed?(attr_name.to_s,
  * **options)`.
- *
- * @missingRailsArgs changed? — CONVERGEABLE: same single-tracker reason as `isSavedChangeToAttribute` above.
  */
 export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
   attr: string,
   options?: DirtyOptions,
 ): boolean {
-  return record._dirty.isChanged(record.mutationsFromDatabase, attr, options);
+  return record.mutationsFromDatabase.isChanged(attr, options);
 }
 
 /**
@@ -98,7 +91,7 @@ export function attributeChangeToBeSaved(
   record: DirtyRecord,
   attr: string,
 ): [unknown, unknown] | null {
-  return record.mutationsFromDatabase[attr] ?? null;
+  return record.mutationsFromDatabase.changeToAttribute(attr);
 }
 
 /**
@@ -127,7 +120,7 @@ export class Dirty {
    * (dirty.rb:118-120) — `mutations_before_last_save.changes`.
    */
   get savedChanges(): Record<string, [unknown, unknown]> {
-    return (this as unknown as DirtyGetterHost)._dirty.previousChanges;
+    return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
   }
 
   /**
@@ -135,7 +128,7 @@ export class Dirty {
    * (dirty.rb:169-171) — `mutations_from_database.any_changes?`.
    */
   get hasChangesToSave(): boolean {
-    return (this as unknown as DirtyGetterHost)._dirty.changed;
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
   }
 
   /**
@@ -143,7 +136,7 @@ export class Dirty {
    * (dirty.rb:175-177) — `mutations_from_database.changes`.
    */
   get changesToSave(): Record<string, [unknown, unknown]> {
-    return (this as unknown as DirtyGetterHost)._dirty.changes;
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
   }
 
   /**
@@ -151,7 +144,7 @@ export class Dirty {
    * (dirty.rb:181-183) — `mutations_from_database.changed_attribute_names`.
    */
   get changedAttributeNamesToSave(): string[] {
-    return (this as unknown as DirtyGetterHost)._dirty.changedAttributeNames;
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
   }
 
   /**
@@ -159,18 +152,8 @@ export class Dirty {
    * (dirty.rb:191-193) — `mutations_from_database.changed_values`.
    */
   get attributesInDatabase(): Record<string, unknown> {
-    return (this as unknown as DirtyGetterHost)._dirty.changedAttributes;
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
   }
-}
-
-interface DirtyGetterHost {
-  _dirty: {
-    changed: boolean;
-    changes: Record<string, [unknown, unknown]>;
-    changedAttributeNames: string[];
-    changedAttributes: Record<string, unknown>;
-    previousChanges: Record<string, [unknown, unknown]>;
-  };
 }
 
 interface DirtyPrivateHost {

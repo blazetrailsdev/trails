@@ -767,37 +767,6 @@ function _extractAssociationAttrs(
 }
 
 /**
- * Queue the constructor-assigned attributes for dirtiness derivation, so
- * `new Model(attrs).changes` matches Rails — a new record built by assignment
- * is dirty against column defaults (`Topic.new(title: "x")` →
- * `{ title: [nil, "x"] }`, `Topic.new` → `{}`). The Model constructor snapshots
- * a clean baseline; this hands the tracker the new-record dirtiness Rails gets
- * for free because assignment produces `FromUser`-over-default attributes whose
- * `changed?` is true — derived, as in Rails, by the first read that asks
- * (`DirtyTracker#deferNewRecordChanges`). Keeps the primary key in scope: an
- * explicitly assigned `id` IS dirty at construction in Rails.
- *
- * Called only from the `!wasSuppressed` constructor branches (where the inline
- * `after_initialize` fires), so the dirty state is established before
- * `after_initialize` — matching Rails, where `assign_attributes` runs before
- * `_run_initialize_callbacks` and `changed?` is already true inside the hook.
- * Found-record reconstruction is the only path that constructs with callbacks
- * suppressed, and it always does so with an EMPTY attribute bag (`new this()` in
- * `_instantiate` / `directInstantiate`) before populating via `writeFromDatabase`
- * + `changesApplied`. So no new-record-with-values construction ever reaches the
- * suppressed branch, and skipping the pass there loses no dirtiness.
- *
- * @internal
- */
-function _reinstateConstructorDirtiness(
-  record: { _dirty: { deferNewRecordChanges: (...args: any[]) => void }; _attributes: unknown },
-  ctor: { _defaultAttributes?: () => unknown },
-): void {
-  if (typeof ctor._defaultAttributes !== "function") return;
-  record._dirty.deferNewRecordChanges(record._attributes);
-}
-
-/**
  * The constructor's association arm. Rails reaches these writers through
  * `assign_attributes` → `public_send("#{k}=", v)`
  * (activemodel/lib/active_model/attribute_assignment.rb:67-75); trails cannot,
@@ -2855,7 +2824,6 @@ export class Base extends Model {
     );
     defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;
-    (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();
     // Apply strict_loading_by_default
     if (this._strictLoadingByDefault) {
@@ -3054,8 +3022,6 @@ export class Base extends Model {
         }
       }
       executeMultiparameterAssignment(this as any, multiparams);
-      // Re-snapshot so mp attrs are part of the initial clean state.
-      (this as any)._dirty.snapshot((this as any)._attributes);
       if (!wasSuppressed) {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
@@ -3066,17 +3032,10 @@ export class Base extends Model {
             new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
           );
         }
-        // Re-snapshot so internals writes are part of the initial clean state.
-        (this as any)._dirty.snapshot((this as any)._attributes);
         if (assocPending) {
           _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-          // belongsTo writers may write the owner FK; re-snapshot so
-          // constructor-form association assignment lands in the clean
-          // baseline, matching regular constructor attrs.
-          (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
-        _reinstateConstructorDirtiness(this as any, ctor as any);
         // Rails yields the constructor block (Core#initialize, core.rb:479)
         // before after_initialize — used by association `build_record` to run
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
@@ -3132,8 +3091,6 @@ export class Base extends Model {
         if (_shouldApplyScopeAttributes(ctor2)) {
           _applyScopeAttributes(ctor2, this as any, new Set(Object.keys(attrs)));
         }
-        // Re-snapshot so internals writes are part of the initial clean state.
-        (this as any)._dirty.snapshot((this as any)._attributes);
         // Assign store accessor keys after the clean baseline so they appear
         // as dirty on new records (mirrors Rails: new-record attrs are changed
         // relative to nil). Dispatch through the prototype setter so the write
@@ -3154,13 +3111,8 @@ export class Base extends Model {
         }
         if (assocPending) {
           _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-          // belongsTo writers may write the owner FK; re-snapshot so
-          // constructor-form association assignment lands in the clean
-          // baseline, matching regular constructor attrs.
-          (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
-        _reinstateConstructorDirtiness(this as any, ctor2 as any);
         // Rails yields the constructor block (Core#initialize, core.rb:479)
         // before after_initialize — used by association `build_record` to run
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
@@ -3173,10 +3125,6 @@ export class Base extends Model {
     // we still dispatch first to keep Rails' "assign → after_initialize" order.
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-      // Match the dispatch sites above: re-snapshot so any belongsTo FK
-      // writes from the association writers don't leave construction in a
-      // dirty state.
-      (this as any)._dirty.snapshot((this as any)._attributes);
     }
   }
 

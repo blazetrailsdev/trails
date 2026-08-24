@@ -113,10 +113,14 @@ export class AttributeMutationTracker {
     return this.attributes.getAttribute(attrName).originalValue;
   }
 
-  forceChange(attrName: string): void {
+  forceChange(attrName: string): unknown {
     // Intentionally store the live value (no clone) to match Rails:
     // in-place mutations after forceChange must surface via dirty tracking.
-    this.forcedChanges.set(attrName, this.fetchValue(attrName));
+    // Ruby's assignment expression is the method's value, which
+    // `attribute_will_change!` (dirty.rb:409-411) hands back to its caller.
+    const value = this.fetchValue(attrName);
+    this.forcedChanges.set(attrName, value);
+    return value;
   }
 
   protected attrNames(): string[] {
@@ -170,10 +174,11 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     return this.fetchValue(attrName);
   }
 
-  forceChange(attrName: string): void {
-    if (this.attributeChanged(attrName)) return;
-    const value = this.fetchValue(attrName);
-    this.forcedChanges.set(attrName, cloneValue(value));
+  forceChange(attrName: string): unknown {
+    if (this.attributeChanged(attrName)) return undefined;
+    const value = cloneValue(this.fetchValue(attrName));
+    this.forcedChanges.set(attrName, value);
+    return value;
   }
 
   finalizeChanges(): void {
@@ -200,6 +205,9 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
  * Mirrors: ActiveModel::NullMutationTracker
  */
 export class NullMutationTracker {
+  /** Mirrors Ruby's `include Singleton` (attribute_mutation_tracker.rb:157). */
+  static readonly instance = new NullMutationTracker();
+
   changedAttributeNames(): string[] {
     return [];
   }
@@ -233,6 +241,8 @@ export class NullMutationTracker {
   }
 
   forgetChange(_attrName: string): void {}
-  forceChange(_attrName: string): void {}
+  forceChange(_attrName: string): unknown {
+    return undefined;
+  }
   finalizeChanges(): void {}
 }

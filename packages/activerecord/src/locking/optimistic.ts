@@ -204,9 +204,6 @@ type InstanceLockingHost = {
     };
     set(name: string, attribute: unknown): void;
   };
-  _dirty: {
-    attributeWritten(name: string, value: unknown, before: unknown, type: unknown): void;
-  };
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
@@ -281,12 +278,6 @@ export async function _updateRow(
     return affectedRows;
   } catch (e) {
     this._attributes.set(col, lockAttributeWas);
-    this._dirty.attributeWritten(
-      col,
-      lockAttributeWas.value,
-      lockAttributeWas.valueBeforeTypeCast,
-      lockAttributeWas.type,
-    );
     throw e;
   }
 }

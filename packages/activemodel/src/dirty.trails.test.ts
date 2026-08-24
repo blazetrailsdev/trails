@@ -41,13 +41,11 @@ describe("Dirty across dup", () => {
     duped.body = "new";
 
     // MRI: dup.changes == {"title"=>[nil, "A"], "body"=>[nil, "new"]} — the copy
-    // derives its dirtiness from its own rebuilt attributes. `t.changes` is
-    // {"title"=>[nil, "A"]} there and {} here: an ActiveModel source still
-    // baselines at construction (story
-    // `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`).
+    // derives its dirtiness from its own rebuilt attributes, and the source
+    // keeps its own construction-time change.
     expect(duped.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
-    expect(t.changes).toEqual({});
-    expect(t.isChanged).toBe(false);
+    expect(t.changes).toEqual({ title: [null, "A"] });
+    expect(t.isChanged).toBe(true);
     expect(t.body).toBeNull();
   });
 
@@ -57,7 +55,7 @@ describe("Dirty across dup", () => {
 
     t.body = "new";
 
-    expect(t.changes).toEqual({ body: [null, "new"] });
+    expect(t.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
     // MRI: dup.changes == {"title"=>[nil, "A"]}, and the source's later write
     // does not reach it.
     expect(duped.changes).toEqual({ title: [null, "A"] });

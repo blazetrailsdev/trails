@@ -209,14 +209,12 @@ export class UniquenessValidator extends EachValidator {
       }
       if (Array.isArray(pk)) {
         const dbVals = pk.map((col: string) =>
-          record._dirty?.attributeChanged(col)
-            ? record._dirty.attributeWas(col)
-            : record.readAttribute(col),
+          record.attributeChanged(col) ? record.attributeWas(col) : record.readAttribute(col),
         );
         relation = relation.where().not(pk, [dbVals]);
       } else {
-        const dbVal = record._dirty?.attributeChanged(pk)
-          ? record._dirty.attributeWas(pk)
+        const dbVal = record.attributeChanged(pk)
+          ? record.attributeWas(pk)
           : record.readAttribute(pk);
         relation = relation.where().not({ [pk]: [dbVal] });
       }
@@ -456,9 +454,8 @@ async function isValidationNeeded(
       ? [options.scope as string]
       : [];
   const attrs = resolveAttributes(record, [...scope, attribute]);
-  const dirty = record._dirty;
   const anyChangedOrNull = attrs.some(
-    (a) => dirty?.attributeChanged?.(a) || record.readAttribute?.(a) == null,
+    (a) => record.attributeChanged?.(a) || record.readAttribute?.(a) == null,
   );
   if (anyChangedOrNull) return true;
   return !(await validator.isCoveredByUniqueIndex(klass, record, attribute, scope));

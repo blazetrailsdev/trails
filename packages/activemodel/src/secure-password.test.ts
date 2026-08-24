@@ -380,6 +380,7 @@ describe("SecurePasswordTest", () => {
     (builder as any).password = "secret";
     const digest = builder._readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
+    u.changesApplied();
     expect(await u.isValid()).toBe(true);
     (u as any).passwordChallenge = "secret";
     expect(await u.isValid()).toBe(true);
@@ -401,6 +402,7 @@ describe("SecurePasswordTest", () => {
     (builder as any).password = "secret";
     const digest = builder._readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
+    u.changesApplied();
     expect(await u.isValid()).toBe(true);
     (u as any).password = "newpassword";
     (u as any).passwordChallenge = "secret";

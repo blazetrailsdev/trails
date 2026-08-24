@@ -30,12 +30,10 @@ interface TxRecordInternals {
   writeAttribute(name: string, value: unknown): void;
   readAttribute(name: string): unknown;
   _startTransactionState: StartTransactionState;
-  _dirty: {
-    changed: boolean;
-    mutationsFromDatabase: Record<string, unknown>;
-    attributeChanged(name: string): boolean;
-    attributeWas(name: string): unknown;
-  };
+  isChanged: boolean;
+  changes: Record<string, unknown>;
+  attributeChanged(name: string): boolean;
+  attributeWas(name: string): unknown;
 }
 
 // The wrapper adapter exposes currentTransaction() at runtime but not on the
@@ -310,7 +308,7 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     // "original" (pre-TX) is the dirty baseline. Mirrors Rails' attribute
     // reconstruction via attr.with_value_from_user(current_value).
     expect(internals.readAttribute("title")).toBe("changed-during-tx");
-    expect(internals._dirty.mutationsFromDatabase).toEqual({
+    expect(internals.changes).toEqual({
       title: ["original", "changed-during-tx"],
     });
   });
@@ -339,7 +337,7 @@ describe("restoreTransactionRecordState composite primary key arm", () => {
 // ==========================================================================
 // Story K-followup regression tests
 // ==========================================================================
-describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
+describe("restore_transaction_record_state after rollback (Story K-followup)", () => {
   it("rollback preserves in-TX user edits as dirty", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
     const { Topic } = await makeSQLiteTopic();
@@ -359,9 +357,9 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
     // Post-TX value stays live in memory; pre-TX value becomes the dirty baseline.
     // Mirrors Rails: attr.with_value_from_user keeps current value, pre-TX as original.
     expect(internals.readAttribute("title")).toBe("tx-edit");
-    expect(internals._dirty.attributeChanged("title")).toBe(true);
-    expect(internals._dirty.attributeWas("title")).toBe("original");
-    expect(internals._dirty.mutationsFromDatabase).toEqual({
+    expect(internals.attributeChanged("title")).toBe(true);
+    expect(internals.attributeWas("title")).toBe("original");
+    expect(internals.changes).toEqual({
       title: ["original", "tx-edit"],
     });
   });
@@ -382,8 +380,8 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
       shouldRunCallbacks: false,
     });
 
-    expect(internals._dirty.changed).toBe(false);
-    expect(internals._dirty.mutationsFromDatabase).toEqual({});
+    expect(internals.isChanged).toBe(false);
+    expect(internals.changes).toEqual({});
   });
 });
 
