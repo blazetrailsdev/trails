@@ -20,6 +20,8 @@ import { getFs, getPath, type FsStatResult } from "../../fs-adapter.js";
  * Mirrors Ruby `File.atomic_write` (core_ext/file/atomic.rb:20-52). The
  * yielded object stands in for the `Tempfile` the Ruby block writes to; only
  * `write` is used by callers, and `binmode`/`close` are the adapter's job.
+ * `atomic_write` is synchronous and its block is a synchronous callback, so it
+ * does not route through trails' `Tempfile` port, whose fs access is async.
  */
 export function atomicWrite<T>(
   fileName: string,

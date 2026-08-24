@@ -48,6 +48,9 @@ export {
 } from "./encrypted-file.js";
 export type { EncryptedFileOptions } from "./encrypted-file.js";
 
+export { Tempfile } from "./tempfile.js";
+export type { TempfileBasename } from "./tempfile.js";
+
 export {
   registerChildProcessAdapter,
   getChildProcess,

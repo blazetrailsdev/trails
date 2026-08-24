@@ -155,6 +155,12 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     return this._options;
   }
 
+  /**
+   * @missingRailsCall merge! — PERMANENT: Verified per-site (RFC 0106):
+   *   `default_format_options.merge!(i18n_format_options)`
+   *   (number_converter.rb:146) is object spread `{ ...this.defaultFormatOptions(),
+   *   ...this.i18nFormatOptions() }`; `Hash#merge!` has no JS call form.
+   */
   protected formatOptions(): Record<string, unknown> {
     return { ...this.defaultFormatOptions(), ...this.i18nFormatOptions() };
   }
