@@ -303,9 +303,6 @@ describe("lazy composed_of inclusion", () => {
     class Plain extends Base {}
     expect(own(Plain, "reload")).toBe(false);
     expect(own(Plain, "initializeDup")).toBe(false);
-    // Its reload is the inherited AutosaveAssociation#reload wrapper (which
-    // delegates to Persistence#reload), not an aggregation-cache wrapper. The
-    // aggregation wrapper is only mixed in by composed_of.
     expect(Plain.prototype.reload).toBe(Base.prototype.reload);
     expect(Plain.prototype.reload).not.toBe(persistenceReload);
   });
@@ -338,10 +335,8 @@ describe("lazy composed_of inclusion", () => {
         composedOf(this, "credit", { className: Money, mapping: [["credit", "amount"]] });
       }
     }
-    // `self < Aggregations` is already true via inheritance, so no own override.
     expect(own(SubPriced, "reload")).toBe(false);
     expect(own(SubPriced, "initializeDup")).toBe(false);
-    // But it still inherits the composed_of overrides from Priced.
     expect(SubPriced.prototype.reload).toBe(Priced.prototype.reload);
     expect(SubPriced.prototype.reload).not.toBe(persistenceReload);
   });

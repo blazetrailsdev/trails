@@ -22,7 +22,6 @@ afterAll(() => {
 });
 
 describe("ActiveRecordSchemaTest", () => {
-  // Ride the primary schema-loaded pool via `Base.connection`.
   fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
@@ -64,13 +63,11 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema without version is the current version schema", () => {
-    // Schema class exists and can be instantiated
     const s = new Schema(adapter);
     expect(s).toBeInstanceOf(Schema);
   });
 
   it("schema version accessor", () => {
-    // Migration instances have a version property
     class V1 extends Migration {
       async change() {}
     }
@@ -85,7 +82,6 @@ describe("ActiveRecordSchemaTest", () => {
         t.integer("count");
       });
     });
-    // Verify table exists
     await adapter.executeMutation(
       `INSERT INTO "schema_test" ("title", "count") VALUES ('hello', 1)`,
     );
@@ -120,13 +116,11 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema raises an error for invalid column type", () => {
-    // TableDefinition doesn't have a method for an invalid type; calling a nonexistent method should throw
     const td = new TableDefinition("test_invalid", { adapter });
     expect(() => (td as any).unknownType("col")).toThrow();
   });
 
   it("schema subclass", () => {
-    // Schema can be extended
     class MySchema extends Schema {}
     const s = new MySchema(adapter);
     expect(s).toBeInstanceOf(Schema);
@@ -148,14 +142,12 @@ describe("ActiveRecordSchemaTest", () => {
         t.index(["email"], { name: "idx_email_2", unique: true });
       });
     });
-    // Verify table and indexes created without error
     await adapter.executeMutation(`INSERT INTO "multi_idx" ("email") VALUES ('test@test.com')`);
     const rows = await adapter.execute(`SELECT * FROM "multi_idx"`);
     expect(rows.length).toBe(1);
   });
 
   it.skipIf(adapterType !== "postgres")("timestamps with and without zones", async () => {
-    // TableDefinition timestamps creates created_at and updated_at as datetime
     const td = new TableDefinition("tz_test", { adapter });
     td.timestamps();
     const colNames = td.columns.map((c) => c.name);
@@ -169,7 +161,6 @@ describe("ActiveRecordSchemaTest", () => {
     const td = new TableDefinition("ts_default", { adapter });
     td.timestamps();
     const createdAt = td.columns.find((c) => c.name === "created_at");
-    // timestamps sets null: false by default
     expect(createdAt!.options.null).toBe(false);
   });
 
@@ -199,7 +190,6 @@ describe("ActiveRecordSchemaTest", () => {
     const m = new TsMig();
     m.connection = adapter;
     await m.up();
-    // Verify timestamps were added
     await adapter.executeMutation(
       `INSERT INTO "ts_change" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
     );
@@ -262,7 +252,6 @@ describe("ActiveRecordSchemaTest", () => {
     const m = new TsOptMig();
     m.connection = adapter;
     await m.up();
-    // null: true means we can insert without providing timestamp values
     await adapter.executeMutation(`INSERT INTO "ts_opts" ("name") VALUES ('test')`);
     const rows = await adapter.execute(`SELECT * FROM "ts_opts"`);
     expect(rows.length).toBe(1);
@@ -285,7 +274,6 @@ describe("ActiveRecordSchemaTest", () => {
     const m = new AddTsMig();
     m.connection = adapter;
     await m.up();
-    // Verify timestamps were added
     await adapter.executeMutation(
       `INSERT INTO "ts_add" ("name", "created_at", "updated_at") VALUES ('test', '2023-01-01', '2023-01-01')`,
     );

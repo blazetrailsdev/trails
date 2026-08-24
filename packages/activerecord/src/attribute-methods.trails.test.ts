@@ -61,8 +61,6 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("breed", "string");
       }
     }
-    // Generating the subclass drives the parent's generation first, so the
-    // parent's own flag is set even though it was never generated directly.
     generatable(Dog).defineAttributeMethods();
     expect(Object.prototype.hasOwnProperty.call(Animal, "_attributeMethodsGenerated")).toBe(true);
     expect(generatable(Animal)._attributeMethodsGenerated).toBe(true);
@@ -222,8 +220,6 @@ describe("AttributeMethodsTest (trails)", () => {
     await Topic.loadSchema();
     const first = Topic.attributeNames();
     (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
-    // The reset drops the shared cache's per-table entry; re-reflect so the
-    // suite's warm-cache invariant is restored for later tests.
     await Topic.loadSchema();
     const second = Topic.attributeNames();
     expect(second).not.toBe(first);

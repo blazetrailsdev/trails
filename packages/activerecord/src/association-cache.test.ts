@@ -7,7 +7,6 @@ describe("association cache fold", () => {
     cache.instances.set("posts", { kind: "instance" });
     cache.proxies.set("posts", { kind: "proxy" });
 
-    // One backing slot per name.
     expect(cache.store.size).toBe(1);
     expect(cache.instances.get("posts")).toEqual({ kind: "instance" });
     expect(cache.proxies.get("posts")).toEqual({ kind: "proxy" });
@@ -28,7 +27,6 @@ describe("association cache fold", () => {
     expect(cache.instances.delete("a")).toBe(true);
     expect(cache.instances.has("a")).toBe(false);
     expect(cache.instances.delete("a")).toBe(false);
-    // Slot dropped once empty.
     expect(cache.store.size).toBe(0);
   });
 

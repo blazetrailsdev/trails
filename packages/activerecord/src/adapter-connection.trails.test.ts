@@ -54,7 +54,6 @@ class LifecycleTestAdapter extends AbstractAdapter {
   }
 }
 
-// Adapter that intercepts selectAll to capture allowRetry and simulate reconnects.
 class QueryTestAdapter extends LifecycleTestAdapter {
   capturedAllowRetry: boolean | undefined;
   failOnce = false;
@@ -89,7 +88,6 @@ class QueryTestAdapter extends LifecycleTestAdapter {
   }
 }
 
-// Minimal Post model for retryable-classification tests.
 class PostForRetryTest extends Base {
   static {
     this.attribute("title", "string");
@@ -103,13 +101,10 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     adapter.simulateConnect();
     PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
 
-    // The raw-SQL WHERE makes the SELECT non-retryable, and the retryable
-    // from() node must not raise it back (regression: collector reset).
     const fromNode = new Nodes.SqlLiteral("posts", { retryable: true });
     await PostForRetryTest.where("1 = 1").from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
 
-    // A fully retryable query with a from(Arel node) stays retryable.
     await PostForRetryTest.where({ id: 1 }).from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
 
@@ -120,8 +115,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     await PostForRetryTest.where({ id: 1 }).from(rawFromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
 
-    // from(Relation) compiles its subquery separately too — a non-retryable
-    // fragment inside the subquery must lower the outer classification.
     const rawSubquery = PostForRetryTest.where("1 = 1");
     await PostForRetryTest.where({ id: 1 }).from(rawSubquery, "sub").limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
@@ -164,9 +157,7 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
   disconnectCalls = 0;
   failConfigure = false;
   reconnectCalls = 0;
-  // Number of leading reconnect() calls that should throw before succeeding.
   reconnectFailures = 0;
-  // Error thrown by the failing reconnect() attempts.
   reconnectError: () => Error = () => new ConnectionFailed("connection reset");
 
   override reconnect(): void {
@@ -261,7 +252,6 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
     a.reconnectFailures = 99;
 
     await expect(a.reconnectBang()).rejects.toBeInstanceOf(ConnectionFailed);
-    // Initial attempt plus connectionRetries (2) retries.
     expect(a.reconnectCalls).toBe(3);
     expect((a as unknown as { _verified: boolean })._verified).toBe(false);
     expect((a as unknown as { _lastActivity: number })._lastActivity).toBe(0);

@@ -120,7 +120,6 @@ export function defineAttribute(
   const resolvedDefault = defaultValue === NO_DEFAULT ? existing?.defaultValue : defaultValue;
 
   this._attributeDefinitions.set(name, {
-    // Spread existing to preserve the `virtual` flag a prior declaration set.
     ...existing,
     name,
     type: castType,
@@ -137,9 +136,6 @@ export function defineAttribute(
   );
 
   amResetDefaultAttributes(this);
-  // A newly declared attribute may be virtual (no DB column); force the next
-  // ensureSchemaLoaded to re-run the virtual reconciliation (model-schema.ts
-  // reconcileVirtualAttributes) so it isn't skipped by the one-shot guard.
   this._virtualAttributesReconciled = false;
   encryptionHooks.applyPendingEncryptions(this);
 
@@ -181,21 +177,10 @@ export function defineAttribute(
  * `PendingType` swaps the type.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
-  // Reflect the (always-warm, RFC 0031) schema cache before building, so real
-  // columns — notably the `id` PK — are seeded even when the model is first
-  // constructed without a query (e.g. `new Car({name})`, where no STI `type` key
-  // drives the usual reflect-on-`new` path). Without this the strict
-  // `writeFromUser` raises on the post-INSERT `id` write-back. Gated on
-  // `!_schemaLoaded`: once reflected, `columnsHash` is settled, so skipping
-  // avoids the `.connection` access inside `columnsHash`, which would otherwise
-  // permanently check out a connection on every construction under
-  // `permanent_connection_checkout` = disallowed.
   if (!isSchemaLoaded.call(this) && !this.abstractClass && this.tableName) {
     try {
       this.columnsHash();
-    } catch {
-      // TableNotSpecified / no cache entry — keep the synthesized view.
-    }
+    } catch {}
   }
 
   const cacheHost = this;

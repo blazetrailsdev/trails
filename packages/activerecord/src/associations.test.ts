@@ -78,12 +78,9 @@ describe("AssociationsTest", () => {
     // in-memory target before the reload — exercises the CPK reconciliation path.
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
     const book = await (order as any).books.create({ id: [3, 4], title: "Book" });
-    // Update the book in DB behind the in-memory instance so persisted/in-memory diverge
     const dbBook = await CpkBook.where({ author_id: 3, id: 4 }).first();
     await dbBook!.updateColumns({ title: "A different title" });
-    // Reload the association — must reconcile the existing in-memory book by CPK
     await (order as any).books.load();
-    // CPK identity of the in-memory book is preserved after reload
     expect(book.id).toEqual([3, 4]);
   });
 });
@@ -228,9 +225,6 @@ describe("AssociationProxyTest", () => {
     expect(await member.favoriteMemberships.isEmpty()).toBe(true);
     const membership = await member.favoriteMemberships.createBang({});
     await membership.updateBang({ favorite: false });
-    // CollectionAssociation#size has different behavior when loaded vs. non-loaded:
-    // the first call marks the association as loaded and the second call takes a
-    // different code path, so it's important to keep both assertions.
     expect(await member.favoriteMemberships.size()).toBe(0);
     expect(await member.favoriteMemberships.size()).toBe(0);
   });
@@ -261,7 +255,6 @@ describe("AssociationProxyTest", () => {
   it("save on parent does not load target", async () => {
     const david = developers("david") as any;
     expect(david.projects.loaded).toBe(false);
-    // update_columns on parent should not trigger association loading.
     await david.updateColumns({ salary: 80_000 });
     expect(david.projects.loaded).toBe(false);
   });
@@ -378,9 +371,7 @@ describe("AssociationProxyTest", () => {
     const david = authors("david") as any;
     const post = await Post.create({ title: "original", body: "b" });
     await david.posts.push(post);
-    // Mutate the in-memory instance.
     post.title = "mutated";
-    // load() should preserve the in-memory instance, not replace with a fresh DB copy.
     const loaded = await david.posts.load();
     const found = loaded.find((r: any) => r.readAttribute("id") === post.id);
     expect(found).toBe(post);
@@ -953,10 +944,6 @@ describe("PreloaderTest", () => {
     otherDogComment.origin_type = otherDog.constructor.name;
     otherDogComment.origin_id = otherDog.id;
 
-    // Both Dog and OtherDog are backed by a table named `dogs`, however they are
-    // stored in different databases and should therefore result in two separate
-    // queries rather than be batched together — `LoaderQuery#hashKey`
-    // distinguishes loaders by connection identity.
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: [dogComment, otherDogComment],
@@ -1341,8 +1328,6 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
-  // Tests are synchronous reflection checks — no DB queries; fixtures([])
-  // wires the canonical schema without declaring any fixture set.
   fixtures([]);
 
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
@@ -1843,7 +1828,6 @@ describe("AssociationsTest", () => {
   it("force reload", async () => {
     const firm = new Firm({ name: "A New Firm, Inc" });
     await firm.save();
-    // forcing to load all clients
     for (const _ of await firm.clients) {
       void _;
     }
@@ -1853,7 +1837,6 @@ describe("AssociationsTest", () => {
     const client = new Client({ name: "TheClient.com", firm_id: firm.id });
     await client.save();
 
-    // New firm should have cached no client objects / zero count.
     expect(await firm.clients.isEmpty()).toBe(true);
     expect(await firm.clients.size()).toBe(0);
 
@@ -2038,11 +2021,6 @@ describe("AssociationsTest", () => {
     });
     await tag.save();
 
-    // Noise join row that collides on blog_post_id but not blog_id: a tag on a
-    // different blog wired to this post's id via a deliberately cross-blog join
-    // row. The composite through scope keys on [blog_id, blog_post_id], so it
-    // must AND both columns — a regression to single-column (blog_post_id-only)
-    // filtering would leak this row into `blogPost.tags`.
     const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
     const noiseTag = await ShardedTag.create({ name: "Other Blog Tag", blog_id: otherBlogId });
     await ShardedBlogPostTag.create({
@@ -2071,10 +2049,6 @@ describe("AssociationsTest", () => {
       name: "Ruby on Rails",
       blog_id: (blogPost as any).blog_id,
     });
-    // The autosave variant exists to prove `<<` saves the unsaved target before
-    // building the join row (matching the canonical `append composite foreign key
-    // has many association with autosave` above); assert that transition so the
-    // test can't pass with a pre-persisted tag.
     expect(tag.isNewRecord()).toBe(true);
 
     await association(blogPost, "tags").push(tag);
@@ -2194,7 +2168,6 @@ describe("AssociationsTest", () => {
     (childPost.association("parent") as any).writer(parentPost);
     await childPost.save();
 
-    // reload to forget the parent association
     const reloaded = await ShardedBlogPost.find((childPost as any).id);
     const loaded = await (reloaded as any).loadBelongsTo("parent");
     expect(loaded.id).toBe((parentPost as any).id);
@@ -2354,12 +2327,6 @@ describe("AssociationsTest", () => {
     ).toBe(false);
   });
 
-  // Exercises loadHasMany's inline (no-reflection) fallback against a
-  // query_constraints owner: invoked with a composite FK and an unregistered
-  // association name, the fallback must derive the owner key from the owner's
-  // query_constraints (`[blog_id, id]`, mirroring
-  // `reflection.activeRecordPrimaryKey`) rather than zipping the scalar `id`
-  // against the 2-column FK (which would raise CompositePrimaryKeyMismatchError).
   it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
     const post = await ShardedBlogPost.create({ blog_id: 1, title: "Post" });
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
@@ -2433,9 +2400,6 @@ describe("AssociationsTest", () => {
   });
 
   it("delete single composite has many through join row", async () => {
-    // Covers the composite-aware delete on a has_many :through: the join lookup
-    // must AND across both [blog_id, blog_post_id] columns so only the owning
-    // join row is removed.
     const blogPost = shardedBlogPosts("great_post_blog_one");
     const tag = await ShardedTag.create({ name: "shared", blog_id: (blogPost as any).blog_id });
     await ShardedBlogPostTag.create({
@@ -2444,8 +2408,6 @@ describe("AssociationsTest", () => {
       tag_id: (tag as any).id,
     });
 
-    // Noise join row colliding on blog_post_id + tag_id but a different blog_id;
-    // a regression to single-column (blog_post_id-only) deletion would remove it.
     const otherBlogId = (shardedBlogs("sharded_blog_two") as any).id;
     await ShardedBlogPostTag.create({
       blog_id: otherBlogId,
@@ -2455,7 +2417,6 @@ describe("AssociationsTest", () => {
 
     await association(blogPost, "tags").delete(tag);
 
-    // Only the owning composite join row is removed; the cross-blog noise row stays.
     expect(
       await ShardedBlogPostTag.where({
         blog_id: (blogPost as any).blog_id,
@@ -2470,7 +2431,6 @@ describe("AssociationsTest", () => {
         tag_id: (tag as any).id,
       }),
     ).toHaveLength(1);
-    // Target tag itself is untouched.
     expect(await ShardedTag.where({ id: (tag as any).id })).not.toHaveLength(0);
   });
 

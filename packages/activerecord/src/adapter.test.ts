@@ -24,8 +24,6 @@ import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { itIfSupports } from "./support/supports.js";
 import { runWithoutConnection } from "./support/connection-helper.js";
-// Opt into the canonical-model autoload index so association targets resolve by
-// name on first reference — no manual `registerModel`.
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -89,11 +87,6 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
 // adapter's lazy-transaction bookkeeping).
 async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
   if (adapterType === "postgres") {
-    // ruby-pg reads `raw_connection.transaction_status == PG::PQTRANS_INTRANS`.
-    // node-postgres' pg.Client exposes no transaction_status, but the PG
-    // adapter flips `_inTransaction` in the very code path that issues
-    // BEGIN/COMMIT/ROLLBACK on the raw client, so it faithfully tracks whether
-    // a transaction is live on the raw connection.
     return Boolean((conn as unknown as { _inTransaction?: boolean })._inTransaction);
   }
   if (adapterType === "mysql") {
@@ -216,7 +209,6 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  // SQLite (not reached: remote-disconnect cases are gated on remoteSupported).
   return conn.active();
 }
 
@@ -226,10 +218,6 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
 describe("AdapterTest", () => {
   fixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
     usesTransaction: [
-      // Raise a DB error mid-statement (aborts an open PG transaction, poisoning
-      // transactional teardown) — run un-wrapped; they persist nothing. The
-      // index tests' add_index/remove_index commit (DDL auto-commits on MySQL),
-      // so they too run outside the shared transaction (cleanup in a finally).
       "value limit violations are translated to specific exception",
       "numeric value out of ranges are translated to specific exception",
       "uniqueness violations are translated to specific exception",
@@ -238,7 +226,6 @@ describe("AdapterTest", () => {
       "indexes",
       "remove index when name and wrong column name specified",
       "remove index when name and wrong column name specified positional argument",
-      // Re-establishes `Base`, swapping the pool out from under the fixture pin.
       "disable prepared statements",
     ],
   });
@@ -264,7 +251,6 @@ describe("AdapterTest", () => {
   it("create record with pk as zero", async () => {
     await Book.create({ id: 0 });
     expect((await Book.find(0)).id).toBe(0);
-    // assert_nothing_raised: a throw here fails the test.
     await Book.destroy(0);
   });
 
@@ -364,10 +350,6 @@ describe("AdapterTest", () => {
     }
   });
 
-  // current database (gated by respond_to?(:current_database)) lives in the
-  // MySQL-gated AdapterTest block below (MySQL) and adapters/postgresql/
-  // adapter.test.ts (PG).
-
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
     const result = await Base.connection.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
     expect(result).toBeInstanceOf(Result);
@@ -381,9 +363,6 @@ describe("AdapterTest", () => {
     expect(result.rows).toEqual([]);
     expect(result.columns.length).toBeGreaterThan(0);
   });
-
-  // charset / collation / show-variable / cross-database-selects (MySQL-only)
-  // live in the MySQL-gated AdapterTest block below.
 
   // Rails gates this `unless in_memory_db?` (adapter_test.rb:176): a
   // re-established `:memory:` connection is a fresh, empty database.
@@ -588,11 +567,8 @@ describe("AdapterForeignKeyTest", () => {
 
   it("disable referential integrity", async () => {
     const conn = Base.connection;
-    // assert_nothing_raised: a throw inside the block fails the test.
     await conn.disableReferentialIntegrity(async () => {
       await insertIntoFkTestHasFk();
-      // delete created record as otherwise disableReferentialIntegrity will
-      // try to enable constraints after the block and fail.
       await conn.executeMutation("DELETE FROM fk_test_has_fk");
     });
   });
@@ -619,7 +595,6 @@ describe("AdapterTestWithoutTransaction", () => {
     const conn = Base.connection;
     conn.enableQueryCacheBang();
     try {
-      // posts fixtures are loaded (e.g. "welcome"), so the count is fixture-backed.
       expect(posts("welcome").id).toBeGreaterThan(0);
       const count = (await Post.count()) as number;
 
@@ -759,7 +734,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     usesTransaction: nonTransactional,
   });
 
-  // remote_disconnect / kill_connection_from_server are MySQL/PG-only.
   const remoteSupported = adapterType !== "sqlite";
 
   // Cases blocked on genuine trails PG/MySQL adapter divergences that the faithful
@@ -890,18 +864,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     async () => {
       await remoteDisconnect(connection);
 
-      connection.cleanBang(); // this simulates a fresh checkout from the pool
+      connection.cleanBang();
 
-      // Backdate last activity to simulate a connection we haven't used in a while
       (connection as unknown as { _lastActivity: number })._lastActivity =
         Date.now() - 5 * 60 * 1000;
 
-      // Clean did not verify / fix the connection
       expect(await activePredicate(connection)).toBe(false);
 
-      // Because the connection hasn't been verified since checkout, and the
-      // query cannot safely be retried, the connection is verified before
-      // querying.
       await Post.deleteAll();
 
       expect(await connection.active()).toBe(true);
@@ -913,14 +882,10 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     async () => {
       await remoteDisconnect(connection);
 
-      connection.cleanBang(); // this simulates a fresh checkout from the pool
+      connection.cleanBang();
 
-      // Clean did not verify / fix the connection
       expect(await activePredicate(connection)).toBe(false);
 
-      // Because the query cannot be retried, and we (mistakenly) believe the
-      // connection is still good, the query fails — the alternative would be
-      // excessive reverification.
       await expect(Post.deleteAll()).rejects.toBeInstanceOf(AdapterError);
     },
   );
@@ -930,14 +895,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     async () => {
       await remoteDisconnect(connection);
 
-      connection.cleanBang(); // this simulates a fresh checkout from the pool
+      connection.cleanBang();
 
       (connection as unknown as { _lastActivity: number })._lastActivity =
         Date.now() - 5 * 60 * 1000;
 
       expect(await activePredicate(connection)).toBe(false);
 
-      // Quote string will not verify a broken connection.
       connection.quoteString("");
 
       await Post.deleteAll();
@@ -949,7 +913,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   it.skipIf(!remoteSupported)(
     "querying after a failed non-retryable query restores and succeeds",
     async () => {
-      await Post.first(); // Connection verified (and prepared statement pool populated)
+      await Post.first();
 
       await remoteDisconnect(connection);
 
@@ -957,7 +921,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         connection.execute("INSERT INTO posts(title, body) VALUES ('foo', 'bar')"),
       ).rejects.toBeInstanceOf(ConnectionFailed);
 
-      expect(await Post.first()).toBeTruthy(); // Verifying causes a reconnect and the query succeeds
+      expect(await Post.first()).toBeTruthy();
       expect(await connection.active()).toBe(true);
     },
   );
@@ -1046,12 +1010,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await connection.active()).toBe(true);
   });
 
-  // Runs on every remote-capable adapter (PG + MySQL/MariaDB). #4935 closed the
-  // two MySQL divergences that used to gate this to PG: (1) Mysql2Adapter now
-  // overrides `verifyBang` to probe with a real `active?`-style ping
-  // (`active()`) so it detects the server-side kill and reconnects, and
-  // (2) `isMysql2ConnectionError` now maps the mysql2 driver's "Can't add new
-  // command when connection is in closed state" to `ConnectionFailed`.
   it.skipIf(!remoteSupported)(
     "active transaction is restored after remote disconnection",
     async () => {
@@ -1060,8 +1018,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         await connection.materializeTransactions();
         await remoteDisconnect(connection);
 
-        // Regular queries are not retryable, so the only abstract operation we
-        // can perform here is a direct verify.
         await connection.verifyBang();
 
         await Post.deleteAll();
@@ -1070,8 +1026,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         throw new Rollback();
       });
 
-      // The deletion occurred within the outer (rolled-back) transaction, not
-      // directly on the freshly-reestablished connection, so the posts remain:
       expect((await Post.count()) as number).toBeGreaterThan(0);
     },
   );
@@ -1089,10 +1043,8 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         }),
       ).rejects.toBeInstanceOf(ConnectionFailed);
 
-      expect(invocations).toBe(1); // the whole transaction block is not retried
+      expect(invocations).toBe(1);
 
-      // After the (outermost) transaction block failed, the connection is ready
-      // to reconnect on next use, but hasn't done so yet.
       expect(await activePredicate(connection)).toBe(false);
       expect((await Post.count()) as number).toBeGreaterThan(0);
     },
@@ -1151,9 +1103,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     const pool = (connection as unknown as { pool: { newConnection(): DatabaseAdapter } }).pool;
     const fresh = pool.newConnection();
     try {
-      // The pool may hand back an already-connected adapter (sync drivers open
-      // eagerly), which would have run configure_connection before our override
-      // is installed. Disconnect so the first query reconnects and re-runs it.
       fresh.disconnectBang();
       // Rails relies on the default connection_retries (1); trails' getter
       // defaults to 1 too (abstract-adapter.ts:1581), so no explicit set needed.
@@ -1223,8 +1172,6 @@ describe("InvalidateTransactionTest", () => {
         }
       });
 
-      // asserting outside of the transaction to make sure we actually reach the
-      // end of the test and perform the assertion
       expect(invalidated).toBe(true);
     },
   );

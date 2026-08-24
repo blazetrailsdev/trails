@@ -64,7 +64,6 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const p = Post.new({ published: false }) as any;
-    // false is a valid value, not "blank"
     expect(p.published).toBe(false);
   });
 
@@ -250,9 +249,6 @@ describe("AttributeMethodsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        // canonical `posts.body` is NOT NULL; default it so the many
-        // `create({ title })` sites below satisfy the constraint. `score` is a
-        // synthetic non-column attribute exercised purely in memory.
         this.attribute("body", "string", { default: "" });
         this.attribute("score", "integer");
       }
@@ -457,9 +453,6 @@ describe("AttributeMethodsTest", () => {
   });
   it("bulk updates respect access control", async () => {
     const { Post } = makeModel();
-    // `legacy_comments_count` is a real canonical `posts` column (an integer
-    // counter), so the bulk UPDATE has a column to write; the synthetic
-    // `score` attribute isn't persisted (excluded by `attributesForCreate`).
     await Post.create({ title: "bulk" });
     await Post.where({ title: "bulk" }).updateAll({ legacy_comments_count: 5 });
     const updated = await Post.findBy({ title: "bulk" });
@@ -696,7 +689,6 @@ describe("AttributeMethodsTest", () => {
     const { Post } = makeModel();
     const p = new Post({});
     expect(p.id).toBeNull();
-    // Accessing id again should still return null (not throw)
     expect(p.id).toBeNull();
   });
   it("respond_to?", () => {
@@ -816,7 +808,6 @@ describe("AttributeMethodsTest", () => {
     const Topic = makeTopic();
     const t = new Topic({ written_on: "2023-01-15" });
     const raw = t.readAttributeBeforeTypeCast("written_on");
-    // Raw value is the string before casting
     expect(raw).toBeDefined();
   });
 
@@ -910,11 +901,9 @@ describe("AttributeMethodsTest", () => {
   it("non-attribute read and write", async () => {
     const Topic = makeTopic();
     const t = new Topic({});
-    // Writing to a non-attribute should throw or be ignored
     try {
       t.nonexistent = "value";
     } catch (e) {
-      // Expected: MissingAttributeError or similar
       expect(e).toBeDefined();
     }
   });
@@ -944,13 +933,9 @@ describe("AttributeMethodsTest", () => {
       };
       record.writeAttribute("written_on", utcTime);
       const wo = record.written_on;
-      // record.written_on is equal to (i.e. simultaneous with) utc_time …
       expect(wo.utc().toTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
-      // … but is a TimeWithZone …
       expect(wo).toBeInstanceOf(TimeWithZone);
-      // … and is in the current Time.zone …
       expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
-      // … and represents time values adjusted accordingly (Time.utc(2007,12,31,16)).
       const t = wo.time;
       expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([
         2007, 12, 31, 16, 0, 0,
@@ -1035,7 +1020,6 @@ describe("AttributeMethodsTest", () => {
     t.readAttribute = (attrName: string, block?: (name: string) => unknown) =>
       String(superReadAttribute(attrName, block)).toUpperCase();
 
-    // `[]` dispatches read_attribute, so the override reaches bracket reads too.
     expect(t.readAttribute("title")).toBe("STOP CHANGING THE TOPIC");
     expect(t.get("title")).toBe("STOP CHANGING THE TOPIC");
 
@@ -1348,7 +1332,6 @@ describe("AttributeMethodsTest", () => {
     // warm, so the real columns are known and an unknown name is detectable.
     await Topic.create({ title: "orig" });
     const t = (await Topic.first()) as any;
-    // known attributes can be written
     t.writeAttribute("title", "known");
     expect(t.readAttribute("title")).toBe("known");
     // Mirrors: topic[:no_column_exists] = "Hello!" → assert_raises MissingAttributeError
@@ -1406,9 +1389,6 @@ describe("initialize_generated_modules", () => {
         this.attribute("title", "string");
       }
     }
-    // Declaring the attribute routes through defineAttributeMethods, which
-    // must seed the generated module — no explicit initializeGeneratedModules
-    // call in the test.
     (Topic as any).defineAttributeMethods();
     expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
   });
@@ -1419,7 +1399,6 @@ describe("initialize_generated_modules", () => {
         this.attribute("title", "string");
       }
     }
-    // Simulate already-generated state, then prove the reset fires.
     (Topic as any)._attributeMethodsGenerated = true;
     (Topic as any)._aliasAttributesMassGenerated = true;
     Topic.initializeGeneratedModules();
@@ -1434,7 +1413,6 @@ describe("initialize_generated_modules", () => {
       }
     }
     Topic.initializeGeneratedModules();
-    // Core's version initializes the generated-association-methods set.
     expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Set);
   });
 });
