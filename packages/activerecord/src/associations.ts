@@ -540,10 +540,10 @@ export function _wireInverseAssociation(owner: Base, child: Base, inverseName: s
 }
 
 /**
- * Write a singular (belongs_to / has_one) target onto the record's
- * `SingularAssociation` holder, reached via `record.association(name)` and
- * stored there as `target` — the trails analog of Rails' `@target` living on
- * the association object (`@association_cache[name]`). Every write is Rails'
+ * Write an inverse target onto the record's holder for `assocName`, reached
+ * via `record.association(name)` and stored there as `target` — the trails
+ * analog of Rails' `@target` living on the association object
+ * (`@association_cache[name]`). Every write is Rails'
  * one inverse write, `set_inverse_instance` -> `inversed_from`
  * (`association.rb:132-137, 153-155`); a collection name reaches
  * `CollectionAssociation#target=` (`collection_association.rb:284-295`)
