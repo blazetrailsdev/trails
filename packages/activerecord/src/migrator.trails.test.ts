@@ -53,7 +53,7 @@ function envName(adapter: DatabaseAdapter): string {
  * subclass whose `#migrations` answers an in-memory list, so the path argument
  * is never read.
  */
-function migrationContext(migrations: MigrationProxy[]): MigrationContext {
+function migrationContextClass(migrations: MigrationProxy[]): MigrationContext {
   return new (class extends MigrationContext {
     override get migrations(): MigrationProxy[] {
       return migrations;
@@ -199,7 +199,7 @@ describe("Migrator trails extensions", () => {
     expect(ran).toEqual(["2"]);
 
     ran.length = 0;
-    await migrationContext([m1(), m2()]).migrate(2);
+    await migrationContextClass([m1(), m2()]).migrate(2);
     expect(ran).toEqual(["1"]);
   });
 
@@ -219,18 +219,18 @@ describe("Migrator trails extensions", () => {
 
   it("migrate returns [] when both the current and target version are 0", async () => {
     const ran: string[] = [];
-    const migrationContextForTest = migrationContext([
+    const migrationContext = migrationContextClass([
       makeMigration(0, "M0", async () => {
         ran.push("0");
       }),
     ]);
-    await expect(migrationContextForTest.migrate(0)).resolves.toEqual([]);
+    await expect(migrationContext.migrate(0)).resolves.toEqual([]);
     expect(ran).toEqual([]);
   });
 
   it("migrate applies its block by selecting the migrations handed to the per-run Migrator", async () => {
     const ran: string[] = [];
-    const migrationContextForTest = migrationContext([
+    const migrationContext = migrationContextClass([
       makeMigration(1, "M1", async () => {
         ran.push("1");
       }),
@@ -238,7 +238,7 @@ describe("Migrator trails extensions", () => {
         ran.push("2");
       }),
     ]);
-    await migrationContextForTest.migrate(null, (m) => m.version === 2);
+    await migrationContext.migrate(null, (m) => m.version === 2);
     expect(ran).toEqual(["2"]);
   });
 
@@ -255,7 +255,7 @@ describe("Migrator trails extensions", () => {
     ];
 
     await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate();
-    await migrationContext(migrations()).migrate(1, (m) => m.version !== 3);
+    await migrationContextClass(migrations()).migrate(1, (m) => m.version !== 3);
     expect(reverted).toEqual(["2"]);
   });
 

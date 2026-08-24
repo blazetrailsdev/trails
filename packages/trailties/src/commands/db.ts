@@ -748,8 +748,9 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, prefix }) => {
-        const migrationContext = migrationContextFor(adapter, []);
-        const version = (await migrationContext.currentVersion()) ?? 0;
+        // `pool.migration_context.current_version` (`databases.rake:311`),
+        // whose nil — a NoDatabaseError — interpolates to nothing.
+        const version = (await migrationContextFor(adapter, []).currentVersion()) ?? "";
         console.log(`${prefix}Current version: ${version}`);
       });
     });
@@ -803,8 +804,6 @@ export function dbCommand(): Command {
         const mDirs = await migrationsDirsForConfig(raw);
         const migrationContext = migrationContextFor(adapter, mDirs);
         if (migrationContext.migrations.length === 0) return;
-        // `pool.migration_context.open.pending_migrations`
-        // (`railties/databases.rake:333`).
         const pending = await migrationContext.open().pendingMigrations();
         if (pending.length > 0) {
           // Match Rails' output format (from activerecord/lib/active_record/

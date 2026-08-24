@@ -2358,6 +2358,8 @@ export class MigrationContext<
    * @missingRailsCall first — PERMANENT: Ruby `Array#first` on the `scan`
    *   result (migration.rb:1375) is a method; JS reads the first match off the
    *   `String#match` result by index, which records no callee.
+   *
+   * `protected` for the same reason {@link migrationFiles} is.
    */
   protected parseMigrationFilename(filename: string): [string, string, string] | null {
     const base = filename.replace(/.*[/\\]/, "");
@@ -2508,6 +2510,13 @@ export class Migrator {
       throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
     }
     return fnResult as T;
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
+  async run(): Promise<number | undefined> {
+    return this.isUseAdvisoryLock()
+      ? this.withAdvisoryLock(() => this.runWithoutLock())
+      : this.runWithoutLock();
   }
 
   /**
@@ -2741,13 +2750,6 @@ export class Migrator {
 
   private async _appliedVersions(): Promise<Set<number>> {
     return new Set(await this._schemaMigration.integerVersions());
-  }
-
-  /** @internal Mirrors: ActiveRecord::Migrator#run (`migration.rb:1444-1450`) */
-  async run(): Promise<number | undefined> {
-    return this.isUseAdvisoryLock()
-      ? this.withAdvisoryLock(() => this.runWithoutLock())
-      : this.runWithoutLock();
   }
 
   /**

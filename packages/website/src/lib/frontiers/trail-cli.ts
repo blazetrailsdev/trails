@@ -89,19 +89,21 @@ class VfsMigrationContext extends MigrationContext {
     return this.migrationFiles().flatMap((path) => {
       const parsed = this.parseMigrationFilename(path);
       if (!parsed) return [];
-      const [version, name] = parsed;
+      const [rawVersion, name] = parsed;
       return [
         {
-          version,
+          version: Number(rawVersion),
           name: camelize(name),
           filename: path,
           migration: async (): Promise<Migration> => {
             const content = this.vfs.read(path)?.content;
             if (!content) throw new Error(`File not found: ${path}`);
             await this.executeCode(content);
-            const reg = this.getMigrations().find((r) => r.version === version);
+            const reg = this.getMigrations().find((r) => r.version === rawVersion);
             if (!reg) {
-              throw new Error(`Migration ${version} from ${path} did not register after execution`);
+              throw new Error(
+                `Migration ${rawVersion} from ${path} did not register after execution`,
+              );
             }
             return reg.migration();
           },
