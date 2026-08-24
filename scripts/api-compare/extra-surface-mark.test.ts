@@ -15,9 +15,27 @@ describe("extra-surface mark", () => {
   it("measures only the gated packages", () => {
     const measured = measure([
       { package: "arel", totalNovel: 0, totalExtras: 63 },
-      { package: "activerecord", totalNovel: 394, totalExtras: 1424 },
+      { package: "activerecord", totalNovel: 399, totalExtras: 1424 },
+      { package: "activemodel", totalNovel: 12, totalExtras: 34 },
     ]);
-    expect(measured).toEqual({ arel: { novel: 0, total: 63 } });
+    expect(measured).toEqual({
+      arel: { novel: 0, total: 63 },
+      activerecord: { novel: 399, total: 1424 },
+    });
+  });
+
+  // A gated package with no committed mark makes `exceedances` and `staleMarks`
+  // skip it — the gate would pass silently on the package it was just widened
+  // to cover. Adding a name to GATED_PACKAGES without seeding its mark is
+  // therefore a disarm, not a no-op.
+  it("does not gate a package whose mark was never seeded", () => {
+    expect(exceedances(marks, { arel: { novel: 0, total: 63 } })).toEqual([]);
+    expect(
+      exceedances(marks, {
+        arel: { novel: 0, total: 63 },
+        activerecord: { novel: 9999, total: 9999 },
+      }),
+    ).toEqual([]);
   });
 
   it("passes when both dimensions hold at the mark", () => {
