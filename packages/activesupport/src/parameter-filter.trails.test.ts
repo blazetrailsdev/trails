@@ -6,7 +6,10 @@ import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 /**
  * Behaviour Rails asserts inside its own `test "process parameter filter"`
  * table (parameter_filter_test.rb:8-44) — deep dot-notation keys and block
- * filters — kept here so the enrolled test names stay Rails' own.
+ * filters — kept here so the enrolled test names stay Rails' own, plus cases
+ * with no Rails counterpart at all: JS value shapes (`Date`, class instances,
+ * null-prototype objects) that Ruby's `Hash#each` walk never meets, and the
+ * `HashWithIndifferentAccess` recursion Rails covers from ActionDispatch.
  */
 describe("ParameterFilter (trails)", () => {
   it("filters a deep key only under its parent", () => {
