@@ -4,6 +4,6 @@
     "tsFile": "transactions.ts",
     "rubyName": "add_to_transaction",
     "call": "with_connection",
-    "reason": "Reviewed (RFC 0106 wave 4c): trails resolves the adapter through `threadedConnectionFor(ctor) ?? ctor.connection` instead of the `with_connection` block form, which the pool-checkout convergence (RFC 0073) owns; converging here would fork that flip."
+    "reason": "Reviewed (RFC 0106 wave 4c): trails resolves the adapter through `threadedConnectionFor(ctor) ?? ctor.connection` instead of the `with_connection` block form, which the pool-checkout convergence (RFC 0073) owns; converging here would fork that flip. Tracked by story `converge-residual-connection-lease-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
   }
 ]

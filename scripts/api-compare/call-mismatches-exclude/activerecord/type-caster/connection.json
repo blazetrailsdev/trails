@@ -4,6 +4,6 @@
     "tsFile": "type-caster/connection.ts",
     "rubyName": "type_for_attribute",
     "call": "with_connection",
-    "reason": "Verified per-site (RFC 0106 wave 4g): `@klass.with_connection { |connection| connection.lookup_cast_type_from_column(column) }` (type_caster/connection.rb:21). trails' `withConnection` returns a Promise (connection-handling.ts:366) and `typeForAttribute` is called from synchronous Arel type-casting, so the body reads the adapter directly and takes a permanent checkout where Rails scopes a lease. Same sync/async shortcoming as the `data_source_exists?` gate two lines above it; both are documented at the call site and tracked by RFC 0073."
+    "reason": "Verified per-site (RFC 0106 wave 4g): `@klass.with_connection { |connection| connection.lookup_cast_type_from_column(column) }` (type_caster/connection.rb:21). trails' `withConnection` returns a Promise (connection-handling.ts:366) and `typeForAttribute` is called from synchronous Arel type-casting, so the body reads the adapter directly and takes a permanent checkout where Rails scopes a lease. Same sync/async shortcoming as the `data_source_exists?` gate two lines above it; both are documented at the call site and tracked by RFC 0073. Tracked by story `typecaster-connection-drops-datasource-gate-and-with-connection` (RFC 0106 exit ledger, 2026-08-24)."
   }
 ]

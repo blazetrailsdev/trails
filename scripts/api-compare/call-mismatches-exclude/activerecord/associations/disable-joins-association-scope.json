@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/disable-joins-association-scope.ts",
-    "rubyName": "scope",
-    "call": "add_constraints",
-    "reason": "Reviewed (wave 4d): `scope` DOES call the ported body at both Rails call sites, spelled `_addConstraintsDj` — Ruby lets the subclass shadow AssociationScope#add_constraints with a different arity, TS rejects a derived declaration of a base-private name (TS2415) and the two signatures are not override-compatible. See the @missingRailsCall tag at the call site."
-  }
-]
