@@ -51,6 +51,7 @@ import {
   assertValidKeys,
   KeyError,
   any,
+  truncateBytes,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
@@ -1730,27 +1731,21 @@ export class SchemaStatements {
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
+  /**
+   * @missingRailsCall fetch — PERMANENT: `index_algorithms.fetch(algorithm) { raise ... }`
+   *   (schema_statements.rb:1504-1506). A JS object has no `fetch`, and Hash#fetch's
+   *   block-on-miss arm has no JS call analogue, so the key-presence test and the raise
+   *   are spelled inline at Rails' site.
+   */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (!algorithm) return undefined;
+    const indexAlgorithms = this.indexAlgorithms();
     const normalized = algorithm.toLowerCase();
-
-    const indexAlgorithms =
-      typeof (this as any).indexAlgorithms === "function"
-        ? ((this as any).indexAlgorithms() as Record<string, string>)
-        : null;
-
-    if (indexAlgorithms) {
-      if (normalized in indexAlgorithms) {
-        const result = indexAlgorithms[normalized];
-        return result || undefined;
-      }
-    } else if (normalized === "concurrently") {
-      return "CONCURRENTLY";
-    }
-
-    const valid = indexAlgorithms ? Object.keys(indexAlgorithms) : ["concurrently"];
+    if (normalized in indexAlgorithms) return indexAlgorithms[normalized] || undefined;
     throw new ArgumentError(
-      `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
+      `Algorithm must be one of the following: ${Object.keys(indexAlgorithms)
+        .map((a) => `:${a}`)
+        .join(", ")}`,
     );
   }
 
@@ -1871,15 +1866,23 @@ export class SchemaStatements {
    *
    * @missingRailsCall first — PERMANENT: RFC 0106: Ruby String#first(10) on a hexdigest —
    *   the port slices (schema_statements.rb:1603).
+   * @missingRailsCall limit — CONVERGEABLE: `name.mb_chars.limit(short_limit)`
+   *   (schema_statements.rb:1608). ActiveSupport::Multibyte::Chars is unported, so
+   *   there is no `limit` receiver to call; `Chars#limit` is defined as
+   *   `truncate_bytes(limit, omission: nil)` (multibyte/chars.rb:118-120), which is
+   *   what the port calls directly, so the byte-truncation behaviour matches.
    */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = Array.isArray(column) ? column : [column];
     const name = `index_${tableName}_on_${cols.join("_and_")}`;
-    const limit = this.maxIndexNameSize();
-    if (name.length <= limit) return name;
-    const hashed = "_" + getCrypto().createHash("sha256").update(name).digest("hex").slice(0, 10);
-    const shortName = `idx_on_${cols.join("_")}`.slice(0, limit - hashed.length);
-    return `${shortName}${hashed}`;
+    if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
+
+    const hashedIdentifier =
+      "_" + getCrypto().createHash("sha256").update(name).digest("hex").slice(0, 10);
+    const shortName = `idx_on_${cols.join("_")}`;
+
+    const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
+    return `${truncateBytes(shortName, shortLimit, { omission: null })}${hashedIdentifier}`;
   }
 
   /** @internal */

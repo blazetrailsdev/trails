@@ -324,7 +324,7 @@ export function buildTruncateStatements(
 
 /** @internal */
 interface LastInsertIdResultHost {
-  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   quote(value: unknown): string;
 }
 
@@ -336,11 +336,14 @@ export async function lastInsertIdResult(
   this: LastInsertIdResultHost,
   sequenceName: string,
 ): Promise<Result> {
-  return this.execQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
+  return this.internalExecQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#returning_column_values
+ * @missingRailsCall first — PERMANENT: `result.rows.first` is Ruby's Array#first,
+ * which on a JS array is the `[0]` index read; there is no ported `first`
+ * receiver method to call.
  * @internal
  */
 export function returningColumnValues(result: Result): unknown[] | undefined {
