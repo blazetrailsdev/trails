@@ -254,7 +254,7 @@ describe("AttributeAssignmentTest", () => {
       }
       override _assignAttributes(attrs: Record<string, unknown>): void {
         called.push(attrs);
-        super._assignAttributes(attrs);
+        void super._assignAttributes(attrs);
       }
     }
     const p = new Person({});
