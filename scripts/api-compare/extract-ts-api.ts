@@ -610,6 +610,15 @@ export function extractFromProgram(
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
         const extracted = extractNamespace(node, checker, relPath);
+        if (node.body && ts.isModuleBlock(node.body)) {
+          for (const stmt of node.body.statements) {
+            if (!ts.isClassDeclaration(stmt) || !stmt.name || !isExported(stmt)) continue;
+            const nested = extractClass(stmt, checker, relPath, srcDir);
+            if (nested) {
+              info.classes[`${relPath}:${nested.name}`] = nested;
+            }
+          }
+        }
         const existing = info.modules[modKey];
         if (existing) {
           const existingNames = new Set(existing.instanceMethods.map((m) => m.name));
