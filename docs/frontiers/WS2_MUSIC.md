@@ -7,7 +7,7 @@
 
 ## Approach
 
-TDD. Content is validated by automated replay tests that boot a runtime, execute every action, and assert every checkpoint. Tests run in CI — a change to `trail-cli.ts` or `activerecord` that breaks the Music tutorial fails the build.
+TDD. Content is validated by automated replay tests that boot a runtime, execute every action, and assert every checkpoint. Tests run in CI — a change to `trails-cli.ts` or `activerecord` that breaks the Music tutorial fails the build.
 
 ---
 

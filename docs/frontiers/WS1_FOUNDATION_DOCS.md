@@ -494,7 +494,7 @@ src/lib/frontiers/components/
 src/lib/frontiers/components/
   Terminal.svelte
 src/lib/frontiers/
-  trail-cli.ts              — Add ANSI color codes (backwards-compatible)
+  trails-cli.ts             — Add ANSI color codes (backwards-compatible)
 ```
 
 ---

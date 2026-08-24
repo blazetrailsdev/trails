@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { TutorialStep } from "../../tutorials/types.js";
-  import type { CliResult } from "../../trail-cli.js";
+  import type { CliResult } from "../../trails-cli.js";
   import type { VirtualFS } from "../../virtual-fs.js";
   import type { SqlJsAdapter } from "../../sql-js-adapter.js";
   import ActionCard from "./ActionCard.svelte";

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { FileDiff } from "../../tutorials/types.js";
-  import type { CliResult } from "../../trail-cli.js";
+  import type { CliResult } from "../../trails-cli.js";
   import type { VirtualFS } from "../../virtual-fs.js";
   import CliAction from "./CliAction.svelte";
   import DiffViewer from "./DiffViewer.svelte";

@@ -117,7 +117,7 @@ class VfsMigrationContext extends MigrationContext {
   }
 }
 
-export interface TrailCliDeps {
+export interface TrailsCliDeps {
   vfs: VirtualFS;
   adapter: SqlJsAdapter;
   executeCode: (code: string) => Promise<unknown>;
@@ -167,7 +167,7 @@ const browserProcessAdapter: ProcessAdapter = {
   stdin: { isTTY: false, read: async () => null },
 };
 
-export function createTrailCLI(deps: TrailCliDeps) {
+export function createTrailsCLI(deps: TrailsCliDeps) {
   const { vfs, adapter } = deps;
   const output: string[] = [];
   function log(msg: string) {

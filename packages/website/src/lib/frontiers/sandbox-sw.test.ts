@@ -178,9 +178,9 @@ describe("sandbox-sw message handling", () => {
 
   describe("CLI execution", () => {
     it("trail-cli accepts generate model command", async () => {
-      const { createTrailCLI } = await import("./trail-cli.js");
+      const { createTrailsCLI } = await import("./trails-cli.js");
       const migrations: any[] = [];
-      const cli = createTrailCLI({
+      const cli = createTrailsCLI({
         vfs,
         adapter,
         executeCode: async () => {},

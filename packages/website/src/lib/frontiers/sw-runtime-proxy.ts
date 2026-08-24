@@ -3,7 +3,7 @@
  * Separated from SwAdapterProxy which handles DB introspection only.
  */
 
-import type { CliResult } from "./trail-cli.js";
+import type { CliResult } from "./trails-cli.js";
 import type { SwClient } from "./sw-client.js";
 
 export class SwRuntimeProxy {

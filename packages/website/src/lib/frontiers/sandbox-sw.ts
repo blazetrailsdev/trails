@@ -13,7 +13,7 @@ import { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VirtualFS } from "./virtual-fs.js";
 import { CompiledCache } from "./compiled-cache.js";
 import { stripTypes } from "./transpiler.js";
-import { createTrailCLI, type CliResult } from "./trail-cli.js";
+import { createTrailsCLI, type CliResult } from "./trails-cli.js";
 import { createAppServer, type AppServer } from "./app-server.js";
 import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.js";
 import { resolveVfsPath } from "./vfs-resolve.js";
@@ -38,7 +38,7 @@ let adapter: SqlJsAdapter;
 let vfs: VirtualFS;
 let compiled: CompiledCache;
 let migrations: MigrationProxy[] = [];
-let cli: ReturnType<typeof createTrailCLI>;
+let cli: ReturnType<typeof createTrailsCLI>;
 let appServer: AppServer;
 let initialized = false;
 
@@ -94,7 +94,7 @@ async function init(): Promise<void> {
   vfs = new VirtualFS(adapter);
   compiled = new CompiledCache(adapter);
 
-  cli = createTrailCLI({
+  cli = createTrailsCLI({
     vfs,
     adapter,
     executeCode,
@@ -121,7 +121,7 @@ function replaceDatabase(data: Uint8Array): void {
   vfs = new VirtualFS(adapter);
   compiled = new CompiledCache(adapter);
   migrations = [];
-  cli = createTrailCLI({
+  cli = createTrailsCLI({
     vfs,
     adapter,
     executeCode,

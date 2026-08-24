@@ -4,7 +4,7 @@
  */
 
 import type { VfsFile } from "./virtual-fs.js";
-import type { CliResult } from "./trail-cli.js";
+import type { CliResult } from "./trails-cli.js";
 
 // ── Request → Response mapping ──────────────────────────────────────────
 // Each request type maps to exactly one response shape. SwClient.send()

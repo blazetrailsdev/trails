@@ -144,8 +144,8 @@ Replace the text-input CLI (`TasksPanel.svelte`) with a real terminal emulator.
 
 - Check Ghostty WASM availability (https://github.com/ghostty-org/ghostty)
 - Fallback: xterm.js + xterm-addon-fit (established, used by VS Code web)
-- Integration: render in splitpane, dispatch to `trail-cli.ts` `exec()`, ANSI colors
-- Add ANSI escape codes to `trail-cli.ts` output (backwards-compatible)
+- Integration: render in splitpane, dispatch to `trails-cli.ts` `exec()`, ANSI colors
+- Add ANSI escape codes to `trails-cli.ts` output (backwards-compatible)
 
 ## Followups
 
