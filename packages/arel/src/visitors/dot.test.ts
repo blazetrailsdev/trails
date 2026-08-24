@@ -50,9 +50,7 @@ describe("TestDot", () => {
   it("Arel Nodes Case and friends", () => {
     const foo = buildQuoted("foo");
     const node = new Nodes.Case(foo);
-    (node as unknown as { conditions: Nodes.When[] }).conditions = [
-      new Nodes.When(foo, buildQuoted(1)),
-    ];
+    node.conditions = [new Nodes.When(foo, buildQuoted(1))];
     node.default = new Nodes.Else(buildQuoted(0));
 
     const out = dot.compile(node);

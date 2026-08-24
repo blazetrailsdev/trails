@@ -14,7 +14,7 @@ import { Unary } from "./unary.js";
  */
 export class Case extends NodeExpression {
   readonly case: Node | null;
-  readonly conditions: When[];
+  conditions: When[];
   default: Else | null;
 
   constructor(operand?: Node, defaultValue?: Node) {
