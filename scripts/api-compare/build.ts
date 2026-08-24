@@ -308,10 +308,27 @@ export function renderJsdoc(
     while (head.length > 1 && head.at(-1)!.trim() === "*") head.pop();
     return [...head, ...tail].join("\n");
   }
-  const tagLines = ordered.flatMap((e) => renderEntry(e, indent, tag));
   if (at !== undefined) {
-    return [...head.slice(0, at), ...tagLines, ...head.slice(at), ...tail].join("\n");
+    // One insertion point per tag, taken from the source in ascending order and
+    // paired with the sorted entries: same-family tags separated by prose go
+    // back to the lines they came from rather than all collapsing onto the
+    // first one, so a pass that migrates nothing rewrites nothing (RFC 0106).
+    // A mint (or a drop) leaves the counts unequal; the extras ride at the last
+    // known slot, which is today's sorted-append behaviour within a run of tags.
+    const slots = ordered
+      .map((e) => e.slot)
+      .filter((s): s is number => s !== undefined)
+      .sort((a, b) => a - b)
+      .map((s) => Math.min(s, head.length));
+    const out = head.slice();
+    const positions = ordered.map((_, i) => slots[Math.min(i, slots.length - 1)] ?? at);
+    // Descending, so an earlier insertion cannot shift a later one's index.
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      out.splice(positions[i], 0, ...renderEntry(ordered[i], indent, tag));
+    }
+    return [...out, ...tail].join("\n");
   }
+  const tagLines = ordered.flatMap((e) => renderEntry(e, indent, tag));
   const sep = hasProse ? [`${indent} *`] : [];
   return [...head, ...sep, ...tagLines, ...tail].join("\n");
 }

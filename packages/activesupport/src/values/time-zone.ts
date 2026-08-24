@@ -720,8 +720,8 @@ export class Timezone {
    * `TZInfo::Timezone#utc_to_local`: as of tzinfo 2 this is the local time
    * carrying a non-zero UTC offset, which a `Temporal.ZonedDateTime` is.
    */
-  utcToLocal(time: Date | Temporal.Instant): Temporal.ZonedDateTime {
-    return instantFrom(toDate(time)).toZonedDateTimeISO(this.identifier);
+  utcToLocal(time: Time): Temporal.ZonedDateTime {
+    return time.toTime().toInstant().toZonedDateTimeISO(this.identifier);
   }
 
   /**
@@ -1057,21 +1057,25 @@ export class TimeZone {
    * `tzinfo.utc_to_local` returns a time carrying a non-zero UTC offset — a
    * `Temporal.ZonedDateTime` here. The
    * `ActiveSupport.utc_to_local_returns_utc_offset_times` arm hands that back
-   * as is; the legacy arm rebuilds `Time.utc(...)` from its parts, which is a
-   * `Date` whose UTC fields carry the local wall clock.
-   *
-   * @missingRailsCall utc — PERMANENT. `Time.utc(t.year, ..., t.sec_fraction * 1_000_000)`
-   *   (time_zone.rb:542-547). trails' non-offset arm rebuilds the same
-   *   components as a JS `Date` through `Date.UTC`, the seat this method's
-   *   callers read. Pre-existing: surfaced only once `DateTime#utc`
-   *   (date_time/calculations.rb:184) was ported and `utc` entered the
-   *   population.
+   * as is; the legacy arm rebuilds it with `Time.utc(t.year, t.month, t.day,
+   * t.hour, t.min, t.sec, t.sec_fraction * 1_000_000)` (time_zone.rb:545) —
+   * `sec_fraction` in microseconds being the Temporal value's sub-second
+   * components folded into one microsecond count, the nanosecond remainder
+   * riding as its fraction so the full sub-microsecond precision survives.
    */
-  utcToLocal(time: Date | Temporal.Instant): Temporal.ZonedDateTime | Date {
+  utcToLocal(time: Time): Temporal.ZonedDateTime | Time {
     const t = this.tzinfo.utcToLocal(time);
     return utcToLocalReturnsUtcOffsetTimes()
       ? t
-      : new Date(Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute, t.second, t.millisecond));
+      : Time.utc(
+          t.year,
+          t.month,
+          t.day,
+          t.hour,
+          t.minute,
+          t.second,
+          t.millisecond * 1_000 + t.microsecond + t.nanosecond / 1_000,
+        );
   }
 
   /**

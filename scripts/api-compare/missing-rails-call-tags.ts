@@ -50,6 +50,10 @@ export interface TagEntry {
   call: string;
   reason: string;
   rawLines: string[];
+  /** Index in `parseJsdoc`'s `rest` this tag was lifted from, so `renderJsdoc`
+   *  can put it back where it stood even when prose separates it from its
+   *  same-family neighbours (RFC 0106). Absent on a newly minted entry. */
+  slot?: number;
 }
 
 /** Where a JSDoc comment starts, so an empty-reason error can name a
@@ -173,7 +177,12 @@ export function parseJsdoc(
       // reason and slide past the empty-reason gate below. `rawLines` keeps
       // the line verbatim, so idempotency is unaffected.
       slot ??= rest.length;
-      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: synthetic ? [] : [line] };
+      open = {
+        call: m[1],
+        reason: (m[2] ?? "").trim(),
+        rawLines: synthetic ? [] : [line],
+        slot: rest.length,
+      };
       entries.push(open);
       tagLineOf.set(open, sourceIndex);
       if (synthetic) open = null;

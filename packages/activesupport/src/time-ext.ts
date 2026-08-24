@@ -292,6 +292,16 @@ export function prevOccurring(date: Date, day: string): Temporal.Instant {
 // advance
 // ---------------------------------------------------------------------------
 
+interface AdvanceOptions {
+  years?: number;
+  months?: number;
+  weeks?: number;
+  days?: number;
+  hours?: number;
+  minutes?: number;
+  seconds?: number;
+}
+
 /**
  * Rails' `Time#advance` (time/calculations.rb:194-217) writes the normalised
  * `:weeks` / `:days` back into the caller's hash, but `Date#advance`
@@ -300,18 +310,19 @@ export function prevOccurring(date: Date, day: string): Temporal.Instant {
  * date_ext_test.rb:367-371). One TS function stands in for both reopenings, so
  * it takes the non-mutating arm and normalises into a copy.
  */
+export function advance(date: Date, options: AdvanceOptions): Temporal.Instant;
+/**
+ * A `::Time` receiver answers a `::Time`, as it does in Ruby — the receiver
+ * `TimeWithZone#advance`'s variable-length arm hands `time.advance(options)`
+ * (time_with_zone.rb:433-434). A JS `Date` reads its components in the SYSTEM
+ * zone, so that arm cannot go through the `Date` one without moving the wall
+ * clock it is advancing.
+ */
+export function advance(date: RubyTime, options: AdvanceOptions): RubyTime;
 export function advance(
-  date: Date,
-  options: {
-    years?: number;
-    months?: number;
-    weeks?: number;
-    days?: number;
-    hours?: number;
-    minutes?: number;
-    seconds?: number;
-  },
-): Temporal.Instant {
+  date: Date | RubyTime,
+  options: AdvanceOptions,
+): Temporal.Instant | RubyTime {
   options = { ...options };
 
   if (options.weeks != null) {
@@ -326,18 +337,23 @@ export function advance(
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  let d = toDate(date);
+  let d = date instanceof RubyTime ? date.toTime().toPlainDate() : toDate(date);
   if (options.years) d = d.add({ months: options.years * 12 });
   if (options.months) d = d.add({ months: options.months });
   if (options.weeks) d = d.add({ days: options.weeks * 7 });
   if (options.days) d = d.add({ days: options.days });
 
-  const timeAdvancedByDate = change(date, { year: d.year, month: d.month, day: d.day });
+  const timeAdvancedByDate =
+    date instanceof RubyTime
+      ? change(date, { year: d.year, month: d.month, day: d.day })
+      : change(date, { year: d.year, month: d.month, day: d.day });
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
 
   if (secondsToAdvance === 0) {
     return timeAdvancedByDate;
+  } else if (timeAdvancedByDate instanceof RubyTime) {
+    return timeAdvancedByDate.plus(secondsToAdvance);
   } else {
     return since(new Date(timeAdvancedByDate.epochMilliseconds), secondsToAdvance);
   }

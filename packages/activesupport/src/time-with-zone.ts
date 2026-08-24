@@ -16,6 +16,8 @@ import { instantFrom } from "./temporal.js";
 import { Rational, Time } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
+import { advance as timeAdvance } from "./time-ext.js";
+import { inTimeZone } from "./core-ext/date-and-time/zones.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
@@ -823,80 +825,26 @@ export class TimeWithZone {
   // ---------------------------------------------------------------------------
 
   /**
-   * Advance by calendar amounts. Variable parts (years, months, weeks, days)
-   * are applied in local time; fixed parts (hours, minutes, seconds) from UTC.
+   * Mirrors: `ActiveSupport::TimeWithZone#advance` (time_with_zone.rb:430-438).
+   * Variable-length parts advance from `#time` — the local wall clock, whose
+   * calendar arithmetic is `Time#advance`'s (time/calculations.rb:194-217) and
+   * through it `Date#advance`'s — and the result is wrapped back into this
+   * zone, exactly as `method_missing` (:553-557) does. Everything else advances
+   * from `#utc`, for accuracy when moving across DST boundaries.
    *
-   * @missingRailsCall any? — CONVERGEABLE (story
-   *   time-with-zone-advance-change-delegations, RFC 0023): Rails' advance (time_with_zone.rb:430-437) picks
-   *   the variable-length arm with `options.values_at(:years, :weeks, :months,
-   *   :days).any?` and hands it to `method_missing(:advance, options)`; trails
-   *   has no `method_missing` arm to hand it to and computes both arms inline,
-   *   so the guard is a plain `if (options.years)`-style test per key rather
-   *   than an `any?` over a values_at slice. Converging needs the `Time#advance`
-   *   core-ext port that the delegation targets.
-   * @missingRailsCall in_time_zone — CONVERGEABLE (story
-   *   time-with-zone-advance-change-delegations, RFC 0023): The fixed-length arm is
-   *   `utc.advance(options).in_time_zone(time_zone)` (time_with_zone.rb:436);
-   *   trails has no `Time#advance` core-ext for a `Temporal.Instant` to delegate
-   *   to, so the seconds offset is applied inline and there is no cross-zone
-   *   round trip to close with `in_time_zone`. Blocked on porting
-   *   `DateAndTime::Calculations#advance` for the `Time` receiver.
+   * @missingRailsArgs in_time_zone — PERMANENT: Ruby's `in_time_zone` is a
+   * method ON the receiver; TypeScript cannot reopen `Time`, so
+   * `core-ext/date-and-time/zones.ts` is the receiver-form reopening of
+   * `DateAndTime::Zones` and takes the receiver as its first argument.
    */
   advance(options: AdvanceOptions): TimeWithZone {
-    const l = this._local();
-    let { year, month, day } = l;
-
-    // Apply variable parts in local time
-    if (options.years) year += options.years;
-    if (options.months) {
-      month += options.months;
-      // Normalize month overflow
-      while (month > 12) {
-        month -= 12;
-        year++;
-      }
-      while (month < 1) {
-        month += 12;
-        year--;
-      }
+    if ([options.years, options.weeks, options.months, options.days].some((v) => v != null)) {
+      return this._wrapWithTimeZone(
+        timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
+      ) as TimeWithZone;
+    } else {
+      return inTimeZone(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
     }
-    // Clamp day to valid range for the new month
-    const maxDay = daysInMonth(year, month);
-    if (day > maxDay) day = maxDay;
-
-    if (options.weeks) day += options.weeks * 7;
-    if (options.days) day += options.days;
-
-    // `TimeZone#local` builds its wall clock with `Time.utc`, which raises on a
-    // day outside the month rather than rolling over the way `Date.UTC` does —
-    // so carry the accumulated days into the calendar here.
-    const rolled = Temporal.PlainDate.from({ year, month, day: 1 }).add({ days: day - 1 });
-
-    // Reconstruct the local time, then convert to UTC
-    const newLocal = this._timeZone.local(
-      rolled.year,
-      rolled.month,
-      rolled.day,
-      l.hour,
-      l.minute,
-      l.second,
-      l.millisecond,
-    );
-
-    // Now apply fixed parts as seconds on UTC
-    let ms = 0;
-    if (options.hours) ms += options.hours * 3600000;
-    if (options.minutes) ms += options.minutes * 60000;
-    if (options.seconds) ms += options.seconds * 1000;
-
-    if (ms !== 0) {
-      return new TimeWithZone(
-        Temporal.Instant.fromEpochMilliseconds(Math.trunc(newLocal._epochMs + ms)),
-        this._timeZone,
-      );
-    }
-
-    return newLocal;
   }
 
   /**
