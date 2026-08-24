@@ -1,7 +1,8 @@
 import { Errors } from "./errors.js";
 import {
   ValidationContext,
-  ValidationsContextHost,
+  Validations,
+  ClassMethods as ValidationsClassMethods,
   initInternals as validationsInitInternals,
   initializeDup as validationsInitializeDup,
   contextForValidation as validationsContextForValidation,
@@ -9,15 +10,12 @@ import {
   raiseValidationError as validationsRaiseValidationError,
   predicateForValidationContext as validationsPredicateForValidationContext,
   _mergeAttributes as validationsMergeAttributes,
-  VALID_OPTIONS_FOR_VALIDATE,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
   Callbacks as ASCallbacks,
   defineCallbacks,
-  resetCallbacks as asResetCallbacks,
-  setCallback,
   runCallbacks,
   extend,
   include,
@@ -30,7 +28,6 @@ import {
   type CodeGenerator,
   Module,
   classAttribute,
-  kernelArray,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -45,7 +42,7 @@ import {
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
-import { CallbackFn, CallbackConditions, defineModelCallbacks } from "./callbacks.js";
+import { defineModelCallbacks } from "./callbacks.js";
 import {
   serializableHash,
   SerializeOptions,
@@ -53,7 +50,7 @@ import {
   readAttributeForSerialization as serializationReadAttributeForSerialization,
   type SerializationRecord,
 } from "./serialization.js";
-import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
+import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
 import * as AttributeMethods from "./attribute-methods.js";
@@ -70,7 +67,6 @@ import {
   attributeWriterMissing as defaultAttributeWriterMissing,
   isMassAssignmentEmpty,
   ArgumentError,
-  NoMethodError,
 } from "./attribute-assignment.js";
 import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
 import {
@@ -169,6 +165,15 @@ export interface Model {
   runValidationsBang(): Promise<boolean>;
   raiseValidationError(): never;
   readAttributeForValidation(attribute: string): unknown;
+  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
+  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
+  readonly validationContext: string | string[] | null;
+  /** @internal */
+  _validationContext: string | string[] | null;
+  /** @internal */
+  _runValidateCallbacks(): Promise<void>;
   /** @internal */
   sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
 
@@ -218,22 +223,10 @@ export class Model {
   declare static attributeMethodPatterns: AttributeMethodPattern[];
   declare static isAttributeMethodPatterns: boolean;
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
-  // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
-  // (activemodel/lib/active_model/validations.rb:50). Map keyed by attribute
-  // name (or `null` for validators registered without `attributes:`); O(1)
-  // `validatorsOn(attr)` via direct bucket lookup.
-  //
-  // Subclass isolation is copy-on-first-write rather than Rails'
-  // eager-on-`inherited`. JS has no `inherited` hook that fires when a
-  // subclass is defined, so we defer the dup until the subclass first
-  // writes (see `_ensureOwnValidators`). Behavioral consequence: if a
-  // subclass never registers its own validator, it keeps reading through
-  // the prototype chain and will see validators the parent adds *after*
-  // the subclass was defined. Identical in all cases where a subclass
-  // registers at least one validator (the standard pattern for
-  // `static { this.validates(...) }` blocks at class-definition time);
-  // only the "defined but never written to" window diverges from Rails.
-  static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
+  // Runtime accessor comes from the `classAttribute()` call at the bottom of
+  // this file (validations.rb:50). Keyed by attribute name (or `null` for
+  // validators registered without `attributes:`), as Ruby's Hash-of-Arrays is.
+  declare static _validators: Map<string | null, Array<ValidatorLike>>;
   declare private static _modelName: ModelName | null;
 
   declare static attribute: Extended<typeof AttributesClassMethods>["attribute"];
@@ -296,11 +289,10 @@ export class Model {
    */
   declare static validatesBang: Extended<typeof Validates>["validatesBang"];
 
-  static clearValidatorsBang(): void {
-    // Rails: `_validators.clear` (activemodel/lib/active_model/validations.rb:248).
-    this._validators = new Map();
-    asResetCallbacks(this.prototype, "validate");
-  }
+  /** Mirrors: validations.rb:246-249, mixed on by the `extend()` below. */
+  declare static clearValidatorsBang: Extended<
+    typeof ValidationsClassMethods
+  >["clearValidatorsBang"];
 
   /**
    * Mirrors: ActiveModel::Validations::ClassMethods#attribute_method?
@@ -312,101 +304,23 @@ export class Model {
   }
 
   /**
-   * Mirrors: ActiveModel::Validations::ClassMethods#validate (validations.rb:160-185).
-   * The key check runs only under `args.all?(Symbol)` — a block validator may carry
-   * validator-ish keys. An unknown method name is a `send`-dispatched callback
-   * filter, so it raises `NoMethodError` at validation time, not registration time.
-   *
-   * `on:` merges into `:if` (validations.rb:170-172) and `except_on:` into
-   * `:unless` as an intersection of `Array(except_on)` with
-   * `Array(o.validation_context)` (:174-182), so a nil context never intersects
-   * and the validator still runs; the result goes straight to `set_callback`
-   * (:184).
+   * Adds a validation method or block to the class (validations.rb:160-185),
+   * mixed on by the `extend()` below.
    */
-  static validate<T extends ValidatableRecord = ValidatableRecord>(
+  declare static validate: <T extends ValidatableRecord = ValidatableRecord>(
     methodOrFn: string | ((record: T) => unknown),
-    options: ConditionalOptions = {},
-  ): void {
-    if (typeof methodOrFn === "string") {
-      for (const k of Object.keys(options)) {
-        if (!(VALID_OPTIONS_FOR_VALIDATE as readonly string[]).includes(k)) {
-          throw new ArgumentError(
-            `Unknown key: :${k}. Valid keys are: ${VALID_OPTIONS_FOR_VALIDATE.map((v) => `:${v}`).join(", ")}. Perhaps you meant to call \`validates\` instead of \`validate\`?`,
-          );
-        }
-      }
-    }
-
-    const fn: CallbackFn = (record: object) => {
-      // Return the underlying result so a Promise-returning validator flows
-      // into the callback runner, which awaits it (RFC 0063 made the validation
-      // chain async) rather than dropping it as an unhandled rejection. Most
-      // validators are synchronous like Rails; the exception is a DB-backed one
-      // such as `uniqueness`, whose existence check the awaited chain runs
-      // inline.
-      const r = record as T & Record<string, unknown>;
-      if (typeof methodOrFn === "function") {
-        // Bind `this` to the record so block validators written as
-        // `function () { this.foo }` (Rails `instance_exec`) resolve `this`,
-        // while arrow validators reading the `record` arg keep working.
-        return methodOrFn.call(r, r) as void;
-      } else if (typeof r[methodOrFn] === "function") {
-        return (r[methodOrFn] as () => void)();
-      }
-      throw new NoMethodError(
-        `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
-      );
-    };
-    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
-    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
-
-    if (options.on !== undefined) {
-      const pred = validationsPredicateForValidationContext(options.on);
-      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
-    }
-
-    if (options.exceptOn !== undefined) {
-      const exceptOn = kernelArray(options.exceptOn);
-      unlessConds = [
-        (record: object) => {
-          const current = kernelArray(
-            (record as unknown as ValidationsContextHost).validationContext,
-          );
-          return exceptOn.some((c) => current.includes(c));
-        },
-        ...unlessConds,
-      ];
-    }
-
-    setCallback(this.prototype, "validate", fn, {
-      ...(ifConds.length > 0 ? { if: ifConds } : {}),
-      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
-      ...(options.prepend ? { prepend: true } : {}),
-    });
-  }
+    options?: ConditionalOptions,
+  ) => void;
 
   /**
-   * Validates each of the specified attributes with a block.
-   *
-   * Mirrors: ActiveModel::Validations.validates_each —
-   * `validates_with BlockValidator, _merge_attributes(attr_names), &block`
-   * (activemodel/lib/active_model/validations.rb:190-192). `_merge_attributes`
-   * flattens, so a nested `[:title, :content]` contributes its members again.
-   * `validates_with` registers through `validate(validator, options)`
-   * (with.rb:103), which is where the `on:` / `except_on:` merge happens.
+   * Validates each of the specified attributes with a block
+   * (validations.rb:88-90), mixed on by the `extend()` below.
    */
-  static validatesEach<T extends ValidatableRecord = ValidatableRecord>(
+  declare static validatesEach: <T extends ValidatableRecord = ValidatableRecord>(
     attrNames: Array<string | string[]>,
-    fn: (record: T, attribute: string, value: unknown) => void,
-    options: ConditionalOptions = {},
-  ): void {
-    const validator = new BlockValidator(
-      { ...this._mergeAttributes([...attrNames]), ...options },
-      fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
-    );
-    this._registerValidator(validator);
-    this.validate((record: ValidatableRecord) => validator.validate(record), options);
-  }
+    block: (record: T, attribute: string, value: unknown) => void,
+    options?: ConditionalOptions,
+  ) => void;
 
   /**
    * Validates using a custom validator class instance.
@@ -418,45 +332,11 @@ export class Model {
    */
   declare static validatesWith: Extended<typeof WithClassMethods>["validatesWith"];
 
-  /**
-   * Return all validators registered on this model.
-   *
-   * Mirrors: ActiveModel::Validations.validators
-   */
-  static validators(): Array<ValidatorLike> {
-    // Rails: `_validators.values.flatten.uniq`
-    // (activemodel/lib/active_model/validations.rb:204-206).
-    const seen = new Set<ValidatorLike>();
-    const out: Array<ValidatorLike> = [];
-    for (const bucket of this._validators.values()) {
-      for (const v of bucket) {
-        if (seen.has(v)) continue;
-        seen.add(v);
-        out.push(v);
-      }
-    }
-    return out;
-  }
+  /** List all validators used to validate the model (validations.rb:204-206). */
+  declare static validators: Extended<typeof ValidationsClassMethods>["validators"];
 
-  /**
-   * Return validators registered for the given attributes. O(1) bucket
-   * lookup per attribute — Rails
-   * `attributes.flat_map { |attribute| _validators[attribute.to_sym] }`
-   * (activemodel/lib/active_model/validations.rb:266-270).
-   *
-   * Returns a detached copy each call (same shape whether the bucket is
-   * populated or empty). Deliberately does NOT mirror Rails' default-proc
-   * auto-vivification (`Hash.new { |h,k| h[k] = [] }`) — that's a Ruby
-   * hash artifact that would turn reads into state mutations, and on a
-   * subclass it would also require eagerly invoking
-   * `_ensureOwnValidators()` just to avoid polluting the parent's map.
-   * The detached copy keeps both concerns away from the reader (caller
-   * mutation can't leak into internals; consecutive calls return
-   * independent arrays).
-   */
-  static validatorsOn(...attributes: string[]): Array<ValidatorLike> {
-    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
-  }
+  /** List all validators used to validate one attribute (validations.rb:266-270). */
+  declare static validatorsOn: Extended<typeof ValidationsClassMethods>["validatorsOn"];
 
   // -- Individual validator helper methods --
   // These mirror the Rails validates_*_of shorthand methods
@@ -582,43 +462,6 @@ export class Model {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static resetCallbacks: Extended<typeof ASCallbacks.ClassMethods>["resetCallbacks"];
-
-  static _ensureOwnValidators(): void {
-    // Copy-on-first-write dup. Rails' `inherited(base)` hook
-    // (activemodel/lib/active_model/validations.rb:287-291) does this
-    // eagerly at class-definition time; JS has no such hook, so we defer
-    // the dup until the first write on the subclass. Produces an
-    // independent top-level Map whose per-attribute arrays are also fresh,
-    // matching Rails' `dup.each { |k, v| dup[k] = v.dup }` — downward
-    // writes from the subclass never leak up to the parent.
-    if (!Object.hasOwn(this, "_validators")) {
-      const cloned = new Map<string | null, Array<ValidatorLike>>();
-      for (const [k, arr] of this._validators) cloned.set(k, [...arr]);
-      this._validators = cloned;
-    }
-  }
-
-  /**
-   * Register `validator` under each of its declared attributes (or under
-   * the `null` key when none are declared) — the `_validators[...] <<
-   * validator` half of Rails `validates_with` (validations/with.rb:95-101),
-   * reached here from `validates_each`, whose Rails body registers by routing
-   * through `validates_with` itself (validations.rb:190-192).
-   */
-  private static _registerValidator(validator: ValidatorLike): void {
-    this._ensureOwnValidators();
-    const attributes = (validator as { attributes?: readonly string[] }).attributes;
-    const keys: Array<string | null> =
-      Array.isArray(attributes) && attributes.length > 0 ? attributes.map(String) : [null];
-    for (const key of keys) {
-      let bucket = this._validators.get(key);
-      if (!bucket) {
-        bucket = [];
-        this._validators.set(key, bucket);
-      }
-      bucket.push(validator);
-    }
-  }
 
   /**
    * Define custom model callbacks.
@@ -861,26 +704,6 @@ export class Model {
    */
   declare attributes: Record<string, unknown>;
 
-  // Rails `validation_context` holds either a single Symbol or an
-  // Array<Symbol> (or nil). `valid?([:create, :publish])` round-trips
-  // the array so `on: :create` / `on: [:create]` / `on: [:create, :other]`
-  // validators all fire. See `validations.rb:361-368` and `:294-306`.
-  /**
-   * Rails has no `@validation_context` ivar — the context lives on the
-   * `ValidationContext` (validations.rb:463-470). Writing through that object
-   * rather than a model field is what lets a frozen model be validated.
-   *
-   * @internal
-   */
-  get _validationContext(): string | string[] | null {
-    return this.contextForValidation().context;
-  }
-
-  /** @internal */
-  set _validationContext(value: string | string[] | null) {
-    this.contextForValidation().context = value;
-  }
-
   /**
    * Lazy-initialized `ValidationContext`, which owns the active context. Set on
    * first `contextForValidation()` call and cleared by `initInternals()`.
@@ -888,95 +711,6 @@ export class Model {
    * @internal
    */
   _contextForValidation?: ValidationContext;
-
-  /**
-   * Lazy accessor for the active `ValidationContext`. Mirrors Rails
-   * `context_for_validation` (validations.rb:463-465).
-   *
-   * @internal Rails-private helper.
-   */
-
-  /**
-   * Run the `:validate` callbacks and report whether the model has no
-   * errors. Mirrors Rails `run_validations!` (validations.rb:473-476).
-   *
-   * @internal Rails-private helper.
-   */
-
-  /**
-   * Throw `ValidationError` for the current model. Mirrors Rails
-   * `raise_validation_error` (validations.rb:478-480).
-   *
-   * @internal Rails-private helper.
-   */
-
-  /**
-   * Mirrors: ActiveModel::Validations#valid? (validations.rb:361-368) — read the
-   * current context, write the new one through `context_for_validation`, restore
-   * in `ensure`.
-   */
-  async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
-    this.errors.clear();
-    const ctor = this.constructor as typeof Model;
-    // Rails `valid?(context = nil)` (validations.rb:361-368) always
-    // assigns `context_for_validation.context = context` on entry,
-    // restoring in `ensure`. An omitted argument and an explicit
-    // `null` both map to Rails' `nil` — so we collapse both to
-    // `null` here. For `ValidationContext` / Array we deep-copy to
-    // prevent caller-side mutation from leaking into our frame.
-    let normalized: string | string[] | null;
-    if (context === undefined || context === null) {
-      normalized = null;
-    } else if (context instanceof ValidationContext) {
-      const inner = context.context;
-      normalized = Array.isArray(inner) ? [...inner] : inner;
-    } else if (Array.isArray(context)) {
-      normalized = [...context];
-    } else {
-      normalized = context;
-    }
-    const currentContext = this.validationContext;
-    this.contextForValidation().context = normalized;
-
-    try {
-      // Rails: `run_validations!` is the block, and its truthy return becomes
-      // run_callbacks' value; `false` here means the chain halted.
-      const completed = await runCallbacks(this, "validation", async () => {
-        await this.runValidationsBang();
-        return true;
-      });
-      if (!completed) return false;
-      return this.errors.empty;
-    } finally {
-      this.contextForValidation().context = currentContext;
-    }
-  }
-
-  /** @internal */
-  async _runValidateCallbacks(): Promise<void> {
-    const ctor = this.constructor as typeof Model;
-    await runCallbacks(this, "validate");
-  }
-
-  /**
-   * Run validations and return whether the record is valid.
-   *
-   * Mirrors Rails `alias_method :validate, :valid?`
-   * (activemodel/lib/active_model/validations.rb:370).
-   */
-  validate(context?: string | string[] | ValidationContext | null): Promise<boolean> {
-    return this.isValid(context);
-  }
-
-  /**
-   * Opposite of `isValid`. Accepts an optional context.
-   *
-   * Mirrors Rails `def invalid?(context = nil); !valid?(context); end`
-   * (activemodel/lib/active_model/validations.rb:408-410).
-   */
-  async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
-    return !(await this.isValid(context));
-  }
 
   /**
    * Mirrors: HelperMethods#validates_presence_of (validations/presence.rb:34-36).
@@ -1480,31 +1214,6 @@ export class Model {
   }
 
   /**
-   * Return the current validation context.
-   *
-   * Mirrors: ActiveModel::Validations#validation_context
-   *
-   * @internal
-   */
-  get validationContext(): string | string[] | null {
-    return this._validationContext;
-  }
-
-  /**
-   * Run validations. Returns `true` when valid; raises `ValidationError`
-   * otherwise — never returns `false`.
-   *
-   * Mirrors Rails `def validate!(context = nil); valid?(context) || raise_validation_error; end`
-   * (activemodel/lib/active_model/validations.rb:417-419).
-   */
-  async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
-    if (!(await this.isValid(context))) {
-      this.raiseValidationError();
-    }
-    return true;
-  }
-
-  /**
    * Return a subset of attributes.
    *
    * Mirrors: ActiveModel::Access#slice
@@ -1543,7 +1252,9 @@ classAttribute.call(Model, "attributeMethodPatterns", {
 });
 
 // Ruby `include ActiveModel::Validations` brings ClassMethods#validates and
-// friends (validations/validates.rb:111-178) onto the class.
+// friends (validations.rb:57-307, validations/validates.rb:111-178) onto the
+// class; `with.rb:87` reopens the same `ClassMethods`, hence the second extend.
+extend(Model, ValidationsClassMethods);
 extend(Model, WithClassMethods);
 include(Model, { validatesWith: withValidatesWith });
 
@@ -1618,8 +1329,9 @@ include(Model, ASCallbacks.InstanceMethods);
 // (validations/callbacks.rb:32) and its `included do` block (:25-30).
 extend(Model, ValidationsCallbacksClassMethods);
 // Ruby `include ActiveModel::Validations`' `included do` block
-// (validations.rb:48).
+// (validations.rb:48-50).
 defineCallbacks(Model.prototype, "validate", { scope: ["name"] });
+classAttribute.call(Model, "_validators", { instanceWriter: false, default: new Map() });
 
 defineCallbacks(Model.prototype, "validation", {
   skipAfterCallbacksIfTerminated: true,
@@ -1630,6 +1342,7 @@ include(Model, ToJsonWithActiveSupportEncoder);
 
 // Ruby `include ActiveModel::Validations` (validations.rb:52) and
 // `include ActiveModel::ForbiddenAttributesProtection` (model.rb:12-14).
+include(Model, Validations);
 include(Model, {
   contextForValidation: validationsContextForValidation,
   runValidationsBang: validationsRunValidationsBang,

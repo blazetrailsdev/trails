@@ -40,12 +40,17 @@ export class WithValidator extends EachValidator {
  */
 type ValidatorLike = { validate(record: ValidatableRecord): unknown };
 
-type ValidatorClass = new (options: Record<string, unknown>) => ValidatorLike;
+/** The `&block` Ruby's `klass.new(options.dup, &block)` (with.rb:92) hands on. */
+type ValidatorBlock = (record: ValidatableRecord, attribute: string, value: unknown) => void;
+
+type ValidatorClass = new (
+  options: Record<string, unknown>,
+  block?: ValidatorBlock,
+) => ValidatorLike;
 
 /** The class-level surface `ClassMethods#validates_with` self-sends. */
 export interface ValidatesWithClassHost {
   _validators: Map<string | null, ValidatorLike[]>;
-  _ensureOwnValidators(): void;
   validate(fn: (record: ValidatableRecord) => unknown, options?: Record<string, unknown>): void;
 }
 
@@ -78,6 +83,16 @@ export const ClassMethods = {
    * (activemodel/lib/active_model/validations/with.rb:88-105).
    */
   validatesWith(this: ValidatesWithClassHost, ...args: unknown[]): void {
+    // Ruby's `def validates_with(*args, &block)` (with.rb:88) keeps the block
+    // out of `*args`; TS has no block parameter, so a trailing function that is
+    // not a validator class (which answers `validate` on its prototype) stands
+    // in for it — `validates_each` (validations.rb:88-90) passes one.
+    const last = args[args.length - 1];
+    const block =
+      typeof last === "function" &&
+      typeof (last as ValidatorClass).prototype?.validate !== "function"
+        ? (args.pop() as ValidatorBlock)
+        : undefined;
     const [klasses, options] = extractOptionsBang(args);
     options.class = this;
 
@@ -87,17 +102,26 @@ export const ClassMethods = {
       // to the validator; only `Validator#initialize` strips `:class`
       // (validator.rb:107-110), leaving every standard key visible in
       // `validator.options`.
-      const validator = new klass({ ...options });
+      const validator = new klass({ ...options }, block);
 
-      this._ensureOwnValidators();
+      // Ruby's `_validators[key] << validator` (with.rb:95-101) mutates the
+      // Hash the `inherited` hook (validations.rb:287-291) already dupped onto
+      // this class. JS has no `inherited`, so the dup happens here instead:
+      // `class_attribute`'s writer is local to the class
+      // (core_ext/class/attribute.rb:86), so assigning a copy is what keeps a
+      // subclass's registrations off its parent. The `Hash.new { [] }` default
+      // proc is spelled out for the same reason it always is — a `Map` has none.
+      const _validators = new Map(this._validators);
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attribute of attributes) {
-          _pushValidator(this._validators, String(attribute), validator);
+          const key = String(attribute);
+          _validators.set(key, [...(_validators.get(key) ?? []), validator]);
         }
       } else {
-        _pushValidator(this._validators, null, validator);
+        _validators.set(null, [...(_validators.get(null) ?? []), validator]);
       }
+      this._validators = _validators;
 
       // Ruby passes the validator object itself as the callback filter
       // (with.rb:103); a trails callback filter is a function, so the send is
@@ -106,24 +130,3 @@ export const ClassMethods = {
     }
   },
 };
-
-/**
- * Ruby's `_validators` is a `Hash.new { |h, k| h[k] = [] }`
- * (validations.rb:50), so `_validators[key] << validator` vivifies the bucket.
- * A JS `Map` has no default proc; this is that one expression.
- *
- * @noRailsEquivalent PERMANENT — Ruby's default-proc vivification, which a JS
- * `Map` cannot express in the subscript itself.
- */
-function _pushValidator(
-  validators: Map<string | null, ValidatorLike[]>,
-  key: string | null,
-  validator: ValidatorLike,
-): void {
-  let bucket = validators.get(key);
-  if (!bucket) {
-    bucket = [];
-    validators.set(key, bucket);
-  }
-  bucket.push(validator);
-}
