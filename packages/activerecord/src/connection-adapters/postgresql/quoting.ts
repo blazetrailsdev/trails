@@ -118,6 +118,13 @@ export function quoteColumnName(name: string): string {
  * backslash as an ordinary character. The surrounding quotes are added by the
  * caller — abstract `quote` (abstract/quoting.rb:75-76). Rails has no `E'`
  * handling anywhere in postgresql/quoting.rb.
+ *
+ * @missingRailsCall with_raw_connection — CONVERGEABLE (RFC 0073
+ *   permanent-connection-checkout): Rails escapes inside
+ *   `with_raw_connection { |c| c.escape(s) }`; `withRawConnection` is async in
+ *   trails and `quoteString` is reached from synchronous quoting paths, so the
+ *   lease cannot be taken until 0073 flips those paths. The escaping is the
+ *   same (PG `standard_conforming_strings`).
  */
 export function quoteString(value: string): string {
   return value.replace(/'/g, "''");

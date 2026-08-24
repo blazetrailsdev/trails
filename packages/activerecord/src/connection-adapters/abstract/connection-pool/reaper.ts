@@ -45,6 +45,12 @@ export class Reaper {
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static _timers = new Map<number, ReturnType<typeof setInterval>>();
 
+  /**
+   * @missingRailsCall spawn_thread — PERMANENT: connection_pool/reaper.rb:59
+   *   starts a background Thread per frequency bucket. JS has no threads, so the
+   *   same period is driven by a `setInterval` timer registered below; there is
+   *   no thread to spawn and no TypeScript spelling of `spawn_thread` to call.
+   */
   static registerPool(pool: ReapablePool, frequency: number): void {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;

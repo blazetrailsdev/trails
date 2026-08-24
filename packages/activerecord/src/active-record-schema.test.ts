@@ -76,7 +76,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema define", async () => {
-    await Schema.define(adapter, async (schema) => {
+    await Schema.define(async (schema) => {
       await schema.createTable("schema_test", (t) => {
         t.string("title");
         t.integer("count");
@@ -94,7 +94,7 @@ describe("ActiveRecordSchemaTest", () => {
     const saved = Base.tableNamePrefix;
     Base.tableNamePrefix = "nep_";
     try {
-      await Schema.define(adapter, { version: 7 }, async (schema) => {
+      await Schema.define({ version: 7 }, async (schema) => {
         await schema.createTable("fruits", (t) => {
           t.string("color");
         });
@@ -135,7 +135,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema load with multiple indexes for column of different names", async () => {
-    await Schema.define(adapter, async (schema) => {
+    await Schema.define(async (schema) => {
       await schema.createTable("multi_idx", (t) => {
         t.string("email");
         t.index(["email"], { name: "idx_email_1" });

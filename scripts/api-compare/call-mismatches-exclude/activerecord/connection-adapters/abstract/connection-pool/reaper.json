@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/reaper.ts",
-    "rubyName": "register_pool",
-    "call": "spawn_thread",
-    "reason": "connection_pool/reaper.rb:59 `spawn_thread` starts a background Thread; trails' Reaper drives the same period from a timer, so there is no thread to spawn. Tracked with the rest of the threadless pool surface by RFC 0073; returned from a `@missingRailsCall` tag by the RFC 0106 permanence audit. Tracked by story `converge-residual-connection-lease-call-set-rows` (RFC 0106 exit ledger, 2026-08-24)."
-  }
-]

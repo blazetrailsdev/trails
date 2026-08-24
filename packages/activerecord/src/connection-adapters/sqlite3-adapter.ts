@@ -2155,9 +2155,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * generation expression as `default_function`, since
    * `tableStructureWithCollation` overrides the GENERATED `dflt_value`.
    */
-  async columns(tableName: string): Promise<Column[]> {
-    const fields = await this.tableStructure(tableName);
-    return fields.map((field) => newColumnFromField(this, tableName, field, fields));
+  /**
+   * Mirrors: SQLite3::SchemaStatements#new_column_from_field
+   * (sqlite3/schema_statements.rb:143) — the per-adapter callee the abstract
+   * `columns` (schema_statements.rb:107-113) maps `column_definitions` through.
+   * Rails' SQLite3Adapter defines no `columns` of its own.
+   *
+   * @internal
+   */
+  private newColumnFromField(
+    tableName: string,
+    field: Record<string, unknown>,
+    definitions: Record<string, unknown>[],
+  ): Column {
+    return newColumnFromField(this, tableName, field, definitions);
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {

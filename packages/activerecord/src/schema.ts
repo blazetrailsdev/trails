@@ -1,4 +1,4 @@
-import { getEnv } from "@blazetrails/activesupport";
+import { getEnv, isPresent } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -24,82 +24,75 @@ export interface SchemaDefineInfo {
  * `class Schema < Migration::Current`, so Schema inherits every
  * schema-manipulation method from Migration. Pairing with Rails here
  * means we don't duplicate a second, shallower `createTable` in this
- * file; `Schema.define(adapter, fn)` hands the block a Schema instance
+ * file; `Schema.define(fn)` hands the block a Schema instance
  * that already exposes Migration's full DSL.
  *
  * Usage:
  *
- *   await Schema.define(adapter, async (schema) => {
+ *   await Schema.define(async (schema) => {
  *     await schema.createTable("users", (t) => {
  *       t.string("name");
  *     });
  *     await schema.addIndex("users", "name");
  *   });
  *
- *   await Schema.define(adapter, { version: 20240101000000 }, async (schema) => { ... });
+ *   await Schema.define({ version: 20240101000000 }, async (schema) => { ... });
  */
 export class Schema extends Current {
   /**
-   * Mirrors: ActiveRecord::Schema.define. Runs the block against a
-   * Schema instance (exposing Migration's DSL), then — matching
-   * Rails — creates the `schema_migrations` and
-   * `ar_internal_metadata` tables, sets the environment flag, and
-   * (if an `info.version` is given) records that version in
-   * `schema_migrations` via `assume_migrated_upto_version`.
+   * Mirrors: ActiveRecord::Schema::Definition::ClassMethods#define
+   * (schema.rb:50-52) — `new.define(info, &block)`.
    */
+  static async define(fn: (schema: Schema) => void | Promise<void>): Promise<void>;
   static async define(
-    adapter: DatabaseAdapter,
-    fn: (schema: Schema) => void | Promise<void>,
-  ): Promise<void>;
-  static async define(
-    adapter: DatabaseAdapter,
     info: SchemaDefineInfo,
     fn: (schema: Schema) => void | Promise<void>,
   ): Promise<void>;
   static async define(
-    adapter: DatabaseAdapter,
     infoOrFn: SchemaDefineInfo | ((schema: Schema) => void | Promise<void>),
     fnOpt?: (schema: Schema) => void | Promise<void>,
   ): Promise<void> {
-    const { info, fn }: { info: SchemaDefineInfo; fn: (s: Schema) => void | Promise<void> } =
-      typeof infoOrFn === "function" ? { info: {}, fn: infoOrFn } : { info: infoOrFn, fn: fnOpt! };
+    const { info, block }: { info: SchemaDefineInfo; block: (s: Schema) => void | Promise<void> } =
+      typeof infoOrFn === "function"
+        ? { info: {}, block: infoOrFn }
+        : { info: infoOrFn, block: fnOpt! };
 
-    const schema = new Schema(adapter);
-    await fn(schema);
-
-    // Mirrors Rails' Schema::Definition#define post-block work:
-    //   connection_pool.schema_migration.create_table
-    //   connection.assume_migrated_upto_version(info[:version]) if info[:version]
-    //   connection_pool.internal_metadata.create_table_and_set_flags(env)
-    const schemaMigration = new SchemaMigration(adapter.pool);
-    await schemaMigration.createTable();
-    if (info.version !== undefined) {
-      // Go through SchemaStatements#assumeMigratedUptoVersion (reached
-      // via the inherited Migration.connection getter) so the known
-      // migration list is pulled from pool.migrationContext.migrations
-      // — matches Rails' `connection.assume_migrated_upto_version`
-      // (see connection-adapters/abstract/schema-statements.ts:1157).
-      // Bypassing that path and calling SchemaMigration directly would
-      // only record the target version without backfilling the
-      // migrations between.
-      await schema.connection.assumeMigratedUptoVersion(info.version);
-    }
-    // Environment fallback chain: explicit info.environment → TRAILS_ENV
-    // → NODE_ENV (one-release fallback) → DatabaseConfigurations.defaultEnv
-    // (defaults to "development" but can be overridden by the app, e.g. via
-    // trailties boot). Using defaultEnv over a hard-coded literal
-    // keeps Schema.define consistent with how Migrator and other
-    // migration-stack pieces resolve the current environment.
-    const currentEnvironment =
-      info.environment ??
-      getEnv("TRAILS_ENV") ??
-      getEnv("NODE_ENV") ??
-      DatabaseConfigurations.defaultEnv;
-    const internalMetadata = new InternalMetadata(adapter.pool);
-    await internalMetadata.createTableAndSetFlags(currentEnvironment);
+    await new Schema().define(info, block);
   }
 
-  constructor(adapter: DatabaseAdapter) {
+  /**
+   * Mirrors: ActiveRecord::Schema::Definition#define (schema.rb:54-62) — the
+   * whole definition runs inside `connection_pool.with_connection do |connection|`,
+   * the block against this Schema instance (Ruby's `instance_eval`), and
+   * `assume_migrated_upto_version` on the yielded connection.
+   */
+  async define(
+    info: SchemaDefineInfo,
+    block: (schema: Schema) => void | Promise<void>,
+  ): Promise<void> {
+    await this.connectionPool.withConnection(async (connection) => {
+      this.connection = connection;
+      await block(this);
+
+      const schemaMigration = new SchemaMigration(this.connectionPool);
+      await schemaMigration.createTable();
+      if (isPresent(info.version)) {
+        await connection.assumeMigratedUptoVersion(info.version!);
+      }
+      // Rails reads `connection_pool.migration_context.current_environment`;
+      // trails resolves the same label through the chain the rest of the
+      // migration stack uses (explicit → TRAILS_ENV → NODE_ENV → default).
+      const currentEnvironment =
+        info.environment ??
+        getEnv("TRAILS_ENV") ??
+        getEnv("NODE_ENV") ??
+        DatabaseConfigurations.defaultEnv;
+      const internalMetadata = new InternalMetadata(this.connectionPool);
+      await internalMetadata.createTableAndSetFlags(currentEnvironment);
+    });
+  }
+
+  constructor(adapter?: DatabaseAdapter) {
     super();
     this.connection = adapter;
   }
@@ -109,5 +102,5 @@ export class Schema extends Current {
  * Mirrors: ActiveRecord::Schema::Definition
  */
 export interface Definition {
-  define(adapter: DatabaseAdapter, fn: (schema: Schema) => void | Promise<void>): Promise<void>;
+  define(info: SchemaDefineInfo, block: (schema: Schema) => void | Promise<void>): Promise<void>;
 }

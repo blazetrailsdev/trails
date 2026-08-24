@@ -42,7 +42,6 @@ import { maxIdentifierLength } from "./database-limits.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { deduplicate } from "../deduplicable.js";
 import {
   singularize,
   pluralize,
@@ -55,7 +54,6 @@ import {
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
-import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import {
   globalPluralizeTableNames,
@@ -1048,120 +1046,27 @@ export class SchemaStatements {
     }
   }
 
+  /**
+   * Mirrors: SchemaStatements#columns (schema_statements.rb:107-113) —
+   * `column_definitions(table_name).map { |field| new_column_from_field(...) }`.
+   * Both callees are per-adapter overrides (PostgreSQL, MySQL, SQLite3), as in
+   * Rails, so they are absent from the abstract host's type and reached through
+   * a cast; `new_column_from_field` is async here, so the map is awaited.
+   */
   async columns(tableName: string): Promise<Column[]> {
-    switch (this.adapterName as AdapterName) {
-      case "sqlite": {
-        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = (
-          await this.internalExecQuery(
-            `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
-            "SCHEMA",
-          )
-        ).toArray();
-        return rows.map((row: any) => {
-          const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
-          return new Column(row.name, row.dflt_value, meta, row.notnull === 0);
-        });
-      }
-      case "postgres": {
-        // Mirror Rails quoted_scope: split a schema.table argument so
-        // table_schema is scoped to the explicit schema when given (else
-        // ANY (current_schemas(false))); table_name matches the bare name while
-        // to_regclass resolves the fully-qualified name for the PK lookup.
-        const pgName = PgUtils.extractSchemaQualifiedName(tableName);
-        const params: string[] = [pgName.identifier, pgName.toString()];
-        let schemaClause: string;
-        if (pgName.schema) {
-          params.push(pgName.schema);
-          schemaClause = `$${params.length}`;
-        } else {
-          schemaClause = "ANY (current_schemas(false))";
-        }
-        const rows = (
-          await this.internalExecQuery(
-            `SELECT c.column_name, c.data_type, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
-            CASE WHEN pk.attname IS NOT NULL THEN true ELSE false END AS is_primary_key
-          FROM information_schema.columns c
-          LEFT JOIN (
-            SELECT a.attname
-            FROM pg_index i
-            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-            WHERE i.indrelid = to_regclass($2) AND i.indisprimary
-          ) pk ON pk.attname = c.column_name
-          WHERE c.table_schema = ${schemaClause} AND c.table_name = $1
-          ORDER BY c.ordinal_position`,
-            "SCHEMA",
-            params,
-          )
-        ).toArray();
-        return rows.map((row: any) => {
-          let sqlType: string = row.data_type;
-          if (row.data_type === "ARRAY") {
-            sqlType = `${row.udt_name.replace(/^_/, "")}[]`;
-          } else if (row.data_type === "USER-DEFINED") {
-            sqlType = row.udt_name;
-          } else if (row.character_maximum_length) {
-            sqlType = `${row.udt_name}(${row.character_maximum_length})`;
-          } else if (
-            row.numeric_precision != null &&
-            row.numeric_scale != null &&
-            (row.udt_name === "numeric" || row.udt_name === "decimal")
-          ) {
-            sqlType = `numeric(${row.numeric_precision},${row.numeric_scale})`;
-          }
-          const meta = deduplicate(
-            new SqlTypeMetadata({
-              sqlType,
-              type: row.udt_name,
-              limit: row.character_maximum_length ?? null,
-              precision: row.numeric_precision ?? null,
-              scale: row.numeric_scale ?? null,
-            }),
-          );
-          return new Column(row.column_name, row.column_default, meta, row.is_nullable === "YES");
-        });
-      }
-      case "mysql2": {
-        const rows = (
-          await this.internalExecQuery(
-            `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
-            "SCHEMA",
-            [tableName],
-          )
-        ).toArray();
-        return rows.map((row: any) => {
-          const name = row.COLUMN_NAME ?? row.column_name;
-          let sqlType: string = row.DATA_TYPE ?? row.data_type;
-          const maxLen = row.CHARACTER_MAXIMUM_LENGTH ?? row.character_maximum_length;
-          const precision = row.NUMERIC_PRECISION ?? row.numeric_precision;
-          const scale = row.NUMERIC_SCALE ?? row.numeric_scale;
-          if (maxLen != null && (sqlType === "varchar" || sqlType === "char")) {
-            sqlType = `${sqlType}(${maxLen})`;
-          } else if (
-            precision != null &&
-            scale != null &&
-            (sqlType === "decimal" || sqlType === "numeric")
-          ) {
-            sqlType = `${sqlType}(${precision},${scale})`;
-          }
-          const meta = deduplicate(
-            new SqlTypeMetadata({
-              sqlType,
-              type: row.DATA_TYPE ?? row.data_type,
-              limit: maxLen ?? null,
-              precision: precision ?? null,
-              scale: scale ?? null,
-            }),
-          );
-          return new Column(
-            name,
-            row.COLUMN_DEFAULT ?? row.column_default,
-            meta,
-            (row.IS_NULLABLE ?? row.is_nullable) === "YES",
-          );
-        });
-      }
-    }
+    tableName = String(tableName);
+    const adapter = this as unknown as {
+      columnDefinitions(tableName: string): Promise<any[]>;
+      newColumnFromField(
+        tableName: string,
+        field: any,
+        definitions: any[],
+      ): Column | Promise<Column>;
+    };
+    const definitions = await adapter.columnDefinitions(tableName);
+    return Promise.all(
+      definitions.map((field) => adapter.newColumnFromField(tableName, field, definitions)),
+    );
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
@@ -1261,39 +1166,19 @@ export class SchemaStatements {
     }
   }
 
+  /**
+   * Mirrors: SchemaStatements#primary_key (schema_statements.rb:145-149) —
+   * `pk = primary_keys(table_name); pk = pk.first unless pk.size > 1; pk`.
+   * `primary_keys` is a per-adapter override, so it is reached through a cast
+   * for the same reason as `columns`' callees above.
+   */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    switch (this.adapterName as AdapterName) {
-      case "sqlite": {
-        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = (
-          await this.internalExecQuery(
-            `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
-            "SCHEMA",
-          )
-        ).toArray();
-        const pk = (rows as any[]).find((r: any) => r.pk > 0);
-        return pk ? pk.name : null;
-      }
-      case "postgres": {
-        const rows = (
-          await this.internalExecQuery(
-            `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = to_regclass($1) AND i.indisprimary LIMIT 1`,
-            "SCHEMA",
-            [tableName],
-          )
-        ).toArray();
-        return rows.length > 0 ? (rows[0] as any).attname : null;
-      }
-      case "mysql2": {
-        const rows = (
-          await this.internalExecQuery(
-            `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`,
-            "SCHEMA",
-          )
-        ).toArray();
-        return rows.length > 0 ? (rows[0] as any).Column_name : null;
-      }
-    }
+    const primaryKeys = await (
+      this as unknown as { primaryKeys(tableName: string): Promise<string[]> }
+    ).primaryKeys(tableName);
+    let pk: string | string[] | null = primaryKeys;
+    if (!(primaryKeys.length > 1)) pk = primaryKeys[0] ?? null;
+    return pk;
   }
 
   async foreignKeys(_tableName: string): Promise<ForeignKeyDefinition[]> {

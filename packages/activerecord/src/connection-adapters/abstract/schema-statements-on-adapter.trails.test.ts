@@ -128,16 +128,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.tableAliasFor(long)).toBe("x".repeat(64));
   });
 
-  it("columns() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
-    const sqlite = new SqliteCapturingAdapter();
-    await sqlite.columns("things");
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
-    await sqlite.columns('a"b');
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("a""b")');
-    await sqlite.columns("aux.widgets");
-    expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
-  });
-
   it("indexes() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
     const sqlite = new SqliteCapturingAdapter();
     await sqlite.indexes("things");
@@ -174,37 +164,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
         `SELECT sql FROM sqlite_temp_master WHERE name = 'idx_widgets_name' AND type = 'index'`,
       `PRAGMA "aux".index_info('idx_widgets_name')`,
     ]);
-  });
-
-  it("primaryKey() sqlite arm uses the schema-prefix form for a schema-qualified name", async () => {
-    const sqlite = new SqliteCapturingAdapter();
-    await sqlite.primaryKey("things");
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
-    await sqlite.primaryKey("aux.widgets");
-    expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
-  });
-
-  it("columns() postgres fallback scopes table_schema to an explicit schema.table", async () => {
-    const stub = new CapturingAdapter("postgres");
-    await stub.columns("myschema.things");
-    expect(stub.lastSql).toContain("c.table_schema = $3");
-    expect(stub.lastSql).not.toContain("current_schemas(false)");
-    expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
-  });
-
-  it("columns() postgres fallback falls back to current_schemas for an unqualified name", async () => {
-    const stub = new CapturingAdapter("postgres");
-    await stub.columns("things");
-    expect(stub.lastSql).toContain("c.table_schema = ANY (current_schemas(false))");
-    expect(stub.lastParams).toEqual(["things", "things"]);
-  });
-
-  it("columnExists() postgres fallback scopes table_schema to an explicit schema.table", async () => {
-    const stub = new CapturingAdapter("postgres");
-    await stub.columnExists("myschema.things", "name");
-    expect(stub.lastSql).toContain("c.table_schema = $3");
-    expect(stub.lastSql).not.toContain("current_schemas(false)");
-    expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
   });
 
   it("columnExists returns false for a value containing quotes instead of erroring", async () => {

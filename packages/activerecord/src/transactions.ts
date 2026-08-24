@@ -19,7 +19,6 @@ import {
 import { ActiveRecord } from "./ar-config.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
-import { threadedConnectionFor } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -609,11 +608,13 @@ export function isTransactionIncludeAnyAction(this: Base, actions: string[]): bo
 /** @internal */
 export async function addToTransaction(this: Base, ensureFinalize = true): Promise<void> {
   const ctor = this.constructor as any;
-  // We're always called from within a transaction, so the adapter IS the
-  // current connection — use the threaded connection rather than the deprecated
-  // `.connection` getter so we don't flip the lease permanent.
-  const adapter = threadedConnectionFor(ctor) ?? ctor.connection;
-  adapter?.addTransactionRecord?.(this, ensureFinalize);
+  // transactions.rb:513-515 — `self.class.with_connection { |connection| ... }`.
+  // We're always called from within a transaction, so the lease is already held
+  // and `with_connection` yields that same connection rather than checking a
+  // second one out.
+  await ctor.withConnection((connection: any) => {
+    connection?.addTransactionRecord?.(this, ensureFinalize);
+  });
 }
 
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
