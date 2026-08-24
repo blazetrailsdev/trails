@@ -1737,12 +1737,13 @@ export class SchemaStatements {
    *   analogue: a plain object has no `fetch`, and there is no ported receiver to call
    *   either — ActiveSupport's `core_ext/hash` defines no `fetch`, so a trails helper
    *   would be surface Rails does not have. The key-presence test and the block's raise
-   *   are spelled inline at Rails' site, with Rails' arguments and message.
+   *   are spelled inline at Rails' site, with Rails' arguments and message; the test is
+   *   `Object.hasOwn`, since a Hash has no prototype chain for `"toString"` to find.
    */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (algorithm == null) return undefined;
     const indexAlgorithms = this.indexAlgorithms();
-    if (algorithm in indexAlgorithms) return indexAlgorithms[algorithm];
+    if (Object.hasOwn(indexAlgorithms, algorithm)) return indexAlgorithms[algorithm];
     throw new ArgumentError(
       `Algorithm must be one of the following: ${Object.keys(indexAlgorithms)
         .map((a) => `:${a}`)
