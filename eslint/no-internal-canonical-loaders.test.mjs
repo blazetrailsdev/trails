@@ -53,7 +53,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     },
     // load-schema-helper's own unit test may import loadSchema directly.
     {
-      filename: "packages/activerecord/src/support/load-schema-helper.test.ts",
+      filename: "packages/activerecord/src/support/load-schema-helper.trails.test.ts",
       code: 'import { loadSchema } from "./load-schema-helper.js";',
     },
     // A banned symbol imported from an unrelated module is not the loader.

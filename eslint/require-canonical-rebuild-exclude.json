@@ -12,7 +12,7 @@
     "packages/activerecord/src/connection-adapters/sqlite3/quoting.trails.test.ts",
     "packages/activerecord/src/core.trails.test.ts",
     "packages/activerecord/src/database-statements.test.ts",
-    "packages/activerecord/src/sqlite/libsql.test.ts",
+    "packages/activerecord/src/sqlite/libsql.trails.test.ts",
     "packages/activerecord/src/transactions.trails.test.ts"
   ],
   "nonExecuting": [

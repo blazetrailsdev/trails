@@ -603,7 +603,7 @@ describe("PrimaryKeyError", () => {
 
 // vendor/rails/activerecord/test/cases/fixtures_test.rb:887-952. Rails writes
 // fk_pointing_to_non_existent_object.yml at runtime and reads it back through create_fixtures;
-// the tableless loader takes the same rows directly, as naked-fixtures.test.ts does. Rails'
+// the tableless loader takes the same rows directly, as naked-fixtures.trails.test.ts does. Rails'
 // `first: fk_object_to_point_to: one` names a label the tableless loader has no registry for,
 // so the dangling reference is spelled as the id itself.
 describe("FixturesWithForeignKeyViolationsTest", () => {

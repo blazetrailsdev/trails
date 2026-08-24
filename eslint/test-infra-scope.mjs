@@ -66,7 +66,7 @@ const testInfraExemptGlobs = [
   "test-helpers/**",
   "support/**",
   "fixtures.test.ts",
-  "naked-fixtures.test.ts",
+  "naked-fixtures.trails.test.ts",
   "test-fixtures.test.ts",
   "test-fixtures/**",
 ];
@@ -91,13 +91,13 @@ export const canonicalLoaderModules = [
 /** Each loader module's own unit test (repo-relative), allowed to import it. */
 export const canonicalLoaderSelfTests = [
   // `canonical-schema` / `canonical-table-rebuild` are trails inventions, so
-  // their self-tests carry the `.trails.` marker (RFC 0078); `load-schema-helper`
-  // mirrors Rails' `test/support/load_schema_helper.rb` and keeps the plain name.
+  // their self-tests carry the `.trails.` marker (RFC 0078). Rails' own
+  // `test/support/load_schema_helper.rb` has no test file, so
+  // `load-schema-helper`'s self-tests are trails inventions too — the two
+  // former siblings (the `loadSchema` table-set assertion and the trails-only
+  // guard on the boot-laid table snapshot) now live in one `.trails.` file.
   `${activerecordSrcRoot}/support/canonical-schema.trails.test.ts`,
   `${activerecordSrcRoot}/support/canonical-table-rebuild.trails.test.ts`,
-  `${activerecordSrcRoot}/support/load-schema-helper.test.ts`,
-  // `load-schema-helper` has a second self-test: the trails-only guard on the
-  // boot-laid table snapshot the adapter-specific arm feeds.
   `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
   `${activerecordSrcRoot}/support/load-schema-helper-uuid-default.trails.test.ts`,
   // …and a third: the cover for `loadSchema`'s own arm-probe guard, which has

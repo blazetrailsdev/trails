@@ -19,7 +19,7 @@ describe("test-infra lint scope", () => {
       `${SRC}/test-helpers/**`,
       `${SRC}/support/**`,
       `${SRC}/fixtures.test.ts`,
-      `${SRC}/naked-fixtures.test.ts`,
+      `${SRC}/naked-fixtures.trails.test.ts`,
       `${SRC}/test-fixtures.test.ts`,
       `${SRC}/test-fixtures/**`,
     ]);
@@ -29,7 +29,6 @@ describe("test-infra lint scope", () => {
     expect(canonicalLoaderSelfTests).toEqual([
       `${SRC}/support/canonical-schema.trails.test.ts`,
       `${SRC}/support/canonical-table-rebuild.trails.test.ts`,
-      `${SRC}/support/load-schema-helper.test.ts`,
       `${SRC}/support/load-schema-helper.trails.test.ts`,
       `${SRC}/support/load-schema-helper-uuid-default.trails.test.ts`,
       `${SRC}/support/load-schema-helper-arm-guard.trails.test.ts`,

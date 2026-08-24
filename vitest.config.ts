@@ -84,7 +84,7 @@ const ADAPTER_SPECIFIC_EXCLUDE =
 // Run them in their own setup-free project.
 const SQLITE_DRIVER_TESTS = [
   "packages/activerecord/src/sqlite/**/*.test.ts",
-  "packages/activerecord/src/sqlite-adapter.test.ts",
+  "packages/activerecord/src/sqlite-adapter.trails.test.ts",
 ];
 
 // Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
