@@ -488,7 +488,7 @@ describe("SchemaAdapter TM delegation", () => {
   it.skip("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
     // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
-    // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
+    // in with-transactional-fixtures.trails.test.ts). Wrapper deleted entirely in E4.
     const testAdapter = Base.connection;
     class Item extends Base {
       static {

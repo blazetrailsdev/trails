@@ -4,11 +4,11 @@
  * Base.connection path for both DML and (on PG / SQLite) DDL.
  *
  * Run this file only (not the whole suite):
- *   pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.test.ts
+ *   pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.trails.test.ts
  *
  * With PG:
  *   ARCONN=postgresql PGHOST=localhost PGPORT=5432 PGUSER=rails \
- *     pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.test.ts
+ *     pnpm vitest run packages/activerecord/src/test-fixtures/use-transactional-tests.trails.test.ts
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../base.js";

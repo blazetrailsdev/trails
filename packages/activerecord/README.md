@@ -295,7 +295,7 @@ p.author; // Author (preloaded)
   association via the sync reader throws `StrictLoadingViolationError` instead of
   silently returning `null` — pointing you at `loadBelongsTo`/`loadHasOne` or
   `.includes(...)`. Strict loading is **off by default** (Rails parity). See
-  [`src/strict-loading-sync-reader.test.ts`](src/strict-loading-sync-reader.test.ts)
+  [`src/strict-loading-sync-reader.trails.test.ts`](src/strict-loading-sync-reader.trails.test.ts)
   and the `loadBelongsTo` implementation in [`src/associations.ts`](src/associations.ts).
 
 ### 3. `isValid()` is async

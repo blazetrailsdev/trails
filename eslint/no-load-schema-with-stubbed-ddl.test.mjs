@@ -35,7 +35,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     },
     // loadSchema with no DDL emitter stubbed is the ordinary schema load.
     {
-      filename: "packages/activerecord/src/support/load-schema-helper.test.ts",
+      filename: "packages/activerecord/src/support/load-schema-helper.trails.test.ts",
       code: `
         import { loadSchema } from "./load-schema-helper.js";
         await loadSchema(adapter);

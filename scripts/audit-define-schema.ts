@@ -77,7 +77,7 @@ function stripCommentsAndStrings(src: string): string {
 // Treat those as not-offending. The list mirrors AR's persistence/finder/
 // calculation surface. `loadSchemaFromAdapter` is *not* in the list — tests
 // that exercise schema loading typically do so against a stubbed adapter
-// (e.g. `attribute-methods/time-zone-conversion.test.ts` injects its own
+// (e.g. `attribute-methods/time-zone-conversion.trails.test.ts` injects its own
 // `columnsHash`), so the real schema lifecycle never runs.
 const EXECUTION_MARKERS =
   /\.(save|saveBang|create|createBang|createOrFindBy|update|updateBang|updateAll|updateAttribute|updateAttributes|updateColumn|updateColumns|upsert|upsertAll|insert|insertAll|destroy|destroyBang|destroyAll|destroyBy|delete|deleteAll|deleteBy|reload|touch|touchAll|increment|decrement|incrementCounter|decrementCounter|resetCounters|findBy|findByBang|findOrCreateBy|findOrInitializeBy|findEach|findInBatches|inBatches|pluck|pick|exists|sum|average|minimum|maximum|calculate|loadAsync|toArray)\b/;

@@ -8,10 +8,13 @@
  * silently dropped on a worker recycled onto an already-loaded database. That
  * direction is what this file catches, on whichever lane is running.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, test } from "vitest";
+import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { recordBootLaidTables, resetTestTables } from "./drop-all-tables.js";
-import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
+import { loadAdapterSpecificSchema, loadSchema } from "./load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
@@ -44,5 +47,29 @@ describe("boot-laid table snapshot", () => {
     const after = await adapter.tables();
     expect(after).not.toContain("leftover_boot_t");
     expect(after).toContain("defaults");
+  });
+});
+
+describe("LoadSchemaHelper", () => {
+  test("load_schema", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    try {
+      await loadSchema(adapter);
+
+      const res = await adapter.selectAll(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      );
+      const tables = res.toArray().map((r) => r.name as string);
+
+      expect(tables.length).toBeGreaterThan(300);
+      expect(tables).toContain("topics");
+      expect(tables).toContain("posts");
+      expect(tables).not.toContain("chat_messages");
+      // The sqlite arm of ADAPTER_SPECIFIC_SCHEMAS: sqlite_specific_schema.rb's
+      // only table.
+      expect(tables).toContain("defaults");
+    } finally {
+      await (adapter as unknown as BetterSQLite3Adapter).close();
+    }
   });
 });

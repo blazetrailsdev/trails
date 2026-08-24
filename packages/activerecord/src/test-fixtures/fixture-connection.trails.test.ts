@@ -9,7 +9,7 @@
  * `"disallowed"`.
  *
  * Run this file only (not the whole suite):
- *   pnpm vitest run packages/activerecord/src/test-fixtures/fixture-connection.test.ts
+ *   pnpm vitest run packages/activerecord/src/test-fixtures/fixture-connection.trails.test.ts
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
