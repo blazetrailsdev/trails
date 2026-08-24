@@ -13,6 +13,8 @@ import {
   type CallbackKind,
   assertValidKeys,
   extractOptionsBang,
+  normalizeCallbackParams,
+  type FilterListEntry,
   type DefineCallbacksOptions,
   defineCallbacks,
   setCallback,
@@ -146,13 +148,10 @@ export interface TransactionalCallbackConditions<
  */
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (
-      this: { prototype: object },
-      fn: CallbackFn | CallbackObject | string,
-      options: CallbackConditions = {},
-    ) {
+    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+      const [, filters, options] = normalizeCallbackParams(["before", ...args], null);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "before", fn, options);
+      setCallback(this.prototype, callback, "before", ...filters, options);
     },
     writable: true,
     configurable: true,
@@ -168,13 +167,10 @@ type CallbackHost = object;
  */
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (
-      this: { prototype: object },
-      fn: AroundCallbackFn | CallbackObject | string,
-      options: CallbackConditions = {},
-    ) {
+    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+      const [, filters, options] = normalizeCallbackParams(["around", ...args], null);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "around", fn, options);
+      setCallback(this.prototype, callback, "around", ...filters, options);
     },
     writable: true,
     configurable: true,
@@ -188,17 +184,13 @@ export function _defineAroundModelCallback(klass: CallbackHost, callback: string
  */
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (
-      this: { prototype: object },
-      fn: CallbackFn | CallbackObject | string,
-      options: CallbackConditions = {},
-    ) {
+    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+      const [, filters, options] = normalizeCallbackParams(["after", ...args], null);
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      options = { ...options };
       options.prepend = true;
       const conditional = new Value((v) => v !== false);
-      options.if = [...(kernelArray(options.if) as CallbackConditionFilter[]), conditional];
-      setCallback(this.prototype, callback, "after", fn, options);
+      options.if = [...kernelArray(options.if), conditional];
+      setCallback(this.prototype, callback, "after", ...filters, options);
     },
     writable: true,
     configurable: true,

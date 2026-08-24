@@ -30,13 +30,15 @@ function modelWith(...events: string[]): any {
  * names the shape those methods have rather than reaching for a cast at each
  * call site.
  */
+type GeneratedMacro<F> = (...args: Array<F | object | string | CallbackConditions>) => void;
+
 interface GeneratedModelCallbacks {
-  beforeSave(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
-  afterSave(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
-  aroundSave(fn: GeneratedAroundCallback | object, conditions?: CallbackConditions): void;
-  beforeCreate(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
-  afterCreate(fn: GeneratedCallback | object, conditions?: CallbackConditions): void;
-  aroundCreate(fn: GeneratedAroundCallback | object, conditions?: CallbackConditions): void;
+  beforeSave: GeneratedMacro<GeneratedCallback>;
+  afterSave: GeneratedMacro<GeneratedCallback>;
+  aroundSave: GeneratedMacro<GeneratedAroundCallback>;
+  beforeCreate: GeneratedMacro<GeneratedCallback>;
+  afterCreate: GeneratedMacro<GeneratedCallback>;
+  aroundCreate: GeneratedMacro<GeneratedAroundCallback>;
 }
 
 type GeneratedCallback = (record: Model) => unknown;
@@ -44,6 +46,26 @@ type GeneratedAroundCallback = (record: Model, proceed: () => void | Promise<voi
 
 function generated(klass: typeof Model): GeneratedModelCallbacks {
   return klass as unknown as GeneratedModelCallbacks;
+}
+
+/**
+ * Mirrors: ActiveModel::CallbacksTest::Violin (callbacks_test.rb:117-130).
+ */
+class Violin extends Model {
+  static {
+    this.defineModelCallbacks("create");
+  }
+  history: string[] = [];
+  callback1(): void {
+    this.history.push("callback1");
+  }
+  callback2(): void {
+    this.history.push("callback2");
+  }
+  async create(): Promise<this> {
+    await runCallbacks(this, "create", () => {});
+    return this;
+  }
 }
 
 describe("CallbacksTest", () => {
@@ -131,22 +153,13 @@ describe("CallbacksTest", () => {
   });
 
   it("after_create callbacks with both callbacks declared in different lines", async () => {
-    const log: string[] = [];
-    class Person extends Model {
+    class Violin2 extends Violin {
       static {
-        this.defineModelCallbacks("create");
-        this.attribute("name", "string");
-        generated(this).afterCreate(() => {
-          log.push("first");
-        });
-        generated(this).afterCreate(() => {
-          log.push("second");
-        });
+        generated(this).afterCreate(":callback1");
+        generated(this).afterCreate(":callback2");
       }
     }
-    const p = new Person({ name: "test" });
-    await runCallbacks(p, "create");
-    expect(log).toEqual(["first", "second"]);
+    expect((await new Violin2().create()).history).toEqual(["callback1", "callback2"]);
   });
 
   it("complete callback chain", async () => {
@@ -223,22 +236,12 @@ describe("CallbacksTest", () => {
   });
 
   it("after_create callbacks with both callbacks declared in one line", async () => {
-    const order: string[] = [];
-    class Person extends Model {
+    class Violin1 extends Violin {
       static {
-        this.defineModelCallbacks("create");
-        generated(this).afterCreate(() => {
-          order.push("first_after");
-        });
-        generated(this).afterCreate(() => {
-          order.push("second_after");
-        });
+        generated(this).afterCreate(":callback1", ":callback2");
       }
     }
-    await new Person().runCallbacks("create", () => {
-      order.push("create");
-    });
-    expect(order).toEqual(["create", "first_after", "second_after"]);
+    expect((await new Violin1().create()).history).toEqual(["callback1", "callback2"]);
   });
 
   it("the callback chain is not halted when around or after callbacks return false", async () => {

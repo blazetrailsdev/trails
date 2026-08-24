@@ -377,6 +377,7 @@ export {
   runCallbacks,
   getCallbackChains,
   peekCallbackChain,
+  normalizeCallbackParams,
   CallbacksMixin,
   throwAbort,
   isAbortSignal,
