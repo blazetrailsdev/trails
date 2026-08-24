@@ -1446,29 +1446,29 @@ function warmColumnsHashSync(
 export function tableName(this: SchemaHost, value?: string | null): string {
   if (value !== undefined) {
     value = value == null ? null : String(value);
-    const changed = this._tableName !== value;
-    this._tableName = value;
-    if (changed) {
+    if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
+      if (value === this._tableName) return this._tableName ?? "";
       // Rails table_name= runs `reset_column_information if connected?`, which
       // resets the predicate builder and (via initialize_find_by_cache) the
       // find_by statement cache. We have no connection-pool `connected?`
       // gate, so we clear these two caches eagerly and directly (rather than
       // routing through the heavier resetColumnInformation/schema reload) so
       // the next query rebuilds against the new table.
-      (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
       (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
-      // Rails reset_column_information also reloads the schema so the new
-      // table's columns are re-reflected. A subclass created with a different
-      // table_name (e.g. `Class.new(Minimalistic) { self.table_name = "aircraft" }`)
-      // inherits the parent's `_schemaLoaded = true` through the prototype
-      // chain and would otherwise never reflect its own table. Shadow the
-      // inherited flag with an own `false` so the next load re-reflects.
-      (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
       // Rails' reset_column_information also nils @attribute_names (on the
       // class and, recursively, its descendants); drop the memos now so reads
       // before the next load don't see the old table's names.
       clearAttributeNamesMemo(this);
     }
+    this._tableName = value;
+    (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
+    // Rails reset_column_information also reloads the schema so the new
+    // table's columns are re-reflected. A subclass created with a different
+    // table_name (e.g. `Class.new(Minimalistic) { self.table_name = "aircraft" }`)
+    // inherits the parent's `_schemaLoaded = true` through the prototype
+    // chain and would otherwise never reflect its own table. Shadow the
+    // inherited flag with an own `false` so the next load re-reflects.
+    (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
     return this._tableName ?? "";
   }
   if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
