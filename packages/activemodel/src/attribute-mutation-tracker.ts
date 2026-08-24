@@ -237,10 +237,4 @@ export class NullMutationTracker {
   originalValue(_attrName: string): unknown {
     return undefined;
   }
-
-  forgetChange(_attrName: string): void {}
-  forceChange(_attrName: string): unknown {
-    return undefined;
-  }
-  finalizeChanges(): void {}
 }
