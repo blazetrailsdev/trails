@@ -139,7 +139,7 @@ export class Attribute extends Node {
     return new BitwiseNot(this);
   }
 
-  as(other: string): As {
+  as(other: string | SqlLiteral): As {
     return new As(this, new SqlLiteral(other, { retryable: true }));
   }
 

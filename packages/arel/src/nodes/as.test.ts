@@ -1,33 +1,35 @@
 import { describe, it, expect } from "vitest";
-import { Table, SelectManager, Nodes } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
+import { sql, Table, Nodes } from "../index.js";
 
 describe("As", () => {
-  const users = new Table("users");
   describe("#as", () => {
     it("makes an AS node", () => {
-      const node = users.get("name").as("n");
-      expect(node).toBeInstanceOf(Nodes.As);
+      const attr = new Table("users").get("id");
+      const as = attr.as(sql("foo"));
+      expect(as.left).toBe(attr);
+      // Ruby's SqlLiteral is a String subclass, so `assert_equal "foo", as.right`
+      // compares string values (sql_literal.rb:6-11); the TS node carries the
+      // text in `value`.
+      expect((as.right as Nodes.SqlLiteral).value).toBe("foo");
     });
 
     it("converts right to SqlLiteral if a string", () => {
-      const mgr = new SelectManager();
-      mgr.from("raw_table");
-      const sql = mgr.toSql();
-      expect(sql).toContain("raw_table");
+      const attr = new Table("users").get("id");
+      const as = attr.as("foo");
+      expect(as.right).toBeInstanceOf(Nodes.SqlLiteral);
     });
   });
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const a = new Nodes.Not(users.get("id").eq(1));
-      const b = new Nodes.Not(users.get("id").eq(1));
-      expect(a.constructor).toBe(b.constructor);
+      const array = [new Nodes.As("foo", "bar"), new Nodes.As("foo", "bar")];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.Extract(users.get("created_at"), "YEAR");
-      const b = new Nodes.Extract(users.get("created_at"), "MONTH");
-      expect(a.field).not.toBe(b.field);
+      const array = [new Nodes.As("foo", "bar"), new Nodes.As("foo", "baz")];
+      expect(uniq(array).length).toBe(2);
     });
   });
 

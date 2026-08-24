@@ -1,44 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
+import { Nodes } from "../index.js";
 
 describe("TestDescending", () => {
-  const users = new Table("users");
   it("construct", () => {
-    const desc = new Nodes.Descending(users.get("name"));
-    expect(desc).toBeInstanceOf(Nodes.Descending);
-    expect(desc.expr).toBeInstanceOf(Nodes.Attribute);
+    const descending = new Nodes.Descending("zomg");
+    expect(descending.expr).toBe("zomg");
   });
 
   it("reverse", () => {
-    const desc = new Nodes.Descending(users.get("name"));
-    const reversed = desc.reverse();
-    expect(reversed).toBeInstanceOf(Nodes.Ascending);
+    const descending = new Nodes.Descending("zomg");
+    const ascending = descending.reverse();
+    expect(ascending).toBeInstanceOf(Nodes.Ascending);
+    expect(ascending.expr).toBe(descending.expr);
   });
 
   it("direction", () => {
-    const desc = new Nodes.Descending(users.get("name"));
-    expect(desc.direction).toBe("desc");
+    const descending = new Nodes.Descending("zomg");
+    expect(descending.direction).toBe("desc");
   });
 
   it("ascending?", () => {
-    const desc = new Nodes.Descending(users.get("name"));
-    expect(desc.isAscending()).toBe(false);
+    const descending = new Nodes.Descending("zomg");
+    expect(descending.isAscending()).toBeFalsy();
   });
 
   it("descending?", () => {
-    const desc = new Nodes.Descending(users.get("name"));
-    expect(desc.isDescending()).toBe(true);
+    const descending = new Nodes.Descending("zomg");
+    expect(descending.isDescending()).toBe(true);
   });
 
   it("equality with same ivars", () => {
-    const a = new Nodes.Descending(users.get("name"));
-    const b = new Nodes.Descending(users.get("name"));
-    expect(a.direction).toBe(b.direction);
+    const array = [new Nodes.Descending("zomg"), new Nodes.Descending("zomg")];
+    expect(uniq(array).length).toBe(1);
   });
 
   it("inequality with different ivars", () => {
-    const a = new Nodes.Descending(users.get("name"));
-    const b = new Nodes.Descending(users.get("email"));
-    expect((a.expr as Nodes.Attribute).name).not.toBe((b.expr as Nodes.Attribute).name);
+    const array = [new Nodes.Descending("zomg"), new Nodes.Descending("zomg!")];
+    expect(uniq(array).length).toBe(2);
   });
 });

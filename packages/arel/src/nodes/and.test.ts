@@ -1,30 +1,33 @@
 import { describe, it, expect } from "vitest";
-import { testConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
+import { Nodes } from "../index.js";
+import type { Node } from "./node.js";
 
 describe("And", () => {
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const s1 = new Nodes.DeleteStatement();
-      const s2 = new Nodes.DeleteStatement();
-      expect(s1.relation).toBe(s2.relation);
-      expect(s1.wheres.length).toBe(s2.wheres.length);
+      const array = [
+        new Nodes.And(["foo", "bar"] as unknown as Node[]),
+        new Nodes.And(["foo", "bar"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Table("users");
-      const b = new Table("posts");
-      expect(a.name).not.toBe(b.name);
+      const array = [
+        new Nodes.And(["foo", "bar"] as unknown as Node[]),
+        new Nodes.And(["foo", "baz"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(2);
     });
   });
 
   describe("functions as node expression", () => {
     it("allows aliasing", () => {
-      const caseNode = new Nodes.Case()
-        .when(new Nodes.SqlLiteral("1 = 1"), new Nodes.SqlLiteral("'yes'"))
-        .as("result");
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(caseNode)).toBe("CASE WHEN 1 = 1 THEN 'yes' END AS result");
+      const aliased = new Nodes.And(["foo", "bar"] as unknown as Node[]).as("baz") as Nodes.As;
+
+      expect(aliased).toBeInstanceOf(Nodes.As);
+      expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);
     });
   });
 });
