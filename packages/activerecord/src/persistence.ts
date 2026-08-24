@@ -1200,8 +1200,6 @@ export async function reload<T extends ReloadRecord>(
   defineDynamicSelectReaders(this as unknown as import("./base.js").Base);
   this._newRecord = false;
   this._previouslyNewRecord = false;
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty#reload (dirty.rb:63-68) —
-  // the reloaded attribute set is the new baseline, so both trackers go.
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
 
@@ -1320,9 +1318,7 @@ export function becomes<
       becoming._newRecord = this._newRecord;
       becoming._destroyed = this._destroyed;
       // Mirrors: `becoming.instance_variable_set(:@mutations_from_database,
-      // @mutations_from_database ||= nil)` (persistence.rb:493) — share the
-      // original's tracker by reference so the became record reports the same
-      // change-set.
+      // @mutations_from_database ||= nil)` (persistence.rb:493).
       becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
       // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
       // errors across the class swap. Noop if the errors object doesn't expose

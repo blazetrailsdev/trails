@@ -180,7 +180,10 @@ export class Dirty {
   /**
    * Pending changes diff against the values loaded from the database.
    *
-   * Mirrors: ActiveModel::Dirty#mutations_from_database (dirty.rb:382-388)
+   * Mirrors: ActiveModel::Dirty#mutations_from_database (dirty.rb:382-388).
+   * Ruby's second arm hands the tracker `self` (dirty.rb:385) where the first
+   * hands it an `AttributeSet`; `Model` always has `_attributes`, so only the
+   * first arm is reachable from trails.
    *
    * @internal
    */
@@ -267,7 +270,7 @@ export class Dirty {
   restoreAttributeBang(name: string): void {
     const attrName = (this.constructor as unknown as DirtyClass).resolveAttributeName(name);
     if (this.attributeChanged(attrName)) {
-      (this as unknown as DirtyWriteHost)._writeAttribute(attrName, this.attributeWas(attrName));
+      (this as unknown as Record<string, unknown>)[attrName] = this.attributeWas(attrName);
       this.clearAttributeChange(attrName);
     }
   }
@@ -280,13 +283,6 @@ export class Dirty {
  * including class.
  */
 type DirtyClass = { resolveAttributeName(name: string): string };
-
-/**
- * Ruby's `__send__("#{attr_name}=", ...)` (dirty.rb:417) reaches the generated
- * writer; the `_write_attribute` it is an alias of (attributes.rb:159) is the
- * one spelling every including model answers, generated writer or not.
- */
-type DirtyWriteHost = { _writeAttribute(name: string, value: unknown): void };
 
 /**
  * Mirrors `ActiveModel::Dirty#init_attributes` (dirty.rb:253-262): rebuild a

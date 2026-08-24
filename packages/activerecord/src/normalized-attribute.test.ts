@@ -73,12 +73,9 @@ describe("NormalizedAttributeTest", () => {
 
   it("normalizes changed-in-place value before validation", async () => {
     // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
-    // mutates the cast value the `Attribute` already holds, leaving the same
-    // `Attribute` — and its `original_value_for_database` — in the set, which
-    // is what `changed_in_place?` (attribute.rb:70) compares against. JS
-    // strings are immutable, so writing through the set would instead yield a
-    // `WithCastValue`, whose `changed_in_place?` is false by definition
-    // (attribute.rb:243-245). Reach the mutated-in-place state directly.
+    // mutates the cast value the `Attribute` holds. JS strings are immutable,
+    // and writing through the set yields a `WithCastValue`, whose
+    // `changed_in_place?` is false by definition (attribute.rb:243-245).
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
       _hasValue: boolean;
@@ -93,12 +90,9 @@ describe("NormalizedAttributeTest", () => {
 
   it("normalizes value on demand", () => {
     // Ruby's `@aircraft.name.downcase!` (normalized_attribute_test.rb:36)
-    // mutates the cast value the `Attribute` already holds, leaving the same
-    // `Attribute` — and its `original_value_for_database` — in the set, which
-    // is what `changed_in_place?` (attribute.rb:70) compares against. JS
-    // strings are immutable, so writing through the set would instead yield a
-    // `WithCastValue`, whose `changed_in_place?` is false by definition
-    // (attribute.rb:243-245). Reach the mutated-in-place state directly.
+    // mutates the cast value the `Attribute` holds. JS strings are immutable,
+    // and writing through the set yields a `WithCastValue`, whose
+    // `changed_in_place?` is false by definition (attribute.rb:243-245).
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
       _hasValue: boolean;

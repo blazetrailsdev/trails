@@ -124,9 +124,7 @@ export class AttributeMutationTracker {
   }
 
   protected attrNames(): string[] {
-    const keys = new Set(this.attributes.keys());
-    for (const attrName of this.forcedChanges.keys()) keys.add(attrName);
-    return [...keys];
+    return this.attributes.keys();
   }
 
   protected attributeChanged(attrName: string): boolean {
