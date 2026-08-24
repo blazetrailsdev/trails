@@ -41,7 +41,8 @@ import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
-import { RangeError as ActiveModelRangeError, runAllCallbacks } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { runCallbacks } from "@blazetrails/activesupport";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -936,13 +937,7 @@ export function initializeDup(
   // `initialize` is registered `only: :after`, so this fires just the
   // after_initialize chain. strict:"sync" guarantees synchronous completion —
   // void the settled result.
-  void runAllCallbacks(
-    (this.constructor as { prototype: object }).prototype,
-    "initialize",
-    this,
-    undefined,
-    { strict: "sync" },
-  );
+  void runCallbacks(this, "initialize", undefined, { strict: "sync" });
   this._newRecord = true;
   this._previouslyNewRecord = false;
   this._destroyed = false;

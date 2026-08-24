@@ -2,8 +2,6 @@ import type { Base } from "./base.js";
 
 import {
   ArgumentError,
-  runBeforeCallbacksOnProto,
-  runAfterCallbacksOnProto,
   Model,
   type AttributeSet,
   type CallbackObject,
@@ -15,6 +13,7 @@ import {
   included,
   kernelArray,
   peekCallbackChain as asPeekCallbackChain,
+  runCallbacks,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";
@@ -326,7 +325,7 @@ export function setCallback<T extends typeof Model>(
  */
 export async function beforeCommittedBang(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  await runBeforeCallbacksOnProto((ctor as any).prototype, "before_commit", record);
+  await runCallbacks(record, "before_commit");
 }
 
 /**
@@ -344,7 +343,7 @@ export async function committedBang(
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
       const ctor = this.constructor as typeof Base;
-      await runAfterCallbacksOnProto((ctor as any).prototype, "commit", this);
+      await runCallbacks(this, "commit");
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -368,7 +367,7 @@ export async function rolledbackBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       const ctor = this.constructor as typeof Base;
-      await runAfterCallbacksOnProto((ctor as any).prototype, "rollback", this);
+      await runCallbacks(this, "rollback");
     }
   } finally {
     restoreTransactionRecordState.call(this, forceRestoreState);

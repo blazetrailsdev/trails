@@ -9,12 +9,8 @@
  */
 
 import type { Base } from "./base.js";
-import { included } from "@blazetrails/activesupport";
-import {
-  runAllCallbacks,
-  snapshotCallbacksOnProto,
-  restoreCallbacksOnProto,
-} from "@blazetrails/activemodel";
+import { included, type Callback } from "@blazetrails/activesupport";
+import { getCallbackChains, peekCallbackChain, runCallbacks } from "@blazetrails/activesupport";
 import { subclasses as _subclasses } from "./inheritance.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
@@ -59,16 +55,25 @@ export async function resetCallbacks(
   event: string,
   fn: () => void | Promise<void>,
 ): Promise<void> {
+  // test_case.rb:180-184 — `_#{kind}_callbacks.dup` for the class and each
+  // subclass. trails keys a chain on the prototype (the object its instances
+  // resolve it from), and duplicates it as its entry array.
+  const oldCallbacks = new Map<ModelCtor, Callback[] | undefined>();
   const targets = [modelClass, ..._subclasses(modelClass)];
-  const snapshots = targets.map(
-    (klass) =>
-      [klass, snapshotCallbacksOnProto((klass as { prototype: object }).prototype, event)] as const,
-  );
+  for (const klass of targets) {
+    const chain = peekCallbackChain((klass as { prototype: object }).prototype, event);
+    oldCallbacks.set(klass, chain ? [...chain.entries] : undefined);
+  }
   try {
     await fn();
   } finally {
-    for (const [klass, snapshot] of snapshots) {
-      restoreCallbacksOnProto((klass as { prototype: object }).prototype, event, snapshot);
+    // test_case.rb:187-190 — `_#{kind}_callbacks=` writes the saved chain back.
+    for (const klass of targets) {
+      const chains = getCallbackChains((klass as { prototype: object }).prototype);
+      const chain = chains.get(event);
+      if (!chain) continue;
+      chain.clear();
+      for (const entry of oldCallbacks.get(klass) ?? []) chain.append(entry);
     }
   }
 }
@@ -106,7 +111,7 @@ export async function _createRecord(this: any, block?: (record: any) => void): P
   // (increment_counters, counter_cache.rb:200-207) → Persistence (the INSERT).
   const ctor = this.constructor;
   return (
-    (await runAllCallbacks(ctor.prototype, "create", this, () =>
+    (await runCallbacks(this, "create", () =>
       dirtyCreateRecord.call(this, () =>
         counterCacheCreateRecord.call(this, () => persistenceCreateRecord.call(this, block)),
       ),
@@ -123,7 +128,7 @@ export async function _updateRecord(this: any, block?: (record: any) => void): P
   // (dirty.rb:233-237) and then Persistence (the UPDATE).
   const ctor = this.constructor;
   return (
-    (await runAllCallbacks(ctor.prototype, "update", this, () =>
+    (await runCallbacks(this, "update", () =>
       recordUpdateTimestamps.call(this, () =>
         dirtyUpdateRecord.call(this, () =>
           PersistenceInstanceMethods._updateRecord.call(this, block),

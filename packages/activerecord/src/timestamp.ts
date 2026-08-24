@@ -4,7 +4,7 @@ import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
-import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { runCallbacks } from "@blazetrails/activesupport";
 import { withTransactionReturningStatus } from "./transactions.js";
 
 /**
@@ -135,7 +135,7 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   // `else true end` no-op). This is how a `has_one ..., touch: true` on a model
   // that itself has no timestamps still propagates the touch to its child.
   if (touchCols.length === 0) {
-    await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+    await runCallbacks(this, "touch");
     return true;
   }
 
@@ -249,7 +249,7 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
     self._skipDirtyTracking = null;
   }
 
-  await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+  await runCallbacks(this, "touch");
   return true;
 }
 

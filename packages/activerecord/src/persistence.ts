@@ -8,11 +8,8 @@
 import { Temporal } from "@blazetrails/date";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import {
-  ArgumentError,
-  SerializeCastValue,
-  runAfterCallbacksOnProto,
-} from "@blazetrails/activemodel";
+import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
+import { runCallbacks } from "@blazetrails/activesupport";
 import {
   InsertManager,
   UpdateManager,
@@ -547,7 +544,7 @@ export async function incrementBang<T extends CounterBangRecord>(
   // counter). The class-level `updateCounters` above only emits SQL.
   if (options.touch != null) {
     const ctor = this.constructor as unknown as { prototype: object };
-    await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+    await runCallbacks(this, "touch");
   }
   return this;
 }

@@ -12,7 +12,7 @@ import {
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
-import { runAllCallbacks } from "@blazetrails/activemodel";
+import { runCallbacks } from "@blazetrails/activesupport";
 
 /**
  * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation
@@ -402,7 +402,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         // `delete_all`, which removes them by matching all non-PK FK columns.
         const recs = (await scope.toArray()) as Base[];
         for (const r of recs) {
-          await runAllCallbacks((r.constructor as typeof Base).prototype, "destroy", r as any);
+          await runCallbacks(r as any, "destroy");
         }
         count = await scope.deleteAll();
       }
