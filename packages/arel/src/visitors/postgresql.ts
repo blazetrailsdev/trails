@@ -61,14 +61,17 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  // Mirrors Rails Postgres formatting: `( expr )` with spaces inside
-  // the parens. The base ToSql renders `(expr)` without spaces, so
-  // override to match Rails' `visit_Arel_Nodes_GroupingElement`.
+  // Mirrors: Arel::Visitors::PostgreSQL#visit_Arel_Nodes_GroupingElement
+  // (postgresql.rb:44-47) — `( expr )` with spaces inside the parens, where
+  // the base ToSql renders `(expr)` without them.
   protected override visitArelNodesGroupingElement(
     o: Nodes.GroupingElement,
     collector: SQLString,
   ): SQLString {
-    return this.groupingArrayOrGroupingElement(o, collector);
+    collector.append("( ");
+    this.visit(o.expr, collector);
+    collector.append(" )");
+    return collector;
   }
 
   // Cube/Rollup/GroupingSet: emit `CUBE` / `ROLLUP` / `GROUPING SETS`
@@ -126,23 +129,21 @@ export class PostgreSQL extends ToSql {
   }
 
   /**
-   * Mirrors Rails Postgres `grouping_array_or_grouping_element` (postgresql.rb:87).
-   * Trails' `GroupingElement` always carries an `expressions: Node[]`
-   * (Rails normalizes between bare `expr` and array `expr`); the wrapped
-   * `( ... )` shape is the one Rails takes when `o.expr.is_a? Array`,
-   * which Trails always hits. Used by visitArelNodesCube / RollUp /
-   * GroupingSet / GroupingElement.
+   * Mirrors: Arel::Visitors::PostgreSQL#grouping_array_or_grouping_element
+   * (postgresql.rb:88-96). A bare `expr` — a single GroupingElement handed to
+   * `Cube.new` — is visited as-is, so it supplies its own parentheses.
    */
   protected groupingArrayOrGroupingElement(
     o: Nodes.GroupingElement,
     collector: SQLString,
   ): SQLString {
-    collector.append("( ");
-    o.expressions.forEach((expr, i) => {
-      if (i > 0) collector.append(", ");
-      this.visit(expr, collector);
-    });
-    collector.append(" )");
+    if (Array.isArray(o.expr)) {
+      collector.append("( ");
+      this.visit(o.expr, collector);
+      collector.append(" )");
+    } else {
+      return this.visit(o.expr, collector);
+    }
     return collector;
   }
 
