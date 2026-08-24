@@ -169,7 +169,7 @@ export class Column {
    * cache against another reflected one, while trails' fixtures warm compares a
    * dump-loaded cache against a reflected one — dropping `array` / `serial` /
    * `rowid` & co. reds `base_test.rb`'s `test_clear_cache!`. Tracked by RFC
-   * 0096 `converge-column-encode-with-init-with`.
+   * 0096 `converge-column-subclass-state-out-of-encode-with`.
    */
   encodeWith(coder: ColumnCoder): void {
     coder["class"] = "Column";
