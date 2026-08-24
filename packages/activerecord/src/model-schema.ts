@@ -1445,6 +1445,7 @@ function warmColumnsHashSync(
  */
 export function tableName(this: SchemaHost, value?: string | null): string {
   if (value !== undefined) {
+    value = value == null ? null : String(value);
     const changed = this._tableName !== value;
     this._tableName = value;
     if (changed) {
@@ -1496,6 +1497,12 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
  * A non-base class answers its own `@sequence_name` if it has one and the base
  * class's otherwise; only a base class computes one.
  *
+ * The writer stores `value.to_s` and sets `@explicit_sequence_name` — a
+ * non-null `_sequenceName` IS that flag here, since only this writer sets it
+ * and `reset_sequence_name` nils it — so `sequence_name = nil` stores an
+ * explicit `""` (Ruby's `nil.to_s`, not JS `String(null)`) rather than falling
+ * back to the computed name, exactly as Rails does.
+ *
  * Rails memoizes `reset_sequence_name`, which reaches the default through
  * `with_connection { |c| c.default_sequence_name(...) }` (model_schema.rb:379-382)
  * — async in trails, and this reader is synchronous — so the conventional name
@@ -1503,8 +1510,8 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
  */
 export function sequenceName(this: SchemaHost, value?: string | null): string | null {
   if (value !== undefined) {
-    this._sequenceName = value;
-    return value;
+    this._sequenceName = value == null ? "" : String(value);
+    return this._sequenceName;
   }
   if (isBaseClass(this as unknown as typeof Base)) {
     const pk = this.primaryKey;
