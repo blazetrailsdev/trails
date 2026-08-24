@@ -1,7 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
-import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 export class AbsenceValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {

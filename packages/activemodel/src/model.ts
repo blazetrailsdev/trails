@@ -3,7 +3,6 @@ import {
   ValidationContext,
   Validations,
   ClassMethods as ValidationsClassMethods,
-  HelperMethods,
   initInternals as validationsInitInternals,
   initializeDup as validationsInitializeDup,
   contextForValidation as validationsContextForValidation,
@@ -11,6 +10,7 @@ import {
   raiseValidationError as validationsRaiseValidationError,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
+import { HelperMethods } from "./validations/helper-methods.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
   Callbacks as ASCallbacks,
@@ -48,7 +48,8 @@ import {
 } from "./serialization.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
-import type { AttrNameArg, ConditionalOptions } from "./validations.js";
+import type { ConditionalOptions } from "./validations.js";
+import type { AttrNameArg } from "./validations/helper-methods.js";
 import * as AttributeMethods from "./attribute-methods.js";
 import {
   AttributeMethodPattern,

@@ -2,7 +2,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { except } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
-import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Manages lazily-defined virtual attributes for acceptance validation.

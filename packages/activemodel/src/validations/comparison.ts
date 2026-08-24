@@ -6,7 +6,7 @@ import { isBlank, underscore } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
-import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /** Ruby `Comparable`'s `<=>`, spelled `compareTo` in trails. */
 function hasCompareTo(value: unknown): value is { compareTo(other: unknown): number | null } {

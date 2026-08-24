@@ -5,7 +5,7 @@ import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.j
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 

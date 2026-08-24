@@ -3,7 +3,7 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { camelize, except, Range } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
-import type { AttrNameArg, HelperMethodsHost } from "../validations.js";
+import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 /**
  * Mirrors: ActiveModel::Validations::LengthValidator (length.rb)
