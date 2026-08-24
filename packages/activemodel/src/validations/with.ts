@@ -85,12 +85,14 @@ export const ClassMethods = {
   validatesWith(this: ValidatesWithClassHost, ...args: unknown[]): void {
     // Ruby's `def validates_with(*args, &block)` (with.rb:88) keeps the block
     // out of `*args`; TS has no block parameter, so a trailing function that is
-    // not a validator class (which answers `validate` on its prototype) stands
-    // in for it — `validates_each` (validations.rb:88-90) passes one.
+    // not one of the validator classes stands in for it — `validates_each`
+    // (validations.rb:88-90) is the caller that passes one. A validator is a
+    // `class`, a block never is, and `*args` always holds at least one class.
     const last = args[args.length - 1];
     const block =
+      args.length > 1 &&
       typeof last === "function" &&
-      typeof (last as ValidatorClass).prototype?.validate !== "function"
+      !/^class[\s{]/.test(Function.prototype.toString.call(last))
         ? (args.pop() as ValidatorBlock)
         : undefined;
     const [klasses, options] = extractOptionsBang(args);
