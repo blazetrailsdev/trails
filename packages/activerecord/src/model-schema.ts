@@ -1092,6 +1092,13 @@ function getColumnsHash(host: SchemaHost): Record<string, unknown> {
  *
  * `host` is always the class the load was triggered on: every class reflects
  * its OWN `table_name` (model_schema.rb:587-597).
+ *
+ * `load_schema!` settles `@columns_hash` and nothing else, so this drops no
+ * `@default_attributes` / `@attribute_types` memo: those are Rails-dropped only
+ * by `reload_schema_from_cache` (attributes.rb:267-270,
+ * activemodel/attribute_registration.rb:88-95), i.e. by
+ * `reset_column_information`. An eager `define_default_attribute` write
+ * (attributes.rb:277-291) therefore survives the model's first reflection.
  */
 function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void {
   const ignored = new Set(host._ignoredColumns ?? []);
@@ -1101,13 +1108,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     filteredHash[name] = column;
   }
 
-  // Rails' `load_schema!` settles `@columns_hash` and nothing else
-  // (model_schema.rb:587-597); `@default_attributes` / `@attribute_types` are
-  // dropped ONLY by `reload_schema_from_cache` (attributes.rb:267-270,
-  // activemodel/attribute_registration.rb:88-95) — i.e. by
-  // `reset_column_information`, never by an ordinary load. So an eager
-  // `define_default_attribute` write (attributes.rb:277-291) survives the
-  // model's first reflection here, exactly as it does in Ruby.
   type CacheBag = {
     _attributesBuilder?: unknown;
     _yamlEncoder?: unknown;

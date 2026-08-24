@@ -50,12 +50,6 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(new Legacy({ title: "t" }).heading).toBe("t");
   });
 
-  // Rails' `inherited` hook (attribute_methods.rb:265-272) seats a
-  // GeneratedAttributeMethods for every class from the moment it exists. JS has
-  // no such hook, so an empty subclass reached only through
-  // `isInstanceMethodAlreadyImplemented` used to keep the bare `Module`
-  // ActiveModel's lazy `generated_attribute_methods` seats
-  // (activemodel/attribute_methods.rb:400-402) for its whole life.
   it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {
     class Middle extends Base {
       static {

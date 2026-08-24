@@ -736,11 +736,6 @@ describe("DefineAttributeSTITest", () => {
 describe("DefineAttributeBeforeSchemaLoadTest", () => {
   fixtures([]);
 
-  // Rails drops `@default_attributes` only in `reload_schema_from_cache`
-  // (attributes.rb:267-270), which `reset_column_information` calls — never an
-  // ordinary `load_schema!` (model_schema.rb:587-597). So an eager
-  // `define_attribute` write outlives the model's first reflection, and is
-  // dropped by `reset_column_information`.
   it("define_attribute before the first schema load survives the load", async () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
