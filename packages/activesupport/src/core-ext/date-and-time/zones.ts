@@ -12,7 +12,7 @@
  * stays line-for-line with the Ruby.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
@@ -21,7 +21,7 @@ import { toTime } from "../date/conversions.js";
 import { Object } from "../object/acts-like.js";
 
 /** A receiver of the mixin: the `Date` arm or the `Time` arm. */
-export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant;
+export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant | RubyTime;
 
 /**
  * Returns the simultaneous time in `Time.zone` if a zone is given or if
@@ -55,12 +55,15 @@ export function inTimeZone(
   dateOrTime: Date | Temporal.Instant,
   zone?: unknown,
 ): TimeWithZone | Temporal.Instant;
+export function inTimeZone(dateOrTime: RubyTime, zone?: unknown): TimeWithZone | RubyTime;
 export function inTimeZone(
   dateOrTime: DateOrTime,
   zone: unknown = currentZone(),
-): TimeWithZone | Temporal.Instant {
+): TimeWithZone | Temporal.Instant | RubyTime {
   const timeZone = findZoneBang(zone);
-  const time = Object.actsLike(dateOrTime, "time") ? (dateOrTime as Date | Temporal.Instant) : null;
+  const time = Object.actsLike(dateOrTime, "time")
+    ? (dateOrTime as Date | Temporal.Instant | RubyTime)
+    : null;
 
   if (timeZone) {
     return timeWithZone(dateOrTime, time, timeZone);
@@ -80,7 +83,7 @@ export function inTimeZone(
  */
 function timeWithZone(
   dateOrTime: DateOrTime,
-  time: Date | Temporal.Instant | null,
+  time: Date | Temporal.Instant | RubyTime | null,
   zone: TimeZone,
 ): TimeWithZone {
   if (time !== null) {
@@ -97,6 +100,9 @@ function timeWithZone(
  * Ruby's `time.utc? ? time : time.getutc` (zones.rb:34) — the receiver read as
  * its UTC instant, which a `Temporal.Instant` already is.
  */
-function asInstant(time: Date | Temporal.Instant): Temporal.Instant {
+function asInstant(time: Date | Temporal.Instant | RubyTime): Temporal.Instant {
+  if (time instanceof RubyTime) {
+    return (time.isUtc() ? time : time.getutc()).toTime().toInstant();
+  }
   return time instanceof Temporal.Instant ? time : instantFrom(time);
 }

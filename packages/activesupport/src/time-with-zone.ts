@@ -17,6 +17,7 @@ import { Rational, Time } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import { advance as timeAdvance } from "./time-ext.js";
+import { inTimeZone } from "./core-ext/date-and-time/zones.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
@@ -831,21 +832,18 @@ export class TimeWithZone {
    * zone, exactly as `method_missing` (:553-557) does. Everything else advances
    * from `#utc`, for accuracy when moving across DST boundaries.
    *
-   * @missingRailsCall in_time_zone — CONVERGEABLE (RFC 0023): `in_time_zone`
-   *   (zones.ts) takes a `Date` or a `Temporal.Instant`, not the `::Time` that
-   *   `Time#advance` answers; its `time_with_zone` arm for a named zone is the
-   *   constructor call made here (zones.rb:32-38). Converging needs the
-   *   `::Time` receiver arm on `inTimeZone` itself.
+   * @missingRailsArgs in_time_zone — PERMANENT: Ruby's `in_time_zone` is a
+   * method ON the receiver; TypeScript cannot reopen `Time`, so
+   * `core-ext/date-and-time/zones.ts` is the receiver-form reopening of
+   * `DateAndTime::Zones` and takes the receiver as its first argument.
    */
   advance(options: AdvanceOptions): TimeWithZone {
-    // If we're advancing a value of variable length (i.e., years, weeks, months, days), advance from #time,
-    // otherwise advance from #utc, for accuracy when moving across DST boundaries
     if ([options.years, options.weeks, options.months, options.days].some((v) => v != null)) {
       return this._wrapWithTimeZone(
         timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
       ) as TimeWithZone;
     } else {
-      return new TimeWithZone(timeAdvance(this.utc(), options), this.timeZone);
+      return inTimeZone(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
     }
   }
 
