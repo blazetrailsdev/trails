@@ -1321,21 +1321,24 @@ export class Migration {
   /**
    * Run the migration in a given direction.
    *
-   * Mirrors: ActiveRecord::Migration#migrate
-   *
-   * @missingRailsCall with_connection — CONVERGEABLE:
-   *   `DatabaseTasks.migration_connection.pool.with_connection` (migration.rb:973)
-   *   checks a connection out for the duration of `exec_migration`; trails runs
-   *   the migration body against the already-seated `this.connection`.
-   *   Convergence is RFC 0051 story
-   *   `migration-migrate-drops-pool-with-connection`, which lands on RFC 0073's
-   *   permanent-checkout flip.
+   * Mirrors: ActiveRecord::Migration#migrate (migration.rb:964-983). The body
+   * runs inside `DatabaseTasks.migration_connection.pool.with_connection`
+   * (`:973`) so the connection `exec_migration` is handed is one checked out
+   * for the duration of the migration. `DatabaseTasks` is reached through the
+   * call-time config source rather than an import for the same reason
+   * `#connection` does — naming `tasks/database-tasks.js` here would be a
+   * load-time edge back into a module that already imports this one.
    */
   async migrate(direction: "up" | "down"): Promise<void> {
     this.announce(direction === "up" ? "migrating" : "reverting");
-    const start = Date.now();
-    await this.execMigration(this.connection, direction);
-    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
+    let timeElapsed = 0;
+    const pool = migrationArConfig()!.databaseTasks().migrationConnection().pool as ConnectionPool;
+    await pool.withConnection(async (conn) => {
+      const start = Date.now();
+      await this.execMigration(conn, direction);
+      timeElapsed = (Date.now() - start) / 1000;
+    });
+    const elapsed = timeElapsed.toFixed(4);
     this.announce(`${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
     this.write();
   }
