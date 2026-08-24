@@ -844,15 +844,24 @@ export class Association {
     // (association.rb:384-387); ours needs it twice because of the plain-`new`
     // fallback below, so it is bound once here.
     //
-    // Rails yields inside `build_record` and returns after, so
-    // `set_new_record`/`save` (singular_association.rb:29-32, :67-70) see a
-    // fully initialized record. When `_assignAttributes` defers —
-    // `scope_for_create`'s `create_with` half can name an association writer
-    // (relation.rb:1231-1235) — a JS constructor cannot await it back into this
-    // synchronous return, so the assign is parked on the record for `save` to
-    // drain, exactly as `populate_with_current_scope_attributes` is
-    // (`_applyScopeAttributes`, base.ts). The yield and the return keep Rails'
-    // order.
+    //
+    // Rails completes `initialize_attributes` before the yield and before
+    // `build_record` returns (association.rb:383-388). When `_assignAttributes`
+    // defers — `scope_for_create`'s `create_with` half can name an association
+    // writer (relation.rb:1231-1235) — TS cannot reproduce that: JS has no
+    // synchronous await, so a sync method cannot complete a promise before
+    // returning. The only shape that could is an awaited `buildRecord`, and
+    // that trades this invisible ordering for a Rails-VISIBLE regression:
+    // `CollectionAssociation#build` returns the record itself
+    // (collection_association.rb:117-122), so `post.comments.build` would
+    // become a promise. Preserving the sync return is the higher fidelity.
+    //
+    // So the assign is parked on the record and drained before any write
+    // (`awaitPendingNestedReaderLoads`, nested-attributes.ts) — the same
+    // deferral `populate_with_current_scope_attributes` takes
+    // (`_applyScopeAttributes`, base.ts:657-681), and the one RFC 0087 ratified
+    // for the constructor itself. The yield and the return keep Rails' order;
+    // only the parked writes settle later, and nothing saves against them.
     const initializeAndYield = (record: Base): void => {
       const pending = this.initializeAttributes(record, attributes);
       if (pending) parkNestedReaderLoad(record, pending);
