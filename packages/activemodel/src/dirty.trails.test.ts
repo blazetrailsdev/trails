@@ -78,3 +78,453 @@ describe("Dirty across dup", () => {
     expect(duped.isChanged).toBe(true);
   });
 });
+
+/**
+ * The TS-only extras that used to live interleaved among the mirrored
+ * `dirty_test.rb` names in `dirty.test.ts`. They pin trails behaviour with no
+ * Rails test of the same name to mirror.
+ */
+describe("DirtyTest extras", () => {
+  class DirtyPerson extends Model {
+    static {
+      this.attribute("name", "string");
+      this.attribute("age", "integer");
+      this.attribute("color", "string");
+    }
+  }
+
+  it("attributeChange returns null when attribute is unchanged", () => {
+    const p = new DirtyPerson({ name: "Alice" });
+    p.changesApplied();
+    expect(p.attributeChange("name")).toBeNull();
+  });
+});
+
+describe("Dirty Tracking", () => {
+  class Person extends Model {
+    static {
+      this.attribute("name", "string");
+      this.attribute("age", "integer");
+    }
+  }
+
+  it("not changed initially", () => {
+    const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
+    expect(p.isChanged).toBe(false);
+    expect(p.changed).toEqual([]);
+  });
+
+  it("setting attribute will result in change", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    expect(p.isChanged).toBe(true);
+    expect(p.changed).toContain("name");
+  });
+
+  it("attributeWas returns original value", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    expect(p.attributeWas("name")).toBe("dean");
+  });
+
+  it("changes to attribute values", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    expect(p.attributeChange("name")).toEqual(["dean", "sam"]);
+  });
+
+  it("list of changed attribute keys", () => {
+    const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    p._writeAttribute("age", 31);
+    expect(p.changes).toEqual({
+      name: ["dean", "sam"],
+      age: [30, 31],
+    });
+  });
+
+  it("setting color to same value should not result in change being recorded", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "dean");
+    expect(p.isChanged).toBe(false);
+  });
+
+  it("resetting attribute", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    expect(p.isChanged).toBe(true);
+    p._writeAttribute("name", "dean");
+    expect(p.isChanged).toBe(false);
+  });
+
+  it("changing the same attribute multiple times retains the correct original value", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    p._writeAttribute("name", "bob");
+    expect(p.attributeChange("name")).toEqual(["dean", "bob"]);
+  });
+
+  it("restore_attributes should restore all previous data", () => {
+    const p = new Person({ name: "dean", age: 30 });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    p._writeAttribute("age", 99);
+    p.restoreAttributes();
+    expect(p._readAttribute("name")).toBe("dean");
+    expect(p._readAttribute("age")).toBe(30);
+    expect(p.isChanged).toBe(false);
+  });
+
+  it("saving should preserve previous changes", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    p.changesApplied();
+    expect(p.isChanged).toBe(false);
+    expect(p.previousChanges).toEqual({ name: ["dean", "sam"] });
+  });
+
+  it("setting new attributes should not affect previous changes", () => {
+    const p = new Person({ name: "dean" });
+    p.changesApplied();
+    p._writeAttribute("name", "sam");
+    p.changesApplied();
+    p._writeAttribute("name", "bob");
+    expect(p.previousChanges).toEqual({ name: ["dean", "sam"] });
+    expect(p.changes).toEqual({ name: ["sam", "bob"] });
+  });
+
+  it("cast-value-aware: same cast value = no change", () => {
+    class Sized extends Model {
+      static {
+        this.attribute("size", "integer");
+      }
+    }
+    const s = new Sized({ size: "2" });
+    s.changesApplied();
+    s._writeAttribute("size", "2.3");
+    expect(s.isChanged).toBe(false);
+    s._writeAttribute("size", "5.1");
+    expect(s.isChanged).toBe(true);
+  });
+});
+describe("attributeBeforeTypeCast", () => {
+  it("returns the raw value before type casting", () => {
+    class Price extends Model {
+      static {
+        this.attribute("amount", "integer");
+      }
+    }
+
+    const price = new Price({ amount: "42" });
+    expect(price._readAttribute("amount")).toBe(42);
+    expect(price._attributes.getAttribute("amount").valueBeforeTypeCast).toBe("42");
+  });
+
+  it("tracks raw values on writeAttribute", () => {
+    class Price extends Model {
+      static {
+        this.attribute("amount", "integer");
+      }
+    }
+
+    const price = new Price({ amount: 10 });
+    price._writeAttribute("amount", "99");
+    expect(price._readAttribute("amount")).toBe(99);
+    expect(price._attributes.getAttribute("amount").valueBeforeTypeCast).toBe("99");
+  });
+});
+
+describe("clearChangesInformation", () => {
+  it("clear_changes_information should reset all changes", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+
+    const p = new Person({ name: "Alice", age: 30 });
+    p.changesApplied();
+    p._writeAttribute("name", "Bob");
+    p.changesApplied();
+    expect(Object.keys(p.previousChanges).length).toBeGreaterThan(0);
+
+    p._writeAttribute("age", 31);
+    expect(p.isChanged).toBe(true);
+
+    p.clearChangesInformation();
+    expect(p.isChanged).toBe(false);
+    expect(Object.keys(p.previousChanges).length).toBe(0);
+  });
+});
+describe("clearAttributeChanges clears forced-dirty state", () => {
+  it("force-dirtied attribute is no longer dirty after clearAttributeChanges — forced flag must not leak", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m.attributeWillChangeBang("ratio");
+    expect(m.changed).toContain("ratio");
+
+    m.clearAttributeChanges(["ratio"]);
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).not.toContain("ratio");
+  });
+});
+
+describe("clearAttributeChanges", () => {
+  it("clears changes for specific attributes only", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+
+    const p = new Person({ name: "Alice", age: 30 });
+    p.changesApplied();
+    p._writeAttribute("name", "Bob");
+    p._writeAttribute("age", 31);
+    expect(p.changed).toContain("name");
+    expect(p.changed).toContain("age");
+
+    p.clearAttributeChanges(["name"]);
+    expect(p.changed).not.toContain("name");
+    expect(p.changed).toContain("age");
+  });
+});
+
+describe("attributeChanged with from/to options", () => {
+  it("returns true when from/to match the change", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
+  });
+
+  it("returns false when from does not match", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Charlie", to: "Bob" })).toBe(false);
+  });
+
+  it("returns false when to does not match", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice", to: "Charlie" })).toBe(false);
+  });
+
+  it("supports only from option", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice" })).toBe(true);
+    expect(u.attributeChanged("name", { from: "Wrong" })).toBe(false);
+  });
+
+  it("supports only to option", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { to: "Bob" })).toBe(true);
+    expect(u.attributeChanged("name", { to: "Wrong" })).toBe(false);
+  });
+});
+
+describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
+  it("attributePreviouslyChanged returns true for attributes changed in last save", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.attributePreviouslyChanged("name")).toBe(true);
+  });
+
+  it("attributePreviouslyChanged supports from/to options", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.attributePreviouslyChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.attributePreviouslyChanged("name", { to: "Charlie" })).toBe(false);
+  });
+
+  it("attributePreviouslyWas returns value before last save", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u._writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.attributePreviouslyWas("name")).toBe("Alice");
+  });
+});
+
+describe("numeric type.isChanged integration via dirty tracking", () => {
+  it("integer attribute set to non-numeric string still appears in changes — number_to_non_number? path", () => {
+    class Item extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Item.attribute("count", "integer");
+
+    const item = new Item({ count: 10 });
+    item.changesApplied();
+    item._writeAttribute("count", "abc");
+    expect(item.changed).toContain("count");
+  });
+
+  it("force-change is cleared by restoreAttributes — forced flag must not survive restore", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m.attributeWillChangeBang("ratio");
+    expect(m.changed).toContain("ratio");
+
+    m.restoreAttributes();
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).not.toContain("ratio");
+  });
+
+  it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m.attributeWillChangeBang("ratio");
+    expect(m.changed).toContain("ratio");
+
+    m.changesApplied();
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).not.toContain("ratio");
+  });
+
+  it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m.attributeWillChangeBang("ratio");
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).toContain("ratio");
+    // The "was" side must be the cloned pre-mutation snapshot from forceChange,
+    // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
+    expect(m.changes["ratio"]).toEqual([NaN, NaN]);
+  });
+
+  it("float attribute NaN-to-NaN does NOT appear in changes — equal_nan? exemption", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).not.toContain("ratio");
+    expect(m.changes).not.toHaveProperty("ratio");
+  });
+
+  it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {
+    class Item extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Item.attribute("count", "integer");
+
+    const item = new Item({ count: 1 });
+    item.changesApplied();
+    item._writeAttribute("count", true);
+    expect(item.changed).toContain("count");
+  });
+
+  it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._writeAttribute("ratio", 1.0);
+    expect(m.changed).toContain("ratio");
+    m._writeAttribute("ratio", NaN);
+    expect(m.changed).not.toContain("ratio");
+  });
+});

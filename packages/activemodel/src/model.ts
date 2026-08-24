@@ -28,7 +28,6 @@ import {
   Module,
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
-import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import {
@@ -787,15 +786,6 @@ export class Model {
 
   toPartialPath(): string {
     return (this.constructor as typeof Model)._toPartialPath();
-  }
-
-  /**
-   * Returns the type of the attribute (the Type object).
-   *
-   * Mirrors: ActiveModel::Attributes#attribute_for_inspect
-   */
-  typeForAttribute(name: string, block?: () => Type): Type {
-    return (this.constructor as typeof Model).typeForAttribute(name, block);
   }
 
   /**

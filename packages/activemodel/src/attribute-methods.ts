@@ -234,9 +234,17 @@ export function isRespondToWithoutAttributes(
   return method in (this as Record<string, unknown>);
 }
 
-/** @internal Rails-private helper. Mirrors: #attribute_method? */
+/**
+ * @internal Rails-private helper. Mirrors: #attribute_method?
+ * (attribute_methods.rb:541-543) —
+ * `respond_to_without_attributes?(:attributes) && attributes.include?(attr_name)`.
+ * Ruby `Hash#include?` is key existence, so the second call is `Object.hasOwn`
+ * over the hash `attributes` returns.
+ */
 export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return this._attributes?.has(attrName) ?? false;
+  return (
+    this.isRespondToWithoutAttributes("attributes") && Object.hasOwn(this.attributes, attrName)
+  );
 }
 
 /** @internal Rails-private helper. Mirrors: #matched_attribute_method */
@@ -676,6 +684,8 @@ export function defineCall(
 
 export type InstanceHost = {
   _attributes?: { has(name: string): boolean };
+  attributes: Record<string, unknown>;
+  isRespondToWithoutAttributes(method: string, includePrivateMethods?: boolean): boolean;
   attributeMethodPatterns?: AttributeMethodPattern[];
   constructor: AttributeMethodHost;
 };
