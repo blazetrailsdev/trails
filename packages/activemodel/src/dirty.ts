@@ -24,6 +24,8 @@ export class Dirty {
   declare _dirty: DirtyTracker;
   declare _attributes: AttributeSet;
   /** @internal */
+  declare _readAttribute: (name: string) => unknown;
+  /** @internal */
 
   /**
    * Mirrors: ActiveModel::Dirty#changes_applied (dirty.rb:272-279)
@@ -148,11 +150,27 @@ export class Dirty {
    * Check if an attribute value has changed in-place (by identity).
    *
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place? (dirty.rb:367-369)
+   *
+   * @missingRailsCall changed_in_place? — PERMANENT: Language shortcoming.
+   * Rails delegates to `mutations_from_database.changed_in_place?`, which is
+   * `attributes[attr_name].changed_in_place?` (attribute_mutation_tracker.rb:
+   * 50-52) — and that is `false` by definition on `Attribute::WithCastValue`
+   * (attribute.rb:243-245). Ruby reaches an in-place change by mutating the
+   * cast value the Attribute already holds (`aircraft.name.downcase!`,
+   * normalized_attribute_test.rb:36); JS strings, Numbers and Dates are
+   * immutable, so the port can only reach the same state by writing a new cast
+   * value onto the set — exactly the shape Rails classifies as not-in-place.
+   * Asking the Attribute therefore cannot answer the question here, so the
+   * before/after values are compared directly.
    */
   attributeChangedInPlace(name: string): boolean {
-    return this._dirty.changedInPlace(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(name),
-    );
+    name = (this.constructor as unknown as DirtyClass).resolveAttributeName(name);
+    const current = this._readAttribute(name);
+    const recorded = this._dirty.mutationsFromDatabase[name];
+    if (recorded) return current !== recorded[1];
+    const original = this._dirty.attributeWas(name);
+    if (original === undefined) return false;
+    return original !== current;
   }
 
   /**
@@ -460,16 +478,6 @@ export class DirtyTracker {
    */
   attributePreviouslyChanged(name: string, options?: DirtyOptions): boolean {
     return this.isChanged(this.mutationsBeforeLastSave, name, options);
-  }
-
-  /**
-   * Mirrors: ActiveModel::AttributeMutationTracker#changed_in_place?
-   * (attribute_mutation_tracker.rb:50-52) — `attributes[attr_name].changed_in_place?`.
-   * An attribute the set does not carry answers through `Attribute::Null`,
-   * whose `changed_in_place?` is false.
-   */
-  changedInPlace(name: string): boolean {
-    return this._attrs?.getAttribute(name).changedInPlace() ?? false;
   }
 
   /**
