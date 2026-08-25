@@ -67,7 +67,7 @@ export class Collection extends Array<Initializer> {
     return new Collection(...this, ...other);
   }
 
-  /** @internal Mirrors Rails `tsort_each_child`. */
+  /** Mirrors: Rails `tsort_each_child` (initializable.rb:49). */
   tsortEachChild(node: Initializer): Initializer[] {
     return this.filter((i) => i.before === node.name || i.name === node.after);
   }

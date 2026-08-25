@@ -8,6 +8,7 @@ import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
+import unbackedInternalNeedsReceipt from "./eslint/unbacked-internal-needs-receipt.mjs";
 import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
@@ -235,6 +236,7 @@ export default defineConfig(
           "no-node-builtins": noNodeBuiltins,
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
+          "unbacked-internal-needs-receipt": unbackedInternalNeedsReceipt,
           "rails-error-parity": railsErrorParity,
           "rails-callback-invocations": railsCallbackInvocations,
           "rails-arel-tosql": railsArelTosql,
@@ -359,6 +361,23 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",
+    },
+  },
+
+  // ── unbacked-internal-needs-receipt (RFC 0121): the reverse direction of
+  //    rails-private-jsdoc — an `@internal` with no Rails-private counterpart
+  //    needs a `@noRailsEquivalent` receipt. Per-package enrollment, ONLY-GROW:
+  //    a package joins this list once its tags are burnt down, and a package is
+  //    never removed to turn a red run green. Keep in sync with the same block
+  //    in eslint/rails-private-jsdoc.config.mjs.
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
+    // reads, so the manifest cannot back an `@internal` there by construction
+    // and `parity:api:extra` holds the tree out of scoring entirely.
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    rules: {
+      "blazetrails/unbacked-internal-needs-receipt": "error",
     },
   },
 

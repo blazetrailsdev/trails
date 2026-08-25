@@ -105,6 +105,46 @@ describe("harvestObjectLiteralMethods", () => {
     });
   });
 
+  it("clears internal where a receipt rides along, through the symbol too (RFC 0121)", () => {
+    const methods = objectLiteralMethods(
+      `/**
+       * @internal
+       * @noRailsEquivalent PERMANENT — a language fact.
+       */
+      function receipted(a: number): void {}
+      /** @internal */
+      function hidden(a: number): void {}
+      export const Reg = {
+        receipted,
+        hidden,
+        viaProperty: receipted,
+        /**
+         * @internal
+         * @noRailsEquivalent PERMANENT — a language fact.
+         */
+        receiptOnProperty: hidden,
+        /**
+         * @internal
+         * @noRailsEquivalent PERMANENT — a language fact.
+         */
+        inline(a: number): void {},
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.internal === true]));
+    expect(byName).toEqual({
+      receipted: false,
+      hidden: true,
+      viaProperty: false,
+      receiptOnProperty: false,
+      inline: false,
+    });
+    for (const name of ["receipted", "viaProperty", "receiptOnProperty", "inline"]) {
+      expect(methods.find((m) => m.name === name)!.noRailsEquivalent).toBe(
+        "PERMANENT — a language fact.",
+      );
+    }
+  });
+
   it("captures get/set accessors as the Rails-named reader and writer pair", () => {
     const methods = objectLiteralMethods(
       `let backing: boolean | null = null;
@@ -2029,6 +2069,143 @@ describe("extractFromProgram — @internal JSDoc on class members", () => {
       (m) => m.name === "constructor",
     )!;
     expect(ctor.internal).toBe(true);
+  });
+});
+
+describe("extractFromProgram — @noRailsEquivalent beats @internal (RFC 0121)", () => {
+  const R = "@internal\n         * @noRailsEquivalent PERMANENT — a language fact.";
+  const REASON = "PERMANENT — a language fact.";
+
+  it("clears internal on a receipted top-level function and exported const", () => {
+    const info = extractFromFiles("/p", {
+      "arel.ts": `
+        /** @internal */
+        export function tagged(): void {}
+        /**
+         * ${R}
+         */
+        export function receipted(): void {}
+        /**
+         * ${R}
+         */
+        export const receiptedConst = (): void => {};
+      `,
+    });
+    const fns = fileFunctionsOf(info, "arel.ts");
+    expect(fns.find((f) => f.name === "tagged")!.internal).toBe(true);
+    for (const name of ["receipted", "receiptedConst"]) {
+      const fn = fns.find((f) => f.name === name)!;
+      expect(fn.internal).toBeUndefined();
+      expect(fn.noRailsEquivalent).toBe(REASON);
+    }
+  });
+
+  it("clears internal on a receipted class member, static included", () => {
+    const info = extractFromFiles("/p", {
+      "select-core.ts": `
+        export class SelectCore {
+          /** @internal */
+          tagged(): void {}
+          /**
+           * ${R}
+           */
+          receipted(): void {}
+          /**
+           * ${R}
+           */
+          static staticReceipted(): void {}
+        }
+      `,
+    });
+    const cls = info.classes["select-core.ts:SelectCore"];
+    expect(cls.instanceMethods.find((m) => m.name === "tagged")!.internal).toBe(true);
+    const receipted = cls.instanceMethods.find((m) => m.name === "receipted")!;
+    expect(receipted.internal).toBeUndefined();
+    expect(receipted.noRailsEquivalent).toBe(REASON);
+    expect(cls.classMethods.find((m) => m.name === "staticReceipted")!.internal).toBeUndefined();
+  });
+
+  it("keeps internal on private, protected, #-identifier and private-param members", () => {
+    const info = extractFromFiles("/p", {
+      "updater.ts": `
+        export class Updater {
+          constructor(
+            /**
+             * ${R}
+             */
+            private factory: unknown,
+            /**
+             * ${R}
+             */
+            public seam: unknown,
+          ) {}
+          /**
+           * ${R}
+           */
+          private priv(): void {}
+          /**
+           * ${R}
+           */
+          protected prot(): void {}
+          /**
+           * ${R}
+           */
+          #hidden(): void {}
+        }
+      `,
+    });
+    const cls = info.classes["updater.ts:Updater"];
+    for (const name of ["factory", "priv", "prot", "#hidden"]) {
+      expect(cls.instanceMethods.find((m) => m.name === name)!.internal).toBe(true);
+    }
+    expect(cls.instanceMethods.find((m) => m.name === "seam")!.internal).toBeUndefined();
+  });
+
+  it("clears internal on a receipted property inherited through an extended interface", () => {
+    const info = extractFromFiles("/p", {
+      "host.ts": `
+        export interface Base {
+          /** @internal */
+          tagged(): void;
+          /**
+           * ${R}
+           */
+          receipted(): void;
+        }
+        export interface Host extends Base {}
+      `,
+    });
+    const host = info.modules["host.ts:Host"];
+    expect(host.instanceMethods.find((m) => m.name === "tagged")!.internal).toBe(true);
+    const receipted = host.instanceMethods.find((m) => m.name === "receipted")!;
+    expect(receipted.internal).toBeUndefined();
+    expect(receipted.noRailsEquivalent).toBe(REASON);
+  });
+
+  it("clears internal on a receipted member of a synthesized __mixin class, constructor included", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new (...a: any[]) => object) {
+          class M extends Base {
+            /**
+             * ${R}
+             */
+            constructor(...a: any[]) { super(...a); }
+            /** @internal */
+            tagged(): void {}
+            /**
+             * ${R}
+             */
+            receipted(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "constructor")!.internal).toBeUndefined();
+    expect(mixin.instanceMethods.find((m) => m.name === "tagged")!.internal).toBe(true);
+    expect(mixin.instanceMethods.find((m) => m.name === "receipted")!.internal).toBeUndefined();
   });
 });
 

@@ -14,8 +14,21 @@
  */
 import tseslint from "typescript-eslint";
 import railsPrivateJsdoc from "./rails-private-jsdoc.mjs";
+import unbackedInternalNeedsReceipt from "./unbacked-internal-needs-receipt.mjs";
 
 export default [
+  // Plugin registration is global (no `files`): ESLint refuses to redefine a
+  // plugin, so the two rule blocks below cannot each declare it.
+  {
+    plugins: {
+      blazetrails: {
+        rules: {
+          "rails-private-jsdoc": railsPrivateJsdoc,
+          "unbacked-internal-needs-receipt": unbackedInternalNeedsReceipt,
+        },
+      },
+    },
+  },
   {
     files: [
       "packages/arel/src/**/*.ts",
@@ -40,7 +53,22 @@ export default [
     // Nothing disables `rails-private-jsdoc` inline, so ignoring inline config
     // costs no legitimate suppression.
     linterOptions: { reportUnusedDisableDirectives: "off" },
-    plugins: { blazetrails: { rules: { "rails-private-jsdoc": railsPrivateJsdoc } } },
     rules: { "blazetrails/rails-private-jsdoc": "error" },
+  },
+  // The reverse direction (RFC 0121), enrolled per package and ONLY-GROW.
+  // Keep this `files` list in sync with the `unbacked-internal-needs-receipt`
+  // block in eslint.config.mjs.
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
+    // reads, so the manifest cannot back an `@internal` there by construction
+    // and `parity:api:extra` holds the tree out of scoring entirely.
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaVersion: "latest", sourceType: "module" },
+    },
+    linterOptions: { reportUnusedDisableDirectives: "off" },
+    rules: { "blazetrails/unbacked-internal-needs-receipt": "error" },
   },
 ];

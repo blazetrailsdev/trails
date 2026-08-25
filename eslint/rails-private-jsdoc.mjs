@@ -23,14 +23,51 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = path.resolve(__dirname, "rails-private-methods.json");
 
 let manifestCache = null;
-function loadManifest() {
+let manifestPresent = false;
+
+/**
+ * Test seam; pass `null` to install the "manifest absent" state. The manifest is
+ * gitignored and only exists after
+ * `pnpm rails-privates:manifest`, so a rule test has to supply its own. Writing
+ * one to the real path instead would not be hermetic: vitest runs the two rule
+ * tests in separate forked processes over one filesystem, and whichever restored
+ * last decided what the file held afterwards — which is how a fixture ends up
+ * parked on top of the real manifest for the rest of the session.
+ */
+export function setManifestForTests(manifest) {
+  // `null` installs the INERT state — an empty manifest, which is exactly what
+  // the Lint job writes and what a rule that flags what the manifest does NOT
+  // list has to be tested against.
+  manifestCache = manifest ?? { files: {} };
+  manifestPresent = hasEntries(manifestCache);
+}
+
+function hasEntries(manifest) {
+  return Object.keys(manifest?.files ?? {}).length > 0;
+}
+
+export function loadManifest() {
   if (manifestCache) return manifestCache;
-  if (!fs.existsSync(MANIFEST_PATH)) {
-    manifestCache = { files: {} };
-    return manifestCache;
-  }
-  manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+  manifestCache = fs.existsSync(MANIFEST_PATH)
+    ? JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"))
+    : { files: {} };
+  manifestPresent = hasEntries(manifestCache);
   return manifestCache;
+}
+
+/**
+ * Whether the manifest carries real data, as opposed to being INERT.
+ *
+ * Presence is decided by CONTENT, not by the file existing: `prelint` runs the
+ * builder with `--allow-missing`, which — when rails-api.json is absent — WRITES
+ * an empty manifest rather than skipping, and says in so many words that the
+ * rules reading it "will report nothing" for that run. An existence check
+ * therefore reads INERT as real and answers backwards for a rule whose polarity
+ * is "flag what the manifest does NOT list".
+ */
+export function manifestAvailable() {
+  loadManifest();
+  return manifestPresent;
 }
 
 let repoRootCache = null;
@@ -48,11 +85,11 @@ function repoRoot() {
   return repoRootCache;
 }
 
-function relFromRepoRoot(filename) {
+export function relFromRepoRoot(filename) {
   return path.relative(repoRoot(), filename).split(path.sep).join("/");
 }
 
-function jsdocHasInternal(node, sourceCode) {
+export function attachedJsDoc(node, sourceCode) {
   // Only treat the closest preceding JSDoc as attached to `node`. A
   // file header `/** ... */` separated from the declaration by blank
   // lines must not be matched, otherwise the autofix would edit the
@@ -73,9 +110,14 @@ function jsdocHasInternal(node, sourceCode) {
     ) {
       continue;
     }
-    return { tag: c.value.includes("@internal"), comment: c };
+    return c;
   }
-  return { tag: false, comment: null };
+  return null;
+}
+
+function jsdocHasInternal(node, sourceCode) {
+  const comment = attachedJsDoc(node, sourceCode);
+  return { tag: comment !== null && comment.value.includes("@internal"), comment };
 }
 
 function indentOf(line) {

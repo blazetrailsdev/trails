@@ -138,8 +138,8 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
-  /** @internal Rails `_all_load_paths(add_autoload_paths_to_load_path)`. */
-  async allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
+  /** Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730). */
+  async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = await this.paths();
     const cfg = this.config;
