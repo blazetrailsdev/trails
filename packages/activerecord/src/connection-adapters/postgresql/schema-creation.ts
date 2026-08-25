@@ -66,7 +66,7 @@ export function _pgGeneratedClause(
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  declare protected adapter: PgSchemaCreationHost;
+  declare protected conn: PgSchemaCreationHost;
 
   constructor(adapter: PgSchemaCreationHost) {
     super(adapter);
@@ -88,8 +88,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
     // implementation when no real adapter is present (e.g. unit-test context
     // where only the minimal SchemaQuoter shim is wired).
-    if (typeof this.adapter.typeToSql === "function") {
-      return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
+    if (typeof this.conn.typeToSql === "function") {
+      return this.conn.typeToSql(type as string, options as Record<string, unknown>);
     }
     return super.typeToSql(type, options);
   }
@@ -147,13 +147,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitValidateConstraint(name: string): string {
-    return `VALIDATE CONSTRAINT ${this.adapter.quoteColumnName(name)}`;
+    return `VALIDATE CONSTRAINT ${this.conn.quoteColumnName(name)}`;
   }
 
   /** @internal */
   protected visitExclusionConstraintDefinition(o: ExclusionConstraintDefinition): string {
     const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.adapter.quoteColumnName(o.name));
+    if (o.name) p.push("CONSTRAINT", this.conn.quoteColumnName(o.name));
     p.push("EXCLUDE");
     if (o.using) p.push(`USING ${o.using}`);
     p.push(`(${o.expression})`);
@@ -165,17 +165,17 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected async visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): Promise<string> {
     const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.adapter.quoteColumnName(o.name));
+    if (o.name) p.push("CONSTRAINT", this.conn.quoteColumnName(o.name));
     p.push("UNIQUE");
     if ((await this.supportsNullsNotDistinct()) && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
     if (o.usingIndex) {
-      p.push(`USING INDEX ${this.adapter.quoteColumnName(o.usingIndex)}`);
+      p.push(`USING INDEX ${this.conn.quoteColumnName(o.usingIndex)}`);
     } else {
       // Rails wraps with `Array(o.column)`, so a nil column renders `UNIQUE ()`
       // and PostgreSQL owns the rejection — `[null]` would throw in the quoter
       // first (add_unique_constraint has no pre-raise for the empty case).
       const cols = wrap(o.column)
-        .map((column) => this.adapter.quoteColumnName(column))
+        .map((column) => this.conn.quoteColumnName(column))
         .join(", ");
       p.push(`(${cols})`);
     }
@@ -222,14 +222,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
     const column = o.column;
     column.sqlType = this.typeToSql(column.type, column.options);
-    const quotedName = this.adapter.quoteColumnName(o.name);
+    const quotedName = this.conn.quoteColumnName(o.name);
 
     let sql = `ALTER COLUMN ${quotedName} TYPE ${column.sqlType}`;
 
     const options = this.columnOptions(column);
 
     if (options["collation"]) {
-      sql += ` COLLATE ${this.adapter.quoteColumnName(String(options["collation"]))}`;
+      sql += ` COLLATE ${this.conn.quoteColumnName(String(options["collation"]))}`;
     }
     if (options["using"]) {
       sql += ` USING ${options["using"]}`;
@@ -245,7 +245,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
         // quote_default_expression so array/typeMap-aware serialization
         // is preserved on ALTER COLUMN SET DEFAULT.
-        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${await this.adapter.quoteDefaultExpression(options["default"], column)}`;
+        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${await this.conn.quoteDefaultExpression(options["default"], column)}`;
       }
     }
 
@@ -260,13 +260,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefaultDefinition(
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
-    const col = this.adapter.quoteColumnName(o.column.name);
+    const col = this.conn.quoteColumnName(o.column.name);
     // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
     // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
       o.default == null
         ? "DROP DEFAULT"
-        : `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+        : `SET DEFAULT ${await this.conn.quoteDefaultExpression(o.default, o.column)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 
@@ -274,7 +274,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
-      sql += ` COLLATE ${this.adapter.quoteColumnName(String(opts["collation"]))}`;
+      sql += ` COLLATE ${this.conn.quoteColumnName(String(opts["collation"]))}`;
     }
     const col = opts["column"] as { type?: string; name?: string } | undefined;
     if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
@@ -320,14 +320,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * @internal
    */
   protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
-    const host = this.adapter as PgSchemaCreationHost & {
+    const host = this.conn as PgSchemaCreationHost & {
       quotedIncludeColumnsForIndex?(columns: string | string[]): Promise<string>;
     };
     if (typeof host.quotedIncludeColumnsForIndex === "function") {
       return host.quotedIncludeColumnsForIndex(o);
     }
     if (typeof o === "string") return o;
-    return o.map((c) => this.adapter.quoteColumnName(c)).join(", ");
+    return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
   }
 
   /**

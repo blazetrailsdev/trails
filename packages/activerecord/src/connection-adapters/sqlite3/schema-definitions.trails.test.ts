@@ -46,7 +46,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
     td.column("full_name", "virtual" as any, { as: "a || b" } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
-    const sql = await new SchemaCreation((td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation((td as any).conn).accept(td);
     expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b)');
     expect(sql).not.toContain("varchar");
     expect(sql).not.toContain("VARCHAR");
@@ -56,7 +56,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
     const td = new TableDefinition(conn, "items");
     td.column("x", "integer");
     td.column("expr", "integer", { as: "x + 1", stored: true } as any);
-    const sql = await new SchemaCreation((td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation((td as any).conn).accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
   });
 });

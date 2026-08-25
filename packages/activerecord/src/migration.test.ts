@@ -25,7 +25,7 @@ import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mys
 import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/sqlite3/schema-creation.js";
 
 function emitTableSql(td: TableDefinition): Promise<string> {
-  const adapter = (td as any)._adapter;
+  const adapter = (td as any).conn;
   const adapterName = adapter.adapterName;
   // Every visitor takes its connection for identifier/default quoting (and, on MySQL,
   // the `supports*` / isMariadb() flags), so thread the table definition's through —

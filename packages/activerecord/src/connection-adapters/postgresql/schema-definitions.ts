@@ -258,7 +258,7 @@ export class TableDefinition extends AbstractTableDefinition {
     // postgresql/schema_definitions.rb:265-268 — this is where a constraint
     // declared inside `create_table` gets its generated name and its
     // `deferrable` validation, not just the `add_exclusion_constraint` path.
-    options = (this._adapter as unknown as PgConstraintOptionsConn).exclusionConstraintOptions(
+    options = (this.conn as unknown as PgConstraintOptionsConn).exclusionConstraintOptions(
       this.name,
       expression,
       options as Record<string, unknown>,
@@ -270,7 +270,7 @@ export class TableDefinition extends AbstractTableDefinition {
     columnName: string | string[],
     options: UniqueConstraintOptions = {},
   ): UniqueConstraintDefinition {
-    options = (this._adapter as unknown as PgConstraintOptionsConn).uniqueConstraintOptions(
+    options = (this.conn as unknown as PgConstraintOptionsConn).uniqueConstraintOptions(
       this.name,
       columnName,
       options as Record<string, unknown>,

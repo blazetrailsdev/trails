@@ -361,7 +361,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   // Rails generates CREATE TABLE SQL by accepting the TableDefinition into the
   // adapter's SchemaCreation visitor; there is no TableDefinition#to_sql.
   const toSql = (td: TableDefinition): Promise<string> => {
-    const adapter = (td as any)._adapter;
+    const adapter = (td as any).conn;
     return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
   };
 
