@@ -87,13 +87,12 @@ async function resolveConnectionFacts(
     const pk = await cache.primaryKeys(model.arelTable.name);
     if (pk != null) primaryKeys = Array.isArray(pk) ? pk : [pk];
   }
-  const indexesByTable = new Map<string, unknown[]>();
-  if (cache) indexesByTable.set(model.tableName, await cache.indexes(model.tableName));
+  const indexes: unknown[] = cache ? await cache.indexes(model.tableName) : [];
   return {
     supportsInsertReturning,
     supportsInsertConflictTarget,
     primaryKeys,
-    indexes: (name: string) => indexesByTable.get(name) ?? [],
+    indexes: (name: string) => (name === model.tableName ? indexes : []),
   };
 }
 
