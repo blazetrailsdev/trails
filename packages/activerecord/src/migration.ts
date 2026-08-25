@@ -361,12 +361,13 @@ export class ReversibleBlockHelper {
 export type MigrationClass = new () => Migration;
 
 /** The trailing options hash `Migration#run` pops with `extract_options!`. */
-export type MigrationRunOptions = { direction?: "up" | "down"; revert?: boolean };
+type MigrationRunOptions = { direction?: "up" | "down"; revert?: boolean };
 
 /**
- * @noRailsEquivalent Ruby gives a block its own slot, so `revert(*classes, &blk)`
- * needs no test to tell a migration class from the block. In TS both arrive as
- * trailing positional functions, so the two have to be told apart by shape.
+ * @noRailsEquivalent PERMANENT — Ruby gives a block its own slot, so
+ * `revert(*migration_classes, &block)` (migration.rb:852) needs no test to tell
+ * a migration class from the block. In TS both arrive as trailing positional
+ * functions, so the two can only be told apart by shape.
  */
 function isMigrationClass(fn: unknown): fn is MigrationClass {
   return typeof fn === "function" && (fn === Migration || fn.prototype instanceof Migration);
@@ -1219,8 +1220,6 @@ export class Migration {
    * `run(*migration_classes.reverse, revert: true) unless migration_classes.empty?`.
    */
   async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
-    // Ruby's block is a slot of its own; in TS it arrives as a trailing
-    // positional, so it is split off before the migration classes are reversed.
     const last = migrationClasses[migrationClasses.length - 1];
     const fn = typeof last === "function" && !isMigrationClass(last) ? last : undefined;
     const klasses = (fn ? migrationClasses.slice(0, -1) : migrationClasses) as MigrationClass[];
