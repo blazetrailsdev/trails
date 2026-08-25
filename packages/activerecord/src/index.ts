@@ -350,10 +350,8 @@ export { Session as DatabaseSelectorSession } from "./middleware/database-select
 export { DatabaseSelector } from "./middleware/database-selector.js";
 export { ShardSelector } from "./middleware/shard-selector.js";
 
-// `DisableJoinsAssociationScope` has no exported name here, but it must still be
-// loaded so it registers its scope builder into `associations/_scope-slots.ts`
-// (Zeitwerk autoloads it in Ruby when `Association#scope` names it).
-// `associations.ts` cannot load it: it extends `Relation`, and that edge closes
-// the relation<->associations cycle. See CLAUDE.md, "Call-time constant
-// resolution (Ruby autoload → the zero-import slot)".
+// No exported name, but it must be loaded so it registers its scope builder into
+// `associations/_scope-slots.ts` (Zeitwerk autoloads it when `Association#scope`
+// names it). `associations.ts` cannot load it: it extends `Relation`, closing
+// the relation<->associations cycle. CLAUDE.md, "Call-time constant resolution".
 import "./associations/disable-joins-association-scope.js";
