@@ -31,7 +31,6 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
-  Attribute,
   AttributeMethodPattern,
   Model,
   Type,
