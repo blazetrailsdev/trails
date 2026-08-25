@@ -2,7 +2,6 @@ import type { RackApp } from "./mock-request.js";
 
 interface Mutex {
   lock(): void;
-  /** @internal */
   unlock(): void;
 }
 
@@ -11,7 +10,6 @@ class DefaultMutex implements Mutex {
   lock() {
     this.synchronized = true;
   }
-  /** @internal */
   unlock() {
     this.synchronized = false;
   }

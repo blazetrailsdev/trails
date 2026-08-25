@@ -166,6 +166,46 @@ function fixerInsertInternal(fixer, node, sourceCode, jsdocComment) {
   return fixer.insertTextBeforeRange(node.range, `/** @internal */\n${indent}`);
 }
 
+/**
+ * TS name of the class / interface a member is declared in, or `null` for a
+ * top-level declaration. The manifest's `entities` map is keyed by exactly this
+ * name (the last segment of the contributing Ruby entity's FQN).
+ */
+function enclosingEntityName(node) {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    if (cur.type === "ClassDeclaration" || cur.type === "ClassExpression") {
+      return cur.id?.name ?? null;
+    }
+    if (cur.type === "TSInterfaceDeclaration") return cur.id?.name ?? null;
+  }
+  return null;
+}
+
+/**
+ * Whether the manifest tags `name` in `rel`.
+ *
+ * The manifest's `entities` entry names the Rails entities that project onto
+ * this TS file. A declaration whose enclosing class/interface is NOT one of
+ * them is a type Rails does not have — `rack/lock.ts` hosts Rails' `Rack::Lock`
+ * (whose `unlock` is private, rack/lib/rack/lock.rb) beside a local `Mutex`
+ * protocol whose `unlock` mirrors the PUBLIC stdlib `Mutex#unlock` — and its
+ * members are not gated by a name some other entity in the file made private.
+ *
+ * A declaration that IS a known entity still reads the file-wide union: Rails
+ * routinely splits one class across sibling modules in one file (`Rack::Request`
+ * and `Rack::Request::Helpers`) that the port folds into a single TS class, so
+ * narrowing to one entity's own names there would drop real gating.
+ *
+ * A top-level declaration has no enclosing entity to resolve — the module-mixin
+ * idiom puts a module's methods there as `this`-typed functions — so it reads
+ * the union too.
+ */
+function manifestTags(manifest, rel, entity, name) {
+  const entities = manifest.entities?.[rel];
+  if (entity !== null && entities && !entities.includes(entity)) return false;
+  return (manifest.files?.[rel] ?? []).includes(name);
+}
+
 function check(context, node, name) {
   if (!name) return;
   // For autofix + comment lookup, use the outer ExportNamedDeclaration
@@ -176,8 +216,7 @@ function check(context, node, name) {
   if (!filename) return;
   const rel = relFromRepoRoot(filename);
   const manifest = loadManifest();
-  const fileNames = manifest.files?.[rel];
-  if (!fileNames || !fileNames.includes(name)) return;
+  if (!manifestTags(manifest, rel, enclosingEntityName(node), name)) return;
 
   const sourceCode = context.sourceCode ?? context.getSourceCode();
   const { tag, comment } = jsdocHasInternal(target, sourceCode);
