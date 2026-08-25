@@ -32,8 +32,6 @@ export type CanonicalKind =
   | "nothingRaised"
   | "same"
   | "notSame"
-  | "predicate"
-  | "notPredicate"
   | "instanceOf"
   | "respondTo"
   | "notRespondTo"
@@ -59,8 +57,6 @@ const NEGATION: Partial<Record<CanonicalKind, CanonicalKind>> = {
   noMatch: "match",
   same: "notSame",
   notSame: "same",
-  predicate: "notPredicate",
-  notPredicate: "predicate",
   respondTo: "notRespondTo",
   notRespondTo: "respondTo",
   // `expect(() => …).not.toThrow()` is the port of `assert_nothing_raised`,
@@ -98,9 +94,14 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_same: "same",
   assert_not_same: "notSame",
   refute_same: "notSame",
-  assert_predicate: "predicate",
-  assert_not_predicate: "notPredicate",
-  refute_predicate: "notPredicate",
+  // Minitest defines `assert_predicate obj, meth` as `assert obj.send(meth)`
+  // and `refute_predicate` as `refute obj.send(meth)`
+  // (minitest/lib/minitest/assertions.rb), so their canonical kinds are the
+  // truthiness pair — there is no separate "call this predicate" assertion for
+  // a TS port to mirror, and `expect(obj.pred).toBeTruthy()` IS the twin.
+  assert_predicate: "truthy",
+  assert_not_predicate: "falsy",
+  refute_predicate: "falsy",
   assert_instance_of: "instanceOf",
   assert_kind_of: "instanceOf",
   assert_respond_to: "respondTo",

@@ -259,7 +259,7 @@ export interface AbstractAdapter {
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
   ): Promise<void>;
-  renameTable(oldName: string, newName: string): Promise<void>;
+  renameTable(tableName: string, newName: string): Promise<void>;
   addColumn(
     tableName: string,
     columnName: string,

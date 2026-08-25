@@ -29,22 +29,7 @@ function baseClass(): typeof Base {
   return _base;
 }
 
-export class NullSchemaMigration {
-  async createTable(): Promise<void> {}
-  async dropTable(): Promise<void> {}
-
-  async allVersions(): Promise<string[]> {
-    return [];
-  }
-
-  async count(): Promise<number> {
-    return 0;
-  }
-
-  async tableExists(): Promise<boolean> {
-    return false;
-  }
-}
+export class NullSchemaMigration {}
 
 export class SchemaMigration {
   private _pool: ConnectionPool | NullPool;
