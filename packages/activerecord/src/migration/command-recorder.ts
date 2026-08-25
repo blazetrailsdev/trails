@@ -13,8 +13,17 @@ import {
   joinTableName as _joinTableName,
 } from "./join-table.js";
 
+/**
+ * A recorded migration block — the third element of a command tuple, Rails'
+ * `&block` (migration/command_recorder.rb:109).
+ */
+export type MigrationBlock = (...args: any[]) => unknown;
+
+/** A recorded command: `[cmd, args, block]` (migration/command_recorder.rb:109). */
+export type MigrationCommand = [string, unknown[], MigrationBlock?];
+
 export class CommandRecorder {
-  private _commands: Array<[string, unknown[]]> = [];
+  private _commands: MigrationCommand[] = [];
   private _delegate: unknown;
   private _reverting = false;
 
@@ -39,7 +48,7 @@ export class CommandRecorder {
     this._reverting = value;
   }
 
-  get commands(): Array<[string, unknown[]]> {
+  get commands(): MigrationCommand[] {
     return [...this._commands];
   }
 
@@ -49,11 +58,11 @@ export class CommandRecorder {
    * `inverse_of(...)` when `@reverting`), so nested `revert` blocks cancel out
    * by double-negation.
    */
-  record(cmd: string, args: unknown[]): void {
+  record(cmd: string, args: unknown[], block?: MigrationBlock): void {
     if (this._reverting) {
-      this._commands.push(this.inverseOf(cmd, args));
+      this._commands.push(this.inverseOf(cmd, args, block));
     } else {
-      this._commands.push([cmd, args]);
+      this._commands.push([cmd, args, block]);
     }
   }
 
@@ -103,7 +112,7 @@ export class CommandRecorder {
    * because a name the recorder does not answer reads back as the proxy's
    * `NoMethodError`-raising function rather than `undefined`.
    */
-  inverseOf(cmd: string, args: unknown[]): [string, unknown[]] {
+  inverseOf(cmd: string, args: unknown[], block?: MigrationBlock): MigrationCommand {
     const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
     if (!(method in this)) {
       throw new IrreversibleMigration(
@@ -113,7 +122,11 @@ export class CommandRecorder {
           `2. Use the #reversible method to define reversible behavior.\n`,
       );
     }
-    return (this[method] as (args: unknown[]) => [string, unknown[]]).call(this, args);
+    return (this[method] as (args: unknown[], block?: MigrationBlock) => MigrationCommand).call(
+      this,
+      args,
+      block,
+    );
   }
 
   /**
@@ -123,12 +136,9 @@ export class CommandRecorder {
    * a single batched command (mirrors the Rails bulk alter path).
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#change_table
-   *
-   * @missingRailsCall bulk_change_table — PERMANENT: Rails records the bulk path
-   *   as a lambda `-> t { bulk_change_table(table_name, commands) }`
-   *   (migration/command_recorder.rb:142); the port's command tuple carries no
-   *   block seat, so it records `[tableName, commands]` and `replay`
-   *   re-dispatches each sub-command (command-recorder.ts:138,152-160).
+   * (command_recorder.rb:141-152). The bulk path's recorded lambda reaches
+   * `bulkChangeTable` through the `methodMissingProxy`, as the Ruby lambda's
+   * `self` reaches it through `method_missing` (command_recorder.rb:142).
    */
   async changeTable(
     tableName: string,
@@ -153,7 +163,17 @@ export class CommandRecorder {
       const recorder = new CommandRecorder(this._delegate);
       recorder.reverting = this._reverting;
       await callback(delegate.updateTableDefinition(tableName, recorder));
-      this._commands.push(["changeTable", [tableName, recorder.commands]]);
+      const commands = recorder.commands;
+      this._commands.push([
+        "changeTable",
+        [tableName],
+        () =>
+          (
+            this as unknown as {
+              bulkChangeTable(tableName: string, operations: MigrationCommand[]): Promise<void>;
+            }
+          ).bulkChangeTable(tableName, commands),
+      ]);
     } else {
       await callback(delegate.updateTableDefinition(tableName, this));
     }
@@ -163,27 +183,15 @@ export class CommandRecorder {
    * Replay all recorded commands against the given migration.
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#replay
+   * (command_recorder.rb:148-152). TS has no block syntax: Ruby's `&block`
+   * passes nothing when the block is nil, so an absent block must not become a
+   * trailing `undefined` argument to a splat-taking method like
+   * `drop_table(*table_names)`.
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
-    for (const [cmd, args] of this.commands) {
-      // Bulk changeTable stores [tableName, subCommands[]]. Replay each
-      // sub-command individually rather than forwarding the array as an arg.
-      if (cmd === "changeTable" && Array.isArray(args[1])) {
-        const subCmds = args[1] as Array<[string, unknown[]]>;
-        for (const [sub, subArgs] of subCmds) {
-          if (typeof migration[sub] === "function") {
-            await migration[sub](...subArgs);
-          }
-        }
-      } else if (typeof migration[cmd] === "function") {
-        await migration[cmd](...args);
-      }
+    for (const [cmd, args, block] of this.commands) {
+      await migration[cmd](...args, ...(block === undefined ? [] : [block]));
     }
-  }
-
-  /** Returns the full inverse command list. */
-  inverse(): Array<[string, unknown[]]> {
-    return [...this._commands].reverse().map(([cmd, args]) => this.inverseOf(cmd, args));
   }
 
   // ---------------------------------------------------------------------------
@@ -197,7 +205,7 @@ export class CommandRecorder {
    *   (migration/command_recorder.rb:199); JS spells the same operation as the
    *   `delete` OPERATOR (command-recorder.ts:192), which records no callee.
    */
-  invertCreateTable(args: unknown[]): [string, unknown[]] {
+  invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
     // createTable may be recorded as [name, options, fn] — find the trailing options hash
     let optsIdx = -1;
@@ -213,17 +221,22 @@ export class CommandRecorder {
       delete opts["ifNotExists"];
       a[optsIdx] = opts;
     }
-    return ["dropTable", a];
+    return ["dropTable", a, block];
   }
 
-  /** @internal */
-  invertDropTable(args: unknown[]): [string, unknown[]] {
+  /**
+   * @internal
+   *
+   * TS has no block syntax, so a recordable method's trailing callback rides
+   * inside `args` where Ruby carries it in the block seat (the `revert order`
+   * test's `create_table("bananas", &block)`); either position is Rails'
+   * `block` for the reversibility check (command_recorder.rb:214).
+   */
+  invertDropTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
-    // The reversal block (table definition) rides as a trailing function, the
-    // same convention create_table uses (see the `revert order` test).
-    let block: unknown;
+    let argsBlock: unknown;
     if (a.length > 0 && typeof a[a.length - 1] === "function") {
-      block = a.pop();
+      argsBlock = a.pop();
     }
     let options: Record<string, unknown> = {};
     if (
@@ -241,7 +254,12 @@ export class CommandRecorder {
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     }
-    if (a.length === 1 && Object.keys(options).length === 0 && block === undefined) {
+    if (
+      a.length === 1 &&
+      Object.keys(options).length === 0 &&
+      block === undefined &&
+      argsBlock === undefined
+    ) {
       throw new IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
@@ -249,36 +267,36 @@ export class CommandRecorder {
 
     const result = [...a];
     if (Object.keys(options).length > 0) result.push(options);
-    if (block !== undefined) result.push(block);
-    return ["createTable", result];
+    if (argsBlock !== undefined) result.push(argsBlock);
+    return ["createTable", result, block];
   }
 
   /** @internal */
-  invertCreateJoinTable(args: unknown[]): [string, unknown[]] {
-    return ["dropJoinTable", args];
+  invertCreateJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["dropJoinTable", args, block];
   }
 
   /** @internal */
-  invertDropJoinTable(args: unknown[]): [string, unknown[]] {
-    return ["createJoinTable", args];
+  invertDropJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["createJoinTable", args, block];
   }
 
   /** @internal */
-  invertAddColumn(args: unknown[]): [string, unknown[]] {
-    return ["removeColumn", args];
+  invertAddColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["removeColumn", args, block];
   }
 
   /** @internal */
-  invertRemoveColumn(args: unknown[]): [string, unknown[]] {
+  invertRemoveColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (typeof args[2] !== "string") {
       throw new IrreversibleMigration("remove_column is only reversible if given a type.");
     }
-    return ["addColumn", args];
+    return ["addColumn", args, block];
   }
 
   /** @internal */
-  invertAddIndex(args: unknown[]): [string, unknown[]] {
-    return ["removeIndex", args];
+  invertAddIndex(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["removeIndex", args, block];
   }
 
   /** @internal */
@@ -310,33 +328,33 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertAddTimestamps(args: unknown[]): [string, unknown[]] {
-    return ["removeTimestamps", args];
+  invertAddTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["removeTimestamps", args, block];
   }
 
   /** @internal */
-  invertRemoveTimestamps(args: unknown[]): [string, unknown[]] {
-    return ["addTimestamps", args];
+  invertRemoveTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["addTimestamps", args, block];
   }
 
   /** @internal */
-  invertAddReference(args: unknown[]): [string, unknown[]] {
-    return ["removeReference", args];
+  invertAddReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["removeReference", args, block];
   }
 
   /** Alias of invertAddReference (Rails: `alias :invert_add_belongs_to :invert_add_reference`). @internal */
-  invertAddBelongsTo(args: unknown[]): [string, unknown[]] {
-    return this.invertAddReference(args);
+  invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return this.invertAddReference(args, block);
   }
 
   /** @internal */
-  invertRemoveReference(args: unknown[]): [string, unknown[]] {
-    return ["addReference", args];
+  invertRemoveReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["addReference", args, block];
   }
 
   /** Alias of invertRemoveReference (Rails: `alias :invert_remove_belongs_to :invert_remove_reference`). @internal */
-  invertRemoveBelongsTo(args: unknown[]): [string, unknown[]] {
-    return this.invertRemoveReference(args);
+  invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return this.invertRemoveReference(args, block);
   }
 
   /**
@@ -346,14 +364,14 @@ export class CommandRecorder {
    *   (migration/command_recorder.rb:288); JS spells the same operation as the
    *   `delete` OPERATOR (command-recorder.ts:326), which records no callee.
    */
-  invertAddForeignKey(args: unknown[]): [string, unknown[]] {
+  invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
     if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
       const opts = { ...(a[a.length - 1] as Record<string, unknown>) };
       delete opts["validate"];
       a[a.length - 1] = opts;
     }
-    return ["removeForeignKey", a];
+    return ["removeForeignKey", a, block];
   }
 
   /** @internal */
@@ -380,7 +398,7 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertAddCheckConstraint(args: unknown[]): [string, unknown[]] {
+  invertAddCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
     if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
       const opts = { ...(a[a.length - 1] as Record<string, unknown>) };
@@ -391,11 +409,11 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return ["removeCheckConstraint", a];
+    return ["removeCheckConstraint", a, block];
   }
 
   /** @internal */
-  invertRemoveCheckConstraint(args: unknown[]): [string, unknown[]] {
+  invertRemoveCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (args.length < 2) {
       throw new IrreversibleMigration(
         "remove_check_constraint is only reversible if given an expression.",
@@ -410,26 +428,26 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return ["addCheckConstraint", a];
+    return ["addCheckConstraint", a, block];
   }
 
   /** @internal */
-  invertAddExclusionConstraint(args: unknown[]): [string, unknown[]] {
-    return ["removeExclusionConstraint", args];
+  invertAddExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["removeExclusionConstraint", args, block];
   }
 
   /** @internal */
-  invertRemoveExclusionConstraint(args: unknown[]): [string, unknown[]] {
+  invertRemoveExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (args.length < 2) {
       throw new IrreversibleMigration(
         "remove_exclusion_constraint is only reversible if given an expression.",
       );
     }
-    return ["addExclusionConstraint", args];
+    return ["addExclusionConstraint", args, block];
   }
 
   /** @internal */
-  invertAddUniqueConstraint(args: unknown[]): [string, unknown[]] {
+  invertAddUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const options =
       args.length > 0 && typeof args[args.length - 1] === "object" && args[args.length - 1] !== null
         ? (args[args.length - 1] as Record<string, unknown>)
@@ -439,11 +457,11 @@ export class CommandRecorder {
         "add_unique_constraint is not reversible if given an using_index.",
       );
     }
-    return ["removeUniqueConstraint", args];
+    return ["removeUniqueConstraint", args, block];
   }
 
   /** @internal */
-  invertRemoveUniqueConstraint(args: unknown[]): [string, unknown[]] {
+  invertRemoveUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
     // extract_options! only strips a trailing Hash, never an Array
     if (
@@ -460,7 +478,7 @@ export class CommandRecorder {
         "remove_unique_constraint is only reversible if given an column_name.",
       );
     }
-    return ["addUniqueConstraint", args];
+    return ["addUniqueConstraint", args, block];
   }
 
   /** @internal */
@@ -578,37 +596,37 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertCreateEnum(args: unknown[]): [string, unknown[]] {
-    return ["dropEnum", args];
+  invertCreateEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["dropEnum", args, block];
   }
 
   /** @internal */
-  invertEnableExtension(args: unknown[]): [string, unknown[]] {
-    return ["disableExtension", args];
+  invertEnableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["disableExtension", args, block];
   }
 
   /** @internal */
-  invertDisableExtension(args: unknown[]): [string, unknown[]] {
-    return ["enableExtension", args];
+  invertDisableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["enableExtension", args, block];
   }
 
   /** @internal */
-  invertCreateSchema(args: unknown[]): [string, unknown[]] {
-    return ["dropSchema", args];
+  invertCreateSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["dropSchema", args, block];
   }
 
   /** @internal */
-  invertDropSchema(args: unknown[]): [string, unknown[]] {
-    return ["createSchema", args];
+  invertDropSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["createSchema", args, block];
   }
 
   /** @internal */
-  invertCreateVirtualTable(args: unknown[]): [string, unknown[]] {
-    return ["dropVirtualTable", args];
+  invertCreateVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["dropVirtualTable", args, block];
   }
 
   /** @internal */
-  invertDropEnum(args: unknown[]): [string, unknown[]] {
+  invertDropEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
     // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();
     if (
@@ -624,7 +642,7 @@ export class CommandRecorder {
         "drop_enum is only reversible if given a list of enum values.",
       );
     }
-    return ["createEnum", args];
+    return ["createEnum", args, block];
   }
 
   /** @internal */
@@ -659,7 +677,7 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertDropVirtualTable(args: unknown[]): [string, unknown[]] {
+  invertDropVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
     // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();
     if (
@@ -673,7 +691,7 @@ export class CommandRecorder {
     if (a[1] === undefined) {
       throw new IrreversibleMigration("drop_virtual_table is only reversible if given options.");
     }
-    return ["createVirtualTable", args];
+    return ["createVirtualTable", args, block];
   }
 
   /** @internal */

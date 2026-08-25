@@ -29,25 +29,29 @@ export class Window extends Node {
     return this;
   }
 
-  frame(node: Node): this {
-    this.framing = node;
-    return this;
+  /**
+   * Mirrors `frame` (nodes/window.rb:30-32), whose value is the assignment —
+   * the framing node itself, which `rows`/`range` hand back to their caller.
+   */
+  frame(expr: Node): Node {
+    this.framing = expr;
+    return expr;
   }
 
-  rows(expr: Node | null = null): Rows | this {
+  rows(expr: Node | null = null): Node {
     if (this.framing) {
       return new Rows(expr);
+    } else {
+      return this.frame(new Rows(expr));
     }
-    this.frame(new Rows(expr));
-    return this;
   }
 
-  range(expr: Node | null = null): Range | this {
+  range(expr: Node | null = null): Node {
     if (this.framing) {
       return new Range(expr);
+    } else {
+      return this.frame(new Range(expr));
     }
-    this.frame(new Range(expr));
-    return this;
   }
 }
 
@@ -67,15 +71,21 @@ export class NamedWindow extends Window {
 // `Following`, `Rows`, `Range` all extend Unary; only `CurrentRow`
 // extends Node directly (it carries no expr).
 export class Preceding extends Unary {
-  declare readonly expr: Node | null;
-  constructor(expr: Node | null = null) {
+  /**
+   * Rails' `Preceding.new(expr = nil)` (window.rb) puts no bound on the expr — the
+   * frame offset is commonly a bare Integer — so it keeps `Unary`'s `expr`.
+   */
+  constructor(expr: unknown = null) {
     super(expr);
   }
 }
 
 export class Following extends Unary {
-  declare readonly expr: Node | null;
-  constructor(expr: Node | null = null) {
+  /**
+   * Rails' `Following.new(expr = nil)` (window.rb) puts no bound on the expr — the
+   * frame offset is commonly a bare Integer — so it keeps `Unary`'s `expr`.
+   */
+  constructor(expr: unknown = null) {
     super(expr);
   }
 }
