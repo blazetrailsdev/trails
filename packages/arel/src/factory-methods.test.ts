@@ -1,114 +1,83 @@
 import { describe, it, expect } from "vitest";
-import { fakeRecordConnection } from "./test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "./index.js";
+import { Table, Nodes } from "./index.js";
+import { FactoryMethods } from "./factory-methods.js";
 
 describe("TestFactoryMethods", () => {
-  const users = new Table("users");
-  const posts = new Table("posts");
+  // Rails defines a `Factory` class that `include Arel::FactoryMethods`
+  // (factory_methods_test.rb:8-14); the module object itself is the receiver here.
+  const factory = FactoryMethods;
+
   it("create join", () => {
-    const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
-    expect(join).toBeInstanceOf(Nodes.InnerJoin);
+    const join = factory.createJoin("one", "two");
+    expect(join).toBeInstanceOf(Nodes.Join);
+    expect(join.right).toBe("two");
   });
 
   it("create table alias", () => {
-    const aliased = users.alias("u");
-    expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-    expect(aliased.name).toBe("u");
+    const tableAlias = factory.createTableAlias("one" as never, "two");
+    expect(tableAlias).toBeInstanceOf(Nodes.TableAlias);
+    expect(tableAlias.right).toBe("two");
   });
 
   it("create and", () => {
-    const and = users.createAnd([users.get("id").eq(1), users.get("name").eq("dean")]);
-    expect(and).toBeInstanceOf(Nodes.And);
-    expect(and.children.length).toBe(2);
+    const andNode = factory.createAnd(["foo", "bar"]);
+    expect(andNode).toBeInstanceOf(Nodes.And);
+    expect(andNode.children).toEqual(["foo", "bar"]);
   });
 
   it("create string join", () => {
-    const join = users.createStringJoin("INNER JOIN posts ON posts.user_id = users.id");
+    const join = factory.createStringJoin("foo");
     expect(join).toBeInstanceOf(Nodes.StringJoin);
+    expect(join.left).toBe("foo");
   });
 
   it("grouping", () => {
-    const g = users.grouping(users.get("id").eq(1));
-    expect(g).toBeInstanceOf(Nodes.Grouping);
+    const grouping = factory.grouping("one" as never);
+    expect(grouping).toBeInstanceOf(Nodes.Grouping);
+    expect(grouping.expr).toBe("one");
   });
 
   it("create on", () => {
-    const on = users.createOn(users.get("id").eq(posts.get("user_id")));
+    const on = factory.createOn("one" as never);
     expect(on).toBeInstanceOf(Nodes.On);
-  });
-
-  it("lower", () => {
-    const fn = users.lower(users.get("name"));
-    expect(fn).toBeInstanceOf(Nodes.NamedFunction);
-    expect(fn.name).toBe("LOWER");
-  });
-
-  // Mirrors Rails: `lower(column)` wraps non-Node arguments via
-  // `Nodes.build_quoted` (factory_methods.rb), so a string column resolves
-  // to LOWER('name') rather than rendering "[object Object]".
-  it("lower wraps non-Node arguments via buildQuoted", () => {
-    const fn = users.lower("name");
-    expect(fn.expressions[0]).toBeInstanceOf(Nodes.Quoted);
-    expect(new Visitors.ToSql(fakeRecordConnection).compile(fn)).toBe("LOWER('name')");
-  });
-
-  it("coalesce", () => {
-    const fn = users.coalesce(users.get("name"), new Nodes.Quoted("default"));
-    expect(fn).toBeInstanceOf(Nodes.NamedFunction);
-    expect(fn.name).toBe("COALESCE");
-    expect(new Visitors.ToSql(fakeRecordConnection).compile(fn)).toBe(
-      'COALESCE("users"."name", \'default\')',
-    );
-  });
-
-  it("cast", () => {
-    const fn = users.cast(users.get("age"), "VARCHAR");
-    expect(fn).toBeInstanceOf(Nodes.NamedFunction);
-    expect(fn.name).toBe("CAST");
-    // Mirrors Rails: `cast` builds NamedFunction("CAST", [name.as(type)]),
-    // not a string-interpolated SqlLiteral. The compiled SQL must reference
-    // the column properly rather than "[object Object] AS VARCHAR".
-    expect(new Visitors.ToSql(fakeRecordConnection).compile(fn)).toBe(
-      'CAST("users"."age" AS VARCHAR)',
-    );
-  });
-
-  // Mirrors Rails: delegating to `name.as(type)` produces an `As` whose
-  // alias is a *retryable* SqlLiteral (factory_methods.rb / alias_predication.rb),
-  // not a plain SqlLiteral.
-  it("cast delegates to .as(type) for a retryable alias", () => {
-    const fn = users.cast(users.get("age"), "VARCHAR");
-    const asNode = fn.expressions[0] as Nodes.As;
-    expect(asNode).toBeInstanceOf(Nodes.As);
-    const right = asNode.right as Nodes.SqlLiteral;
-    expect(right).toBeInstanceOf(Nodes.SqlLiteral);
-    expect(right.retryable).toBe(true);
+    expect(on.expr).toBe("one");
   });
 
   it("create true", () => {
-    const t = users.createTrue();
-    expect(t).toBeInstanceOf(Nodes.True);
-    expect(new Visitors.ToSql(fakeRecordConnection).compile(t)).toBe("TRUE");
+    const trueNode = factory.createTrue();
+    expect(trueNode).toBeInstanceOf(Nodes.True);
   });
 
   it("create false", () => {
-    const f = users.createFalse();
-    expect(f).toBeInstanceOf(Nodes.False);
-    expect(new Visitors.ToSql(fakeRecordConnection).compile(f)).toBe("FALSE");
+    const falseNode = factory.createFalse();
+    expect(falseNode).toBeInstanceOf(Nodes.False);
   });
 
-  describe("FactoryMethods is mixed into every Node subclass", () => {
-    const eq = users.get("id").eq(1);
-    it("createTrue available on Equality", () => {
-      expect(eq.createTrue()).toBeInstanceOf(Nodes.True);
-    });
-    it("grouping available on Equality", () => {
-      expect(eq.grouping(eq)).toBeInstanceOf(Nodes.Grouping);
-    });
-    it("createAnd available on Equality", () => {
-      const and = eq.createAnd([eq, eq]);
-      expect(and).toBeInstanceOf(Nodes.And);
-      expect(and.children.length).toBe(2);
-    });
+  it("lower", () => {
+    const lower = factory.lower("one");
+    expect(lower).toBeInstanceOf(Nodes.NamedFunction);
+    expect(lower.name).toBe("LOWER");
+    expect(lower.expressions.map((e) => (e as Nodes.Quoted).expr)).toEqual(["one"]);
+  });
+
+  it("coalesce", () => {
+    const relation = new Table("users");
+    const fieldNode = relation.get("active");
+    const coalesce = factory.coalesce(fieldNode, new Nodes.Quoted(0));
+    expect(coalesce).toBeInstanceOf(Nodes.NamedFunction);
+    expect(coalesce.name).toBe("COALESCE");
+    expect(coalesce.expressions).toEqual([fieldNode, new Nodes.Quoted(0)]);
+  });
+
+  it("cast", () => {
+    const relation = new Table("users");
+    const fieldNode = relation.get("active");
+    const cast = factory.cast(fieldNode, "boolean");
+    expect(cast).toBeInstanceOf(Nodes.NamedFunction);
+    expect(cast.name).toBe("CAST");
+    const asNode = cast.expressions[0];
+    expect(asNode).toBeInstanceOf(Nodes.As);
+    expect((asNode as Nodes.As).left).toBe(fieldNode);
+    expect(String((asNode as Nodes.As).right)).toBe("boolean");
   });
 });

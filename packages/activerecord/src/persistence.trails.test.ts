@@ -18,7 +18,7 @@ import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -317,5 +317,25 @@ describe("PersistenceTest (trails)", () => {
 
     expect(emitted).toContain("654321");
     expect(emitted).not.toContain("'654321'");
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["posts"]);
+
+  // Rails' `becomes` merges the target class's default attributes UNDER this
+  // record's own (`@attributes.reverse_merge!(becoming.@attributes)`,
+  // persistence.rb:491). `Hash#reverse_merge!` keeps an entry whenever the KEY
+  // is present, and a partially-selected record's AttributeSet carries every
+  // column — the unselected ones as Uninitialized attributes — so the target's
+  // defaults do NOT fill them in and reading one still raises.
+  it("becomes on a partially selected record keeps the missing attributes missing", async () => {
+    const post = (await CanonicalPost.select("id").first())!;
+    const special = post.becomes(SpecialPost);
+
+    expect(special.id).toBe(post.id);
+    expect(() => (special as unknown as { title: string }).title).toThrow(
+      /missing attribute|title/i,
+    );
   });
 });

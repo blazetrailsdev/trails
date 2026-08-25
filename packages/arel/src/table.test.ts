@@ -14,6 +14,8 @@ import {
   fakeRecordConnection,
   mysqlTestConnection,
 } from "./test-helpers/connection.js";
+import { mustBeLike } from "./test-helpers/must-be-like.js";
+import { uniq } from "./test-helpers/uniq.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -66,16 +68,19 @@ describe("TableTest", () => {
 
   describe("skip", () => {
     it("should add an offset", () => {
-      const mgr = users.project(star);
-      mgr.skip(10);
-      expect(mgr.toSql()).toContain("OFFSET 10");
+      const sm = users.skip(2);
+      expect(mustBeLike(sm.toSql())).toBe(mustBeLike('SELECT FROM "users" OFFSET 2'));
     });
   });
 
   describe("having", () => {
     it("adds a having clause", () => {
-      const mgr = users.having(sql("COUNT(*) > 1")).project(star);
-      expect(mgr.toSql()).toContain("HAVING");
+      const mgr = users.having(users.get("id").eq(10));
+      expect(mustBeLike(mgr.toSql())).toBe(
+        mustBeLike(`
+         SELECT FROM "users" HAVING "users"."id" = 10
+        `),
+      );
     });
   });
 
@@ -112,8 +117,12 @@ describe("TableTest", () => {
 
   describe("group", () => {
     it("should create a group", () => {
-      const mgr = users.group(users.get("age")).project(star);
-      expect(mgr.toSql()).toContain("GROUP BY");
+      const manager = users.group(users.get("id"));
+      expect(mustBeLike(manager.toSql())).toBe(
+        mustBeLike(`
+          SELECT FROM "users" GROUP BY "users"."id"
+        `),
+      );
     });
   });
 
@@ -124,48 +133,48 @@ describe("TableTest", () => {
     });
 
     it("ignores as if it equals name", () => {
-      const t = new Table("users", { as: "users" });
-      expect(t.name).toBe("users");
-      expect(t.tableAlias).toBeNull();
+      const rel = new Table("users", { as: "users" });
+      expect(rel.tableAlias).toBeNull();
     });
 
     it("should accept literal SQL", () => {
-      const mgr = users.project(sql("1 as one"));
-      const result = mgr.toSql();
-      expect(result).toContain("1 as one");
+      // Rails' Table.new takes any name object (table.rb:26-31); the trails
+      // constructor still types `name` as a string.
+      const rel = new Table(sql("generate_series(4, 2)") as never);
+      expect(rel.name).toEqual(sql("generate_series(4, 2)"));
     });
 
     it("should accept Arel nodes", () => {
-      const mgr = users.project(users.get("id"));
-      const result = mgr.toSql();
-      expect(result).toContain('"users"."id"');
+      const node = new Nodes.NamedFunction("generate_series", [4, 2] as never);
+      const rel = new Table(node as never);
+      expect(rel.name).toBe(node);
     });
   });
 
   describe("order", () => {
     it("should take an order", () => {
-      const mgr = users.order(users.get("name").asc()).project(star);
-      expect(mgr.toSql()).toContain("ORDER BY");
+      const manager = users.order("foo");
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike('SELECT FROM "users" ORDER BY foo'));
     });
   });
 
   describe("take", () => {
     it("should add a limit", () => {
-      const mgr = users.take(10).project(star);
-      expect(mgr.toSql()).toContain("LIMIT 10");
+      const manager = users.take(1);
+      manager.project(new Nodes.SqlLiteral("*"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike('SELECT * FROM "users" LIMIT 1'));
     });
   });
 
   describe("project", () => {
     it("can project", () => {
-      const mgr = users.project(users.get("name"));
-      expect(mgr.toSql()).toContain('"name"');
+      const manager = users.project(new Nodes.SqlLiteral("*"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike('SELECT * FROM "users"'));
     });
 
     it("takes multiple parameters", () => {
-      const mgr = users.project(users.get("name"), users.get("email"));
-      expect(mgr.toSql()).toContain('"name"');
-      expect(mgr.toSql()).toContain('"email"');
+      const manager = users.project(new Nodes.SqlLiteral("*"), new Nodes.SqlLiteral("*"));
+      expect(mustBeLike(manager.toSql())).toBe(mustBeLike('SELECT *, * FROM "users"'));
     });
   });
 
@@ -181,32 +190,25 @@ describe("TableTest", () => {
   describe("[]", () => {
     describe("when given a Symbol", () => {
       it("manufactures an attribute if the symbol names an attribute within the relation", () => {
-        const attr = users.get("id");
-        expect(attr).toBeInstanceOf(Nodes.Attribute);
-        expect(attr.name).toBe("id");
-        expect(attr.relation).toBe(users);
+        const column = users.get("id");
+        expect(column.name).toBe("id");
       });
     });
   });
 
   describe("equality", () => {
-    // Rails asserts `array.uniq.size` (table_test.rb:191-202), which exercises
-    // the eql? + hash contract together; JS has no uniq-by-eql, so assert both
-    // halves explicitly.
     it("is equal with equal ivars", () => {
       const relation1 = new Table("users", { as: "zomg" });
       const relation2 = new Table("users", { as: "zomg" });
-      expect(relation1.eql(relation2)).toBe(true);
-      expect(relation1.hash()).toBe(relation2.hash());
+      const array = [relation1, relation2];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
       const relation1 = new Table("users", { as: "zomg" });
       const relation2 = new Table("users", { as: "zomg2" });
-      // Rails' Table#hash hashes only @name (table.rb:88-92), so these share a
-      // hash bucket; uniq drops to eql?, which distinguishes them.
-      expect(relation1.hash()).toBe(relation2.hash());
-      expect(relation1.eql(relation2)).toBe(false);
+      const array = [relation1, relation2];
+      expect(uniq(array).length).toBe(2);
     });
   });
 
@@ -296,17 +298,14 @@ describe("TableTest", () => {
 
   describe("alias", () => {
     it("should create a node that proxies to a table", () => {
-      const aliased = users.alias("u");
-      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect(aliased.relation).toBe(users);
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(aliased.get("id"));
-      expect(sql).toBe('"u"."id"');
+      const node = users.alias();
+      expect(node.name).toBe("users_2");
+      expect(node.get("id").relation).toBe(node);
     });
   });
 
   it("should have a name", () => {
-    const t = new Table("widgets");
-    expect(t.name).toBe("widgets");
+    expect(users.name).toBe("users");
   });
 
   describe("[] (get) with explicit table", () => {

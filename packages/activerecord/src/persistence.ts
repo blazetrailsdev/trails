@@ -1633,7 +1633,12 @@ export async function _createRecord(
   // declared columns present in the value map; an explicit `attributeNames`
   // arg overrides it (Persistence#_create_record(attribute_names)).
   const selfNames =
-    attributeNames ?? Object.keys(attrs).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
+    attributeNames ??
+    // Rails' `self.attribute_names` is `@attributes.keys` — AttributeSet#keys,
+    // which selects the INITIALIZED names (attribute_set.rb:46-48). Reading the
+    // keys of `valuesForDatabase()` instead would include uninitialized
+    // attributes, which that reader emits as nil (attribute_set.rb:32-34).
+    (this._attributes.keys() as string[]).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
   // attribute_names_for_partial_inserts (dirty.rb:207-217), which reads
   // `changed_attribute_names_to_save` — derived from the `Attribute` graph, so

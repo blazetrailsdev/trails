@@ -808,3 +808,45 @@ describe("TableDefinition id hash form", () => {
     expect(id.options.default).toBe("generated");
   });
 });
+
+describe("Table exists-predicate forwarders", () => {
+  const calls: unknown[][] = [];
+  const recordingSchema = {
+    columnExists: async (...args: unknown[]) => {
+      calls.push(["columnExists", ...args]);
+      return true;
+    },
+    foreignKeyExists: async (...args: unknown[]) => {
+      calls.push(["foreignKeyExists", ...args]);
+      return true;
+    },
+  };
+
+  it("columnExists forwards the type and the trailing options", async () => {
+    calls.length = 0;
+    const t = new Table("users", recordingSchema as never);
+    await t.columnExists("name", "string", { limit: 80 });
+    await t.columnExists("name", "string");
+    await t.columnExists("name");
+    expect(calls).toEqual([
+      ["columnExists", "users", "name", "string", { limit: 80 }],
+      ["columnExists", "users", "name", "string"],
+      ["columnExists", "users", "name", undefined],
+    ]);
+  });
+
+  it("foreignKeyExists forwards the to_table alongside the options", async () => {
+    calls.length = 0;
+    const t = new Table("users", recordingSchema as never);
+    await t.foreignKeyExists("authors", { column: "author_id" });
+    await t.foreignKeyExists("authors");
+    await t.foreignKeyExists({ column: "author_id" });
+    await t.foreignKeyExists();
+    expect(calls).toEqual([
+      ["foreignKeyExists", "users", "authors", { column: "author_id" }],
+      ["foreignKeyExists", "users", "authors"],
+      ["foreignKeyExists", "users", { column: "author_id" }],
+      ["foreignKeyExists", "users"],
+    ]);
+  });
+});

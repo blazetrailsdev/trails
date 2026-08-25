@@ -94,23 +94,13 @@ export class AttributeSet {
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes()) {
-      if (attr.isInitialized()) {
-        result[name] = attr.valueBeforeTypeCast;
-      }
-    }
-    return result;
+    return Object.fromEntries(
+      transformValues(this.attributes(), (attr) => attr.valueBeforeTypeCast),
+    );
   }
 
   valuesForDatabase(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes()) {
-      if (attr.isInitialized()) {
-        result[name] = attr.valueForDatabase;
-      }
-    }
-    return result;
+    return Object.fromEntries(transformValues(this.attributes(), (attr) => attr.valueForDatabase));
   }
 
   isKey(name: string): boolean {
@@ -221,7 +211,7 @@ export class AttributeSet {
   reverseMergeBang(target: AttributeSet): this {
     this.assertNotFrozen();
     for (const [name, attr] of target.attributes()) {
-      if (!this.isKey(name)) {
+      if (!this._attributes.has(name)) {
         this._attributes.set(name, attr);
       }
     }

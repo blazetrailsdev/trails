@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
+import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { Table, Visitors } from "../index.js";
 
 describe("MathTest", () => {
@@ -7,29 +8,49 @@ describe("MathTest", () => {
   const table = new Table("users");
 
   // These test names match the Ruby convention (interpolation-stripped names)
-  it("average should be compatible with", () => {
-    expect(visitor.compile(table.get("id").average().multiply(2))).toBe('AVG("users"."id") * 2');
-    expect(visitor.compile(table.get("id").average().add(2))).toBe('(AVG("users"."id") + 2)');
+  it("average should be compatible with ", () => {
+    const table = new Table("users");
+    expect(mustBeLike(visitor.compile(table.get("id").average().multiply(2)))).toBe(
+      mustBeLike(`
+        AVG("users"."id") * 2
+      `),
+    );
   });
 
-  it("count should be compatible with", () => {
-    expect(visitor.compile(table.get("id").count().multiply(2))).toBe('COUNT("users"."id") * 2');
-    expect(visitor.compile(table.get("id").count().add(2))).toBe('(COUNT("users"."id") + 2)');
+  it("count should be compatible with ", () => {
+    const table = new Table("users");
+    expect(mustBeLike(visitor.compile(table.get("id").count().multiply(2)))).toBe(
+      mustBeLike(`
+        COUNT("users"."id") * 2
+      `),
+    );
   });
 
-  it("maximum should be compatible with", () => {
-    expect(visitor.compile(table.get("id").maximum().multiply(2))).toBe('MAX("users"."id") * 2');
-    expect(visitor.compile(table.get("id").maximum().add(2))).toBe('(MAX("users"."id") + 2)');
+  it("maximum should be compatible with ", () => {
+    const table = new Table("users");
+    expect(mustBeLike(visitor.compile(table.get("id").maximum().multiply(2)))).toBe(
+      mustBeLike(`
+        MAX("users"."id") * 2
+      `),
+    );
   });
 
-  it("minimum should be compatible with", () => {
-    expect(visitor.compile(table.get("id").minimum().multiply(2))).toBe('MIN("users"."id") * 2');
-    expect(visitor.compile(table.get("id").minimum().add(2))).toBe('(MIN("users"."id") + 2)');
+  it("minimum should be compatible with ", () => {
+    const table = new Table("users");
+    expect(mustBeLike(visitor.compile(table.get("id").minimum().multiply(2)))).toBe(
+      mustBeLike(`
+        MIN("users"."id") * 2
+      `),
+    );
   });
 
-  it("attribute node should be compatible with", () => {
-    expect(visitor.compile(table.get("id").multiply(2))).toBe('"users"."id" * 2');
-    expect(visitor.compile(table.get("id").add(2))).toBe('("users"."id" + 2)');
+  it("attribute node should be compatible with ", () => {
+    const table = new Table("users");
+    expect(mustBeLike(visitor.compile(table.get("id").multiply(2)))).toBe(
+      mustBeLike(`
+        "users"."id" * 2
+      `),
+    );
   });
 
   it("average should be compatible with *", () => {
@@ -246,41 +267,46 @@ describe("MathTest", () => {
 
   it("average should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(
-      table.get("id").average().divide(2),
+    expect(mustBeLike(visitor.compile(table.get("id").average().add(2)))).toBe(
+      mustBeLike(`
+        (AVG("users"."id") + 2)
+      `),
     );
-    expect(sql).toContain("AVG");
-    expect(sql).toContain("/");
   });
 
   it("count should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(table.get("id").count().divide(2));
-    expect(sql).toContain("COUNT");
-    expect(sql).toContain("/");
+    expect(mustBeLike(visitor.compile(table.get("id").count().add(2)))).toBe(
+      mustBeLike(`
+        (COUNT("users"."id") + 2)
+      `),
+    );
   });
 
   it("maximum should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(
-      table.get("id").maximum().divide(2),
+    expect(mustBeLike(visitor.compile(table.get("id").maximum().add(2)))).toBe(
+      mustBeLike(`
+        (MAX("users"."id") + 2)
+      `),
     );
-    expect(sql).toContain("MAX");
-    expect(sql).toContain("/");
   });
 
   it("minimum should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(
-      table.get("id").minimum().divide(2),
+    expect(mustBeLike(visitor.compile(table.get("id").minimum().add(2)))).toBe(
+      mustBeLike(`
+        (MIN("users"."id") + 2)
+      `),
     );
-    expect(sql).toContain("MIN");
-    expect(sql).toContain("/");
   });
 
   it("attribute node should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(table.get("id").divide(2));
-    expect(sql).toContain("/");
+    expect(mustBeLike(visitor.compile(table.get("id").add(2)))).toBe(
+      mustBeLike(`
+        ("users"."id" + 2)
+      `),
+    );
   });
 });
