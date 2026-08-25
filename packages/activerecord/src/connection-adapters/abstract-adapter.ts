@@ -400,7 +400,7 @@ export interface AbstractAdapter {
   ): Promise<string>;
   /** @internal */
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
-  tableExists(tableName: string): Promise<boolean>;
+  tableExists(tableName: string): Promise<boolean | null>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   internalStringOptionsForPrimaryKey(): Record<string, unknown>;
   // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
@@ -421,7 +421,7 @@ export interface AbstractAdapter {
   ): Promise<boolean>;
   tables(): Promise<string[]>;
   views(): Promise<string[]>;
-  viewExists(viewName: string): Promise<boolean>;
+  viewExists(viewName: string): Promise<boolean | null>;
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   /**
@@ -550,7 +550,7 @@ export interface AbstractAdapter {
   nativeDatabaseTypes(): Record<string, unknown>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
-  dataSourceExists(name: string): Promise<boolean>;
+  dataSourceExists(name: string): Promise<boolean | null>;
   /** Mirrors `DatabaseStatements#sanitize_limit` (abstract/database_statements.rb). */
   sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
   /**

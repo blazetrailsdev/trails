@@ -14,7 +14,7 @@ import {
 } from "./join-table.js";
 
 export class CommandRecorder {
-  private _commands: Array<{ cmd: string; args: unknown[] }> = [];
+  private _commands: Array<[string, unknown[]]> = [];
   private _delegate: unknown;
   private _reverting = false;
 
@@ -39,7 +39,7 @@ export class CommandRecorder {
     this._reverting = value;
   }
 
-  get commands(): Array<{ cmd: string; args: unknown[] }> {
+  get commands(): Array<[string, unknown[]]> {
     return [...this._commands];
   }
 
@@ -53,7 +53,7 @@ export class CommandRecorder {
     if (this._reverting) {
       this._commands.push(this.inverseOf(cmd, args));
     } else {
-      this._commands.push({ cmd, args });
+      this._commands.push([cmd, args]);
     }
   }
 
@@ -103,7 +103,7 @@ export class CommandRecorder {
    * because a name the recorder does not answer reads back as the proxy's
    * `NoMethodError`-raising function rather than `undefined`.
    */
-  inverseOf(cmd: string, args: unknown[]): { cmd: string; args: unknown[] } {
+  inverseOf(cmd: string, args: unknown[]): [string, unknown[]] {
     const method = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
     if (!(method in this)) {
       throw new IrreversibleMigration(
@@ -113,10 +113,7 @@ export class CommandRecorder {
           `2. Use the #reversible method to define reversible behavior.\n`,
       );
     }
-    const [invertedCmd, invertedArgs] = (
-      this[method] as (args: unknown[]) => [string, unknown[]]
-    ).call(this, args);
-    return { cmd: invertedCmd, args: invertedArgs };
+    return (this[method] as (args: unknown[]) => [string, unknown[]]).call(this, args);
   }
 
   /**
@@ -156,7 +153,7 @@ export class CommandRecorder {
       const recorder = new CommandRecorder(this._delegate);
       recorder.reverting = this._reverting;
       await callback(delegate.updateTableDefinition(tableName, recorder));
-      this._commands.push({ cmd: "changeTable", args: [tableName, recorder.commands] });
+      this._commands.push(["changeTable", [tableName, recorder.commands]]);
     } else {
       await callback(delegate.updateTableDefinition(tableName, this));
     }
@@ -168,12 +165,12 @@ export class CommandRecorder {
    * Mirrors: ActiveRecord::Migration::CommandRecorder#replay
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
-    for (const { cmd, args } of this._commands) {
+    for (const [cmd, args] of this.commands) {
       // Bulk changeTable stores [tableName, subCommands[]]. Replay each
       // sub-command individually rather than forwarding the array as an arg.
       if (cmd === "changeTable" && Array.isArray(args[1])) {
-        const subCmds = args[1] as Array<{ cmd: string; args: unknown[] }>;
-        for (const { cmd: sub, args: subArgs } of subCmds) {
+        const subCmds = args[1] as Array<[string, unknown[]]>;
+        for (const [sub, subArgs] of subCmds) {
           if (typeof migration[sub] === "function") {
             await migration[sub](...subArgs);
           }
@@ -185,8 +182,8 @@ export class CommandRecorder {
   }
 
   /** Returns the full inverse command list. */
-  inverse(): Array<{ cmd: string; args: unknown[] }> {
-    return [...this._commands].reverse().map(({ cmd, args }) => this.inverseOf(cmd, args));
+  inverse(): Array<[string, unknown[]]> {
+    return [...this._commands].reverse().map(([cmd, args]) => this.inverseOf(cmd, args));
   }
 
   // ---------------------------------------------------------------------------

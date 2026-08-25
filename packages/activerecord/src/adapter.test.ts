@@ -279,7 +279,7 @@ describe("AdapterTest", () => {
     expect(await conn.tableExists("accounts")).toBe(true);
     expect(await conn.tableExists("nonexistingtable")).toBe(false);
     expect(await conn.tableExists("'")).toBe(false);
-    expect(await conn.tableExists(null as unknown as string)).toBe(false);
+    expect(await conn.tableExists(null as unknown as string)).toBeFalsy();
   });
 
   it("data sources", async () => {
@@ -295,7 +295,7 @@ describe("AdapterTest", () => {
     expect(await conn.dataSourceExists("accounts")).toBe(true);
     expect(await conn.dataSourceExists("nonexistingtable")).toBe(false);
     expect(await conn.dataSourceExists("'")).toBe(false);
-    expect(await conn.dataSourceExists(null as unknown as string)).toBe(false);
+    expect(await conn.dataSourceExists(null as unknown as string)).toBeFalsy();
   });
 
   it("indexes", async () => {

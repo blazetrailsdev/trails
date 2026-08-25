@@ -165,7 +165,7 @@ export class SchemaMigration {
   }
 
   // Rails: connection.data_source_exists?(table_name) (schema_migration.rb:100-104).
-  async tableExists(): Promise<boolean> {
+  async tableExists(): Promise<boolean | null> {
     return await this._withConnection((connection) => connection.dataSourceExists(this.tableName));
   }
 

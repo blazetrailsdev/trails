@@ -1561,7 +1561,7 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
   const { NoDatabaseError } = await import("../errors.js");
   const { SchemaMigration } = await import("../schema-migration.js");
   return DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
-    let alreadyInitialized = false;
+    let alreadyInitialized: boolean | null = false;
     for (;;) {
       try {
         const adapter = await pool.leaseConnection();

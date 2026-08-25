@@ -514,13 +514,13 @@ describe("InvertibleMigrationTest", () => {
       recorder.record("createTable", ["grapes"]);
     });
     expect(recorder.commands).toEqual([
-      { cmd: "createTable", args: ["apples", block] },
-      { cmd: "dropTable", args: ["elderberries"] },
-      { cmd: "createTable", args: ["clementines"] },
-      { cmd: "createTable", args: ["dates"] },
-      { cmd: "dropTable", args: ["bananas", block] },
-      { cmd: "dropTable", args: ["grapes"] },
-      { cmd: "dropTable", args: ["figs"] },
+      ["createTable", ["apples", block]],
+      ["dropTable", ["elderberries"]],
+      ["createTable", ["clementines"]],
+      ["createTable", ["dates"]],
+      ["dropTable", ["bananas", block]],
+      ["dropTable", ["grapes"]],
+      ["dropTable", ["figs"]],
     ]);
   });
 

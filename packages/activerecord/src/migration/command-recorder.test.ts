@@ -43,7 +43,7 @@ describe("Migration", () => {
       // The recorder only records the command — no DDL runs, so there is no table to tear down.
       // eslint-disable-next-line blazetrails/require-table-teardown
       (recorder as unknown as { createTable(name: string): void }).createTable("horses");
-      expect(recorder.commands).toEqual([{ cmd: "createTable", args: ["horses"] }]);
+      expect(recorder.commands).toEqual([["createTable", ["horses"]]]);
     });
 
     it("unknown commands delegate", () => {
@@ -77,7 +77,7 @@ describe("Migration", () => {
         recorder.record("createTable", ["hello"]);
         recorder.record("createTable", ["world"]);
       });
-      const tables = recorder.commands.map(({ args }) => args);
+      const tables = recorder.commands.map(([, args]) => args);
       expect(tables).toEqual([["world"], ["hello"]]);
     });
 
@@ -99,13 +99,13 @@ describe("Migration", () => {
       });
       /* eslint-enable blazetrails/require-table-teardown */
       expect(recorder.commands).toEqual([
-        { cmd: "createTable", args: ["apples", block] },
-        { cmd: "dropTable", args: ["elderberries"] },
-        { cmd: "createTable", args: ["clementines", block] },
-        { cmd: "createTable", args: ["dates"] },
-        { cmd: "dropTable", args: ["bananas", block] },
-        { cmd: "dropTable", args: ["grapes"] },
-        { cmd: "dropTable", args: ["figs", block] },
+        ["createTable", ["apples", block]],
+        ["dropTable", ["elderberries"]],
+        ["createTable", ["clementines", block]],
+        ["createTable", ["dates"]],
+        ["dropTable", ["bananas", block]],
+        ["dropTable", ["grapes"]],
+        ["dropTable", ["figs", block]],
       ]);
     });
 
@@ -118,8 +118,8 @@ describe("Migration", () => {
       });
 
       expect(recorder.commands).toEqual([
-        { cmd: "renameColumn", args: ["fruits", "cultivar", "kind"] },
-        { cmd: "removeColumn", args: ["fruits", "name", "string"] },
+        ["renameColumn", ["fruits", "cultivar", "kind"]],
+        ["removeColumn", ["fruits", "name", "string"]],
       ]);
 
       await expect(
@@ -147,9 +147,9 @@ describe("Migration", () => {
         });
       });
 
-      expect(recorder.commands.map(({ cmd, args }) => ({ cmd, args: args.slice(0, -1) }))).toEqual([
-        { cmd: "changeTable", args: ["fruits"] },
-        { cmd: "changeTable", args: ["fruits"] },
+      expect(recorder.commands.map(([cmd, args]) => [cmd, args.slice(0, -1)])).toEqual([
+        ["changeTable", ["fruits"]],
+        ["changeTable", ["fruits"]],
       ]);
     });
 
@@ -158,7 +158,7 @@ describe("Migration", () => {
         recorder.record("createTable", ["system_settings"]);
       });
       const dropTable = recorder.commands[0];
-      expect(dropTable).toEqual({ cmd: "dropTable", args: ["system_settings"] });
+      expect(dropTable).toEqual(["dropTable", ["system_settings"]]);
     });
 
     it("invert create table with if not exists", async () => {
@@ -166,7 +166,7 @@ describe("Migration", () => {
         recorder.record("createTable", ["system_settings", { ifNotExists: true }]);
       });
       const dropTable = recorder.commands[0];
-      expect(dropTable).toEqual({ cmd: "dropTable", args: ["system_settings", {}] });
+      expect(dropTable).toEqual(["dropTable", ["system_settings", {}]]);
     });
 
     it("invert create table with options and block", () => {
@@ -176,10 +176,7 @@ describe("Migration", () => {
         { id: false },
         block,
       ]);
-      expect(dropTable).toEqual({
-        cmd: "dropTable",
-        args: ["people_reminders", { id: false }, block],
-      });
+      expect(dropTable).toEqual(["dropTable", ["people_reminders", { id: false }, block]]);
     });
 
     it("invert drop table", () => {
@@ -189,10 +186,7 @@ describe("Migration", () => {
         { id: false },
         block,
       ]);
-      expect(createTable).toEqual({
-        cmd: "createTable",
-        args: ["people_reminders", { id: false }, block],
-      });
+      expect(createTable).toEqual(["createTable", ["people_reminders", { id: false }, block]]);
     });
 
     it("invert drop table with if exists", () => {
@@ -202,10 +196,7 @@ describe("Migration", () => {
         { id: false, ifExists: true },
         block,
       ]);
-      expect(createTable).toEqual({
-        cmd: "createTable",
-        args: ["people_reminders", { id: false }, block],
-      });
+      expect(createTable).toEqual(["createTable", ["people_reminders", { id: false }, block]]);
     });
 
     it("invert drop table without a block nor option", () => {
@@ -243,7 +234,7 @@ describe("Migration", () => {
 
     it("invert create join table", () => {
       const dropJoinTable = recorder.inverseOf("createJoinTable", ["musics", "artists"]);
-      expect(dropJoinTable).toEqual({ cmd: "dropJoinTable", args: ["musics", "artists"] });
+      expect(dropJoinTable).toEqual(["dropJoinTable", ["musics", "artists"]]);
     });
 
     it("invert create join table with table name", () => {
@@ -252,10 +243,10 @@ describe("Migration", () => {
         "artists",
         { tableName: "catalog" },
       ]);
-      expect(dropJoinTable).toEqual({
-        cmd: "dropJoinTable",
-        args: ["musics", "artists", { tableName: "catalog" }],
-      });
+      expect(dropJoinTable).toEqual([
+        "dropJoinTable",
+        ["musics", "artists", { tableName: "catalog" }],
+      ]);
     });
 
     it("invert drop join table", () => {
@@ -266,20 +257,20 @@ describe("Migration", () => {
         { tableName: "catalog" },
         block,
       ]);
-      expect(createJoinTable).toEqual({
-        cmd: "createJoinTable",
-        args: ["musics", "artists", { tableName: "catalog" }, block],
-      });
+      expect(createJoinTable).toEqual([
+        "createJoinTable",
+        ["musics", "artists", { tableName: "catalog" }, block],
+      ]);
     });
 
     it("invert rename table", () => {
       const rename = recorder.inverseOf("renameTable", ["old", "new"]);
-      expect(rename).toEqual({ cmd: "renameTable", args: ["new", "old"] });
+      expect(rename).toEqual(["renameTable", ["new", "old"]]);
     });
 
     it("invert add column", () => {
       const remove = recorder.inverseOf("addColumn", ["table", "column", "type", {}]);
-      expect(remove).toEqual({ cmd: "removeColumn", args: ["table", "column", "type", {}] });
+      expect(remove).toEqual(["removeColumn", ["table", "column", "type", {}]]);
     });
 
     it("invert change column", () => {
@@ -300,10 +291,10 @@ describe("Migration", () => {
         "column",
         { from: "old_value", to: "new_value" },
       ]);
-      expect(change).toEqual({
-        cmd: "changeColumnDefault",
-        args: ["table", "column", { from: "new_value", to: "old_value" }],
-      });
+      expect(change).toEqual([
+        "changeColumnDefault",
+        ["table", "column", { from: "new_value", to: "old_value" }],
+      ]);
     });
 
     it("invert change column default with from and to with boolean", () => {
@@ -312,10 +303,10 @@ describe("Migration", () => {
         "column",
         { from: true, to: false },
       ]);
-      expect(change).toEqual({
-        cmd: "changeColumnDefault",
-        args: ["table", "column", { from: false, to: true }],
-      });
+      expect(change).toEqual([
+        "changeColumnDefault",
+        ["table", "column", { from: false, to: true }],
+      ]);
     });
 
     itIfSupports("comments", "invert change column comment", () => {
@@ -330,10 +321,10 @@ describe("Migration", () => {
         "column",
         { from: "old_value", to: "new_value" },
       ]);
-      expect(change).toEqual({
-        cmd: "changeColumnComment",
-        args: ["table", "column", { from: "new_value", to: "old_value" }],
-      });
+      expect(change).toEqual([
+        "changeColumnComment",
+        ["table", "column", { from: "new_value", to: "old_value" }],
+      ]);
     });
 
     itIfSupports("comments", "invert change column comment with from and to with nil", () => {
@@ -342,10 +333,10 @@ describe("Migration", () => {
         "column",
         { from: undefined, to: "new_value" },
       ]);
-      expect(change).toEqual({
-        cmd: "changeColumnComment",
-        args: ["table", "column", { from: "new_value", to: undefined }],
-      });
+      expect(change).toEqual([
+        "changeColumnComment",
+        ["table", "column", { from: "new_value", to: undefined }],
+      ]);
     });
 
     itIfSupports("comments", "invert change table comment", () => {
@@ -359,10 +350,10 @@ describe("Migration", () => {
         "table",
         { from: "old_value", to: "new_value" },
       ]);
-      expect(change).toEqual({
-        cmd: "changeTableComment",
-        args: ["table", { from: "new_value", to: "old_value" }],
-      });
+      expect(change).toEqual([
+        "changeTableComment",
+        ["table", { from: "new_value", to: "old_value" }],
+      ]);
     });
 
     itIfSupports("comments", "invert change table comment with from and to with nil", () => {
@@ -370,20 +361,20 @@ describe("Migration", () => {
         "table",
         { from: undefined, to: "new_value" },
       ]);
-      expect(change).toEqual({
-        cmd: "changeTableComment",
-        args: ["table", { from: "new_value", to: undefined }],
-      });
+      expect(change).toEqual([
+        "changeTableComment",
+        ["table", { from: "new_value", to: undefined }],
+      ]);
     });
 
     it("invert change column null", () => {
       const add = recorder.inverseOf("changeColumnNull", ["table", "column", true]);
-      expect(add).toEqual({ cmd: "changeColumnNull", args: ["table", "column", false] });
+      expect(add).toEqual(["changeColumnNull", ["table", "column", false]]);
     });
 
     it("invert remove column", () => {
       const add = recorder.inverseOf("removeColumn", ["table", "column", "type", {}]);
-      expect(add).toEqual({ cmd: "addColumn", args: ["table", "column", "type", {}] });
+      expect(add).toEqual(["addColumn", ["table", "column", "type", {}]]);
     });
 
     it("invert remove column without type", () => {
@@ -394,12 +385,12 @@ describe("Migration", () => {
 
     it("invert rename column", () => {
       const rename = recorder.inverseOf("renameColumn", ["table", "old", "new"]);
-      expect(rename).toEqual({ cmd: "renameColumn", args: ["table", "new", "old"] });
+      expect(rename).toEqual(["renameColumn", ["table", "new", "old"]]);
     });
 
     it("invert add index", () => {
       const remove = recorder.inverseOf("addIndex", ["table", ["one", "two"]]);
-      expect(remove).toEqual({ cmd: "removeIndex", args: ["table", ["one", "two"]] });
+      expect(remove).toEqual(["removeIndex", ["table", ["one", "two"]]]);
     });
 
     it("invert add index with name", () => {
@@ -408,10 +399,7 @@ describe("Migration", () => {
         ["one", "two"],
         { name: "new_index" },
       ]);
-      expect(remove).toEqual({
-        cmd: "removeIndex",
-        args: ["table", ["one", "two"], { name: "new_index" }],
-      });
+      expect(remove).toEqual(["removeIndex", ["table", ["one", "two"], { name: "new_index" }]]);
     });
 
     it("invert add index with algorithm option", () => {
@@ -420,20 +408,17 @@ describe("Migration", () => {
         "one",
         { algorithm: "concurrently" },
       ]);
-      expect(remove).toEqual({
-        cmd: "removeIndex",
-        args: ["table", "one", { algorithm: "concurrently" }],
-      });
+      expect(remove).toEqual(["removeIndex", ["table", "one", { algorithm: "concurrently" }]]);
     });
 
     it("invert remove index", () => {
       const add = recorder.inverseOf("removeIndex", ["table", "one"]);
-      expect(add).toEqual({ cmd: "addIndex", args: ["table", "one"] });
+      expect(add).toEqual(["addIndex", ["table", "one"]]);
     });
 
     it("invert remove index with positional column", () => {
       const add = recorder.inverseOf("removeIndex", ["table", ["one", "two"], { options: true }]);
-      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"], { options: true }] });
+      expect(add).toEqual(["addIndex", ["table", ["one", "two"], { options: true }]]);
     });
 
     it("invert remove index with column", () => {
@@ -441,7 +426,7 @@ describe("Migration", () => {
         "table",
         { column: ["one", "two"], options: true },
       ]);
-      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"], { options: true }] });
+      expect(add).toEqual(["addIndex", ["table", ["one", "two"], { options: true }]]);
     });
 
     it("invert remove index with name", () => {
@@ -449,15 +434,12 @@ describe("Migration", () => {
         "table",
         { column: ["one", "two"], name: "new_index" },
       ]);
-      expect(add).toEqual({
-        cmd: "addIndex",
-        args: ["table", ["one", "two"], { name: "new_index" }],
-      });
+      expect(add).toEqual(["addIndex", ["table", ["one", "two"], { name: "new_index" }]]);
     });
 
     it("invert remove index with no special options", () => {
       const add = recorder.inverseOf("removeIndex", ["table", { column: ["one", "two"] }]);
-      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"]] });
+      expect(add).toEqual(["addIndex", ["table", ["one", "two"]]]);
     });
 
     it("invert remove index with no column", () => {
@@ -468,17 +450,17 @@ describe("Migration", () => {
 
     it("invert rename index", () => {
       const rename = recorder.inverseOf("renameIndex", ["table", "old", "new"]);
-      expect(rename).toEqual({ cmd: "renameIndex", args: ["table", "new", "old"] });
+      expect(rename).toEqual(["renameIndex", ["table", "new", "old"]]);
     });
 
     it("invert add timestamps", () => {
       const remove = recorder.inverseOf("addTimestamps", ["table"]);
-      expect(remove).toEqual({ cmd: "removeTimestamps", args: ["table"] });
+      expect(remove).toEqual(["removeTimestamps", ["table"]]);
     });
 
     it("invert remove timestamps", () => {
       const add = recorder.inverseOf("removeTimestamps", ["table", { null: true }]);
-      expect(add).toEqual({ cmd: "addTimestamps", args: ["table", { null: true }] });
+      expect(add).toEqual(["addTimestamps", ["table", { null: true }]]);
     });
 
     it("invert add reference", () => {
@@ -487,15 +469,12 @@ describe("Migration", () => {
         "taggable",
         { polymorphic: true },
       ]);
-      expect(remove).toEqual({
-        cmd: "removeReference",
-        args: ["table", "taggable", { polymorphic: true }],
-      });
+      expect(remove).toEqual(["removeReference", ["table", "taggable", { polymorphic: true }]]);
     });
 
     it("invert add belongs to alias", () => {
       const remove = recorder.inverseOf("addBelongsTo", ["table", "user"]);
-      expect(remove).toEqual({ cmd: "removeReference", args: ["table", "user"] });
+      expect(remove).toEqual(["removeReference", ["table", "user"]]);
     });
 
     it("invert remove reference", () => {
@@ -504,10 +483,7 @@ describe("Migration", () => {
         "taggable",
         { polymorphic: true },
       ]);
-      expect(add).toEqual({
-        cmd: "addReference",
-        args: ["table", "taggable", { polymorphic: true }],
-      });
+      expect(add).toEqual(["addReference", ["table", "taggable", { polymorphic: true }]]);
     });
 
     it("invert remove reference with index and foreign key", () => {
@@ -516,45 +492,45 @@ describe("Migration", () => {
         "taggable",
         { index: true, foreignKey: true },
       ]);
-      expect(add).toEqual({
-        cmd: "addReference",
-        args: ["table", "taggable", { index: true, foreignKey: true }],
-      });
+      expect(add).toEqual([
+        "addReference",
+        ["table", "taggable", { index: true, foreignKey: true }],
+      ]);
     });
 
     it("invert remove belongs to alias", () => {
       const add = recorder.inverseOf("removeBelongsTo", ["table", "user"]);
-      expect(add).toEqual({ cmd: "addReference", args: ["table", "user"] });
+      expect(add).toEqual(["addReference", ["table", "user"]]);
     });
 
     it("invert enable extension", () => {
       const disable = recorder.inverseOf("enableExtension", ["uuid-ossp"]);
-      expect(disable).toEqual({ cmd: "disableExtension", args: ["uuid-ossp"] });
+      expect(disable).toEqual(["disableExtension", ["uuid-ossp"]]);
     });
 
     it("invert disable extension", () => {
       const enable = recorder.inverseOf("disableExtension", ["uuid-ossp"]);
-      expect(enable).toEqual({ cmd: "enableExtension", args: ["uuid-ossp"] });
+      expect(enable).toEqual(["enableExtension", ["uuid-ossp"]]);
     });
 
     it("invert create schema", () => {
       const disable = recorder.inverseOf("createSchema", ["myschema"]);
-      expect(disable).toEqual({ cmd: "dropSchema", args: ["myschema"] });
+      expect(disable).toEqual(["dropSchema", ["myschema"]]);
     });
 
     it("invert drop schema", () => {
       const enable = recorder.inverseOf("dropSchema", ["myschema"]);
-      expect(enable).toEqual({ cmd: "createSchema", args: ["myschema"] });
+      expect(enable).toEqual(["createSchema", ["myschema"]]);
     });
 
     it("invert add foreign key", () => {
       const enable = recorder.inverseOf("addForeignKey", ["dogs", "people"]);
-      expect(enable).toEqual({ cmd: "removeForeignKey", args: ["dogs", "people"] });
+      expect(enable).toEqual(["removeForeignKey", ["dogs", "people"]]);
     });
 
     it("invert remove foreign key", () => {
       const enable = recorder.inverseOf("removeForeignKey", ["dogs", "people"]);
-      expect(enable).toEqual({ cmd: "addForeignKey", args: ["dogs", "people"] });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people"]]);
     });
 
     it("invert add foreign key with column", () => {
@@ -563,10 +539,7 @@ describe("Migration", () => {
         "people",
         { column: "owner_id" },
       ]);
-      expect(enable).toEqual({
-        cmd: "removeForeignKey",
-        args: ["dogs", "people", { column: "owner_id" }],
-      });
+      expect(enable).toEqual(["removeForeignKey", ["dogs", "people", { column: "owner_id" }]]);
     });
 
     it("invert remove foreign key with column", () => {
@@ -575,10 +548,7 @@ describe("Migration", () => {
         "people",
         { column: "owner_id" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { column: "owner_id" }],
-      });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people", { column: "owner_id" }]]);
     });
 
     it("invert add foreign key with column and name", () => {
@@ -587,10 +557,10 @@ describe("Migration", () => {
         "people",
         { column: "owner_id", name: "fk" },
       ]);
-      expect(enable).toEqual({
-        cmd: "removeForeignKey",
-        args: ["dogs", "people", { column: "owner_id", name: "fk" }],
-      });
+      expect(enable).toEqual([
+        "removeForeignKey",
+        ["dogs", "people", { column: "owner_id", name: "fk" }],
+      ]);
     });
 
     it("invert remove foreign key with column and name", () => {
@@ -599,10 +569,10 @@ describe("Migration", () => {
         "people",
         { column: "owner_id", name: "fk" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { column: "owner_id", name: "fk" }],
-      });
+      expect(enable).toEqual([
+        "addForeignKey",
+        ["dogs", "people", { column: "owner_id", name: "fk" }],
+      ]);
     });
 
     it("invert remove foreign key with primary key", () => {
@@ -611,10 +581,7 @@ describe("Migration", () => {
         "people",
         { primaryKey: "person_id" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { primaryKey: "person_id" }],
-      });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people", { primaryKey: "person_id" }]]);
     });
 
     it("invert remove foreign key with primary key and to table in options", () => {
@@ -622,10 +589,7 @@ describe("Migration", () => {
         "dogs",
         { toTable: "people", primaryKey: "uuid" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { primaryKey: "uuid" }],
-      });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people", { primaryKey: "uuid" }]]);
     });
 
     it("invert remove foreign key with on delete on update", () => {
@@ -634,24 +598,21 @@ describe("Migration", () => {
         "people",
         { onDelete: "nullify", onUpdate: "cascade" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { onDelete: "nullify", onUpdate: "cascade" }],
-      });
+      expect(enable).toEqual([
+        "addForeignKey",
+        ["dogs", "people", { onDelete: "nullify", onUpdate: "cascade" }],
+      ]);
     });
 
     it("invert remove foreign key with to table in options", () => {
       let enable = recorder.inverseOf("removeForeignKey", ["dogs", { toTable: "people" }]);
-      expect(enable).toEqual({ cmd: "addForeignKey", args: ["dogs", "people"] });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people"]]);
 
       enable = recorder.inverseOf("removeForeignKey", [
         "dogs",
         { toTable: "people", column: "owner_id" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addForeignKey",
-        args: ["dogs", "people", { column: "owner_id" }],
-      });
+      expect(enable).toEqual(["addForeignKey", ["dogs", "people", { column: "owner_id" }]]);
     });
 
     it("invert remove foreign key is irreversible without to table", () => {
@@ -682,10 +643,10 @@ describe("Migration", () => {
         "speed > 0",
         { name: "speed_check" },
       ]);
-      expect(enable).toEqual({
-        cmd: "removeCheckConstraint",
-        args: ["dogs", "speed > 0", { name: "speed_check" }],
-      });
+      expect(enable).toEqual([
+        "removeCheckConstraint",
+        ["dogs", "speed > 0", { name: "speed_check" }],
+      ]);
     });
 
     it("invert add check constraint if not exists", () => {
@@ -694,10 +655,10 @@ describe("Migration", () => {
         "speed > 0",
         { name: "speed_check", ifNotExists: true },
       ]);
-      expect(enable).toEqual({
-        cmd: "removeCheckConstraint",
-        args: ["dogs", "speed > 0", { name: "speed_check", ifExists: true }],
-      });
+      expect(enable).toEqual([
+        "removeCheckConstraint",
+        ["dogs", "speed > 0", { name: "speed_check", ifExists: true }],
+      ]);
     });
 
     it("invert remove check constraint", () => {
@@ -706,10 +667,10 @@ describe("Migration", () => {
         "speed > 0",
         { name: "speed_check" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addCheckConstraint",
-        args: ["dogs", "speed > 0", { name: "speed_check" }],
-      });
+      expect(enable).toEqual([
+        "addCheckConstraint",
+        ["dogs", "speed > 0", { name: "speed_check" }],
+      ]);
     });
 
     it("invert remove check constraint without expression", () => {
@@ -724,10 +685,10 @@ describe("Migration", () => {
         "speed > 0",
         { name: "speed_check", ifExists: true },
       ]);
-      expect(enable).toEqual({
-        cmd: "addCheckConstraint",
-        args: ["dogs", "speed > 0", { name: "speed_check", ifNotExists: true }],
-      });
+      expect(enable).toEqual([
+        "addCheckConstraint",
+        ["dogs", "speed > 0", { name: "speed_check", ifNotExists: true }],
+      ]);
     });
 
     it("invert add unique constraint constraint with using index", () => {
@@ -742,15 +703,15 @@ describe("Migration", () => {
         ["speed"],
         { deferrable: "deferred", name: "uniq_speed" },
       ]);
-      expect(enable).toEqual({
-        cmd: "addUniqueConstraint",
-        args: ["dogs", ["speed"], { deferrable: "deferred", name: "uniq_speed" }],
-      });
+      expect(enable).toEqual([
+        "addUniqueConstraint",
+        ["dogs", ["speed"], { deferrable: "deferred", name: "uniq_speed" }],
+      ]);
     });
 
     it("invert remove unique constraint constraint without options", () => {
       const enable = recorder.inverseOf("removeUniqueConstraint", ["dogs", ["speed"]]);
-      expect(enable).toEqual({ cmd: "addUniqueConstraint", args: ["dogs", ["speed"]] });
+      expect(enable).toEqual(["addUniqueConstraint", ["dogs", ["speed"]]]);
     });
 
     it("invert remove unique constraint constraint without columns", () => {
@@ -761,12 +722,12 @@ describe("Migration", () => {
 
     it("invert create enum", () => {
       const drop = recorder.inverseOf("createEnum", ["color", ["blue", "green"]]);
-      expect(drop).toEqual({ cmd: "dropEnum", args: ["color", ["blue", "green"]] });
+      expect(drop).toEqual(["dropEnum", ["color", ["blue", "green"]]]);
     });
 
     it("invert drop enum", () => {
       const create = recorder.inverseOf("dropEnum", ["color", ["blue", "green"]]);
-      expect(create).toEqual({ cmd: "createEnum", args: ["color", ["blue", "green"]] });
+      expect(create).toEqual(["createEnum", ["color", ["blue", "green"]]]);
     });
 
     it("invert drop enum without values", () => {
@@ -779,12 +740,12 @@ describe("Migration", () => {
 
     it("invert rename enum", () => {
       const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", "breed"]);
-      expect(enumCmd).toEqual({ cmd: "renameEnum", args: ["breed", "dog_breed"] });
+      expect(enumCmd).toEqual(["renameEnum", ["breed", "dog_breed"]]);
     });
 
     it("invert rename enum with to option", () => {
       const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", { to: "breed" }]);
-      expect(enumCmd).toEqual({ cmd: "renameEnum", args: ["breed", "dog_breed"] });
+      expect(enumCmd).toEqual(["renameEnum", ["breed", "dog_breed"]]);
     });
 
     it("invert add enum value", () => {
@@ -798,10 +759,10 @@ describe("Migration", () => {
         "dog_breed",
         { from: "retriever", to: "beagle" },
       ]);
-      expect(enumValue).toEqual({
-        cmd: "renameEnumValue",
-        args: ["dog_breed", { from: "beagle", to: "retriever" }],
-      });
+      expect(enumValue).toEqual([
+        "renameEnumValue",
+        ["dog_breed", { from: "beagle", to: "retriever" }],
+      ]);
     });
 
     it("invert rename enum value without from", () => {
@@ -822,10 +783,10 @@ describe("Migration", () => {
         "fts5",
         ["content", "meta UNINDEXED", "tokenize='porter ascii'"],
       ]);
-      expect(drop).toEqual({
-        cmd: "dropVirtualTable",
-        args: ["searchables", "fts5", ["content", "meta UNINDEXED", "tokenize='porter ascii'"]],
-      });
+      expect(drop).toEqual([
+        "dropVirtualTable",
+        ["searchables", "fts5", ["content", "meta UNINDEXED", "tokenize='porter ascii'"]],
+      ]);
     });
 
     it("invert drop virtual table", () => {
@@ -834,10 +795,7 @@ describe("Migration", () => {
         "fts5",
         ["title", "content"],
       ]);
-      expect(create).toEqual({
-        cmd: "createVirtualTable",
-        args: ["searchables", "fts5", ["title", "content"]],
-      });
+      expect(create).toEqual(["createVirtualTable", ["searchables", "fts5", ["title", "content"]]]);
     });
 
     it("invert drop virtual table without options", () => {

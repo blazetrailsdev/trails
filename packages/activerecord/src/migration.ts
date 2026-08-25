@@ -694,7 +694,7 @@ export class Migration {
     await this.connection.renameTable(oldName, newName);
   }
 
-  async tableExists(tableName: string): Promise<boolean> {
+  async tableExists(tableName: string): Promise<boolean | null> {
     return this.connection.tableExists(this._pt(tableName));
   }
 
@@ -1356,7 +1356,7 @@ export class Migration {
     return this._recording && this._recorder.reverting;
   }
 
-  async viewExists(viewName: string): Promise<boolean> {
+  async viewExists(viewName: string): Promise<boolean | null> {
     return this.connection.viewExists(viewName);
   }
 
@@ -2789,9 +2789,8 @@ export class Migrator {
 
   /** @internal Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */
   async currentMigration(): Promise<MigrationProxy | null> {
-    const version = await this.currentVersion();
-    if (version === 0) return null;
-    return this._migrations.find((m) => m.version === version) ?? null;
+    const currentVersion = await this.currentVersion();
+    return this.migrations.find((m) => m.version === currentVersion) ?? null;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */

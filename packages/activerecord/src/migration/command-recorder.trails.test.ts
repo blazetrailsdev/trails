@@ -124,7 +124,7 @@ describe("CommandRecorder", () => {
       await recorder.changeTable("fruits", async (t) => {
         await t.string("name");
       });
-      expect(recorder.commands[0].cmd).toBe("addColumn");
+      expect(recorder.commands[0][0]).toBe("addColumn");
     });
 
     it("remove with multiple columns records a single removeColumns", async () => {
@@ -133,7 +133,7 @@ describe("CommandRecorder", () => {
         await t.remove("name", "kind", { type: "string" });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumns", args: ["fruits", "name", "kind", { type: "string" }] },
+        ["removeColumns", ["fruits", "name", "kind", { type: "string" }]],
       ]);
     });
 
@@ -143,7 +143,7 @@ describe("CommandRecorder", () => {
         await t.removeIndex({ name: "index_fruits_on_kind" });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
+        ["removeIndex", ["fruits", undefined, { name: "index_fruits_on_kind" }]],
       ]);
     });
 
@@ -153,7 +153,7 @@ describe("CommandRecorder", () => {
         await t.removeIndex(undefined, { name: "index_fruits_on_kind" });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
+        ["removeIndex", ["fruits", undefined, { name: "index_fruits_on_kind" }]],
       ]);
     });
 
@@ -164,7 +164,7 @@ describe("CommandRecorder", () => {
           await t.removeIndex("kind");
         });
       });
-      expect(recorder.commands).toEqual([{ cmd: "addIndex", args: ["fruits", "kind"] }]);
+      expect(recorder.commands).toEqual([["addIndex", ["fruits", "kind"]]]);
     });
 
     it("raises IrreversibleMigration when removeIndex lacks a column", async () => {
@@ -203,8 +203,8 @@ describe("CommandRecorder", () => {
         await columnMethods(t).bigserial("big_seq");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "seq", "serial"] },
-        { cmd: "addColumn", args: ["fruits", "big_seq", "bigserial"] },
+        ["addColumn", ["fruits", "seq", "serial"]],
+        ["addColumn", ["fruits", "big_seq", "bigserial"]],
       ]);
     });
 
@@ -217,8 +217,8 @@ describe("CommandRecorder", () => {
         });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "big_seq", "bigserial"] },
-        { cmd: "removeColumn", args: ["fruits", "seq", "serial"] },
+        ["removeColumn", ["fruits", "big_seq", "bigserial"]],
+        ["removeColumn", ["fruits", "seq", "serial"]],
       ]);
     });
 
@@ -229,7 +229,7 @@ describe("CommandRecorder", () => {
         await t.primaryKey("token", "uuid");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "token", "uuid", { primaryKey: true }] },
+        ["addColumn", ["fruits", "token", "uuid", { primaryKey: true }]],
       ]);
     });
 
@@ -238,9 +238,7 @@ describe("CommandRecorder", () => {
       await recorder.changeTable("fruits", async (t) => {
         await columnMethods(t).bitVarying("mask");
       });
-      expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "mask", "bit_varying"] },
-      ]);
+      expect(recorder.commands).toEqual([["addColumn", ["fruits", "mask", "bit_varying"]]]);
     });
   });
 
@@ -263,9 +261,9 @@ describe("CommandRecorder", () => {
         await columnMethods(t).longblob("payload");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "qty", "unsigned_integer"] },
-        { cmd: "addColumn", args: ["fruits", "notes", "mediumtext"] },
-        { cmd: "addColumn", args: ["fruits", "payload", "longblob"] },
+        ["addColumn", ["fruits", "qty", "unsigned_integer"]],
+        ["addColumn", ["fruits", "notes", "mediumtext"]],
+        ["addColumn", ["fruits", "payload", "longblob"]],
       ]);
     });
 
@@ -278,8 +276,8 @@ describe("CommandRecorder", () => {
         });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext"] },
-        { cmd: "removeColumn", args: ["fruits", "qty", "unsigned_integer"] },
+        ["removeColumn", ["fruits", "notes", "mediumtext"]],
+        ["removeColumn", ["fruits", "qty", "unsigned_integer"]],
       ]);
     });
   });
