@@ -35,6 +35,31 @@ describe("CommandRecorder", () => {
     expect(recorder.america()).toBe("hi");
   });
 
+  it("runs the block inverseOf(transaction) is handed, as sub_recorder.revert does", async () => {
+    // `invert_transaction` runs the block through `sub_recorder.revert(&block)`
+    // (command_recorder.rb:186-188); the block's statements record their
+    // inverses onto the recorder the migration still reads, and `sub_recorder`
+    // stays empty. Reached here through `record`, whose reverting arm calls
+    // `inverse_of` (command_recorder.rb:94-100).
+    const recorder = new CommandRecorder(abstractDelegate);
+    let ran = 0;
+    await recorder.revert(async () => {
+      recorder.record("transaction", [], async () => {
+        ran += 1;
+        (recorder as unknown as { addColumn(...a: unknown[]): void }).addColumn(
+          "fruits",
+          "colour",
+          "string",
+        );
+      });
+    });
+    expect(ran).toBe(1);
+    // The block's inverse lands on this recorder, not on the empty sub-recorder;
+    // the enclosing `revert` reverses the pair, so the transaction command
+    // (recorded last) reads first.
+    expect(recorder.commands.map((c) => c[0])).toEqual(["transaction", "removeColumn"]);
+  });
+
   it("does not forward a private delegate member, the way public_send does not", () => {
     const recorder = new CommandRecorder({ _secret: () => "no", visible: () => "yes" });
     expect("_secret" in recorder).toBe(false);

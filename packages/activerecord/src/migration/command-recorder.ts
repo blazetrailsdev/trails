@@ -519,14 +519,19 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertTransaction(args: unknown[], _block?: MigrationBlock): MigrationCommand {
-    // Ruby runs the block here, through `sub_recorder.revert(&block)`
-    // (command_recorder.rb:186-188): the sub-recorder only toggles its own
-    // direction, so the block's commands land — already inverted — on THIS
-    // recorder, the one the migration still reads as its connection, and the
-    // sub-recorder itself stays empty. A TS block is a promise, so `transaction`
-    // above awaits it before recording and this method builds only the proc.
+  invertTransaction(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const subRecorder = new CommandRecorder(this._delegate);
+    // `sub_recorder.revert(&block)` (command_recorder.rb:187) runs the block:
+    // the sub-recorder only toggles its OWN direction, so the block's
+    // statements — whose receiver is still the migration reading this recorder
+    // as its connection — record their inverses onto THIS recorder, and
+    // `sub_recorder` stays empty. A TS block returns a promise and this method
+    // is sync, so the await happens in the `transaction` forwarder below, which
+    // then hands `record` no block; a block reaching here came from a direct
+    // `record`/`inverseOf` call and is run on the same terms Ruby runs it.
+    if (block !== undefined) {
+      void subRecorder.revert(block as () => Promise<void>);
+    }
     const invertionsProc = async (): Promise<void> => {
       await subRecorder.replay(
         this as unknown as { [key: string]: (...args: unknown[]) => Promise<void> },
@@ -793,7 +798,14 @@ const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   const block =
     typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
   if (this.reverting && block !== undefined) {
+    // `invert_transaction`'s `sub_recorder.revert(&block)` (command_recorder.rb:187),
+    // awaited here because a TS block is a promise and `inverse_of` is sync.
+    // `record` is then handed no block, so the inversion does not run it twice;
+    // the reverting arm discards the block anyway — `inverse_of` replaces the
+    // whole command (command_recorder.rb:94-100).
     await (block as () => Promise<void>)();
+    this.record("transaction", args);
+    return;
   }
   this.record("transaction", args, block);
 };
