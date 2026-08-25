@@ -61,10 +61,12 @@ describe("TestFactoryMethods", () => {
   it("coalesce", () => {
     const relation = new Table("users");
     const fieldNode = relation.get("active");
-    const coalesce = factory.coalesce(fieldNode, new Nodes.Quoted(0));
+    // Rails' coalesce(*exprs) wraps nothing (factory_methods.rb:45-47), so the
+    // raw 0 reaches `expressions` untouched; trails types the splat as Node[].
+    const coalesce = factory.coalesce(fieldNode, 0 as unknown as Nodes.Node);
     expect(coalesce).toBeInstanceOf(Nodes.NamedFunction);
     expect(coalesce.name).toBe("COALESCE");
-    expect(coalesce.expressions).toEqual([fieldNode, new Nodes.Quoted(0)]);
+    expect(coalesce.expressions).toEqual([fieldNode, 0]);
   });
 
   it("cast", () => {

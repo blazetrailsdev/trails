@@ -1630,14 +1630,12 @@ export async function _createRecord(
 
   const attrs = this._attributes.valuesForDatabase();
   // Rails create super chain, threading attribute_names down to
-  // attributes_for_create. The default (self.attribute_names) is the set of
-  // declared columns present in the value map; an explicit `attributeNames`
-  // arg overrides it (Persistence#_create_record(attribute_names)).
+  // attributes_for_create. The default is `self.attribute_names`
+  // (attribute_methods.rb:333-334), narrowed to the declared columns; an
+  // explicit `attributeNames` arg overrides it
+  // (Persistence#_create_record(attribute_names)).
   const selfNames =
-    attributeNames ??
-    // Rails' `self.attribute_names` is `@attributes.keys` — the INITIALIZED
-    // names (attribute_set.rb:46-48), not every key `valuesForDatabase` emits.
-    (this._attributes.keys() as string[]).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
+    attributeNames ?? this.attributeNames().filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
   // attribute_names_for_partial_inserts (dirty.rb:207-217), which reads
   // `changed_attribute_names_to_save` — derived from the `Attribute` graph, so
