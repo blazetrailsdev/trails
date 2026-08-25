@@ -127,33 +127,28 @@ export class SchemaDumper extends BaseSchemaDumper {
     return !!column.bigint || column.type === "bigint" || /^bigint\b/i.test(column.sqlType ?? "");
   }
 
-  /** @internal */
+  /**
+   * Mirrors `def schema_limit(column)` (abstract/schema_dumper.rb:62-65).
+   *
+   * `limit = column.limit unless column.bigint?` uses the same predicate
+   * `schema_type` does, so a column whose bigint-ness is only visible through
+   * sqlType is limit-suppressed too. The `@connection.native_database_types`
+   * lookup yields `undefined` for a raw/mock source with no backing adapter,
+   * which then dumps the limit — as Rails does for a type whose native entry
+   * carries no `:limit`.
+   * @internal
+   */
   protected schemaLimit(column: Column): string | undefined {
-    // Mirrors Rails `schema_limit`: `limit = column.limit unless column.bigint?` — same
-    // predicate `schema_type` uses, so a column whose bigint-ness is only visible through
-    // sqlType is limit-suppressed too.
     if (this.isBigint(column)) return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
-    if (limit === this._nativeTypeLimit(column)) return undefined;
+    const nativeLimit = (
+      this._adapter()?.nativeDatabaseTypes?.()?.[column.type ?? ""] as
+        | { limit?: unknown }
+        | undefined
+    )?.limit;
+    if (limit === nativeLimit) return undefined;
     return String(limit);
-  }
-
-  /**
-   * `@connection.native_database_types[column.type][:limit]`
-   * (abstract/schema_dumper.rb:64), split out because the lookup has to survive
-   * a dumper with no backing adapter (raw/mock sources).
-   * @internal
-   * Inline in Ruby; extracted only because trails' dumper also runs against
-   * adapterless schema sources.
-   */
-  private _nativeTypeLimit(column: Column): unknown {
-    const adapter = this._adapter();
-    if (!adapter || typeof adapter.nativeDatabaseTypes !== "function") return undefined;
-    const native = adapter.nativeDatabaseTypes()?.[column.type ?? ""] as
-      | { limit?: unknown }
-      | undefined;
-    return native?.limit;
   }
 
   /** @internal */
