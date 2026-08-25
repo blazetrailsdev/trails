@@ -2236,12 +2236,17 @@ export class SchemaStatements {
    * Mirrors: SchemaStatements#check_constraint_for!
    * (schema_statements.rb:1802-1806) — the raise interpolates the options
    * Hash, so the message carries Ruby's `{name: "x"}` rendering, not JSON's.
+   * Ruby's `expression: nil, **options` split happens in the body: an optional
+   * parameter cannot be destructured in the AbstractAdapter interface
+   * declaration the mixin-declaration-drift guard compares against, so `kwargs`
+   * carries the bag and `options` keeps Rails' name for the interpolated rest.
    * @internal
    */
   async checkConstraintForBang(
     tableName: string,
-    { expression, ...options }: { name?: string; expression?: string; validate?: boolean } = {},
+    kwargs: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition> {
+    const { expression, ...options } = kwargs;
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(
