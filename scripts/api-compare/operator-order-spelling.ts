@@ -49,11 +49,13 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Arel::Table": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
-  // attribute_set/builder.rb:110 `def [](key)` → builder.ts `LazyAttributeHash#get`,
-  // :114 `def []=(key, value)` → `set` (a faithful delegate-hash write, unlike
-  // AttributeSet's `set` below). The class is declared at builder.rb:94 directly
-  // under `module ActiveModel`, so its fqn is NOT nested under `AttributeSet`.
-  "ActiveModel::LazyAttributeHash": { "[]": ["get"], "[]=": ["set"] },
+  // attribute_set/builder.rb:110 `def [](key)` → builder.ts
+  // `LazyAttributeHash#getAttribute`, and :114 `def []=(key, value)` → `set`,
+  // the same spellings AttributeSet uses below (RFC 0115 retired the Map-facade
+  // `get`/`has` pair this class used to carry). The class is declared at
+  // builder.rb:94 directly under `module ActiveModel`, so its fqn is NOT nested
+  // under `AttributeSet`.
+  "ActiveModel::LazyAttributeHash": { "[]": ["getAttribute"], "[]=": ["set"] },
   // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute`, and
   // :20 `def []=(name, value)` → `set`, which takes the `Attribute` Rails
   // stores (RFC 0115 retired the bare-value Map-compat sibling it used to be).

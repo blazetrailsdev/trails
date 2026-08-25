@@ -258,6 +258,18 @@ export abstract class Attribute {
     );
   }
 
+  /**
+   * Ruby `Object#dup` for one Attribute — the call `LazyAttributeHash#deep_dup`
+   * and `#assign_default_value` make (`builder.rb:120`, `builder.rb:175`). A
+   * shallow copy that keeps the prototype and shares the `original_attribute`
+   * graph, exactly as Ruby's `dup` does; `initialize_dup` (attribute.rb:155-159)
+   * additionally re-dups `@value`, which is a no-op for the JS primitives Ruby
+   * calls non-duplicable.
+   */
+  dup(): Attribute {
+    return Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as Attribute;
+  }
+
   /** Access the original attribute for cloning. */
   getOriginalAttribute(): Attribute | null {
     return this.originalAttribute;

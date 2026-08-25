@@ -78,9 +78,9 @@ describe("LazyAttributeHash", () => {
     expect(hash.delegateHash().size).toBe(0);
   });
 
-  it("delegateHash reflects materialized entries after get", () => {
+  it("delegateHash reflects materialized entries after []", () => {
     const hash = new LazyAttributeHash(new Map([["name", strType]]), { name: "Bob" });
-    hash.get("name");
+    hash.getAttribute("name");
     expect(hash.delegateHash().has("name")).toBe(true);
   });
 
@@ -147,7 +147,7 @@ describe("LazyAttributeHash", () => {
       { age: "42" },
     );
     expect(hash.keys()).toEqual(["age"]);
-    expect(hash.has("name")).toBe(true);
+    expect(hash.isKey("name")).toBe(true);
   });
 
   it("except returns a copy without the given names", () => {
