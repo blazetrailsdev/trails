@@ -132,6 +132,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * collection's array into it would box that record. Such a proxy gets a
    * collection seat of its own instead.
    */
+  /**
+   * Rails' `@association` ivar (collection_proxy.rb:31-35), which every
+   * mutation on the proxy delegates to — `target` (:33), `loaded?` (:53) and
+   * `delete_all` (:474-476) are all this one read. Handed in by the
+   * constructor, exactly as Rails is handed its association.
+   */
   private _association!: CollectionAssociation;
   private _assocName: string;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
@@ -448,7 +454,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async toArray(): Promise<T[]> {
     if (!this._targetLoaded && this.isNullScope()) {
       const results = await this._execLoad();
-      return this._collectionAssociation().mergeTargetLists(results, this._target) as T[];
+      return this._association.mergeTargetLists(results, this._target) as T[];
     }
     return this.load();
   }
@@ -489,7 +495,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const results = await this._execLoad();
     // `@target = merge_target_lists(find_target, target)`
     // (collection_association.rb:274).
-    this._target = this._collectionAssociation().mergeTargetLists(results, this._target) as T[];
+    this._target = this._association.mergeTargetLists(results, this._target) as T[];
     this._targetLoaded = true;
     this._staleWrapper()?.loadedBang?.();
     return this._target;
@@ -564,7 +570,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   addExistingRecord(record: T): void {
-    this._collectionAssociation().addToTarget(record, { skipCallbacks: true });
+    this._association.addToTarget(record, { skipCallbacks: true });
   }
 
   /**
@@ -583,22 +589,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    return (await this._collectionAssociation().create(
+    return (await this._association.create(
       attrs,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
-  }
-
-  /**
-   * Rails' `@association` ivar (collection_proxy.rb:31-35), which every
-   * mutation on the proxy delegates to — `target` (:33), `loaded?` (:53) and
-   * `delete_all` (:474) all read the same seat. trails resolves it off the
-   * owner instead of holding it, because the proxy is built from the
-   * reflection, not handed the association object.
-   * @internal
-   */
-  private _collectionAssociation(): CollectionAssociation {
-    return this._association;
   }
 
   /**
@@ -611,7 +605,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * the association; the proxy counts nothing itself.
    */
   async size(): Promise<number> {
-    return this._collectionAssociation().size();
+    return this._association.size();
   }
 
   /**
@@ -621,7 +615,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (collection_proxy.rb:831-833) — `@association.empty?`.
    */
   async isEmpty(): Promise<boolean> {
-    return this._collectionAssociation().isEmpty();
+    return this._association.isEmpty();
   }
 
   /**
@@ -728,7 +722,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   divergence — renaming either would break the Rails API surface.
   //   Accepts Integer/String keys too, mirroring Rails' delete_or_destroy.
   async delete(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    const removed = await this._collectionAssociation().delete(
+    const removed = await this._association.delete(
       ...(records as Array<Base | number | string | bigint>),
     );
     this.resetScope();
@@ -749,7 +743,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    const removed = await this._collectionAssociation().destroy(
+    const removed = await this._association.destroy(
       ...(records as Array<Base | number | string | bigint>),
     );
     this.resetScope();
@@ -781,7 +775,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `CollectionAssociation#include?` (collection_association.rb:258-270).
    */
   async isInclude(record: T): Promise<boolean> {
-    return !!(await this._collectionAssociation().isInclude(record));
+    return !!(await this._association.isInclude(record));
   }
 
   /**
@@ -861,7 +855,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (test/cases/associations/has_many_associations_test.rb:2688-2698) pins.
    */
   async replace(otherArray: T[]): Promise<T[] | undefined> {
-    const association = this._collectionAssociation();
+    const association = this._association;
     return (await association.replace(otherArray)) as T[] | undefined;
   }
 
@@ -871,7 +865,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy_all
    */
   async destroyAll(): Promise<T[]> {
-    const records = (await this._collectionAssociation().destroyAll()) as T[];
+    const records = (await this._association.destroyAll()) as T[];
     this.resetScope();
     return records;
   }
@@ -970,7 +964,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   isNullScope(): boolean {
-    return this._collectionAssociation().isNullScope();
+    return this._association.isNullScope();
   }
 
   /**
@@ -1056,7 +1050,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    return (await this._collectionAssociation().createBang(
+    return (await this._association.createBang(
       attrs,
       block as ((record: Base) => void) | undefined,
     )) as T | T[];
@@ -1073,7 +1067,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * in Rails.
    */
   async deleteAll(dependent?: string): Promise<number> {
-    const count = await this._collectionAssociation().deleteAll(dependent);
+    const count = await this._association.deleteAll(dependent);
     this.resetScope();
     return count;
   }

@@ -148,8 +148,8 @@ export class SchemaDumper extends BaseSchemaDumper {
    * (abstract/schema_dumper.rb:64), split out because the lookup has to survive
    * a dumper with no backing adapter (raw/mock sources).
    * @internal
-   * @noRailsEquivalent CONVERGEABLE — inline in Ruby; extracted only because
-   *   trails' dumper also runs against adapterless schema sources.
+   * Inline in Ruby; extracted only because trails' dumper also runs against
+   * adapterless schema sources.
    */
   private _nativeTypeLimit(column: Column): unknown {
     const adapter = this._adapter();

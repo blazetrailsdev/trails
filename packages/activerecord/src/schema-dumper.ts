@@ -1025,8 +1025,6 @@ export abstract class SchemaDumper {
    * The `@connection.supports_virtual_columns?` answer (abstract/schema_dumper.rb:47),
    * resolved once in `table()` because trails' predicate is async.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE — Rails reads the connection predicate
-   *   inline; trails' is async and the emitter chain is sync.
    */
   protected supportsVirtualColumns = false;
 

@@ -1429,7 +1429,7 @@ export function _inlinePolymorphicKeys(
 }
 
 /**
- * The collection arm of `Preloader::Association#associate_records_to_owner`
+ * `Preloader::Association#associate_records_to_owner`
  * (`preloader/association.rb:245-256`), written through the association's
  * `target=` (`association.rb:100-103`), which is what flips `loaded`. Rails has
  * no proxy-side hook for this. The owner lookup Rails does inline
@@ -1439,9 +1439,15 @@ export function _inlinePolymorphicKeys(
  * @internal
  */
 export function _associateRecordsToOwner(association: AssociationInstance, records: Base[]): void {
-  const target = association.target;
-  const notPersistedRecords = (Array.isArray(target) ? target : []).filter((r) => !r.isPersisted());
-  association.target = [...records, ...notPersistedRecords];
+  if (association.isCollection()) {
+    const target = association.target;
+    const notPersistedRecords = (Array.isArray(target) ? target : []).filter(
+      (r) => !r.isPersisted(),
+    );
+    association.target = [...records, ...notPersistedRecords];
+  } else {
+    association.target = records[0] ?? null;
+  }
 }
 
 /**
