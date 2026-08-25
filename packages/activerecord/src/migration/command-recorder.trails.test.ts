@@ -35,29 +35,45 @@ describe("CommandRecorder", () => {
     expect(recorder.america()).toBe("hi");
   });
 
-  it("runs the block inverseOf(transaction) is handed, as sub_recorder.revert does", async () => {
+  it("runs a reverted transaction's block to completion before recording the command", async () => {
     // `invert_transaction` runs the block through `sub_recorder.revert(&block)`
-    // (command_recorder.rb:186-188); the block's statements record their
-    // inverses onto the recorder the migration still reads, and `sub_recorder`
-    // stays empty. Reached here through `record`, whose reverting arm calls
-    // `inverse_of` (command_recorder.rb:94-100).
+    // and only then returns its tuple (command_recorder.rb:186-190), so the
+    // block's inverses land on this recorder BEFORE the `transaction` command
+    // that wraps them. The block awaits here: a fire-and-forget run would push
+    // the command first and append the inverses after it.
     const recorder = new CommandRecorder(abstractDelegate);
+    const recordable = recorder as unknown as {
+      transaction(fn: () => Promise<void>): Promise<void>;
+      addColumn(...a: unknown[]): void;
+    };
     let ran = 0;
     await recorder.revert(async () => {
-      recorder.record("transaction", [], async () => {
+      await recordable.transaction(async () => {
+        await Promise.resolve();
         ran += 1;
-        (recorder as unknown as { addColumn(...a: unknown[]): void }).addColumn(
-          "fruits",
-          "colour",
-          "string",
-        );
+        recordable.addColumn("fruits", "colour", "string");
       });
     });
     expect(ran).toBe(1);
-    // The block's inverse lands on this recorder, not on the empty sub-recorder;
-    // the enclosing `revert` reverses the pair, so the transaction command
-    // (recorded last) reads first.
+    // The enclosing `revert` reverses the pair, so the command recorded last
+    // reads first.
     expect(recorder.commands.map((c) => c[0])).toEqual(["transaction", "removeColumn"]);
+  });
+
+  it("propagates a throw from a reverted transaction's block", async () => {
+    // Ruby's exception propagates synchronously out of `invert_transaction`
+    // (command_recorder.rb:187); the awaited block rejects the same call.
+    const recorder = new CommandRecorder(abstractDelegate);
+    const recordable = recorder as unknown as {
+      transaction(fn: () => Promise<void>): Promise<void>;
+    };
+    await expect(
+      recorder.revert(async () => {
+        await recordable.transaction(async () => {
+          throw new TypeError("boom");
+        });
+      }),
+    ).rejects.toThrow("boom");
   });
 
   it("does not forward a private delegate member, the way public_send does not", () => {
