@@ -4591,7 +4591,16 @@ classAttribute.call(Base, "counterCachedAssociationNames", {
 // app.message_verifier("active_record/token_for")` onto ActiveRecord::Base at
 // boot. trails has no railtie, so token-for.ts builds the verifier from the
 // injected secret and this sink performs that assignment.
+let _bootTokenVerifier: _MessageVerifier | null = null;
 _registerGeneratedTokenVerifierSink((verifier) => {
+  // railtie.rb:331 assigns with `||=`, so an explicit
+  // `Base.generatedTokenVerifier = ...` is never overwritten. The seam may
+  // still replace the value it installed itself, which is how a re-injected
+  // secret reaches the slot.
+  if (Base.generatedTokenVerifier != null && Base.generatedTokenVerifier !== _bootTokenVerifier) {
+    return;
+  }
+  _bootTokenVerifier = verifier;
   Base.generatedTokenVerifier = verifier;
 });
 extend(Base, {
