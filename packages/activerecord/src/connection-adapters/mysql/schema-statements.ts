@@ -9,7 +9,10 @@ import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
-import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
+import {
+  TableDefinition as MysqlTableDefinition,
+  Table as MysqlTable,
+} from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
@@ -244,6 +247,21 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   }
 
   /**
+   * Mirrors: MySQL::SchemaStatements#create_table_definition
+   * (mysql/schema_statements.rb:172-174)
+   * @internal
+   */
+  override createTableDefinition(
+    name: string,
+    options: Record<string, unknown> = {},
+  ): MysqlTableDefinition {
+    return new MysqlTableDefinition(name, {
+      ...options,
+      adapter: this as unknown as VisitorHostAdapter,
+    });
+  }
+
+  /**
    * Mirrors: MySQL::SchemaStatements#add_index_length
    *
    * @internal
@@ -317,18 +335,6 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   }
 
   return this._defaultRowFormat ?? null;
-}
-
-/**
- * Mirrors: MySQL::SchemaStatements#create_table_definition
- * @internal
- */
-export function createTableDefinition(
-  this: VisitorHostAdapter,
-  name: string,
-  options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
-): TableDefinition {
-  return new TableDefinition(name, { ...options, adapter: this });
 }
 
 /**

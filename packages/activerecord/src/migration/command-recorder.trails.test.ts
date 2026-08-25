@@ -127,6 +127,50 @@ describe("CommandRecorder", () => {
       expect(recorder.commands[0][0]).toBe("addColumn");
     });
 
+    it("forwarders record no trailing options hash when the splat is empty", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.remove("name");
+        await t.index("kind");
+        await t.timestamps();
+        await t.removeTimestamps();
+        await t.removeIndex("kind");
+        await t.references("supplier");
+        await t.removeReferences("supplier");
+        await t.foreignKey("suppliers");
+        await t.removeForeignKey();
+        await t.checkConstraint("qty > 0");
+        await t.removeCheckConstraint();
+      });
+      expect(recorder.commands).toEqual([
+        ["removeColumns", ["fruits", "name"]],
+        ["addIndex", ["fruits", "kind"]],
+        ["addTimestamps", ["fruits"]],
+        ["removeTimestamps", ["fruits"]],
+        ["removeIndex", ["fruits", "kind"]],
+        ["addReference", ["fruits", "supplier"]],
+        ["removeReference", ["fruits", "supplier"]],
+        ["addForeignKey", ["fruits", "suppliers"]],
+        ["removeForeignKey", ["fruits"]],
+        ["addCheckConstraint", ["fruits", "qty > 0"]],
+        ["removeCheckConstraint", ["fruits"]],
+      ]);
+    });
+
+    it("removeCheckConstraint records the expression alongside the options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.removeCheckConstraint("qty > 0", { name: "chk" });
+        await t.removeCheckConstraint("qty > 0");
+        await t.removeCheckConstraint({ name: "chk" });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }]],
+        ["removeCheckConstraint", ["fruits", "qty > 0"]],
+        ["removeCheckConstraint", ["fruits", { name: "chk" }]],
+      ]);
+    });
+
     it("remove with multiple columns records a single removeColumns", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {

@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../base.js";
 import { MysqlSchemaStatements } from "./schema-statements.js";
-import { Table as MysqlTable } from "./schema-definitions.js";
+import {
+  Table as MysqlTable,
+  TableDefinition as MysqlTableDefinition,
+} from "./schema-definitions.js";
 
 import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
-  createTableDefinition,
   defaultType,
   newColumnFromField,
   type MysqlColumnReflectionHost,
@@ -103,7 +105,9 @@ describe("MySQL::SchemaStatements", () => {
 
   it("createTableDefinition returns MySQL TableDefinition", async () => {
     const conn = await Base.leaseConnection();
-    expect(createTableDefinition.call(conn as never, "users").name).toBe("users");
+    const td = MysqlSchemaStatements.prototype.createTableDefinition.call(conn as never, "users");
+    expect(td.name).toBe("users");
+    expect(td).toBeInstanceOf(MysqlTableDefinition);
   });
 
   const reflectionHost = (

@@ -3719,7 +3719,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
+    const rest = options;
     const unlogged =
       (rest.unlogged as boolean | undefined) ?? PostgreSQLAdapter.createUnloggedTables;
     return new PgTableDefinition(name, { ...rest, unlogged, adapter: this });
