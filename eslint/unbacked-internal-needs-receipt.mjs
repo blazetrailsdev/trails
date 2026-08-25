@@ -19,12 +19,21 @@
  * is not autofixable: the remedy is a reviewed reason, or deleting a tag that was
  * never earned.
  *
+ * The manifest is gitignored and built from rails-api.json, so this rule only
+ * goes live in the `rails-comparison` CI job; it no-ops wherever the manifest
+ * is absent (see `manifestAvailable`).
+ *
  * ENROLLMENT is per package, in the `files` list of the rule's block in
  * eslint.config.mjs and eslint/rails-private-jsdoc.config.mjs. That set is
  * ONLY-GROW: a package joins once its `@internal` tags are burnt down, and no
  * package is ever removed to get a red run green.
  */
-import { attachedJsDoc, loadManifest, relFromRepoRoot } from "./rails-private-jsdoc.mjs";
+import {
+  attachedJsDoc,
+  loadManifest,
+  manifestAvailable,
+  relFromRepoRoot,
+} from "./rails-private-jsdoc.mjs";
 
 /**
  * A whole file with no Rails counterpart carries ONE `@noRailsEquivalent` in a
@@ -46,6 +55,14 @@ function hasFileLevelReceipt(sourceCode) {
 
 function check(context, node, name) {
   if (!name) return;
+  // No manifest means no information, and this rule's polarity turns that into
+  // "every `@internal` is unbacked" — the opposite of `rails-private-jsdoc`,
+  // which requires the tag NOWHERE under the same condition. The standalone
+  // Lint job builds the manifest with `--allow-missing` (no Ruby there), so it
+  // is genuinely absent and this rule must fail open, exactly as
+  // `rails-file-structure-method-order` no-ops there. It goes live in the
+  // `rails-comparison` job, which extracts rails-api.json first.
+  if (!manifestAvailable()) return;
   // `_`-prefixed names are dropped from the measured surface by name alone
   // (`walkTsFileSurface` in extra-surface.ts), before `internal` is even read.
   // An `@internal` there hides nothing, and a `@noRailsEquivalent` written on

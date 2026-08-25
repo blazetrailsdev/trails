@@ -23,9 +23,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = path.resolve(__dirname, "rails-private-methods.json");
 
 let manifestCache = null;
+let manifestPresent = false;
 
 /**
- * Test seam. The manifest is gitignored and only exists after
+ * Test seam; pass `null` to install the "manifest absent" state. The manifest is
+ * gitignored and only exists after
  * `pnpm rails-privates:manifest`, so a rule test has to supply its own. Writing
  * one to the real path instead would not be hermetic: vitest runs the two rule
  * tests in separate forked processes over one filesystem, and whichever restored
@@ -33,17 +35,34 @@ let manifestCache = null;
  * parked on top of the real manifest for the rest of the session.
  */
 export function setManifestForTests(manifest) {
-  manifestCache = manifest;
+  // `null` installs the ABSENT state — the empty stand-in plus the flag saying
+  // it is a stand-in — which is what the Lint job sees and what a rule that
+  // flags what the manifest does NOT list has to be tested against.
+  manifestCache = manifest ?? { files: {} };
+  manifestPresent = manifest != null;
 }
 
 export function loadManifest() {
   if (manifestCache) return manifestCache;
   if (!fs.existsSync(MANIFEST_PATH)) {
     manifestCache = { files: {} };
+    manifestPresent = false;
     return manifestCache;
   }
   manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+  manifestPresent = true;
   return manifestCache;
+}
+
+/**
+ * Whether the manifest was actually found, as opposed to the empty stand-in
+ * `loadManifest` returns when it is absent. The two are indistinguishable in
+ * the returned object, and which one you are holding decides opposite answers
+ * for a rule whose polarity is "flag what the manifest does NOT list".
+ */
+export function manifestAvailable() {
+  loadManifest();
+  return manifestPresent;
 }
 
 let repoRootCache = null;

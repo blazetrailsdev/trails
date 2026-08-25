@@ -96,4 +96,23 @@ tester.run("unbacked-internal-needs-receipt", rule, {
   ],
 });
 
+// The standalone Lint job builds the manifest with `--allow-missing` and there
+// is no Ruby there, so the file is genuinely absent. This rule's polarity turns
+// "no manifest" into "every `@internal` is unbacked" unless it fails open —
+// which is how it reported 4 false positives on names that ARE Rails-private.
+tester.run("unbacked-internal-needs-receipt (no manifest)", rule, {
+  valid: [
+    {
+      filename: inheritanceFile,
+      code: `/** @internal */\nexport function seam() {}\n`,
+      // Scoped to this case: the manifest cache is module-global, and
+      // RuleTester runs every case after the module body, so setting it at
+      // import time would silently apply to the suite above too.
+      before: () => setManifestForTests(null),
+      after: () => setManifestForTests(FIXTURE),
+    },
+  ],
+  invalid: [],
+});
+
 console.log("unbacked-internal-needs-receipt: ok");
