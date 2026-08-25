@@ -96,8 +96,6 @@ class CreateSchoolsAndClassesMigration extends SilentMigration {
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {
-    // Dropped by this migration's own `migrate("down")` in the caller's finally
-    // block, which the rule can't see from here.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("rockets", (t) => {
       t.string("name");
@@ -1057,10 +1055,6 @@ describeIfSupports("foreign_keys", "Migration", () => {
         Base.tableNameSuffix = "";
       });
 
-      // Rails' setup/teardown: `@migration.migrate(:up)` / `(:down)` — the bare
-      // `rockets` / `astronauts` names travel Migration#method_missing's
-      // proper_table_name, which is what the WithPrefix / WithSuffix subclasses
-      // exist to cover (foreign_key_test.rb:34-43, :47-64).
       const withChangeColumnTables = async (
         body: (conn: AbstractAdapter) => Promise<void>,
       ): Promise<void> => {

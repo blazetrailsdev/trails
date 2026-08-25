@@ -462,24 +462,30 @@ export class CheckConstraintDefinition {
     return this.name != null ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
+  /**
+   * Mirrors: `defined_for?(name:, expression: nil, validate: nil, **options)`
+   * (schema_definitions.rb:189-195).
+   *
+   * `expression` is accepted but never compared — Rails does not compare it
+   * either (it is used upstream to derive the name), and a raw-string compare
+   * would spuriously fail against the adapter's normalized form (e.g.
+   * PostgreSQL's `pg_get_constraintdef`).
+   *
+   * The validate arm is `validate.nil? || validate == options.fetch(:validate,
+   * validate)`: with `:validate` unstored the fetch falls back to the lookup
+   * value, so the comparison is trivially true and the `validate?` getter's
+   * `true` default must not stand in for it. The residual arm is
+   * `options.slice(*self.options.keys)` followed by the `to_s` compare, where
+   * Ruby's `nil.to_s` is `""`.
+   */
   isDefinedFor(options: {
     name: string | null | undefined;
     expression?: string;
     validate?: boolean | null;
     [key: string]: unknown;
   }): boolean {
-    // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
-    // validate: nil, **options) (schema_definitions.rb:189-195). The expression is
-    // accepted but never compared (it is used upstream to derive the name); a
-    // raw-string compare would spuriously fail against the adapter's normalized
-    // form (e.g. PostgreSQL's `pg_get_constraintdef`). The validate arm mirrors
-    // `validate.nil? || validate == self.options.fetch(:validate, validate)`:
-    // with `:validate` unstored the fetch falls back to the lookup value, so the
-    // comparison is trivially true — the getter's `true` default must not stand
-    // in for it.
     const { name, expression: _expression, validate, ...rest } = options;
     const sliced = Object.entries(rest).filter(([k]) => k in this.options);
-    // Ruby `nil.to_s` is "" (schema_definitions.rb:194), not "null".
     const toS = (v: unknown): string => (v == null ? "" : String(v));
     return (
       this.name === (name == null ? "" : name.toString()) &&

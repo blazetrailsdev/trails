@@ -4,12 +4,7 @@ import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./inde
 import { typeRegistry } from "./type/registry.js";
 import "./attribute/user-provided-default.js";
 
-/**
- * TS-only coverage for `Attribute` that has no counterpart in Rails'
- * `activemodel/test/cases/attribute_test.rb`. Kept out of the mirrored
- * `attribute.test.ts` so `parity:test` reports that file at Extra=0.
- */
-describe("Attribute (trails-only)", () => {
+describe("Attribute — trails-only coverage", () => {
   it("#serializable? delegates to the type", () => {
     const attr = Attribute.fromDatabase("count", 42, typeRegistry.lookup("integer"));
     expect(attr.isSerializable()).toBe(true);
