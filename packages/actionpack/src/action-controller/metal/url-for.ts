@@ -3,11 +3,8 @@
  *
  * Includes url_for into the host class, adding HTTP-layer URL options
  * like host, port, and protocol from the current request.
- * Re-exports the core urlFor from ActionDispatch.
  * @see https://api.rubyonrails.org/classes/ActionController/UrlFor.html
  */
-
-export { urlFor, type UrlOptions } from "../../action-dispatch/url-for.js";
 
 export function urlOptionsFromRequest(request: {
   host?: string;

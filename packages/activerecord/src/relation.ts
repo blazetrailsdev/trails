@@ -3226,7 +3226,7 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#select_values */
   selectValues: (string | Nodes.Node)[];
   /** Mirrors: ActiveRecord::Relation#group_values */
-  groupValues: string[];
+  groupValues: Array<string | Nodes.Node>;
   /** Mirrors: ActiveRecord::Relation#order_values */
   orderValues: Array<string | Nodes.Node>;
   /** Mirrors: ActiveRecord::Relation#joins_values */

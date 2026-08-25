@@ -472,8 +472,9 @@ export async function withTransactionReturningStatus<T>(
   // connection is taken from the block parameter rather than re-read off the
   // deprecated `.connection` getter, matching Rails.
   await modelClass.withConnection(async (connection) => {
-    // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const hadOuterTransaction = currentTransaction() !== null || connection.inTransaction;
+    // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`
+    // (transactions.rb:411).
+    const ensureFinalize = !connection.isTransactionOpen();
 
     await dbTransaction.call(connection as any, async () => {
       // Enroll record with the TransactionManager so it fires committedBang/
@@ -483,10 +484,7 @@ export async function withTransactionReturningStatus<T>(
       // intentionally do NOT register a per-call tx.afterRollback hook here: the
       // closure would capture per-save state, and on multi-save rollbacks the
       // last-registered hook would overwrite the correct outermost snapshot.
-      await addToTransaction.call(
-        this,
-        !hadOuterTransaction || hasTransactionalCallbacks.call(this),
-      );
+      await addToTransaction.call(this, ensureFinalize || hasTransactionalCallbacks.call(this));
       rememberTransactionRecordState.call(this);
 
       status = await fn();

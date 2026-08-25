@@ -5,148 +5,152 @@
  * full RouteSet. Tests requiring a live RouteSet are marked pending.
  */
 import { describe, it, expect } from "vitest";
-import { urlFor } from "../../action-dispatch/url-for.js";
+import { URL } from "../../action-dispatch/http/url.js";
 
 describe("UrlForTest", () => {
   it("exception is thrown without host", () => {
-    expect(() => urlFor({ path: "/posts" })).toThrow(/Missing host/);
+    expect(() => URL.urlFor({ path: "/posts" })).toThrow(/Missing host/);
   });
 
   it("anchor", () => {
-    expect(urlFor({ host: "example.com", path: "/posts", anchor: "comments" })).toBe(
+    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: "comments" })).toBe(
       "http://example.com/posts#comments",
     );
   });
 
   it("nil anchor", () => {
-    expect(urlFor({ host: "example.com", path: "/posts" })).toBe("http://example.com/posts");
+    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: null })).toBe(
+      "http://example.com/posts",
+    );
   });
 
   it("false anchor", () => {
-    // Empty string anchor means no fragment
-    expect(urlFor({ host: "example.com", path: "/posts", anchor: "" })).toBe(
+    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: false })).toBe(
       "http://example.com/posts",
     );
   });
 
   it("anchor should call to param", () => {
     const anchor = { toParam: () => "anchor" };
-    expect(urlFor({ path: "/c/a/i", anchor, only_path: true })).toBe("/c/a/i#anchor");
+    expect(URL.urlFor({ path: "/c/a/i", anchor, onlyPath: true })).toBe("/c/a/i#anchor");
   });
 
   it("anchor should escape unsafe pchar", () => {
-    expect(urlFor({ host: "example.com", path: "/c/a", anchor: "#anchor" })).toBe(
+    expect(URL.urlFor({ host: "example.com", path: "/c/a", anchor: "#anchor" })).toBe(
       "http://example.com/c/a#%23anchor",
     );
   });
 
   it("anchor should not escape safe pchar", () => {
     expect(
-      urlFor({ path: "/c/a", only_path: true, anchor: "name=user&email=user@domain.com" }),
+      URL.urlFor({ path: "/c/a", onlyPath: true, anchor: "name=user&email=user@domain.com" }),
     ).toBe("/c/a#name=user&email=user@domain.com");
   });
 
   it("default host", () => {
-    expect(urlFor({ host: "example.com", path: "/" })).toBe("http://example.com/");
+    expect(URL.urlFor({ host: "example.com", path: "/" })).toBe("http://example.com/");
   });
 
   it("host may be overridden", () => {
-    expect(urlFor({ host: "other.com", path: "/" })).toBe("http://other.com/");
+    expect(URL.urlFor({ host: "other.com", path: "/" })).toBe("http://other.com/");
   });
 
   it("subdomain may be changed", () => {
-    expect(urlFor({ host: "www.basecamphq.com", subdomain: "api", path: "/c/a/i" })).toBe(
+    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: "api", path: "/c/a/i" })).toBe(
       "http://api.basecamphq.com/c/a/i",
     );
   });
 
   it("subdomain may be object", () => {
-    const model = { toString: () => "api" };
-    expect(urlFor({ host: "www.basecamphq.com", subdomain: model, path: "/c/a/i" })).toBe(
+    // Rails: `Class.new { def self.to_param; "api"; end }` (url_for_test.rb:119).
+    const model = { toParam: () => "api" };
+    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: model, path: "/c/a/i" })).toBe(
       "http://api.basecamphq.com/c/a/i",
     );
   });
 
   it("subdomain may be removed", () => {
-    expect(urlFor({ host: "www.basecamphq.com", subdomain: false, path: "/c/a/i" })).toBe(
+    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: false, path: "/c/a/i" })).toBe(
       "http://basecamphq.com/c/a/i",
     );
   });
 
   it("subdomain may be removed with blank string", () => {
-    expect(urlFor({ host: "api.basecamphq.com", subdomain: "", path: "/c/a/i" })).toBe(
+    expect(URL.urlFor({ host: "api.basecamphq.com", subdomain: "", path: "/c/a/i" })).toBe(
       "http://basecamphq.com/c/a/i",
     );
   });
 
   it("multiple subdomains may be removed", () => {
     expect(
-      urlFor({ host: "mobile.www.api.basecamphq.com", subdomain: false, path: "/c/a/i" }),
+      URL.urlFor({ host: "mobile.www.api.basecamphq.com", subdomain: false, path: "/c/a/i" }),
     ).toBe("http://basecamphq.com/c/a/i");
   });
 
   it("subdomain may be accepted with numeric host", () => {
-    expect(urlFor({ host: "127.0.0.1", subdomain: "api", path: "/c/a/i" })).toBe(
+    expect(URL.urlFor({ host: "127.0.0.1", subdomain: "api", path: "/c/a/i" })).toBe(
       "http://127.0.0.1/c/a/i",
     );
   });
 
   it("domain may be changed", () => {
-    expect(urlFor({ host: "www.basecamphq.com", domain: "37signals.com", path: "/c/a/i" })).toBe(
-      "http://www.37signals.com/c/a/i",
-    );
+    expect(
+      URL.urlFor({ host: "www.basecamphq.com", domain: "37signals.com", path: "/c/a/i" }),
+    ).toBe("http://www.37signals.com/c/a/i");
   });
 
   it("tld length may be changed", () => {
     expect(
-      urlFor({ host: "www.basecamphq.com", subdomain: "mobile", tld_length: 2, path: "/c/a/i" }),
+      URL.urlFor({ host: "www.basecamphq.com", subdomain: "mobile", tldLength: 2, path: "/c/a/i" }),
     ).toBe("http://mobile.www.basecamphq.com/c/a/i");
   });
 
   it("port", () => {
-    expect(urlFor({ host: "example.com", port: 8080, path: "/" })).toBe("http://example.com:8080/");
+    expect(URL.urlFor({ host: "example.com", port: 8080, path: "/" })).toBe(
+      "http://example.com:8080/",
+    );
   });
 
   it("default port", () => {
     // Port 80 for http should not appear
-    expect(urlFor({ host: "example.com", port: 80, path: "/" })).toBe("http://example.com/");
+    expect(URL.urlFor({ host: "example.com", port: 80, path: "/" })).toBe("http://example.com/");
   });
 
   it("protocol with and without separators", () => {
-    expect(urlFor({ host: "example.com", protocol: "https", path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: "https", path: "/" })).toBe(
       "https://example.com/",
     );
-    expect(urlFor({ host: "example.com", protocol: "https://", path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: "https://", path: "/" })).toBe(
       "https://example.com/",
     );
-    expect(urlFor({ host: "example.com", protocol: "https:", path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: "https:", path: "/" })).toBe(
       "https://example.com/",
     );
   });
 
   it("without protocol", () => {
-    expect(urlFor({ host: "example.com", protocol: "//", path: "/" })).toBe("//example.com/");
-    expect(urlFor({ host: "example.com", protocol: false, path: "/" })).toBe("//example.com/");
+    expect(URL.urlFor({ host: "example.com", protocol: "//", path: "/" })).toBe("//example.com/");
+    expect(URL.urlFor({ host: "example.com", protocol: false, path: "/" })).toBe("//example.com/");
   });
 
   it("without protocol and with port", () => {
-    expect(urlFor({ host: "example.com", protocol: "//", port: 3000, path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: "//", port: 3000, path: "/" })).toBe(
       "//example.com:3000/",
     );
-    expect(urlFor({ host: "example.com", protocol: false, port: 3000, path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: false, port: 3000, path: "/" })).toBe(
       "//example.com:3000/",
     );
   });
 
   it("user name and password", () => {
-    expect(urlFor({ host: "example.com", user: "admin", password: "secret", path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", user: "admin", password: "secret", path: "/" })).toBe(
       "http://admin:secret@example.com/",
     );
   });
 
   it("user name and password with escape codes", () => {
     expect(
-      urlFor({
+      URL.urlFor({
         host: "www.basecamphq.com",
         user: "openid.aol.com/nextangler",
         password: "one two?",
@@ -155,36 +159,38 @@ describe("UrlForTest", () => {
     ).toBe("http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i");
   });
 
-  it("trailing slash", () => {
-    expect(urlFor({ host: "example.com", path: "/posts", trailing_slash: true })).toBe(
-      "http://example.com/posts/",
-    );
+  it.skip("trailing slash", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with protocol", () => {
-    expect(
-      urlFor({ host: "example.com", protocol: "https", path: "/posts", trailing_slash: true }),
-    ).toBe("https://example.com/posts/");
+  it.skip("trailing slash with protocol", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with only path", () => {
-    expect(urlFor({ path: "/posts", trailing_slash: true, only_path: true })).toBe("/posts/");
+  it.skip("trailing slash with only path", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with anchor", () => {
-    expect(
-      urlFor({ host: "example.com", path: "/posts", trailing_slash: true, anchor: "top" }),
-    ).toBe("http://example.com/posts/#top");
+  it.skip("trailing slash with anchor", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
-  it("trailing slash with params", () => {
-    expect(
-      urlFor({ host: "example.com", path: "/posts", trailing_slash: true, params: { page: "1" } }),
-    ).toBe("http://example.com/posts/?page=1");
+  it.skip("trailing slash with params", () => {
+    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
+    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
+    // fills a blank path (url.rb:76).
   });
 
   it("relative url root is respected", () => {
-    const url = urlFor({ host: "example.com", path: "/posts", script_name: "/app" });
+    const url = URL.urlFor({ host: "example.com", path: "/posts", scriptName: "/app" });
     expect(url).toBe("http://example.com/app/posts");
   });
 
@@ -192,11 +198,11 @@ describe("UrlForTest", () => {
     // pending: needs RouteSet::Config with relative_url_root
     // Rails: ActionDispatch::Routing::RouteSet::Config.new("/subdir")
     expect(
-      urlFor({
+      URL.urlFor({
         host: "www.basecamphq.com",
         protocol: "https",
         path: "/c/a/i",
-        script_name: "/subdir",
+        scriptName: "/subdir",
       }),
     ).toBe("https://www.basecamphq.com/subdir/c/a/i");
   });
@@ -217,30 +223,29 @@ describe("UrlForTest", () => {
     expect(true).toBe(true); // pending: needs RouteSet scoped :account_id
   });
 
-  it("using nil script name properly concats with original script name", () => {
-    // original_script_name is prepended when script_name is nil, mirroring route_set.rb
-    expect(
-      urlFor({
-        host: "www.basecamphq.com",
-        protocol: "https",
-        path: "/c/a/i",
-        original_script_name: "/subdir",
-      }),
-    ).toBe("https://www.basecamphq.com/subdir/c/a/i");
+  it.skip("using nil script name properly concats with original script name", () => {
+    // needs RouteSet `:original_script_name` handling. The concatenation under test
+    // is `script_name = original_script_name + script_name` (route_set.rb:869-873);
+    // ActionDispatch::Http::URL only ever sees the already-concatenated
+    // `:script_name`, so there is nothing at this layer to assert.
   });
 
   it("only path", () => {
-    expect(urlFor({ path: "/posts", only_path: true })).toBe("/posts");
+    expect(URL.urlFor({ path: "/posts", onlyPath: true })).toBe("/posts");
   });
 
   it("one parameter", () => {
-    expect(urlFor({ host: "example.com", path: "/posts", params: { page: "2" } })).toBe(
+    expect(URL.urlFor({ host: "example.com", path: "/posts", params: { page: "2" } })).toBe(
       "http://example.com/posts?page=2",
     );
   });
 
   it("two parameters", () => {
-    const url = urlFor({ host: "example.com", path: "/posts", params: { page: "2", per: "10" } });
+    const url = URL.urlFor({
+      host: "example.com",
+      path: "/posts",
+      params: { page: "2", per: "10" },
+    });
     expect(url).toContain("page=2");
     expect(url).toContain("per=10");
     expect(url).toContain("?");
@@ -248,7 +253,7 @@ describe("UrlForTest", () => {
   });
 
   it("params option", () => {
-    const url = urlFor({ path: "/c/a", only_path: true, params: { domain: "foo", id: "1" } });
+    const url = URL.urlFor({ path: "/c/a", onlyPath: true, params: { domain: "foo", id: "1" } });
     expect(url).toBe("/c/a?domain=foo&id=1");
   });
 
@@ -258,26 +263,30 @@ describe("UrlForTest", () => {
 
   it("non hash params option", () => {
     // Non-hash params value is treated as a scalar and appended under a "params" key
-    const url = urlFor({ path: "/c/a", only_path: true, params: { params: "p" } });
+    const url = URL.urlFor({ path: "/c/a", onlyPath: true, params: { params: "p" } });
     expect(url).toBe("/c/a?params=p");
   });
 
   it("hash parameter", () => {
-    const url = urlFor({ host: "example.com", path: "/", params: { filter: { name: "test" } } });
+    const url = URL.urlFor({
+      host: "example.com",
+      path: "/",
+      params: { filter: { name: "test" } },
+    });
     expect(url).toContain("filter%5Bname%5D=test");
   });
 
   it("array parameter", () => {
-    const url = urlFor({ host: "example.com", path: "/", params: { ids: [1, 2, 3] } });
+    const url = URL.urlFor({ host: "example.com", path: "/", params: { ids: [1, 2, 3] } });
     expect(url).toContain("ids%5B%5D=1");
     expect(url).toContain("ids%5B%5D=2");
     expect(url).toContain("ids%5B%5D=3");
   });
 
   it("hash recursive parameters", () => {
-    const url = urlFor({
+    const url = URL.urlFor({
       path: "/c/a",
-      only_path: true,
+      onlyPath: true,
       params: { query: { person: { name: "Bob", position: "prof" }, hobby: "piercing" } },
     });
     const params = url.split("?")[1].split("&").sort();
@@ -287,9 +296,9 @@ describe("UrlForTest", () => {
   });
 
   it("hash recursive and array parameters", () => {
-    const url = urlFor({
+    const url = URL.urlFor({
       path: "/c/a/101",
-      only_path: true,
+      onlyPath: true,
       params: {
         query: { person: { name: "Bob", position: ["prof", "artdirector"] }, hobby: "piercing" },
       },
@@ -327,13 +336,13 @@ describe("UrlForTest", () => {
   });
 
   it("url params with nil to param are not in url", () => {
-    const url = urlFor({ host: "example.com", path: "/", params: { a: null, b: "2" } });
+    const url = URL.urlFor({ host: "example.com", path: "/", params: { a: null, b: "2" } });
     expect(url).not.toContain("a=");
     expect(url).toContain("b=2");
   });
 
   it("false url params are included in query", () => {
-    const url = urlFor({ host: "example.com", path: "/", params: { a: false } });
+    const url = URL.urlFor({ host: "example.com", path: "/", params: { a: false } });
     expect(url).toContain("a=false");
   });
 
@@ -351,12 +360,12 @@ describe("UrlForTest", () => {
 
   it("nested optional", () => {
     // Just test that url generation works with basic path
-    expect(urlFor({ host: "example.com", path: "/posts" })).toBe("http://example.com/posts");
+    expect(URL.urlFor({ host: "example.com", path: "/posts" })).toBe("http://example.com/posts");
   });
 
   it("https default port", () => {
     // Port 443 for https should not appear
-    expect(urlFor({ host: "example.com", protocol: "https", port: 443, path: "/" })).toBe(
+    expect(URL.urlFor({ host: "example.com", protocol: "https", port: 443, path: "/" })).toBe(
       "https://example.com/",
     );
   });

@@ -153,7 +153,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // `active?` is `connected?` PLUS a live ping — so a failed ping leaves
   // `connected?` true while `active?` goes false.
   override isConnected(): boolean {
-    return this._client !== null && !this._permanentlyClosed && !this._isFakeConnection;
+    return this._client !== null;
   }
 
   // Single persistent connection — mirrors Rails' @raw_connection. Unified onto
