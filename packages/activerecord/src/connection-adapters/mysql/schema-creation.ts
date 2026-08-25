@@ -63,7 +63,7 @@ export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationC
 export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal Widened from the base `SchemaQuoter` to the full `@conn` surface: the
    * `supports*` flags and `quote` for `add_sql_comment!`. */
-  declare protected adapter: VisitorHostAdapter;
+  declare protected conn: VisitorHostAdapter;
 
   constructor(host: VisitorHostAdapter) {
     super(host);
@@ -72,7 +72,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal Live MariaDB lookup — consults the host adapter every call so a late
    * `getFullVersion()` flip (lazy detection on first probe) is honored. */
   protected async isMariadb(): Promise<boolean> {
-    return this.adapter.isMariadb();
+    return this.conn.isMariadb();
   }
 
   /** @internal */
@@ -179,12 +179,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
   protected supportsIndexesInCreate(): boolean {
-    return this.adapter.supportsIndexesInCreate();
+    return this.conn.supportsIndexesInCreate();
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
   protected async supportsCheckConstraints(): Promise<boolean> {
-    return this.adapter.supportsCheckConstraints();
+    return this.conn.supportsCheckConstraints();
   }
 
   /** @internal */
@@ -202,7 +202,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
-    const changeColumnSql = `CHANGE ${this.adapter.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
+    const changeColumnSql = `CHANGE ${this.conn.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
     return this.addColumnPositionBang(
       changeColumnSql,
       this.columnOptions(o.column) as MysqlColumnOptions,
@@ -213,11 +213,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefaultDefinition(
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
-    let sql = `ALTER COLUMN ${this.adapter.quoteColumnName(o.column.name)} `;
+    let sql = `ALTER COLUMN ${this.conn.quoteColumnName(o.column.name)} `;
     if (o.default == null && !o.column.null) {
       sql += "DROP DEFAULT";
     } else {
-      sql += `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+      sql += `SET DEFAULT ${await this.conn.quoteDefaultExpression(o.default, o.column)}`;
     }
     return sql;
   }
@@ -235,9 +235,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const parts: string[] = create ? ["CREATE"] : [];
     if (indexType) parts.push(indexType);
     parts.push("INDEX");
-    parts.push(this.adapter.quoteColumnName(o.name));
+    parts.push(this.conn.quoteColumnName(o.name));
     if (o.using) parts.push(`USING ${o.using}`);
-    if (create) parts.push(`ON ${this.adapter.quoteTableName(o.table)}`);
+    if (create) parts.push(`ON ${this.conn.quoteTableName(o.table)}`);
     parts.push(`(${await this.quotedColumns(o)})`);
 
     return this.addSqlCommentBang(parts.join(" "), o.comment);
@@ -289,7 +289,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected addColumnPositionBang(sql: string, options: MysqlColumnOptions): string {
     if (options.first) return `${sql} FIRST`;
-    if (options.after) return `${sql} AFTER ${this.adapter.quoteColumnName(options.after)}`;
+    if (options.after) return `${sql} AFTER ${this.conn.quoteColumnName(options.after)}`;
     return sql;
   }
 
@@ -299,13 +299,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     columnName: string | string[],
     options: AddIndexOptions = {},
   ): Promise<string> {
-    const [index] = await this.adapter.addIndexOptions(tableName, columnName, options);
+    const [index] = await this.conn.addIndexOptions(tableName, columnName, options);
     return this.accept(index);
   }
 
   /** @internal */
   protected addSqlCommentBang(sql: string, comment: string | null | undefined): string {
     if (!comment?.trim()) return sql;
-    return `${sql} COMMENT ${this.adapter.quote(comment)}`;
+    return `${sql} COMMENT ${this.conn.quote(comment)}`;
   }
 }

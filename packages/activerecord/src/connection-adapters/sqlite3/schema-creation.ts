@@ -29,8 +29,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const schema = index.table.slice(0, dot);
     const bare = index.table.slice(dot + 1);
     return (
-      `${this.adapter.quoteColumnName(schema)}.${this.adapter.quoteColumnName(index.name)} ` +
-      `ON ${this.adapter.quoteColumnName(bare)}`
+      `${this.conn.quoteColumnName(schema)}.${this.conn.quoteColumnName(index.name)} ` +
+      `ON ${this.conn.quoteColumnName(bare)}`
     );
   }
 

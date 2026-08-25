@@ -1086,7 +1086,7 @@ export class TableDefinition {
   readonly options?: string;
   readonly comment?: string;
   private _primaryKeys?: PrimaryKeyDefinition;
-  protected _adapter: TableDefinitionConn;
+  protected conn: TableDefinitionConn;
 
   constructor(
     conn: TableDefinitionConn,
@@ -1102,7 +1102,7 @@ export class TableDefinition {
       [key: string]: unknown;
     } = {},
   ) {
-    this._adapter = conn;
+    this.conn = conn;
     this.name = name;
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
@@ -1234,7 +1234,7 @@ export class TableDefinition {
 
   /** @internal */
   protected validColumnDefinitionOptions(): string[] {
-    return this._adapter.validColumnDefinitionOptions();
+    return this.conn.validColumnDefinitionOptions();
   }
 
   /** @internal */
@@ -1299,10 +1299,10 @@ export class TableDefinition {
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
   ): ForeignKeyDefinition {
-    const prefix = this._adapter.tableNamePrefix ?? globalTableNamePrefix();
-    const suffix = this._adapter.tableNameSuffix ?? globalTableNameSuffix();
+    const prefix = this.conn.tableNamePrefix ?? globalTableNamePrefix();
+    const suffix = this.conn.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;
-    const opts = this._adapter.foreignKeyOptions(this.name, prefixedToTable, { ...options });
+    const opts = this.conn.foreignKeyOptions(this.name, prefixedToTable, { ...options });
     return new ForeignKeyDefinition(
       this.name,
       prefixedToTable,
@@ -1324,7 +1324,7 @@ export class TableDefinition {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): CheckConstraintDefinition {
-    options = this._adapter.checkConstraintOptions(this.name, expression, options) as {
+    options = this.conn.checkConstraintOptions(this.name, expression, options) as {
       name?: string;
       validate?: boolean;
     };

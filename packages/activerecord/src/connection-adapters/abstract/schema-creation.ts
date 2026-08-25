@@ -74,7 +74,7 @@ interface IndexVisitor {
 
 export class SchemaCreation {
   /** Rails' `SchemaCreation#initialize(conn)` (abstract/schema_creation.rb:6-9). */
-  constructor(protected adapter: SchemaCreationConn) {}
+  constructor(protected conn: SchemaCreationConn) {}
 
   // Capability probes. Eight of these are `delegate ... to: :@conn`
   // (abstract/schema_creation.rb:16-21): supports_indexes_in_create?,
@@ -84,7 +84,7 @@ export class SchemaCreation {
   // them, so its version gates reach the visitor.
 
   protected supportsPartialIndex(): boolean {
-    return this.adapter.supportsPartialIndex();
+    return this.conn.supportsPartialIndex();
   }
 
   /** Not delegated: Rails defines it on `SchemaCreation` itself
@@ -94,45 +94,45 @@ export class SchemaCreation {
   }
 
   protected async supportsIndexInclude(): Promise<boolean> {
-    return this.adapter.supportsIndexInclude();
+    return this.conn.supportsIndexInclude();
   }
 
   protected async supportsNullsNotDistinct(): Promise<boolean> {
-    return this.adapter.supportsNullsNotDistinct();
+    return this.conn.supportsNullsNotDistinct();
   }
 
   // Quoting delegations. Rails declares these as `delegate ... to: :@conn`
   // (abstract/schema_creation.rb:16-19); here `@conn` is the {@link SchemaQuoter}
-  // threaded in as `this.adapter`. `quote_column_name` maps to `quoteColumnName`.
+  // threaded in as `this.conn`. `quote_column_name` maps to `quoteColumnName`.
 
   /** @internal */
   protected quoteColumnName(name: string): string {
-    return this.adapter.quoteColumnName(name);
+    return this.conn.quoteColumnName(name);
   }
 
   /** @internal */
   protected quoteTableName(name: string): string {
-    return this.adapter.quoteTableName(name);
+    return this.conn.quoteTableName(name);
   }
 
   /** @internal */
   protected quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
-    return this.adapter.quoteDefaultExpression(value, column);
+    return this.conn.quoteDefaultExpression(value, column);
   }
 
   /** @internal */
   protected supportsIndexesInCreate(): boolean {
-    return this.adapter.supportsIndexesInCreate();
+    return this.conn.supportsIndexesInCreate();
   }
 
   /** @internal */
   protected supportsExclusionConstraints(): boolean {
-    return this.adapter.supportsExclusionConstraints();
+    return this.conn.supportsExclusionConstraints();
   }
 
   /** @internal */
   protected supportsUniqueConstraints(): boolean {
-    return this.adapter.supportsUniqueConstraints();
+    return this.conn.supportsUniqueConstraints();
   }
 
   /**
@@ -144,7 +144,7 @@ export class SchemaCreation {
    */
   protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
     if (typeof o === "string") return o;
-    return o.map((c) => this.adapter.quoteColumnName(c)).join(", ");
+    return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
   }
 
   // Async since the PG quoter's default-expression path issues a live regtype
@@ -181,7 +181,7 @@ export class SchemaCreation {
   protected async visitTableDefinition(o: TableDefinition): Promise<string> {
     let createSql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
     if (o.ifNotExists) createSql += " IF NOT EXISTS";
-    createSql += ` ${this.adapter.quoteTableName(o.name)}`;
+    createSql += ` ${this.conn.quoteTableName(o.name)}`;
 
     // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
     // but map to thunks so each column visit runs only after the previous one
@@ -226,12 +226,12 @@ export class SchemaCreation {
 
   /** @internal */
   protected useForeignKeys(): boolean {
-    return this.adapter.useForeignKeys();
+    return this.conn.useForeignKeys();
   }
 
   /** @internal */
   protected async supportsCheckConstraints(): Promise<boolean> {
-    return this.adapter.supportsCheckConstraints();
+    return this.conn.supportsCheckConstraints();
   }
 
   /**
@@ -265,7 +265,7 @@ export class SchemaCreation {
       }
       throw e;
     }
-    let columnSql = `${this.adapter.quoteColumnName(o.name)} ${o.sqlType}`;
+    let columnSql = `${this.conn.quoteColumnName(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       columnSql = await this.addColumnOptionsBang(
         columnSql,
@@ -280,7 +280,7 @@ export class SchemaCreation {
   }
 
   protected async visitAlterTable(o: AlterTable): Promise<string> {
-    let sql = `ALTER TABLE ${this.adapter.quoteTableName(o.name)} `;
+    let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
 
     sql += (await Promise.all(o.adds.map((col) => this.accept(col)))).join(" ");
     sql += (await Promise.all(o.foreignKeyAdds.map((fk) => this.visitAddForeignKey(fk)))).join(" ");
@@ -337,7 +337,7 @@ export class SchemaCreation {
    * @internal
    */
   protected quotedIndexNameAndTable(index: IndexDefinition): string {
-    return `${this.adapter.quoteColumnName(index.name)} ON ${this.adapter.quoteTableName(index.table)}`;
+    return `${this.conn.quoteColumnName(index.name)} ON ${this.conn.quoteTableName(index.table)}`;
   }
 
   /**
@@ -360,25 +360,25 @@ export class SchemaCreation {
       opclass?: string | Record<string, string>;
     },
   ): Promise<string> {
-    const host = this.adapter as SchemaQuoter & {
+    const host = this.conn as SchemaQuoter & {
       quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): Promise<string>;
     };
     if (typeof host.quotedColumnsForIndex === "function") {
       return host.quotedColumnsForIndex(columnNames, options);
     }
-    return columnNames.map((c) => this.adapter.quoteColumnName(c)).join(", ");
+    return columnNames.map((c) => this.conn.quoteColumnName(c)).join(", ");
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
     const quotedColumns = (Array.isArray(o.column) ? o.column : [o.column])
-      .map((c) => this.adapter.quoteColumnName(c))
+      .map((c) => this.conn.quoteColumnName(c))
       .join(", ");
     const quotedPrimaryKeys = (Array.isArray(o.primaryKey) ? o.primaryKey : [o.primaryKey])
-      .map((c) => this.adapter.quoteColumnName(c))
+      .map((c) => this.conn.quoteColumnName(c))
       .join(", ");
-    let sql = `CONSTRAINT ${this.adapter.quoteColumnName(o.name)} `;
+    let sql = `CONSTRAINT ${this.conn.quoteColumnName(o.name)} `;
     sql += `FOREIGN KEY (${quotedColumns}) `;
-    sql += `REFERENCES ${this.adapter.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
+    sql += `REFERENCES ${this.conn.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
     if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
     if (o.onUpdate) sql += ` ${this.actionSql("UPDATE", o.onUpdate)}`;
     return sql;
@@ -392,7 +392,7 @@ export class SchemaCreation {
     if (this.optionsIncludeDefault(options)) {
       // Rails: `sql << " DEFAULT #{quote_default_expression(...)}"`
       // (schema_creation.rb:150) — the keyword lives here, not in the quoter.
-      sql += ` DEFAULT ${await this.adapter.quoteDefaultExpression(
+      sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(
         options.default,
         (options as Record<string, unknown>)["column"],
       )}`;
@@ -439,7 +439,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected nativeDatabaseTypes(): NativeDatabaseTypes {
-    return this.adapter.nativeDatabaseTypes();
+    return this.conn.nativeDatabaseTypes();
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
@@ -491,12 +491,12 @@ export class SchemaCreation {
 
   /** @internal */
   protected visitPrimaryKeyDefinition(o: PrimaryKeyDefinition): string {
-    return `PRIMARY KEY (${o.name.map((name) => this.adapter.quoteColumnName(name)).join(", ")})`;
+    return `PRIMARY KEY (${o.name.map((name) => this.conn.quoteColumnName(name)).join(", ")})`;
   }
 
   /** @internal */
   protected visitDropConstraint(name: string): string {
-    return `DROP CONSTRAINT ${this.adapter.quoteColumnName(name)}`;
+    return `DROP CONSTRAINT ${this.conn.quoteColumnName(name)}`;
   }
 
   /** @internal */
