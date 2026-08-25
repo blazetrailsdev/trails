@@ -1042,7 +1042,10 @@ describe("PreloaderTest", () => {
     }).call();
     const queryCalls = spy.mock.calls.filter((c) => c[0].length > 0);
     expect(queryCalls).toHaveLength(1);
-    expect(association(author, "essayCategory").loaded).toBe(true);
+    // Rails: `assert_predicate author.association(:essay_category), :loaded?`
+    // (associations_test.rb:1337) — the singular association object off the
+    // owner, not a CollectionProxy.
+    expect((author as any).association("essayCategory").isLoaded()).toBe(true);
     const preloaded = (author as any).association("essayCategory").target;
     expect(allCategories).toContain(preloaded);
   });

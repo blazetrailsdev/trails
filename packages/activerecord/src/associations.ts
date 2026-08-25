@@ -1484,6 +1484,23 @@ export function association<T extends Base = Base>(
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
   validateThroughReflection(ctor, assocName);
+  // Rails only ever builds a CollectionProxy for a collection reflection: its
+  // one construction site is `CollectionAssociation#reader`
+  // (`collection_association.rb:34-41`), and `@association`
+  // (`collection_proxy.rb:31-35`) is therefore always a has_many/habtm
+  // association. A singular reflection has no path into this class at all —
+  // `SingularAssociation#reader` (`singular_association.rb:11-17`) returns the
+  // record, and `owner.association(name)` (`associations.rb:288-294`) returns
+  // the association object itself. So hand that back rather than wrapping a
+  // `SingularAssociation` in a proxy whose mutations are all array-shaped.
+  const instance = record.association(assocName) as unknown as { isCollection(): boolean };
+  if (!instance.isCollection()) {
+    throw new TypeError(
+      `association() builds a CollectionProxy, which Rails has only for a collection ` +
+        `reflection; "${assocName}" on ${ctor.name} is singular. ` +
+        `Use record.association("${assocName}") for the singular association object.`,
+    );
+  }
   if (!_CollectionProxyCtor) {
     throw new Error(
       "CollectionProxy not registered. Either import '@blazetrails/activerecord' " +

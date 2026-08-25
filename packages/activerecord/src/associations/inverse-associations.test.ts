@@ -1162,7 +1162,9 @@ describe("InversePolymorphicBelongsToTests", () => {
   // `Array.isArray(child)` — silently skipping the child on owner save.
   it("has_one createBang stores a single record as target, not an array", async () => {
     const human = await Human.createBang({});
-    const face = await association(human, "autosaveFace").createBang({ description: "haunted" });
+    const face = await (human as any)
+      .association("autosaveFace")
+      .createBang({ description: "haunted" });
 
     const holder = (human as any).association("autosaveFace");
     expect(Array.isArray(holder.target)).toBe(false);
@@ -1170,10 +1172,10 @@ describe("InversePolymorphicBelongsToTests", () => {
 
     // autosave must not bail: a description change on the created child is
     // persisted when the owner is saved.
-    (face as any).description = "new description";
+    face.description = "new description";
     await human.saveBang();
-    await (face as any).reload();
-    expect((face as any).description).toBe("new description");
+    await face.reload();
+    expect(face.description).toBe("new description");
   });
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
