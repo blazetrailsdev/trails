@@ -10,6 +10,7 @@ import {
 } from "../serialization.js";
 import { ModelName, Naming } from "../naming.js";
 import {
+  ActiveSupportJSON,
   include,
   extend,
   included,
@@ -122,7 +123,7 @@ export class JSON {
   fromJson(json: string, ...includeRoot: [includeRoot?: boolean | string | null]): this {
     const ctor = this.constructor as typeof JSON;
     const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
-    let hash = globalThis.JSON.parse(json) as unknown;
+    let hash = ActiveSupportJSON.decode(json);
     // Ruby truthiness: only `false`/`nil` skip the unwrap, and Rails ignores
     // the configured root key on the read path (json.rb:146-147).
     if (root !== false && root != null) {

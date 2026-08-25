@@ -233,21 +233,3 @@ function isMemberOf(members: unknown, value: unknown): boolean {
   }
   return false;
 }
-
-/**
- * Rails: `options.except(:in, :within).merge!(value: value)` — passes
- * through every validator option except the collection keys, with the
- * rejected value merged in for i18n interpolation
- * (inclusion.rb:11, exclusion.rb:11).
- */
-export function exceptInWithinMergeValue(
-  options: Record<string, unknown>,
-  value: unknown,
-): Record<string, unknown> {
-  const rest: Record<string, unknown> = {};
-  for (const key of Object.keys(options)) {
-    if (key !== "in" && key !== "within") rest[key] = options[key];
-  }
-  rest.value = value;
-  return rest;
-}

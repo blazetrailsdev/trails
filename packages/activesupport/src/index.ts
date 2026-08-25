@@ -232,6 +232,7 @@ export {
   slice,
   except,
   merge,
+  mergeBang,
   isInclude as isIncludeObj,
   deepTransformKeys,
   deepCamelizeKeys,

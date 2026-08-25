@@ -4,14 +4,14 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "define_call",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "attribute_methods.rb:457 guards the `send(...)` arm with `CALL_COMPILABLE_REGEXP.match?(target_name)`; trails emits a JS property descriptor rather than compiled source, and a property lookup needs no name to be compilable, so the arm the regexp selects has no counterpart to guard (see the JSDoc on defineCall)."
   },
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
     "rubyName": "match",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "attribute_methods.rb:487 returns `AttributeMethod.new(proxy_target, $1)`, a two-member `Struct` (:474); trails' `match` returns the object literal `{ attr }` — porting the Struct is tracked separately, not closed here."
   },
   {
     "package": "activemodel",
