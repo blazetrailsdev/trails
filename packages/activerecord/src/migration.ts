@@ -7,6 +7,7 @@ import {
   underscore,
   humanize,
   isPlainObject,
+  extractOptionsBang,
   stdout,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -350,6 +351,26 @@ export class ReversibleBlockHelper {
   down(fn: () => Promise<void>): void {
     if (this.reverting) this[toRun].push(fn);
   }
+}
+
+/**
+ * A migration class, as `Migration#run` / `Migration#revert` take it
+ * (migration.rb:937, migration.rb:852) — Ruby passes the class object itself
+ * and calls `.new` on it.
+ */
+export type MigrationClass = new () => Migration;
+
+/** The trailing options hash `Migration#run` pops with `extract_options!`. */
+type MigrationRunOptions = { direction?: "up" | "down"; revert?: boolean };
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby gives a block its own slot, so
+ * `revert(*migration_classes, &block)` (migration.rb:852) needs no test to tell
+ * a migration class from the block. In TS both arrive as trailing positional
+ * functions, so the two can only be told apart by shape.
+ */
+function isMigrationClass(fn: unknown): fn is MigrationClass {
+  return typeof fn === "function" && (fn === Migration || fn.prototype instanceof Migration);
 }
 
 /**
@@ -1193,18 +1214,19 @@ export class Migration {
   }
 
   /**
-   * Revert a migration or a block of operations.
+   * Reverts the given migration classes, and/or a block of operations.
    *
-   * Mirrors: ActiveRecord::Migration#revert
+   * Mirrors: ActiveRecord::Migration#revert (`migration.rb:852-869`) —
+   * `run(*migration_classes.reverse, revert: true) unless migration_classes.empty?`.
    */
-  async revert(migrationOrFn?: Migration | (() => Promise<void>)): Promise<void> {
-    if (migrationOrFn === undefined) return;
-    if (migrationOrFn instanceof Migration) {
-      // Mirrors Rails `revert(*migration_classes)` -> `run(..., revert: true)`.
-      await this.run(migrationOrFn, { revert: true });
-      return;
+  async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
+    const last = migrationClasses[migrationClasses.length - 1];
+    const fn = typeof last === "function" && !isMigrationClass(last) ? last : undefined;
+    const klasses = (fn ? migrationClasses.slice(0, -1) : migrationClasses) as MigrationClass[];
+    if (klasses.length > 0) {
+      await this.run(...[...klasses].reverse(), { revert: true });
     }
-    const fn = migrationOrFn;
+    if (fn === undefined) return;
     if (this._recording) {
       // Nested: reuse the active recorder and just toggle its direction, so a
       // `revert` inside a reverting migration cancels by double-negation
@@ -1248,34 +1270,41 @@ export class Migration {
    * executing it `down` without reverting, so it wraps the call in a nested
    * `revert`.
    */
-  async run(
-    migration: Migration,
-    opts: { direction?: "up" | "down"; revert?: boolean } = {},
-  ): Promise<void> {
+  async run(...migrationClasses: Array<MigrationClass | MigrationRunOptions>): Promise<void> {
+    const [klasses, opts] = extractOptionsBang(migrationClasses) as [
+      MigrationClass[],
+      MigrationRunOptions,
+    ];
     let dir = opts.direction ?? "up";
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {
+      // If in revert and going :up, say, we want to execute :down without reverting, so
       await this.revert(async () => {
-        await this.run(migration, { direction: dir, revert: true });
+        await this.run(...klasses, { direction: dir, revert: true });
       });
-    } else if (this._recording) {
-      // Recording (but not reverting): route the sub-migration's ops into the
-      // active recorder by sharing our recorder state with it.
-      const prevRecorder = migration._recorder;
-      const prevRecording = migration._recording;
-      const prevConn = migration._connectionOverride;
-      migration._recorder = this._recorder;
-      migration._recording = true;
-      migration._connectionOverride = this.connection;
-      try {
-        await (dir === "up" ? migration.up() : migration.down());
-      } finally {
-        migration._recorder = prevRecorder;
-        migration._recording = prevRecording;
-        migration._connectionOverride = prevConn;
-      }
     } else {
-      await migration.execMigration(this.connection, dir);
+      for (const migrationClass of klasses) {
+        const migration = new migrationClass();
+        if (this._recording) {
+          // Recording (but not reverting): route the sub-migration's ops into the
+          // active recorder by sharing our recorder state with it.
+          const prevRecorder = migration._recorder;
+          const prevRecording = migration._recording;
+          const prevConn = migration._connectionOverride;
+          migration._recorder = this._recorder;
+          migration._recording = true;
+          migration._connectionOverride = this.connection;
+          try {
+            await (dir === "up" ? migration.up() : migration.down());
+          } finally {
+            migration._recorder = prevRecorder;
+            migration._recording = prevRecording;
+            migration._connectionOverride = prevConn;
+          }
+        } else {
+          await migration.execMigration(this.connection, dir);
+        }
+      }
     }
   }
 

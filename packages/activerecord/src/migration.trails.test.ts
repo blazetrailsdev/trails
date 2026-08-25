@@ -432,4 +432,33 @@ describe("Migration#removeColumns forwards to the connection", () => {
       await connection.dropTable("my_table", { ifExists: true });
     }
   });
+
+  // `run` takes migration CLASSES (migration.rb:937-949) and constructs each;
+  // `revert` forwards them reversed (migration.rb:853). No Rails test covers the
+  // multi-class arms directly, so the ordering contract is pinned here.
+  it("run constructs each migration class in order and revert reverses them", async () => {
+    const order: string[] = [];
+    class RunOrderA extends Migration {
+      override write(): void {}
+      async change(): Promise<void> {
+        order.push(`A:${this.isReverting() ? "down" : "up"}`);
+      }
+    }
+    class RunOrderB extends Migration {
+      override write(): void {}
+      async change(): Promise<void> {
+        order.push(`B:${this.isReverting() ? "down" : "up"}`);
+      }
+    }
+    const host = new (class extends Migration {
+      override write(): void {}
+    })();
+
+    await host.run(RunOrderA, RunOrderB);
+    expect(order).toEqual(["A:up", "B:up"]);
+
+    order.length = 0;
+    await host.revert(RunOrderA, RunOrderB);
+    expect(order).toEqual(["B:down", "A:down"]);
+  });
 });
