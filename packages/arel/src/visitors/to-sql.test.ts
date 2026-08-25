@@ -174,7 +174,7 @@ describe("the to_sql visitor", () => {
   it("should not quote sql literals", () => {
     // Rails is `@table[Arel.star]`; trails' `Table#get` is typed to the string
     // name, so the star node is seated on the Attribute directly.
-    const node = table.get(star as unknown as string);
+    const node = table.get(star);
     expect(mustBeLike(compile(node))).toBe(mustBeLike(`"users".*`));
   });
 
@@ -236,7 +236,7 @@ describe("the to_sql visitor", () => {
     });
 
     it("should compile Arel nodes", () => {
-      const test = new Nodes.NamedFunction("generate_series", [4, 2] as unknown as Nodes.Node[]);
+      const test = new Nodes.NamedFunction("generate_series", [4, 2]);
       expect(mustBeLike(compile(test))).toBe(mustBeLike("generate_series(4, 2)"));
     });
   });
@@ -379,21 +379,21 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Cte", () => {
     it("handles CTEs with a MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, true);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star), true);
       expect(mustBeLike(compile(cte))).toBe(
         mustBeLike(`"foo" AS MATERIALIZED (SELECT * FROM "bar")`),
       );
     });
 
     it("handles CTEs with a NOT MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast, false);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star), false);
       expect(mustBeLike(compile(cte))).toBe(
         mustBeLike(`"foo" AS NOT MATERIALIZED (SELECT * FROM "bar")`),
       );
     });
 
     it("handles CTEs with no MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("foo", new Table("bar").project(star).ast);
+      const cte = new Nodes.Cte("foo", new Table("bar").project(star));
       expect(mustBeLike(compile(cte))).toBe(mustBeLike(`"foo" AS (SELECT * FROM "bar")`));
     });
 
@@ -815,7 +815,7 @@ describe("the to_sql visitor", () => {
 
     it("should compile nodes with bind params", () => {
       const bp = new Nodes.BindParam(1);
-      const test = new Nodes.NamedFunction("generate_series", [4, bp] as unknown as Nodes.Node[]);
+      const test = new Nodes.NamedFunction("generate_series", [4, bp]);
       expect(mustBeLike(compile(test))).toBe(mustBeLike("generate_series(4, ?)"));
     });
   });
@@ -1403,13 +1403,8 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::BoundSqlLiteral", () => {
     it("supports other bound literals as binds", () => {
-      // Rails to_sql_test.rb: `Arel.sql("?", [1, 2, Arel.sql("?", 3)])` — one
-      // `?` bound to a mixed scalar/Arel-node list. The nested bound literal is
-      // visited (its own `?`), the scalars each `add_bind` → `?, ?, ?`.
-      const inner = new Nodes.BoundSqlLiteral("?", [3], {});
-      const node = new Nodes.BoundSqlLiteral("?", [[1, 2, inner]], {});
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toBe("?, ?, ?");
+      const node = sql("?", [1, 2, sql("?", 3)]);
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("?, ?, ?");
     });
   });
 

@@ -216,8 +216,8 @@ export class NotIn extends Binary {
 
 /** Join base class — Rails defines via const_set in binary.rb */
 export abstract class Join extends Binary {
-  declare readonly left: Node;
-  declare readonly right: Node | null;
+  declare left: Node;
+  declare right: Node | null;
 
   constructor(left: Node, right: Node | null = null) {
     super(left, right);
@@ -226,8 +226,8 @@ export abstract class Join extends Binary {
 
 /** Set operations — Rails defines via const_set in binary.rb */
 export class Union extends Binary {
-  declare readonly left: Node;
-  declare readonly right: Node;
+  declare left: Node;
+  declare right: Node;
 
   constructor(left: Node, right: Node) {
     super(left, right);
@@ -235,8 +235,8 @@ export class Union extends Binary {
 }
 
 export class UnionAll extends Binary {
-  declare readonly left: Node;
-  declare readonly right: Node;
+  declare left: Node;
+  declare right: Node;
 
   constructor(left: Node, right: Node) {
     super(left, right);
@@ -244,8 +244,8 @@ export class UnionAll extends Binary {
 }
 
 export class Intersect extends Binary {
-  declare readonly left: Node;
-  declare readonly right: Node;
+  declare left: Node;
+  declare right: Node;
 
   constructor(left: Node, right: Node) {
     super(left, right);
@@ -253,8 +253,8 @@ export class Intersect extends Binary {
 }
 
 export class Except extends Binary {
-  declare readonly left: Node;
-  declare readonly right: Node;
+  declare left: Node;
+  declare right: Node;
 
   constructor(left: Node, right: Node) {
     super(left, right);

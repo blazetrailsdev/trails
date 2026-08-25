@@ -1,7 +1,7 @@
 import type { Node } from "./nodes/node.js";
 import { And } from "./nodes/nary.js";
 import { buildQuoted } from "./nodes/casted.js";
-import type { Join } from "./nodes/binary.js";
+import type { Join, NodeOrValue } from "./nodes/binary.js";
 import { False } from "./nodes/false.js";
 import { Grouping } from "./nodes/grouping.js";
 import { InnerJoin } from "./nodes/inner-join.js";
@@ -43,7 +43,7 @@ export interface FactoryMethodsModule {
   createOn(expr: Node): On;
   grouping(expr: Node): Grouping;
   lower(column: unknown): NamedFunction;
-  coalesce(...exprs: Node[]): NamedFunction;
+  coalesce(...exprs: NodeOrValue[]): NamedFunction;
   cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction;
 }
 
@@ -91,7 +91,10 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new NamedFunction("LOWER", [buildQuoted(column)]);
   },
 
-  coalesce(...exprs: Node[]): NamedFunction {
+  // Rails wraps nothing here — `NamedFunction.new "COALESCE", exprs`
+  // (factory_methods.rb:45-47) — so a raw value reaches `expressions`
+  // untouched (test/cases/arel/factory_methods_test.rb:69-76).
+  coalesce(...exprs: NodeOrValue[]): NamedFunction {
     return new NamedFunction("COALESCE", exprs);
   },
 

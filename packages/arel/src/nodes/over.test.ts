@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel::Nodes::OverTest", () => {
   const users = new Table("users");
@@ -46,15 +47,13 @@ describe("Arel::Nodes::OverTest", () => {
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const a = users.get("id").eq(1);
-      const b = users.get("id").eq(1);
-      expect((a.left as Nodes.Attribute).name).toBe((b.left as Nodes.Attribute).name);
+      const array = [new Nodes.Over("foo", "bar"), new Nodes.Over("foo", "bar")];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.And([users.get("id").eq(1)]);
-      const b = new Nodes.And([users.get("id").eq(2)]);
-      expect(a).not.toBe(b);
+      const array = [new Nodes.Over("foo", "bar"), new Nodes.Over("foo", "baz")];
+      expect(uniq(array).length).toBe(2);
     });
   });
 

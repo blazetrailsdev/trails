@@ -9,7 +9,7 @@ import { SqlLiteral } from "./sql-literal.js";
  * Mirrors: Arel::Nodes::Extract (extends Unary)
  */
 export class Extract extends Unary {
-  readonly field: string;
+  field: string;
 
   constructor(expr: Node | Node[], field: string) {
     super(expr);

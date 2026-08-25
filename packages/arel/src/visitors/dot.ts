@@ -1,6 +1,7 @@
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
+import { _setDot } from "../node-slots.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
@@ -586,7 +587,13 @@ export class Dot extends Visitor {
     return ctor?.name ?? "Object";
   }
 
-  static {
+  /**
+   * Seeds this visitor's dispatch cache. Called once, lazily, the first time
+   * the cache is built — see the note in `Visitor.dispatchCache`.
+   *
+   * @internal
+   */
+  static registerDispatch(): void {
     const reg = (ctor: NodeCtor, m: string) => Dot.dispatchCache().set(ctor, m);
     reg(Nodes.Function, "visitArelNodesFunction");
     // Each aggregate has its own Rails alias chain; Trails dispatches them
@@ -642,3 +649,5 @@ export class Dot extends Visitor {
     reg(Nodes.Fragments, "visitNoEdges");
   }
 }
+
+_setDot(Dot);

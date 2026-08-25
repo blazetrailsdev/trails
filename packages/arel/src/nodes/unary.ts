@@ -3,7 +3,7 @@ import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
 export class Unary extends NodeExpression {
-  readonly expr: unknown;
+  expr: unknown;
 
   // Mirrors Rails `alias :value :expr` (unary.rb:7).
   get value(): unknown {
@@ -27,7 +27,7 @@ export class On extends Unary {}
 // from NodeExpression. Field type narrowed to `Node` since callers always
 // pass an Arel node.
 export class Not extends Unary {
-  declare readonly expr: Node;
+  declare expr: Node;
   constructor(expr: Node) {
     super(expr);
   }
@@ -37,7 +37,7 @@ export class Not extends Unary {
 // the inherited `expr` slot — Rails' visit_Arel_Nodes_Lateral reads `o.expr`
 // (postgresql.rb:66).
 export class Lateral extends Unary {
-  declare readonly expr: Node;
+  declare expr: Node;
   constructor(expr: Node) {
     super(expr);
   }
@@ -65,7 +65,7 @@ export class Group extends Unary {}
  * (to_sql.rb:170-173).
  */
 export class OptimizerHints extends Unary {
-  declare readonly expr: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
+  declare expr: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
 }
 
 _setNot(Not);

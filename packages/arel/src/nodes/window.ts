@@ -59,7 +59,7 @@ export class Window extends Node {
  * NamedWindow — a named window definition (WINDOW w AS (...))
  */
 export class NamedWindow extends Window {
-  readonly name: string;
+  name: string;
 
   constructor(name: string) {
     super();
@@ -93,14 +93,14 @@ export class Following extends Unary {
 export class CurrentRow extends Node {}
 
 export class Rows extends Unary {
-  declare readonly expr: Node | null;
+  declare expr: Node | null;
   constructor(expr: Node | null = null) {
     super(expr);
   }
 }
 
 export class Range extends Unary {
-  declare readonly expr: Node | null;
+  declare expr: Node | null;
   constructor(expr: Node | null = null) {
     super(expr);
   }

@@ -82,3 +82,18 @@ export let _Attribute: (new (relation: any, name: string) => any) | undefined;
 export function _setAttribute(ctor: new (relation: any, name: string) => any): void {
   _Attribute = ctor;
 }
+
+/**
+ * `Arel::Visitors::Dot` — the constant `TreeManager#to_dot` names when it runs
+ * (tree_manager.rb:57-61). A value import of `visitors/dot.js` from
+ * `tree-manager.ts` closes a cycle back through `table.js` and
+ * `select-manager.js` onto the three `extends TreeManager` modules, so
+ * entering the graph at `update-manager.js` evaluates `DeleteManager` with
+ * `TreeManager` still in TDZ.
+ * @internal
+ */
+export let _Dot: (new () => { accept(node: any, collector: any): any }) | undefined;
+/** @internal */
+export function _setDot(ctor: new () => { accept(node: any, collector: any): any }): void {
+  _Dot = ctor;
+}

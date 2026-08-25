@@ -144,7 +144,13 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 
-  static {
+  /**
+   * Seeds this visitor's dispatch cache. Called once, lazily, the first time
+   * the cache is built — see the note in `Visitor.dispatchCache`.
+   *
+   * @internal
+   */
+  static registerDispatch(): void {
     PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
   }
 }

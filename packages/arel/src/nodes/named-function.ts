@@ -1,4 +1,4 @@
-import { Node } from "./node.js";
+import type { NodeOrValue } from "./binary.js";
 import { Function } from "./function.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Over } from "./over.js";
@@ -10,9 +10,9 @@ import { NamedWindow, Window } from "./window.js";
  * Mirrors: Arel::Nodes::NamedFunction
  */
 export class NamedFunction extends Function {
-  readonly name: string;
+  name: string;
 
-  constructor(name: string, expressions: Node[], aliasName?: string, distinct = false) {
+  constructor(name: string, expressions: NodeOrValue[], aliasName?: string, distinct = false) {
     super(expressions, aliasName ?? null);
     this.name = name;
     this.distinct = distinct;

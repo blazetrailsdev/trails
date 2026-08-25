@@ -15,8 +15,8 @@ import type { Included } from "@blazetrails/activesupport";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
   readonly operator: string;
-  readonly left: NodeOrValue;
-  readonly right: NodeOrValue;
+  left: NodeOrValue;
+  right: NodeOrValue;
 
   constructor(operator: string, left: NodeOrValue, right: NodeOrValue) {
     super(left, right);

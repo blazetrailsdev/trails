@@ -13,7 +13,7 @@ import { Unary } from "./unary.js";
  * Mirrors: Arel::Nodes::Case
  */
 export class Case extends NodeExpression {
-  readonly case: Node | null;
+  case: Node | null;
   conditions: When[];
   default: Else | null;
 

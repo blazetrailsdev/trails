@@ -2,6 +2,7 @@ import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Table } from "../table.js";
+import type { SelectManager } from "../select-manager.js";
 
 /**
  * Cte — a Common Table Expression node.
@@ -13,11 +14,19 @@ export class Cte extends Binary {
   // `Nodes::SqlLiteral` (rendered bare), so `TableAlias#to_cte` passes that
   // literal straight through to `Cte.new`. A plain-string name (e.g. a directly
   // constructed `Cte`) is quoted. Accept both.
-  readonly name: string | SqlLiteral;
-  readonly relation: Node;
+  name: string | SqlLiteral;
+  // Rails seats a manager here directly —
+  // `Cte.new("foo", Table.new(:bar).project(Arel.star))`
+  // (test/cases/arel/visitors/to_sql_test.rb:1008) — and
+  // `visit_Arel_SelectManager` (to_sql.rb:358-361) renders it.
+  relation: Node | SelectManager;
   readonly materialized: boolean | null;
 
-  constructor(name: string | SqlLiteral, relation: Node, materialized: boolean | null = null) {
+  constructor(
+    name: string | SqlLiteral,
+    relation: Node | SelectManager,
+    materialized: boolean | null = null,
+  ) {
     super(name, relation);
     this.name = name;
     this.relation = relation;
