@@ -1,4 +1,8 @@
-import { withIndifferentAccess, type HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import {
+  indexWith,
+  withIndifferentAccess,
+  type HashWithIndifferentAccess,
+} from "@blazetrails/activesupport";
 import { NoMethodError } from "./attribute-assignment.js";
 
 /**
@@ -14,13 +18,18 @@ export class Access {
    *   def slice(*methods)
    *     methods.flatten.index_with { |method| public_send(method) }.with_indifferent_access
    *   end
+   *
+   * @missingRailsArgs index_with — PERMANENT: Ruby's `index_with` is an
+   * Enumerable method on the receiver (core_ext/enumerable.rb:66), so the
+   * flattened array is `self` there. trails ports the Enumerable core_ext as
+   * free functions taking the collection first (`enumerable-utils.ts:43`),
+   * which JS requires short of monkey-patching `Array.prototype`, so the
+   * receiver arrives as the first argument.
    */
   slice(...methods: (string | string[])[]): HashWithIndifferentAccess<unknown> {
-    const indexed: Record<string, unknown> = {};
-    for (const method of methods.flat()) {
-      indexed[method] = publicSend(this, method);
-    }
-    return withIndifferentAccess(indexed);
+    return withIndifferentAccess(
+      Object.fromEntries(indexWith(methods.flat(), (method) => publicSend(this, method))),
+    );
   }
 
   /**
