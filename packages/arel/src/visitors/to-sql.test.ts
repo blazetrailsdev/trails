@@ -2269,6 +2269,10 @@ describe("the to_sql visitor", () => {
 });
 
 describe("ArelQuoter / defaultQuoter wiring", () => {
+  // Trails-only: this block exercises `defaultQuoter` — the adapter quoting —
+  // rather than the FakeRecord double of fake_record.rb:55-90, so every visitor
+  // here, the `RecordingToSql` subclasses at the end included, keeps
+  // `testConnection`.
   const users = new Table("users");
 
   it("default quoter emits double-quoted identifiers", () => {
