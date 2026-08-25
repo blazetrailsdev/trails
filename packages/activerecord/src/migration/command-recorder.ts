@@ -165,7 +165,7 @@ export class CommandRecorder {
    * Mirrors: ActiveRecord::Migration::CommandRecorder#replay
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
-    for (const [cmd, args] of this._commands) {
+    for (const [cmd, args] of this.commands) {
       // Bulk changeTable stores [tableName, subCommands[]]. Replay each
       // sub-command individually rather than forwarding the array as an arg.
       if (cmd === "changeTable" && Array.isArray(args[1])) {
