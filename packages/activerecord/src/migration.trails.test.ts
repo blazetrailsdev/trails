@@ -403,13 +403,12 @@ describe("createTable force + ifNotExists key presence", () => {
   });
 });
 
+// Rails' Migration has no `remove_columns` of its own: `method_missing` forwards
+// to `connection.send(:remove_columns, ...)`, so a migration emits the single
+// combined `ALTER TABLE` the connection builds
+// (abstract/schema_statements.rb:675-682). Query-count shape mirrors
+// `test_remove_columns_single_statement` (test/cases/migration/columns_test.rb:402-419).
 describe("Migration#removeColumns forwards to the connection", () => {
-  // Rails' Migration has no `remove_columns` of its own: `method_missing`
-  // forwards to `connection.send(:remove_columns, ...)` (migration.rb:1035-1051),
-  // so a migration emits the single combined `ALTER TABLE` the connection builds
-  // (abstract/schema_statements.rb:675-682). Mirrors the query-count shape of
-  // `test_remove_columns_single_statement`
-  // (test/cases/migration/columns_test.rb:402-419).
   it("emits the same single statement the connection path does", async () => {
     const connection = Base.connection;
     try {

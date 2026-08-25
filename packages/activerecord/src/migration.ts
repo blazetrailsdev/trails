@@ -1130,11 +1130,10 @@ export class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    const removeColumns = this.connection.removeColumns as (
-      tableName: string,
-      ...args: Array<string | ColumnOptions>
-    ) => Promise<void>;
-    await removeColumns.call(this.connection, tableName, ...columnsOrOptions);
+    const connection = this.connection as unknown as {
+      removeColumns(tableName: string, ...args: Array<string | ColumnOptions>): Promise<void>;
+    };
+    await connection.removeColumns(tableName, ...columnsOrOptions);
   }
 
   async addColumns(

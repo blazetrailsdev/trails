@@ -204,10 +204,6 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
       }
     ).typeToSql(type, options);
 
-  // Rails generates `enum` from `define_column_methods ... :enum`
-  // (postgresql/schema_definitions.rb:186-189), so the column type stays `:enum`
-  // and `enum_type` rides along in the options for `type_to_sql` to resolve
-  // (postgresql/schema_statements.rb:854-857).
   it("passes :enum through as the column type with enum_type forwarded", () => {
     const td = new TableDefinition("t", { adapter: leased });
     td.enum("current_mood", { enum_type: "mood" });
