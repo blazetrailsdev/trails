@@ -1263,7 +1263,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit_Integer", () => {
-    compile(buildQuoted(8787878092));
+    compile(8787878092);
   });
 
   it("should visit_NilClass", () => {
