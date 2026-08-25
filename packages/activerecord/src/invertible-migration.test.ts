@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
-import { Migration, IrreversibleMigration } from "./migration.js";
+import { Migration, IrreversibleMigration, type MigrationClass } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
@@ -202,8 +202,8 @@ class LegacyMigration extends Migration {
 }
 
 class RevertWholeMigration extends SilentMigration {
-  protected _migration: Migration;
-  constructor(migration: Migration) {
+  protected _migration: MigrationClass;
+  constructor(migration: MigrationClass) {
     super();
     this._migration = migration;
   }
@@ -381,7 +381,7 @@ describe("InvertibleMigrationTest", () => {
   it("migrate revert whole migration", async () => {
     const migration = new InvertibleMigration();
     for (const klass of [LegacyMigration, InvertibleMigration]) {
-      const revert = new RevertWholeMigration(new klass());
+      const revert = new RevertWholeMigration(klass);
       await migration.migrate("up");
       await revert.migrate("up");
       expect(await migration.connection.tableExists("horses")).toBe(false);
@@ -393,7 +393,7 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it("migrate nested revert whole migration", async () => {
-    const revert = new NestedRevertWholeMigration(new InvertibleRevertMigration());
+    const revert = new NestedRevertWholeMigration(InvertibleRevertMigration);
     await revert.migrate("down");
     expect(await revert.connection.tableExists("horses")).toBe(true);
     await revert.migrate("up");
