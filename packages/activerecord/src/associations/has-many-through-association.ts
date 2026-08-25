@@ -18,6 +18,15 @@ import { runCallbacks } from "@blazetrails/activesupport";
  * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation
  */
 export class HasManyThroughAssociation extends HasManyAssociation {
+  /**
+   * Rails' `@through_scope` (`has_many_through_association.rb:69`, exposed by
+   * `attr_reader :through_scope`): the association scope captured for the
+   * duration of `build_record`, which `through_scope_attributes` reads
+   * (`has_many_through_association.rb:71-77`).
+   * @internal
+   */
+  _throughScope?: unknown;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
@@ -254,18 +263,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     block?: (record: Base) => void,
   ): Base | null {
     this.ensureNotNested();
-    // Rails captures `scope` here inside the caller's `scoping` block, so a
-    // scoped build (`post.people.where(readers: { skimmer: true }).create`)
-    // sees the relation's values. trails carries that relation on the owner's
-    // proxy as `_pendingThroughScope` (association-relation.ts:153) instead of
-    // a current-scope stack, so prefer it when one is in flight.
-    const pendingThroughScope = (
-      this.owner._collectionProxies.get(this.reflection.name) as
-        | { _pendingThroughScope?: unknown }
-        | undefined
-    )?._pendingThroughScope;
-    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope =
-      pendingThroughScope ?? (this as unknown as { scope?: () => unknown }).scope?.();
+    this._throughScope = this.scope();
     try {
       // Rails' `super` lands in `ThroughAssociation#build_record`
       // (through_association.rb:116-129) first; the module is not in the TS
@@ -273,12 +271,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       throughBuildRecord(this, (attributes ??= {}));
       const record = super.buildRecord(attributes, block);
       if (!record) return record;
-      const built = buildThroughInverseFor(
-        this.owner,
-        this.reflection,
-        record,
-        (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope,
-      );
+      const built = buildThroughInverseFor(this.owner, this.reflection, record, this._throughScope);
       if (built) {
         const inverseAssoc = (
           record as unknown as { association?: (n: string) => any }
@@ -305,7 +298,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       }
       return record;
     } finally {
-      (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = null;
+      this._throughScope = null;
     }
   }
 

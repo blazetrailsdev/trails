@@ -782,26 +782,21 @@ export class Relation<T extends Base> {
     if (Array.isArray(attrs)) {
       return attrs.map((a) => this.build(a, block));
     }
-    // Rails: `build`/`new` is `scoping { _new(attributes) }` — the new
-    // record's `populate_with_current_scope_attributes` seeds from THIS
-    // relation's `scope_for_create` (which may be empty, e.g. `unscoped`)
-    // rather than the class-level default scope. Set current_scope across the
-    // construction so the constructor's seeding honors the relation's scope.
+    // Rails: `block = current_scope_restoring_block(&block); scoping { _new(attributes, &block) }`
+    // (relation.rb:125-132) — the new record's
+    // `populate_with_current_scope_attributes` seeds from THIS relation's
+    // `scope_for_create` (which may be empty, e.g. `unscoped`) rather than the
+    // class-level default scope, while the block yields with the PRIOR scope
+    // re-installed (relation.rb:1345).
+    const restoring = block ? this.currentScopeRestoringBlock(block) : undefined;
     const modelClass = this._model as any;
     const prev = ScopeRegistry.currentScope(modelClass);
     modelClass.setCurrentScope(this as any);
-    let record: T;
     try {
-      record = new this._model(attrs) as T;
+      return this._new(attrs, restoring);
     } finally {
       modelClass.setCurrentScope(prev);
     }
-    // The block runs AFTER current_scope is restored, matching Rails'
-    // `current_scope_restoring_block` (relation.rb:1345): it captures the
-    // PRIOR scope before `scoping {}` and re-installs it before yielding, so
-    // the user block sees the prior scope, not this relation's scope.
-    if (block) block(record);
-    return record;
   }
 
   /**
@@ -3071,15 +3066,15 @@ export class Relation<T extends Base> {
     };
   }
 
-  private _new(attributes: Record<string, unknown>): T {
-    return new (this.model as any)(attributes) as T;
+  protected _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+    return new (this.model as any)(attributes, block) as T;
   }
 
-  private _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
+  protected _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
     return (this.model as any).create(attributes, block);
   }
 
-  private _createBang(
+  protected _createBang(
     attributes: Record<string, unknown>,
     block?: (record: T) => void,
   ): Promise<T> {

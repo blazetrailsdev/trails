@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
-  _findTargetReachable,
   _ownerChainReflection,
   _routeThroughViaAssociationScope,
   _loadSingularViaStatementCache,
@@ -293,12 +292,9 @@ export class SingularAssociation extends Association {
       if (this.disableJoins) return this.scope().first();
 
       // `Association#find_target`'s first statement (association.rb:248-250).
-      // Gated by `find_target?`: a new-record owner without the key present never
-      // reaches `find_target` and so never raises.
-      if (
-        this.isViolatesStrictLoading() &&
-        _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
-      ) {
+      // The `find_target?` gate is `Association#loadTarget`'s
+      // (association.rb:190), so the raise itself is unconditional as in Rails.
+      if (this.isViolatesStrictLoading()) {
         strictLoadingViolationBang({ owner: owner.constructor, reflection });
       }
 

@@ -37,6 +37,65 @@ export interface InsertAllOptions {
   recordTimestamps?: boolean;
 }
 
+/**
+ * The connection and schema-cache facts Rails' `InsertAll#initialize` reads
+ * synchronously at `insert_all.rb:38-45` — `supports_insert_returning?`,
+ * `supports_insert_conflict_target?`, `schema_cache.primary_keys(table_name)`
+ * and `schema_cache.indexes(table_name)`. Every one of those is async in
+ * trails, so `InsertAll.execute` resolves them before constructing and the
+ * constructor body stays the pure assignment Rails' is.
+ *
+ * @noRailsEquivalent PERMANENT: a genuine TypeScript shortcoming — a
+ *   constructor cannot await. Resolving in the async factory keeps the
+ *   Rails-named constructor tail in place rather than deferring it to
+ *   `execute`.
+ * @internal
+ */
+interface ResolvedConnectionFacts {
+  supportsInsertReturning: boolean;
+  supportsInsertConflictTarget: boolean;
+  primaryKeys: string[];
+  indexes: (tableName: string) => unknown[];
+}
+
+/**
+ * Resolves the facts above off the connection and schema cache. A missing
+ * support predicate reads as unsupported, matching Rails'
+ * `AbstractAdapter#supports_insert_conflict_target?` returning false, so a
+ * wrapper adapter that forgets to delegate cannot emit a bogus conflict
+ * target.
+ *
+ * @noRailsEquivalent PERMANENT: the async half of `ResolvedConnectionFacts`
+ *   above, for the same constructor-cannot-await reason.
+ * @internal
+ */
+async function resolveConnectionFacts(
+  model: ModelClass,
+  connection: any,
+): Promise<ResolvedConnectionFacts> {
+  const cache = connection.schemaCache;
+  const supportsInsertReturning =
+    typeof connection.supportsInsertReturning === "function"
+      ? await connection.supportsInsertReturning()
+      : false;
+  const supportsInsertConflictTarget =
+    typeof connection.supportsInsertConflictTarget === "function"
+      ? await connection.supportsInsertConflictTarget()
+      : false;
+  let primaryKeys: string[] = [];
+  if (cache && typeof cache.primaryKeys === "function") {
+    const pk = await cache.primaryKeys(model.arelTable.name);
+    if (pk != null) primaryKeys = Array.isArray(pk) ? pk : [pk];
+  }
+  const indexes: unknown[] = cache ? await cache.indexes(model.tableName) : [];
+  return {
+    supportsInsertReturning,
+    supportsInsertConflictTarget,
+    primaryKeys,
+    indexes: (name: string) => (name === model.tableName ? indexes : []),
+  };
+}
+
 export class InsertAll {
   readonly model: ModelClass;
   readonly connection: ModelClass["connection"];
@@ -58,15 +117,8 @@ export class InsertAll {
   private scopeAttributes: Record<string, unknown>;
   private _recordTimestamps: boolean;
   private _updatableColumns: string[] | undefined;
-  private _uniqueByResolved = false;
   private _keysIncludingTimestamps: Set<string> | undefined;
-  // Resolved from schema_cache.primary_keys(table_name) during the async
-  // _populateUpdatableColumns pass; undefined until then. See primaryKeys().
-  private _schemaCachePrimaryKeys: string[] | undefined;
-  // True when `returning` was auto-defaulted to the primary keys (Rails:
-  // `@returning = primary_keys if @returning == true`), so it can be
-  // re-resolved to the schema-cache value once that's available.
-  private _returningDefaulted = false;
+  private _facts: ResolvedConnectionFacts;
 
   static async execute(
     relation: Relation<any>,
@@ -74,17 +126,21 @@ export class InsertAll {
     options: InsertAllOptions = {},
   ): Promise<Result> {
     const model = (relation as any)._model as ModelClass;
-    return withConnection.call(model as any, (c: any) =>
-      new InsertAll(relation, c, inserts, options).execute(),
+    return withConnection.call(model as any, async (c: any) =>
+      new InsertAll(
+        relation,
+        c,
+        inserts,
+        options,
+        await resolveConnectionFacts(model, c),
+      ).execute(),
     ) as Promise<Result>;
   }
 
   /**
-   * @missingRailsCall find_unique_index_for — PERMANENT: Language shortcoming: Rails
-   * resolves `@unique_by` here (insert_all.rb:42) off a synchronous
-   * `schema_cache.indexes`; that read is async in trails, so the call rides
-   * the deferral in `_populateUpdatableColumns()`, which every path awaits
-   * before anything reads `uniqueBy`.
+   * `facts` carries what Rails' constructor tail (insert_all.rb:38-45) reads
+   * synchronously off the connection and schema cache; see
+   * `ResolvedConnectionFacts`.
    *
    * @missingRailsArgs except — PERMANENT: Ruby's `scope_for_create.except(col)`
    * is a receiver-form call; JS objects have no `except`, so the activesupport
@@ -96,7 +152,9 @@ export class InsertAll {
     connection: ModelClass["connection"],
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
+    facts: ResolvedConnectionFacts,
   ) {
+    this._facts = facts;
     this.model = (relation as any)._model as ModelClass;
     this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
@@ -137,14 +195,19 @@ export class InsertAll {
     }
 
     this.verifyAttributeNamesAreKnown();
+
+    if (this.returning === undefined) {
+      this.returning = facts.supportsInsertReturning ? this.primaryKeys() : false;
+    }
+    if (Array.isArray(this.returning) && this.returning.length === 0) this.returning = false;
+
+    this.uniqueBy = this.findUniqueIndexFor(this.uniqueBy);
+
     this.configureOnDuplicateUpdateLogic();
+    this.ensureValidOptionsForConnectionBang();
   }
 
   async execute(): Promise<Result> {
-    // Resolve uniqueBy before the empty-batch shortcut so the Rails guard
-    // (insert_all.rb#initialize validates uniqueBy in the constructor before
-    // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
-    await this._populateUpdatableColumns();
     if (isEmpty(this.inserts)) return Result.empty();
     // Mirrors Rails InsertAll#execute: build the log/instrumentation label
     // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all
@@ -165,88 +228,24 @@ export class InsertAll {
     return this.connection.buildInsertSql(new Builder(this));
   }
 
+  /** Mirrors: ActiveRecord::InsertAll#updatable_columns (insert_all.rb:58-60). */
   updatableColumns(): string[] {
-    return this._updatableColumns ?? [];
-  }
-
-  /** @internal Async init: resolves uniqueByColumns via cache.indexes() then finalizes updatableColumns. */
-  private async _populateUpdatableColumns(): Promise<void> {
-    // Rails resolves @unique_by synchronously in the constructor (line 42 of
-    // insert_all.rb), before configure_on_duplicate_update_logic. Our port
-    // defers it because schema-cache reads are async — but it must still
-    // run on every path so updateOnly + uniqueBy still gets validated and
-    // index.where flows through to conflictTarget.
-    // Resolve the database primary keys from the schema cache (Rails'
-    // `primary_keys` is `Array(schema_cache.primary_keys(table_name))`) before
-    // anything reads primaryKeys(), so readonlyColumns and the Builder's
-    // conflict target see the schema-cache value rather than the model's
-    // configured primary key. findUniqueIndexFor still reads model.primaryKey
-    // directly for its `unique_by || model.primary_key` match.
-    if (this._schemaCachePrimaryKeys === undefined) {
-      this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
-      // Rails runs this in the constructor (`insert_all.rb:38`), keyed off
-      // `@returning.nil?`; `supports_insert_returning?` is async here, so it
-      // rides the same deferral `@unique_by` already takes and `returning`
-      // stays undefined — Ruby's nil — until now.
-      if (this.returning === undefined) {
-        const supportsReturning =
-          typeof (this.connection as any).supportsInsertReturning === "function"
-            ? await (this.connection as any).supportsInsertReturning()
-            : false;
-        this.returning = supportsReturning ? this.primaryKeys() : false;
-        this._returningDefaulted = supportsReturning;
-      }
-      if (this._returningDefaulted) {
-        // Rails: `@returning = primary_keys` then `@returning = false if
-        // @returning == []` (insert_all.rb:39-40). For an id-less table the
-        // schema-cache primary keys are [], so RETURNING is dropped entirely
-        // rather than emitting a bare `RETURNING ""`.
-        const pks = this.primaryKeys();
-        this.returning = pks.length > 0 ? pks : false;
-      }
-    }
-    if (!this._uniqueByResolved) {
-      this.uniqueBy = await this.findUniqueIndexFor(this.uniqueBy);
-      this._uniqueByResolved = true;
-      await this.ensureValidOptionsForConnectionBang();
-    }
-    if (this._updatableColumns) return;
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
-    this._updatableColumns = [...this.keys].filter((k) => !exclude.has(k));
-    // Mirrors Rails' elsif branch: only coerce "update"→"skip" on the auto-generated
-    // update path. Custom SQL (updateSql) and explicit updateOnly are handled earlier
-    // in configureOnDuplicateUpdateLogic and must not be overridden here.
-    if (
-      this.onDuplicate === "update" &&
-      !this.updateSql &&
-      !isPresent(this.updateOnly) &&
-      isEmpty(this._updatableColumns)
-    ) {
-      this.onDuplicate = "skip";
-    }
+    return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
   }
 
   /**
+   * Mirrors: ActiveRecord::InsertAll#primary_keys (insert_all.rb:61-63) — the
+   * *database* primary keys, empty for an id-less table, distinct from the
+   * model's configured `primary_key`.
+   *
    * @missingRailsCall table_name — PERMANENT: Language shortcoming: Rails reads
-   * `schema_cache.primary_keys(model.table_name)` here (insert_all.rb:61);
-   * that schema-cache read is async in trails, so the table name is passed
-   * at the deferred read in `dbPrimaryKeys()` and this reader returns the
-   * value it resolved.
+   * `schema_cache.primary_keys(model.table_name)` here; that schema-cache read
+   * is async in trails, so the table name is passed where the read happens
+   * (`resolveConnectionFacts`) and this reader returns the resolved value.
    */
   primaryKeys(): string[] {
-    // Rails: `Array(@model.schema_cache.primary_keys(model.table_name))`
-    // (insert_all.rb:61) — the *database* primary keys from the schema cache,
-    // not the model's attribute-derived `primary_key`. Those reads are async
-    // in our port, so they're resolved once into `_schemaCachePrimaryKeys`
-    // during _populateUpdatableColumns. Until that runs (the constructor's
-    // `returning` default and verifyAttributes), fall back to the model's
-    // primary key; for the no-PK case (partitioned table — primaryKey nil/"")
-    // both yield [] so `returning` emits no RETURNING clause rather than
-    // RETURNING "".
-    if (this._schemaCachePrimaryKeys !== undefined) return this._schemaCachePrimaryKeys;
-    const pk = this.model.primaryKey;
-    if (pk == null || pk === "") return [];
-    return Array.isArray(pk) ? pk : [pk];
+    return this._facts.primaryKeys;
   }
 
   skipDuplicates(): boolean {
@@ -334,13 +333,8 @@ export class InsertAll {
 
   /**
    * @internal
-   * @missingRailsCall empty? — PERMANENT: Language shortcoming: Rails' last branch is
-   * `@on_duplicate == :update && updatable_columns.empty?`
-   * (insert_all.rb:140), but `updatable_columns` subtracts
-   * `unique_by_columns`, which trails can only resolve off an async
-   * schema-cache read; that branch therefore runs at the end of
-   * `_populateUpdatableColumns()`, which every path awaits before
-   * `onDuplicate` is read.
+   * Mirrors: ActiveRecord::InsertAll#configure_on_duplicate_update_logic
+   * (insert_all.rb:129-143).
    */
   private configureOnDuplicateUpdateLogic(): void {
     const onDuplicate = this.onDuplicate;
@@ -367,11 +361,8 @@ export class InsertAll {
     } else if (this.isCustomUpdateSqlProvided()) {
       this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = "update";
-    } else if (onDuplicate === "skip") {
+    } else if (onDuplicate === "update" && isEmpty(this.updatableColumns())) {
       this.onDuplicate = "skip";
-    } else if (onDuplicate === "update") {
-      // Finalized in _populateUpdatableColumns() after async uniqueIndexes() resolves.
-      this.onDuplicate = "update";
     }
   }
 
@@ -389,12 +380,8 @@ export class InsertAll {
   }
 
   /** @internal */
-  private async ensureValidOptionsForConnectionBang(): Promise<void> {
-    if (
-      this.returning &&
-      typeof (this.connection as any).supportsInsertReturning === "function" &&
-      !(await (this.connection as any).supportsInsertReturning())
-    ) {
+  private ensureValidOptionsForConnectionBang(): void {
+    if (this.returning && !this._facts.supportsInsertReturning) {
       throw new Error(
         `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,
       );
@@ -457,22 +444,12 @@ export class InsertAll {
   }
 
   /** @internal Mirrors: ActiveRecord::InsertAll#find_unique_index_for */
-  private async findUniqueIndexFor(
+  private findUniqueIndexFor(
     uniqueBy: string | string[] | IndexDefinition | undefined,
-  ): Promise<IndexDefinition | undefined> {
+  ): IndexDefinition | undefined {
     if (uniqueBy instanceof IndexDefinition) return uniqueBy;
-    // Default to unsupported when the predicate is missing — matches Rails'
-    // AbstractAdapter#supports_insert_conflict_target? returning false, so a
-    // wrapper adapter that forgets to delegate doesn't silently fall through
-    // and emit a bogus conflict target.
-    const conn = this.connection as {
-      supportsInsertConflictTarget?: () => Promise<boolean>;
-    };
-    const supports =
-      typeof conn.supportsInsertConflictTarget === "function"
-        ? await conn.supportsInsertConflictTarget()
-        : false;
-    if (!supports) {
+    const conn = this.connection as { constructor?: { name?: string } };
+    if (!this._facts.supportsInsertConflictTarget) {
       // Rails returns nil for a nil unique_by even when conflict targets are
       // unsupported (plain insertAll on MySQL); a given unique_by raises.
       if (uniqueBy == null) return undefined;
@@ -492,12 +469,12 @@ export class InsertAll {
       uniqueBy == null ? modelPrimaryKeys : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
     const match = nameOrCols.map(String);
     const sortedMatch = [...match].sort().join(",");
-    const tableName = this.model.arelTable.name;
-    const idx = (await this.uniqueIndexes()).find(
+    const idx = this.uniqueIndexes().find(
       (i: any) =>
         match.includes(i.name) ||
         (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
     ) as { name: string; columns: string[]; where?: string } | undefined;
+    const tableName = this.model.tableName;
     if (idx) {
       return idx instanceof IndexDefinition
         ? idx
@@ -506,8 +483,7 @@ export class InsertAll {
     // The PK fallback is order-sensitive (Rails `match == primary_keys`,
     // insert_all.rb:163) — unlike the index match above, which sorts. A
     // composite PK supplied in a different column order falls through to the
-    // raise, matching Rails. `primaryKeys()` is the schema-cache value, already
-    // resolved in _populateUpdatableColumns before this method runs.
+    // raise, matching Rails. `primaryKeys()` is the schema-cache value.
     const dbPrimaryKeys = this.primaryKeys().map(String);
     if (match.join(",") === dbPrimaryKeys.join(",")) {
       return uniqueBy == null
@@ -524,33 +500,10 @@ export class InsertAll {
 
   /**
    * @internal
-   * Rails' schema_cache.indexes is synchronous; our TS port is async because
-   * the underlying driver call is. Always await this method.
-   *
-   * Mirrors: ActiveRecord::InsertAll#unique_indexes
+   * Mirrors: ActiveRecord::InsertAll#unique_indexes (insert_all.rb:169-171).
    */
-  private async uniqueIndexes(): Promise<unknown[]> {
-    const conn = this.connection as any;
-    const cache = conn.schemaCache;
-    if (!cache) return [];
-    const indexes: unknown[] = await cache.indexes(this.model.tableName);
-    return indexes.filter((i: any) => i.unique);
-  }
-
-  /**
-   * @internal
-   * Mirrors: ActiveRecord::InsertAll#primary_keys —
-   * `Array(model.schema_cache.primary_keys(table_name))`. This is the
-   * *database* primary key (empty for an id-less table), distinct from the
-   * model's configured `primary_key` used to build the conflict match.
-   */
-  private async dbPrimaryKeys(): Promise<string[]> {
-    const conn = this.connection as any;
-    const cache = conn.schemaCache;
-    if (!cache || typeof cache.primaryKeys !== "function") return [];
-    const pk = await cache.primaryKeys(this.model.arelTable.name);
-    if (pk == null) return [];
-    return Array.isArray(pk) ? pk : [pk];
+  private uniqueIndexes(): unknown[] {
+    return this._facts.indexes(this.model.tableName).filter((i: any) => i.unique);
   }
 
   /** @internal */

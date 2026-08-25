@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
-  _findTargetReachable,
   _inlineOwnerKey,
   _inlinePolymorphicKeys,
   _ownerChainReflection,
@@ -590,10 +589,10 @@ async function findTarget(
     }
   }
 
-  // `Association#find_target`'s first statement (association.rb:248-250). Gated
-  // by `find_target?`: a new-record owner without the FK present never reaches
-  // `find_target` and so never raises.
-  if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
+  // `Association#find_target`'s first statement (association.rb:248-250). The
+  // `find_target?` gate is `Association#loadTarget`'s (association.rb:190), so
+  // the raise itself is unconditional as in Rails.
+  if (violatesStrictLoading) {
     const ctor = record.constructor as typeof Base;
     const reflection = ctor._reflectOnAssociation?.(assocName);
     if (!reflection) throw new AssociationNotFoundError(record, assocName);
