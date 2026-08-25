@@ -859,9 +859,8 @@ export class ToSql extends Visitor {
 
   private visitArelTable(o: Table, collector: SQLString): SQLString {
     // Mirrors Rails visit_Arel_Table (to_sql.rb): if name is a Node, visit
-    // it (subquery-as-table); else quote as identifier. Trails types
-    // `Table.name` as `string`; callers smuggling a Node in must cast.
-    const name = o.name as unknown;
+    // it (subquery-as-table); else quote as identifier.
+    const name = o.name;
     if (name instanceof Node) {
       this.visit(name, collector);
     } else {
