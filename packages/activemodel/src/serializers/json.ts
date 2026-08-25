@@ -8,8 +8,15 @@ import {
   type SerializeOptions,
   type SerializationRecord,
 } from "../serialization.js";
-import { ModelName } from "../naming.js";
-import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
+import { ModelName, Naming } from "../naming.js";
+import {
+  include,
+  extend,
+  included,
+  classAttribute,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 
 function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
@@ -65,6 +72,18 @@ export class JSON {
 
   /** Plain attribute store for lightweight adopters; subclasses override with their storage shape. */
   declare attributes: Record<string, unknown>;
+
+  /**
+   * Mirrors: json.rb:12-16
+   *   included do
+   *     extend ActiveModel::Naming
+   *     class_attribute :include_root_in_json, instance_writer: false, default: false
+   *   end
+   */
+  static [included](base: object): void {
+    extend(base as { prototype: object }, Naming);
+    classAttribute.call(base, "includeRootInJson", { instanceWriter: false, default: false });
+  }
 
   /**
    * Mirrors: json.rb:96-108
@@ -127,7 +146,14 @@ export class JSON {
         );
       }
     }
-    this.attributes = hash;
+    // json.rb:147 — `self.attributes = hash`. `attributes=` is
+    // `alias attributes= assign_attributes` on any AttributeAssignment host
+    // (attribute_assignment.rb:36), and trails spells that alias
+    // `setAttributes` because the write path can owe I/O; Rails' `from_json`
+    // does not await it either.
+    void (this as unknown as { setAttributes(h: Record<string, unknown>): unknown }).setAttributes(
+      hash,
+    );
     return this;
   }
 

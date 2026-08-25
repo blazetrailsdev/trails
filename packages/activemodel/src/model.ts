@@ -9,9 +9,13 @@ import {
   runValidationsBang as validationsRunValidationsBang,
   raiseValidationError as validationsRaiseValidationError,
   readAttributeForValidation as validationsReadAttributeForValidation,
+  freeze as validationsFreeze,
 } from "./validations.js";
 import { HelperMethods } from "./validations/helper-methods.js";
-import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
+import {
+  sanitizeForMassAssignment as attrSanitize,
+  sanitizeForbiddenAttributes as forbiddenSanitize,
+} from "./forbidden-attributes-protection.js";
 import {
   Callbacks as ASCallbacks,
   defineCallbacks,
@@ -20,7 +24,6 @@ import {
   include,
   prepend,
   runLoadHooks,
-  wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
   type Extended,
@@ -29,20 +32,15 @@ import {
 } from "@blazetrails/activesupport";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { AttributeSet } from "./attribute-set.js";
-import { ModelLike, ModelName } from "./naming.js";
+import { ModelName } from "./naming.js";
 import {
   Dirty,
   initInternals as dirtyInitInternals,
   initializeDup as dirtyInitializeDup,
 } from "./dirty.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
-import {
-  serializableHash,
-  SerializeOptions,
-  asJsonThenable,
-  readAttributeForSerialization as serializationReadAttributeForSerialization,
-  type SerializationRecord,
-} from "./serialization.js";
+import { Serialization } from "./serialization.js";
+import { JSON as SerializersJSON } from "./serializers/json.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import type { ConditionalOptions } from "./validations.js";
@@ -55,8 +53,6 @@ import {
   _resurrectAttributeMethods,
 } from "./attribute-methods.js";
 import * as AttributeAssignment from "./attribute-assignment.js";
-import { isMassAssignmentEmpty, ArgumentError } from "./attribute-assignment.js";
-import { sanitizeForMassAssignment as attrSanitize } from "./forbidden-attributes-protection.js";
 import {
   ClassMethods as ValidationsCallbacksClassMethods,
   type ValidationCallbackFilter,
@@ -74,7 +70,6 @@ import {
   attributeNames,
   setDefineMethodAttribute,
   _writeAttribute,
-  freeze as attributesFreeze,
   initializeDup as attributesInitializeDup,
 } from "./attributes.js";
 import {
@@ -87,7 +82,9 @@ import {
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
 } from "./attribute-registration.js";
-import { _toPartialPath } from "./conversion.js";
+import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Access } from "./access.js";
+import { Naming } from "./naming.js";
 
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods (attributes.rb:38-101) — the
@@ -106,7 +103,7 @@ const AttributesClassMethods = { attribute, setDefineMethodAttribute, attributeN
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface Model extends Dirty {
+export interface Model extends Dirty, Access, Conversion, Serialization, Naming, SerializersJSON {
   /**
    * `ActiveModel::Validations#validates_with` (validations/with.rb:144-151),
    * mixed on by the `include(Model, …)` at the bottom of this file.
@@ -180,6 +177,9 @@ export interface Model extends Dirty {
   _runValidateCallbacks(): Promise<void>;
   /** @internal */
   sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+  /** @internal */
+  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  freeze(): this;
 
   /**
    * The instance halves of `include HelperMethods` (validations.rb:46) that a
@@ -232,11 +232,18 @@ export interface Model extends Dirty {
 export class Model {
   [key: string]: unknown;
 
-  static includeRootInJson: boolean | string = false;
-  // Rails: class_attribute :param_delimiter, instance_reader: false, default: "-"
-  // (activemodel/lib/active_model/conversion.rb:32)
-  static paramDelimiter: string = "-";
+  /**
+   * `class_attribute :include_root_in_json, instance_writer: false,
+   * default: false` (json.rb:15), installed by `JSON.[included]`.
+   */
+  declare static includeRootInJson: boolean | string;
+  /**
+   * `class_attribute :param_delimiter, instance_reader: false, default: "-"`
+   * (conversion.rb:32), installed by `Conversion.[included]`.
+   */
+  declare static paramDelimiter: string;
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+  declare private static _modelName: ModelName | null;
   // Runtime accessors come from the `classAttribute()` calls at the bottom of
   // this file (attribute_methods.rb:70-73).
   declare static attributeAliases: Record<string, string>;
@@ -248,13 +255,13 @@ export class Model {
   // this file (validations.rb:50). Keyed by attribute name (or `null` for
   // validators registered without `attributes:`), as Ruby's Hash-of-Arrays is.
   declare static _validators: Map<string | null, Array<ValidatorLike>>;
-  declare private static _modelName: ModelName | null;
 
   declare static attribute: Extended<typeof AttributesClassMethods>["attribute"];
   declare static setDefineMethodAttribute: Extended<
     typeof AttributesClassMethods
   >["setDefineMethodAttribute"];
-  static _toPartialPath = _toPartialPath;
+  /** Mirrors: ActiveModel::Conversion::ClassMethods#_to_partial_path (conversion.rb:108-117). */
+  declare static _toPartialPath: Extended<typeof ConversionClassMethods>["_toPartialPath"];
 
   /** @internal Rails-private helper (CLAUDE.md § "Generated attribute readers are properties"). */
   declare static defineMethodAttribute: typeof defineMethodAttribute;
@@ -411,14 +418,8 @@ export class Model {
   /** `extend ActiveModel::Translation` (validations.rb:43). */
   declare static humanAttributeName: typeof translationHumanAttributeName;
 
-  /**
-   * The i18n scope for translation lookups.
-   *
-   * Mirrors: ActiveModel::Translation.i18n_scope
-   */
-  static get i18nScope(): string {
-    return "activemodel";
-  }
+  /** `extend ActiveModel::Translation` (validations.rb:43) — translation.rb:20-22. */
+  declare static i18nScope: string;
 
   // Ruby `include ActiveModel::AttributeMethods` (attribute_methods.rb:73)
   // brings the whole ClassMethods surface along; the `extend(Model, …)` at the
@@ -465,26 +466,15 @@ export class Model {
    * `"Admin"` for `Admin::User`, `"MyApplication::Business"`). JS class names
    * carry no module path, so this carrier lets STI/polymorphic `type` values
    * and `modelName` reconstruct the qualified Rails constant name.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby reads the module path off the constant
+   * itself (`module_parents`); a JS class name carries no module path, so a
+   * namespaced model declares it. Same carrier as `JSON.moduleName`.
    */
   declare static moduleName?: string;
 
-  /**
-   * Mirrors Rails `model_name` (naming.rb:270-277). The namespace is the
-   * enclosing module, carried as `moduleName` because a JS class has no module
-   * path; `@_model_name ||=` is a per-class ivar, so the memo is an own
-   * property rather than an inherited one.
-   */
-  static get modelName(): ModelName {
-    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      // Rails walks `module_parents` for a module answering
-      // `use_relative_model_naming?` (naming.rb:271-276). JS has no
-      // enclosing-module chain to walk, so nothing can declare relative naming
-      // and the detect answers nil.
-      const namespace = null;
-      this._modelName = new ModelName(this as unknown as ModelLike, namespace);
-    }
-    return this._modelName;
-  }
+  /** `extend ActiveModel::Naming` (api.rb:66) — naming.rb:270-277. */
+  declare static modelName: ModelName;
 
   _attributes: AttributeSet = new AttributeSet();
   errors!: Errors<this>;
@@ -523,11 +513,11 @@ export class Model {
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   /**
-   * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
+   * Mirrors: ActiveModel::API#initialize (api.rb:82-85) →
+   * ActiveModel::Attributes#initialize (attributes.rb:106-109)
    *
-   * Rails pattern:
    *   Attributes#initialize: @attributes = self.class._default_attributes.deep_dup
-   *   API#initialize:        assign_attributes(attributes); super()
+   *   API#initialize:        assign_attributes(attributes) if attributes; super()
    */
   constructor(attrs: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
@@ -542,31 +532,11 @@ export class Model {
 
     this._attributes = ctor._defaultAttributes().deepDup();
 
-    // API#initialize — assign_attributes(attributes) (api.rb:80-82), which runs
-    // `sanitize_for_mass_assignment` (ForbiddenAttributesProtection) before the
-    // per-key dispatch: an unpermitted `ActionController::Parameters`-like bag
-    // raises `ForbiddenAttributesError` at construction, a permitted one is
-    // unwrapped via `to_h`, and a plain hash passes through untouched. Each key
-    // is then routed through `_assignAttribute` → setter dispatch, exactly like
-    // Rails' `_assign_attribute` (attribute_assignment.rb:67-75): a key with a
-    // writer (a framework-generated attribute setter, a user-defined `set name`,
-    // or a nested-attribute `<assoc>Attributes=` setter) dispatches through it,
-    // and a genuinely-unknown, writer-less key routes to `attributeWriterMissing`
-    // (→ `UnknownAttributeError`). The `_initializingAttributes` window lets the
-    // AR write path detect construction (e.g. composite-PK `id=` remap) without
-    // re-raising mid-construction. Empty bag is a no-op — mirrors
-    // `assign_attributes`' `return if new_attributes.empty?` (so a subclass
-    // `_assignAttributes` override isn't invoked for `new Model({})`, and neither
-    // is sanitization). The ActiveRecord `Base` constructor sanitizes before
-    // `super()`, converting any params wrapper to a plain hash, so this second
-    // sanitize on the AR path no-ops rather than double-checking.
     this._initializingAttributes = true;
     try {
-      if (!isMassAssignmentEmpty(attrs)) {
-        // AR's override can owe I/O; Rails' `initialize` does not await it
-        // either — the deferred writes drain on save (RFC 0087).
-        void this._assignAttributes(this.sanitizeForMassAssignment(attrs));
-      }
+      // AR's override of `_assign_attributes` can owe I/O; Rails' `initialize`
+      // does not await it either — the writes drain on save (RFC 0087).
+      if (attrs != null) void this.assignAttributes(attrs);
     } finally {
       this._initializingAttributes = false;
     }
@@ -579,11 +549,6 @@ export class Model {
     if (callbackSuppressor._suppressInitializeCallback !== true) {
       void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
-  }
-
-  /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
-  get includeRootInJson(): boolean | string {
-    return (this.constructor as typeof Model).includeRootInJson;
   }
 
   /**
@@ -601,39 +566,6 @@ export class Model {
    * @internal
    */
   _contextForValidation?: ValidationContext;
-
-  /**
-   * Freeze this model instance. Mirrors Rails
-   * `ActiveModel::Validations#freeze` (activemodel/lib/active_model/validations.rb:372-377):
-   *
-   *   def freeze
-   *     errors
-   *     context_for_validation
-   *     super
-   *   end
-   *
-   * Rails pre-touches `@errors` and `@context_for_validation` so frozen
-   * models can still answer `#errors` and `#validation_context` without
-   * tripping their `||=` lazy-init. Trails mirrors that by reading
-   * `errors` and calling `contextForValidation()` to populate its
-   * cached `ValidationContext`. The `validationContext` getter alone
-   * is not enough — it doesn't write to `_contextForValidation`, so a
-   * subsequent `contextForValidation()` call on the frozen instance
-   * would throw on the cache assignment.
-   */
-  freeze(): this {
-    void this.errors;
-    // Pre-materialize the lazy ValidationContext cache so callers can
-    // still invoke `contextForValidation()` on a frozen instance —
-    // Rails does the equivalent at validations.rb:374 by touching
-    // `context_for_validation` inside `freeze`. Touching
-    // `validationContext` alone would not populate the cache.
-    void this.contextForValidation();
-    // validations.rb:376 — `super` reaches `Attributes#freeze` (attributes.rb:150-153).
-    attributesFreeze.call(this);
-    Object.freeze(this);
-    return this;
-  }
 
   /**
    * Mirrors Ruby's `Object#dup`: allocate, copy the ivars, dispatch
@@ -663,67 +595,6 @@ export class Model {
     return duped;
   }
 
-  serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash(this, options);
-  }
-
-  asJson(options?: SerializeOptions): Record<string, unknown> {
-    const ctor = this.constructor as typeof Model;
-    return asJsonThenable(
-      () => this.serializableHash(options),
-      ctor.includeRootInJson,
-      () => ctor.modelName.element,
-      options ?? {},
-    );
-  }
-
-  /**
-   * Deserialize a JSON string into this model's attributes.
-   *
-   * Mirrors: ActiveModel::Serializers::JSON#from_json (json.rb:144-149)
-   *
-   *   def from_json(json, include_root = include_root_in_json)
-   *     hash = ActiveSupport::JSON.decode(json)
-   *     hash = hash.values.first if include_root
-   *     self.attributes = hash
-   *     self
-   *   end
-   *
-   * `includeRoot` defaults to the class-level `includeRootInJson`
-   * (matching Rails); when truthy, unwrap unconditionally via
-   * first-value semantics regardless of the configured root key. Empty
-   * strings are truthy here per Ruby semantics — only `false`/`null`
-   * skip the unwrap.
-   */
-  fromJson(json: string, includeRoot?: boolean | string): this {
-    const ctor = this.constructor as typeof Model;
-    const root = includeRoot ?? ctor.includeRootInJson;
-    let attrs: unknown = JSON.parse(json);
-    // Rails' `self.attributes = hash` routes through `assign_attributes`,
-    // which raises `ArgumentError` when the payload isn't hash-like
-    // (attribute_assignment.rb:29-30). Surface the same class loudly with
-    // shape-accurate diagnostics, matching JSONSerializer.fromJson
-    // (serializers/json.ts).
-    const shapeOf = (v: unknown) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
-    const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-      typeof v === "object" && v !== null && !Array.isArray(v);
-    if (!isPlainObject(attrs)) {
-      throw new ArgumentError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
-    }
-    if (root !== false && root != null) {
-      attrs = Object.values(attrs)[0];
-      if (!isPlainObject(attrs)) {
-        throw new ArgumentError(
-          `fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`,
-        );
-      }
-    }
-    for (const [key, value] of Object.entries(attrs)) {
-      this._writeAttribute(key, value);
-    }
-    return this;
-  }
-
   /**
    * Whether this model instance has been persisted.
    * ActiveModel returns false; ActiveRecord overrides.
@@ -732,97 +603,6 @@ export class Model {
    */
   isPersisted(): boolean {
     return false;
-  }
-
-  get modelName(): ModelName {
-    return (this.constructor as typeof Model).modelName;
-  }
-
-  /**
-   * Returns self. Required by ActiveModel::Conversion.
-   *
-   * Mirrors: ActiveModel::Conversion#to_model
-   */
-  toModel(): this {
-    return this;
-  }
-
-  /**
-   * @internal Rails-private helper.
-   */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
-    return attrSanitize(attributes);
-  }
-
-  /**
-   * Mirrors: ActiveModel::ForbiddenAttributesProtection
-   * (`alias :sanitize_forbidden_attributes :sanitize_for_mass_assignment`).
-   *
-   * @internal Rails-private helper.
-   */
-
-  /**
-   * Mirrors: ActiveModel::Validations
-   * (`alias :read_attribute_for_validation :send`). Reads the attribute by
-   * name; ActiveRecord overrides to resolve associations.
-   */
-
-  /**
-   * Mirrors: ActiveModel::Serialization
-   * (`alias :read_attribute_for_serialization :send`). Public, overridable hook;
-   * dispatches the named reader, falling back to the attribute store.
-   */
-  readAttributeForSerialization(key: string): unknown {
-    return serializationReadAttributeForSerialization(this as unknown as SerializationRecord, key);
-  }
-
-  toParam(): string | null {
-    if (!this.isPersisted()) return null;
-    const key = this.toKey();
-    if (!key) return null;
-    if (!key.every((part) => part !== null && part !== undefined && part !== false)) return null;
-    return key.map(String).join((this.constructor as typeof Model).paramDelimiter);
-  }
-
-  toPartialPath(): string {
-    return (this.constructor as typeof Model)._toPartialPath();
-  }
-
-  /**
-   * Return an array of all key attributes if any of the attributes is set,
-   * whether or not the object is persisted.
-   *
-   * Mirrors: ActiveModel::Conversion#to_key
-   */
-  toKey(): unknown[] | null {
-    // conversion.rb:67-70 — `key = respond_to?(:id) && id; key ? Array(key) : nil`.
-    // `Array(key)` is what keeps a composite `id` from being double-wrapped.
-    const key = this.respondTo("id") ? this._readAttribute("id") : false;
-    return key != null && key !== false ? wrap(key) : null;
-  }
-
-  /**
-   * Return a subset of attributes.
-   *
-   * Mirrors: ActiveModel::Access#slice
-   */
-  slice(...methods: (string | string[])[]): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const m of methods.flat()) {
-      result[m] = this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m));
-    }
-    return result;
-  }
-
-  /**
-   * Return attribute values as an array.
-   *
-   * Mirrors: ActiveModel::Access#values_at
-   */
-  valuesAt(...methods: (string | string[])[]): unknown[] {
-    return methods
-      .flat()
-      .map((m) => this._readAttribute((this.constructor as typeof Model).resolveAttributeName(m)));
   }
 
   /**
@@ -891,6 +671,24 @@ include(Model, Attributes);
 // attributes.rb:156-159 — `_write_attribute` and `alias :attribute= :_write_attribute`.
 include(Model, { _writeAttribute, "attribute=": _writeAttribute });
 
+// api.rb:65-68 — `included do extend ActiveModel::Naming; extend ActiveModel::Translation end`.
+// The Translation half is issued from `Validations.[included]` (validations.rb:43);
+// the `Naming.extended` hook (naming.rb:253-256) installs the instance delegate.
+extend(Model, Naming);
+
+// Ruby `include ActiveModel::Conversion` (api.rb:16) and its ClassMethods half
+// (conversion.rb:105-118); the `included do` block (:28-33) rides along from
+// the module's own `[included]` hook.
+include(Model, Conversion);
+extend(Model, ConversionClassMethods);
+
+// Ruby `include ActiveModel::Serialization` (serialization.rb:127), which
+// `ActiveModel::Serializers::JSON` pulls in (json.rb:11); its `included do`
+// block (json.rb:12-16) extends Naming and issues the
+// `class_attribute :include_root_in_json`.
+include(Model, Serialization);
+include(Model, SerializersJSON);
+
 // Ruby `include ActiveModel::AttributeAssignment` (api.rb:14).
 include(Model, {
   assignAttributes: AttributeAssignment.assignAttributes,
@@ -937,8 +735,14 @@ include(Model, {
   runValidationsBang: validationsRunValidationsBang,
   raiseValidationError: validationsRaiseValidationError,
   readAttributeForValidation: validationsReadAttributeForValidation,
+  freeze: validationsFreeze,
+  sanitizeForMassAssignment: attrSanitize,
   sanitizeForbiddenAttributes: forbiddenSanitize,
 });
+
+// model.rb:44 — `include ActiveModel::Access`, the one thing `model.rb` does
+// beyond `include ActiveModel::API`.
+include(Model, Access);
 
 // The `super`-opening halves of the Validations and Dirty modules: each
 // defines `init_internals` / `initialize_dup` and opens with `super`

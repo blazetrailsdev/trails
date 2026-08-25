@@ -26,7 +26,28 @@ export interface TranslationClassMethods {
   humanAttributeName(attr: string, options?: HumanAttributeNameOptions): string;
 }
 
-export type Translation = TranslationClassMethods;
+/**
+ * Mirrors: ActiveModel::Translation (translation.rb:11-73) — the module a host
+ * gains by `extend ActiveModel::Translation` (validations.rb:43, api.rb:67).
+ */
+export class Translation {
+  /**
+   * Mirrors: ActiveModel::Translation#i18n_scope (translation.rb:20-22)
+   *
+   *   def i18n_scope
+   *     :activemodel
+   *   end
+   */
+  static get i18nScope(): string {
+    return "activemodel";
+  }
+
+  /** Mirrors: ActiveModel::Translation#lookup_ancestors (translation.rb:27-29). */
+  static lookupAncestors = lookupAncestors;
+
+  /** Mirrors: ActiveModel::Translation#human_attribute_name (translation.rb:44-72). */
+  static humanAttributeName = humanAttributeName;
+}
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];

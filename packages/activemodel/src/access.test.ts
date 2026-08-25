@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { withIndifferentAccess } from "@blazetrails/activesupport";
 
 describe("AccessTest", () => {
   class SliceModel extends Model {
@@ -12,15 +13,22 @@ describe("AccessTest", () => {
 
   it("slice", () => {
     const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    const sliced = m.slice("name", "age");
-    expect(sliced).toEqual({ name: "Alice", age: 30 });
-    expect(sliced.email).toBeUndefined();
+    const expected = withIndifferentAccess({ name: m.name, age: m.age });
+    const actual = m.slice("name", "age");
+
+    expect([...actual.keys()]).toEqual([...expected.keys()]);
+
+    expected.forEach((value, key) => {
+      expect(actual.get(key)).toEqual(value);
+    });
   });
 
   it("slice with array", () => {
     const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    const sliced = m.slice(["name", "age"]);
-    expect(sliced).toEqual({ name: "Alice", age: 30 });
+    const expected = withIndifferentAccess({ name: m.name, age: m.age });
+    const actual = m.slice(["name", "age"]);
+
+    expect([...actual.entries()]).toEqual([...expected.entries()]);
   });
 
   it("values_at", () => {

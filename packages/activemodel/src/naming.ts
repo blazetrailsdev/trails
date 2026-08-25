@@ -8,6 +8,7 @@ import {
   isBlank,
   include,
   ToJsonWithActiveSupportEncoder,
+  extended,
   type Included,
 } from "@blazetrails/activesupport";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
@@ -19,6 +20,50 @@ import { ArgumentError, TypeError } from "./attribute-assignment.js";
  */
 export interface Naming {
   readonly modelName: ModelName;
+}
+
+/**
+ * Mirrors: ActiveModel::Naming#model_name (naming.rb:270-277) — the module's
+ * one INSTANCE method, so what `extend ActiveModel::Naming` (api.rb:66) copies
+ * onto the host's singleton. `@_model_name ||=` is a per-class ivar, so the
+ * memo is an own property rather than an inherited one.
+ */
+function modelName(this: NamingHost): ModelName {
+  if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
+    // Rails walks `module_parents` for a module answering
+    // `use_relative_model_naming?` (naming.rb:271-276). JS has no
+    // enclosing-module chain to walk, so nothing can declare relative naming
+    // and the detect answers nil.
+    const namespace = null;
+    this._modelName = new ModelName(this as unknown as ModelLike, namespace);
+  }
+  return this._modelName;
+}
+
+/**
+ * Mirrors: ActiveModel::Naming.extended (naming.rb:253-256)
+ *
+ *   def self.extended(base)
+ *     base.silence_redefinition_of_method :model_name
+ *     base.delegate :model_name, to: :class
+ *   end
+ *
+ * Ruby's `delegate` defines an instance method; the class-method reader it
+ * forwards to ports as an accessor property, so the delegate is one too.
+ */
+function namingExtended(base: NamingHost): void {
+  Object.defineProperty(base.prototype, "modelName", {
+    get(this: object): ModelName {
+      return (this.constructor as unknown as { modelName: ModelName }).modelName;
+    },
+    configurable: true,
+  });
+}
+
+/** The class `extend ActiveModel::Naming` is applied to. */
+interface NamingHost {
+  prototype: object;
+  _modelName?: ModelName | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -366,3 +411,28 @@ function builtinClassName(value: unknown): string {
   if (typeof value === "bigint") return "Integer";
   return (value as { constructor?: { name?: string } })?.constructor?.name ?? typeof value;
 }
+
+// `extend ActiveModel::Naming` copies the module's INSTANCE methods onto the
+// host's singleton — `model_name` (naming.rb:270) — and never its module
+// functions, `def self.plural` and friends (naming.rb:283-348), which stay
+// reachable as `ActiveModel::Naming.plural(record)`. Ruby tells the two apart
+// by singleton-vs-instance method; TypeScript's namespace merge puts both on
+// one object, so `extend()`'s enumerable-own-key rule is where that line is
+// drawn instead: the instance half is defined enumerable below and every
+// module function is hidden from it.
+for (const moduleFunction of Object.keys(Naming)) {
+  Object.defineProperty(Naming, moduleFunction, {
+    ...Object.getOwnPropertyDescriptor(Naming, moduleFunction)!,
+    enumerable: false,
+  });
+}
+Object.defineProperty(Naming, "modelName", {
+  get: modelName,
+  enumerable: true,
+  configurable: true,
+});
+Object.defineProperty(Naming, extended, {
+  value: namingExtended,
+  enumerable: false,
+  configurable: true,
+});

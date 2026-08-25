@@ -183,6 +183,7 @@ import {
   type ParameterFilter,
   peekCallbackChain,
   runCallbacks,
+  type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
@@ -4477,7 +4478,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   _createRecord(block?: (record: this) => void): Promise<boolean>;
   /** @internal */
   _updateRecord(block?: (record: this) => void): Promise<boolean>;
-  slice(...keys: string[]): Record<string, unknown>;
+  slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
