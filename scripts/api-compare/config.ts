@@ -159,7 +159,7 @@ export const MANIFEST_PACKAGES = [
  * A rule that demands a `@noRailsEquivalent` receipt for an `@internal` tag
  * with no manifest backing MUST subtract these: for them "no Rails counterpart"
  * and "not covered by the manifest" are the same state, so it has no basis to
- * ask. Tracked by `rails-privates-manifest-missing-gem-packages` (RFC 0121).
+ * ask.
  */
 export const PACKAGES_OUTSIDE_MANIFEST = ["date", "html-sanitizer", "activerecord-cli"] as const;
 
