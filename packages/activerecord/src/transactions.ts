@@ -21,13 +21,14 @@ import { Rollback } from "./errors.js";
 export { Rollback };
 import { threadedConnectionFor } from "./connection-handling.js";
 
-import { Transaction } from "./connection-adapters/abstract/transaction.js";
+import {
+  CURRENT_TRANSACTION_KEY,
+  Transaction,
+} from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 
 type TransactionAction = "create" | "update" | "destroy";
-
-const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
 
 /**
  * Get the currently active transaction, if any.
@@ -97,38 +98,17 @@ export async function transaction<T>(
     }
   }
 
-  // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
-  // runs inside `with_connection { |c| c.transaction(...) }` and threads the
-  // yielded connection. Taking the yielded connection (the block parameter
-  // connection) instead of the deprecated `.connection` getter keeps the build/
-  // callback path from flipping the lease permanent under
-  // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
-  // releases the connection once the transaction completes.
-  return modelClass.withConnection(async (adapter) => {
-    const result = await dbTransaction.call(
-      adapter as any,
-      async (userTx?: unknown) => {
-        let internalTx: Transaction;
-        if (userTx instanceof Transaction) {
-          internalTx = userTx;
-        } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
-          internalTx = (userTx as any)._internalTransaction;
-        } else {
-          const tmCurrent = (adapter as any).currentTransaction?.();
-          internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
-        }
-        return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
-          const publicTx =
-            userTx instanceof PublicTransaction ? userTx : internalTx.userTransaction;
-          return fn(publicTx);
-        });
-      },
-      {
-        requiresNew: options?.requiresNew,
-        isolation: options?.isolation,
-        joinable: options?.joinable,
-      },
-    );
+  // Taking the yielded connection (the block parameter connection) instead of
+  // the deprecated `.connection` getter keeps the build/callback path from
+  // flipping the lease permanent under `permanent_connection_checkout =
+  // :deprecated | :disallowed`, so the pool releases the connection once the
+  // transaction completes.
+  return modelClass.withConnection(async (connection) => {
+    const result = await dbTransaction.call(connection as any, fn as (tx?: unknown) => Promise<T>, {
+      requiresNew: options?.requiresNew,
+      isolation: options?.isolation,
+      joinable: options?.joinable,
+    });
     return result as T | undefined;
   });
 }
@@ -280,7 +260,9 @@ export function afterRollback<T extends typeof Model>(
  * `*filter_list` is untyped in Ruby and stays open here so the macros above can
  * forward their own `TransactionCallbackFilter<T>` through it. Rails leaves
  * `:on` in the Hash it hands to `super`, where an unknown key is ignored;
- * trails' `assertValidKeys` rejects it, so it comes off first.
+ * trails' `assertValidKeys` rejects it, so it comes off at that seam — after
+ * this body's own guard, and for every event, since `before_commit` reaches
+ * `super` with the `:on` `set_options_for_callbacks!` left in place.
  */
 export function setCallback<T extends typeof Model>(
   this: T,
@@ -297,8 +279,8 @@ export function setCallback<T extends typeof Model>(
       (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
       ...kernelArray(options.if),
     ];
-    delete options.on;
   }
+  delete options.on;
 
   (Model.setCallback as (this: T, name: string, ...args: unknown[]) => void).call(
     this,
@@ -465,16 +447,6 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
  * scheduling.
  *
  * Mirrors: ActiveRecord::Transactions#with_transaction_returning_status
- *
- * @missingRailsArgs connection.transaction — CONVERGEABLE: `transactions.rb:413`
- * opens the transaction on the yielded `connection`; the connection-level
- * `DatabaseStatements#transaction` exists in trails
- * (`connection-adapters/abstract/database-statements.ts:568`) but does not
- * establish the `ar_current_transaction` execution-state scope that
- * `ClassMethods#transaction` above installs, so reaching it directly would drop
- * `currentTransaction()` inside the block. Converging means moving that scope
- * down to the connection — tracked as
- * `converge-current-transaction-scope-onto-connection`.
  */
 export async function withTransactionReturningStatus<T>(
   this: Base,
@@ -498,7 +470,7 @@ export async function withTransactionReturningStatus<T>(
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
     const hadOuterTransaction = currentTransaction() !== null || connection.inTransaction;
 
-    await transaction(modelClass, async () => {
+    await dbTransaction.call(connection as any, async () => {
       // Enroll record with the TransactionManager so it fires committedBang/
       // rolledbackBang after the transaction commits or rolls back. The TM-driven
       // rolledbackBang path calls restoreTransactionRecordState which reads the
@@ -656,11 +628,9 @@ const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
  *
  * Ruby's `args << options` mutates the caller's splat array, and so does this;
  * the filters are copied out first because `extractOptionsBang` answers `args`
- * itself when the last element is not a Hash. `on:` is dropped from the options
- * rather than left in place as Ruby leaves it: ActiveModel's chain validates
- * `on:` itself and has no ActiveRecord `transaction_include_any_action?` to
- * build, so a surviving `on:` would be re-validated against the `before_commit`
- * event and rejected.
+ * itself when the last element is not a Hash. `:on` stays in the options
+ * afterwards, exactly as `transactions.rb:334-341` leaves it, so `set_callback`
+ * sees it again.
  *
  * @internal
  *
@@ -684,7 +654,6 @@ export function setOptionsForCallbacksBang(
     const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
     assertValidTransactionAction(fireOn);
     const existingIf = options.if;
-    delete options.on;
     options.if = [
       (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
       ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
