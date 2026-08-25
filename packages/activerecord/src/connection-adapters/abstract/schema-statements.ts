@@ -619,7 +619,7 @@ export class SchemaStatements {
    * Mirrors: `SchemaStatements#rename_table` (`schema_statements.rb:524-526`).
    */
   async renameTable(_tableName: string, _newName: string): Promise<void> {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:524
     throw new NotImplementedError("rename_table is not implemented");
   }
 
