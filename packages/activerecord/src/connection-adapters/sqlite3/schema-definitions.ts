@@ -9,17 +9,8 @@ import {
   ColumnDefinition,
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
-import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
-  constructor(
-    conn: TableDefinitionConn,
-    name: string,
-    options: { id?: boolean | "uuid"; [key: string]: unknown } = {},
-  ) {
-    super(conn, name, options);
-  }
-
   override references(name: string, options: Record<string, unknown> = {}): this {
     return super.references(name, { type: "integer", ...options } as any);
   }

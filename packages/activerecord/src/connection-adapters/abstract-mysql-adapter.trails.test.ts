@@ -13,25 +13,13 @@ import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
-<<<<<<< HEAD
   return new Column(
     "id",
     null,
-    { sqlType: "bigint", extra: opts.autoIncrement ? "auto_increment" : "" },
+    new TypeMetadata({ sqlType: "bigint" }, { extra: opts.autoIncrement ? "auto_increment" : "" }),
     false,
     { defaultFunction: opts.defaultFunction ?? null },
   );
-||||||| parent of 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
-  return new Column("id", null, { sqlType: "bigint" }, false, {
-    autoIncrement: opts.autoIncrement ?? false,
-    defaultFunction: opts.defaultFunction ?? null,
-  });
-=======
-  return new Column("id", null, new TypeMetadata({ sqlType: "bigint" }), false, {
-    autoIncrement: opts.autoIncrement ?? false,
-    defaultFunction: opts.defaultFunction ?? null,
-  });
->>>>>>> 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
 }
 
 describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {

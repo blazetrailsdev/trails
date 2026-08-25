@@ -8,13 +8,10 @@ describe("MysqlColumn", () => {
     const original = new MysqlColumn(
       "id",
       null,
-<<<<<<< HEAD
-      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8, extra: "auto_increment" },
-||||||| parent of 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
-      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
-=======
-      new TypeMetadata({ sqlType: "bigint(20) unsigned", type: "integer", limit: 8 }),
->>>>>>> 735272b86 (refactor(activerecord): positional conn in TableDefinition, adapter TypeMetadata in Column subclasses, one CREATE INDEX body (RFC 0051, RFC 0096))
+      new TypeMetadata(
+        { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
+        { extra: "auto_increment" },
+      ),
       false,
     );
     const coder: Record<string, unknown> = {};
@@ -66,7 +63,11 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     const meta = new TypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255 });
     expect(meta.extra).toBeNull();
 
-    const col = new MysqlColumn("name", null, { sqlType: "varchar(255)", type: "string" });
+    const col = new MysqlColumn(
+      "name",
+      null,
+      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+    );
     expect(col.extra).toBeNull();
     expect(col.isAutoIncrement()).toBe(false);
     expect(col.isVirtual()).toBe(false);
