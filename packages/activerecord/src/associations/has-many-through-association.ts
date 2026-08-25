@@ -254,18 +254,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     block?: (record: Base) => void,
   ): Base | null {
     this.ensureNotNested();
-    // Rails captures `scope` here inside the caller's `scoping` block, so a
-    // scoped build (`post.people.where(readers: { skimmer: true }).create`)
-    // sees the relation's values. trails carries that relation on the owner's
-    // proxy as `_pendingThroughScope` (association-relation.ts:153) instead of
-    // a current-scope stack, so prefer it when one is in flight.
-    const pendingThroughScope = (
-      this.owner._collectionProxies.get(this.reflection.name) as
-        | { _pendingThroughScope?: unknown }
-        | undefined
-    )?._pendingThroughScope;
-    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope =
-      pendingThroughScope ?? (this as unknown as { scope?: () => unknown }).scope?.();
+    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = (
+      this as unknown as { scope?: () => unknown }
+    ).scope?.();
     try {
       // Rails' `super` lands in `ThroughAssociation#build_record`
       // (through_association.rb:116-129) first; the module is not in the TS

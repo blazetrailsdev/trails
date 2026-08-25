@@ -44,8 +44,16 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * returns the plain `Association` instance when this relation was built
    * by `Association#targetScope()` for internal scope merging.
    */
-  get proxyAssociation(): CollectionProxy<T> | Association {
-    return this._association;
+  get proxyAssociation(): Association {
+    // Rails' `@association` is always the `Association` itself; trails' seat
+    // holds the owner's `CollectionProxy` on the user-facing path, so unwrap it
+    // here — `Association#scope`'s
+    // `klass.current_scope.proxy_association == self` branch
+    // (association.rb:110) compares against the association.
+    const association = this._association as CollectionProxy<T> & {
+      proxyAssociation?: Association;
+    };
+    return association.proxyAssociation ?? (this._association as Association);
   }
 
   /**
@@ -115,28 +123,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Build an unsaved associated record. Merges the relation's scope
-   * attributes (e.g. `where(title: "X")` → `{ title: "X" }`) with the
-   * caller's attrs, then delegates to the association so the FK (and, for
-   * polymorphic, the `*_type`) is set and the record is pushed onto the
-   * loaded target.
-   *
-   * Mirrors: ActiveRecord::AssociationRelation#_new / #build
-   */
-  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
-  build(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (r: T) => void,
-  ): T | T[] {
-    if (Array.isArray(attrs)) {
-      return attrs.map((a) => this.build(a, block));
-    }
-    const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).build(merged, block);
-  }
-
-  /**
    * Find the first record matching the current scope, or build one (unsaved).
    * Routes build through the association so the FK and polymorphic type are
    * set even when the owner is unsaved (no FK in the where clause).
@@ -150,64 +136,33 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Build and persist an associated record through the owning association.
-   *
-   * Mirrors: ActiveRecord::AssociationRelation#_create / #create
+   * Mirrors: ActiveRecord::AssociationRelation#_new (association_relation.rb:31-33).
+   * The `scoping {}` wrap lives in `Relation#build` (relation.rb:125-132), so
+   * `Association#scope` sees this relation as the current scope while the
+   * record is built.
    */
-  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
-  async create(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (r: T) => void,
-  ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
-      const records: T[] = [];
-      for (const a of attrs) records.push(await this.create(a, block));
-      return records;
-    }
-    const merged = { ...this.scopeForCreate(), ...attrs };
-    // `_association` is the owner's `CollectionProxy` when this relation was
-    // spawned off the proxy, and the OO association when it came from
-    // `Association#scope` (the `delegate(*QueryMethods, to: :scope)` path,
-    // collection_proxy.rb:1128-1137). `HasManyThroughAssociation#build_record`
-    // reads the in-flight scope back off the owner's cached proxy, so resolve
-    // that proxy here rather than stamping the association object.
-    const assoc = this._association as unknown as {
-      owner?: { _collectionProxies?: Map<string, unknown> };
-      reflection?: { name: string };
-    };
-    const proxy = (assoc.owner?._collectionProxies?.get(assoc.reflection?.name ?? "") ??
-      this._association) as CollectionProxy<T> & { _pendingThroughScope?: unknown };
-    const prev = proxy._pendingThroughScope;
-    proxy._pendingThroughScope = this;
-    try {
-      return await proxy.create(merged, block);
-    } finally {
-      proxy._pendingThroughScope = prev;
-    }
+  protected override _new(attributes: Record<string, unknown>): T {
+    return (this._association as CollectionProxy<T>).build(attributes);
   }
 
   /**
-   * Build and persist an associated record, raising on validation failure.
-   * Delegates to `CollectionProxy#createBang`, which throws `RecordInvalid`
-   * directly so FK + loaded-target wiring stay in sync with the non-bang
-   * path.
-   *
-   * Mirrors: ActiveRecord::AssociationRelation#_create! / #create!
+   * Mirrors: ActiveRecord::AssociationRelation#_create (association_relation.rb:35-37).
    */
-  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
-  async createBang(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (r: T) => void,
-  ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
-      const records: T[] = [];
-      for (const a of attrs) records.push(await this.createBang(a, block));
-      return records;
-    }
-    const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).createBang(merged, block);
+  protected override _create(
+    attributes: Record<string, unknown>,
+    block?: (record: T) => void,
+  ): Promise<T> {
+    return (this._association as CollectionProxy<T>).create(attributes, block);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AssociationRelation#_create! (association_relation.rb:39-41).
+   */
+  protected override _createBang(
+    attributes: Record<string, unknown>,
+    block?: (record: T) => void,
+  ): Promise<T> {
+    return (this._association as CollectionProxy<T>).createBang(attributes, block);
   }
 
   /**

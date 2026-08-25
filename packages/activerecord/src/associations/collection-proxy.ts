@@ -425,6 +425,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * behind the proxy's back.
    */
   private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
+    // `CollectionAssociation#load_target` reaches `find_target` only through
+    // `find_target?` (collection_association.rb:272-279, association.rb:190):
+    // a new-record owner without the foreign key present leaves `@target`
+    // unassigned rather than querying — and so never reaches `find_target`'s
+    // `violates_strict_loading?` raise (association.rb:248-250). The predicate
+    // is read off the owner's own holder, whose rich reflection answers
+    // `active_record_primary_key`; the load itself still runs on a fresh holder
+    // for the reason above.
+    if (
+      !queryExecutor &&
+      !(
+        this._collectionAssociation() as unknown as { findTargetNeeded(): boolean }
+      ).findTargetNeeded()
+    ) {
+      return [];
+    }
     const { _buildAssociationInstance } = await import("./instance-methods.js");
     const assoc = _buildAssociationInstance.call(this._record, this.reflection) as unknown as {
       _queryExecutor?: () => Promise<Base[]>;

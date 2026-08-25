@@ -32,7 +32,6 @@ import type { Association as AssociationInstance } from "./associations/associat
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import {
-  underscore,
   constantize,
   registerConstant,
   unregisterConstant,
@@ -45,10 +44,7 @@ import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
-import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { foreignKeyPresentFor } from "./associations/foreign-association.js";
-import { ThroughAssociation } from "./associations/through-association.js";
 
 /**
  * **Rails parity note:** Rails' `Associations.eager_load!` uses Ruby's
@@ -1247,77 +1243,6 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
     return;
   }
   holder._setTargetFromLoader(result as Base | Base[] | null);
-}
-
-/**
- * Whether a lazy load would actually reach `find_target` — and therefore
- * `violates_strict_loading?`. Rails gates the strict-loading check inside
- * `find_target`, which `find_target?` only enters under macro-specific rules:
- *
- *   - has_one/has_many/habtm (`Association#find_target?`, association.rb:320):
- *     `!loaded? && (!owner.new_record? || foreign_key_present?) && klass` — a
- *     persisted owner always reaches it; a *new* owner only when the FK is
- *     present.
- *   - belongs_to (`BelongsToAssociation#find_target?`,
- *     belongs_to_association.rb:124): `!loaded? && foreign_key_present? && klass`
- *     — there is NO new-record short-circuit; the owner-side FK must be present
- *     even for a persisted owner. (Mirrors the OO belongs_to override of
- *     `findTargetNeeded` in belongs-to-association.ts.)
- *
- * So a strict-loading owner that never reaches `find_target` returns nil/[]
- * silently. This returns false for exactly those cases so callers can skip the
- * violation, matching `find_target?` / `null_scope?`.
- *
- * `foreign_key_present?` has the same two-branch dispatch used by the OO
- * association (`CollectionAssociation#foreignKeyPresent`, which the proxy's
- * `null_scope?` delegates to): a belongs_to reads the
- * owner-side FK columns; a `:through` routes through its belongs_to
- * (`ThroughAssociation#foreign_key_present?`); a vanilla has_one/has_many/habtm
- * requires the owner's `active_record_primary_key`
- * (`ForeignAssociation#foreign_key_present?`).
- *
- * @internal
- */
-export function _findTargetReachable(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-  kind: "belongsTo" | "foreign",
-): boolean {
-  if (kind === "belongsTo") {
-    return _associationForeignKeyPresent(record, assocName, options, kind);
-  }
-  if (!record.isNewRecord()) return true;
-  return _associationForeignKeyPresent(record, assocName, options, kind);
-}
-
-function _associationForeignKeyPresent(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-  kind: "belongsTo" | "foreign",
-): boolean {
-  const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (options.through) {
-    // No association instance here, so the module's `self` is an owner /
-    // reflection pair that inherits the module — Ruby reaches
-    // `foreign_key_present?` off the association it always has in hand.
-    return reflection
-      ? ThroughAssociation.foreignKeyPresent.call({
-          ...ThroughAssociation,
-          owner: record,
-          reflection,
-        })
-      : false;
-  }
-  if (kind === "belongsTo") {
-    const fk = options.foreignKey ?? options.queryConstraints;
-    const fkNames =
-      typeof fk === "string" ? [fk] : Array.isArray(fk) ? fk : [`${underscore(assocName)}_id`];
-    return fkNames.every((name) => record._readAttribute(name) != null);
-  }
-  return reflection ? foreignKeyPresentFor(reflection as AssociationReflection, record) : false;
 }
 
 /**

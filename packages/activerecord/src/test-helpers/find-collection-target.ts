@@ -4,7 +4,7 @@ import { _buildAssociationInstance } from "../associations/instance-methods.js";
 
 /**
  * Runs a has_many load the way `CollectionProxy` and the through loaders do —
- * `find_target` (`association.rb:248`) on an association holder — for an
+ * `load_target` (`association.rb:189-195`) on an association holder — for an
  * options set that is not necessarily the declared one.
  *
  * The holder is built fresh rather than taken from `record.association(name)`
@@ -12,8 +12,8 @@ import { _buildAssociationInstance } from "../associations/instance-methods.js";
  * suppression, its inverse wiring) untouched, which is what these tests want
  * when they drive the loader directly.
  *
- * Test-only sugar: `find_target` is protected, as in Rails, so every call site
- * would otherwise repeat the same cast. `async` so `check_validity!` — run when
+ * Test-only sugar: every call site would otherwise repeat the same cast.
+ * `async` so `check_validity!` — run when
  * the holder is built, as in `Association#initialize` (`association.rb:41-45`) —
  * surfaces as a rejection like every other load failure.
  *
@@ -44,5 +44,10 @@ export async function findCollectionTarget(
     scope: positionalScope,
     options,
   });
-  return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
+  // `load_target` rather than `find_target`: the `find_target?` gate lives
+  // there (association.rb:190), and `CollectionProxy` now loads through it too.
+  const loaded = await (
+    assoc as unknown as { loadTarget(): Promise<Base[] | Base | null> | Base[] | Base | null }
+  ).loadTarget();
+  return (loaded ?? []) as Base[];
 }

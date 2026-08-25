@@ -792,7 +792,7 @@ export class Relation<T extends Base> {
     modelClass.setCurrentScope(this as any);
     let record: T;
     try {
-      record = new this._model(attrs) as T;
+      record = this._new(attrs);
     } finally {
       modelClass.setCurrentScope(prev);
     }
@@ -3071,15 +3071,15 @@ export class Relation<T extends Base> {
     };
   }
 
-  private _new(attributes: Record<string, unknown>): T {
+  protected _new(attributes: Record<string, unknown>): T {
     return new (this.model as any)(attributes) as T;
   }
 
-  private _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
+  protected _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
     return (this.model as any).create(attributes, block);
   }
 
-  private _createBang(
+  protected _createBang(
     attributes: Record<string, unknown>,
     block?: (record: T) => void,
   ): Promise<T> {
