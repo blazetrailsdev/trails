@@ -20,13 +20,14 @@ import { ActiveRecord } from "./ar-config.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
-import { Transaction } from "./connection-adapters/abstract/transaction.js";
+import {
+  CURRENT_TRANSACTION_KEY,
+  Transaction,
+} from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 
 type TransactionAction = "create" | "update" | "destroy";
-
-const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
 
 /**
  * Get the currently active transaction, if any.
@@ -96,38 +97,17 @@ export async function transaction<T>(
     }
   }
 
-  // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
-  // runs inside `with_connection { |c| c.transaction(...) }` and threads the
-  // yielded connection. Taking the yielded connection (the block parameter
-  // connection) instead of the deprecated `.connection` getter keeps the build/
-  // callback path from flipping the lease permanent under
-  // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
-  // releases the connection once the transaction completes.
-  return modelClass.withConnection(async (adapter) => {
-    const result = await dbTransaction.call(
-      adapter as any,
-      async (userTx?: unknown) => {
-        let internalTx: Transaction;
-        if (userTx instanceof Transaction) {
-          internalTx = userTx;
-        } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
-          internalTx = (userTx as any)._internalTransaction;
-        } else {
-          const tmCurrent = (adapter as any).currentTransaction?.();
-          internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
-        }
-        return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
-          const publicTx =
-            userTx instanceof PublicTransaction ? userTx : internalTx.userTransaction;
-          return fn(publicTx);
-        });
-      },
-      {
-        requiresNew: options?.requiresNew,
-        isolation: options?.isolation,
-        joinable: options?.joinable,
-      },
-    );
+  // Taking the yielded connection (the block parameter connection) instead of
+  // the deprecated `.connection` getter keeps the build/callback path from
+  // flipping the lease permanent under `permanent_connection_checkout =
+  // :deprecated | :disallowed`, so the pool releases the connection once the
+  // transaction completes.
+  return modelClass.withConnection(async (connection) => {
+    const result = await dbTransaction.call(connection as any, fn as (tx?: unknown) => Promise<T>, {
+      requiresNew: options?.requiresNew,
+      isolation: options?.isolation,
+      joinable: options?.joinable,
+    });
     return result as T | undefined;
   });
 }
@@ -165,6 +145,14 @@ type TransactionCallbackFilter<T extends typeof Model> =
   | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
   | CallbackObject
   | string;
+/**
+ * Rails' `*args` on the transaction macros: the filters `set_callback` takes,
+ * optionally closed by the options Hash `set_options_for_callbacks!` extracts.
+ */
+type TransactionCallbackArgs<T extends typeof Model> = (
+  | TransactionCallbackFilter<T>
+  | CallbackOptions
+)[];
 type CallbackOptions = {
   // Rails takes any Symbol here and rejects a bad one at runtime, in
   // `assert_valid_transaction_action` (transactions.rb:344-348) — so the type
@@ -189,89 +177,76 @@ export const InstanceMethods = {
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#before_commit */
 export function beforeCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined);
-  setCallback.call(this, "before_commit", "before", fn, args);
+  setOptionsForCallbacksBang(args);
+  setCallback.call(this, "before_commit", "before", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_commit */
 export function afterCommit<T extends typeof Model>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(
-    options as Record<string, unknown> | undefined,
-    prependOption(),
-  );
-  setCallback.call(this, "commit", "after", fn, args);
+  setOptionsForCallbacksBang(args, prependOption());
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_save_commit */
 export function afterSaveCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: ["create", "update"],
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_create_commit */
 export function afterCreateCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "create",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_update_commit */
 export function afterUpdateCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "update",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_destroy_commit */
 export function afterDestroyCommit<T extends typeof Base>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(options as Record<string, unknown> | undefined, {
+  setOptionsForCallbacksBang(args, {
     on: "destroy",
     ...prependOption(),
   });
-  setCallback.call(this, "commit", "after", fn, args);
+  setCallback.call(this, "commit", "after", ...args);
 }
 
 /** Mirrors: ActiveRecord::Transactions::ClassMethods#after_rollback */
 export function afterRollback<T extends typeof Model>(
   this: T,
-  fn: TransactionCallbackFilter<T>,
-  options?: CallbackOptions,
+  ...args: TransactionCallbackArgs<T>
 ): void {
-  const args = setOptionsForCallbacksBang(
-    options as Record<string, unknown> | undefined,
-    prependOption(),
-  );
-  setCallback.call(this, "rollback", "after", fn, args);
+  setOptionsForCallbacksBang(args, prependOption());
+  setCallback.call(this, "rollback", "after", ...args);
 }
 
 /**
@@ -284,7 +259,9 @@ export function afterRollback<T extends typeof Model>(
  * `*filter_list` is untyped in Ruby and stays open here so the macros above can
  * forward their own `TransactionCallbackFilter<T>` through it. Rails leaves
  * `:on` in the Hash it hands to `super`, where an unknown key is ignored;
- * trails' `assertValidKeys` rejects it, so it comes off first.
+ * trails' `assertValidKeys` rejects it, so it comes off at that seam — after
+ * this body's own guard, and for every event, since `before_commit` reaches
+ * `super` with the `:on` `set_options_for_callbacks!` left in place.
  */
 export function setCallback<T extends typeof Model>(
   this: T,
@@ -301,8 +278,8 @@ export function setCallback<T extends typeof Model>(
       (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
       ...kernelArray(options.if),
     ];
-    delete options.on;
   }
+  delete options.on;
 
   (Model.setCallback as (this: T, name: string, ...args: unknown[]) => void).call(
     this,
@@ -488,11 +465,11 @@ export async function withTransactionReturningStatus<T>(
   // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
   // connection is taken from the block parameter rather than re-read off the
   // deprecated `.connection` getter, matching Rails.
-  await modelClass.withConnection(async (adapter) => {
+  await modelClass.withConnection(async (connection) => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
+    const hadOuterTransaction = currentTransaction() !== null || connection.inTransaction;
 
-    await transaction(modelClass, async () => {
+    await dbTransaction.call(connection as any, async () => {
       // Enroll record with the TransactionManager so it fires committedBang/
       // rolledbackBang after the transaction commits or rolls back. The TM-driven
       // rolledbackBang path calls restoreTransactionRecordState which reads the
@@ -650,42 +627,39 @@ const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 /**
  * Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
  *
- * Ruby mutates `args` in place; TS returns the merged option hash instead —
- * the callers bind it straight back into the `set_callback` call, so the
- * mutation is not observable. `on:` is dropped from the returned hash rather
- * than left in place as Ruby leaves it: ActiveModel's chain validates `on:`
- * itself and has no ActiveRecord `transaction_include_any_action?` to build,
- * so a surviving `on:` would be re-validated against the `before_commit`
- * event and rejected.
+ * Ruby's `args << options` mutates the caller's splat array, and so does this;
+ * the filters are copied out first because `extractOptionsBang` answers `args`
+ * itself when the last element is not a Hash. `:on` stays in the options
+ * afterwards, exactly as `transactions.rb:334-341` leaves it, so `set_callback`
+ * sees it again.
  *
  * @internal
  *
  * @missingRailsCall merge! — PERMANENT: Reviewed (RFC 0106 wave 4c): Ruby's
  *   `args.extract_options!.merge!(enforced_options)` mutates the extracted hash
- *   in place; TS returns a fresh merged object via spread because the caller
- *   binds the result straight into `set_callback`, so there is no in-place
- *   `merge!` to name.
+ *   in place; TS builds the merged object with a spread rather than writing the
+ *   enforced keys into the caller's own options literal, so there is no
+ *   in-place `merge!` to name.
  */
 export function setOptionsForCallbacksBang(
-  options: Record<string, unknown> | undefined,
+  args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
-): Record<string, unknown> {
-  const merged = { ...options, ...enforcedOptions };
+): void {
+  const [rest, extracted] = extractOptionsBang(args);
+  const options: Record<string, unknown> = { ...extracted, ...enforcedOptions };
+  const filterList = [...rest];
+  args.length = 0;
+  args.push(...filterList, options);
 
-  if (merged.on !== undefined) {
-    const fireOn = (Array.isArray(merged.on) ? merged.on : [merged.on]) as string[];
+  if (options.on !== undefined) {
+    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
     assertValidTransactionAction(fireOn);
-    const { on: _on, if: existingIf, ...rest } = merged;
-    return {
-      ...rest,
-      if: [
-        (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
-        ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
-      ],
-    };
+    const existingIf = options.if;
+    options.if = [
+      (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
+      ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+    ];
   }
-
-  return merged;
 }
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action

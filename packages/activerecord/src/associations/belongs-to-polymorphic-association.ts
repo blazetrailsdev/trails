@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { modelRegistry } from "../associations.js";
 import { baseClass, demodulize } from "../inheritance.js";
-import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
 /**
@@ -34,19 +33,20 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * Also check if the type column has changed, not just the FK.
    */
   override isTargetChanged(): boolean {
-    return super.isTargetChanged() || this.owner.attributeChanged(this.foreignTypeName());
+    return super.isTargetChanged() || this.owner.attributeChanged(this.reflection.foreignType!);
   }
 
   override isTargetPreviouslyChanged(): boolean {
     return (
       super.isTargetPreviouslyChanged() ||
-      this.owner.attributePreviouslyChanged(this.foreignTypeName())
+      this.owner.attributePreviouslyChanged(this.reflection.foreignType!)
     );
   }
 
   override isSavedChangeToTarget(): boolean {
     return (
-      super.isSavedChangeToTarget() || this.owner.isSavedChangeToAttribute(this.foreignTypeName())
+      super.isSavedChangeToTarget() ||
+      this.owner.isSavedChangeToAttribute(this.reflection.foreignType!)
     );
   }
 
@@ -76,7 +76,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     record: Base | null,
     { force = false }: { force?: boolean } = {},
   ): void {
-    const typeCol = this.foreignTypeName();
+    const typeCol = this.reflection.foreignType!;
     // Rails: writes record.class.polymorphic_name, which is the Ruby class
     // name (including "::" for namespaced classes). JS class names can't
     // contain "::", so deriving purely from `constructor.name` would
@@ -148,15 +148,6 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 
   /**
-   * Derive the type column name. Returns `options.foreignType` when provided,
-   * otherwise falls back to `${underscore(assocName)}_type`. Mirrors the same
-   * logic in `loadBelongsTo` so reads and writes use the same column.
-   */
-  private foreignTypeName(): string {
-    return this.reflection.options.foreignType ?? `${underscore(this.reflection.name)}_type`;
-  }
-
-  /**
    * Mirror of MacroReflection#activeRecordRegistryName plus a
    * "preserve existing value" rule: when the owner already stores a
    * foreign_type that points to this record's class, keep it (covers
@@ -200,7 +191,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 
   private readForeignType(): string | null {
-    const ft = this.foreignTypeName();
+    const ft = this.reflection.foreignType!;
     const value =
       typeof (this.owner as any)._readAttribute === "function"
         ? (this.owner as any)._readAttribute(ft)

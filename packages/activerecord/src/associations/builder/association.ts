@@ -143,6 +143,9 @@ export class Association {
         name,
         scope,
         options: { ...options },
+        get foreignType(): string | null {
+          return (reflection as { foreignType?: string | null }).foreignType ?? null;
+        },
       },
     ];
 

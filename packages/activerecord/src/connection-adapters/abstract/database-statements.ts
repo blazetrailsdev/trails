@@ -27,7 +27,9 @@ import {
 
 import type { Quoting } from "./quoting.js";
 import type { ConnectionPool, NullPool } from "./connection-pool.js";
-import { TransactionManager } from "./transaction.js";
+import { CURRENT_TRANSACTION_KEY, Transaction, TransactionManager } from "./transaction.js";
+import { Transaction as UserTransaction } from "../../transaction.js";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { exceedsBindParamsLimit } from "./database-limits.js";
 import { Result } from "../../result.js";
 import {
@@ -567,10 +569,33 @@ export async function truncateTables(
  */
 export async function transaction<T>(
   this: DatabaseStatementsHost,
-  fn: (tx?: unknown) => Promise<T> | T,
+  block: (tx?: unknown) => Promise<T> | T,
   options: { requiresNew?: boolean; isolation?: string; joinable?: boolean } = {},
 ): Promise<T | undefined> {
   const { requiresNew, isolation, joinable = true } = options;
+
+  // Ruby reads the open transaction back off the connection
+  // (`current_transaction`, `transaction.rb:352-354`); trails holds it in
+  // execution state, installed here so every block this method runs — however
+  // the transaction below is opened — sees it as `ActiveRecord.current_transaction`.
+  const fn = (userTx?: unknown): Promise<T> | T => {
+    let internalTx: Transaction;
+    if (userTx instanceof Transaction) {
+      internalTx = userTx;
+    } else if (
+      userTx &&
+      (userTx as { _internalTransaction?: unknown })._internalTransaction instanceof Transaction
+    ) {
+      internalTx = (userTx as { _internalTransaction: Transaction })._internalTransaction;
+    } else {
+      const tmCurrent = this.currentTransaction?.();
+      internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(this as never);
+    }
+    return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
+      const publicTx = userTx instanceof UserTransaction ? userTx : internalTx.userTransaction;
+      return block(publicTx);
+    });
+  };
 
   const currentTxn = this.currentTransaction?.();
   const currentTxnJoinable =

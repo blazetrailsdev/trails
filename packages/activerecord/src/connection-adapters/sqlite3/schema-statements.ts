@@ -193,10 +193,10 @@ export async function virtualTableExists(
 }
 
 export function createSchemaDumper(
-  source: unknown,
+  this: DatabaseAdapter,
   options: Record<string, unknown> = {},
 ): AbstractSchemaDumper {
-  return SchemaDumper.create(source as Parameters<typeof SchemaDumper.create>[0], options);
+  return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
 }
 
 /** @internal */

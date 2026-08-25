@@ -201,6 +201,14 @@ export interface AssociationDefinition {
   isInverseUpdatesCounterCache?: () => unknown;
   /** Rails' `AbstractReflection#klass`. See {@link macro}. */
   klass?: typeof Base;
+  /**
+   * Rails' `AssociationReflection#foreign_type` — the polymorphic `*_type`
+   * column (`attr_reader`, reflection.rb:514; assigned at :520). Carried on the
+   * lightweight definitions too
+   * (`builder/association.rb`'s `Reflection.create` result answers it), so a
+   * polymorphic `belongs_to` reaches it the way Rails does. See {@link macro}.
+   */
+  foreignType?: string | null;
 }
 
 /**

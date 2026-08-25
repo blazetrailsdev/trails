@@ -13,6 +13,7 @@
  */
 
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { ColumnInfo, IndexInfo, SchemaSource } from "../../schema-dumper.js";
 
 /**
@@ -44,11 +45,11 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** Mirrors `def self.create(connection, options)` (abstract/schema_dumper.rb:8-10). */
   static override create<T extends typeof BaseSchemaDumper>(
     this: T,
-    connection: SchemaSource,
+    connection: SchemaSource | DatabaseAdapter,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     return new (this as unknown as new (
-      connection: SchemaSource,
+      connection: SchemaSource | DatabaseAdapter,
       options: Record<string, unknown>,
     ) => InstanceType<T>)(connection, options);
   }

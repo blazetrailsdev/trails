@@ -15,6 +15,16 @@ import {
 import { ActiveRecord } from "../../ar-config.js";
 
 /**
+ * The execution-state slot holding the connection's open transaction, which is
+ * what `ActiveRecord.current_transaction` (`transactions.rb:236-238`) reads and
+ * `DatabaseStatements#transaction` installs. It lives here, beside the
+ * `Transaction` it holds, because both that installer and the reader import it.
+ *
+ * @internal
+ */
+export const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
+
+/**
  * Equality-keyed lookup of the candidate instance whose transactional
  * callbacks should fire for a given logical row.
  *
