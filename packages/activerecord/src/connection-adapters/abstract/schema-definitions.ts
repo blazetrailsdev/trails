@@ -466,21 +466,25 @@ export class CheckConstraintDefinition {
     name: string | null | undefined;
     expression?: string;
     validate?: boolean | null;
+    [key: string]: unknown;
   }): boolean {
     // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
-    // ...): it matches on name (and validate) only — the expression is accepted
-    // but never compared (it is used upstream to derive the name). A raw-string
-    // expression compare would spuriously fail against the adapter's normalized
+    // validate: nil, **options) (schema_definitions.rb:189-195). The expression is
+    // accepted but never compared (it is used upstream to derive the name); a
+    // raw-string compare would spuriously fail against the adapter's normalized
     // form (e.g. PostgreSQL's `pg_get_constraintdef`). The validate arm mirrors
-    // `validate.nil? || validate == self.options.fetch(:validate, validate)`
-    // (schema_definitions.rb:193): with `:validate` unstored the fetch falls back
-    // to the lookup value, so the comparison is trivially true — the getter's
-    // `true` default must not stand in for it.
+    // `validate.nil? || validate == self.options.fetch(:validate, validate)`:
+    // with `:validate` unstored the fetch falls back to the lookup value, so the
+    // comparison is trivially true — the getter's `true` default must not stand
+    // in for it.
+    const { name, expression: _expression, validate, ...rest } = options;
+    const sliced = Object.entries(rest).filter(([k]) => k in this.options);
+    // Ruby `nil.to_s` is "" (schema_definitions.rb:194), not "null".
+    const toS = (v: unknown): string => (v == null ? "" : String(v));
     return (
-      this.name === (options.name == null ? "" : options.name.toString()) &&
-      (options.validate == null ||
-        !("validate" in this.options) ||
-        options.validate === this.validate)
+      this.name === (name == null ? "" : name.toString()) &&
+      (validate == null || !("validate" in this.options) || validate === this.validate) &&
+      sliced.every(([k, v]) => toS((this.options as Record<string, unknown>)[k]) === toS(v))
     );
   }
 }

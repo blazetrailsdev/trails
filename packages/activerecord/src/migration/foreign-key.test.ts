@@ -94,6 +94,23 @@ class CreateSchoolsAndClassesMigration extends SilentMigration {
   }
 }
 
+class CreateRocketsMigration extends SilentMigration {
+  async change(): Promise<void> {
+    // Dropped by this migration's own `migrate("down")` in the caller's finally
+    // block, which the rule can't see from here.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("rockets", (t) => {
+      t.string("name");
+    });
+
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await this.createTable("astronauts", (t) => {
+      t.string("name");
+      t.references("rocket", { foreignKey: true });
+    });
+  }
+}
+
 describeIfSupports("foreign_keys", "Migration", () => {
   describe("ForeignKeyInCreateTest", () => {
     fixtures([]);
@@ -672,11 +689,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
       try {
         // These live in this test's own `:memory:` connection, disconnected in
         // the finally below — nothing to collide with a sibling fork.
-        // eslint-disable-next-line blazetrails/require-table-teardown
+
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
-        // eslint-disable-next-line blazetrails/require-table-teardown
+
         await connection.createTable("astronauts", { force: true }, (t) => {
           t.string("name");
           t.references("rocket");
@@ -1040,21 +1057,21 @@ describeIfSupports("foreign_keys", "Migration", () => {
         Base.tableNameSuffix = "";
       });
 
+      // Rails' setup/teardown: `@migration.migrate(:up)` / `(:down)` — the bare
+      // `rockets` / `astronauts` names travel Migration#method_missing's
+      // proper_table_name, which is what the WithPrefix / WithSuffix subclasses
+      // exist to cover (foreign_key_test.rb:34-43, :47-64).
       const withChangeColumnTables = async (
         body: (conn: AbstractAdapter) => Promise<void>,
       ): Promise<void> => {
         const conn = await ambientConnection();
         await conn.dropTable(astronauts, rockets, { ifExists: true });
-        await conn.createTable(rockets, {}, (t) => {
-          t.string("name");
-        });
-        await conn.createTable(astronauts, {}, (t) => {
-          t.string("name");
-          t.references("rocket", { foreignKey: true });
-        });
+        const migration = new CreateRocketsMigration();
+        await migration.migrate("up");
         try {
           await body(conn);
         } finally {
+          await migration.migrate("down");
           await conn.dropTable(astronauts, rockets, { ifExists: true });
         }
       };
