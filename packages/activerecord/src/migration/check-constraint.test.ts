@@ -4,6 +4,7 @@ import { Base } from "../base.js";
 import { NotImplementedError, StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
+import { rubyInspectHash } from "../relation/ruby-inspect.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
@@ -429,7 +430,7 @@ describe("Migration", () => {
       ).rejects.toThrow(ArgumentError);
 
       expect(error?.message).toBe(
-        `Table 'trades' has no check constraint for {name: "quantity_check"}`,
+        `Table 'trades' has no check constraint for ${rubyInspectHash({ name: "quantity_check" })}`,
       );
 
       await assertNothingRaised(() =>
