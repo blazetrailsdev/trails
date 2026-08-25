@@ -772,12 +772,12 @@ export function yamlEncoder(this: SchemaHost): YAMLEncoder {
  * :string` defs have no column. Callers needing the AM Type — for
  * casting, dirty tracking, comparison — should use `typeForAttribute`
  * instead. Returns a NullColumn for unknown names (model_schema.rb:463-468)
- * so `column.null`, `column.type`, etc. remain safely accessible.
+ * so `column.null`, `column.type`, etc. remain safely accessible. `fetch` with
+ * a block, not `??`: a stored column wins even when falsy.
  */
 export function columnForAttribute(this: SchemaHost, name: string): any {
   loadSchema.call(this);
   const hash = getColumnsHash(this);
-  // `fetch` with a block, not `??`: a stored column wins even when falsy.
   return name in hash ? hash[name] : new NullColumn(name);
 }
 

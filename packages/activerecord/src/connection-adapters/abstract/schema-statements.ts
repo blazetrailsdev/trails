@@ -2232,15 +2232,18 @@ export class SchemaStatements {
     return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
   }
 
-  /** @internal */
+  /**
+   * Mirrors: SchemaStatements#check_constraint_for!
+   * (schema_statements.rb:1802-1806) — the raise interpolates the options
+   * Hash, so the message carries Ruby's `{name: "x"}` rendering, not JSON's.
+   * @internal
+   */
   async checkConstraintForBang(
     tableName: string,
     { expression, ...options }: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition> {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
-      // schema_statements.rb:1803-1806 interpolates the options Hash, so the
-      // message carries Ruby's `{name: "x"}` rendering, not JSON's.
       throw new ArgumentError(
         `Table '${tableName}' has no check constraint for ${expression ?? rubyInspectHash(options)}`,
       );

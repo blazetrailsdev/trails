@@ -97,12 +97,12 @@ describe("Column", () => {
 
 describe("NullColumn", () => {
   it("has empty name", () => {
-    const col = new NullColumn();
+    const col = new NullColumn("");
     expect(col.name).toBe("");
   });
 
   it("has null default", () => {
-    const col = new NullColumn();
+    const col = new NullColumn("");
     expect(col.default).toBeNull();
   });
 

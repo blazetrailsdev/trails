@@ -225,7 +225,7 @@ export type ColumnCoder = Record<string, unknown>;
  * Mirrors: ActiveRecord::ConnectionAdapters::NullColumn
  */
 export class NullColumn extends Column {
-  constructor(name: string = "") {
+  constructor(name: string) {
     super(name, null);
   }
 }

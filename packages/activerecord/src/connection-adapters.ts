@@ -70,7 +70,8 @@ export function register(name: string, loader: AdapterLoader): void {
 
 /**
  * Synchronous half of `resolve(name)` — Rails does this check inline, but
- * trails' sync callers can't await the dynamic import.
+ * trails' sync callers can't await the dynamic import. Raises the same
+ * AdapterNotFound `resolve` raises (connection_adapters.rb:34-39).
  *
  * @internal
  */
@@ -87,7 +88,9 @@ export function validateAdapterName(adapterName: string): void {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters.resolve
  *
- * Resolves an adapter name to its class.
+ * Resolves an adapter name to its class. The AdapterNotFound message is built
+ * inline as Rails builds it (connection_adapters.rb:34-39), with its
+ * gem/Gemfile pair rendered as the JS package/package.json one.
  */
 export async function resolve(adapterName: string): Promise<AdapterClass> {
   const cached = resolved.get(adapterName);
@@ -95,8 +98,6 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
 
   const loader = adapters.get(adapterName);
   if (!loader) {
-    // connection_adapters.rb:34-39 builds this message inline, with its
-    // gem/Gemfile pair rendered as the JS package/package.json one.
     const err = new AdapterNotFound(
       `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
         `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
