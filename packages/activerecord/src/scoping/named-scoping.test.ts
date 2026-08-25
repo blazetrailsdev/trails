@@ -254,9 +254,11 @@ describe("NamedScopingTest", () => {
     const conflicts = ["records", "toArray", "toSql", "explain"];
     for (const name of conflicts) {
       const klass = class extends Post {};
-      expect(() => (klass as any).scope(name, (q: any) => q.where({ approved: true }))).toThrow(
-        new RegExp(`You tried to define a scope named "${name}" on the model`),
-      );
+      expect(() =>
+        (klass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
+      ).toThrow(new RegExp(`You tried to define a scope named "${name}" on the model`));
     }
   });
 
@@ -428,20 +430,28 @@ describe("NamedScopingTest", () => {
     for (const name of conflicts) {
       const re = new RegExp(`You tried to define a scope named "${name}" on the model`);
       expect(() =>
-        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedKlass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).toThrow(re);
       expect(() =>
-        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedSubklass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).toThrow(re);
     }
 
     const nonConflicts = ["findByTitle", "approved", "pub", "pri", "pro", "open"];
     for (const name of nonConflicts) {
       expect(() =>
-        (ReservedKlass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedKlass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).not.toThrow();
       expect(() =>
-        (ReservedSubklass as any).scope(name, (q: any) => q.where({ approved: true })),
+        (ReservedSubklass as any).scope(name, function (this: any) {
+          return this.where({ approved: true });
+        }),
       ).not.toThrow();
     }
   });

@@ -32,7 +32,7 @@ interface ScopeRegistryLike {
   setCurrentScope(model: unknown, scope: unknown): void;
 }
 
-type ScopeBody = (rel: ScopeInternals) => unknown;
+type ScopeBody = (this: ScopeInternals) => unknown;
 
 const model = Post as unknown as {
   scope(name: string, body: ScopeBody): void;
@@ -73,11 +73,11 @@ describe("SpawnAlreadyInScopeTest", () => {
     const currentScope = model.where({ type: "SpecialPost" });
     let spawned: ScopeInternals | undefined;
 
-    defineAndCallScope("spawnsInsideBody", (rel) => {
+    defineAndCallScope("spawnsInsideBody", function () {
       withCurrentScope(currentScope, () => {
-        spawned = rel.spawn();
+        spawned = this.spawn();
       });
-      return rel;
+      return this;
     });
 
     expect(await spawned!.toSql()).toMatch(/SpecialPost/);
@@ -94,14 +94,14 @@ describe("SpawnAlreadyInScopeTest", () => {
     let flagAfterBody: boolean | undefined;
     let bodyRelation: ScopeInternals | undefined;
 
-    defineAndCallScope("checksBothConditions", (rel) => {
-      bodyRelation = rel;
+    defineAndCallScope("checksBothConditions", function () {
+      bodyRelation = this;
       const registry = model.scopeRegistry();
-      flagWithoutScope = rel.isAlreadyInScope(registry);
-      withCurrentScope(rel, (reg) => {
-        flagWithScope = rel.isAlreadyInScope(reg);
+      flagWithoutScope = this.isAlreadyInScope(registry);
+      withCurrentScope(this, (reg) => {
+        flagWithScope = this.isAlreadyInScope(reg);
       });
-      return rel;
+      return this;
     });
 
     withCurrentScope(bodyRelation, (registry) => {
@@ -116,12 +116,12 @@ describe("SpawnAlreadyInScopeTest", () => {
   test("clones do not inherit the delegate-to-model flag", () => {
     let clonedFlag: boolean | undefined;
 
-    defineAndCallScope("clonedInBody", (rel) => {
-      const cloned = rel.clone();
+    defineAndCallScope("clonedInBody", function () {
+      const cloned = this.clone();
       withCurrentScope(cloned, (registry) => {
         clonedFlag = cloned.isAlreadyInScope(registry);
       });
-      return rel;
+      return this;
     });
 
     // Rails' `initialize_copy` ends in `reset`, which clears the flag. If it
@@ -131,9 +131,9 @@ describe("SpawnAlreadyInScopeTest", () => {
   });
 
   test("chaining inside a scope body accumulates conditions", async () => {
-    const scoped = defineAndCallScope("chainedInBody", (rel) =>
-      rel.where({ type: "Post" }).where({ title: "Welcome to the weblog" }),
-    ) as ScopeInternals;
+    const scoped = defineAndCallScope("chainedInBody", function () {
+      return this.where({ type: "Post" }).where({ title: "Welcome to the weblog" });
+    }) as ScopeInternals;
 
     const sql = await scoped.toSql();
     expect(sql).toMatch(/type/);
