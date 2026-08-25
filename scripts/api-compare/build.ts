@@ -17,7 +17,8 @@
  *   - tags for now-satisfied calls are dropped (human-authored reasons are
  *     harvested to stdout, never destroyed unseen). A call is "now-satisfied"
  *     only where the artifact carries an expectation for the declaration; a tag
- *     on a declaration the artifact says nothing about is preserved verbatim;
+ *     on a declaration the artifact says nothing about is preserved verbatim
+ *     and reported INERT — it suppresses nothing and never will (RFC 0106);
  *   - existing tags that still apply are kept byte-for-byte (idempotent:
  *     a second run produces zero edits);
  *   - a tag with no reason fails the run (see the empty-reason contract in
@@ -506,9 +507,13 @@ export function reconcileFileText(
    *  declaration the artifact does know — a genuine convergence, reported so
    *  the receipt does not vanish unseen. */
   harvested: { tsName: string; entry: TagEntry }[];
-  /** Tags left exactly as written on a declaration the artifact carries no
-   *  expectation for. Nothing here was migrated, and nothing here was dropped. */
-  preserved: { tsName: string; entry: TagEntry }[];
+  /** Tags on a declaration the artifact carries no expectation for: compare.ts
+   *  matched no Ruby method onto it, so the tag suppresses nothing and never
+   *  will. Distinct from a STALE tag, which DID suppress a flag that has since
+   *  converged. Left exactly as written — nothing here was migrated, and
+   *  nothing here was dropped — and reported so the tree can be swept
+   *  (RFC 0106). */
+  inert: { tsName: string; entry: TagEntry }[];
   /** Every (rubyName, call) the file now tags with a real justification — kept
    *  and newly-added alike. These are the baseline rows the tag supersedes, so
    *  `main` drops them from the split baseline in the same operation (RFC
@@ -527,7 +532,7 @@ export function reconcileFileText(
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
-  const preserved: { tsName: string; entry: TagEntry }[] = [];
+  const inert: { tsName: string; entry: TagEntry }[] = [];
   const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
   const skipped: string[] = [];
@@ -591,7 +596,7 @@ export function reconcileFileText(
         onlyCall,
       );
       if (!exp) {
-        preserved.push(
+        inert.push(
           ...entries
             .filter((entry) => !isStale(entry.call))
             .map((entry) => ({ tsName: name, entry })),
@@ -635,12 +640,12 @@ export function reconcileFileText(
     .filter(([k]) => !seen.has(k))
     .map(([, e]) => e.tsName)
     .sort();
-  if (edits.length === 0) return { text: null, harvested, preserved, tagged, unmatched, skipped };
+  if (edits.length === 0) return { text: null, harvested, inert, tagged, unmatched, skipped };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested, preserved, tagged, unmatched, skipped };
+  return { text: out, harvested, inert, tagged, unmatched, skipped };
 }
 
 /** (tsFile → tsName → expectation) for one package: every call the artifact
@@ -1003,14 +1008,7 @@ async function main(argv: string[]): Promise<number> {
         console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
         return 1;
       }
-      const {
-        text: next,
-        harvested,
-        preserved,
-        tagged,
-        unmatched,
-        skipped: fileSkipped,
-      } = reconciled;
+      const { text: next, harvested, inert, tagged, unmatched, skipped: fileSkipped } = reconciled;
       skipped += fileSkipped.length;
       for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
       for (const h of harvested) {
@@ -1019,10 +1017,13 @@ async function main(argv: string[]): Promise<number> {
             `longer flagged there, so its receipt is retired. Reason it carried: ${h.entry.reason}`,
         );
       }
-      for (const kept of preserved) {
+      for (const dead of inert) {
+        const at = dead.entry.line === undefined ? declFile : `${declFile}:${dead.entry.line}`;
         console.log(
-          `preserved ${tag} on ${declFile} ${kept.tsName} for \`${kept.entry.call}\` — no ` +
-            "expectation for that declaration in the artifact; the tag is left exactly as written.",
+          `INERT ${tag} at ${at} on ${dead.tsName} for \`${dead.entry.call}\` — no expectation ` +
+            "for that declaration in the artifact, so the tag suppresses nothing and never " +
+            "will; delete it, or re-site it on the declaration whose flag it is meant to " +
+            "suppress. Left exactly as written.",
         );
       }
       if (unmatched.length > 0) {

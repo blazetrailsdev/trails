@@ -6,12 +6,10 @@
 
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
   serial: boolean;
-  oid: number | null;
-  fmod: number | null;
   array: boolean;
   identity: string | null;
   generated: string | null;
@@ -39,24 +37,34 @@ export class Column extends BaseColumn {
       generated?: string | null;
     } = {},
   ) {
-    const meta = new SqlTypeMetadata({
-      sqlType: sqlTypeMetadata.sqlType ?? undefined,
-      type: sqlTypeMetadata.type,
-      limit: sqlTypeMetadata.limit ?? undefined,
-      precision: sqlTypeMetadata.precision ?? undefined,
-      scale: sqlTypeMetadata.scale ?? undefined,
-    });
+    const meta = new TypeMetadata(
+      {
+        sqlType: sqlTypeMetadata.sqlType ?? undefined,
+        type: sqlTypeMetadata.type,
+        limit: sqlTypeMetadata.limit ?? undefined,
+        precision: sqlTypeMetadata.precision ?? undefined,
+        scale: sqlTypeMetadata.scale ?? undefined,
+      },
+      { oid: sqlTypeMetadata.oid, fmod: sqlTypeMetadata.fmod },
+    );
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
       comment: options.comment,
     });
     this.serial = options.serial ?? false;
-    this.oid = sqlTypeMetadata.oid ?? null;
-    this.fmod = sqlTypeMetadata.fmod ?? null;
     this.array = options.array ?? sqlTypeMetadata.sqlType?.endsWith("[]") ?? false;
     this.identity = options.identity ?? null;
     this.generated = options.generated ?? null;
+  }
+
+  // Mirrors: `delegate :oid, :fmod, to: :sql_type_metadata` (postgresql/column.rb:7).
+  get oid(): number | null {
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.oid ?? null;
+  }
+
+  get fmod(): number | null {
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
   }
 
   // Mirrors: Column#sql_type — strips the array suffix so callers get the
@@ -130,8 +138,6 @@ export class Column extends BaseColumn {
   override initWith(coder: ColumnCoder): void {
     super.initWith(coder);
     this.serial = (coder["serial"] as boolean) ?? false;
-    this.oid = (coder["oid"] as number | null) ?? null;
-    this.fmod = (coder["fmod"] as number | null) ?? null;
     this.array = (coder["array"] as boolean) ?? false;
     this.identity = (coder["identity"] as string | null) ?? null;
     this.generated = (coder["generated"] as string | null) ?? null;

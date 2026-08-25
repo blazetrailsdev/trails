@@ -903,8 +903,11 @@ export abstract class SchemaDumper {
    * Emit inline check-constraint `t.checkConstraint(...)` lines inside the
    * createTable block. Mirrors Rails' `SchemaDumper#check_constraints_in_create`:
    * only the validated constraints go inline; the not-valid ones are returned as
-   * the `remaining` stream of `ctx.addCheckConstraint(...)` calls the caller
-   * prints after the block.
+   * the `remaining` block of `ctx.addCheckConstraint(...)` calls the caller
+   * prints after the block. Rails' `remaining` StringIO takes one `puts`
+   * (schema_dumper.rb:303), so its analogue is one joined block — the shape the
+   * valid arm pushes (`:292`) — rather than a stream object: `table()` already
+   * treats a pushed entry containing newlines as one block.
    * @internal
    *
    * @missingRailsCall any? — PERMANENT: Ruby's block-less `any?` (schema_dumper.rb:284) is
@@ -952,7 +955,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `  await ctx.addCheckConstraint(${tableNameStr}, ${expr}${optStr});`;
       });
-      return addCheckConstraintStatements.sort();
+      return [addCheckConstraintStatements.sort().join("\n")];
     }
     return undefined;
   }

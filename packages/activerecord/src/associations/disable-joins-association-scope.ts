@@ -233,12 +233,8 @@ export class DisableJoinsAssociationScope extends AssociationScope {
    *
    * Mirrors: DisableJoinsAssociationScope#add_constraints (lines 33-56).
    *
-   * @missingRailsCall add_constraints — PERMANENT: Rails' subclass method shadows
-   * `AssociationScope#add_constraints` with a different arity, which Ruby
-   * permits. TypeScript rejects a derived declaration of a name the base
-   * declares `private` (TS2415), and the two signatures are not
-   * override-compatible, so the `Dj` suffix is the only spelling available;
-   * `scope()` still calls it at both of Rails' call sites.
+   * The `Dj` suffix is a TS2415 workaround, justified where the flag is
+   * actually raised — `scope()`'s `@missingRailsCall` receipt above.
    */
   private _addConstraintsDj(
     reflection: ChainEntry,

@@ -354,10 +354,10 @@ describe("reconcileFileText", () => {
     const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const r = reconcileFileText("foo.ts", FILE, expectations, () => DEFAULT_TAG_REASON);
     expect(r.harvested.map((h) => h.entry.reason)).toEqual(["placeholder to drop"]);
-    expect(r.preserved).toEqual([]);
+    expect(r.inert).toEqual([]);
   });
 
-  it("preserves a pre-existing tag on a declaration the artifact knows nothing about", () => {
+  it("reports a pre-existing tag on a declaration the artifact knows nothing about as inert", () => {
     // The PR #6873 loss: migrating one method's rows rewrote the JSDoc of every
     // declaration in the file, and a reviewed receipt on an unrelated one — with
     // no baseline row anywhere to put it back — was deleted on a `harvested`
@@ -380,13 +380,35 @@ describe("reconcileFileText", () => {
     expect(r.text!).toContain("@missingRailsCall save — PERMANENT: x");
     expect(r.text!).toContain("@missingRailsCall with_raw_connection — PERMANENT: escapes inline.");
     expect(r.harvested).toEqual([]);
-    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([
+    expect(r.inert.map((p) => [p.tsName, p.entry.call])).toEqual([
       ["quoteString", "with_raw_connection"],
     ]);
     // And a second run over the result is still a no-op.
     expect(
       reconcileFileText("foo.ts", r.text!, expectations, () => "PERMANENT: x").text,
     ).toBeNull();
+  });
+
+  it("names the file:line an inert tag is written on", () => {
+    // The INERT report has to name a site the operator can open: the tag is on
+    // a declaration with no Rails counterpart, so nothing else in the run
+    // points at it (RFC 0106).
+    const src = [
+      "export class Foo {",
+      "  /**",
+      "   * Mirrors Rails `Foo#bar`.",
+      "   */",
+      "  bar(): void {}",
+      "",
+      "  /**",
+      "   * @missingRailsCall with_raw_connection — PERMANENT: escapes inline.",
+      "   */",
+      "  _quoteStringTs(): void {}",
+      "}",
+    ].join("\n");
+    const expectations = new Map([owned("Foo", "bar", new Set(["save"]))]);
+    const r = reconcileFileText("foo.ts", src, expectations, () => "PERMANENT: x");
+    expect(r.inert.map((p) => [p.tsName, p.entry.line])).toEqual([["_quoteStringTs", 8]]);
   });
 
   it("retires a tag compare.ts reports stale, and only that one", () => {
@@ -417,7 +439,7 @@ describe("reconcileFileText", () => {
     expect(r.text!).not.toContain("@missingRailsCall logger");
     expect(r.text!).toContain("@missingRailsCall with_raw_connection — PERMANENT: escapes inline.");
     expect(r.harvested.map((h) => [h.tsName, h.entry.call])).toEqual([["bar", "logger"]]);
-    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([
+    expect(r.inert.map((p) => [p.tsName, p.entry.call])).toEqual([
       ["quoteString", "with_raw_connection"],
     ]);
   });
@@ -450,7 +472,7 @@ describe("reconcileFileText", () => {
     expect(r.text!).toContain("@missingRailsCall logger — PERMANENT: reviewed elsewhere.");
     expect(r.text!).not.toContain("@missingRailsCall logger — PERMANENT: no logger yet.");
     expect(r.harvested.map((h) => [h.tsName, h.entry.call])).toEqual([["bar", "logger"]]);
-    expect(r.preserved.map((p) => [p.tsName, p.entry.call])).toEqual([["bar", "logger"]]);
+    expect(r.inert.map((p) => [p.tsName, p.entry.call])).toEqual([["bar", "logger"]]);
   });
 
   it("is idempotent: a second run produces zero edits", () => {
@@ -967,7 +989,7 @@ describe("@missingRailsArgs receipts (--kind args)", () => {
       ARGS_TAG,
     );
     expect(r.text!).not.toContain(ARGS_TAG);
-    expect(r.preserved).toEqual([]);
+    expect(r.inert).toEqual([]);
   });
 
   it("justifiesArgs demands a permanence claim the call-set tag does not", () => {

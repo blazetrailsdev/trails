@@ -3056,12 +3056,6 @@ export class PostgreSQLAdapter
    * (XmlData, BitData, Range, ArrayData) fall through to the base dispatch.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
-   *
-   * @missingRailsCall check_int_in_range — PERMANENT: Equivalent (RFC 0072
-   *   activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is
-   *   a bare alias — `export const checkIntInRange = checkIntegerRange` — so the
-   *   routed call is the alias target and the extractor never sees the alias
-   *   name. Nothing to converge.
    */
   override quote(value: unknown): string {
     return pgQuote.call(this, value);
@@ -3071,15 +3065,6 @@ export class PostgreSQLAdapter
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_string
    * (postgresql/quoting.rb:127-131) — escape-only, so the inherited `quote`
    * dispatches here instead of the abstract backslash-doubling escape.
-   *
-   * @missingRailsCall with_raw_connection — PERMANENT: Language shortcoming: Rails'
-   *   quote_string escapes through the live connection (`with_raw_connection {
-   *   |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres
-   *   exposes no escape entry point at all — sync or async — and `quote_string`
-   *   is a sync method every `quote` call site depends on. The override
-   *   reproduces libpq's standard_conforming_strings escaping inline in
-   *   postgresql/quoting.ts (same divergence already baselined for that module's
-   *   quote_string).
    */
   override quoteString(s: string): string {
     return pgQuoteString(s);
@@ -3348,44 +3333,35 @@ export class PostgreSQLAdapter
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
     await this.clearCacheBang();
-    const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(tableName);
-    const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
     await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteColumnName(unqualifiedNew)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
     // Rails reads max_identifier_length here, which lazily runs the SHOW query
     // on first use; warm the memo so the truncation limit is the real server
     // value rather than the synchronous fallback.
-    const maxLen = await this.warmMaxIdentifierLength();
-    const renamedName = oldSchema
-      ? `${this.quoteColumnName(oldSchema)}.${this.quoteColumnName(unqualifiedNew)}`
-      : unqualifiedNew;
-    const result = await this.pkAndSequenceFor(renamedName).catch(() => null);
+    const maxIdentifierLength = await this.warmMaxIdentifierLength();
+    const result = await this.pkAndSequenceFor(newName);
     if (result) {
       const [pk, seq] = result;
-      const pkeySuffix = "_pkey";
-      const maxPkeyPrefix = maxLen - pkeySuffix.length;
-      const oldIdx = `${unqualifiedOld.slice(0, maxPkeyPrefix)}${pkeySuffix}`;
-      const newIdx = `${unqualifiedNew.slice(0, maxPkeyPrefix)}${pkeySuffix}`;
-      const qualifiedOldIdx = oldSchema
-        ? `${this.quoteColumnName(oldSchema)}.${this.quoteColumnName(oldIdx)}`
-        : this.quoteColumnName(oldIdx);
-      // Always rename the pkey index when a PK exists (mirrors Rails schema_statements.rb:443-445).
-      await this.exec(
-        `ALTER INDEX IF EXISTS ${qualifiedOldIdx} RENAME TO ${this.quoteColumnName(newIdx)}`,
+      // postgresql/schema_statements.rb:442-443: PostgreSQL automatically creates an index for
+      // PRIMARY KEY with name consisting of truncated table name and "_pkey" suffix fitting into
+      // max_identifier_length number of characters.
+      const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
+      const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
+      const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
+      await this.execute(
+        `ALTER INDEX ${this.quoteTableName(idx)} RENAME TO ${this.quoteTableName(newIdx)}`,
       );
-      if (seq) {
-        const seqSuffix = `_${pk}_seq`;
-        const maxSeqPrefix = maxLen - seqSuffix.length;
-        const expectedOldSeq = `${unqualifiedOld.slice(0, maxSeqPrefix)}${seqSuffix}`;
-        if (seq.identifier === expectedOldSeq) {
-          const newSeqName = `${unqualifiedNew.slice(0, maxSeqPrefix)}${seqSuffix}`;
-          await this.exec(
-            `ALTER SEQUENCE IF EXISTS ${seq.quoted()} RENAME TO ${this.quoteColumnName(newSeqName)}`,
-          );
-        }
+
+      // postgresql/schema_statements.rb:448-449: PostgreSQL automatically creates a sequence for
+      // PRIMARY KEY with name consisting of truncated table name and "#{primary_key}_seq" suffix
+      // fitting into max_identifier_length number of characters.
+      const maxSeqPrefix = maxIdentifierLength - `_${pk}_seq`.length;
+      if (seq && seq.identifier === `${tableName.slice(0, maxSeqPrefix)}_${pk}_seq`) {
+        const newSeq = `${newName.slice(0, maxSeqPrefix)}_${pk}_seq`;
+        await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
       }
     }
     await this.renameTableIndexes(tableName, newName);
@@ -3738,15 +3714,16 @@ export class PostgreSQLAdapter
     fmod: number,
   ): Promise<PgTypeMetadata> {
     const castType = await this.getOidType(oid, fmod, columnName, sqlType);
-    return new PgTypeMetadata({
-      sqlType,
-      type: castType.type(),
-      oid,
-      fmod,
-      limit: castType.limit ?? null,
-      precision: castType.precision ?? null,
-      scale: castType.scale ?? null,
-    });
+    return new PgTypeMetadata(
+      {
+        sqlType,
+        type: castType.type(),
+        limit: castType.limit ?? null,
+        precision: castType.precision ?? null,
+        scale: castType.scale ?? null,
+      },
+      { oid, fmod },
+    );
   }
 
   /** @internal */
