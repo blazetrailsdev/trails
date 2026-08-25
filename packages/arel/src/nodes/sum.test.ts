@@ -1,30 +1,33 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel::Nodes::SumTest", () => {
   const users = new Table("users");
   describe("as", () => {
     it("should alias the sum", () => {
-      const sum = users.get("age").sum();
-      const aliased = sum.as("total_age");
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      expect(visitor.compile(aliased)).toBe('SUM("users"."age") AS total_age');
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(users.get("id").sum().as("foo"));
+      expect(sql).toBe('SUM("users"."id") AS foo');
     });
   });
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const w1 = new Nodes.Window();
-      const w2 = new Nodes.Window();
-      expect(w1.orders.length).toBe(w2.orders.length);
-      expect(w1.partitions.length).toBe(w2.partitions.length);
+      const array = [
+        new Nodes.Sum(["foo"] as unknown as Node[]),
+        new Nodes.Sum(["foo"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const s1 = new Nodes.NamedFunction("SUM", [users.get("id")]);
-      const s2 = new Nodes.NamedFunction("SUM", [users.get("name")]);
-      expect(s1.expressions[0]).not.toBe(s2.expressions[0]);
+      const array = [
+        new Nodes.Sum(["foo"] as unknown as Node[]),
+        new Nodes.Sum(["foo!"] as unknown as Node[]),
+      ];
+      expect(uniq(array).length).toBe(2);
     });
   });
 

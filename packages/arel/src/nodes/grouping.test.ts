@@ -1,27 +1,31 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { Nodes, Visitors } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("GroupingTest", () => {
-  const users = new Table("users");
   describe("equality", () => {
-    it("is not equal with different ivars", () => {
-      const w1 = new Nodes.Window();
-      const w2 = new Nodes.Window();
-      w2.order(users.get("id").asc());
-      expect(w1.orders.length).not.toBe(w2.orders.length);
+    it("is equal with equal ivars", () => {
+      const array = [
+        new Nodes.Grouping("foo" as unknown as Node),
+        new Nodes.Grouping("foo" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(1);
     });
 
-    it("is equal with equal ivars", () => {
-      const c1 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      const c2 = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-      expect(c1.name).toBe(c2.name);
+    it("is not equal with different ivars", () => {
+      const array = [
+        new Nodes.Grouping("foo" as unknown as Node),
+        new Nodes.Grouping("bar" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(2);
     });
   });
 
   it("should create Equality nodes", () => {
-    const grouped = new Nodes.Grouping(users.get("id").eq(1));
-    const sql = new Visitors.ToSql(fakeRecordConnection).compile(grouped);
-    expect(sql).toBe('("users"."id" = 1)');
+    const grouping = new Nodes.Grouping(new Nodes.Quoted("foo"));
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(grouping.eq("foo"));
+    expect(sql).toBe("('foo') = 'foo'");
   });
 });

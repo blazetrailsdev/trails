@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection, mysqlTestConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("TestBin", () => {
   it("new", () => {
@@ -9,15 +10,13 @@ describe("TestBin", () => {
   });
 
   it("equality with same ivars", () => {
-    const a = new Nodes.Bin("zomg");
-    const b = new Nodes.Bin("zomg");
-    expect(a).toEqual(b);
+    const array = [new Nodes.Bin("zomg"), new Nodes.Bin("zomg")];
+    expect(uniq(array).length).toBe(1);
   });
 
   it("inequality with different ivars", () => {
-    const a = new Nodes.Bin("zomg");
-    const b = new Nodes.Bin("zomg!");
-    expect(a).not.toEqual(b);
+    const array = [new Nodes.Bin("zomg"), new Nodes.Bin("zomg!")];
+    expect(uniq(array).length).toBe(2);
   });
 
   it("default to sql", () => {

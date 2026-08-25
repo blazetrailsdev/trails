@@ -6,11 +6,10 @@ import { uniq } from "../test-helpers/uniq.js";
 describe("Arel::Nodes::ExtractTest", () => {
   const users = new Table("users");
   it("should extract field", () => {
-    const createdAt = users.get("created_at");
-    const node = new Nodes.Extract(createdAt, "YEAR");
-    const visitor = new Visitors.ToSql(fakeRecordConnection);
-    const sql = visitor.compile(node);
-    expect(sql).toBe('EXTRACT(YEAR FROM "users"."created_at")');
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(
+      users.get("timestamp").extract("date"),
+    );
+    expect(sql).toBe('EXTRACT(DATE FROM "users"."timestamp")');
   });
 
   it("uppercases a lowercase field to match Rails", () => {
@@ -39,18 +38,19 @@ describe("Arel::Nodes::ExtractTest", () => {
 
   describe("as", () => {
     it("should alias the extract", () => {
-      const createdAt = users.get("created_at");
-      const node = new Nodes.Extract(createdAt, "MONTH").as("birth_month");
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      const sql = visitor.compile(node);
-      expect(sql).toBe('EXTRACT(MONTH FROM "users"."created_at") AS birth_month');
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
+        users.get("timestamp").extract("date").as("foo"),
+      );
+      expect(sql).toBe('EXTRACT(DATE FROM "users"."timestamp") AS foo');
     });
 
     it("should not mutate the extract", () => {
-      const original = new Nodes.Extract(users.get("created_at"), "YEAR");
-      const aliased = original.as("y");
-      expect(original).toBeInstanceOf(Nodes.Extract);
-      expect(aliased).toBeInstanceOf(Nodes.As);
+      const extract = users.get("timestamp").extract("date");
+      // Rails snapshots with `extract.dup`; arel's TS nodes carry no `dup`, so
+      // the untouched twin stands in for the copy.
+      const before = users.get("timestamp").extract("date");
+      extract.as("foo");
+      expect(extract.eql(before)).toBe(true);
     });
   });
 

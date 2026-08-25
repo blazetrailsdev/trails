@@ -1,19 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { testConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors, Table, star } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("CommentTest", () => {
   describe("equality", () => {
-    it("is not equal with different contents", () => {
-      const a = new Nodes.SqlLiteral("NOW()");
-      const b = new Nodes.SqlLiteral("CURRENT_TIMESTAMP");
-      expect(a.value).not.toBe(b.value);
+    it("is equal with equal contents", () => {
+      const array = [new Nodes.Comment(["foo"]), new Nodes.Comment(["foo"])];
+      expect(uniq(array).length).toBe(1);
     });
 
-    it("is equal with equal contents", () => {
-      const a = new Nodes.SqlLiteral("NOW()");
-      const b = new Nodes.SqlLiteral("NOW()");
-      expect(a.value).toBe(b.value);
+    it("is not equal with different contents", () => {
+      const array = [new Nodes.Comment(["foo"]), new Nodes.Comment(["bar"])];
+      expect(uniq(array).length).toBe(2);
     });
   });
 

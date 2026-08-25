@@ -1,38 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("TestInfixOperation", () => {
-  const users = new Table("users");
   it("construct", () => {
-    const a = users.get("age");
-    const b = new Nodes.Quoted(10);
-    const node = new Nodes.InfixOperation("||", a, b);
-    expect(node.operator).toBe("||");
-    expect(node.left).toBe(a);
-    expect(node.right).toBe(b);
+    const operation = new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node);
+    expect(operation.operator).toBe("+");
+    expect(operation.left).toBe(1);
+    expect(operation.right).toBe(2);
   });
 
   it("operation alias", () => {
-    const node = new Nodes.InfixOperation("+", users.get("a"), users.get("b"));
-    const aliased = node.as("total");
-    expect(aliased).toBeInstanceOf(Nodes.As);
+    const operation = new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node);
+    const aliaz = operation.as("zomg");
+    expect(aliaz).toBeInstanceOf(Nodes.As);
+    expect(aliaz.left).toBe(operation);
+    expect(String(aliaz.right)).toBe("zomg");
   });
 
   it("operation ordering", () => {
-    const node = new Nodes.UnaryOperation("-", users.get("age"));
-    expect(node.asc()).toBeInstanceOf(Nodes.Ascending);
-    expect(node.desc()).toBeInstanceOf(Nodes.Descending);
+    const operation = new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node);
+    const ordering = operation.desc();
+    expect(ordering).toBeInstanceOf(Nodes.Descending);
+    expect(ordering.expr).toBe(operation);
+    expect(ordering.isDescending()).toBeTruthy();
   });
 
   it("equality with same ivars", () => {
-    const a = new Nodes.InfixOperation("+", users.get("x"), new Nodes.Quoted(1));
-    const b = new Nodes.InfixOperation("+", users.get("x"), new Nodes.Quoted(1));
-    expect(a.operator).toBe(b.operator);
+    const array = [
+      new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node),
+      new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node),
+    ];
+    expect(uniq(array).length).toBe(1);
   });
 
   it("inequality with different ivars", () => {
-    const a = new Nodes.InfixOperation("+", users.get("x"), new Nodes.Quoted(1));
-    const b = new Nodes.InfixOperation("-", users.get("x"), new Nodes.Quoted(1));
-    expect(a.operator).not.toBe(b.operator);
+    const array = [
+      new Nodes.InfixOperation("+", 1 as unknown as Node, 2 as unknown as Node),
+      new Nodes.InfixOperation("+", 1 as unknown as Node, 3 as unknown as Node),
+    ];
+    expect(uniq(array).length).toBe(2);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../index.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("table alias", () => {
   const users = new Table("users");
@@ -14,16 +15,21 @@ describe("table alias", () => {
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const a = new Nodes.TableAlias(users, "u");
-      const b = new Nodes.TableAlias(users, "u");
-      expect(a).toEqual(b);
+      const relation1 = new Table("users");
+      const node1 = new Nodes.TableAlias(relation1, "foo");
+      const relation2 = new Table("users");
+      const node2 = new Nodes.TableAlias(relation2, "foo");
+      const array = [node1, node2];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.Window();
-      a.order(users.get("id").asc());
-      const b = new Nodes.Window();
-      expect(a.orders.length).not.toBe(b.orders.length);
+      const relation1 = new Table("users");
+      const node1 = new Nodes.TableAlias(relation1, "foo");
+      const relation2 = new Table("users");
+      const node2 = new Nodes.TableAlias(relation2, "bar");
+      const array = [node1, node2];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });
