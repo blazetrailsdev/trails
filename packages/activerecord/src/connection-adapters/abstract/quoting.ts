@@ -538,13 +538,9 @@ function typeCastedBinds(
   this: { typeCast: (v: unknown) => unknown },
   binds: unknown[] | null | undefined,
 ): unknown[] | undefined {
-  return binds?.map((value: any) => {
-    if (
-      value instanceof ModelAttribute ||
-      (value && typeof value === "object" && "valueForDatabase" in value)
-    ) {
-      const vfd = value.valueForDatabase;
-      return this.typeCast(typeof vfd === "function" ? value.valueForDatabase() : vfd);
+  return binds?.map((value: unknown) => {
+    if (value instanceof ModelAttribute) {
+      return this.typeCast(value.valueForDatabase);
     }
     return this.typeCast(value);
   });

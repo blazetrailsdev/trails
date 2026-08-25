@@ -38,7 +38,9 @@ function truthy(value: unknown): boolean {
  */
 interface ChainedBackend extends Base {
   initialized(): boolean;
+  /** @internal */
   initTranslations(): void;
+  /** @internal */
   translations(): TranslationData;
 }
 

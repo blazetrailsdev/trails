@@ -358,7 +358,6 @@ export class PostgreSQLAdapter
   }
 
   // Mirrors: PostgreSQLAdapter.create_unlogged_tables class_attribute (postgresql_adapter.rb:105).
-  // Pass this value as `unlogged` when constructing a PostgreSQL TableDefinition.
   static createUnloggedTables = false;
 
   /** Mirrors: PostgreSQLAdapter.decode_dates class_attribute (postgresql_adapter.rb:132). */
@@ -3688,10 +3687,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    const rest = options;
-    const unlogged =
-      (rest.unlogged as boolean | undefined) ?? PostgreSQLAdapter.createUnloggedTables;
-    return new PgTableDefinition(this, name, { ...rest, unlogged });
+    return new PgTableDefinition(this, name, options);
   }
 
   /** @internal */

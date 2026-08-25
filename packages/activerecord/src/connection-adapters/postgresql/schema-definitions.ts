@@ -11,6 +11,7 @@
 import { NotImplementedError } from "../../errors.js";
 import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -229,7 +230,6 @@ export class TableDefinition extends AbstractTableDefinition {
     name: string,
     options: {
       id?: boolean | "uuid";
-      unlogged?: boolean;
       options?: string;
       comment?: string;
       temporary?: boolean;
@@ -238,7 +238,7 @@ export class TableDefinition extends AbstractTableDefinition {
     } = {},
   ) {
     super(conn, name, options);
-    this.unlogged = options.unlogged ?? false;
+    this.unlogged = PostgreSQLAdapter.createUnloggedTables;
   }
 
   exclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): this {

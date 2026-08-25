@@ -127,9 +127,13 @@ export class KeyValue {
   links = links;
   flattenKeys = flattenKeys;
   flattenTranslations = flattenTranslations;
+  /** @internal */
   storeLink = storeLink;
+  /** @internal */
   resolveLink = resolveLink;
+  /** @internal */
   findLink = findLink;
+  /** @internal */
   escapeDefaultSeparator = escapeDefaultSeparator;
 
   /** @internal Ruby's `@translations` ivar, which `translations` memoizes into. */

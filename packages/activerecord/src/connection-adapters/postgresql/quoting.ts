@@ -265,22 +265,6 @@ export async function quoteDefaultExpression(
   return quote.call(this, serialized);
 }
 
-/**
- * `Type::Binary::Data` detection that survives a dep tree resolving two copies
- * of `@blazetrails/activemodel`, where a bare `instanceof` silently misses.
- * Same duck-typing rationale — and same shape — as `type_casted_binds`'
- * `Attribute` check in `abstract/quoting.ts`.
- */
-function isBinaryData(value: unknown): value is BinaryData {
-  if (value instanceof BinaryData) return true;
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    (value as { bytes?: unknown }).bytes instanceof Uint8Array &&
-    !(value instanceof Uint8Array)
-  );
-}
-
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // PG's date/time infinity sentinels are `Number.±Infinity`
   // (activemodel/src/type/internal/sentinels.ts:25), so they must be intercepted
@@ -290,13 +274,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // no Rails arm to mirror here.
   if (value === DateInfinity) return "infinity";
   if (value === DateNegativeInfinity) return "-infinity";
-  // Rails: `when Type::Binary::Data` (postgresql/quoting.rb:207). Detected
-  // duck-typed rather than by `instanceof` alone, for the same reason
-  // `type_casted_binds` duck-types its `Attribute` (abstract/quoting.ts:675-681):
-  // when the dep tree resolves two copies of `@blazetrails/activemodel` the
-  // `instanceof` silently misses and the wrapper reaches pg as a plain object,
-  // which node-postgres JSON-stringifies.
-  if (isBinaryData(value)) {
+  // Rails: `when Type::Binary::Data` (postgresql/quoting.rb:207).
+  if (value instanceof BinaryData) {
     // node-postgres binds Buffer as bytea natively (text-format hex literal).
     // Returning a Buffer over the existing Uint8Array preserves bytes
     // 128–255 that the prior `value.toString()` path corrupted via UTF-8

@@ -60,6 +60,7 @@ export function deepSymbolizeKeys(hash: TranslationData): TranslationData {
   return result;
 }
 
+/** @internal */
 function deepSymbolizeKeysInObject(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(deepSymbolizeKeysInObject);
   if (isHash(value)) return deepSymbolizeKeys(value);

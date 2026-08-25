@@ -325,6 +325,7 @@ export class Response {
     this.setHeader(EXPIRES, new Date(0).toUTCString());
   }
 
+  /** @internal */
   bufferedBodyBang(): boolean {
     return this.bufferedBody();
   }
@@ -357,6 +358,7 @@ export class Response {
     return this._buffered;
   }
 
+  /** @internal */
   append(chunk: string): string {
     this.body.push(chunk);
     if (this.length !== null) {

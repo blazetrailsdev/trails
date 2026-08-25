@@ -40,6 +40,8 @@ export interface LocatorModel {
    * (`(block: () => R | Promise<R>) => Promise<R>`) is assignable
    * without casts, and a synchronous duck-typed `unscoped(block) => R`
    * also works.
+   *
+   * @internal
    */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }

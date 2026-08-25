@@ -320,6 +320,7 @@ export class QueryParser {
   }
 }
 
+/** @internal */
 function unescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, " "));
 }

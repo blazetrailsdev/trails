@@ -28,7 +28,11 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_REGEX =
   /^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{1,2}-\d{1,2}[T \t]+\d{1,2}:\d{2}:\d{2}(\.[0-9]*)?(([ \t]*)Z|[-+]\d{2}?(:\d{2})?)?)$/;
 
-/** Mirrors the private `convert_dates_from` (json/decoding.rb:48-73). */
+/**
+ * Mirrors the private `convert_dates_from` (json/decoding.rb:48-73).
+ *
+ * @internal
+ */
 function convertDatesFrom(data: unknown): unknown {
   if (data == null) {
     return null;

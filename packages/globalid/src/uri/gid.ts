@@ -159,6 +159,7 @@ function normalizeModelId(raw: unknown, modelName: string): string | string[] {
   return parts.length === 1 ? parts[0] : parts;
 }
 
+/** @internal */
 function parseQueryParams(qs: string | undefined): Record<string, string> {
   if (!qs) return {};
   const result: Record<string, string> = {};
