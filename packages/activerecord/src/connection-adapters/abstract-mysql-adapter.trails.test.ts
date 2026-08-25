@@ -12,10 +12,13 @@ import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
-  return new Column("id", null, { sqlType: "bigint" }, false, {
-    autoIncrement: opts.autoIncrement ?? false,
-    defaultFunction: opts.defaultFunction ?? null,
-  });
+  return new Column(
+    "id",
+    null,
+    { sqlType: "bigint", extra: opts.autoIncrement ? "auto_increment" : "" },
+    false,
+    { defaultFunction: opts.defaultFunction ?? null },
+  );
 }
 
 describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {

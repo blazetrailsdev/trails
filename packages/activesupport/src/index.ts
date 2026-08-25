@@ -82,6 +82,8 @@ export {
   setExitCode,
   onSignal,
   setEnv,
+  abort,
+  SystemExit,
 } from "./process-adapter.js";
 export type { ProcessAdapter, WriteStream, ReadStream, SignalName } from "./process-adapter.js";
 

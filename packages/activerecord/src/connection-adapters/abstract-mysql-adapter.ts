@@ -830,7 +830,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
 
     if (!Object.prototype.hasOwnProperty.call(opts, "autoIncrement")) {
-      opts["autoIncrement"] = (column as any).autoIncrement ?? false;
+      opts["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
     }
 
     const td = this.createTableDefinition(tableName);
@@ -1821,7 +1821,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const options: ColumnOptions = {
       default: column.default,
       null: column.null,
-      autoIncrement: column.autoIncrement,
+      autoIncrement: column.isAutoIncrement(),
       comment: column.comment ?? undefined,
     };
 

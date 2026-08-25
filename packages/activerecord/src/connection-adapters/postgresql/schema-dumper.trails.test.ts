@@ -25,9 +25,12 @@ function makeColumn(
   return new Column(
     options.name ?? "id",
     null,
-    { sqlType: options.sqlType ?? options.type ?? "bigint", type: options.type ?? "integer" },
+    {
+      sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
+      type: options.type ?? "integer",
+    },
     true,
-    { serial: options.serial, array: options.array, generated: options.generated },
+    { serial: options.serial, generated: options.generated },
   );
 }
 

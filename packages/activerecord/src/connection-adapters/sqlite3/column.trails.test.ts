@@ -54,10 +54,26 @@ describe("SQLite3::Column JSON round-trip", () => {
     const back = Object.create(Column.prototype) as Column;
     back.initWith(JSON.parse(JSON.stringify(coder)));
 
+    // sqlite3/column.rb:35-42 carries `auto_increment` ALONE; `rowid` and
+    // `@generated_type` are dropped by a round-trip upstream too, so the
+    // restored ivars are nil/absent and every predicate over them is falsy.
+    expect(Object.keys(coder).sort()).toEqual(
+      [
+        "auto_increment",
+        "class",
+        "collation",
+        "comment",
+        "default",
+        "default_function",
+        "name",
+        "null",
+        "sql_type_metadata",
+      ].sort(),
+    );
     expect(back).toBeInstanceOf(Column);
     expect(back.autoIncrement).toBe(true);
-    expect(back.rowid).toBe(true);
-    expect(back.isVirtualStored()).toBe(true);
-    expect(back).toEqual(col);
+    expect(back.rowid).toBeUndefined();
+    expect(back.isVirtual()).toBe(false);
+    expect(back.isVirtualStored()).toBe(false);
   });
 });

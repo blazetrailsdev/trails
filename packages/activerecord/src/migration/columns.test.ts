@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import type { Column } from "../connection-adapters/column.js";
+import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
 import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../errors.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ambientConnection } from "../support/rocket-tables.js";
@@ -431,8 +432,8 @@ describe("Migration", () => {
         await connection.renameColumn("test_models", "id", "id_test");
         const renamed = (await connection.columns("test_models")).find(
           (c) => c.name === "id_test",
-        ) as (Column & { autoIncrement?: boolean }) | undefined;
-        expect(renamed?.autoIncrement).toBe(true);
+        ) as MysqlColumn | undefined;
+        expect(renamed?.isAutoIncrement()).toBe(true);
         void TestModel.resetColumnInformation();
       } finally {
         await connection.renameColumn("test_models", "id_test", "id");

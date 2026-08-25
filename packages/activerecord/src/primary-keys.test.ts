@@ -793,10 +793,10 @@ describe("PrimaryKeyIntegerTest", () => {
     //        assert_equal :integer, column.type
     //        assert_not_predicate column, :bigint?
     //        assert_predicate column, :unsigned?
-    expect(col.autoIncrement).toBe(true);
+    expect(col.isAutoIncrement()).toBe(true);
     expect(col.type).toBe("integer");
     expect(col.isBigint()).toBe(false);
-    expect(col.unsigned).toBe(true);
+    expect(col.isUnsigned()).toBe(true);
   });
 
   it.skipIf(adapterType !== "mysql")("bigint primary key with unsigned", async () => {
@@ -811,9 +811,9 @@ describe("PrimaryKeyIntegerTest", () => {
     //        assert_equal :integer, column.type
     //        assert_predicate column, :bigint?
     //        assert_predicate column, :unsigned?
-    expect(col.autoIncrement).toBe(true);
+    expect(col.isAutoIncrement()).toBe(true);
     expect(col.type).toBe("integer");
     expect(col.isBigint()).toBe(true);
-    expect(col.unsigned).toBe(true);
+    expect(col.isUnsigned()).toBe(true);
   });
 });

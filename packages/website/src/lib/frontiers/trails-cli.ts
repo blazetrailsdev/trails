@@ -44,8 +44,6 @@ function parseInput(input: string): ParsedInput {
   return { command, args, opts };
 }
 
-const MIGRATION_FILE_PATTERN = /^(\d+)[-_](.+)\.(?:ts|js)$/;
-
 // NOTE: The up/down implementations assume executeCode will register migrations
 // via deps.registerMigration. When executeCode is implemented, it must either:
 // (a) evaluate the file in a sandbox that exposes registerMigration, or
@@ -53,11 +51,13 @@ const MIGRATION_FILE_PATTERN = /^(\d+)[-_](.+)\.(?:ts|js)$/;
 //     proxy without the registry lookup.
 /**
  * The `MigrationContext` every `db:*` command runs through, over the browser's
- * virtual FS instead of a directory: Rails' `migration_files` /
- * `parse_migration_filename` (`migration.rb:1369-1376`) are private, and a Ruby
- * private method is still overridable by a subclass, so discovery is repointed
- * there and the run surface (`migrate` / `rollback` / `open` /
- * `migrations_status`) is inherited unchanged.
+ * virtual FS instead of a directory: Rails' `migration_files`
+ * (`migration.rb:1369-1372`) is private, and a Ruby private method is still
+ * overridable by a subclass, so discovery is repointed there and the run
+ * surface (`migrate` / `rollback` / `open` / `migrations_status`) is inherited
+ * unchanged. `parse_migration_filename` is NOT overridden — the inherited
+ * `migration.rb:1374-1376` regex already reads
+ * `db/migrate/<version>_<name>.ts`, scope group included.
  */
 class VfsMigrationContext extends MigrationContext {
   constructor(
@@ -78,23 +78,17 @@ class VfsMigrationContext extends MigrationContext {
       .sort();
   }
 
-  protected override parseMigrationFilename(filename: string): [string, string, string] | null {
-    const basename = filename.split("/").pop() ?? "";
-    const match = basename.match(MIGRATION_FILE_PATTERN);
-    if (!match) return null;
-    return [match[1], match[2].replace(/-/g, "_"), ""];
-  }
-
   override get migrations(): MigrationProxy[] {
     const migrations = this.migrationFiles().flatMap((path) => {
       const parsed = this.parseMigrationFilename(path);
       if (!parsed) return [];
-      const [rawVersion, name] = parsed;
+      const [rawVersion, name, scope] = parsed;
       return [
         {
           version: Number(rawVersion),
           name: camelize(name),
           filename: path,
+          scope: scope || undefined,
           migration: async (): Promise<Migration> => {
             const content = this.vfs.read(path)?.content;
             if (!content) throw new Error(`File not found: ${path}`);

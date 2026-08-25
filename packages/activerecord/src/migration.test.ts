@@ -15,6 +15,7 @@ import { adapterType } from "./test-adapter.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
@@ -2502,7 +2503,7 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
     const isAutoIncrement = async (): Promise<boolean> => {
       const cols = await adapter.columns("delete_me");
       const id = cols.find((c) => c.name === "id");
-      return (id as { autoIncrement?: boolean })?.autoIncrement === true;
+      return (id as MysqlColumn | undefined)?.isAutoIncrement() === true;
     };
 
     const ss = adapter;

@@ -22,6 +22,7 @@ import {
   isBlank,
   stdout,
   stderr,
+  abort,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
@@ -536,9 +537,8 @@ export class DatabaseTasks {
     // No blank-string special case — Rails only does File.exist?, so "" flows through
     // the same path (existsSync("") === false) and aborts with the filename in the message.
     if (!getFs().existsSync(filename)) {
-      throw new Error(
-        `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`,
-      );
+      const message = `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`;
+      abort(message);
     }
   }
 
@@ -1026,15 +1026,10 @@ export class DatabaseTasks {
    * Mirrors: `ActiveRecord::Tasks::DatabaseTasks#migrate_status`
    * (`database_tasks.rb:302-315`), which `databases.rake:230-232` calls rather
    * than inlining.
-   *
-   * The missing-table arm is Rails' `Kernel.abort` (`:304`) as a throw:
-   * `Kernel.abort` exits the process, which a library method has no business
-   * doing here, so the CLI's own error-to-exit-code path carries it. Same shape
-   * {@link checkSchemaFile} already takes for the same Ruby call.
    */
   static async migrateStatus(): Promise<void> {
     if (!(await this.migrationConnectionPool().schemaMigration.tableExists())) {
-      throw new Error("Schema migrations table does not exist yet.");
+      abort("Schema migrations table does not exist yet.");
     }
     const rows = await this.migrationConnectionPool().migrationContext.migrationsStatus();
     const center = (s: string, w: number) => {

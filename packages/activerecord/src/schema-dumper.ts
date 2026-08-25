@@ -357,8 +357,14 @@ class AdapterSchemaSource implements SchemaSource {
         isEnum: col.type === "enum" ? true : undefined,
         isSerial: (col as any).isSerial === true ? true : undefined,
         comment: col.comment ?? undefined,
-        autoIncrement: (col as any).autoIncrement === true ? true : undefined,
-        unsigned: (col as any).unsigned === true ? true : undefined,
+        autoIncrement:
+          (typeof (col as any).isAutoIncrement === "function"
+            ? (col as any).isAutoIncrement()
+            : (col as any).autoIncrement === true) || undefined,
+        unsigned:
+          (typeof (col as any).isUnsigned === "function"
+            ? (col as any).isUnsigned()
+            : (col as any).unsigned === true) || undefined,
         virtual: isVirtual ? true : undefined,
         virtualStored: isVirtual && isVirtualStored ? true : undefined,
         extra: (col as any).extra ?? undefined,
