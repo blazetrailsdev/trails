@@ -19,18 +19,6 @@ export class Builder {
   }
 }
 
-/**
- * Shallow clone of an Attribute that preserves the prototype chain, so
- * mutations on the clone don't bleed back into the schema-default prototype.
- *
- * Mirrors: `default.dup` in ActiveModel::LazyAttributeHash#assign_default_value
- *
- * @internal Rails-private helper.
- */
-function dupAttribute(attr: Attribute): Attribute {
-  return Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
-}
-
 /** Mirrors: ActiveModel::LazyAttributeSet */
 export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
@@ -75,7 +63,10 @@ export class LazyAttributeSet extends AttributeSet {
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = this._attributes.get(name);
     if (attr) {
-      return blockOrValue(attr, block);
+      // builder.rb:43 `attr.value(&block)`. trails' `Attribute#value` is a getter,
+      // so `Uninitialized#value`'s yield-the-name arm lives at the call site.
+      if (block !== undefined && attr instanceof Uninitialized) return block(name);
+      return attr.value;
     }
 
     if (this.castedValues.has(name)) return this.castedValues.get(name);
@@ -94,7 +85,9 @@ export class LazyAttributeSet extends AttributeSet {
       this.castedValues.set(name, casted);
       return casted;
     } else {
-      return blockOrValue(this.defaultAttribute(name, valuePresent, value), block);
+      const attr = this.defaultAttribute(name, valuePresent, value);
+      if (block !== undefined && attr instanceof Uninitialized) return block(name);
+      return attr.value;
     }
   }
 
@@ -136,25 +129,13 @@ export class LazyAttributeSet extends AttributeSet {
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
-      const built = attr ? dupAttribute(attr) : Attribute.uninitialized(name, type!);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
       this._attributes.set(name, built);
       return built;
     } else {
       return Attribute.null(name);
     }
   }
-}
-
-/**
- * Ruby's `attr.value(&block)`: an Uninitialized attribute yields its name to
- * the block, every other attribute ignores it (attribute.rb `Uninitialized#value`).
- *
- * @noRailsEquivalent Ruby passes the block through `value(&block)`; trails'
- *   `Attribute#value` is a getter, so the block arm lives at the call site.
- */
-function blockOrValue(attr: Attribute, block?: (name: string) => unknown): unknown {
-  if (block !== undefined && attr instanceof Uninitialized) return block(attr.name);
-  return attr.value;
 }
 
 /**
@@ -168,6 +149,7 @@ export class LazyAttributeHash {
   private values: Record<string, unknown>;
   private additionalTypes: Map<string, Type>;
   private defaultAttributes: Map<string, Attribute>;
+  private materialized: boolean;
 
   /**
    * Return a new map applying `fn` to each materialized Attribute.
@@ -233,35 +215,41 @@ export class LazyAttributeHash {
     this.types = types;
     this.values = values;
     this.additionalTypes = additionalTypes;
+    this.materialized = false;
     this.defaultAttributes = defaultAttributes;
     this.delegate = delegateHash;
   }
 
+  /** Mirrors: `def key?(key)` (builder.rb:106-108). */
   isKey(key: string): boolean {
-    return this.has(key);
+    return this.delegate.has(key) || Object.hasOwn(this.values, key) || this.types.has(key);
   }
 
-  get(name: string): Attribute {
-    if (this.delegate.has(name)) return this.delegate.get(name)!;
-    return this.assignDefault(name);
+  /** Mirrors: `def [](key)` (builder.rb:110-112). */
+  getAttribute(key: string): Attribute {
+    return this.delegate.get(key) ?? this.assignDefaultValue(key);
   }
 
-  set(name: string, attr: Attribute): void {
-    this.delegate.set(name, attr);
+  /** Mirrors: `def []=(key, value)` (builder.rb:114-116). */
+  set(key: string, value: Attribute): void {
+    this.delegate.set(key, value);
   }
 
+  /**
+   * Mirrors: `def deep_dup` (builder.rb:118-122) — `dup` (which copies the
+   * delegate hash, builder.rb:124-127) with every entry replaced by its own
+   * `Attribute#dup`. `types`/`values` stay shared, as Ruby's shallow `dup` does.
+   */
   deepDup(): LazyAttributeHash {
-    const copy = new LazyAttributeHash(
+    const delegateHash = new Map<string, Attribute>();
+    for (const [name, attr] of this.delegate) delegateHash.set(name, attr.dup());
+    return new LazyAttributeHash(
       this.types,
-      { ...this.values },
+      this.values,
       this.additionalTypes,
       this.defaultAttributes,
+      delegateHash,
     );
-    const cache = new Map<Attribute, Attribute>();
-    for (const [name, attr] of this.delegate) {
-      copy.delegate.set(name, LazyAttributeHash.cloneAttr(attr, cache));
-    }
-    return copy;
   }
 
   /**
@@ -310,8 +298,13 @@ export class LazyAttributeHash {
    * @internal Rails-private helper.
    */
   protected materialize(): Map<string, Attribute> {
-    for (const key of Object.keys(this.values)) this.get(key);
-    for (const key of this.types.keys()) this.get(key);
+    if (!this.materialized) {
+      for (const key of Object.keys(this.values)) this.getAttribute(key);
+      for (const key of this.types.keys()) this.getAttribute(key);
+      if (!Object.isFrozen(this)) {
+        this.materialized = true;
+      }
+    }
     return this.delegate;
   }
 
@@ -321,50 +314,31 @@ export class LazyAttributeHash {
   }
 
   /**
-   * @internal Rails-private helper. Mirrors: LazyAttributeHash#assign_default_value
-   * Materializes an attribute entry for `name` from the value/type tables.
+   * @internal Rails-private helper. Mirrors: `def assign_default_value(name)`
+   * (builder.rb:165-180). Ruby's implicit `nil` when `name` is in neither table
+   * is `Attribute.null(name)` here, the null object `AttributeSet#default_attribute`
+   * (attribute_set.rb:114-116) returns for the same case — `[]` is typed to an
+   * Attribute, and TS has no nil that answers `value`.
    */
   assignDefaultValue(name: string): Attribute {
-    return this.assignDefault(name);
-  }
-
-  keys(): string[] {
-    const keys = new Set([
-      ...Object.keys(this.values),
-      ...this.types.keys(),
-      ...this.delegate.keys(),
-    ]);
-    return [...keys].filter((name) => this.get(name).isInitialized());
-  }
-
-  has(name: string): boolean {
-    return this.delegate.has(name) || Object.hasOwn(this.values, name) || this.types.has(name);
-  }
-
-  private static cloneAttr(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
-    const existing = cache.get(attr);
-    if (existing) return existing;
-    const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
-    cache.set(attr, cloned);
-    const orig = attr.getOriginalAttribute();
-    if (orig) {
-      cloned.setOriginalAttribute(LazyAttributeHash.cloneAttr(orig, cache));
-    }
-    return cloned;
-  }
-
-  private assignDefault(name: string): Attribute {
     const type = this.additionalTypes.get(name) ?? this.types.get(name);
-    if (Object.hasOwn(this.values, name) && type) {
-      const attr = Attribute.fromDatabase(name, this.values[name], type);
-      this.delegate.set(name, attr);
-      return attr;
+    let valuePresent = true;
+    let value: unknown;
+    if (Object.hasOwn(this.values, name)) {
+      value = this.values[name];
+    } else {
+      valuePresent = false;
     }
-    if (this.types.has(name)) {
-      const defaultAttr = this.defaultAttributes.get(name);
-      const attr = defaultAttr ? dupAttribute(defaultAttr) : Attribute.uninitialized(name, type!);
+
+    if (valuePresent) {
+      const attr = Attribute.fromDatabase(name, value, type!);
       this.delegate.set(name, attr);
       return attr;
+    } else if (this.types.has(name)) {
+      const attr = this.defaultAttributes.get(name);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
+      this.delegate.set(name, built);
+      return built;
     }
     return Attribute.null(name);
   }

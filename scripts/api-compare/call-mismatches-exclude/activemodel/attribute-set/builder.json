@@ -4,7 +4,7 @@
     "tsFile": "attribute-set/builder.ts",
     "rubyName": "assign_default_value",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "builder.rb:166,168 `additional_types.fetch(name, types[name])` and `values.fetch(name) { value_present = false }`; a JS Map has no two-argument `fetch` and neither Map nor a plain object has a block-taking `fetch`, so the lookup is `get(name) ?? types.get(name)` and the key-presence probe is `Object.hasOwn` (same gap as the `default_attribute` -> `fetch` row)."
   },
   {
     "package": "activemodel",
@@ -18,7 +18,7 @@
     "tsFile": "attribute-set/builder.ts",
     "rubyName": "deep_dup",
     "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "builder.rb:120 `delegate_hash.transform_values(&:dup)`; the delegate hash is a JS Map, which has no `transform_values`, and `LazyAttributeHash#transformValues` cannot stand in because it materializes first — so the copy loop is spelled inline."
   },
   {
     "package": "activemodel",
@@ -39,6 +39,6 @@
     "tsFile": "attribute-set/builder.ts",
     "rubyName": "materialize",
     "call": "each_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "builder.rb:153-154 walks `values.each_key`/`types.each_key`; `values` is a plain object and `types` a Map here, neither of which has Ruby's Hash#each_key — `Object.keys(...)`/`Map#keys()` is the only spelling (same gap as the `attributes` -> `each_key` row above)."
   }
 ]
