@@ -120,7 +120,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
       const lines: string[] = [];
-      await adapter.createSchemaDumper(adapter).dumpTable(lines, "ex_idx_both");
+      await adapter.createSchemaDumper().dumpTable(lines, "ex_idx_both");
       const indexLine = lines.find((l) => l.includes("ex_idx_both_i"))!;
       expect(indexLine.indexOf("include:")).toBeGreaterThan(-1);
       expect(indexLine.indexOf("include:")).toBeLessThan(indexLine.indexOf("nullsNotDistinct:"));
