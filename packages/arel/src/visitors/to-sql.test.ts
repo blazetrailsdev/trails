@@ -25,9 +25,8 @@ function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unkn
 describe("the to_sql visitor", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  // Mirrors the Rails `before` block and `compile` helper
-  // (`to_sql_test.rb:10-18`): the visitor is built on the FakeRecord
-  // connection, which is what makes `true` render as `'t'` here.
+  // Rails' `before` block and `compile` helper (`to_sql_test.rb:10-18`): the
+  // FakeRecord connection is what makes `true` render as `'t'` here.
   const visitor = new Visitors.ToSql(fakeRecordConnection);
   const table = new Table("users");
   const attr = table.get("id");
@@ -868,8 +867,6 @@ describe("the to_sql visitor", () => {
     });
 
     it("should handle arbitrary operators", () => {
-      // Rails' visit_Arel_Nodes_UnaryOperation emits `" #{operator} "` — the
-      // leading space is part of the expected string here, as it is in Ruby.
       const node = new Nodes.UnaryOperation("!", new Table("products").get("active"));
       expect(compile(node)).toBe(` ! "products"."active"`);
     });
@@ -1305,19 +1302,15 @@ describe("the to_sql visitor", () => {
     const count = new Nodes.Count([star]);
     count.distinct = true;
     expect(compile(count)).toBe("COUNT(DISTINCT *)");
-
     const sum = new Nodes.Sum([star]);
     sum.distinct = true;
     expect(compile(sum)).toBe("SUM(DISTINCT *)");
-
     const max = new Nodes.Max([star]);
     max.distinct = true;
     expect(compile(max)).toBe("MAX(DISTINCT *)");
-
     const min = new Nodes.Min([star]);
     min.distinct = true;
     expect(compile(min)).toBe("MIN(DISTINCT *)");
-
     const avg = new Nodes.Avg([star]);
     avg.distinct = true;
     expect(compile(avg)).toBe("AVG(DISTINCT *)");
@@ -1447,8 +1440,6 @@ describe("the to_sql visitor", () => {
   });
 
   it("works with BindParams", () => {
-    // Rails: `compile(Nodes::BindParam.new(1))` is `"?"` — the value is
-    // collected as a bind, never inlined.
     const node = new Nodes.BindParam(1);
     expect(mustBeLike(compile(node))).toBe(mustBeLike("?"));
   });
