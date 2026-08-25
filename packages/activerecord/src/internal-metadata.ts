@@ -205,7 +205,7 @@ export class InternalMetadata {
    */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
-    sm.project(new Nodes.Count([star]));
+    sm.project(new Nodes.Count([star()]));
     const values = await this._withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
@@ -251,7 +251,7 @@ export class InternalMetadata {
     key: string,
   ): Promise<Record<string, unknown> | null> {
     const sm = new SelectManager(this.arelTable);
-    sm.project(star);
+    sm.project(star());
     sm.where(this.arelTable.get(this.primaryKey).eq(new Nodes.BindParam(key)));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);

@@ -25,8 +25,8 @@ export class RangeHandler {
    * literal is that shape, and `between` reads nothing else off it.
    */
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const beginBind = this.predicateBuilder.buildBindAttribute(attribute.name, value.begin);
-    const endBind = this.predicateBuilder.buildBindAttribute(attribute.name, value.end);
+    const beginBind = this.predicateBuilder.buildBindAttribute(String(attribute.name), value.begin);
+    const endBind = this.predicateBuilder.buildBindAttribute(String(attribute.name), value.end);
     return attribute.between({ begin: beginBind, end: endBind, excludeEnd: value.excludeEnd });
   }
 

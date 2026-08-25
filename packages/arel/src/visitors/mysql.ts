@@ -23,19 +23,14 @@ export class MySQL extends ToSql {
   }
 
   // MySQL renders an UnqualifiedColumn by visiting its inner expression
-  // (typically an Attribute). Rails delegates with `visit o.expr` —
-  // unlike the base ToSql which special-cases the bare name. The
-  // relation prefix this leaves on for an Attribute is fine: MySQL's
-  // `UPDATE t SET x = t.x + 1` is valid.
+  // (typically an Attribute), unlike the base ToSql which special-cases the
+  // bare name (mysql.rb:13-15). The relation prefix this leaves on for an
+  // Attribute is fine: MySQL's `UPDATE t SET x = t.x + 1` is valid.
   protected override visitArelNodesUnqualifiedColumn(
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else if (o.expr !== null) {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     return collector;
   }
 

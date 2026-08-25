@@ -50,13 +50,13 @@ export function sql(
 }
 
 /**
- * Arel.star — represents `*` in a projection.
+ * Arel.star() — represents `*` in a projection.
  *
- * Mirrors: Arel.star (arel.rb:60). Rails' `star` is a method returning a
- * fresh literal each call; trails keeps the long-standing constant so the
- * `Arel.star` spelling at every call site is unchanged.
+ * Mirrors: Arel.star (arel.rb:59-61).
  */
-export const star = sql("*", { retryable: true });
+export function star(): SqlLiteral {
+  return sql("*", { retryable: true });
+}
 
 /**
  * Arel.fetchAttribute() — yield the attribute nodes reachable from `value`.

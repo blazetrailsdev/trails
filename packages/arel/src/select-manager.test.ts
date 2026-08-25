@@ -35,7 +35,7 @@ describe("SelectManagerTest", () => {
     describe("order", () => {
       it("accepts symbols", () => {
         const mgr = new SelectManager();
-        mgr.project(star);
+        mgr.project(star());
         mgr.from(users);
         mgr.order(new Nodes.SqlLiteral("foo"));
         expect(mustBeLike(mgr.toSql())).toBe(mustBeLike(`SELECT * FROM "users" ORDER BY foo`));
@@ -68,7 +68,7 @@ describe("SelectManagerTest", () => {
 
       it("can make a subselect", () => {
         const mgr = new SelectManager();
-        mgr.project(star);
+        mgr.project(star());
         mgr.from(sql("zomg"));
         const as = mgr.as("foo");
         const outer = new SelectManager();
@@ -92,7 +92,7 @@ describe("SelectManagerTest", () => {
       it("should support any ast", () => {
         const mgr1 = new SelectManager();
         const mgr2 = new SelectManager();
-        mgr2.project(star);
+        mgr2.project(star());
         mgr2.from(users);
         const as = mgr2.as("omg");
         mgr1.project(sql("lol"));
@@ -165,7 +165,7 @@ describe("SelectManagerTest", () => {
 
     it("makes updates to the correct copy", () => {
       const mgr = new SelectManager(users);
-      mgr.project(star);
+      mgr.project(star());
       mgr.where(users.get("id").eq(1));
       const sql = mgr.toSql();
       expect(sql).toContain("WHERE");
@@ -307,11 +307,11 @@ describe("SelectManagerTest", () => {
 
   describe("union", () => {
     const m1 = new SelectManager(users);
-    m1.project(star);
+    m1.project(star());
     m1.where(users.get("age").lt(18));
 
     const m2 = new SelectManager(users);
-    m2.project(star);
+    m2.project(star());
     m2.where(users.get("age").gt(99));
 
     it("should union two managers", () => {
@@ -336,11 +336,11 @@ describe("SelectManagerTest", () => {
   describe("intersect", () => {
     it("should intersect two managers", () => {
       const m1 = new SelectManager(users);
-      m1.project(star);
+      m1.project(star());
       m1.where(users.get("age").gt(18));
 
       const m2 = new SelectManager(users);
-      m2.project(star);
+      m2.project(star());
       m2.where(users.get("age").lt(99));
 
       const node = m1.intersect(m2);
@@ -355,11 +355,11 @@ describe("SelectManagerTest", () => {
   describe("except", () => {
     it("should except two managers", () => {
       const m1 = new SelectManager(users);
-      m1.project(star);
+      m1.project(star());
       m1.where(users.get("age").between(18, 60));
 
       const m2 = new SelectManager(users);
-      m2.project(star);
+      m2.project(star());
       m2.where(users.get("age").between(40, 99));
 
       const node = m1.except(m2);
@@ -373,8 +373,8 @@ describe("SelectManagerTest", () => {
 
   describe("minus", () => {
     it("minus aliases except", () => {
-      const q1 = users.project(star);
-      const q2 = users.project(star);
+      const q1 = users.project(star());
+      const q2 = users.project(star());
       expect(new Visitors.ToSql(fakeRecordConnection).compile(q1.minus(q2))).toContain("EXCEPT");
     });
   });
@@ -388,7 +388,7 @@ describe("SelectManagerTest", () => {
       const top = users.project(users.get("id")).where(users.get("karma").gt(100));
       const usersAs = new Nodes.As(usersTop, top);
       const selectManager = comments
-        .project(star)
+        .project(star())
         .with(usersAs)
         .where(comments.get("author_id").in(usersTop.project(usersTop.get("id"))));
 
@@ -425,7 +425,7 @@ describe("SelectManagerTest", () => {
       const asStatement = new Nodes.As(replies, union);
 
       const manager = new SelectManager();
-      manager.withRecursive(asStatement).from(replies).project(star);
+      manager.withRecursive(asStatement).from(replies).project(star());
 
       expect(mustBeLike(visitor.compile(manager.ast))).toBe(
         mustBeLike(`
@@ -455,7 +455,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("taken aliases limit", () => {
-      const mgr = users.project(star).take(5);
+      const mgr = users.project(star()).take(5);
       expect(mgr.taken).toBe(mgr.limit);
       expect(mgr.taken).toBe(5);
     });
@@ -489,12 +489,12 @@ describe("SelectManagerTest", () => {
     });
 
     it("accepts string and wraps in SqlLiteral", () => {
-      const mgr = users.project(star).order("name ASC");
+      const mgr = users.project(star()).order("name ASC");
       expect(mgr.toSql()).toContain("ORDER BY name ASC");
     });
 
     it("accepts symbol and uses description (Rails :sym.to_s == 'sym')", () => {
-      const mgr = users.project(star).order(Symbol("name"));
+      const mgr = users.project(star()).order(Symbol("name"));
       expect(mgr.toSql()).toContain("ORDER BY name");
     });
   });
@@ -1021,8 +1021,9 @@ describe("SelectManagerTest", () => {
 
   describe("projections", () => {
     it("reads projections", () => {
-      const mgr = users.project(users.get("name"), users.get("age"));
-      expect(mgr.projections.length).toBe(2);
+      const manager = new SelectManager();
+      manager.project(sql("foo"), sql("bar"));
+      expect(manager.projections).toEqual([sql("foo"), sql("bar")]);
     });
   });
 
@@ -1069,7 +1070,7 @@ describe("SelectManagerTest", () => {
 
     it("accepts a TreeManager and unwraps to ast", () => {
       const sub = users.project(users.get("id")).where(users.get("active").eq(true));
-      const mgr = users.project(star).where(sub);
+      const mgr = users.project(star()).where(sub);
       expect(mgr.toSql()).toContain("WHERE");
     });
 
@@ -1171,7 +1172,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("stores the Comment node on the SelectCore (Rails fidelity)", () => {
-      const mgr = users.project(star).comment("trace");
+      const mgr = users.project(star()).comment("trace");
       // Rails: `@ctx.comment = Nodes::Comment.new(values)` — sets on
       // the core, not the statement. SelectStatement no longer carries
       // a `comment` field at all.
@@ -1182,7 +1183,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("emits the comment exactly once", () => {
-      const sql = users.project(star).comment("once").toSql();
+      const sql = users.project(star()).comment("once").toSql();
       const matches = sql.match(/\/\* once \*\//g) ?? [];
       expect(matches.length).toBe(1);
     });
@@ -1218,7 +1219,7 @@ describe("SelectManagerTest", () => {
     it("returns outer join sql", () => {
       expect(
         users
-          .project(star)
+          .project(star())
           .outerJoin(posts)
           .on(users.get("id").eq(posts.get("user_id")))
           .toSql(),
@@ -1288,12 +1289,12 @@ describe("SelectManagerTest", () => {
 
   describe("lock", () => {
     it("adds a lock node", () => {
-      expect(users.project(star).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+      expect(users.project(star()).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
     });
   });
 
   it("chaining returns the manager", () => {
-    const mgr = users.project(star);
+    const mgr = users.project(star());
     expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
     expect(mgr.order(users.get("id").asc())).toBe(mgr);
     expect(mgr.take(10)).toBe(mgr);
@@ -1303,7 +1304,7 @@ describe("SelectManagerTest", () => {
 
   it("rightOuterJoin generates RIGHT OUTER JOIN", () => {
     const mgr = new SelectManager(users);
-    mgr.project(star);
+    mgr.project(star());
     mgr.join(posts, Nodes.RightOuterJoin).on(users.get("id").eq(posts.get("user_id")));
     expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
     expect(mgr.toSql()).toContain('"posts"');
@@ -1311,73 +1312,17 @@ describe("SelectManagerTest", () => {
 
   it("fullOuterJoin generates FULL OUTER JOIN", () => {
     const mgr = new SelectManager(users);
-    mgr.project(star);
+    mgr.project(star());
     mgr.join(posts, Nodes.FullOuterJoin).on(users.get("id").eq(posts.get("user_id")));
     expect(mgr.toSql()).toContain("FULL OUTER JOIN");
   });
 
   it("window creates a named window", () => {
     const mgr = new SelectManager(users);
-    mgr.project(star);
+    mgr.project(star());
     const win = mgr.window("w");
     win.order(users.get("created_at").asc());
     expect(mgr.toSql()).toContain("WINDOW");
-  });
-
-  describe("projections", () => {
-    it("reads projections", () => {
-      const users = new Table("users");
-      const manager = users.project(users.get("name"), users.get("age"));
-      expect(manager.projections.length).toBe(2);
-    });
-  });
-
-  describe("projections=", () => {
-    it("overwrites projections", () => {
-      const users = new Table("users");
-      const manager = users.project(users.get("name"));
-      expect(manager.projections.length).toBe(1);
-      manager.projections = [users.get("age")];
-      expect(manager.projections.length).toBe(1);
-      const sql = manager.toSql();
-      expect(sql).toContain('"age"');
-      expect(sql).not.toContain('"name"');
-    });
-  });
-
-  describe("where_sql", () => {
-    it("gives me back the where sql", () => {
-      const users = new Table("users");
-      const manager = users
-        .project("*")
-        .where(users.get("name").eq("Alice"))
-        .where(users.get("age").gt(18));
-      expect(manager.constraints.length).toBe(2);
-    });
-  });
-
-  it("should hand back froms", () => {
-    const users = new Table("users");
-    const manager = users.project("*");
-    expect(manager.source).toBeDefined();
-  });
-
-  describe("orders", () => {
-    it("returns order clauses", () => {
-      const users = new Table("users");
-      const manager = users.project("*").order(users.get("name").asc());
-      expect(manager.orders.length).toBe(1);
-    });
-  });
-
-  describe("exists", () => {
-    it("can be aliased", () => {
-      const users = new Table("users");
-      const subquery = users.project(users.get("id"));
-      const aliased = subquery.as("sub");
-      expect(aliased).toBeInstanceOf(Nodes.TableAlias);
-      expect((aliased.name as Nodes.SqlLiteral).value).toBe("sub");
-    });
   });
 
   it("returns empty array when no joins", () => {
@@ -1427,7 +1372,7 @@ describe("SelectManagerTest", () => {
   });
 
   it("should take an order", () => {
-    const mgr = users.order(users.get("name").asc()).project(star);
+    const mgr = users.order(users.get("name").asc()).project(star());
     expect(mgr.toSql()).toContain("ORDER BY");
   });
 
@@ -1546,7 +1491,7 @@ describe("SelectManagerTest", () => {
   describe("delete", () => {
     it("copies where", () => {
       const mgr = new SelectManager(users);
-      mgr.project(star).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
+      mgr.project(star()).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
       const whereSql = mgr.whereSql()?.value;
       expect(whereSql).toContain("WHERE");
       expect(whereSql).toContain("AND");
@@ -1586,7 +1531,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("returns nil when there are no wheres", () => {
-      const mgr = new SelectManager(users).project(star);
+      const mgr = new SelectManager(users).project(star());
       expect(mgr.whereSql()).toBeNull();
     });
   });
@@ -1611,13 +1556,15 @@ describe("SelectManagerTest", () => {
 
   describe("optimizerHints", () => {
     it("places hints after SELECT", () => {
-      const mgr = new SelectManager(users).project(star).optimizerHints("MAX_EXECUTION_TIME(1000)");
+      const mgr = new SelectManager(users)
+        .project(star())
+        .optimizerHints("MAX_EXECUTION_TIME(1000)");
       expect(mgr.toSql()).toBe('SELECT /*+ MAX_EXECUTION_TIME(1000) */ * FROM "users"');
     });
 
     it("supports multiple hints", () => {
       const mgr = new SelectManager(users)
-        .project(star)
+        .project(star())
         .optimizerHints("NO_INDEX_MERGE(users)", "BKA(users)");
       expect(mgr.toSql()).toBe('SELECT /*+ NO_INDEX_MERGE(users) BKA(users) */ * FROM "users"');
     });
@@ -1628,14 +1575,14 @@ describe("SelectManagerTest", () => {
     // sanitizing path, so they name a real quoting connection at the call site.
     it("sanitizes comment delimiters from hints", () => {
       const mgr = new SelectManager(users)
-        .project(star)
+        .project(star())
         .optimizerHints("HINT */ DROP TABLE users --");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toBe('SELECT /*+ HINT DROP TABLE users -- */ * FROM "users"');
     });
 
     it("sanitizes newlines from hints", () => {
-      const mgr = new SelectManager(users).project(star).optimizerHints("HINT\nwith\nnewlines");
+      const mgr = new SelectManager(users).project(star()).optimizerHints("HINT\nwith\nnewlines");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).not.toContain("\n");
       expect(sql).toContain("/*+ HINT with newlines */");
@@ -1645,7 +1592,7 @@ describe("SelectManagerTest", () => {
       // Rails always wraps the sanitized-and-joined hints in `/*+ ... */`
       // (to_sql.rb:170-172); it never drops the comment when the hints reduce to
       // empty, so `optimizer_hints("/* */", "/**/")` still emits the marker.
-      const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "/**/");
+      const mgr = new SelectManager(users).project(star()).optimizerHints("/* */", "/**/");
       expect(new Visitors.ToSql(testConnection).compile(mgr.ast)).toBe(
         'SELECT /*+   */ * FROM "users"',
       );
@@ -1655,7 +1602,7 @@ describe("SelectManagerTest", () => {
     // `Nodes::OptimizerHints.new(hints)` (select_manager.rb), so the AST
     // carries an OptimizerHints node — not a bare string array.
     it("stores hints as an OptimizerHints node on the SelectCore", () => {
-      const mgr = new SelectManager(users).project(star).optimizerHints("X", "Y");
+      const mgr = new SelectManager(users).project(star()).optimizerHints("X", "Y");
       expect(mgr.ast.cores[0].optimizerHints).toBeInstanceOf(Nodes.OptimizerHints);
       expect((mgr.ast.cores[0].optimizerHints as Nodes.OptimizerHints).expr).toEqual(["X", "Y"]);
     });
@@ -1663,7 +1610,7 @@ describe("SelectManagerTest", () => {
     // Mirrors Rails: `optimizer_hints` is a no-op when called with no
     // arguments (the Rails impl skips the assignment when hints empty).
     it("is a no-op when called with no hints", () => {
-      const mgr = new SelectManager(users).project(star).optimizerHints();
+      const mgr = new SelectManager(users).project(star()).optimizerHints();
       expect(mgr.ast.cores[0].optimizerHints).toBeNull();
     });
   });

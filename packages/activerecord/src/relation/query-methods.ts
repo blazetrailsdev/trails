@@ -3050,7 +3050,9 @@ export function buildFrom(this: QueryMethodsHost): unknown {
 }
 
 function tableStar(table: any): unknown {
-  return table.star ?? table.get("*");
+  // Rails' `table[Arel.star]` (query_methods.rb) — a Table and a TableAlias
+  // both answer `[]`.
+  return table.get(Arel.star());
 }
 
 /**

@@ -57,11 +57,17 @@ export class Table extends Node {
     _engine.current = value;
   }
 
-  readonly name: string;
+  // Rails stores whatever `name` it was handed (table.rb:16) — a String, an
+  // `Arel.sql` SqlLiteral, or a node such as a NamedFunction
+  // (test/cases/arel/table_test.rb:118-130).
+  readonly name: string | Node;
   readonly tableAlias: string | null;
   readonly klass?: TableKlass;
 
-  constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
+  constructor(
+    name: string | Node,
+    options?: { as?: string; klass?: TableKlass; typeCaster?: unknown },
+  ) {
     super();
     this.name = name;
     const as = options?.as ?? null;
@@ -179,16 +185,19 @@ export class Table extends Node {
     // whose name is nil; only a subquery-shaped statement ever renders it. It
     // also takes a node name — `@table[Arel.star]`
     // (test/cases/arel/visitors/to_sql_test.rb:50) — which the alias lookup
-    // skips and the visitor renders as-is (table.rb:110-113).
+    // skips and the visitor renders as-is (table.rb:81-85).
     const resolved =
       name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
-    return new Attribute(table ?? this, resolved as string);
+    return new Attribute(table ?? this, resolved);
   }
 
   /**
    * Mirrors: Arel::Table#hash — only name (Rails excludes aliases to avoid loops).
    */
   override hash(): number {
+    // Rails hashes `@name` whatever it is (table.rb:88-93); a node name hashes
+    // by its own `hash`.
+    if (typeof this.name !== "string") return this.name.hash();
     let h = 0x811c9dc5;
     for (let i = 0; i < this.name.length; i++) {
       h ^= this.name.charCodeAt(i);
@@ -203,7 +212,11 @@ export class Table extends Node {
    */
   eql(other: unknown): boolean {
     if (!(other instanceof Table)) return false;
-    return this.name === other.name && this.tableAlias === other.tableAlias;
+    // Ruby's `self.name == other.name` is value equality, so a SqlLiteral or
+    // node name compares by content, not identity.
+    const sameName =
+      this.name instanceof Node ? this.name.eql(other.name) : this.name === other.name;
+    return sameName && this.tableAlias === other.tableAlias;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
@@ -221,20 +234,6 @@ export class Table extends Node {
 
   isAbleToTypeCast(): boolean {
     return this.typeCaster != null;
-  }
-
-  /**
-   * The `*` projection for this table — `table.*` after visitor compilation.
-   *
-   * Mirrors Rails' `Arel::Table#[Arel.star]`: returns an `Attribute` rather
-   * than a pre-baked SQL literal, so the table identifier is quoted by the
-   * adapter visitor (ANSI for SQLite/PG, backticks for MySQL). The `"*"`
-   * sentinel is handled by `visit_Arel_Attributes_Attribute` and skips
-   * column-name quoting (matches Rails' `quote_column_name(Arel.star)`,
-   * which passes the `SqlLiteral` through unchanged).
-   */
-  get star(): Attribute {
-    return new Attribute(this, "*");
   }
 
   /**

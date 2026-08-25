@@ -19,7 +19,7 @@ describe("CommentTest", () => {
   describe("sanitization", () => {
     it("strips comment terminators so input cannot break out", () => {
       const users = new Table("users");
-      const mgr = users.project(star);
+      const mgr = users.project(star());
       mgr.comment("hello */ DROP TABLE users");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain("/* hello DROP TABLE users */");
@@ -29,7 +29,7 @@ describe("CommentTest", () => {
 
     it("strips comment openers from values", () => {
       const users = new Table("users");
-      const mgr = users.project(star);
+      const mgr = users.project(star());
       mgr.comment("before /* nested */ after");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain("/* before nested after */");
@@ -37,7 +37,7 @@ describe("CommentTest", () => {
 
     it("normalizes whitespace in comments", () => {
       const users = new Table("users");
-      const mgr = users.project(star);
+      const mgr = users.project(star());
       mgr.comment("hello   \n  world");
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain("/* hello world */");

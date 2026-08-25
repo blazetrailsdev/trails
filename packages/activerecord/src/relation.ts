@@ -2,7 +2,7 @@ import { Temporal } from "@blazetrails/date";
 import { except, hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { first } from "./ruby-first.js";
-import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
+import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
@@ -1196,7 +1196,7 @@ export class Relation<T extends Base> {
           : [(join.left as unknown as { name: string }).name],
       );
 
-    joinedTables.push(this.table.name);
+    joinedTables.push(String(this.table.name));
 
     // always convert table names to downcase as in Oracle quoted table names are in uppercase
     const downcased = joinedTables.map((name) => name.toLowerCase());
@@ -1355,11 +1355,11 @@ export class Relation<T extends Base> {
         !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
       ) {
         const attr = table.get(this.model.lockingColumn);
-        updates[attr.name] = this._incrementAttribute(attr);
+        updates[String(attr.name)] = this._incrementAttribute(attr);
       }
       values = this._substituteValues(Object.entries(updates));
     } else {
-      values = sql(this.model.sanitizeSqlForAssignment(updates, table.name));
+      values = sql(this.model.sanitizeSqlForAssignment(updates, String(table.name)));
     }
 
     // Mirrors `relation.rb:606-616`.
@@ -2392,7 +2392,7 @@ export class Relation<T extends Base> {
       // Mirror Rails Relation#update_counters: `attr = table[counter_name]` →
       // `updates[attr.name] = _increment_attribute(attr, value)` (relation.rb:930).
       const attr = this.table.get(counterName);
-      updates[attr.name] = this._incrementAttribute(attr, value);
+      updates[String(attr.name)] = this._incrementAttribute(attr, value);
     }
 
     const touch = touchFromCounters as CounterCacheTouchOption | undefined;
@@ -2692,7 +2692,12 @@ export class Relation<T extends Base> {
   }
 
   aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
-    return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
+    return AliasTracker.create(
+      this.model.connectionPool(),
+      String(this.table.name),
+      joins,
+      aliases,
+    );
   }
 
   bindAttribute<R>(
@@ -2711,7 +2716,7 @@ export class Relation<T extends Base> {
     }
 
     const attr = this.table.get(name);
-    const bind = this.predicateBuilder.buildBindAttribute(attr.name, value);
+    const bind = this.predicateBuilder.buildBindAttribute(String(attr.name), value);
     return block(attr, bind);
   }
 
@@ -2915,11 +2920,8 @@ export class Relation<T extends Base> {
       if (collection.hasLimitOrOffset) {
         const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
         if (this.distinctValue && isEmpty(collection.selectValues)) {
-          // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
-          // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
           // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
-          const star = (this.table as { star?: Nodes.Node }).star ?? this.table.get("*");
-          query.selectValues = [...query.selectValues, star];
+          query.selectValues = [...query.selectValues, this.table.get(star())];
         }
         const subqueryAlias = "subquery_for_cache_key";
         const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
@@ -3145,8 +3147,8 @@ export class Relation<T extends Base> {
         // render as `SET col = (select ...)`, which SQLite/MySQL/PG require.
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
-      const type = this.model.typeForAttribute(attr.name);
-      return [attr, this.predicateBuilder.buildBindAttribute(attr.name, type.cast(value))];
+      const type = this.model.typeForAttribute(String(attr.name));
+      return [attr, this.predicateBuilder.buildBindAttribute(String(attr.name), type.cast(value))];
     });
   }
 

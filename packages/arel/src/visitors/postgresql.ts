@@ -1,4 +1,3 @@
-import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
@@ -52,11 +51,7 @@ export class PostgreSQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     collector.append("DISTINCT ON ( ");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else if (o.expr !== null) {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     collector.append(" )");
     return collector;
   }
