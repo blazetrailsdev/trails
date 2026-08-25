@@ -2,7 +2,7 @@ import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank, underscore } from "@blazetrails/activesupport";
+import { isBlank, slice, underscore } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -37,8 +37,9 @@ export class ComparisonValidator extends EachValidator {
   }
 
   validateEach(record: ValidatableRecord, attrName: string, value: unknown): void {
-    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
-      const rawOptionValue = this.options[option];
+    for (const [option, rawOptionValue] of Object.entries(
+      slice(this.options, ...(Object.keys(COMPARE_CHECKS) as CompareKey[])),
+    ) as [CompareKey, unknown][]) {
       if (rawOptionValue === undefined) continue;
       const optionValue = this.resolveValue(record, rawOptionValue);
 

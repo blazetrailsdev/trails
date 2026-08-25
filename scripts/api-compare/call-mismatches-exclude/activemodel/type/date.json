@@ -4,6 +4,6 @@
     "tsFile": "type/date.ts",
     "rubyName": "new_date",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "date.rb:68 `::Date.new(year, mon, mday) rescue nil`; trails' Date type yields a `Temporal.PlainDate`, whose only construction form is the static `Temporal.PlainDate.from({ year, month, day }, { overflow: \"reject\" })` — there is no `new` on it, and the reject option is what reproduces `rescue nil`."
   }
 ]

@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { except, humanize } from "@blazetrails/activesupport";
+import { except, humanize, mergeBang } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
@@ -35,6 +35,12 @@ export class ConfirmationValidator extends EachValidator {
    * `setup!` installs — `record.public_send("#{attribute}_confirmation")`
    * (:12) — which is a zero-arg Ruby method, so trails' `public_send` of it is
    * a property read (CLAUDE.md § "Generated attribute readers are properties").
+   *
+   * @missingRailsArgs merge! — PERMANENT: `Hash#merge!` is a receiver method
+   * on the hash `except` returns; trails ports Ruby's Hash
+   * core methods as free functions taking the hash first
+   * (`hash-utils.ts:140`), which JS requires short of monkey-patching
+   * `Object.prototype`, so the receiver arrives as the first argument.
    */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
@@ -48,10 +54,11 @@ export class ConfirmationValidator extends EachValidator {
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
-      record.errors.add(confirmationAttr, ":confirmation", {
-        ...except(this.options, "caseSensitive"),
-        attribute: humanAttr,
-      });
+      record.errors.add(
+        confirmationAttr,
+        ":confirmation",
+        mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttr }),
+      );
     }
   }
 }

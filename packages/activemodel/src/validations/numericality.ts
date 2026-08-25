@@ -1,6 +1,13 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, Range, kernelFloat, slice } from "@blazetrails/activesupport";
+import {
+  underscore,
+  BigDecimal,
+  Range,
+  kernelFloat,
+  mergeBang,
+  slice,
+} from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -76,6 +83,15 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
+  /**
+   * Mirrors: numericality.rb:36-65
+   *
+   * @missingRailsArgs merge! — PERMANENT: `Hash#merge!` is a receiver method
+   * on the hash `filtered_options` returns; trails ports Ruby's Hash core
+   * methods as free functions taking the hash first (`hash-utils.ts:140`),
+   * which JS requires short of monkey-patching `Object.prototype`, so the
+   * receiver arrives as the first argument.
+   */
   validateEach(
     record: ValidatableRecord,
     attribute: string,
@@ -103,20 +119,17 @@ export class NumericalityValidator extends EachValidator {
 
     // Rails uses filtered_options(value).merge!(count: option_value)
     // for compare/range branches and filtered_options(value) (no count)
-    // for odd/even. Build a fresh filtered base each branch so non-
-    // reserved validator options (message, if, unless, …) reach i18n.
-    const withCount = (count: unknown): Record<string, unknown> => ({
-      ...this.filteredOptions(value),
-      count,
-    });
-
+    // for odd/even. A fresh filtered base each branch keeps non-reserved
+    // validator options (message, if, unless, …) reaching i18n.
     // Ruby `Hash#slice(*keys)` yields the entries in the ARGUMENT order, not the
     // receiver's, so `options.slice(*RESERVED_OPTIONS)` walks the options in
     // RESERVED_OPTIONS order — COMPARE, then NUMBER, then RANGE (numericality.rb:16).
     // Iterating the constant reproduces that, which is what fixes the order errors
     // land in when one attribute fails several checks at once.
-    for (const option of RESERVED_OPTIONS) {
-      let optionValue = this.options[option] as NumericValue | undefined;
+    for (const [option, rawOptionValue] of Object.entries(
+      slice(this.options, ...RESERVED_OPTIONS),
+    )) {
+      let optionValue = rawOptionValue as NumericValue | undefined;
       if (optionValue === undefined) continue;
       if (option in NUMBER_CHECKS) {
         // Rails: value.to_i.public_send(NUMBER_CHECKS[option]) — TS has no
@@ -130,13 +143,21 @@ export class NumericalityValidator extends EachValidator {
         // Range#include?, and :count interpolates the range's own to_s.
         const range = optionValue as unknown as Range<number>;
         if (!range.isInclude(num as number)) {
-          record.errors.add(attribute, `:${option}`, withCount(range.toS()));
+          record.errors.add(
+            attribute,
+            `:${option}`,
+            mergeBang(this.filteredOptions(value), { count: range.toS() }),
+          );
         }
       } else if (option in COMPARE_CHECKS) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
         if (optionValue === undefined) continue;
         if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
-          record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+          record.errors.add(
+            attribute,
+            `:${underscore(option)}`,
+            mergeBang(this.filteredOptions(value), { count: optionValue }),
+          );
         }
       }
     }

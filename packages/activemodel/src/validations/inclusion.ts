@@ -1,12 +1,11 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include } from "@blazetrails/activesupport";
+import { except, include, mergeBang } from "@blazetrails/activesupport";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 import {
   checkValidityBang,
   type Clusivity,
   delimiter,
-  exceptInWithinMergeValue,
   inclusionMethod,
   isInclude,
   resolveValue,
@@ -34,9 +33,20 @@ export interface InclusionValidator extends Clusivity {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InclusionValidator extends EachValidator {
+  /**
+   * @missingRailsArgs merge! — PERMANENT: `Hash#merge!` is a receiver method
+   * on the hash `except` returns; trails ports Ruby's Hash core methods as
+   * free functions taking the hash first (`hash-utils.ts:140`), which JS
+   * requires short of monkey-patching `Object.prototype`, so the receiver
+   * arrives as the first argument.
+   */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isInclude(record, value)) {
-      record.errors.add(attribute, ":inclusion", exceptInWithinMergeValue(this.options, value));
+      record.errors.add(
+        attribute,
+        ":inclusion",
+        mergeBang(except(this.options, "in", "within"), { value }),
+      );
     }
   }
 }
