@@ -157,6 +157,20 @@ describe("CommandRecorder", () => {
       ]);
     });
 
+    it("removeCheckConstraint records the expression alongside the options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", async (t) => {
+        await t.removeCheckConstraint("qty > 0", { name: "chk" });
+        await t.removeCheckConstraint("qty > 0");
+        await t.removeCheckConstraint({ name: "chk" });
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "removeCheckConstraint", args: ["fruits", "qty > 0", { name: "chk" }] },
+        { cmd: "removeCheckConstraint", args: ["fruits", "qty > 0"] },
+        { cmd: "removeCheckConstraint", args: ["fruits", { name: "chk" }] },
+      ]);
+    });
+
     it("remove with multiple columns records a single removeColumns", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.changeTable("fruits", async (t) => {

@@ -1821,18 +1821,21 @@ export class Table {
 
   async removeCheckConstraint(
     expressionOrOptions?: string | { name?: string },
-    options?: { name?: string },
+    options: { name?: string } = {},
   ): Promise<void> {
     if (typeof expressionOrOptions === "string") {
-      return this._schema.removeCheckConstraint(
-        this.name,
-        options?.name ? options : expressionOrOptions,
-      );
+      if (Object.keys(options).length === 0) {
+        return this._schema.removeCheckConstraint(this.name, expressionOrOptions);
+      }
+      return this._schema.removeCheckConstraint(this.name, expressionOrOptions, options);
     }
-    if (expressionOrOptions === undefined || Object.keys(expressionOrOptions).length === 0) {
+    // Ruby's `**options` collects the hash from either position, so an absent
+    // expression with the options behind it keeps them.
+    const opts = { ...expressionOrOptions, ...options };
+    if (Object.keys(opts).length === 0) {
       return this._schema.removeCheckConstraint(this.name);
     }
-    return this._schema.removeCheckConstraint(this.name, expressionOrOptions);
+    return this._schema.removeCheckConstraint(this.name, opts);
   }
 
   async checkConstraintExists(
