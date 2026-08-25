@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel", () => {
   const users = new Table("users");
@@ -14,15 +16,19 @@ describe("Arel", () => {
 
     describe("equality", () => {
       it("is equal with equal ivars", () => {
-        const a = new Nodes.Not(new Nodes.Quoted("foo"));
-        const b = new Nodes.Not(new Nodes.Quoted("foo"));
-        expect(a.hash()).toBe(b.hash());
+        const array = [
+          new Nodes.Not("foo" as unknown as Node),
+          new Nodes.Not("foo" as unknown as Node),
+        ];
+        expect(uniq(array).length).toBe(1);
       });
 
       it("is not equal with different ivars", () => {
-        const a = new Nodes.Not(new Nodes.Quoted("foo"));
-        const b = new Nodes.Not(new Nodes.Quoted("baz"));
-        expect(a.hash()).not.toBe(b.hash());
+        const array = [
+          new Nodes.Not("foo" as unknown as Node),
+          new Nodes.Not("baz" as unknown as Node),
+        ];
+        expect(uniq(array).length).toBe(2);
       });
     });
 

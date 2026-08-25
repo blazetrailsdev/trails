@@ -1,17 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("True", () => {
   describe("equality", () => {
     it("is equal to other true nodes", () => {
-      const a = new Nodes.True();
-      const b = new Nodes.True();
-      expect(a.constructor).toBe(b.constructor);
+      const array = [new Nodes.True(), new Nodes.True()];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with other nodes", () => {
-      const a = new Nodes.CurrentRow();
-      expect(a).not.toBeInstanceOf(Nodes.Preceding);
+      const array = [new Nodes.True(), new (Nodes.Node as unknown as new () => Node)()];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

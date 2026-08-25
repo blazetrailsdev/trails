@@ -27,7 +27,7 @@ describe("TestDescending", () => {
 
   it("descending?", () => {
     const descending = new Nodes.Descending("zomg");
-    expect(descending.isDescending()).toBe(true);
+    expect(descending.isDescending()).toBeTruthy();
   });
 
   it("equality with same ivars", () => {

@@ -1,15 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
+import type { Node } from "./node.js";
+import { uniq } from "../test-helpers/uniq.js";
 
 describe("Arel::Nodes::CountTest", () => {
   const users = new Table("users");
   describe("as", () => {
     it("should alias the count", () => {
-      const count = users.get("id").count();
-      const aliased = count.as("user_count");
-      const visitor = new Visitors.ToSql(fakeRecordConnection);
-      expect(visitor.compile(aliased)).toBe('COUNT("users"."id") AS user_count');
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(
+        users.get("id").count().as("foo"),
+      );
+      expect(sql).toBe('COUNT("users"."id") AS foo');
     });
   });
 
@@ -22,17 +24,19 @@ describe("Arel::Nodes::CountTest", () => {
 
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const rel = users.project(users.get("id")).ast;
-      const a = new Nodes.Cte("cte", rel);
-      const b = new Nodes.Cte("cte", rel);
-      expect(a.name).toBe(b.name);
-      expect(a.relation).toBe(b.relation);
+      const array = [
+        new Nodes.Count("foo" as unknown as Node),
+        new Nodes.Count("foo" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const a = new Nodes.TableAlias(users, "u");
-      const b = new Nodes.TableAlias(users, "v");
-      expect(a.name).not.toBe(b.name);
+      const array = [
+        new Nodes.Count("foo" as unknown as Node),
+        new Nodes.Count("foo!" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(2);
     });
   });
 });

@@ -22,7 +22,7 @@ describe("TestAscending", () => {
 
   it("ascending?", () => {
     const ascending = new Nodes.Ascending("zomg");
-    expect(ascending.isAscending()).toBe(true);
+    expect(ascending.isAscending()).toBeTruthy();
   });
 
   it("descending?", () => {

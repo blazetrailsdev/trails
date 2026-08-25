@@ -31,6 +31,14 @@
  * candidates are therefore subtracted after projection, applying the guard in
  * the TS namespace it actually gates on.
  *
+ * Alongside `files`, the manifest carries `entities` — for each TS file, the
+ * names of the Ruby entities that project onto it (every segment of each
+ * contributing FQN, since a Ruby `KeyValue::Implementation` is a TS class
+ * `KeyValue`). `files` stays the file-wide name union; `entities` lets
+ * `rails-private-jsdoc` tell a Rails-mirroring declaration from a local helper
+ * type that merely shares the file, so one entity's private name no longer
+ * gates an unrelated type's same-named member (RFC 0121).
+ *
  * Run after `pnpm parity:api` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
  *   pnpm rails-privates:manifest
  */
@@ -90,7 +98,7 @@ emitDeprecatedManifest();
 emitCallbackInvocationsManifest();
 
 if (!hasRailsApi) {
-  writeJsonManifest(OUT, { files: {} });
+  writeJsonManifest(OUT, { files: {}, entities: {} });
   flushManifestBatch();
   process.exit(0);
 }
@@ -186,8 +194,9 @@ function ancestorsFor(host: RubyEntity): { instance: RubyEntity[]; klass: RubyEn
 
 interface Manifest {
   files: Record<string, string[]>;
+  entities: Record<string, string[]>;
 }
-const manifest: Manifest = { files: {} };
+const manifest: Manifest = { files: {}, entities: {} };
 
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
@@ -198,6 +207,12 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // marked all-private if every contributor declares it private/protected.
   // rubyFile → name → "all-private" | "mixed"
   const fileVis = new Map<string, Map<string, "all-private" | "mixed">>();
+  // The TS entity names a Ruby file contributes — every segment of every
+  // contributing FQN, because the port folds a nested Ruby module onto the
+  // outer name (`I18n::Backend::KeyValue::Implementation` is class `KeyValue`).
+  // A TS class or interface outside this set is a local helper type Rails does
+  // not have, and `rails-private-jsdoc` leaves its members alone (RFC 0121).
+  const fileEntities = new Map<string, Set<string>>();
   const note = (file: string, name: string, vis: string) => {
     let m = fileVis.get(file);
     if (!m) {
@@ -209,11 +224,20 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     if (prev === undefined) m.set(name, isPriv ? "all-private" : "mixed");
     else if (prev === "all-private" && !isPriv) m.set(name, "mixed");
   };
+  const noteEntity = (file: string, fqn: string) => {
+    let s = fileEntities.get(file);
+    if (!s) {
+      s = new Set();
+      fileEntities.set(file, s);
+    }
+    for (const seg of fqn.split("::")) s.add(seg);
+  };
 
   const visit = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
       const { instance, klass } = ancestorsFor(host);
+      noteEntity(host.file, host.fqn);
       for (const ent of instance) {
         for (const m of ent.instanceMethods ?? []) note(host.file, m.name, m.visibility);
       }
@@ -233,8 +257,10 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   visit(rubyPkg.classes ?? {});
   visit(rubyPkg.modules ?? {});
 
-  for (const [rubyFile, names] of fileVis) {
-    const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
+  // A Ruby name's `?`/`!` variants share a TS candidate with their bare stem,
+  // so the all-private decision is re-applied in the TS namespace: any name a
+  // `mixed` Ruby name maps onto is subtracted after projection.
+  const project = (names: Map<string, "all-private" | "mixed">): Set<string> => {
     const tsNames = new Set<string>();
     for (const [ruby, status] of names) {
       if (status !== "all-private") continue;
@@ -244,15 +270,30 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       if (status === "all-private") continue;
       for (const c of rubyMethodToTs(ruby) ?? []) tsNames.delete(c);
     }
-    if (tsNames.size === 0) continue;
-    const existing = manifest.files[tsRel] ?? [];
-    manifest.files[tsRel] = [...new Set([...existing, ...tsNames])].sort();
+    return tsNames;
+  };
+
+  for (const [rubyFile, names] of fileVis) {
+    const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
+    const tsNames = project(names);
+    if (tsNames.size > 0) {
+      const existing = manifest.files[tsRel] ?? [];
+      manifest.files[tsRel] = [...new Set([...existing, ...tsNames])].sort();
+    }
+    const entities = fileEntities.get(rubyFile);
+    if (entities && entities.size > 0) {
+      manifest.entities[tsRel] = [
+        ...new Set([...(manifest.entities[tsRel] ?? []), ...entities]),
+      ].sort();
+    }
   }
 }
 
 const sortedFiles: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.files).sort()) sortedFiles[k] = manifest.files[k];
-const final: Manifest = { files: sortedFiles };
+const sortedEntities: Record<string, string[]> = {};
+for (const k of Object.keys(manifest.entities).sort()) sortedEntities[k] = manifest.entities[k];
+const final: Manifest = { files: sortedFiles, entities: sortedEntities };
 
 writeJsonManifest(OUT, final);
 flushManifestBatch();
