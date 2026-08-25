@@ -2068,8 +2068,10 @@ export function harvestObjectLiteralMethods(
       }
     }
     if (!mname) continue;
-    // A reason reached through the checker (shorthand / `foo: NS.bar`) lands
-    // after the flag was computed, so apply the same precedence here.
+    // Load-bearing, not a restatement of the branches above: for a shorthand or
+    // `foo: NS.bar`, `internal` comes from the TARGET declaration while the
+    // reason may have been written on the PROPERTY. Without this the entry
+    // carries `internal: true` alongside a receipt the scorer then never reads.
     if (noRailsEquivalent !== undefined) internal = false;
     const line = prop.getSourceFile().getLineAndCharacterOfPosition(prop.getStart()).line + 1;
     out.push({

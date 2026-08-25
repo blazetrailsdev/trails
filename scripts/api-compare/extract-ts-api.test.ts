@@ -122,6 +122,11 @@ describe("harvestObjectLiteralMethods", () => {
          * @internal
          * @noRailsEquivalent PERMANENT — a language fact.
          */
+        receiptOnProperty: hidden,
+        /**
+         * @internal
+         * @noRailsEquivalent PERMANENT — a language fact.
+         */
         inline(a: number): void {},
       };`,
     );
@@ -130,9 +135,10 @@ describe("harvestObjectLiteralMethods", () => {
       receipted: false,
       hidden: true,
       viaProperty: false,
+      receiptOnProperty: false,
       inline: false,
     });
-    for (const name of ["receipted", "viaProperty", "inline"]) {
+    for (const name of ["receipted", "viaProperty", "receiptOnProperty", "inline"]) {
       expect(methods.find((m) => m.name === name)!.noRailsEquivalent).toBe(
         "PERMANENT — a language fact.",
       );
