@@ -1518,7 +1518,14 @@ describe("BasicsTest", () => {
 
     const c2 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
-    expect(c2).toEqual(c1);
+    // Rails' `assert_equal c1, c2` compares element-wise through `Column#==`
+    // (sqlite3/column.rb:45-49 and its siblings), not structurally. That matters
+    // here and not upstream: Rails only ever compares one reflected cache with
+    // another, while trails' fixtures warm installs the BOOT DUMP as c1, and a
+    // dump-loaded column legitimately lacks the ivars the per-subclass coders
+    // never carry (`rowid`, `@generated_type` — sqlite3/column.rb:35-42).
+    expect(c2!.length).toBe(c1!.length);
+    c2!.forEach((col, i) => expect(col.equals(c1![i])).toBe(true));
 
     // Restore the harness' always-warm invariant for the rest of the file:
     // trails cannot re-warm synchronously on read the way Rails' cold-DB-hit

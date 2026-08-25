@@ -11,7 +11,7 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { stdout, stderr, setEnv } from "@blazetrails/activesupport";
+import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -1473,6 +1473,27 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 });
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {
+  // `Kernel.abort` leaves the host at exit status 1; under the node process
+  // adapter that is `process.exitCode`, which would red the whole vitest
+  // worker, so the adapter's two abort effects are captured here instead.
+  let exitCodes: number[];
+  let stderrWrites: string[];
+
+  beforeEach(() => {
+    exitCodes = [];
+    stderrWrites = [];
+    const adapter = getProcessAdapter();
+    vi.spyOn(adapter, "setExitCode").mockImplementation((code) => void exitCodes.push(code));
+    vi.spyOn(adapter.stderr, "write").mockImplementation((chunk) => {
+      stderrWrites.push(chunk);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("check schema file", () => {
     // Rails: assert_called_with(Kernel, :abort, [/awesome-file.sql/]) — aborts when file missing.
     // No blank-string branch: Rails only does File.exist?, so "" flows through the same path.
@@ -1480,6 +1501,8 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
       /nonexistent-awesome-file\.sql/,
     );
     expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
+    expect(stderrWrites.join("")).toMatch(/nonexistent-awesome-file\.sql/);
+    expect(exitCodes).toEqual([1, 1]);
   });
 });
 

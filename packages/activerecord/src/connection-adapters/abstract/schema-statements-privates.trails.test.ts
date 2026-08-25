@@ -16,6 +16,7 @@ import { AbstractAdapter } from "../abstract-adapter.js";
 import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { Table, Visitors } from "@blazetrails/arel";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},
@@ -631,13 +632,18 @@ describe("distinctRelationForPrimaryKey", () => {
   // adapter compiles and binds it; a node with no `toSql` would flatten to
   // "[object Object]" on the way through a string-compiling port.
   const arelNode = { __arel: true };
+  const quoter = {
+    quoteColumnName: (n: string) => `"${n}"`,
+    quoteTableName: (n: string) => `"${n}"`,
+  };
+  const visitor = new Visitors.ToSql(quoter as never);
 
   function makeRelation(over: Record<string, unknown> = {}) {
     const calls = { reselect: [] as unknown[], where: [] as Record<string, unknown>[] };
     const rel: any = {
       _calls: calls,
       primaryKey: "id",
-      table: { name: "posts" },
+      table: new Table("posts"),
       orderValues: [],
       limitValue: 5,
       offsetValue: 2,
@@ -645,7 +651,13 @@ describe("distinctRelationForPrimaryKey", () => {
         calls.reselect = cols;
         // Rails reselect spawns a clone; return a distinct object so a stray
         // distinctBang on the original would be observable.
-        return { ...this, distinctBang: () => {}, arel: this.arel };
+        return {
+          ...this,
+          distinctBang() {
+            return this;
+          },
+          arel: this.arel,
+        };
       },
       arel: () => arelNode,
       // Rails uses where! (in-place); mirror that with whereBang.
@@ -653,11 +665,8 @@ describe("distinctRelationForPrimaryKey", () => {
         calls.where.push(c);
         return this;
       },
-      limitBang(v: unknown) {
-        this.limitValue = v;
-      },
-      offsetBang(v: unknown) {
-        this.offsetValue = v;
+      noneBang() {
+        return this;
       },
       ...over,
     };
@@ -666,12 +675,12 @@ describe("distinctRelationForPrimaryKey", () => {
 
   it("reselects the table-qualified pk and materializes ids via selectRows", async () => {
     const selectRows = vi.fn().mockResolvedValue([[10], [20]]);
-    const ss = makeStatements({ quoteColumnName: (n: string) => `"${n}"`, selectRows });
+    const ss = makeStatements({ ...quoter, visitor, selectRows });
     const rel = makeRelation();
 
     await ss.distinctRelationForPrimaryKey(rel);
 
-    expect(rel._calls.reselect).toEqual(['"posts"."id"']);
+    expect(rel._calls.reselect).toEqual([['"posts"."id"']]);
     expect(selectRows).toHaveBeenCalledWith(arelNode, "SQL");
     expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
     expect(rel.limitValue).toBeNull();
@@ -684,7 +693,7 @@ describe("distinctRelationForPrimaryKey", () => {
       ["2026-01-01", 10],
       ["2026-01-02", 20],
     ]);
-    const ss = makeStatements({ quoteColumnName: (n: string) => `"${n}"`, selectRows });
+    const ss = makeStatements({ ...quoter, visitor, selectRows });
     const rel = makeRelation();
 
     await ss.distinctRelationForPrimaryKey(rel);
@@ -696,7 +705,8 @@ describe("distinctRelationForPrimaryKey", () => {
     const noneBang = vi.fn();
     const whereBang = vi.fn();
     const ss = makeStatements({
-      quoteColumnName: (n: string) => `"${n}"`,
+      ...quoter,
+      visitor,
       selectRows: vi.fn().mockResolvedValue([]),
     });
     const rel = makeRelation({ noneBang, whereBang });
@@ -705,6 +715,22 @@ describe("distinctRelationForPrimaryKey", () => {
 
     expect(noneBang).toHaveBeenCalledTimes(1);
     expect(whereBang).not.toHaveBeenCalled();
+  });
+
+  // Rails has no nil-pk guard: `Array(nil)` is `[]`, so the projection is empty
+  // and `limit_value`/`offset_value` are still cleared (schema_statements.rb:1451).
+  it("clears limit and offset for a relation with no primary key", async () => {
+    const selectRows = vi.fn().mockResolvedValue([]);
+    const noneBang = vi.fn();
+    const ss = makeStatements({ ...quoter, visitor, selectRows });
+    const rel = makeRelation({ primaryKey: null, noneBang });
+
+    await ss.distinctRelationForPrimaryKey(rel);
+
+    expect(rel._calls.reselect).toEqual([[]]);
+    expect(noneBang).toHaveBeenCalledTimes(1);
+    expect(rel.limitValue).toBeNull();
+    expect(rel.offsetValue).toBeNull();
   });
 });
 

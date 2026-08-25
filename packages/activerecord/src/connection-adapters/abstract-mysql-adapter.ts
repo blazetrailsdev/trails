@@ -1819,7 +1819,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const options: ColumnOptions = {
       default: column.default,
       null: column.null,
-      autoIncrement: column.autoIncrement,
+      autoIncrement: column.isAutoIncrement(),
       comment: column.comment ?? undefined,
     };
 

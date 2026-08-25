@@ -25,9 +25,14 @@ function makeColumn(
   return new Column(
     options.name ?? "id",
     null,
-    { sqlType: options.sqlType ?? options.type ?? "bigint", type: options.type ?? "integer" },
+    {
+      // `array` derives from the UNSTRIPPED sql_type (postgresql/column.rb:37-39),
+      // so the fixture spells the "[]" suffix rather than setting a flag.
+      sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
+      type: options.type ?? "integer",
+    },
     true,
-    { serial: options.serial, array: options.array, generated: options.generated },
+    { serial: options.serial, generated: options.generated },
   );
 }
 

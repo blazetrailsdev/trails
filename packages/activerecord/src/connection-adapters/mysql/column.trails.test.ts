@@ -4,21 +4,28 @@ import { Column as MysqlColumn } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
 describe("MysqlColumn", () => {
+  // mysql/column.rb defines no `encode_with` / `init_with`: every predicate it
+  // adds derives from `sql_type` / `collation` / `sql_type_metadata.extra`, all
+  // of which the BASE coder persists. So the round-trip carries no MySQL keys
+  // and the predicates still answer.
   it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
     const original = new MysqlColumn(
       "id",
       null,
-      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
+      { sqlType: "bigint(20) unsigned", type: "integer", limit: 8, extra: "auto_increment" },
       false,
-      { autoIncrement: true, unsigned: true, virtual: false },
     );
     const coder: Record<string, unknown> = {};
     original.encodeWith(coder);
+    expect(Object.keys(coder)).not.toContain("unsigned");
+    expect(Object.keys(coder)).not.toContain("auto_increment");
+    expect(Object.keys(coder)).not.toContain("virtual");
+
     const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
     restored.initWith(JSON.parse(JSON.stringify(coder)));
-    expect(restored.autoIncrement).toBe(true);
-    expect(restored.unsigned).toBe(true);
-    expect(restored.virtual).toBe(false);
+    expect(restored.isAutoIncrement()).toBe(true);
+    expect(restored.isUnsigned()).toBe(true);
+    expect(restored.isVirtual()).toBe(false);
     expect(restored.sqlType).toBe("bigint(20) unsigned");
   });
 });

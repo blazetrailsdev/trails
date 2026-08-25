@@ -9,10 +9,6 @@ import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
-  unsigned: boolean;
-  autoIncrement: boolean;
-  virtual: boolean;
-
   constructor(
     name: string,
     defaultValue: unknown,
@@ -29,9 +25,6 @@ export class Column extends BaseColumn {
       collation?: string | null;
       comment?: string | null;
       defaultFunction?: string | null;
-      unsigned?: boolean;
-      autoIncrement?: boolean;
-      virtual?: boolean;
     } = {},
   ) {
     const meta = new TypeMetadata(
@@ -49,9 +42,6 @@ export class Column extends BaseColumn {
       comment: options.comment,
       defaultFunction: options.defaultFunction,
     });
-    this.unsigned = options.unsigned ?? false;
-    this.autoIncrement = options.autoIncrement ?? false;
-    this.virtual = options.virtual ?? false;
   }
 
   /** Raw MySQL `Extra` string (e.g. "VIRTUAL GENERATED", "STORED GENERATED",
@@ -64,54 +54,43 @@ export class Column extends BaseColumn {
     return (this.sqlTypeMetadata as TypeMetadata | null)?.extra ?? null;
   }
 
-  /**
-   * @missingRailsCall match? — PERMANENT: Per-entry verified (RFC 0032
-   *   wide-entry verification): Rails mysql/column.rb:9-11 runs the unsigned
-   *   regex against sql_type on every call; trails mysql/column.ts:12 stores
-   *   `unsigned` as a readonly boolean computed when the adapter builds columns
-   *   from SHOW FULL FIELDS.
-   */
+  // Mirrors: mysql/column.rb:9-11. End-anchored, and no /i flag as in Rails —
+  // SHOW FULL FIELDS reports the `Type` column lowercased.
   isUnsigned(): boolean {
-    return this.unsigned;
+    return /\bunsigned(?: zerofill)?$/.test(this.sqlType ?? "");
   }
 
   isCaseSensitive(): boolean {
     return this.collation != null && !this.collation.endsWith("_ci");
   }
 
+  // Mirrors: mysql/column.rb:17-19
   isAutoIncrement(): boolean {
-    return this.autoIncrement;
+    return this.extra === "auto_increment";
   }
 
+  // Mirrors: `alias_method :auto_incremented_by_db?, :auto_increment?`
+  // (mysql/column.rb:20)
   isAutoIncrementedByDb(): boolean {
-    return this.autoIncrement;
+    return this.isAutoIncrement();
+  }
+
+  // Mirrors: mysql/column.rb:22-24
+  isVirtual(): boolean {
+    return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra);
   }
 
   /**
-   * @missingRailsCall match? — PERMANENT: Per-entry verified (RFC 0032
-   *   wide-entry verification): Rails mysql/column.rb:22-24 runs the
-   *   VIRTUAL/STORED/PERSISTENT regex against extra on every call; trails
-   *   mysql/column.ts:14 stores `virtual` as a readonly boolean computed at
-   *   column construction.
+   * Rails' MySQL::Column defines NEITHER coder half (mysql/column.rb has no
+   * `encode_with` / `init_with`): every predicate it adds derives from
+   * `sql_type` / `collation` / `sql_type_metadata.extra`, all of which the base
+   * coder already persists. The one thing left is the `class` tag, which Ruby
+   * gets from the YAML object tag and JSON has to spell out.
+   *
+   * @see Column#encodeWith
    */
-  isVirtual(): boolean {
-    return this.virtual;
-  }
-
-  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
-  override initWith(coder: ColumnCoder): void {
-    super.initWith(coder);
-    this.unsigned = (coder["unsigned"] as boolean) ?? false;
-    this.autoIncrement = (coder["auto_increment"] as boolean) ?? false;
-    this.virtual = (coder["virtual"] as boolean) ?? false;
-  }
-
   override encodeWith(coder: ColumnCoder): void {
     super.encodeWith(coder);
     coder["class"] = "MySQL::Column";
-    coder["unsigned"] = this.unsigned;
-    coder["auto_increment"] = this.autoIncrement;
-    coder["virtual"] = this.virtual;
-    coder["extra"] = this.extra;
   }
 }

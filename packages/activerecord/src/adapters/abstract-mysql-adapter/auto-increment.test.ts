@@ -52,14 +52,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
       const columns = await adapter.columns("auto_increments");
       const col = (columns as any[]).find((c) => c.name === "id");
-      assertNotPredicate(col, (c) => c.autoIncrement);
+      assertNotPredicate(col, (c) => c.isAutoIncrement());
     });
 
     it("auto increment false with create table", async () => {
       await adapter.createTable("auto_increments", { autoIncrement: false, force: "cascade" });
       const columns = await adapter.columns("auto_increments");
       const col = (columns as any[]).find((c) => c.name === "id");
-      assertNotPredicate(col, (c) => c.autoIncrement);
+      assertNotPredicate(col, (c) => c.isAutoIncrement());
     });
   });
 });

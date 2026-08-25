@@ -3397,7 +3397,15 @@ export interface Relation<T extends Base>
   // element type, in query_methods.rb source order.
   select(fn: (record: T) => boolean): Promise<T[]>;
   select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
-  reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  /**
+   * Rails' `reselect(*args)` flattens its args (`query_methods.rb` —
+   * `reselect!` does `args.flatten!`), so an array argument is a valid single
+   * field list; `distinct_relation_for_primary_key` passes one
+   * (`schema_statements.rb:1438`).
+   */
+  reselect(
+    ...args: (string | Nodes.Node | Record<string, unknown> | readonly (string | Nodes.Node)[])[]
+  ): Relation<T>;
   group(...args: (string | Nodes.Node)[]): Relation<T>;
   regroup(...args: string[]): Relation<T>;
   order(...args: OrderArg[]): Relation<T>;

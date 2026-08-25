@@ -3780,7 +3780,6 @@ export class PostgreSQLAdapter
         collation: collation ?? undefined,
         comment: comment || null,
         serial,
-        array: type.endsWith("[]"),
         identity: identity || null,
         generated: gen || null,
       },

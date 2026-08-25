@@ -14,6 +14,8 @@ import { CommandRecorder } from "../../migration/command-recorder.js";
 import type { MigrationCommand } from "../../migration/command-recorder.js";
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
+import type { Relation } from "../../relation.js";
+import type { Base } from "../../base.js";
 import {
   TableDefinition,
   Table,
@@ -53,6 +55,7 @@ import {
   KeyError,
   any,
   truncateBytes,
+  wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
@@ -1610,75 +1613,30 @@ export class SchemaStatements {
    * `Promise` would run the relation and hand back its records instead. The
    * caller therefore reuses the relation it passed in.
    */
-  async distinctRelationForPrimaryKey(relation: {
-    primaryKey?: string | string[];
-    table?: { [key: string]: unknown };
-    orderValues?: unknown[];
-    reselect?: (...cols: unknown[]) => unknown;
-    distinctBang?: () => unknown;
-    noneBang?: () => void;
-    whereBang?: (conditions: Record<string, unknown>) => unknown;
-    limitValue?: number | null;
-    offsetValue?: number | null;
-    arel?: () => unknown;
-  }): Promise<void> {
-    const pk = relation.primaryKey;
-    if (!pk) return;
-
-    const pkNames = Array.isArray(pk) ? pk : [pk];
-    // Rails: primary_key_columns = Array(primary_key).map { |c| visitor.compile(relation.table[c]) }
-    // — table-qualified, quoted columns so a bare `id` stays unambiguous when the
-    // relation joins another table (the whole reason this path exists).
-    const tableName = (relation.table as { name?: string } | undefined)?.name;
-    const quoteCol = (c: string): string =>
-      typeof this.quoteColumnName === "function" ? this.quoteColumnName(c) : c;
-    const pkColumns = pkNames.map((c) =>
-      tableName != null ? `${this.quoteTableName(tableName)}.${quoteCol(c)}` : quoteCol(c),
+  async distinctRelationForPrimaryKey(relation: Relation<Base>): Promise<void> {
+    const primaryKeyColumns = wrap(relation.primaryKey).map((column) =>
+      this.visitor.compile(relation.table.get(column)),
     );
-    const values = this.columnsForDistinct(pkColumns, (relation.orderValues as string[]) ?? []);
 
-    // Rails: limited = relation.reselect(values).distinct! — reselect always
-    // spawns a clone, so distinct! never touches the passed relation. Keep the
-    // distinctBang coupled to the reselect spawn so a missing reselect can't
-    // mutate the original.
-    let limited: any = relation;
-    const selectValues = Array.isArray(values) ? values : [values];
-    if (limited.reselect) {
-      limited = limited.reselect(...selectValues);
-      if (limited.distinctBang) limited.distinctBang();
-    }
+    const values = this.columnsForDistinct(primaryKeyColumns, relation.orderValues as string[]);
 
-    // Rails: select_rows(limited.arel, "SQL").map { |r| r.last(primary_key.length) }
-    // — the ARel node goes to the adapter, which compiles and binds it
-    // (schema_statements.rb:1440); flattening to SQL here would strand the
-    // binds. selectRows yields positional column arrays, so the trailing pk
-    // values survive the leading order columns PG/MySQL prepend in
-    // columns_for_distinct.
-    const pkLen = pkNames.length;
-    const rows = (await (this as any).selectRows(limited.arel(), "SQL")) as unknown[][];
-    const limitedIds: unknown[][] = rows.map((row) => row.slice(-pkLen));
+    const limited = relation.reselect(values).distinctBang();
+    // Rails hands `select_rows` the ARel node (schema_statements.rb:1440) so the
+    // adapter compiles and binds it; flattening to SQL here would strand the binds.
+    const limitedIds = (await this.selectRows(limited.arel(), "SQL")).map((results) =>
+      results.slice(-wrap(relation.primaryKey).length),
+    );
 
     if (limitedIds.length === 0) {
-      if (typeof (relation as any).noneBang === "function") {
-        (relation as any).noneBang();
-      }
+      relation.noneBang();
     } else {
-      // Rails: relation.where!(**Array(primary_key).zip(limited_ids.transpose).to_h)
-      // — keyed on the bare pk attribute names, not the quoted/qualified columns.
-      // Use whereBang (in-place mutation of the passed relation) to match `where!`;
-      // plain `where` returns a clone, which would strand the limit/offset reset
-      // below on a different object than the caller holds.
-      const transposed: unknown[][] = pkNames.map((_, i) => limitedIds.map((row) => row[i]));
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < pkNames.length; i++) {
-        conditions[pkNames[i]] = transposed[i];
-      }
-      relation.whereBang?.(conditions);
+      const transposed = wrap(relation.primaryKey).map((_, i) => limitedIds.map((row) => row[i]));
+      relation.whereBang(
+        Object.fromEntries(wrap(relation.primaryKey).map((key, i) => [key, transposed[i]])),
+      );
     }
 
-    // Rails: relation.limit_value = relation.offset_value = nil
-    relation.limitValue = null;
-    relation.offsetValue = null;
+    relation.limitValue = relation.offsetValue = null;
   }
 
   updateTableDefinition(tableName: string, base?: unknown): Table {

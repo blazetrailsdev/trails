@@ -199,7 +199,7 @@ describe("CommentTest", () => {
     const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "id")!;
     expect(col.comment).toBe("Edited column comment");
     if (adapterType === "mysql") {
-      expect(col.autoIncrement).toBe(true);
+      expect(col.isAutoIncrement()).toBe(true);
     }
   });
 

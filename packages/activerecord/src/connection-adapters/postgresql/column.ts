@@ -7,10 +7,10 @@
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { isPresent } from "@blazetrails/activesupport";
 
 export class Column extends BaseColumn {
   serial: boolean;
-  array: boolean;
   identity: string | null;
   generated: string | null;
 
@@ -32,7 +32,6 @@ export class Column extends BaseColumn {
       defaultFunction?: string | null;
       comment?: string | null;
       serial?: boolean;
-      array?: boolean;
       identity?: string | null;
       generated?: string | null;
     } = {},
@@ -53,7 +52,6 @@ export class Column extends BaseColumn {
       comment: options.comment,
     });
     this.serial = options.serial ?? false;
-    this.array = options.array ?? sqlTypeMetadata.sqlType?.endsWith("[]") ?? false;
     this.identity = options.identity ?? null;
     this.generated = options.generated ?? null;
   }
@@ -95,9 +93,12 @@ export class Column extends BaseColumn {
     return this.serial;
   }
 
-  // Mirrors: Column#identity? — truthy when attidentity is "a" or "d"
+  // Mirrors: Column#identity? — the adapter already seats `identity.presence`
+  // (postgresql/schema_statements.rb:990), so Ruby's truthiness on the raw ivar
+  // is `!= null`. A coder that never carried the key leaves it `undefined`,
+  // which `!= null` reads as falsy the way Ruby reads a missing ivar's nil.
   get isIdentity(): boolean {
-    return this.identity !== null && this.identity !== "";
+    return this.identity != null;
   }
 
   // Mirrors: Column#auto_incremented_by_db?
@@ -105,9 +106,10 @@ export class Column extends BaseColumn {
     return this.isSerial || this.isIdentity;
   }
 
-  // Mirrors: Column#virtual? — true for any generated (stored) column
+  // Mirrors: Column#virtual? — `@generated.present?` (postgresql/column.rb:29),
+  // so "" is blank and a nil/absent ivar is falsy.
   override isVirtual(): boolean {
-    return this.generated !== null && this.generated !== "";
+    return isPresent(this.generated);
   }
 
   // Mirrors: Column#has_default? — virtual columns never have a user-visible default
@@ -115,7 +117,14 @@ export class Column extends BaseColumn {
     return super.hasDefault && !this.isVirtual();
   }
 
-  // Mirrors: Column#array? — true when the column stores an array type
+  // Mirrors: `def array; sql_type_metadata.sql_type.end_with?("[]"); end`
+  // (postgresql/column.rb:37-39) — derived from the UNSTRIPPED sql_type, which
+  // is why it reads the metadata rather than this class' `sqlType` override.
+  get array(): boolean {
+    return this.sqlTypeMetadata?.sqlType?.endsWith("[]") ?? false;
+  }
+
+  // Mirrors: `alias :array? :array` (postgresql/column.rb:40)
   isArray(): boolean {
     return this.array;
   }
@@ -134,23 +143,22 @@ export class Column extends BaseColumn {
     );
   }
 
-  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
+  // Mirrors: postgresql/column.rb:50-55 — `serial`, `identity`, `generated`,
+  // then `super`. `oid`/`fmod` are not ivars here (they delegate to the
+  // metadata, which the base coder persists) and `array` is derived.
   override initWith(coder: ColumnCoder): void {
-    super.initWith(coder);
     this.serial = (coder["serial"] as boolean) ?? false;
-    this.array = (coder["array"] as boolean) ?? false;
     this.identity = (coder["identity"] as string | null) ?? null;
     this.generated = (coder["generated"] as string | null) ?? null;
+    super.initWith(coder);
   }
 
+  /** @see Column#encodeWith — this subclass' half of the JSON class tag. */
   override encodeWith(coder: ColumnCoder): void {
-    super.encodeWith(coder);
-    coder["class"] = "PostgreSQL::Column";
     coder["serial"] = this.serial;
-    coder["oid"] = this.oid;
-    coder["fmod"] = this.fmod;
-    coder["array"] = this.array;
     coder["identity"] = this.identity;
     coder["generated"] = this.generated;
+    super.encodeWith(coder);
+    coder["class"] = "PostgreSQL::Column";
   }
 }

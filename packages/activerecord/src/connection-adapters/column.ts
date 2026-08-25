@@ -163,20 +163,22 @@ export class Column {
    * carries no tag, so the tag is written as a key and `rehydrateColumn`
    * dispatches on it.
    *
-   * Rails' own subclasses carry part of their state through the coder too —
-   * `PostgreSQL::Column` writes `serial` / `identity` / `generated`
-   * (`postgresql/column.rb:50-61`) and `SQLite3::Column` writes
-   * `auto_increment` (`sqlite3/column.rb:36-44`); `MySQL::Column` writes
-   * nothing, because its `extra` lives in `MySQL::TypeMetadata` and rides
-   * along inside `sql_type_metadata`. trails' overrides go further still,
-   * encoding the state Rails either derives from `sql_type` (`array`, from the
-   * `[]` suffix — `postgresql/column.rb:37-40`) or reaches through
-   * `sql_type_metadata`, which the base coder already persists (`oid` / `fmod`,
-   * `postgresql/column.rb:7`; MySQL's `extra`, `mysql/column.rb:7-24`), plus
-   * the `rowid` / `generated_type` Rails genuinely loses. Dropping the keys
-   * today leaves those fields `undefined`, which flips the `x !== null` guards
-   * the subclasses port Ruby's `nil?` / `present?` as. Tracked by RFC 0096
-   * `converge-column-subclass-coders-to-rails-per-subclass-key-sets`.
+   * Rails' subclasses each carry their OWN key set through the coder, and
+   * trails now mirrors them one for one: `PostgreSQL::Column` writes `serial` /
+   * `identity` / `generated` then calls `super` (`postgresql/column.rb:50-61`)
+   * — `oid` / `fmod` are not ivars there but `delegate`s to the metadata
+   * (`:7`) the base coder already persists, and `array` derives from the
+   * unstripped `sql_type` (`:37-39`); `SQLite3::Column` writes `auto_increment`
+   * alone (`sqlite3/column.rb:35-42`), so `rowid` and `@generated_type` are
+   * dropped by a round-trip upstream too; `MySQL::Column` defines no coder half
+   * at all, because `unsigned?` / `case_sensitive?` / `auto_increment?` /
+   * `virtual?` all derive from `sql_type` / `collation` /
+   * `sql_type_metadata.extra` (`mysql/column.rb:7-24`).
+   *
+   * A key a subclass no longer writes leaves its ivar absent on a dump-loaded
+   * column, which is exactly Ruby's nil — so each of those predicates is
+   * spelled with Ruby's nil truthiness (`!= null` / `present?`), never
+   * `!== null`.
    */
   encodeWith(coder: ColumnCoder): void {
     coder["class"] = "Column";

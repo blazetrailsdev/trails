@@ -125,6 +125,34 @@ export function onSignal(name: SignalName, handler: () => void): () => void {
 }
 
 /**
+ * Ruby's `SystemExit` — the exception `Kernel#abort` raises. Its `status` is
+ * the exit status the host would leave with, and its message is the string
+ * `abort` was given (`"exit"` when it was given none).
+ */
+export class SystemExit extends Error {
+  readonly status: number;
+
+  constructor(status: number, message = "exit") {
+    super(message);
+    this.name = "SystemExit";
+    this.status = status;
+  }
+}
+
+/**
+ * Ruby's `Kernel#abort`: write `message` to stderr, then raise `SystemExit`
+ * with status 1. MRI does raise — `rescue SystemExit` catches it — so the
+ * unwind is faithful; what makes it an abort rather than an ordinary error is
+ * that the process is left with a non-zero status, which is set here through
+ * the process adapter so a test host can observe it without exiting.
+ */
+export function abort(message?: string): never {
+  if (message !== undefined) stderr.write(`${message}\n`);
+  setExitCode(1);
+  throw new SystemExit(1, message);
+}
+
+/**
  * Mutate the `env` snapshot. Use sparingly — `env` is intended to be
  * immutable after registration. Legitimate uses: test setup, dotenv
  * shims at boot. Updates both the underlying adapter and the exported

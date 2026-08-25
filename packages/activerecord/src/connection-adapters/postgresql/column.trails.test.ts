@@ -18,6 +18,24 @@ describe("PostgreSQL::Column JSON round-trip", () => {
     const back = Object.create(Column.prototype) as Column;
     back.initWith(JSON.parse(JSON.stringify(coder)));
 
+    // postgresql/column.rb:56-61 carries `serial` / `identity` / `generated`
+    // and nothing else: `oid` / `fmod` ride inside `sql_type_metadata`, and
+    // `array` derives from the unstripped sql_type.
+    expect(Object.keys(coder).sort()).toEqual(
+      [
+        "class",
+        "collation",
+        "comment",
+        "default",
+        "default_function",
+        "generated",
+        "identity",
+        "name",
+        "null",
+        "serial",
+        "sql_type_metadata",
+      ].sort(),
+    );
     expect(back).toBeInstanceOf(Column);
     expect(back.isArray()).toBe(true);
     expect(back.oid).toBe(1015);

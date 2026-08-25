@@ -14,6 +14,8 @@ import {
   stderr,
   stdin,
   stdout,
+  abort,
+  SystemExit,
   type ProcessAdapter,
   type WriteStream,
 } from "./process-adapter.js";
@@ -289,6 +291,35 @@ describe("processAdapter", () => {
     it("reports 'custom' when a user adapter is registered", () => {
       registerProcessAdapter(makeFakeAdapter());
       expect(processAdapterConfig.adapter).toBe("custom");
+    });
+  });
+
+  describe("abort", () => {
+    it("writes the message to stderr, sets exit status 1 and raises SystemExit", () => {
+      const adapter = makeFakeAdapter();
+      registerProcessAdapter(adapter);
+
+      expect(() => abort("Schema migrations table does not exist yet.")).toThrow(SystemExit);
+      expect((adapter.stderr as unknown as { written: string[] }).written).toEqual([
+        "Schema migrations table does not exist yet.\n",
+      ]);
+      expect((adapter as unknown as { __exitCode: () => number }).__exitCode()).toBe(1);
+    });
+
+    it('raises SystemExit with Ruby\'s "exit" message and writes nothing when given none', () => {
+      const adapter = makeFakeAdapter();
+      registerProcessAdapter(adapter);
+
+      let raised: SystemExit | undefined;
+      try {
+        abort();
+      } catch (e) {
+        raised = e as SystemExit;
+      }
+      expect(raised).toBeInstanceOf(SystemExit);
+      expect(raised.message).toBe("exit");
+      expect(raised.status).toBe(1);
+      expect((adapter.stderr as unknown as { written: string[] }).written).toEqual([]);
     });
   });
 
