@@ -60,17 +60,15 @@ describeIfPg("PostgreSQLAdapter", () => {
           await connection.changeTable("citexts", async (t) => {
             await (t as PgTable).citext("username");
           });
-          void Citext.resetColumnInformation();
-          // Rails: assert_equal :citext, Citext.columns_hash["username"].type (citext_test.rb:47-48)
-          // TODO: restore once InstrumentationAlreadyStartedError after DDL inside
-          //   connection.transaction() is fixed in the PG driver.
+          await Citext.resetColumnInformation();
+          const column = Citext.columnsHash()["username"] as unknown as PgColumn;
+          expect(column.type).toBe("citext");
+
           throw new Rollback();
         });
       } finally {
         void Citext.resetColumnInformation();
       }
-      const colsAfter = await connection.columns("citexts");
-      expect(colsAfter.find((c) => c.name === "username")).toBeUndefined();
     });
 
     it("write", async () => {

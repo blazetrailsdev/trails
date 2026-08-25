@@ -17,7 +17,7 @@ import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
-import { quoteColumnName } from "./quoting.js";
+import { quoteTableName } from "./quoting.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   addForeignKey(
@@ -99,30 +99,15 @@ const INDEX_ON_REGEX =
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#indexes
  *
  * Houses the SQLite index introspection in the file Rails keeps it in; the
- * adapter delegates here. Schema-qualified names (e.g. `temp.widgets`) place
- * the qualifier before the PRAGMA keyword.
- *
- * @missingRailsCall quote_table_name — PERMANENT: Per-site verified (RFC 0106
- *   wave 4b): sqlite3/schema_statements.rb:9 is `PRAGMA
- *   index_list(#{quote_table_name(table_name)})`; trails splits an
- *   attached-schema-qualified name first and quotes the two halves with
- *   `quoteColumnName` (sqlite3/schema-statements.ts:109-116), because PRAGMA
- *   takes `schema.table` as two separately-quoted identifiers, not one quoted
- *   string.
+ * adapter delegates here.
  */
 export async function indexes(
   adapter: DatabaseAdapter,
   tableName: string,
 ): Promise<IndexDefinition[]> {
-  const { schema, bare } = splitTableName(tableName);
-  const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
   const rows = (
-    await adapter.internalExecQuery(
-      `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
-      "SCHEMA",
-    )
+    await adapter.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
   ).toArray() as Array<{ name: string; unique: number; origin: string }>;
-  const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
   const result: IndexDefinition[] = [];
   for (const idx of rows) {
     // Skip SQLite's internal auto-indexes (named `sqlite_*`); user-visible
@@ -130,7 +115,7 @@ export async function indexes(
     if (idx.name.startsWith("sqlite_")) continue;
 
     const indexSql = (await adapter.queryValue(
-      `SELECT sql FROM ${sqliteMaster} WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
+      `SELECT sql FROM sqlite_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
       "SCHEMA",
@@ -141,10 +126,7 @@ export async function indexes(
     if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
 
     const cols = (
-      await adapter.internalExecQuery(
-        `PRAGMA ${pragmaPrefix}index_info(${adapter.quote(idx.name)})`,
-        "SCHEMA",
-      )
+      await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
     ).toArray() as Array<{ name: string | null; seqno: number }>;
     const columnNames = cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
 
@@ -161,16 +143,11 @@ export async function indexes(
       }
     }
 
-    result.push(new IndexDefinition(bare, idx.name, idx.unique !== 0, columns, { orders, where }));
+    result.push(
+      new IndexDefinition(tableName, idx.name, idx.unique !== 0, columns, { orders, where }),
+    );
   }
   return result;
-}
-
-function splitTableName(tableName: string): { schema: string; bare: string } {
-  const dot = tableName.lastIndexOf(".");
-  return dot === -1
-    ? { schema: "", bare: tableName }
-    : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
 }
 
 /**

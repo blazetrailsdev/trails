@@ -1586,48 +1586,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
   }
 
-  private _splitTableName(tableName: string): { schema: string; bare: string } {
-    const dot = tableName.lastIndexOf(".");
-    return dot === -1
-      ? { schema: "", bare: tableName }
-      : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
-  }
-
-  /**
-   * The abstract `index_name` (abstract/schema_statements.rb) with the schema
-   * qualifier taken off the table before the default name is built. Rails
-   * embeds `table_name` verbatim, so an ATTACHed `aux.customers` yields the
-   * dotted identifier `index_aux.customers_on_name`, which the CREATE INDEX
-   * emission then reads as a schema qualifier and rejects. Every other
-   * qualified path in this adapter (`columns`, `foreignKeys`, `primaryKeys`)
-   * already derives from the bare table; the qualifier is re-applied to the
-   * INDEX name by `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
-   *
-   * @noRailsEquivalent PERMANENT — SQLite ATTACHed-schema support, which Rails
-   * has no notion of at all, so there is no Ruby `index_name` behaviour to
-   * converge toward. Same deviation as
-   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
-   */
-  override indexName(
-    tableName: string,
-    options:
-      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
-      | string
-      | string[],
-  ): string {
-    return super.indexName(this._splitTableName(tableName).bare, options);
-  }
-
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#remove_index
-   * (`sqlite3_adapter.rb:286-292`), with the schema qualifier put back on the
-   * INDEX name for a qualified table — the same fork
-   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition` takes on create, and
-   * ratified in the same place. Rails emits the bare name because it has no
-   * ATTACHed-schema notion; SQLite resolves a bare `DROP INDEX` name across
-   * main, temp and each ATTACHed database in attach order, so two schemas
-   * carrying one index name would otherwise drop whichever it reaches first.
-   * An unqualified table takes the Rails emission untouched.
+   * (`sqlite3_adapter.rb:286-292`).
    */
   async removeIndex(
     tableName: string,
@@ -1653,13 +1614,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    const { schema } = this._splitTableName(tableName);
-
-    await this.execQuery(
-      schema === ""
-        ? `DROP INDEX ${quoteColumnName(indexName)}`
-        : `DROP INDEX ${quoteColumnName(schema)}.${quoteColumnName(indexName)}`,
-    );
+    await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(options: Record<string, unknown> = {}): Sqlite3SchemaDumper {
@@ -1853,13 +1808,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const prefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (
-      await this.internalExecQuery(
-        `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
-        "SCHEMA",
-      )
+      await this.internalExecQuery(`PRAGMA foreign_key_list(${this.quote(tableName)})`, "SCHEMA")
     ).toArray();
     // Deferred or immediate foreign keys can only be seen in the CREATE TABLE sql
     // Rails: `table_structure_sql(table_name).select { |column_string|
@@ -1919,7 +1869,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const columnKey = fromCols.join(",");
       const primaryKeyKey = toCols.join(",");
       const nameKey = columnKey.replace(/,/g, "_");
-      const name = namesByColumn.get(columnKey) ?? `fk_${bare}_${nameKey}`;
+      const name = namesByColumn.get(columnKey) ?? `fk_${tableName}_${nameKey}`;
       const deferrable = fkDefs[`${toTable},${columnKey},${primaryKeyKey}`];
       results.push(
         // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
@@ -2099,35 +2049,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
   }
 
-  /**
-   * Resolve the sqlite_master reference for a possibly-schema-qualified
-   * name. SQLite stores each attached DB's schema in its own
-   * `<schema>.sqlite_master`; `aux.widgets` is row `name='widgets'` in
-   * `aux.sqlite_master`, never `name='aux.widgets'` in the main catalog.
-   */
-  private _sqliteMasterFor(name: string): { sqliteMaster: string; bare: string } {
-    const { schema, bare } = this._splitTableName(name);
-    return {
-      sqliteMaster: schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master",
-      bare,
-    };
-  }
-
   async tableExists(name: string): Promise<boolean> {
     // Rails guards with `if table_name.present?` and returns nil for nil/blank
     // names (schema_statements.rb:61); we return false for the same observable
     // `table_exists?(nil)` result rather than dereferencing a null name.
     if (name == null) return false;
-    if (name.includes(".")) {
-      const { sqliteMaster, bare } = this._sqliteMasterFor(name);
-      const rows = (
-        await this.internalExecQuery(
-          `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name='${sqliteQuoteString(bare)}'`,
-          "SCHEMA",
-        )
-      ).toArray() as Array<{ one: number }>;
-      return rows.length > 0;
-    }
     const rows = (
       await this.internalExecQuery(
         `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
@@ -2142,20 +2068,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * scalar PKs, an array for composite PKs, or null for rowid-only
    * tables (no explicit PK column). Matches Rails' SchemaCache which
    * stores `string | string[] | null` for primary_keys entries.
-   *
-   * Uses the `PRAGMA schema.table_info(table)` form for schema-qualified
-   * names (e.g. `temp.widgets`). The `PRAGMA table_info("schema"."table")`
-   * form does NOT work — SQLite treats the whole quoted string as a
-   * single table name and returns no rows.
    */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (
-      await this.internalExecQuery(
-        `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
-        "SCHEMA",
-      )
+      await this.internalExecQuery(`PRAGMA table_info(${quoteTableName(tableName)})`, "SCHEMA")
     ).toArray() as Array<{ name: string; pk: number }>;
     const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
     if (pks.length === 0) return null;
@@ -2368,13 +2284,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<void> {
     await this.ensureConnected();
     const rename = options.rename ?? {};
-    const { bare: bareTable } = this._splitTableName(tableName);
 
     // Rails: altered_table_name = "a#{table_name}" (sqlite3_adapter.rb:566).
-    // Kept bare even for a schema-qualified table: the buffer is a TEMPORARY
-    // table, which always lives in the `temp` schema, so a qualifier would be
-    // rejected.
-    const alteredTableName = `a${bareTable}`;
+    const alteredTableName = `a${tableName}`;
 
     // No explicit missing-table guard: the first move's `columns` reaches
     // table_structure, which already raises StatementInvalid naming the table
@@ -2417,27 +2329,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
 
-  /**
-   * @internal
-   *
-   * @missingRailsArgs quote_table_name — PERMANENT: Rails passes `table_name`
-   *   whole (sqlite3_adapter.rb:790-795); PRAGMA takes an attached-schema
-   *   qualifier as two separately-quoted identifiers rather than one quoted
-   *   name, so the two halves are quoted apart (see the split rationale on
-   *   `indexes` in sqlite3/schema-statements.ts).
-   */
+  /** @internal */
   private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteTableName(schema)}.` : "";
     const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
     // Rails: `internal_exec_query("PRAGMA table_xinfo(#{quote_table_name(table_name)})",
     // "SCHEMA")` (sqlite3_adapter.rb:792-794); `toArray` hands back the plain
     // rows every reader of `tableInfo` here consumes.
     return (
-      await this.internalExecQuery(
-        `PRAGMA ${pragmaPrefix}${pragma}(${quoteTableName(bare)})`,
-        "SCHEMA",
-      )
+      await this.internalExecQuery(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, "SCHEMA")
     ).toArray();
   }
 
@@ -2633,10 +2532,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
    *
-   * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`) and so
-   * does this, for a schema-qualified destination as much as a bare one: the
-   * qualifier lands on the INDEX name, which is where SQLite takes it, in
-   * `SQLite3::SchemaCreation#quotedIndexNameAndTable`.
+   * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`).
    * @internal
    */
   private async copyTableIndexes(
@@ -2645,12 +2541,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     rename: Record<string, string> = {},
   ): Promise<void> {
     const idxRows = await this.indexes(from);
-    const { bare: bareFrom } = this._splitTableName(from);
-    const { bare: bareTo } = this._splitTableName(to);
     for (const idx of idxRows) {
       let name = idx.name;
-      if (bareTo === `a${bareFrom}`) name = `t${name}`;
-      else if (bareFrom === `a${bareTo}`) name = name.slice(1);
+      if (to === `a${from}`) name = `t${name}`;
+      else if (from === `a${to}`) name = name.slice(1);
       // Rails gates the rename/filter on `columns.is_a?(Array)` — and with it
       // the `columns(to)` reflection: an expression index carries its
       // parenthesized expression as a bare string, copied across verbatim.
@@ -2662,8 +2556,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         cols = idx.columns;
       }
       if (!cols.length) continue;
-      const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
+      const escapedFrom = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`, "g"), `$1${to}_`);
       const options: {
         name: string;
         internal: boolean;
