@@ -142,6 +142,7 @@ import {
   type ExclusionConstraintOptions,
   type UniqueConstraintOptions,
 } from "./postgresql/schema-definitions.js";
+import { _setPostgreSQLAdapterClass } from "./postgresql/postgresql-adapter-slot.js";
 import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
   CheckConstraintDefinition,
@@ -358,7 +359,8 @@ export class PostgreSQLAdapter
   }
 
   // Mirrors: PostgreSQLAdapter.create_unlogged_tables class_attribute (postgresql_adapter.rb:105).
-  // Pass this value as `unlogged` when constructing a PostgreSQL TableDefinition.
+  // Read directly by PostgreSQL::TableDefinition's ctor
+  // (postgresql/schema_definitions.rb:254), via the zero-import slot.
   static createUnloggedTables = false;
 
   /** Mirrors: PostgreSQLAdapter.decode_dates class_attribute (postgresql_adapter.rb:132). */
@@ -3701,10 +3703,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    const rest = options;
-    const unlogged =
-      (rest.unlogged as boolean | undefined) ?? PostgreSQLAdapter.createUnloggedTables;
-    return new PgTableDefinition(this, name, { ...rest, unlogged });
+    return new PgTableDefinition(this, name, options);
   }
 
   /** @internal */
@@ -4662,3 +4661,5 @@ PostgreSQLAdapter.prototype.performQuery = function (
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
 // gate behavior on the postgresql adapter being loaded.
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
+
+_setPostgreSQLAdapterClass(PostgreSQLAdapter);

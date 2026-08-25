@@ -354,6 +354,7 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
 
 const normalizedKeyCache = newDoubleNestedCache();
 
+/** @internal */
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   let bySeparator = normalizedKeyCache.get(separator);
   if (bySeparator === undefined) {
@@ -441,6 +442,7 @@ function truthy(value: unknown): boolean {
   return value != null && value !== false;
 }
 
+/** @internal */
 function translateKey(
   key: TranslateKey,
   throwOption: unknown,
@@ -483,6 +485,8 @@ function translateKey(
  *
  *   I18n.setExceptionHandler(new I18nExceptionHandler())          // an object
  *   I18n.exceptionHandler().call(exception, locale, key, options) // will be called like this
+ *
+ * @internal
  */
 function handleException(
   handling: "raise" | "throw" | false,
@@ -526,6 +530,8 @@ function slice(hash: TranslateOptions, ...keys: string[]): TranslateOptions {
  * The `RegExp` below is Ruby's `Regexp.union(I18n.config.interpolation_patterns)`,
  * and `matchAll` its `String#scan`, which on a pattern carrying groups yields
  * one array of captures per match.
+ *
+ * @internal
  */
 function interpolationKeysFromTranslation(translation: unknown): unknown[] {
   if (typeof translation === "string") {

@@ -121,10 +121,13 @@ export function packageSrcDir(pkg: string): string {
 /**
  * The api-compare packages `scripts/build-rails-privates-manifest.ts` projects
  * Rails visibility onto — every api-compared package of a Rails framework,
- * actionpack's four included. Deliberately still a subset of `PACKAGES`: the
- * gem ports (`rack`, `globalid`, `i18n`, `did-you-mean`) have no entry yet, so
- * their `@internal` tags are unvalidatable in both directions — tracked by
- * `rails-privates-manifest-missing-gem-packages`.
+ * actionpack's four included, plus the four gem ports whose gem source is
+ * vendored and extracted (`rack`, `globalid`, `i18n`, `did-you-mean`).
+ *
+ * This is `PACKAGES` in full: a package is projectable exactly when the Ruby
+ * extractor runs over its vendored source, which is what `compareApi !== false`
+ * already means. The ports with no Ruby side at all are listed in
+ * `PACKAGES_OUTSIDE_MANIFEST`.
  */
 export const MANIFEST_PACKAGES = [
   "arel",
@@ -137,7 +140,28 @@ export const MANIFEST_PACKAGES = [
   "actionpackversion",
   "actionview",
   "trailties",
+  "rack",
+  "globalid",
+  "i18n",
+  "did-you-mean",
 ] as const;
+
+/**
+ * Ports permanently outside `eslint/rails-private-methods.json`, because there
+ * is no Ruby source the privates projection can run over:
+ *
+ * - `date` — vendored, but `compareApi: false` (vendor/sources.ts): the Ruby
+ *   `Date`/`DateTime` surface lives in C (`ext/date/date_core.c`), so the
+ *   extractor sees no method visibilities to project.
+ * - `html-sanitizer`, `activerecord-cli` — not vendored sources at all; they
+ *   have no gem counterpart in `vendor/`.
+ *
+ * A rule that demands a `@noRailsEquivalent` receipt for an `@internal` tag
+ * with no manifest backing MUST subtract these: for them "no Rails counterpart"
+ * and "not covered by the manifest" are the same state, so it has no basis to
+ * ask. Tracked by `rails-privates-manifest-missing-gem-packages` (RFC 0121).
+ */
+export const PACKAGES_OUTSIDE_MANIFEST = ["date", "html-sanitizer", "activerecord-cli"] as const;
 
 /**
  * Manifest package → repo-relative POSIX src dir, derived from `packageSrcDir`

@@ -234,7 +234,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   visit(rubyPkg.modules ?? {});
 
   for (const [rubyFile, names] of fileVis) {
-    const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile).split(path.sep).join("/"));
+    const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
     const tsNames = new Set<string>();
     for (const [ruby, status] of names) {
       if (status !== "all-private") continue;
@@ -382,7 +382,7 @@ function buildDeprecatedManifest(): { files: Record<string, string[]> } | null {
       const rubyNames = deprecatedMethodsInRuby(fs.readFileSync(rubyAbs, "utf8"));
       if (rubyNames.size === 0) continue;
       const rubyRel = path.relative(libDir, rubyAbs).split(path.sep).join("/");
-      const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyRel).split(path.sep).join("/"));
+      const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyRel, pkg).split(path.sep).join("/"));
       const tsNames = new Set<string>(files[tsRel] ?? []);
       for (const ruby of rubyNames) for (const c of rubyMethodToTs(ruby) ?? []) tsNames.add(c);
       if (tsNames.size > 0) files[tsRel] = [...tsNames].sort();

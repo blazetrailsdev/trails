@@ -70,6 +70,7 @@ const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
   scheme: HTTP_X_FORWARDED_SCHEME,
 };
 
+/** @internal */
 function splitHeader(value: string | null | undefined): string[] {
   if (!value) return [];
   return value
@@ -78,6 +79,7 @@ function splitHeader(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+/** @internal */
 function wrapIpv6(address: string): string {
   // Rails: only wrap if not already bracketed and has >1 colon (IPv6 has multiple colons;
   // host:port has exactly one and must not be wrapped).
@@ -87,6 +89,7 @@ function wrapIpv6(address: string): string {
   return address;
 }
 
+/** @internal */
 function splitAuthority(
   authority: string | null | undefined,
 ): [string | null, string | null, number | null] {
@@ -107,6 +110,7 @@ function splitAuthority(
   return [authority, authority, null];
 }
 
+/** @internal */
 function allowedScheme(header: string | null | undefined): string | null {
   if (!header) return null;
   return (ALLOWED_SCHEMES as readonly string[]).includes(header) ? header : null;
@@ -535,6 +539,7 @@ export class Request {
     return this.parseHttpAcceptHeader(this.env["HTTP_ACCEPT_LANGUAGE"]);
   }
 
+  /** @internal */
   getHttpForwarded(token: string): string[] | null {
     return forwardedValues(this.env[HTTP_FORWARDED])?.[token] ?? null;
   }
@@ -584,6 +589,7 @@ export class Request {
     return null;
   }
 
+  /** @internal */
   get forwardedScheme(): string | null {
     const priority = (this.constructor as typeof Request).forwardedPriority;
     for (const type of priority) {

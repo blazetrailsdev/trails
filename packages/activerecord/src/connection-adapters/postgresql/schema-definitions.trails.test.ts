@@ -15,6 +15,7 @@ import {
 } from "./schema-creation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
@@ -174,9 +175,13 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
     expect(td.unlogged).toBe(false);
   });
 
-  it("accepts unlogged option", () => {
-    const td = new TableDefinition(leased, "t", { unlogged: true });
-    expect(td.unlogged).toBe(true);
+  it("reads unlogged from PostgreSQLAdapter.createUnloggedTables", () => {
+    PostgreSQLAdapter.createUnloggedTables = true;
+    try {
+      expect(new TableDefinition(leased, "t").unlogged).toBe(true);
+    } finally {
+      PostgreSQLAdapter.createUnloggedTables = false;
+    }
   });
 
   it("newExclusionConstraintDefinition returns definition without pushing", () => {
@@ -365,10 +370,15 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
   };
 
-  it("emits UNLOGGED when unlogged: true", async () => {
-    const td = new TableDefinition(leased, "products", { unlogged: true });
-    td.string("name");
-    expect(await toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
+  it("emits UNLOGGED when createUnloggedTables is set", async () => {
+    PostgreSQLAdapter.createUnloggedTables = true;
+    try {
+      const td = new TableDefinition(leased, "products");
+      td.string("name");
+      expect(await toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
+    } finally {
+      PostgreSQLAdapter.createUnloggedTables = false;
+    }
   });
 
   it("does not emit UNLOGGED by default", async () => {

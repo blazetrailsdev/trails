@@ -19,6 +19,7 @@ export class MethodOverride {
     this.app = app;
   }
 
+  /** @internal */
   allowedMethods(): string[] {
     return ALLOWED_METHODS;
   }

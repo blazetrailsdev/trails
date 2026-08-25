@@ -24,6 +24,10 @@ export default [
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/globalid/src/**/*.ts",
+      "packages/i18n/src/**/*.ts",
+      "packages/did-you-mean/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     languageOptions: {
