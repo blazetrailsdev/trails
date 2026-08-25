@@ -611,10 +611,16 @@ export class SchemaStatements {
     }
   }
 
-  async renameTable(oldName: string, newName: string): Promise<void> {
-    await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(oldName)} RENAME TO ${this.quoteColumnName(newName)}`,
-    );
+  /**
+   * Renames a table.
+   *
+   *   renameTable('octopuses', 'octopi')
+   *
+   * Mirrors: `SchemaStatements#rename_table` (`schema_statements.rb:524-526`).
+   */
+  async renameTable(_tableName: string, _newName: string): Promise<void> {
+    // @nie disposition=TODO
+    throw new NotImplementedError("rename_table is not implemented");
   }
 
   /**
