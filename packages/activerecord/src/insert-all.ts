@@ -57,14 +57,13 @@ interface ResolvedConnectionFacts {
   indexes: (tableName: string) => unknown[];
 }
 
-const EMPTY_CONNECTION_FACTS: ResolvedConnectionFacts = {
-  supportsInsertReturning: false,
-  supportsInsertConflictTarget: false,
-  primaryKeys: [],
-  indexes: () => [],
-};
-
 /**
+ * Resolves the facts above off the connection and schema cache. A missing
+ * support predicate reads as unsupported, matching Rails'
+ * `AbstractAdapter#supports_insert_conflict_target?` returning false, so a
+ * wrapper adapter that forgets to delegate cannot emit a bogus conflict
+ * target.
+ *
  * @noRailsEquivalent The async half of `ResolvedConnectionFacts` above.
  * @internal
  */
@@ -73,11 +72,6 @@ async function resolveConnectionFacts(
   connection: any,
 ): Promise<ResolvedConnectionFacts> {
   const cache = connection.schemaCache;
-  const tableName = model.arelTable.name;
-  // Default to unsupported when a predicate is missing — matches Rails'
-  // `AbstractAdapter#supports_insert_conflict_target?` returning false, so a
-  // wrapper adapter that forgets to delegate doesn't silently fall through and
-  // emit a bogus conflict target.
   const supportsInsertReturning =
     typeof connection.supportsInsertReturning === "function"
       ? await connection.supportsInsertReturning()
@@ -86,12 +80,9 @@ async function resolveConnectionFacts(
     typeof connection.supportsInsertConflictTarget === "function"
       ? await connection.supportsInsertConflictTarget()
       : false;
-  // Rails: `Array(@model.schema_cache.primary_keys(model.table_name))`
-  // (insert_all.rb:61) — the *database* primary keys, not the model's
-  // attribute-derived `primary_key`.
   let primaryKeys: string[] = [];
   if (cache && typeof cache.primaryKeys === "function") {
-    const pk = await cache.primaryKeys(tableName);
+    const pk = await cache.primaryKeys(model.arelTable.name);
     if (pk != null) primaryKeys = Array.isArray(pk) ? pk : [pk];
   }
   const indexesByTable = new Map<string, unknown[]>();
@@ -146,6 +137,10 @@ export class InsertAll {
   }
 
   /**
+   * `facts` carries what Rails' constructor tail (insert_all.rb:38-45) reads
+   * synchronously off the connection and schema cache; see
+   * `ResolvedConnectionFacts`.
+   *
    * @missingRailsArgs except — PERMANENT: Ruby's `scope_for_create.except(col)`
    * is a receiver-form call; JS objects have no `except`, so the activesupport
    * port takes the receiver as its first argument and the argument list is one
@@ -156,7 +151,7 @@ export class InsertAll {
     connection: ModelClass["connection"],
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
-    facts: ResolvedConnectionFacts = EMPTY_CONNECTION_FACTS,
+    facts: ResolvedConnectionFacts,
   ) {
     this._facts = facts;
     this.model = (relation as any)._model as ModelClass;
@@ -200,7 +195,6 @@ export class InsertAll {
 
     this.verifyAttributeNamesAreKnown();
 
-    // insert_all.rb:38-45 — the constructor tail, in Rails' order.
     if (this.returning === undefined) {
       this.returning = facts.supportsInsertReturning ? this.primaryKeys() : false;
     }

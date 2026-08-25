@@ -418,21 +418,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Runs `find_target` (`association.rb:248`) on a freshly built holder for
-   * this proxy's definition rather than on `record.association(name)`: this
-   * proxy IS the owner's holder for that name, so loading through the cached
-   * one would suppress the loader's writeback into it and mark it loaded
-   * behind the proxy's back.
+   * Runs `load_target` (`collection_association.rb:272-279`) for this proxy:
+   * `find_target?` (`association.rb:190`) decides whether to query at all — a
+   * new-record owner without the foreign key present leaves `@target`
+   * unassigned rather than querying, and so never reaches `find_target`'s
+   * `violates_strict_loading?` raise (`association.rb:248-250`).
+   *
+   * The predicate is read off the owner's own holder, whose rich reflection
+   * answers `active_record_primary_key`; `find_target` itself then runs on a
+   * freshly built holder rather than on `record.association(name)`, because
+   * this proxy IS the owner's holder for that name and loading through the
+   * cached one would suppress the loader's writeback into it and mark it
+   * loaded behind the proxy's back.
    */
   private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
-    // `CollectionAssociation#load_target` reaches `find_target` only through
-    // `find_target?` (collection_association.rb:272-279, association.rb:190):
-    // a new-record owner without the foreign key present leaves `@target`
-    // unassigned rather than querying — and so never reaches `find_target`'s
-    // `violates_strict_loading?` raise (association.rb:248-250). The predicate
-    // is read off the owner's own holder, whose rich reflection answers
-    // `active_record_primary_key`; the load itself still runs on a fresh holder
-    // for the reason above.
     if (
       !queryExecutor &&
       !(

@@ -41,15 +41,13 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * reflection (`proxy_association.reflection`).
    *
    * Returns `CollectionProxy<T>` for user-facing association relations;
-   * returns the plain `Association` instance when this relation was built
-   * by `Association#targetScope()` for internal scope merging.
+   * Rails' `@association` is always the `Association` itself, while trails'
+   * `_association` seat holds the owner's `CollectionProxy` on the user-facing
+   * path — so the proxy is unwrapped here, and `Association#scope`'s
+   * `klass.current_scope.proxy_association == self` branch
+   * (association.rb:110) compares against the association as in Rails.
    */
   get proxyAssociation(): Association {
-    // Rails' `@association` is always the `Association` itself; trails' seat
-    // holds the owner's `CollectionProxy` on the user-facing path, so unwrap it
-    // here — `Association#scope`'s
-    // `klass.current_scope.proxy_association == self` branch
-    // (association.rb:110) compares against the association.
     const association = this._association as CollectionProxy<T> & {
       proxyAssociation?: Association;
     };
@@ -141,8 +139,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * `Association#scope` sees this relation as the current scope while the
    * record is built.
    */
-  protected override _new(attributes: Record<string, unknown>): T {
-    return (this._association as CollectionProxy<T>).build(attributes);
+  protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+    return (this._association as CollectionProxy<T>).build(attributes, block);
   }
 
   /**
