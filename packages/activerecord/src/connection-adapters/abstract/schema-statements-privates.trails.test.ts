@@ -11,6 +11,7 @@ import {
   TableDefinition,
   type ColumnType,
 } from "./schema-definitions.js";
+import type { TableDefinitionOf } from "./schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
@@ -1127,8 +1128,8 @@ describe("SchemaStatements#createTable statement ordering", () => {
       override buildCreateTableDefinition(
         tableName: string,
         options: Parameters<SchemaStatements["buildCreateTableDefinition"]>[1] = {},
-        fn?: (td: TableDefinition) => void,
-      ): TableDefinition {
+        fn?: (td: TableDefinitionOf<this>) => void,
+      ): TableDefinitionOf<this> {
         return super.buildCreateTableDefinition(
           tableName,
           { ...options, comment: "from the definition" },

@@ -7,7 +7,6 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 // Rails: class PostgresqlNetworkAddress < ActiveRecord::Base; end
 class PostgresqlNetworkAddress extends Base {
@@ -25,9 +24,9 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     connection = Base.connection as PostgreSQLAdapter;
     await connection.createTable("postgresql_network_addresses", { force: true }, (t) => {
-      (t as PgTableDefinition).inet("inet_address", { default: "192.168.1.1" });
-      (t as PgTableDefinition).cidr("cidr_address", { default: "192.168.1.0/24" });
-      (t as PgTableDefinition).macaddr("mac_address", { default: "ff:ff:ff:ff:ff:ff" });
+      t.inet("inet_address", { default: "192.168.1.1" });
+      t.cidr("cidr_address", { default: "192.168.1.0/24" });
+      t.macaddr("mac_address", { default: "ff:ff:ff:ff:ff:ff" });
     });
     void PostgresqlNetworkAddress.resetColumnInformation();
     await PostgresqlNetworkAddress.loadSchema();

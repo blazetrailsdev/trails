@@ -72,7 +72,6 @@ import {
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
-  narrowToProjectedColumns,
   defineDynamicSelectReaders,
   subclassFromAttributesForNew,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
@@ -2797,35 +2796,19 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    // Load DB values through deserialize (not cast) so encrypted types decrypt.
-    // Extra/computed select columns aren't in the schema, so pass the result
-    // set's column type (when the adapter reported one) to cast them — mirrors
-    // Rails' `instantiate(record, column_types)` slice in find_by_sql /
-    // JoinDependency#instantiate.
-    for (const [key, value] of Object.entries(row)) {
-      const override = overrideTypes?.[key];
-      if (override) {
-        // An explicit per-attribute `types` override supersedes the schema
-        // type, the way LazyAttributeHash resolves
-        // `additional_types.fetch(name, types[name])` (builder.rb:76).
-        record._attributes.set(key, Attribute.fromDatabase(key, value, override as Type));
-      } else {
-        record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
-      }
-    }
-    // A SELECT that projects only a subset of columns yields a row with just
-    // those keys, so hasAttribute() must reflect what was loaded rather than
-    // the full schema. Mirrors Rails' attributes_builder narrowing (see
-    // narrowToProjectedColumns). Shared with the STI path in inheritance.ts.
-    // `overrideTypes` is threaded so a schema column absent from the row adopts
-    // the per-query override type when narrowed to uninitialized (builder.rb's
-    // `else Attribute.uninitialized(name, type)` branch, where `type` resolves
-    // via `additional_types.fetch(name, types[name])`).
-    narrowToProjectedColumns(
-      this as unknown as typeof Base,
-      record as unknown as Base,
-      row,
-      overrideTypes,
+    // Rails: `klass.attributes_builder.build_from_database(attributes,
+    // column_types)` then `allocate.init_with_attributes(attributes)`
+    // (persistence.rb:82-87). The LazyAttributeSet reports only the projected
+    // columns from `keys`/`key?` because the unprojected ones were never in
+    // `values` (attribute_set/builder.rb:32-39), so there is no narrowing pass.
+    // trails merges its per-query `overrideTypes` into Rails' single
+    // `additional_types` argument, an override winning over the result set's
+    // reported column type for the same name.
+    const additionalTypes = new Map<string, any>();
+    for (const [key, type] of Object.entries(columnTypes ?? {})) additionalTypes.set(key, type);
+    for (const [key, type] of Object.entries(overrideTypes ?? {})) additionalTypes.set(key, type);
+    (record as any).initWithAttributes(
+      (this as any).attributesBuilder().buildFromDatabase(row, additionalTypes),
     );
     defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;

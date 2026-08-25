@@ -3439,15 +3439,18 @@ export class PostgreSQLAdapter
     // Rails resolves the name against `table.to_s` — the SCHEMA-QUALIFIED name,
     // so a generated index name matches the one addIndex produced for the same
     // argument. Passing the bare identifier here silently misses those.
+    // Rails passes the PostgreSQL::Name itself to `quote_table_name`, which
+    // `to_s`es it; trails' `quoteTableName` takes a string, so the `to_s`
+    // happens here rather than at the call site.
     const indexToRemove = new Name(
       table.schema,
       await this.indexNameForRemove(table.toString(), columnName, options),
-    );
+    ).toString();
 
     await this.execute(
       // `?? ""` is Ruby's `#{nil}` — `index_algorithm` returns nil with no
       // `:algorithm`, so the statement carries the empty slot Rails emits.
-      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove.toString())}`,
+      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove)}`,
     );
   }
 
@@ -3918,6 +3921,11 @@ export class PostgreSQLAdapter
    * Return the default expression as-is when it is a SQL function/expression.
    * Mirrors: PostgreSQLAdapter#extract_default_function
    * @internal
+   *
+   * @missingRailsArgs has_default_function? — PERMANENT: Rails passes the local
+   *   `default` (postgresql_adapter.rb:781-782); `default` is a reserved word in
+   *   JavaScript and cannot be a binding identifier, so the parameter is spelled
+   *   `defaultExpr`. Same value, same position.
    */
   extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
     if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {

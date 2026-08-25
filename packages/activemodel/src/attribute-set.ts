@@ -268,37 +268,6 @@ export class AttributeSet {
   }
 
   /**
-   * Narrow the set to the given attribute names, resetting every other
-   * attribute to its uninitialized state (type preserved).
-   *
-   * Mirrors the effect of `AttributeSet::Builder#build_from_database` when a
-   * SELECT projects only a subset of columns: unselected columns are absent
-   * from the materialized set, so `isKey`/`keys` no longer report them.
-   *
-   * `overrideTypes` threads the per-query `additional_types` (Rails' second
-   * `build_from_database` arg): a narrowed column becomes
-   * `Attribute.uninitialized(name, additional_types.fetch(name, types[name]))`
-   * (builder.rb:76-87), so an override supplied for a column absent from the
-   * projected row wins over the declared schema type — matching Rails' resolved
-   * `type` in the `elsif types.key?(name)` / `else Attribute.uninitialized`
-   * branch. Absent that, the declared type is preserved.
-   *
-   * @internal Rails-private helper.
-   */
-  narrowTo(
-    names: Iterable<string>,
-    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): void {
-    this.assertNotFrozen();
-    const keep = names instanceof Set ? names : new Set(names);
-    for (const [name, attr] of this._attributes) {
-      if (keep.has(name)) continue;
-      const type = (overrideTypes?.[name] as Type) ?? attr.type;
-      this._attributes.set(name, Attribute.uninitialized(name, type));
-    }
-  }
-
-  /**
    * The JS spelling of `attributes.freeze`: a `Map` is unaffected by
    * `Object.freeze`, so each writer checks the frozen set explicitly and raises
    * what Ruby's frozen Hash raises.

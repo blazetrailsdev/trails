@@ -75,6 +75,7 @@ import type {
   ColumnType,
   IndexDefinition,
   RemoveForeignKeyOptions,
+  TableDefinitionOf,
 } from "./abstract/schema-definitions.js";
 import type { CommentOrChanges } from "./abstract/schema-statements.js";
 import {
@@ -2008,8 +2009,10 @@ export interface AbstractMysqlAdapter {
 
   createTable(
     name: string,
-    optionsOrFn?: CreateTableArgs[1],
-    fn?: CreateTableArgs[2],
+    optionsOrFn?:
+      | Extract<CreateTableArgs[1], { options?: string }>
+      | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void>;
 
   removeColumn(

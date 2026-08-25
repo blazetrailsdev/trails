@@ -220,7 +220,16 @@ export function validateIndexLengthBang(
   );
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * @missingRailsArgs extract_value_from_default — PERMANENT: Rails passes the
+ *   local `default` (sqlite3/schema_statements.rb:144-147); `default` is a
+ *   reserved word in JavaScript and cannot be a binding identifier, so the local
+ *   keeps the PRAGMA column's own spelling, `dfltValue`.
+ * @missingRailsArgs extract_default_function — PERMANENT: same `default`
+ *   reserved-word substitution (sqlite3/schema_statements.rb:153).
+ */
 export function newColumnFromField(
   adapter: SQLite3SchemaAdapter,
   _tableName: string,

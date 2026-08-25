@@ -1049,6 +1049,22 @@ export class AlterTable {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition
  */
+/**
+ * The table-definition type an adapter's own `create_table_definition` builds.
+ *
+ * Ruby resolves a yielded object's methods at call time, so a PostgreSQL
+ * `create_table` block reaches `PostgreSQL::ColumnMethods` names
+ * (postgresql/schema_definitions.rb:245) with nothing declared anywhere.
+ * TypeScript resolves against the DECLARED parameter type instead, so the
+ * `create_table` yield has to name the receiver's own definition class for the
+ * same names to resolve.
+ */
+export type TableDefinitionOf<A> = A extends {
+  createTableDefinition(name: string, options?: Record<string, unknown>): infer T;
+}
+  ? T
+  : TableDefinition;
+
 export class TableDefinition {
   readonly name: string;
   readonly columns: ColumnDefinition[] = [];
@@ -1451,22 +1467,6 @@ export class TableDefinition {
   ): this;
   virtual(...args: unknown[]): this {
     return this.definedColumn("virtual" as ColumnType, args);
-  }
-
-  jsonb(...names: string[]): this;
-  jsonb(...args: [...names: string[], options: ColumnOptions]): this;
-  jsonb(...args: unknown[]): this {
-    const { names, options } = splitColumnNames(args, "jsonb");
-    for (const name of names) this.column(name, "jsonb", options);
-    return this;
-  }
-
-  char(name: string, options: ColumnOptions = {}): this {
-    return this.column(name, "char", options);
-  }
-
-  array(name: string, type: ColumnType, options: ColumnOptions = {}): this {
-    return this.column(name, type, { ...options, array: true });
   }
 
   timestamps(

@@ -37,6 +37,7 @@ import {
   type ForeignKeyLookupOptions,
   type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
+import type { TableDefinitionOf } from "./schema-definitions.js";
 import type { UniqueConstraintOptions } from "../postgresql/schema-definitions.js";
 import { SchemaCreation, type SchemaCreationConn } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
@@ -362,8 +363,8 @@ export class SchemaStatements {
           limit?: number;
           precision?: number;
         }
-      | ((t: TableDefinition) => void),
-    fn?: (t: TableDefinition) => void,
+      | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
     let kwargs: {
       id?: boolean | ColumnType | IdHashOptions;
@@ -381,7 +382,7 @@ export class SchemaStatements {
       limit?: number;
       precision?: number;
     } = {};
-    let definer: ((t: TableDefinition) => void) | undefined;
+    let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
 
     if (typeof optionsOrFn === "function") {
       definer = optionsOrFn;
@@ -1342,8 +1343,8 @@ export class SchemaStatements {
       force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
-    fn?: (td: TableDefinition) => void,
-  ): TableDefinition {
+    fn?: (td: TableDefinitionOf<this>) => void,
+  ): TableDefinitionOf<this> {
     const { id = true, primaryKey, force: _force, ...rest } = options;
     // Rails uses `options.extract!`, which *deletes* what it returns — so
     // `_skipValidateOptions` only ever reaches the first extraction.
@@ -1362,7 +1363,10 @@ export class SchemaStatements {
       }
     }
 
-    const tableDefinition = this.createTableDefinition(tableName, tdOptions);
+    const tableDefinition = this.createTableDefinition(
+      tableName,
+      tdOptions,
+    ) as TableDefinitionOf<this>;
     tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
 
     if (fn) fn(tableDefinition);
@@ -1378,8 +1382,8 @@ export class SchemaStatements {
       tableName?: string;
       [key: string]: unknown;
     } = {},
-    fn?: (td: TableDefinition) => void,
-  ): TableDefinition {
+    fn?: (td: TableDefinitionOf<this>) => void,
+  ): TableDefinitionOf<this> {
     const joinTableName = this.findJoinTableName(table1, table2, options);
     const { columnOptions = {}, tableName: _, ...rest } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
@@ -1805,44 +1809,37 @@ export class SchemaStatements {
   }
 
   async bulkChangeTable(tableName: string, operations: MigrationCommand[]): Promise<void> {
-    const sqlFragments: string[] = [];
-    const nonCombinable: Array<() => Promise<void>> = [];
+    let sqlFragments: string[] = [];
+    let nonCombinableOperations: Array<() => Promise<void>> = [];
 
     for (const [command, args] of operations) {
       const [table, ...arguments_] = args as [string, ...unknown[]];
-      const forAlterTarget =
-        typeof (this as any)[`${command}ForAlter`] === "function"
-          ? (this as any)
-          : typeof (this as any)[`${command}ForAlter`] === "function"
-            ? (this as any)
-            : null;
-      const forAlterMethod = forAlterTarget ? forAlterTarget[`${command}ForAlter`] : null;
-      if (typeof forAlterMethod === "function") {
-        const result = await forAlterMethod.call(forAlterTarget, table, ...arguments_);
-        const results = Array.isArray(result) ? result : [result];
-        for (const r of results) {
-          if (typeof r === "string") {
-            sqlFragments.push(r);
-          } else if (typeof r === "function") {
-            nonCombinable.push(r);
-          }
+      const method = `${command}ForAlter`;
+
+      if (typeof (this as any)[method] === "function") {
+        const sqls: string[] = [];
+        const procs: Array<() => Promise<void>> = [];
+        const result = await (this as any)[method](table, ...arguments_);
+        for (const v of Array.isArray(result) ? result : [result]) {
+          if (typeof v === "string") sqls.push(v);
+          else if (typeof v === "function") procs.push(v);
         }
+        sqlFragments = sqlFragments.concat(sqls);
+        nonCombinableOperations = nonCombinableOperations.concat(procs);
       } else {
         if (sqlFragments.length > 0) {
           await this.execute(
             `ALTER TABLE ${this.quoteTableName(tableName)} ${sqlFragments.join(", ")}`,
           );
-          sqlFragments.length = 0;
         }
-        for (const proc of nonCombinable) await proc();
-        nonCombinable.length = 0;
+        for (const proc of nonCombinableOperations) await proc();
+        sqlFragments = [];
+        nonCombinableOperations = [];
 
-        const method = (this as any)[command];
-        if (typeof method === "function") {
-          await method.call(this, table, ...arguments_);
-        } else {
+        if (typeof (this as any)[command] !== "function") {
           throw new Error(`Unknown bulk change command: ${command}`);
         }
+        await (this as any)[command](table, ...arguments_);
       }
     }
 
@@ -1851,7 +1848,7 @@ export class SchemaStatements {
         `ALTER TABLE ${this.quoteTableName(tableName)} ${sqlFragments.join(", ")}`,
       );
     }
-    for (const proc of nonCombinable) await proc();
+    for (const proc of nonCombinableOperations) await proc();
   }
 
   validTableDefinitionOptions(): string[] {

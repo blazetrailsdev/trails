@@ -18,7 +18,7 @@ import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-sta
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
-import type { SchemaStatementsLike } from "../abstract/schema-definitions.js";
+import type { SchemaStatementsLike, TableDefinitionOf } from "../abstract/schema-definitions.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 import type { Result } from "../../result.js";
 
@@ -209,8 +209,8 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
    */
   override async createTable(
     name: string,
-    optionsOrFn?: CreateTableArgs[1],
-    fn?: CreateTableArgs[2],
+    optionsOrFn?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void),
+    fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
     const definer = typeof optionsOrFn === "function" ? optionsOrFn : fn;
     const options: CreateTableOptions =

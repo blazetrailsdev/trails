@@ -6,10 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base, Rollback } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
-import type {
-  TableDefinition as PgTableDefinition,
-  Table as PgTable,
-} from "../../connection-adapters/postgresql/schema-definitions.js";
+import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 class Citext extends Base {
@@ -29,7 +26,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     connection = Base.connection as PostgreSQLAdapter;
     await connection.enableExtension("citext");
     await connection.createTable("citexts", (t) => {
-      (t as PgTableDefinition).citext("cival");
+      t.citext("cival");
     });
     void Citext.resetColumnInformation();
     await Citext.loadSchema();

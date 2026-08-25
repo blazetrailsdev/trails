@@ -523,58 +523,6 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
   return subclass;
 }
 
-/**
- * Narrow a freshly-hydrated record's attribute set to the columns actually
- * returned by the query, so `hasAttribute()` reflects a projected SELECT.
- *
- * Mirrors Rails' `attributes_builder`, which builds from
- * `_default_attributes.except(column_names - [primary_key])` (model_schema.rb):
- * only the primary key and virtual (non-column) attributes keep their
- * defaults — every other unselected column is left uninitialized. Applied in
- * both the direct and STI instantiation paths so projected loads narrow
- * regardless of STI, matching the net result of Rails'
- * `instantiate_instance_of`. (Rails narrows in `build_from_database` before
- * `discriminate_class_for_record`; trails resolves the STI subclass first in
- * `_instantiate` and narrows here per concrete class — same end state.)
- *
- * `column_names` is the right narrowing set here: in trails every declared
- * attribute is a real DB column (an `attribute()` with no backing column fails
- * on INSERT), and the confirmation/acceptance validators don't register
- * attribute definitions — so unlike Rails there are no in-set virtual
- * attributes to wrongly uninitialize. On a full `SELECT *` every declared
- * column is in the row, so `narrowable` is empty and the hot path returns
- * early.
- *
- * @internal Rails-private helper.
- */
-export function narrowToProjectedColumns(
-  klass: typeof Base,
-  record: Base,
-  row: Record<string, unknown>,
-  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-): void {
-  const pk = (klass as any).primaryKey as string | string[] | undefined;
-  const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
-  const rowKeys = new Set(Object.keys(row));
-  const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
-  // Hot path: a full SELECT projects every column, so there is nothing to
-  // narrow — skip the attribute-set scan entirely.
-  if (narrowable.length === 0) return;
-  const attrs = (record as any)._attributes as {
-    keys(): Iterable<string>;
-    narrowTo(
-      names: Iterable<string>,
-      overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-    ): void;
-  };
-  const keep = new Set(rowKeys);
-  const drop = new Set(narrowable);
-  for (const name of attrs.keys()) {
-    if (!drop.has(name)) keep.add(name);
-  }
-  attrs.narrowTo(keep, overrideTypes);
-}
-
 const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
 
 /**
@@ -618,10 +566,10 @@ export function defineDynamicSelectReaders(record: Base): void {
   // hasProtoMember check. This covers Rails' method_missing reaching `key?` for
   // BOTH a bare select alias and an ignored column whose value a raw `SELECT *`
   // actually projected (`AttributedDeveloper#name` → "Developer: name"): Rails
-  // makes both respond via `attribute_missing`. narrowToProjectedColumns has
-  // already uninitialized any ignored column the row did not carry, so a narrowed
-  // reload leaves its declared-but-ignored default out of `keys()` and no reader
-  // is installed — matching Rails' `key?` being false for that uninitialized slot.
+  // makes both respond via `attribute_missing`. `build_from_database` never put
+  // a column the row did not carry into `values`, so a projected reload leaves
+  // that declared-but-ignored default out of `keys()` and no reader is
+  // installed — matching Rails' `key?` being false for that uninitialized slot.
   const proto = Object.getPrototypeOf(record) as object;
   for (const name of attrs.keys()) {
     if (installed.has(name)) continue;

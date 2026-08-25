@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { Column } from "../../connection-adapters/postgresql/column.js";
-import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -34,8 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgresqlSerialTest", () => {
     beforeEach(async () => {
       await adapter.dropTable("postgresql_serials", { ifExists: true });
-      await adapter.createTable("postgresql_serials", { force: true }, (table) => {
-        const t = table as PgTableDefinition;
+      await adapter.createTable("postgresql_serials", { force: true }, (t) => {
         t.serial("seq");
         t.integer("serials_id", {
           default: () => "nextval('postgresql_serials_id_seq')",
@@ -76,8 +74,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgresqlBigSerialTest", () => {
     beforeEach(async () => {
       await adapter.dropTable("postgresql_big_serials", { ifExists: true });
-      await adapter.createTable("postgresql_big_serials", { force: true }, (table) => {
-        const t = table as PgTableDefinition;
+      await adapter.createTable("postgresql_big_serials", { force: true }, (t) => {
         t.bigserial("seq");
         t.bigint("serials_id", {
           default: () => "nextval('postgresql_big_serials_id_seq')",
@@ -119,10 +116,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     beforeEach(async () => {
       await adapter.dropTable("foo_bar", "foo", { ifExists: true });
       await adapter.createTable("foo_bar", { force: true }, (table) => {
-        (table as PgTableDefinition).serial("baz_id");
+        table.serial("baz_id");
       });
-      await adapter.createTable("foo", { force: true }, (table) => {
-        const t = table as PgTableDefinition;
+      await adapter.createTable("foo", { force: true }, (t) => {
         t.serial("bar_id");
         t.bigserial("bar_baz_id");
       });
@@ -155,8 +151,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         { force: true, _usesLegacyTableName: true } as Parameters<
           PostgreSQLAdapter["createTable"]
         >[1],
-        (table) => {
-          const t = table as PgTableDefinition;
+        (t) => {
           t.serial("seq");
           t.bigserial("bigseq");
         },
