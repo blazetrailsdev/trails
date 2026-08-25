@@ -10,6 +10,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
+import { Attribute, Types } from "@blazetrails/activemodel";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
@@ -66,12 +67,16 @@ describe("cacheNotificationInfo payload (trails)", () => {
     // valueForDatabase getter counts reads, so the assertion fails if the cast
     // moves back ahead of the slot read (query_cache.rb:311).
     let casts = 0;
-    const probe = {
-      get valueForDatabase() {
-        casts++;
-        return 1;
-      },
+    // A real `ActiveModel::Attribute`, because that is the only thing
+    // `type_casted_binds` unwraps (abstract/quoting.rb:224). `WithCastValue`
+    // reads its database value through `type.serialize`, so counting there
+    // counts exactly the cast the slot is supposed to defer.
+    const countingType = new Types.IntegerType();
+    countingType.serialize = (value: unknown) => {
+      casts++;
+      return value;
     };
+    const probe = Attribute.withCastValue("id", 1, countingType);
 
     const connection = (await Base.leaseConnection()) as unknown as {
       cacheNotificationInfo(

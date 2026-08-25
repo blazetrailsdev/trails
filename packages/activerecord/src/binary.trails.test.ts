@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BinaryData, BinaryType } from "@blazetrails/activemodel";
+import { Attribute, BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Base } from "./base.js";
@@ -43,7 +43,12 @@ describe("binary type_casted_binds payload", () => {
     // rendering as "[object Object]" in query logs.
     const bytes = new Uint8Array([0xde, 0xad]);
     const conn = await Base.connection;
-    const out = conn.typeCastedBinds([{ valueForDatabase: new BinaryData(bytes) }])!;
+    // `type_casted_binds` reaches for `ActiveModel::Attribute` (rb:224), which
+    // is what the bind path actually carries; `BinaryType#serialize` is what
+    // puts the `Data` wrapper inside it (binary.rb:30-33).
+    const bind = Attribute.withCastValue("data", bytes, new BinaryType());
+    expect(bind.valueForDatabase).toBeInstanceOf(BinaryData);
+    const out = conn.typeCastedBinds([bind])!;
     expect(String(out[0])).not.toBe("[object Object]");
     // PG's type_cast returns a Buffer (bytea); normalize before comparing bytes.
     expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
