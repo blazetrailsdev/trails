@@ -11,15 +11,30 @@ import type { Base } from "./base.js";
 export { InvalidSignature };
 
 let _tokenForSecret: string | (() => string) | null = null;
-// `generated_token_verifier` is a `class_attribute`, so each class has its own
-// slot that subclasses inherit until they assign their own (see resolvedVerifier
-// / ownVerifierEntry).
-const tokenVerifierRegistry = new WeakMap<object, { verifier: MessageVerifier | null }>();
-// The value the railtie initializer assigns onto ActiveRecord::Base at boot
-// (railtie.rb:328-334, `self.generated_token_verifier ||= app.message_verifier(...)`).
-// trails has no railtie/application, so the boot-time assignment lands in this
-// module-level slot, which the reader falls back to when no class has written.
-let _defaultVerifier: MessageVerifier | null = null;
+// The sink base.ts installs so the boot-time verifier lands on
+// `ActiveRecord::Base.generated_token_verifier`, which is where the railtie
+// initializer assigns it (railtie.rb:328-334,
+// `self.generated_token_verifier ||= app.message_verifier(...)`). token-for.ts
+// cannot name `Base` — base.ts imports it at runtime, so a reverse runtime
+// import would close a cycle — so base.ts hands the assignment down instead.
+let _assignBootVerifier: ((verifier: MessageVerifier | null) => void) | null = null;
+
+/**
+ * Install the boot-time `generated_token_verifier` assignment. Same trails-only
+ * railtie seam as {@link setTokenForSecret}, split out because the assignment
+ * target lives in base.ts.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT trails has no railtie/application, so the
+ * railtie.rb:328-334 initializer that assigns
+ * `ActiveRecord::Base.generated_token_verifier` has to be injected from base.ts.
+ */
+export function registerGeneratedTokenVerifierSink(
+  sink: (verifier: MessageVerifier | null) => void,
+): void {
+  _assignBootVerifier = sink;
+  buildDefaultVerifier();
+}
 
 /**
  * Configure the secret used for token generation/verification.
@@ -43,32 +58,6 @@ export function setTokenForSecret(secret: string | (() => string) | null): void 
   buildDefaultVerifier();
 }
 
-/**
- * This class's *own* verifier slot, or undefined when the class has never
- * written. A present entry whose `verifier`
- * is null is an explicit nil shadow (Rails: `self.generated_token_verifier = nil`
- * assigns nil to this class), distinct from "no own slot".
- */
-function ownVerifierEntry(modelClass: object): { verifier: MessageVerifier | null } | undefined {
-  return tokenVerifierRegistry.get(modelClass);
-}
-
-/**
- * Resolved `class_attribute` value: the nearest class on the chain with an own
- * slot wins — even a nil shadow stops the walk (so an explicit `= null` does not
- * inherit the parent's verifier). Falls back to the boot-time verifier the
- * railtie stand-in built, and is null when no secret is configured at all.
- */
-function resolvedVerifier(modelClass: object): MessageVerifier | null {
-  let current: any = modelClass;
-  while (current) {
-    const entry = ownVerifierEntry(current);
-    if (entry) return entry.verifier;
-    current = Object.getPrototypeOf(current);
-  }
-  return _defaultVerifier;
-}
-
 function resolveSecret(): string | null {
   if (_tokenForSecret) {
     return typeof _tokenForSecret === "function" ? _tokenForSecret() : _tokenForSecret;
@@ -80,10 +69,8 @@ function resolveSecret(): string | null {
 
 function buildDefaultVerifier(): void {
   const secret = resolveSecret();
-  _defaultVerifier = secret === null ? null : new MessageVerifier(secret);
+  _assignBootVerifier?.(secret === null ? null : new MessageVerifier(secret));
 }
-
-buildDefaultVerifier();
 
 /**
  * TokenDefinition — encapsulates token behavior for a specific purpose.
@@ -161,39 +148,27 @@ export class TokenDefinition {
 }
 
 /**
- * Registry of token definitions per model class.
- */
-const tokenDefinitionRegistry = new WeakMap<object, Map<string, TokenDefinition>>();
-
-/**
- * The nearest class on `modelClass`'s prototype chain (including itself) that has
- * its own registry entry — i.e. the resolved `class_attribute` value. A class
- * that has never written returns its parent's map (live inheritance); a class
- * that has written returns its own snapshot.
- */
-function resolvedDefinitions(modelClass: object): Map<string, TokenDefinition> | undefined {
-  let current: any = modelClass;
-  while (current) {
-    const map = tokenDefinitionRegistry.get(current);
-    if (map) return map;
-    current = Object.getPrototypeOf(current);
-  }
-  return undefined;
-}
-
-/**
  * The `token_definitions` hash. Ruby's Hash carries `fetch`, which every finder
  * goes through (`token_definitions.fetch(purpose)`), so the port hands the same
  * verb back rather than making each caller re-spell the unknown-purpose raise.
  */
-type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>> & {
+export type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>> & {
   fetch(purpose: string): TokenDefinition;
-  merge(other: Record<string, TokenDefinition>): Record<string, TokenDefinition>;
+  merge(other: Record<string, TokenDefinition>): TokenDefinitionsHash;
 };
 
-/** `fetch`/`merge` are non-enumerable so the hash still iterates as
- * `purpose => definition`. */
-function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHash {
+/**
+ * `fetch`/`merge` are non-enumerable so the hash still iterates as
+ * `purpose => definition`. Applied to the `token_definitions` class_attribute's
+ * default and to every `merge` result, so the whole `class_attribute` chain
+ * carries Ruby's Hash verbs.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT a Ruby Hash carries `fetch`/`merge`; a JS object
+ * does not, and `token_definitions.fetch(purpose)` (token_for.rb:42-51) is the
+ * Rails call every finder makes.
+ */
+export function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHash {
   Object.defineProperty(entries, "fetch", {
     value(purpose: string): TokenDefinition {
       const definition = entries[purpose];
@@ -206,75 +181,11 @@ function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHa
     },
   });
   Object.defineProperty(entries, "merge", {
-    value(other: Record<string, TokenDefinition>): Record<string, TokenDefinition> {
-      return { ...entries, ...other };
+    value(other: Record<string, TokenDefinition>): TokenDefinitionsHash {
+      return withFetch({ ...entries, ...other });
     },
   });
   return entries as TokenDefinitionsHash;
-}
-
-/**
- * Rails: `class_attribute :token_definitions, default: {}` — the per-model
- * `purpose => TokenDefinition` map populated by `generates_token_for`. The
- * `class_attribute` reader inherits the parent value until the subclass writes,
- * at which point `generates_token_for` snapshots the inherited hash via
- * `self.token_definitions = token_definitions.merge(...)`. So a subclass that
- * has declared its own token sees the inherited purposes captured at that point
- * (not parent purposes added afterwards). Trails seeds the subclass's own
- * snapshot on each `generates_token_for` write; the reader returns the
- * resolved map — the class's own snapshot, or the parent's map if it never wrote.
- *
- * Mirrors: ActiveRecord::TokenFor#token_definitions
- */
-export function tokenDefinitions(modelClass: typeof Base): TokenDefinitionsHash {
-  const map = resolvedDefinitions(modelClass);
-  return withFetch(map ? Object.fromEntries(map) : {});
-}
-
-/**
- * Rails-shaped writer for `class_attribute :token_definitions` — Rails'
- * `generates_token_for` assigns `self.token_definitions = token_definitions.merge(...)`,
- * and external callers can replace the map outright. Stores the given hash as
- * this class's own registry entry (subclasses still inherit via the reader).
- *
- * Mirrors: ActiveRecord::TokenFor#token_definitions=
- * @internal
- */
-export function setTokenDefinitions(
-  modelClass: typeof Base,
-  value: Record<string, TokenDefinition>,
-): void {
-  tokenDefinitionRegistry.set(modelClass, new Map(Object.entries(value)));
-}
-
-/**
- * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
- * to sign/verify tokens, resolved per class (own slot, else inherited, else the
- * boot-time value the railtie stand-in assigned — see setTokenForSecret).
- *
- * Mirrors: ActiveRecord::TokenFor#generated_token_verifier
- */
-export function generatedTokenVerifier(modelClass: typeof Base): MessageVerifier | null {
-  return resolvedVerifier(modelClass);
-}
-
-/**
- * Rails-shaped writer for `class_attribute :generated_token_verifier` — Rails
- * tests assign `ActiveRecord::Base.generated_token_verifier = MessageVerifier.new(...)`
- * to inject a verifier; `message_verifier`'s `||=` then returns it instead of
- * building from the secret. Assigns to this class's own slot (subclasses inherit
- * via the reader until they assign their own). Assigning null writes an explicit
- * nil shadow on this class — Rails' generated writer assigns to the class, so the
- * reader returns nil rather than the parent's verifier.
- *
- * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
- * @internal
- */
-export function setGeneratedTokenVerifier(
-  modelClass: typeof Base,
-  verifier: MessageVerifier | null,
-): void {
-  tokenVerifierRegistry.set(modelClass, { verifier });
 }
 
 /**
@@ -290,12 +201,9 @@ export function generatesTokenFor(
     block?: (record: any) => unknown;
   } = {},
 ): void {
-  setTokenDefinitions(
-    this,
-    tokenDefinitions(this).merge({
-      [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.block),
-    }),
-  );
+  this.tokenDefinitions = this.tokenDefinitions.merge({
+    [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.block),
+  });
 }
 
 /**

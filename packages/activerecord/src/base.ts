@@ -141,16 +141,14 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import {
-  tokenDefinitions as _tokenDefinitions,
-  setTokenDefinitions as _setTokenDefinitions,
-  generatedTokenVerifier as _generatedTokenVerifier,
-  setGeneratedTokenVerifier as _setGeneratedTokenVerifier,
+  registerGeneratedTokenVerifierSink as _registerGeneratedTokenVerifierSink,
+  withFetch as _withFetch,
   generatesTokenFor as _generatesTokenFor,
   generateTokenFor as _generateTokenFor,
   findByTokenFor as _findByTokenFor,
   findByTokenForBang as _findByTokenForBang,
 } from "./token-for.js";
-import type { TokenDefinition as _TokenDefinition } from "./token-for.js";
+import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   getVerboseQueryLogs as _getVerboseQueryLogs,
@@ -1716,26 +1714,14 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.token_definitions
    */
-  static get tokenDefinitions(): ReturnType<typeof _tokenDefinitions> {
-    return _tokenDefinitions(this);
-  }
-
-  static set tokenDefinitions(value: Record<string, _TokenDefinition>) {
-    _setTokenDefinitions(this, value);
-  }
+  declare static tokenDefinitions: _TokenDefinitionsHash;
 
   /**
    * MessageVerifier backing token-for (null until a verifier is configured).
    *
    * Mirrors: ActiveRecord::Base.generated_token_verifier
    */
-  static get generatedTokenVerifier(): _MessageVerifier | null {
-    return _generatedTokenVerifier(this);
-  }
-
-  static set generatedTokenVerifier(value: _MessageVerifier | null) {
-    _setGeneratedTokenVerifier(this, value);
-  }
+  declare static generatedTokenVerifier: _MessageVerifier | null;
 
   // -- Encrypted attributes --
 
@@ -4586,9 +4572,27 @@ classAttribute.call(Base, "timeZoneAwareTypes", {
 });
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
+// Mirrors token_for.rb:10-11.
+classAttribute.call(Base, "tokenDefinitions", {
+  instanceAccessor: false,
+  instancePredicate: false,
+  default: _withFetch({}),
+});
+classAttribute.call(Base, "generatedTokenVerifier", {
+  instanceAccessor: false,
+  instancePredicate: false,
+});
 classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,
   default: [],
+});
+// The railtie initializer "active_record.generated_token_verifier"
+// (railtie.rb:328-334) assigns `self.generated_token_verifier ||=
+// app.message_verifier("active_record/token_for")` onto ActiveRecord::Base at
+// boot. trails has no railtie, so token-for.ts builds the verifier from the
+// injected secret and this sink performs that assignment.
+_registerGeneratedTokenVerifierSink((verifier) => {
+  Base.generatedTokenVerifier = verifier;
 });
 extend(Base, {
   defaultScope: _defaultScope,
