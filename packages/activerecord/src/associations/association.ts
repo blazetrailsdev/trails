@@ -193,7 +193,7 @@ export class Association {
   constructor(owner: Base, reflection: AssociationDefinition) {
     this.owner = owner;
     this.reflection = _richReflectionFor(owner, reflection);
-    this.disableJoins = reflection.options.disableJoins || false;
+    this.disableJoins = this.reflection.options.disableJoins || false;
 
     // Rails' `check_validity! → klass → compute_class` raises NameError
     // synchronously in the constructor, so `record.association(:name)` itself

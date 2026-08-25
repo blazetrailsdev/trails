@@ -4530,16 +4530,13 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
-// Ruby resolves `validates`' `const_get("#{key.to_s.camelize}Validator")`
-// (activemodel/lib/active_model/validations/validates.rb:121) against the model
-// class, and `ActiveRecord::Base`'s ancestors include `ActiveRecord::Validations`
-// — so `validates :x, presence: true` on an AR model finds THAT module's
-// column/association-aware `PresenceValidator`, not ActiveModel's, with no
-// `validates` override anywhere. JS has no ancestry constant lookup, so the
-// module's validator constants ride onto `Base` as statics, which every model
-// inherits exactly as Ruby inherits the constant.
-// (`extend()` deliberately skips constants, as Ruby's `extend` does, so these
-// are assigned rather than extended on.)
+// `validates`' `const_get("#{key.to_s.camelize}Validator")`
+// (activemodel/lib/active_model/validations/validates.rb:121) resolves against
+// the model's ancestors, which include `ActiveRecord::Validations` — so an AR
+// model finds THAT module's column-aware validators. JS has no ancestry
+// constant lookup, so they ride on `Base` as statics, inherited the way Ruby
+// inherits the constant. Assigned, not extended: `extend()` skips constants
+// because Ruby's `extend` copies methods only.
 Object.assign(Base, {
   AbsenceValidator: _Validations.AbsenceValidator,
   AssociatedValidator: _Validations.AssociatedValidator,
