@@ -35,30 +35,35 @@ let manifestPresent = false;
  * parked on top of the real manifest for the rest of the session.
  */
 export function setManifestForTests(manifest) {
-  // `null` installs the ABSENT state — the empty stand-in plus the flag saying
-  // it is a stand-in — which is what the Lint job sees and what a rule that
-  // flags what the manifest does NOT list has to be tested against.
+  // `null` installs the INERT state — an empty manifest, which is exactly what
+  // the Lint job writes and what a rule that flags what the manifest does NOT
+  // list has to be tested against.
   manifestCache = manifest ?? { files: {} };
-  manifestPresent = manifest != null;
+  manifestPresent = hasEntries(manifestCache);
+}
+
+function hasEntries(manifest) {
+  return Object.keys(manifest?.files ?? {}).length > 0;
 }
 
 export function loadManifest() {
   if (manifestCache) return manifestCache;
-  if (!fs.existsSync(MANIFEST_PATH)) {
-    manifestCache = { files: {} };
-    manifestPresent = false;
-    return manifestCache;
-  }
-  manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
-  manifestPresent = true;
+  manifestCache = fs.existsSync(MANIFEST_PATH)
+    ? JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"))
+    : { files: {} };
+  manifestPresent = hasEntries(manifestCache);
   return manifestCache;
 }
 
 /**
- * Whether the manifest was actually found, as opposed to the empty stand-in
- * `loadManifest` returns when it is absent. The two are indistinguishable in
- * the returned object, and which one you are holding decides opposite answers
- * for a rule whose polarity is "flag what the manifest does NOT list".
+ * Whether the manifest carries real data, as opposed to being INERT.
+ *
+ * Presence is decided by CONTENT, not by the file existing: `prelint` runs the
+ * builder with `--allow-missing`, which — when rails-api.json is absent — WRITES
+ * an empty manifest rather than skipping, and says in so many words that the
+ * rules reading it "will report nothing" for that run. An existence check
+ * therefore reads INERT as real and answers backwards for a rule whose polarity
+ * is "flag what the manifest does NOT list".
  */
 export function manifestAvailable() {
   loadManifest();

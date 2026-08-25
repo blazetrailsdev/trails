@@ -96,23 +96,34 @@ tester.run("unbacked-internal-needs-receipt", rule, {
   ],
 });
 
-// The standalone Lint job builds the manifest with `--allow-missing` and there
-// is no Ruby there, so the file is genuinely absent. This rule's polarity turns
-// "no manifest" into "every `@internal` is unbacked" unless it fails open —
-// which is how it reported 4 false positives on names that ARE Rails-private.
-tester.run("unbacked-internal-needs-receipt (no manifest)", rule, {
-  valid: [
-    {
-      filename: inheritanceFile,
-      code: `/** @internal */\nexport function seam() {}\n`,
-      // Scoped to this case: the manifest cache is module-global, and
-      // RuleTester runs every case after the module body, so setting it at
-      // import time would silently apply to the suite above too.
-      before: () => setManifestForTests(null),
-      after: () => setManifestForTests(FIXTURE),
-    },
-  ],
-  invalid: [],
-});
+// `prelint` builds the manifest with `--allow-missing`, and with no Ruby on the
+// standalone Lint job that WRITES `{"files":{}}` rather than skipping — the
+// builder says outright that the rules reading it "will report nothing" for
+// that run. Both spellings of "no data" must leave this rule inert: its
+// polarity otherwise turns them into "every `@internal` is unbacked", which is
+// how it reported 4 false positives on names that ARE Rails-private.
+//
+// The `{ files: {} }` case is the one that matters — an earlier fix keyed
+// presence off the file EXISTING, which passed the `null` case here while CI
+// still failed on the empty file the builder actually writes.
+for (const [label, manifest] of [
+  ["empty manifest — what --allow-missing writes", { files: {} }],
+  ["manifest absent", null],
+]) {
+  tester.run(`unbacked-internal-needs-receipt (${label})`, rule, {
+    valid: [
+      {
+        filename: inheritanceFile,
+        code: `/** @internal */\nexport function seam() {}\n`,
+        // Scoped to this case: the manifest cache is module-global, and
+        // RuleTester runs every case after the module body, so setting it at
+        // import time would silently apply to the suite above too.
+        before: () => setManifestForTests(manifest),
+        after: () => setManifestForTests(FIXTURE),
+      },
+    ],
+    invalid: [],
+  });
+}
 
 console.log("unbacked-internal-needs-receipt: ok");
