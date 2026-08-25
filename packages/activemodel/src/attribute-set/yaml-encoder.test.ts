@@ -70,7 +70,7 @@ describe("YAMLEncoder", () => {
     expect(JSON.parse(encoded).defaultAttributes).toContain("score");
 
     const decoded = localCoder.decode(encoded);
-    expect(decoded.has("score")).toBe(false);
+    expect(decoded.isKey("score")).toBe(false);
     expect(decoded.castTypes().score).toBe(intType);
   });
 

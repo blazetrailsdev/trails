@@ -179,7 +179,7 @@ describe("NormalizedAttributeTest", () => {
     // Rails mutates the name in place (`name.replace("0")`); JS strings are
     // immutable, so assign through the raw attribute to model the same
     // changed-in-place value, then let save re-normalize it.
-    counted._attributes.set("name", "0");
+    counted._attributes.writeCastValue("name", "0");
     expect(counted.name).toBe("0");
     await counted.save();
     expect(counted.name).toBe("1");

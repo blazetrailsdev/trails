@@ -262,7 +262,7 @@ export function freeze<T extends FrozenRecord>(this: T): T {
  * Mirrors: ActiveRecord::Core#frozen? — `@attributes.frozen?` in Rails.
  */
 export function isFrozen(this: FrozenRecord): boolean {
-  return this._attributes.isFrozen();
+  return Object.isFrozen(this._attributes);
 }
 
 /**

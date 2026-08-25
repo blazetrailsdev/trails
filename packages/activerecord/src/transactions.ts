@@ -368,7 +368,13 @@ export async function rolledbackBang(
  *
  * Mirrors: ActiveRecord::Transactions#remember_transaction_record_state
  */
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs frozen? — PERMANENT: Ruby's `@attributes.frozen?`
+ *   (transactions.rb:328) is a zero-arg receiver method every object answers;
+ *   JS has no such method, so the same read is spelled with the object as
+ *   `Object.isFrozen`'s argument.
+ */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
   // Initialize state once per outermost transaction, then increment level for
@@ -378,7 +384,7 @@ export function rememberTransactionRecordState(this: Base): void {
     r._startTransactionState = {
       newRecord: r._newRecord,
       destroyed: r._destroyed,
-      frozen: r._attributes.isFrozen(),
+      frozen: Object.isFrozen(r._attributes),
       id: this.id,
       previouslyNewRecord: r._previouslyNewRecord,
       attributes: snapshotAttrs,

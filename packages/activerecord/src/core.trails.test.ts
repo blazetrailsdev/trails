@@ -30,15 +30,14 @@ describe("frozen / isFrozen", () => {
   // an attribute map (e.g. via clone/becomes) aren't frozen together.
   it("freeze clones the attribute set so prior references stay mutable", async () => {
     const topic = await Topic.create({ title: "Alice" });
-    const attrsOf = (record: Topic) =>
-      (record as unknown as { _attributes: { isFrozen(): boolean } })._attributes;
+    const attrsOf = (record: Topic) => (record as unknown as { _attributes: object })._attributes;
     const preFreezeAttrs = attrsOf(topic);
     topic.freeze();
     expect(topic.isFrozen()).toBe(true);
     expect(attrsOf(topic)).not.toBe(preFreezeAttrs);
-    expect(preFreezeAttrs.isFrozen()).toBe(false);
+    expect(Object.isFrozen(preFreezeAttrs)).toBe(false);
     // The frozen clone is what the record now exposes.
-    expect(attrsOf(topic).isFrozen()).toBe(true);
+    expect(Object.isFrozen(attrsOf(topic))).toBe(true);
   });
 });
 

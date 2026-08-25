@@ -224,7 +224,7 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({});
-    expect(p._attributes.has("id")).toBe(true);
+    expect(p._attributes.isKey("id")).toBe(true);
   });
 
   it("write_from_database sets the attribute with database typecasting", () => {
@@ -386,9 +386,9 @@ describe("AttributeSetTest", () => {
       ]),
     );
     set.narrowTo(["id", "name"]);
-    expect(set.has("id")).toBe(true);
-    expect(set.has("name")).toBe(true);
-    expect(set.has("salary")).toBe(false);
+    expect(set.isKey("id")).toBe(true);
+    expect(set.isKey("name")).toBe(true);
+    expect(set.isKey("salary")).toBe(false);
     expect(set.keys().sort()).toEqual(["id", "name"]);
   });
 
@@ -398,7 +398,7 @@ describe("AttributeSetTest", () => {
       new Map([["salary", Attribute.fromDatabase("salary", 80000, intType)]]),
     );
     set.narrowTo([]);
-    expect(set.has("salary")).toBe(false);
+    expect(set.isKey("salary")).toBe(false);
     expect(set.getAttribute("salary").type).toBe(intType);
   });
 
@@ -408,7 +408,7 @@ describe("AttributeSetTest", () => {
       new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]),
     );
     set.narrowTo(new Set(["name"]));
-    expect(set.has("name")).toBe(true);
+    expect(set.isKey("name")).toBe(true);
     expect(set.fetchValue("name")).toBe("Alice");
   });
 

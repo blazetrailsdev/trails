@@ -31,6 +31,7 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
+  Attribute,
   AttributeMethodPattern,
   Model,
   Type,
@@ -2804,7 +2805,11 @@ export class Base extends Model {
     for (const [key, value] of Object.entries(row)) {
       const override = overrideTypes?.[key];
       if (override) {
-        record._attributes.overrideFromDatabase(key, value, override);
+        // Rails' `@attributes[name] = Attribute.from_database(...)` — an
+        // explicit per-attribute `types` override supersedes the schema type,
+        // the way LazyAttributeHash resolves `additional_types.fetch(name,
+        // types[name])` (builder.rb:76).
+        record._attributes.set(key, Attribute.fromDatabase(key, value, override as Type));
       } else {
         record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
       }
