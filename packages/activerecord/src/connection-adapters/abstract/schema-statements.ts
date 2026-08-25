@@ -1544,7 +1544,7 @@ export class SchemaStatements {
    */
   async checkConstraintExists(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean },
+    options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<boolean> {
     if (!("name" in options) && !("expression" in options)) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");

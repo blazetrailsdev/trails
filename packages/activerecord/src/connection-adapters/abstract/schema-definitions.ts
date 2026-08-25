@@ -1715,8 +1715,15 @@ export class Table {
     }
   }
 
-  async columnExists(columnName: string, type?: ColumnType): Promise<boolean> {
-    return this._schema.columnExists(this.name, columnName, type);
+  async columnExists(
+    columnName: string,
+    type?: ColumnType,
+    options: Record<string, unknown> = {},
+  ): Promise<boolean> {
+    if (Object.keys(options).length === 0) {
+      return this._schema.columnExists(this.name, columnName, type);
+    }
+    return this._schema.columnExists(this.name, columnName, type, options);
   }
 
   async indexExists(
@@ -1805,11 +1812,21 @@ export class Table {
     return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
-  async foreignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
-    if (toTableOrOptions === undefined) {
+  async foreignKeyExists(
+    toTableOrOptions?: string | Record<string, unknown>,
+    options: Record<string, unknown> = {},
+  ): Promise<boolean> {
+    if (typeof toTableOrOptions === "string") {
+      if (Object.keys(options).length === 0) {
+        return this._schema.foreignKeyExists(this.name, toTableOrOptions);
+      }
+      return this._schema.foreignKeyExists(this.name, toTableOrOptions, options);
+    }
+    const opts = { ...toTableOrOptions, ...options };
+    if (Object.keys(opts).length === 0) {
       return this._schema.foreignKeyExists(this.name);
     }
-    return this._schema.foreignKeyExists(this.name, toTableOrOptions);
+    return this._schema.foreignKeyExists(this.name, opts);
   }
 
   async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
@@ -1911,7 +1928,12 @@ export interface SchemaStatementsLike {
   removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
   removeTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  columnExists(tableName: string, columnName: string, type?: ColumnType): Promise<boolean>;
+  columnExists(
+    tableName: string,
+    columnName: string,
+    type?: ColumnType,
+    options?: Record<string, unknown>,
+  ): Promise<boolean>;
   indexExists(
     tableName: string,
     columnName: string | string[],

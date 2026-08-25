@@ -1414,6 +1414,7 @@ type PersistenceInstanceChainHost = {
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
   _attributes: any;
+  attributeNames(): string[];
   readAttribute(name: string): unknown;
   isWillSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
@@ -1629,11 +1630,12 @@ export async function _createRecord(
 
   const attrs = this._attributes.valuesForDatabase();
   // Rails create super chain, threading attribute_names down to
-  // attributes_for_create. The default (self.attribute_names) is the set of
-  // declared columns present in the value map; an explicit `attributeNames`
-  // arg overrides it (Persistence#_create_record(attribute_names)).
+  // attributes_for_create. The default is `self.attribute_names`
+  // (attribute_methods.rb:333-334), narrowed to the declared columns; an
+  // explicit `attributeNames` arg overrides it
+  // (Persistence#_create_record(attribute_names)).
   const selfNames =
-    attributeNames ?? Object.keys(attrs).filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
+    attributeNames ?? this.attributeNames().filter((k) => Object.hasOwn(ctor.attributeTypes(), k));
   // Rails AttributeMethods::Dirty#_create_record default arg:
   // attribute_names_for_partial_inserts (dirty.rb:207-217), which reads
   // `changed_attribute_names_to_save` — derived from the `Attribute` graph, so

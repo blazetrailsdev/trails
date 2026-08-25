@@ -129,7 +129,7 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#order
    */
-  order(...exprs: Node[]): SelectManager {
+  order(...exprs: (Node | string)[]): SelectManager {
     return this.from().order(...exprs);
   }
 
