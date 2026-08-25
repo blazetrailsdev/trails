@@ -2721,11 +2721,11 @@ export class PostgreSQLAdapter
   override clearCacheBang({
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
-    void super.clearCacheBang({ newConnection });
-    // Rails wraps the pool mutation in `@lock.synchronize`
-    // (abstract_adapter.rb:741-747) — the precondition `dealloc` states
-    // outright: "the statement pool is only accessed while holding the
-    // connection's lock" (postgresql_adapter.rb:308-310).
+    // No `super` call: this body replaces `abstract_adapter.rb:739-748`'s
+    // single `@lock.synchronize` block rather than running after it. The
+    // precondition `dealloc` states outright is that "the statement pool is
+    // only accessed while holding the connection's lock"
+    // (postgresql_adapter.rb:308-310).
     return this.lock.synchronize(() => {
       if (newConnection) {
         // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
