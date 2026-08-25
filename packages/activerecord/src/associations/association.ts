@@ -34,8 +34,9 @@ import {
  * trails has loader-local holders carrying a synthesised `options`/`scope`, and
  * those own properties still win over the reflection's.
  *
- * @noRailsEquivalent Rails has no ad-hoc holder to re-home; this exists only to
- *   give the trails-only ones a real reflection to delegate to.
+ * @noRailsEquivalent CONVERGEABLE: Rails has no ad-hoc holder to re-home; this
+ *   exists only to give the trails-only ones a real reflection to delegate to,
+ *   and retires with the last holder that is not built from a reflection.
  */
 function _richReflectionFor(owner: Base, reflection: AssociationDefinition): AssociationDefinition {
   if (Object.getPrototypeOf(reflection) !== Object.prototype) return reflection;
