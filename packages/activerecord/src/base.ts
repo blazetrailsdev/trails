@@ -372,11 +372,6 @@ import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
 _registerSerializeFn(_serializeAttribute as any);
-import {
-  hasMultiparameterKeys,
-  extractMultiparameterCallstack,
-  executeMultiparameterAssignment,
-} from "./multiparameter-attribute-assignment.js";
 
 /**
  * A single column of a primary key.
@@ -2982,134 +2977,81 @@ export class Base extends Model {
     // after super() so the association proxy exists on `this`.
     let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
-    if (hasMultiparameterKeys(attrs)) {
-      // Mirrors Rails: Base#initialize calls assign_attributes which handles
-      // multiparameter keys. We split: regular attrs go through the Model
-      // constructor for setup, mp attrs are assembled after.
-      //
-      // Suppress after_initialize so it fires after ALL attrs are present
-      // (not just the regular subset), and re-snapshot dirty state so mp
-      // attrs appear clean (part of initial construction, not changes).
-      const ctor = new.target;
-      const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
-      const hadOwnSuppressor = Object.prototype.hasOwnProperty.call(
-        suppressor,
-        "_suppressInitializeCallback",
-      );
-      const wasSuppressed = suppressor._suppressInitializeCallback;
-      suppressor._suppressInitializeCallback = true;
-      const { multiparams, regular } = extractMultiparameterCallstack(attrs);
-      try {
-        super(regular);
-      } finally {
-        // Always restore the flag even if super() throws, so later instances
-        // on this class still fire after_initialize normally.
-        if (hadOwnSuppressor) {
-          suppressor._suppressInitializeCallback = wasSuppressed;
-        } else {
-          delete (suppressor as { _suppressInitializeCallback?: boolean })
-            ._suppressInitializeCallback;
-        }
+    // Suppress after_initialize during super() so we can call
+    // initialize_internals_callback first, then fire after_initialize.
+    // This matches Rails' Core#initialize order:
+    //   init_internals → initialize_internals_callback → super → after_initialize
+    // Multiparameter keys need no split here: super() reaches
+    // `assign_attributes` → `_assign_attributes`, which buckets `key(1i)` out
+    // of the scalar pass and calls `assign_multiparameter_attributes` itself
+    // (attribute_assignment.rb:11-22).
+    const ctor = new.target;
+    // Separate store accessor keys (virtual, backed by a store column rather
+    // than a direct DB column) from regular column attrs. Store accessor attrs
+    // are assigned AFTER the clean re-snapshot so they appear as dirty for new
+    // records — matching Rails' new-record dirty semantics where assign_attributes
+    // runs after init_internals / initialize_internals_callback.
+    const _storeKeys = new Set(Object.values(ctor.storedAttributes()).flat());
+    const _storeAttrs: Record<string, unknown> = {};
+    let attrsForSuper = attrs;
+    if (_storeKeys.size > 0) {
+      for (const [k, v] of Object.entries(attrs)) {
+        if (_storeKeys.has(k)) _storeAttrs[k] = v;
       }
-      executeMultiparameterAssignment(this as any, multiparams);
-      if (!wasSuppressed) {
-        inheritanceInitializeInternalsCallback.call(this as any);
-        // Guard before allocating the Set — the no-scope case is the hot path.
-        if (_shouldApplyScopeAttributes(ctor)) {
-          _applyScopeAttributes(
-            ctor,
-            this as any,
-            new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
-          );
-        }
-        if (assocPending) {
-          _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-          assocPending = null;
-        }
-        // Rails yields the constructor block (Core#initialize, core.rb:479)
-        // before after_initialize — used by association `build_record` to run
-        // `initialize_attributes` (scope FK + set_inverse_instance) first.
-        initBlock?.(this as unknown as Base);
-        // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+      if (Object.keys(_storeAttrs).length > 0) {
+        attrsForSuper = Object.fromEntries(
+          Object.entries(attrs).filter(([k]) => !_storeKeys.has(k)),
+        );
       }
-    } else {
-      // For the regular (non-multiparameter) path, mirror the multiparameter
-      // pattern: suppress after_initialize during super() so we can call
-      // initialize_internals_callback first, then fire after_initialize.
-      // This matches Rails' Core#initialize order:
-      //   init_internals → initialize_internals_callback → super → after_initialize
-      const ctor2 = new.target;
-      // Separate store accessor keys (virtual, backed by a store column rather
-      // than a direct DB column) from regular column attrs. Store accessor attrs
-      // are assigned AFTER the clean re-snapshot so they appear as dirty for new
-      // records — matching Rails' new-record dirty semantics where assign_attributes
-      // runs after init_internals / initialize_internals_callback.
-      const _storeKeys = new Set(Object.values(ctor2.storedAttributes()).flat());
-      const _storeAttrs: Record<string, unknown> = {};
-      let attrsForSuper = attrs;
-      if (_storeKeys.size > 0) {
-        for (const [k, v] of Object.entries(attrs)) {
-          if (_storeKeys.has(k)) _storeAttrs[k] = v;
-        }
-        if (Object.keys(_storeAttrs).length > 0) {
-          attrsForSuper = Object.fromEntries(
-            Object.entries(attrs).filter(([k]) => !_storeKeys.has(k)),
-          );
-        }
+    }
+    const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
+    const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
+    const wasSuppressed = suppressor._suppressInitializeCallback;
+    suppressor._suppressInitializeCallback = true;
+    try {
+      super(attrsForSuper);
+    } finally {
+      if (hadOwn) {
+        suppressor._suppressInitializeCallback = wasSuppressed;
+      } else {
+        delete (suppressor as { _suppressInitializeCallback?: boolean })
+          ._suppressInitializeCallback;
       }
-      const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
-      const hadOwn2 = Object.prototype.hasOwnProperty.call(
-        suppressor2,
-        "_suppressInitializeCallback",
-      );
-      const wasSuppressed2 = suppressor2._suppressInitializeCallback;
-      suppressor2._suppressInitializeCallback = true;
-      try {
-        super(attrsForSuper);
-      } finally {
-        if (hadOwn2) {
-          suppressor2._suppressInitializeCallback = wasSuppressed2;
-        } else {
-          delete (suppressor2 as { _suppressInitializeCallback?: boolean })
-            ._suppressInitializeCallback;
-        }
+    }
+    if (!wasSuppressed) {
+      inheritanceInitializeInternalsCallback.call(this as any);
+      // Guard before allocating the Set — the no-scope case is the hot path.
+      if (_shouldApplyScopeAttributes(ctor)) {
+        _applyScopeAttributes(ctor, this as any, new Set(Object.keys(attrs)));
       }
-      if (!wasSuppressed2) {
-        inheritanceInitializeInternalsCallback.call(this as any);
-        // Guard before allocating the Set — the no-scope case is the hot path.
-        if (_shouldApplyScopeAttributes(ctor2)) {
-          _applyScopeAttributes(ctor2, this as any, new Set(Object.keys(attrs)));
-        }
-        // Assign store accessor keys after the clean baseline so they appear
-        // as dirty on new records (mirrors Rails: new-record attrs are changed
-        // relative to nil). Dispatch through the prototype setter so the write
-        // lands in the store hash rather than a standalone attribute slot.
-        for (const [k, v] of Object.entries(_storeAttrs)) {
-          let proto = Object.getPrototypeOf(this);
-          let dispatched = false;
-          while (proto !== null && proto !== Object.prototype) {
-            const desc = Object.getOwnPropertyDescriptor(proto, k);
-            if (desc?.set) {
-              (desc.set as (val: unknown) => void).call(this, v);
-              dispatched = true;
-              break;
-            }
-            proto = Object.getPrototypeOf(proto);
+      // Assign store accessor keys after the clean baseline so they appear
+      // as dirty on new records (mirrors Rails: new-record attrs are changed
+      // relative to nil). Dispatch through the prototype setter so the write
+      // lands in the store hash rather than a standalone attribute slot.
+      for (const [k, v] of Object.entries(_storeAttrs)) {
+        let proto = Object.getPrototypeOf(this);
+        let dispatched = false;
+        while (proto !== null && proto !== Object.prototype) {
+          const desc = Object.getOwnPropertyDescriptor(proto, k);
+          if (desc?.set) {
+            (desc.set as (val: unknown) => void).call(this, v);
+            dispatched = true;
+            break;
           }
-          if (!dispatched) (this as any)._writeAttribute(k, v);
+          proto = Object.getPrototypeOf(proto);
         }
-        if (assocPending) {
-          _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-          assocPending = null;
-        }
-        // Rails yields the constructor block (Core#initialize, core.rb:479)
-        // before after_initialize — used by association `build_record` to run
-        // `initialize_attributes` (scope FK + set_inverse_instance) first.
-        initBlock?.(this as unknown as Base);
-        // strict:"sync" guarantees synchronous completion -- void the settled result.
-        void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+        if (!dispatched) (this as any)._writeAttribute(k, v);
       }
+      if (assocPending) {
+        _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+        assocPending = null;
+      }
+      // Rails yields the constructor block (Core#initialize, core.rb:479)
+      // before after_initialize — used by association `build_record` to run
+      // `initialize_attributes` (scope FK + set_inverse_instance) first.
+      initBlock?.(this as unknown as Base);
+      // strict:"sync" guarantees synchronous completion -- void the settled result.
+      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
     }
     // Suppressed-callback fallback: parent caller fires after_initialize, so
     // we still dispatch first to keep Rails' "assign → after_initialize" order.

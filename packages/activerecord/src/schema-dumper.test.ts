@@ -416,10 +416,13 @@ describe("SchemaDumperTest", () => {
     const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     await sm.createVersion("20240601120000");
-    const result = await TopLevelDumper.dumpWithVersion(adapter);
-    expect(result).toContain("Schema version: 20240601120000");
-    expect(result).toContain("defineSchema");
-  });
+    const output = (await TopLevelDumper.dump(adapter)).join("\n");
+    // Rails asserts %r{ActiveRecord::Schema\[...\]\.define} against the dump
+    // header (schema_dumper_test.rb:44-47); trails' generated DSL is a plain
+    // function, so the same header carries the version and the define call.
+    expect(output).toMatch(/version: 2024_06_01_120000/);
+    expect(output).toContain("defineSchema");
+  }, 60000);
 
   it("schema dump with regexp ignored table", async () => {
     // The `ignoreTables` filter runs during table enumeration, so drive the
