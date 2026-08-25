@@ -1,6 +1,4 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { TableDefinition as MysqlTableDefinition } from "../connection-adapters/mysql/schema-definitions.js";
-import type { TableDefinition as PgTableDefinition } from "../connection-adapters/postgresql/schema-definitions.js";
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../errors.js";
@@ -35,58 +33,55 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     : { default: "uuid_generate_v4()" };
 
   await adapter.createTable("chat_messages", { id: "uuid", force: true, ...uuidDefault }, (t) => {
-    (t as PgTableDefinition).text("content");
+    t.text("content");
   });
 
   await adapter.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.uuid("message_id", { primaryKey: true, default: "uuid_generate_v4()" });
-    pg.text("content");
+    t.uuid("message_id", { primaryKey: true, default: "uuid_generate_v4()" });
+    t.text("content");
   });
 
   await adapter.createTable("uuid_parents", { id: "uuid", force: true, ...uuidDefault }, (t) => {
-    (t as PgTableDefinition).string("name");
+    t.string("name");
   });
 
   await adapter.createTable("uuid_children", { id: "uuid", force: true, ...uuidDefault }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.string("name");
-    pg.uuid("uuid_parent_id");
+    t.string("name");
+    t.uuid("uuid_parent_id");
   });
 
   const supportsVirtualColumns = await adapter.supportsVirtualColumns();
   await adapter.createTable("defaults", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
     if (supportsVirtualColumns) {
-      pg.virtual("virtual_stored_number", {
+      t.virtual("virtual_stored_number", {
         type: "integer",
         as: "random_number * 10",
         stored: true,
       });
     }
-    pg.integer("random_number", { default: () => "random() * 100" });
-    pg.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
-    pg.date("modified_date", { default: () => "CURRENT_DATE" });
-    pg.date("modified_date_function", { default: () => "now()" });
-    pg.date("fixed_date", { default: "2004-01-01" });
-    pg.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
-    pg.datetime("modified_time_without_precision", {
+    t.integer("random_number", { default: () => "random() * 100" });
+    t.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
+    t.date("modified_date", { default: () => "CURRENT_DATE" });
+    t.date("modified_date_function", { default: () => "now()" });
+    t.date("fixed_date", { default: "2004-01-01" });
+    t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+    t.datetime("modified_time_without_precision", {
       precision: null,
       default: () => "CURRENT_TIMESTAMP",
     });
-    pg.datetime("modified_time_with_precision_0", {
+    t.datetime("modified_time_with_precision_0", {
       precision: 0,
       default: () => "CURRENT_TIMESTAMP",
     });
-    pg.datetime("modified_time_function", { default: () => "now()" });
-    pg.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
-    pg.timestamptz("fixed_time_with_time_zone", { default: "2004-01-01 01:00:00+1" });
-    pg.column("char1", "char(1)", { default: "Y" });
-    pg.string("char2", { limit: 50, default: "a varchar field" });
-    pg.text("char3", { default: "a text field" });
-    pg.bigint("bigint_default", { default: () => "0::bigint" });
-    pg.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
-    pg.text("multiline_default", { default: "--- []\n\n" });
+    t.datetime("modified_time_function", { default: () => "now()" });
+    t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+    t.timestamptz("fixed_time_with_time_zone", { default: "2004-01-01 01:00:00+1" });
+    t.column("char1", "char(1)", { default: "Y" });
+    t.string("char2", { limit: 50, default: "a varchar field" });
+    t.text("char3", { default: "a text field" });
+    t.bigint("bigint_default", { default: () => "0::bigint" });
+    t.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
+    t.text("multiline_default", { default: "--- []\n\n" });
   });
 
   if (await adapter.supportsIdentityColumns()) {
@@ -108,13 +103,12 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   }
 
   await adapter.createTable("postgresql_times", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.interval("time_interval");
-    pg.interval("scaled_time_interval", { precision: 6 });
+    t.interval("time_interval");
+    t.interval("scaled_time_interval", { precision: 6 });
   });
 
   await adapter.createTable("postgresql_oids", { force: true }, (t) => {
-    (t as PgTableDefinition).oid("obj_id");
+    t.oid("obj_id");
   });
 
   await adapter.dropTable("postgresql_timestamp_with_zones", { ifExists: true });
@@ -179,63 +173,56 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   );
 
   await adapter.createTable("limitless_fields", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.binary("binary", { limit: 100_000 });
-    pg.text("text", { limit: 100_000 });
+    t.binary("binary", { limit: 100_000 });
+    t.text("text", { limit: 100_000 });
   });
 
   await adapter.createTable("bigint_array", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.integer("big_int_data_points", { limit: 8, array: true });
-    pg.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
+    t.integer("big_int_data_points", { limit: 8, array: true });
+    t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
   });
 
   await adapter.createTable("uuid_comments", { force: true, id: false }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
-    pg.string("content");
+    t.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    t.string("content");
   });
 
   await adapter.createTable("uuid_entries", { force: true, id: false }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
-    pg.string("entryable_type", { null: false });
-    pg.uuid("entryable_uuid", { null: false });
+    t.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    t.string("entryable_type", { null: false });
+    t.uuid("entryable_uuid", { null: false });
   });
 
   await adapter.createTable("uuid_items", { force: true, id: false }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
-    pg.string("title");
+    t.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    t.string("title");
   });
 
   await adapter.createTable("uuid_messages", { force: true, id: false }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.uuid("uuid", { primaryKey: true, ...uuidDefault });
-    pg.string("subject");
+    t.uuid("uuid", { primaryKey: true, ...uuidDefault });
+    t.string("subject");
   });
 
   await adapter.createTable("test_exclusion_constraints", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.date("start_date");
-    pg.date("end_date");
-    pg.date("valid_from");
-    pg.date("valid_to");
-    pg.date("transaction_from");
-    pg.date("transaction_to");
+    t.date("start_date");
+    t.date("end_date");
+    t.date("valid_from");
+    t.date("valid_to");
+    t.date("transaction_from");
+    t.date("transaction_to");
 
-    pg.exclusionConstraint("daterange(start_date, end_date) WITH &&", {
+    t.exclusionConstraint("daterange(start_date, end_date) WITH &&", {
       using: "gist",
       where: "start_date IS NOT NULL AND end_date IS NOT NULL",
       name: "test_exclusion_constraints_date_overlap",
     });
-    pg.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", {
+    t.exclusionConstraint("daterange(valid_from, valid_to) WITH &&", {
       using: "gist",
       where: "valid_from IS NOT NULL AND valid_to IS NOT NULL",
       name: "test_exclusion_constraints_valid_overlap",
       deferrable: "immediate",
     });
-    pg.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", {
+    t.exclusionConstraint("daterange(transaction_from, transaction_to) WITH &&", {
       using: "gist",
       where: "transaction_from IS NOT NULL AND transaction_to IS NOT NULL",
       name: "test_exclusion_constraints_transaction_overlap",
@@ -244,24 +231,23 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   });
 
   await adapter.createTable("test_unique_constraints", { force: true }, (t) => {
-    const pg = t as PgTableDefinition;
-    pg.integer("position_1");
-    pg.integer("position_2");
-    pg.integer("position_3");
-    pg.integer("position_4");
+    t.integer("position_1");
+    t.integer("position_2");
+    t.integer("position_3");
+    t.integer("position_4");
 
-    pg.uniqueConstraint("position_1", {
+    t.uniqueConstraint("position_1", {
       name: "test_unique_constraints_position_deferrable_false",
     });
-    pg.uniqueConstraint("position_2", {
+    t.uniqueConstraint("position_2", {
       name: "test_unique_constraints_position_deferrable_immediate",
       deferrable: "immediate",
     });
-    pg.uniqueConstraint("position_3", {
+    t.uniqueConstraint("position_3", {
       name: "test_unique_constraints_position_deferrable_deferred",
       deferrable: "deferred",
     });
-    pg.uniqueConstraint("position_4", {
+    t.uniqueConstraint("position_4", {
       name: "test_unique_constraints_position_nulls_not_distinct",
       nullsNotDistinct: true,
     });
@@ -272,12 +258,11 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
       "measurements",
       { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
       (t) => {
-        const pg = t as PgTableDefinition;
-        pg.string("city_id", { null: false });
-        pg.date("logdate", { null: false });
-        pg.integer("peaktemp");
-        pg.integer("unitsales");
-        pg.index(["logdate", "city_id"], { unique: true });
+        t.string("city_id", { null: false });
+        t.date("logdate", { null: false });
+        t.integer("peaktemp");
+        t.integer("unitsales");
+        t.index(["logdate", "city_id"], { unique: true });
       },
     );
     await adapter.createTable("measurements_toronto", {
@@ -305,7 +290,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },
       (t) => {
-        (t as PgTableDefinition).integer("id", { null: false });
+        t.integer("id", { null: false });
       },
     );
 
@@ -365,60 +350,56 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
   });
 
   await adapter.createTable("defaults", { force: true }, (t) => {
-    const my = t as MysqlTableDefinition;
-    my.date("fixed_date", { default: "2004-01-01" });
-    my.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
-    my.column("char1", "char(1)", { default: "Y" });
-    my.string("char2", { limit: 50, default: "a varchar field" });
+    t.date("fixed_date", { default: "2004-01-01" });
+    t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+    t.column("char1", "char(1)", { default: "Y" });
+    t.string("char2", { limit: 50, default: "a varchar field" });
     if (supportsDefaultExpression) {
-      my.binary("uuid", { limit: 36, default: () => "(uuid())" });
-      my.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
+      t.binary("uuid", { limit: 36, default: () => "(uuid())" });
+      t.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
     }
   });
 
   await adapter.createTable("binary_fields", { force: true }, (t) => {
-    const my = t as MysqlTableDefinition;
-    my.binary("var_binary", { limit: 255 });
-    my.binary("var_binary_large", { limit: 4095 });
+    t.binary("var_binary", { limit: 255 });
+    t.binary("var_binary_large", { limit: 4095 });
 
-    my.tinyblob("tiny_blob");
-    my.blob("normal_blob");
-    my.mediumblob("medium_blob");
-    my.longblob("long_blob");
-    my.tinytext("tiny_text");
-    my.text("normal_text");
-    my.mediumtext("medium_text");
-    my.longtext("long_text");
+    t.tinyblob("tiny_blob");
+    t.blob("normal_blob");
+    t.mediumblob("medium_blob");
+    t.longblob("long_blob");
+    t.tinytext("tiny_text");
+    t.text("normal_text");
+    t.mediumtext("medium_text");
+    t.longtext("long_text");
 
-    my.binary("tiny_blob_2", { size: "tiny" });
-    my.binary("medium_blob_2", { size: "medium" });
-    my.binary("long_blob_2", { size: "long" });
-    my.text("tiny_text_2", { size: "tiny" });
-    my.text("medium_text_2", { size: "medium" });
-    my.text("long_text_2", { size: "long" });
+    t.binary("tiny_blob_2", { size: "tiny" });
+    t.binary("medium_blob_2", { size: "medium" });
+    t.binary("long_blob_2", { size: "long" });
+    t.text("tiny_text_2", { size: "tiny" });
+    t.text("medium_text_2", { size: "medium" });
+    t.text("long_text_2", { size: "long" });
 
-    my.index(["var_binary"]);
+    t.index(["var_binary"]);
   });
 
   await adapter.createTable(
     "key_tests",
     { force: true, options: "CHARSET=utf8 ENGINE=MyISAM" },
     (t) => {
-      const my = t as MysqlTableDefinition;
-      my.string("awesome");
-      my.string("pizza");
-      my.string("snacks");
-      my.index(["awesome"], { type: "fulltext", name: "index_key_tests_on_awesome" });
-      my.index(["pizza"], { using: "btree", name: "index_key_tests_on_pizza" });
-      my.index(["snacks"], { name: "index_key_tests_on_snack" });
+      t.string("awesome");
+      t.string("pizza");
+      t.string("snacks");
+      t.index(["awesome"], { type: "fulltext", name: "index_key_tests_on_awesome" });
+      t.index(["pizza"], { using: "btree", name: "index_key_tests_on_pizza" });
+      t.index(["snacks"], { name: "index_key_tests_on_snack" });
     },
   );
 
   await adapter.createTable("collation_tests", { id: false, force: true }, (t) => {
-    const my = t as MysqlTableDefinition;
-    my.string("string_cs_column", { limit: 1, collation: "utf8mb4_bin" });
-    my.string("string_ci_column", { limit: 1, collation: "utf8mb4_general_ci" });
-    my.binary("binary_column", { limit: 1 });
+    t.string("string_cs_column", { limit: 1, collation: "utf8mb4_bin" });
+    t.string("string_ci_column", { limit: 1, collation: "utf8mb4_general_ci" });
+    t.binary("binary_column", { limit: 1 });
   });
 
   await adapter.execute("DROP PROCEDURE IF EXISTS ten");
@@ -434,7 +415,7 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },
       (t) => {
-        (t as MysqlTableDefinition).integer("id", { null: false });
+        t.integer("id", { null: false });
       },
     );
 
