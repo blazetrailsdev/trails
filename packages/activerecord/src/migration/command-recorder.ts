@@ -190,7 +190,18 @@ export class CommandRecorder {
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
-      await migration[cmd](...args, ...(block === undefined ? [] : [block]));
+      const rest = [...args, ...(block === undefined ? [] : [block])];
+      // `migration.send(cmd, ...)` (command_recorder.rb:150) lands in
+      // `Migration#method_missing` (migration.rb:1045) for a command the
+      // migration does not define itself — `transaction`, say. TS has no
+      // implicit dispatch, so the fallback is spelled out.
+      if (typeof migration[cmd] === "function") {
+        await migration[cmd](...rest);
+      } else {
+        await (
+          migration as unknown as { methodMissing(name: string, ...args: unknown[]): Promise<void> }
+        ).methodMissing(cmd, ...rest);
+      }
     }
   }
 
@@ -269,6 +280,11 @@ export class CommandRecorder {
     if (Object.keys(options).length > 0) result.push(options);
     if (argsBlock !== undefined) result.push(argsBlock);
     return ["createTable", result, block];
+  }
+
+  /** @internal Straight reversion — `execute_block: :execute_block` (command_recorder.rb:158). */
+  invertExecuteBlock(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["executeBlock", args, block];
   }
 
   /** @internal */
@@ -503,10 +519,25 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertTransaction(args: unknown[]): [string, unknown[]] {
-    throw new IrreversibleMigration(
-      "This migration uses transaction, which is not automatically reversible.",
-    );
+  invertTransaction(args: unknown[], _block?: MigrationBlock): MigrationCommand {
+    // Rails runs the block here, via `sub_recorder.revert(&block)`
+    // (command_recorder.rb:187), and the run has to COMPLETE before the
+    // `transaction` tuple is appended: the block's statements record their
+    // inverses onto THIS recorder — the sub-recorder only toggles its own
+    // direction and stays empty — so they must land first. A TS block returns
+    // a promise and this method is sync, so the await lives in the one place
+    // that has an await point: the `transaction` forwarder below, which runs
+    // the block to completion and only then appends what this method builds.
+    // That forwarder is the sole producer of a `transaction` command, in Ruby
+    // (command_recorder.rb:125-132) as here, so no reachable path leaves the
+    // block unrun.
+    const subRecorder = new CommandRecorder(this._delegate);
+    const invertionsProc = async (): Promise<void> => {
+      await subRecorder.replay(
+        this as unknown as { [key: string]: (...args: unknown[]) => Promise<void> },
+      );
+    };
+    return ["transaction", args, invertionsProc as unknown as MigrationBlock];
   }
 
   /** @internal */
@@ -752,12 +783,46 @@ const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "dropVirtualTable",
 ] as const;
 
+/**
+ * `transaction` is generated like every other recordable command
+ * (command_recorder.rb:125-132), but it also carries the first half of
+ * `invert_transaction` (:186-188): Ruby's `inverse_of` runs the block inline
+ * because a Ruby block is synchronous, while a TS block returns a promise. So
+ * the block runs — recording its commands, already inverted, onto this
+ * recorder — before `record` appends the `transaction` command itself.
+ */
+(CommandRecorder.prototype as unknown as Record<string, unknown>)["transaction"] = async function (
+  this: CommandRecorder,
+  ...args: unknown[]
+): Promise<void> {
+  const block =
+    typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
+  if (this.reverting && block !== undefined) {
+    // `record`'s reverting arm is `inverse_of` (command_recorder.rb:94-100),
+    // and `invert_transaction` runs the block before returning its tuple
+    // (:186-190). Both halves are spelled out here because only this method has
+    // an await point: the block runs to completion — its inverses landing on
+    // this recorder first, and a throw propagating to the caller — and the
+    // inverted `transaction` command — which `record`'s reverting arm builds
+    // through `invertTransaction` — is appended after them, Ruby's order.
+    await (block as () => Promise<void>)();
+    this.record("transaction", args);
+    return;
+  }
+  this.record("transaction", args, block);
+};
+
 for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   if (method in CommandRecorder.prototype) continue;
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
     this: CommandRecorder,
     ...args: unknown[]
   ): void {
+    // Ruby's `*args` carries only the arguments actually passed
+    // (command_recorder.rb:125-132); a TS method with optional parameters
+    // materializes trailing `undefined`s, which would otherwise be recorded and
+    // replayed as real arguments.
+    while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     this.record(method, args);
   };
 }

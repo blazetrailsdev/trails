@@ -257,7 +257,11 @@ export interface ExtensionStatements {
 /** Enum type DDL — PostgreSQL only. */
 export interface EnumStatements {
   createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
-  dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
+  dropEnum(
+    name: string,
+    valuesOrOptions?: string[] | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
+  ): Promise<void>;
   renameEnumValue(name: string, options: { from: string; to: string }): Promise<void>;
 }
 
@@ -466,11 +470,29 @@ export class SchemaStatements {
   async dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
+      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" } | undefined]
+      | [string, ...string[], ((t: TableDefinition) => void) | undefined]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
+          ((t: TableDefinition) => void) | undefined,
+        ]
   ): Promise<void> {
-    // TS has no kwargs, so Rails' `*table_names, **options`
+    // TS has no kwargs, so Rails' `*table_names, **options, &block`
     // (abstract/schema_statements.rb:540) arrives as a trailing options object
-    // on the rest parameter.
+    // on the rest parameter, and the block as a trailing function. Ruby's
+    // signature swallows both without them reaching `table_names`; here they
+    // are popped off first — the block is only ever read by CommandRecorder,
+    // which keeps it so `drop_table` can invert to `create_table`.
+    const rest = [...args] as unknown[];
+    while (
+      rest.length > 0 &&
+      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
+    ) {
+      rest.pop();
+    }
+    args = rest as typeof args;
     const last = args[args.length - 1];
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];

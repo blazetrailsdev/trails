@@ -83,25 +83,6 @@ export function _registerBase(base: BaseWithLogger): void {
   _base = base;
 }
 
-// Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
-// For {from,to} hashes, returns `to` (which may be null to clear a comment).
-// `to: undefined` is rejected — a missing value cannot be forwarded to SQL.
-function _extractNewCommentValue(v: CommentOrChanges): string | null {
-  if (v !== null && typeof v === "object") {
-    if (!("to" in v) || (v as { to: unknown }).to === undefined) {
-      throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
-    }
-    const to = (v as { to: unknown }).to;
-    if (to !== null && typeof to !== "string") {
-      throw new ArgumentError(
-        `change_column_comment / change_table_comment :to must be a string or null, got ${typeof to}`,
-      );
-    }
-    return to;
-  }
-  return v;
-}
-
 // Registry for AR config injected by Base — breaks the migration ↔ base import cycle.
 /** @internal */
 /**
@@ -374,18 +355,31 @@ function isMigrationClass(fn: unknown): fn is MigrationClass {
 }
 
 /**
+ * Rails asks the connection itself whether it is a recorder —
+ * `connection.respond_to? :revert` (migration.rb:855, 1046) and
+ * `connection.respond_to?(:reverting)` (migration.rb:871). A TS adapter type
+ * cannot be narrowed by a duck-typed `respond_to?`, so the same question is
+ * asked of the class.
+ */
+function isCommandRecorder(connection: unknown): connection is CommandRecorder {
+  return connection instanceof CommandRecorder;
+}
+
+/**
  * Migration — base class for database migrations.
  *
  * Mirrors: ActiveRecord::Migration
  */
 export class Migration {
-  /** @internal Per-migration connection override — mirrors Rails' @connection ivar. */
-  protected _connectionOverride?: DatabaseAdapter;
+  /**
+   * @internal Per-migration connection override — mirrors Rails' @connection
+   * ivar, which holds the adapter OR the `CommandRecorder` that `#revert`
+   * swaps in for the duration of a recorded block (migration.rb:857-864).
+   */
+  protected _connectionOverride?: DatabaseAdapter | CommandRecorder;
   /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
   protected _poolOverride?: ConnectionPool;
   private _executionStrategy?: ExecutionStrategy;
-  private _recording = false;
-  private _recorder = new CommandRecorder();
   private _name?: string;
   /**
    * The migration instance class-level schema operations route through
@@ -522,6 +516,10 @@ export class Migration {
 
   /** @internal Mirrors Rails Migration#method_missing's proper_table_name dispatch. */
   protected _pt(name: string): string {
+    // `method_missing` applies `proper_table_name` only when the connection is
+    // not the recorder (migration.rb:1046-1047) — a recorded command keeps the
+    // raw name, and replay prefixes it when it runs for real.
+    if (isCommandRecorder(this.connection)) return name;
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
@@ -553,20 +551,6 @@ export class Migration {
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    if (this._recording) {
-      // Record `[name, options?, block?]` without trailing `undefined`, so the
-      // inversion to drop_table (which keeps every arg, including the block, for
-      // reversibility) doesn't carry a stray arg into the executed statement.
-      const recordArgs: unknown[] = [name];
-      if (typeof optionsOrFn === "function") {
-        recordArgs.push(optionsOrFn);
-      } else {
-        if (optionsOrFn !== undefined) recordArgs.push(optionsOrFn);
-        if (fn !== undefined) recordArgs.push(fn);
-      }
-      this._recorder.record("createTable", recordArgs);
-      return;
-    }
     const tname = this._pt(name);
     await this.connection.createTable(tname, optionsOrFn, fn);
   }
@@ -591,27 +575,23 @@ export class Migration {
     const rest = [...args] as unknown[];
     // Rails drop_table(*table_names, **options, &block): the trailing block is
     // the table definition, kept only so the recorder can recreate on reversal.
-    const block = typeof rest[rest.length - 1] === "function" ? rest.pop() : undefined;
+    const block = (typeof rest[rest.length - 1] === "function" ? rest.pop() : undefined) as
+      | ((t: TableDefinition) => void)
+      | undefined;
     const last = rest[rest.length - 1];
     const hasOptions = last !== null && typeof last === "object";
     const options = hasOptions
       ? (last as { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean })
       : undefined;
     const names = (hasOptions ? rest.slice(0, -1) : rest) as string[];
-    if (this._recording) {
-      // Record the raw (un-prefixed) names — invert replays through createTable,
-      // which re-applies the table-name prefix. The recorder accepts the splat.
-      const recordArgs: unknown[] = [...names];
-      if (options) recordArgs.push(options);
-      if (block) recordArgs.push(block);
-      this._recorder.record("dropTable", recordArgs);
-      return;
-    }
     const tnames = names.map((n) => this._pt(n)) as [string, ...string[]];
-    if (options) {
-      await this.connection.dropTable(...tnames, options);
+    // Ruby passes the block on its own channel (`&block`), which `drop_table`
+    // ignores and the recorder keeps; TS has only a trailing argument, so the
+    // adapter drops a trailing function the same way Ruby's signature does.
+    if (options !== undefined) {
+      await this.connection.dropTable(...tnames, options, block);
     } else {
-      await this.connection.dropTable(...tnames);
+      await this.connection.dropTable(...tnames, block);
     }
   }
 
@@ -621,10 +601,6 @@ export class Migration {
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addColumn", [tableName, columnName, type, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.addColumn(tableName, columnName, type, options);
   }
@@ -637,19 +613,11 @@ export class Migration {
   ): Promise<void> {
     const type = typeof typeOrOptions === "string" ? typeOrOptions : undefined;
     const opts = typeof typeOrOptions === "object" ? typeOrOptions : (options ?? {});
-    if (this._recording) {
-      this._recorder.record("removeColumn", [tableName, columnName, type, opts]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.removeColumn(tableName, columnName, type, opts);
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("renameColumn", [tableName, oldName, newName]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.renameColumn(tableName, oldName, newName);
   }
@@ -659,10 +627,6 @@ export class Migration {
     columns: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addIndex", [tableName, columns, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.addIndex(tableName, columns, options);
   }
@@ -676,17 +640,6 @@ export class Migration {
       | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
-    if (this._recording) {
-      // Record args as actually passed so command-recorder inversion sees the
-      // same shape: positional column → [table, column, options]; options-hash
-      // form → [table, options] (no spurious trailing hash to mis-strip).
-      const recordArgs =
-        typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)
-          ? [tableName, columnOrOptions, options]
-          : [tableName, columnOrOptions];
-      this._recorder.record("removeIndex", recordArgs);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.removeIndex(tableName, columnOrOptions, options);
   }
@@ -697,19 +650,11 @@ export class Migration {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("changeColumn", [tableName, columnName, type, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.changeColumn(tableName, columnName, type, options);
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("renameTable", [oldName, newName]);
-      return;
-    }
     oldName = this._pt(oldName);
     newName = this._pt(newName);
     await this.connection.renameTable(oldName, newName);
@@ -733,10 +678,6 @@ export class Migration {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("changeColumnDefault", [tableName, columnName, defaultOrChanges]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.changeColumnDefault(tableName, columnName, defaultOrChanges);
   }
@@ -747,10 +688,6 @@ export class Migration {
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("changeColumnNull", [tableName, columnName, allowNull, defaultValue]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.changeColumnNull(tableName, columnName, allowNull, defaultValue);
   }
@@ -765,10 +702,6 @@ export class Migration {
       index?: boolean;
     } = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addReference", [tableName, refName, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.addReference(tableName, refName, options);
   }
@@ -792,10 +725,6 @@ export class Migration {
     refName: string,
     options: { polymorphic?: boolean } = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("removeReference", [tableName, refName, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.removeReference(tableName, refName, options);
   }
@@ -814,10 +743,6 @@ export class Migration {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addForeignKey", [fromTable, toTable, options]);
-      return;
-    }
     fromTable = this._pt(fromTable);
     await this.connection.addForeignKey(fromTable, toTable, options);
   }
@@ -829,15 +754,6 @@ export class Migration {
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
     options?: { column?: string; name?: string; ifExists?: boolean },
   ): Promise<void> {
-    if (this._recording) {
-      // Rails records `remove_foreign_key(from_table, to_table, **options)`;
-      // preserve the trailing options so invert_add_foreign_key's column/name
-      // survive the round-trip and resolve the real constraint on replay.
-      const recordArgs: unknown[] = [fromTable, toTableOrOptions];
-      if (options !== undefined) recordArgs.push(options);
-      this._recorder.record("removeForeignKey", recordArgs);
-      return;
-    }
     fromTable = this._pt(fromTable);
     if (typeof toTableOrOptions === "string") toTableOrOptions = this._pt(toTableOrOptions);
     await this.connection.removeForeignKey(fromTable, toTableOrOptions, options);
@@ -855,10 +771,6 @@ export class Migration {
       [key: string]: unknown;
     } = {},
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addCheckConstraint", [tableName, expression, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.addCheckConstraint(tableName, expression, options);
   }
@@ -868,15 +780,6 @@ export class Migration {
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
     options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
-    if (this._recording) {
-      // Rails records `remove_check_constraint(table, expression, **options)`;
-      // preserve the trailing options so invert_add_check_constraint's :name
-      // survives the round-trip and resolves the real constraint on replay.
-      const recordArgs: unknown[] = [tableName, expressionOrOptions];
-      if (options !== undefined) recordArgs.push(options);
-      this._recorder.record("removeCheckConstraint", recordArgs);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
@@ -905,41 +808,23 @@ export class Migration {
     columnName: string,
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("changeColumnComment", [tableName, columnName, commentOrChanges]);
-      return;
-    }
     tableName = this._pt(tableName);
-    const resolved = _extractNewCommentValue(commentOrChanges);
     const connection = this.connection as DatabaseAdapter & CommentStatements;
-    await connection.changeColumnComment(tableName, columnName, resolved);
+    await connection.changeColumnComment(tableName, columnName, commentOrChanges);
   }
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("changeTableComment", [tableName, commentOrChanges]);
-      return;
-    }
     tableName = this._pt(tableName);
-    const resolved = _extractNewCommentValue(commentOrChanges);
     const connection = this.connection as DatabaseAdapter & CommentStatements;
-    await connection.changeTableComment(tableName, resolved);
+    await connection.changeTableComment(tableName, commentOrChanges);
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("enableExtension", [name, options]);
-      return;
-    }
     const connection = this.connection as DatabaseAdapter & ExtensionStatements;
     await connection.enableExtension(name, options);
   }
 
   async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("disableExtension", [name, options]);
-      return;
-    }
     const connection = this.connection as DatabaseAdapter & ExtensionStatements;
     await connection.disableExtension(name, options);
   }
@@ -949,10 +834,6 @@ export class Migration {
     values: string[],
     options?: Record<string, unknown>,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("createEnum", [name, values, options]);
-      return;
-    }
     const connection = this.connection as DatabaseAdapter & EnumStatements;
     await connection.createEnum(name, values, options);
   }
@@ -970,21 +851,11 @@ export class Migration {
       !Array.isArray(valuesOrOptions);
     const values = isOptsObj ? undefined : valuesOrOptions;
     const opts = isOptsObj ? valuesOrOptions : (options ?? undefined);
-    if (this._recording) {
-      this._recorder.record("dropEnum", [name, values, opts]);
-      return;
-    }
-    // values is only captured for recording (so dropEnum can be inverted to createEnum);
-    // the adapter's dropEnum(name, options?) doesn't need values for SQL execution.
     const connection = this.connection as DatabaseAdapter & EnumStatements;
-    await connection.dropEnum(name, opts ?? {});
+    await connection.dropEnum(name, values, opts);
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("renameEnumValue", [name, options]);
-      return;
-    }
     const connection = this.connection as DatabaseAdapter & EnumStatements;
     await connection.renameEnumValue(name, options);
   }
@@ -994,10 +865,6 @@ export class Migration {
     columnName?: string | string[],
     options?: UniqueConstraintOptions,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addUniqueConstraint", [tableName, columnName, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
     await connection.addUniqueConstraint(tableName, columnName, options);
@@ -1016,29 +883,17 @@ export class Migration {
       !Array.isArray(columnNameOrOptions);
     const columnName = isOptsObj ? undefined : columnNameOrOptions;
     const opts = isOptsObj ? columnNameOrOptions : (options ?? undefined);
-    if (this._recording) {
-      this._recorder.record("removeUniqueConstraint", [tableName, columnName, opts]);
-      return;
-    }
     tableName = this._pt(tableName);
     const connection = this.connection as DatabaseAdapter & UniqueConstraintStatements;
     await connection.removeUniqueConstraint(tableName, columnName, opts);
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addTimestamps", [tableName, options]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.addTimestamps(tableName, options);
   }
 
   async removeTimestamps(tableName: string): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("removeTimestamps", [tableName]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.removeTimestamps(tableName);
   }
@@ -1059,10 +914,6 @@ export class Migration {
     options?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("createJoinTable", [table1, table2, options, fn]);
-      return;
-    }
     table1 = this._pt(table1);
     await this.connection.createJoinTable(table1, table2, options, fn);
   }
@@ -1072,10 +923,6 @@ export class Migration {
     table2: string,
     options?: { tableName?: string },
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("dropJoinTable", [table1, table2, options]);
-      return;
-    }
     table1 = this._pt(table1);
     await this.connection.dropJoinTable(table1, table2, options);
   }
@@ -1095,35 +942,10 @@ export class Migration {
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: Table) => void | Promise<void>,
   ): Promise<void> {
-    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
-    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
-    if (this._recording) {
-      // Rails: change_table delegates to the CommandRecorder so individual
-      // ops inside the block can be inverted (or batched, in the bulk path).
-      await this._recorder.changeTable(
-        tableName,
-        options as Record<string, unknown>,
-        callback as Parameters<CommandRecorder["changeTable"]>[2],
-      );
-      return;
-    }
-    if (options.bulk) {
-      // Bulk path mirrors Rails: delegate to SchemaStatements#changeTable which
-      // records ops via a Proxy and coalesces into a single ALTER. Apply
-      // tableNamePrefix here since SchemaStatements doesn't.
-      const tname = this._pt(tableName);
-      await this.connection.changeTable(tname, options, callback);
-      return;
-    }
-    const table = this.connection.updateTableDefinition(tableName, this);
-    if (callback) await callback(table);
+    await this.connection.changeTable(this._pt(tableName), fnOrOptions, fn);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("renameIndex", [tableName, oldName, newName]);
-      return;
-    }
     tableName = this._pt(tableName);
     await this.connection.renameIndex(tableName, oldName, newName);
   }
@@ -1144,12 +966,6 @@ export class Migration {
     tableName: string,
     ...columnsOrOptions: Array<string | ({ type?: ColumnType } & Record<string, unknown>)>
   ): Promise<void> {
-    if (this._recording) {
-      // Record as a single removeColumns op so invertRemoveColumns can flip
-      // it back to addColumns (Rails: CommandRecorder#invert_remove_columns).
-      this._recorder.record("removeColumns", [tableName, ...columnsOrOptions]);
-      return;
-    }
     tableName = this._pt(tableName);
     const connection = this.connection as unknown as {
       removeColumns(tableName: string, ...args: Array<string | ColumnOptions>): Promise<void>;
@@ -1165,19 +981,17 @@ export class Migration {
     tableName: string,
     ...columnsAndOptions: Array<string | ({ type: ColumnType } & ColumnOptions)>
   ): Promise<void> {
-    if (this._recording) {
-      this._recorder.record("addColumns", [tableName, ...columnsAndOptions]);
-      return;
-    }
-    const last = columnsAndOptions[columnsAndOptions.length - 1];
-    if (typeof last !== "object" || last === null || !("type" in last)) {
-      throw new TypeError("addColumns requires a trailing options hash with a :type entry");
-    }
-    const { type, ...rest } = columnsAndOptions.pop() as { type: ColumnType } & ColumnOptions;
-    const columns = columnsAndOptions as string[];
-    for (const col of columns) {
-      await this.addColumn(tableName, col, type, rest);
-    }
+    // The per-column loop lives on the adapter, as Rails' `add_columns`
+    // (abstract/schema_statements.rb:643-647) does; a migration only forwards,
+    // so a recorded call records one `addColumns` command rather than N
+    // `addColumn`s.
+    const connection = this.connection as unknown as {
+      addColumns(
+        tableName: string,
+        ...args: Array<string | ({ type: ColumnType } & ColumnOptions)>
+      ): Promise<void>;
+    };
+    await connection.addColumns(this._pt(tableName), ...columnsAndOptions);
   }
 
   async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
@@ -1227,34 +1041,19 @@ export class Migration {
       await this.run(...[...klasses].reverse(), { revert: true });
     }
     if (fn === undefined) return;
-    if (this._recording) {
-      // Nested: reuse the active recorder and just toggle its direction, so a
-      // `revert` inside a reverting migration cancels by double-negation
-      // (mirrors Rails `connection.revert(&block)` when connection is already a
-      // CommandRecorder — no fresh recorder, no replay, and no suppress_messages:
-      // Rails only suppresses in the outer branch).
-      await this._recorder.revert(async () => {
-        await fn();
-      });
+    if (isCommandRecorder(this.connection)) {
+      // `connection.revert(&block)` when the connection is already the recorder
+      // (migration.rb:855-856): no fresh recorder, no replay, and no
+      // suppress_messages — Rails only suppresses in the outer branch.
+      await this.connection.revert(fn);
       return;
     }
-    // Outermost: swap in a CommandRecorder as the active delegate, record the
-    // block in reverting mode (commands invert at record time), restore, then
-    // replay the recorded inverses for real.
-    const previousRecorder = this._recorder;
-    const recorder = new CommandRecorder(this.connection);
-    this._recorder = recorder;
-    this._recording = true;
-    try {
-      await recorder.revert(async () => {
-        await this.suppressMessages(async () => {
-          await fn();
-        });
-      });
-    } finally {
-      this._recorder = previousRecorder;
-      this._recording = false;
-    }
+    const recorder = this.commandRecorder();
+    this._connectionOverride = recorder;
+    await this.suppressMessages(async () => {
+      await recorder.revert(fn);
+    });
+    this._connectionOverride = recorder.delegate as DatabaseAdapter;
     await recorder.replay(this as unknown as Record<string, (...a: unknown[]) => Promise<void>>);
   }
 
@@ -1284,26 +1083,7 @@ export class Migration {
       });
     } else {
       for (const migrationClass of klasses) {
-        const migration = new migrationClass();
-        if (this._recording) {
-          // Recording (but not reverting): route the sub-migration's ops into the
-          // active recorder by sharing our recorder state with it.
-          const prevRecorder = migration._recorder;
-          const prevRecording = migration._recording;
-          const prevConn = migration._connectionOverride;
-          migration._recorder = this._recorder;
-          migration._recording = true;
-          migration._connectionOverride = this.connection;
-          try {
-            await (dir === "up" ? migration.up() : migration.down());
-          } finally {
-            migration._recorder = prevRecorder;
-            migration._recording = prevRecording;
-            migration._connectionOverride = prevConn;
-          }
-        } else {
-          await migration.execMigration(this.connection, dir);
-        }
+        await new migrationClass().execMigration(this.connection, dir);
       }
     }
   }
@@ -1382,7 +1162,10 @@ export class Migration {
    * Mirrors: ActiveRecord::Migration#reverting?
    */
   isReverting(): boolean {
-    return this._recording && this._recorder.reverting;
+    // `connection.respond_to?(:reverting) && connection.reverting`
+    // (migration.rb:871-873).
+    const connection = this.connection;
+    return isCommandRecorder(connection) && connection.reverting;
   }
 
   async viewExists(viewName: string): Promise<boolean | null> {
@@ -1457,15 +1240,20 @@ export class Migration {
   // --- Connection (Rails: Migration#connection, #connection_pool) ---
 
   get connection(): DatabaseAdapter {
+    // Rails' @connection is whatever answers the schema statements — the
+    // adapter, or the CommandRecorder #revert swaps in. TS has no duck type
+    // spanning both, so the reader keeps the adapter type and the recorder
+    // arms narrow with `isCommandRecorder`.
     // Rails: `@connection || DatabaseTasks.migration_connection`
     // (`migration.rb:1036-1038`). `DatabaseTasks` is reached through the
     // call-time config source rather than an import: naming
     // `tasks/database-tasks.js` here would be a load-time edge back into a
     // module that already imports this one.
-    return this._connectionOverride ?? migrationArConfig()!.databaseTasks().migrationConnection();
+    return (this._connectionOverride ??
+      migrationArConfig()!.databaseTasks().migrationConnection()) as DatabaseAdapter;
   }
 
-  set connection(conn: DatabaseAdapter | undefined) {
+  set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
     this._connectionOverride = conn;
   }
 
@@ -1763,6 +1551,11 @@ export class Migration {
 
   /** @internal */
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
+    // Ruby carries the block on its own channel, so it is part of neither
+    // `format_arguments` nor `arguments.first` (migration.rb:1045-1052); TS
+    // passes it as a trailing function argument, which must not be mistaken
+    // for either.
+    const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
     return await this.sayWithTime(`${name}(${this.formatArguments(args)})`, async () => {
       const conn = this.connection as unknown as Record<string, unknown>;
       if (typeof conn["revert"] !== "function") {
@@ -1784,6 +1577,7 @@ export class Migration {
       if (strategy.respondToMissing?.(name) !== true) {
         throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
       }
+      if (block !== undefined) args.push(block);
       return await strategy.methodMissing?.(name, ...args);
     });
   }

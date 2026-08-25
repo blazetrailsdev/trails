@@ -22,6 +22,7 @@ import {
   type SQLWarning,
 } from "../errors.js";
 import {
+  ActiveSupport,
   IsolatedExecutionState,
   LoadInterlockAwareMonitor,
   Notifications,
@@ -258,7 +259,14 @@ export interface AbstractAdapter {
   dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
+      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" } | undefined]
+      | [string, ...string[], ((t: TableDefinition) => void) | undefined]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
+          ((t: TableDefinition) => void) | undefined,
+        ]
   ): Promise<void>;
   renameTable(tableName: string, newName: string): Promise<void>;
   addColumn(
@@ -1895,6 +1903,16 @@ export class AbstractAdapter implements Quoting {
   resetBang(): void {
     void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
+    // Rails' `reset!` ends in `attempt_configure_connection`
+    // (abstract_adapter.rb:725-731). `resetBang` is sync per the pool's
+    // contract, so the async hop is scheduled rather than awaited, and a sync
+    // caller has nowhere to receive the re-raise
+    // (abstract_adapter.rb:1216-1221) — the connection is already disconnected
+    // by then, so the next lease reconnects and surfaces the real error. The
+    // rejection itself goes to the error reporter rather than being dropped.
+    void this.attemptConfigureConnection().catch((error: Error) => {
+      ActiveSupport.errorReporter.report(error, { handled: true });
+    });
   }
 
   supportsAdvisoryLocks(): boolean {
