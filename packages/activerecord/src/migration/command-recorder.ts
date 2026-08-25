@@ -81,6 +81,23 @@ export class CommandRecorder {
   }
 
   /**
+   * Mirrors the generated `transaction` forwarder (command_recorder.rb:125-132)
+   * together with the first half of `invert_transaction` (:186-188). Ruby's
+   * `inverse_of` runs the block inline because a Ruby block is synchronous; a
+   * TS block returns a promise, so the block runs — and its commands are
+   * recorded onto this recorder, inverted — here, before `record` appends the
+   * `transaction` command itself.
+   */
+  async transaction(...args: unknown[]): Promise<void> {
+    const block =
+      typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;
+    if (this._reverting && block !== undefined) {
+      await (block as () => Promise<void>)();
+    }
+    this.record("transaction", args, block);
+  }
+
+  /**
    * Execute a block in reverting mode. Commands recorded inside the block
    * are collected, reversed, and their inverses are appended to the
    * command list.
@@ -190,7 +207,18 @@ export class CommandRecorder {
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
-      await migration[cmd](...args, ...(block === undefined ? [] : [block]));
+      const rest = [...args, ...(block === undefined ? [] : [block])];
+      // `migration.send(cmd, ...)` (command_recorder.rb:150) lands in
+      // `Migration#method_missing` (migration.rb:1045) for a command the
+      // migration does not define itself — `transaction`, say. TS has no
+      // implicit dispatch, so the fallback is spelled out.
+      if (typeof migration[cmd] === "function") {
+        await migration[cmd](...rest);
+      } else {
+        await (
+          migration as unknown as { methodMissing(name: string, ...args: unknown[]): Promise<void> }
+        ).methodMissing(cmd, ...rest);
+      }
     }
   }
 
@@ -269,6 +297,11 @@ export class CommandRecorder {
     if (Object.keys(options).length > 0) result.push(options);
     if (argsBlock !== undefined) result.push(argsBlock);
     return ["createTable", result, block];
+  }
+
+  /** @internal Straight reversion — `execute_block: :execute_block` (command_recorder.rb:158). */
+  invertExecuteBlock(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return ["executeBlock", args, block];
   }
 
   /** @internal */
@@ -503,10 +536,20 @@ export class CommandRecorder {
   }
 
   /** @internal */
-  invertTransaction(args: unknown[]): [string, unknown[]] {
-    throw new IrreversibleMigration(
-      "This migration uses transaction, which is not automatically reversible.",
-    );
+  invertTransaction(args: unknown[], _block?: MigrationBlock): MigrationCommand {
+    // Ruby runs the block here, through `sub_recorder.revert(&block)`
+    // (command_recorder.rb:186-188): the sub-recorder only toggles its own
+    // direction, so the block's commands land — already inverted — on THIS
+    // recorder, the one the migration still reads as its connection, and the
+    // sub-recorder itself stays empty. A TS block is a promise, so `transaction`
+    // above awaits it before recording and this method builds only the proc.
+    const subRecorder = new CommandRecorder(this._delegate);
+    const invertionsProc = async (): Promise<void> => {
+      await subRecorder.replay(
+        this as unknown as { [key: string]: (...args: unknown[]) => Promise<void> },
+      );
+    };
+    return ["transaction", args, invertionsProc as unknown as MigrationBlock];
   }
 
   /** @internal */
@@ -758,6 +801,11 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
     this: CommandRecorder,
     ...args: unknown[]
   ): void {
+    // Ruby's `*args` carries only the arguments actually passed
+    // (command_recorder.rb:125-132); a TS method with optional parameters
+    // materializes trailing `undefined`s, which would otherwise be recorded and
+    // replayed as real arguments.
+    while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     this.record(method, args);
   };
 }

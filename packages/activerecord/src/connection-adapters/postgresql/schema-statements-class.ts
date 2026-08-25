@@ -1483,7 +1483,22 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.reloadTypeMap();
   }
 
-  async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+  async dropEnum(
+    name: string,
+    valuesOrOptions?: string[] | { ifExists?: boolean },
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
+    // Rails' `drop_enum(name, values = nil, **options)` (postgresql_adapter.rb:571)
+    // ignores `values` — it is carried only so CommandRecorder can invert the
+    // command to `create_enum`. TS has no kwargs, so an options hash may arrive
+    // in the `values` slot.
+    if (
+      valuesOrOptions !== null &&
+      valuesOrOptions !== undefined &&
+      !Array.isArray(valuesOrOptions)
+    ) {
+      options = valuesOrOptions;
+    }
     const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`

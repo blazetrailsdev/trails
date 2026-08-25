@@ -258,7 +258,14 @@ export interface AbstractAdapter {
   dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
+      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" } | undefined]
+      | [string, ...string[], ((t: TableDefinition) => void) | undefined]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
+          ((t: TableDefinition) => void) | undefined,
+        ]
   ): Promise<void>;
   renameTable(tableName: string, newName: string): Promise<void>;
   addColumn(
@@ -1897,6 +1904,14 @@ export class AbstractAdapter implements Quoting {
   resetBang(): void {
     void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
+    // Rails' `reset!` ends in `attempt_configure_connection`
+    // (abstract_adapter.rb:725-731). `resetBang` is sync per the pool's
+    // contract, so the async hop is scheduled rather than awaited;
+    // `attemptConfigureConnection` already disconnects the connection on
+    // failure (abstract_adapter.rb:1216-1221) and a sync caller has nowhere to
+    // receive the re-raise, so the rejection is absorbed here instead of
+    // surfacing as an unhandled rejection.
+    void this.attemptConfigureConnection().catch(() => {});
   }
 
   supportsAdvisoryLocks(): boolean {

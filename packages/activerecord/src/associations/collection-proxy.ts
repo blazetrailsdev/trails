@@ -599,14 +599,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Rails' `@association` ivar (collection_proxy.rb:33), which every mutation
-   * on the proxy delegates to. trails resolves it off the owner instead of
-   * holding it, because the proxy is built from the reflection, not handed the
-   * association object.
+   * Rails' `@association` ivar (collection_proxy.rb:31-35), which every
+   * mutation on the proxy delegates to — `target` (:33), `loaded?` (:53) and
+   * `delete_all` (:474) all read the same seat.
    * @internal
    */
   private _collectionAssociation(): CollectionAssociation {
-    return this._record.association(this._assocName) as unknown as CollectionAssociation;
+    return this._association;
   }
 
   /**
@@ -1081,11 +1080,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * in Rails.
    */
   async deleteAll(dependent?: string): Promise<number> {
-    const count = await (
-      this._record.association(this._assocName) as unknown as {
-        deleteAll(dependent?: string): Promise<number>;
-      }
-    ).deleteAll(dependent);
+    const count = await this._collectionAssociation().deleteAll(dependent);
     this.resetScope();
     return count;
   }

@@ -2568,9 +2568,11 @@ export class PostgreSQLAdapter
           });
         }
         this._statements.reset();
-        // Rails' `super` — clear_cache!(new_connection: true) + reset_transaction
-        // (abstract_adapter.rb:728-731) — runs inside the same lock, last
-        // (postgresql_adapter.rb:380).
+        // Rails' `super` — clear_cache!(new_connection: true), reset_transaction
+        // and attempt_configure_connection (abstract_adapter.rb:726-730) — runs
+        // inside the same lock, last (postgresql_adapter.rb:380). Its configure
+        // hop is a no-op here: the body above has already re-run it on this
+        // socket and latched `_connectionConfigured`.
         super.resetBang();
       })
       .catch(() => {});
@@ -4289,7 +4291,11 @@ export interface PostgreSQLAdapter {
 
   createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
 
-  dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
+  dropEnum(
+    name: string,
+    valuesOrOptions?: string[] | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
+  ): Promise<void>;
 
   /**
    * @noRailsEquivalent PERMANENT. Rails supports PostgreSQL range *column* types first-class but

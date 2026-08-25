@@ -168,7 +168,10 @@ describe("MigrationTest", () => {
     const seen: unknown[] = [];
     class M extends Migration {}
     const m = new M();
-    (m as unknown as { _connectionOverride: unknown })._connectionOverride = {
+    // Rails has no `Migration#change_table`: `method_missing` forwards to the
+    // adapter, whose `change_table` yields `update_table_definition(table_name,
+    // self)` — the ADAPTER, not the migration (abstract/schema_statements.rb:729-737).
+    const connection = {
       quoteColumnName: (n: string) => n,
       quoteTableName: (n: string) => n,
       quoteDefaultExpression: (v: unknown) => String(v),
@@ -176,7 +179,11 @@ describe("MigrationTest", () => {
         seen.push([tableName, base]);
         return new AdapterTable(tableName, base as never);
       },
+      async changeTable(tableName: string, fn: (t: Table) => void | Promise<void>): Promise<void> {
+        await fn(this.updateTableDefinition(tableName, this));
+      },
     };
+    (m as unknown as { _connectionOverride: unknown })._connectionOverride = connection;
 
     let yielded: unknown;
     await m.changeTable("people", (t) => {
@@ -184,7 +191,7 @@ describe("MigrationTest", () => {
     });
 
     expect(yielded).toBeInstanceOf(AdapterTable);
-    expect(seen).toEqual([["people", m]]);
+    expect(seen).toEqual([["people", connection]]);
   });
 });
 
