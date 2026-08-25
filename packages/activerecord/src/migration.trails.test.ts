@@ -19,7 +19,8 @@ import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
-import { checkoutRawTestAdapter } from "./test-adapter.js";
+import { adapterType, checkoutRawTestAdapter } from "./test-adapter.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
@@ -399,5 +400,37 @@ describe("createTable force + ifNotExists key presence", () => {
     // eslint-disable-next-line blazetrails/require-table-teardown
     const create = adapter.createTable("things", { force: true, ifNotExists: false });
     await expect(create).rejects.toThrow(ArgumentError);
+  });
+});
+
+describe("Migration#removeColumns forwards to the connection", () => {
+  // Rails' Migration has no `remove_columns` of its own: `method_missing`
+  // forwards to `connection.send(:remove_columns, ...)` (migration.rb:1035-1051),
+  // so a migration emits the single combined `ALTER TABLE` the connection builds
+  // (abstract/schema_statements.rb:675-682). Mirrors the query-count shape of
+  // `test_remove_columns_single_statement`
+  // (test/cases/migration/columns_test.rb:402-419).
+  it("emits the same single statement the connection path does", async () => {
+    const connection = Base.connection;
+    try {
+      await connection.createTable("my_table", { force: true }, (t) => {
+        t.integer("col_one");
+        t.integer("col_two");
+      });
+
+      const mig = new (class extends Migration {
+        override write(): void {}
+      })();
+
+      const expectedQueryCount = adapterType === "sqlite" ? 14 : 1;
+      await assertQueriesCount(expectedQueryCount, false, async () => {
+        await mig.removeColumns("my_table", "col_one", "col_two");
+      });
+
+      const columns = (await connection.columns("my_table")).map((c) => c.name);
+      expect(columns).toEqual(["id"]);
+    } finally {
+      await connection.dropTable("my_table", { ifExists: true });
+    }
   });
 });

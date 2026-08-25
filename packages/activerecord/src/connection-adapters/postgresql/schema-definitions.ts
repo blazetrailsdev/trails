@@ -559,6 +559,20 @@ export class TableDefinition extends AbstractTableDefinition {
     return this.pgColumn(name, "string" as ColumnType, enumName, options);
   }
 
+  // Rails generates this from `define_column_methods ... :enum`
+  // (postgresql/schema_definitions.rb:186-189): `:enum` is passed through as the
+  // column type and PG's `type_to_sql` resolves and validates `enum_type`
+  // (postgresql/schema_statements.rb:854-857).
+  enum(...args: [...names: string[], options: ColumnOptions & { enum_type: string }]): this;
+  enum(...args: unknown[]): this {
+    const { names, options } = splitColumnNames(args, "enum");
+    const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type?: string };
+    for (const name of names) {
+      this.column(name, "enum" as ColumnType, { ...rest, enumType } as ColumnOptions);
+    }
+    return this;
+  }
+
   /** @internal */
   private definedPgColumn(
     columnType: string,

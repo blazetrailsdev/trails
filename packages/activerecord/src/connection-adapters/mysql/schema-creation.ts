@@ -294,7 +294,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override async indexInCreate(
+  protected async indexInCreate(
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},

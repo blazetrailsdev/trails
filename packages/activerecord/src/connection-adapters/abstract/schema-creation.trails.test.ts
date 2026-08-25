@@ -61,7 +61,7 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
       return true;
     }
 
-    protected override async indexInCreate(
+    protected async indexInCreate(
       tableName: string,
       columnName: string | string[],
     ): Promise<string> {

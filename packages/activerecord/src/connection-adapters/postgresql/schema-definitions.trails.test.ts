@@ -13,6 +13,7 @@ import {
   SchemaCreation as PgSchemaCreation,
   type PgSchemaCreationHost,
 } from "./schema-creation.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
@@ -192,6 +193,37 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
     expect(defn).toBeInstanceOf(UniqueConstraintDefinition);
     expect(defn.tableName).toBe("orders");
     expect(td.uniqueConstraints).toHaveLength(0);
+  });
+});
+
+describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
+  const typeToSql = (type: string, options: object): string =>
+    (
+      leased as unknown as {
+        typeToSql(type: string, options: object): string;
+      }
+    ).typeToSql(type, options);
+
+  // Rails generates `enum` from `define_column_methods ... :enum`
+  // (postgresql/schema_definitions.rb:186-189), so the column type stays `:enum`
+  // and `enum_type` rides along in the options for `type_to_sql` to resolve
+  // (postgresql/schema_statements.rb:854-857).
+  it("passes :enum through as the column type with enum_type forwarded", () => {
+    const td = new TableDefinition("t", { adapter: leased });
+    td.enum("current_mood", { enum_type: "mood" });
+    const [col] = td.columns;
+    expect(col.type).toBe("enum");
+    expect((col.options as { enumType?: string }).enumType).toBe("mood");
+    expect(typeToSql(col.type, col.options)).toBe("mood");
+  });
+
+  it("raises when enum_type is missing", () => {
+    const td = new TableDefinition("t", { adapter: leased });
+    (td as unknown as Record<string, (...args: unknown[]) => void>).enum("current_mood", {});
+    const [col] = td.columns;
+    expect(() => typeToSql(col.type, col.options)).toThrow(
+      new ArgumentError("enum_type is required for enums"),
+    );
   });
 });
 

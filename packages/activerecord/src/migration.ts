@@ -1129,16 +1129,12 @@ export class Migration {
       this._recorder.record("removeColumns", [tableName, ...columnsOrOptions]);
       return;
     }
-    const last = columnsOrOptions[columnsOrOptions.length - 1];
-    const hasOpts = typeof last === "object" && last !== null;
-    const opts = (hasOpts ? (columnsOrOptions.pop() as Record<string, unknown>) : {}) as {
-      type?: ColumnType;
-      ifExists?: boolean;
-    };
-    const columns = columnsOrOptions as string[];
-    for (const col of columns) {
-      await this.removeColumn(tableName, col, opts.type, { ifExists: opts.ifExists });
-    }
+    tableName = this._pt(tableName);
+    const removeColumns = this.connection.removeColumns as (
+      tableName: string,
+      ...args: Array<string | ColumnOptions>
+    ) => Promise<void>;
+    await removeColumns.call(this.connection, tableName, ...columnsOrOptions);
   }
 
   async addColumns(

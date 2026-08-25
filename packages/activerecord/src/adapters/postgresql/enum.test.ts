@@ -7,7 +7,10 @@ import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.j
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-fixtures.js";
-import type { Table as PgTable } from "../../connection-adapters/postgresql/schema-definitions.js";
+import type {
+  Table as PgTable,
+  TableDefinition as PgTableDefinition,
+} from "../../connection-adapters/postgresql/schema-definitions.js";
 
 // Rails: class PostgresqlEnum < ActiveRecord::Base
 //   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
@@ -333,7 +336,9 @@ describeIfPg("PostgreSQLAdapter", () => {
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },
                 (t) => {
-                  t.enum("current_mood", { enum_type: "mood_in_test_schema" });
+                  (t as PgTableDefinition).enum("current_mood", {
+                    enum_type: "mood_in_test_schema",
+                  });
                 },
               );
             });
