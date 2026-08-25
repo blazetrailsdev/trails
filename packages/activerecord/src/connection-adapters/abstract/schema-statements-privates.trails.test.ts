@@ -802,8 +802,6 @@ describe("dataSourceExists NotImplementedError fallback", () => {
       dataSourceSql: (n: string) => `SELECT 1 WHERE name = '${n}'`,
     });
 
-    // Rails' trailing `if name.present?` modifier (schema_statements.rb:45)
-    // falls off the end of the method, so the value is nil — not false.
     expect(await ss.dataSourceExists("")).toBeNull();
     expect(await ss.dataSourceExists("   ")).toBeNull();
     expect(execute).not.toHaveBeenCalled();

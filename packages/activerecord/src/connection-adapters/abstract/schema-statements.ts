@@ -617,9 +617,12 @@ export class SchemaStatements {
     );
   }
 
-  // Rails guards with a trailing `if table_name.present?` modifier
-  // (schema_statements.rb:60), so a blank name falls off the end of the method
-  // and the value is `nil` — not `false`.
+  /**
+   * Rails guards with a trailing `if table_name.present?` modifier
+   * (schema_statements.rb:60), so a blank name falls off the end of the method
+   * and the value is `nil` — not `false`. Same shape at schema_statements.rb:45
+   * (`data_source_exists?`) and :75 (`view_exists?`).
+   */
   async tableExists(tableName: string): Promise<boolean | null> {
     if (!isPresent(tableName)) return null;
     try {
