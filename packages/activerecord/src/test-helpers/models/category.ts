@@ -72,7 +72,9 @@ export class Category extends Base {
       (q: any) => q.where({ essays: { type: "TypedEssay" } }),
       { through: "essays", source: "writer", sourceType: "Human", primaryKey: "name" },
     );
-    this.scope("general", (q: any) => q.where({ name: "General" }));
+    this.scope("general", function (this: any) {
+      return this.where({ name: "General" });
+    });
   }
 
   static whatAreYou() {

@@ -50,12 +50,11 @@ export class Club extends Base {
       source: "member",
     });
 
-    this.scope("general", (q: any) =>
-      q
-        .leftJoins(":category")
+    this.scope("general", function (this: any) {
+      return this.leftJoins(":category")
         .where({ categories: { name: "General" } })
-        .unscope("limit"),
-    );
+        .unscope("limit");
+    });
   }
 }
 

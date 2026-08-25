@@ -217,7 +217,7 @@ declare the scope signatures on their Relation type.
 
 ## 6. Named scopes: stored, not metaprogrammed
 
-`scope("published", (rel) => rel.where({ published: true }))` stores
+`scope("published", function () { return this.where({ published: true }); })` stores
 the function in a `_scopes` Map on the class and defines a static
 method that delegates through `all()`. The Relation proxy above picks
 the scope up on relation instances. See
@@ -454,7 +454,9 @@ class Post extends Base {
     // `this`, no not* scopes).
     defineEnum(this, "status", { draft: 0, published: 1 });
     // Named scope — use a name that doesn't collide with an enum value above.
-    this.scope("featured", (rel) => rel.where({ featured: true }));
+    this.scope("featured", function () {
+      return this.where({ featured: true });
+    });
   }
 }
 ```

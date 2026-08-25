@@ -139,15 +139,15 @@ describe("query chaining DX", () => {
 
       static {
         this.attribute("published", "boolean");
-        // No manual `rel: Relation<Article>` annotation needed.
-        this.scope("published", (rel) => {
-          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
-          return rel.where({ published: true });
+        // No manual `this: Relation<Article>` annotation needed.
+        this.scope("published", function () {
+          expectTypeOf(this).toMatchTypeOf<Relation<Article>>();
+          return this.where({ published: true });
         });
-        this.scope("recent", (rel, days: number) => {
-          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
+        this.scope("recent", function (days: number) {
+          expectTypeOf(this).toMatchTypeOf<Relation<Article>>();
           expectTypeOf(days).toBeNumber();
-          return rel;
+          return this;
         });
         this.defaultScope((rel) => {
           expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();

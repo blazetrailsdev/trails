@@ -4,6 +4,8 @@ export class Post extends Base {
     this.attribute("published", "boolean");
     this.belongsTo("author");
     this.hasMany("comments");
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function (this: any) {
+      return this.where({ published: true });
+    });
   }
 }

@@ -81,16 +81,38 @@ export class Comment extends Base {
   declare author: Base | null;
 
   static {
-    this.scope("limitBy", (q: any, l: number) => q.limit(l));
-    this.scope("containingTheLetterE", (q: any) => q.where("comments.body LIKE '%e%'"));
-    this.scope("notAgain", (q: any) => q.where("comments.body NOT LIKE '%again%'"));
-    this.scope("forFirstPost", (q: any) => q.where({ post_id: 1 }));
-    this.scope("forFirstAuthor", (q: any) => q.joins(":post").where({ "posts.author_id": 1 }));
-    this.scope("created", (q: any) => q.all());
-    this.scope("orderedByPostId", (q: any) => q.order("comments.post_id DESC"));
-    this.scope("allAsScope", (q: any) => q.all());
+    this.scope("limitBy", function (this: any, l: number) {
+      return this.limit(l);
+    });
+    this.scope("containingTheLetterE", function (this: any) {
+      return this.where("comments.body LIKE '%e%'");
+    });
+    this.scope("notAgain", function (this: any) {
+      return this.where("comments.body NOT LIKE '%again%'");
+    });
+    this.scope("forFirstPost", function (this: any) {
+      return this.where({ post_id: 1 });
+    });
+    this.scope("forFirstAuthor", function (this: any) {
+      return this.joins(":post").where({ "posts.author_id": 1 });
+    });
+    this.scope("created", function (this: any) {
+      return this.all();
+    });
+    this.scope("orderedByPostId", function (this: any) {
+      return this.order("comments.post_id DESC");
+    });
+    this.scope("allAsScope", function (this: any) {
+      return this.all();
+    });
     // Rails: `scope :oops_comments, -> { extending OopsExtension }`.
-    this.scope("oopsComments", (q: any) => q.all(), OopsExtension);
+    this.scope(
+      "oopsComments",
+      function (this: any) {
+        return this.all();
+      },
+      OopsExtension,
+    );
     // Rails: `default_scope { extending OopsExtension }`.
     this.defaultScope((q: any) => q.extending(OopsExtension));
 

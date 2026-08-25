@@ -147,6 +147,15 @@ import {
   type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 
+/**
+ * Ruby's `Hash#fetch(key, default)` returns the STORED value whenever the key
+ * exists — including a stored `nil` or `false` — where `??` would substitute
+ * the default.
+ */
+function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
+  return key in hash ? (hash[key] as T) : defaultValue;
+}
+
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
 const ER_CANNOT_CREATE_TABLE = 1005;
@@ -1090,8 +1099,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return [...orderColumns, columns].join(", ");
   }
 
-  isStrictMode(): boolean {
-    return false;
+  // Mirrors: AbstractMysqlAdapter#strict_mode? (abstract_mysql_adapter.rb:630-632).
+  // `@config.fetch(:strict, true)` — an absent key means strict, and a stored
+  // `false` (or `":default"`, which `type_cast_config_to_boolean` passes
+  // through for `configure_connection`'s defaults check) is honoured.
+  isStrictMode(): boolean | unknown {
+    return (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToBoolean(
+      fetch(this._config, "strict", true),
+    );
   }
 
   isDefaultIndexType(index: { using?: string | null }): boolean {

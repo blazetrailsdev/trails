@@ -59,7 +59,9 @@ export class LazyReader extends Base {
   static {
     this._tableName = "readers";
     this.defaultScope((q: any) => q.where({ skimmer: true }));
-    this.scope("skimmersOrNot", (q: any) => q.unscope({ where: "skimmer" }));
+    this.scope("skimmersOrNot", function (this: any) {
+      return this.unscope({ where: "skimmer" });
+    });
     this.belongsTo("post");
     this.belongsTo("person");
   }

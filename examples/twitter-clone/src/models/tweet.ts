@@ -7,6 +7,8 @@ export class Tweet extends Base {
 
     this.validates("body", { presence: true, length: { maximum: 280 } });
 
-    this.scope("recent", (rel: Relation<Tweet>) => rel.order("created_at", "desc"));
+    this.scope("recent", function (this: Relation<Tweet>) {
+      return this.order("created_at", "desc");
+    });
   }
 }

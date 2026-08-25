@@ -53,7 +53,9 @@ class Post extends Base {
       record.title = record.title.trim();
     });
 
-    Post.scope("published", (rel) => rel.where({ published: true }));
+    Post.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 

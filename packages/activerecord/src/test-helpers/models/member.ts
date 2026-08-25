@@ -140,8 +140,12 @@ export class Member extends Base {
     this.belongsTo("admittable", { polymorphic: true });
     this.hasOne("premiumClub", { through: "admittable" });
 
-    this.scope("unnamed", (q: any) => q.where({ name: null }));
-    this.scope("withMemberTypeId", (q: any, id: number) => q.where({ member_type_id: id }));
+    this.scope("unnamed", function (this: any) {
+      return this.where({ name: null });
+    });
+    this.scope("withMemberTypeId", function (this: any, id: number) {
+      return this.where({ member_type_id: id });
+    });
   }
 }
 

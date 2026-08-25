@@ -2047,7 +2047,7 @@ export class Base extends Model {
   static storedAttributes = _storedAttributes;
 
   // -- Scopes registry (used by Relation) --
-  static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
+  static _scopes: Map<string, (this: any, ...args: any[]) => any> = new Map();
 
   // --- Default scope (wired via extend() after class body) ---
   declare static defaultScope: typeof _defaultScope;

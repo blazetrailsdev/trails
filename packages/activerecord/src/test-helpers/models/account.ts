@@ -34,8 +34,12 @@ export class Account extends Base {
 
     this.aliasAttribute("available_credit", "credit_limit");
 
-    this.scope("open", (q: any) => q.where("firm_name = ?", "37signals"));
-    this.scope("available", (q: any) => q.open());
+    this.scope("open", function (this: any) {
+      return this.where("firm_name = ?", "37signals");
+    });
+    this.scope("available", function (this: any) {
+      return this.open();
+    });
 
     this.beforeDestroy(function (this: Account, record?: Account) {
       // The framework passes the record as the first argument; `this` may be

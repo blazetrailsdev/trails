@@ -102,7 +102,9 @@ export class Project extends Base {
       this.developersLog = [];
     });
 
-    this.scope("allAsScope", (q: any) => q.all());
+    this.scope("allAsScope", function (this: any) {
+      return this.all();
+    });
   }
 
   static allAsMethod() {

@@ -3025,18 +3025,21 @@ export class Relation<T extends Base> {
   /**
    * Run a named-scope body with this relation as the receiver.
    *
-   * Rails `instance_exec`s the body against the relation; trails scope bodies
-   * instead take the relation as their first argument, so it is passed
-   * explicitly here — the `|| self` fallback and the scope-registry threading
-   * are otherwise identical.
+   * Ruby's `(...)` forwards the caller's block alongside the positional
+   * arguments, and `instance_exec` runs it with `self` bound to the relation.
+   * A JS function carries no implicit block, so the body arrives as the
+   * trailing argument (the settled trails spelling of a Ruby block) and
+   * `call(this, ...)` is `instance_exec`'s rebinding — a scope body reads
+   * `this.where(...)`, not a passed-in receiver.
    *
-   * Mirrors: ActiveRecord::Relation#_exec_scope
+   * Mirrors: ActiveRecord::Relation#_exec_scope (relation.rb:552-558)
    */
-  _execScope(fn: (rel: Relation<T>, ...args: unknown[]) => unknown, ...args: unknown[]): unknown {
+  _execScope(...args: unknown[]): unknown {
     this._delegateToModel = true;
     const registry = this.model.scopeRegistry();
+    const body = args.pop() as (this: Relation<T>, ...rest: unknown[]) => unknown;
     try {
-      return this._scoping(null, registry, false, () => fn(this, ...args) || this);
+      return this._scoping(null, registry, false, () => body.call(this, ...args) || this);
     } finally {
       this._delegateToModel = false;
     }
