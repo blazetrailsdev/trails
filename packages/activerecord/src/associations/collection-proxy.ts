@@ -124,9 +124,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * the proxy is handed at construction and reads its `@target` / `@loaded` /
    * `@replaced_or_added_targets` off (`:33`, `:53`). Resolved once in the
    * constructor, so a declared collection has exactly one `@target` in the
-   * system. Spelled `_targetAssociation` because `_association` on this class
-   * is the `this`-alias the `AssociationRelation` bodies invoked with the proxy
-   * as receiver read.
+   * system.
    *
    * trails' `association(record, name)` factory also builds a proxy for a
    * declared SINGULAR name, which Rails never does: `@association` there is a
@@ -134,7 +132,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * collection's array into it would box that record. Such a proxy gets a
    * collection seat of its own instead.
    */
-  private _targetAssociation!: CollectionAssociation;
+  private _association!: CollectionAssociation;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
   // Rails' `CollectionProxy` holds no target of its own — `target`, `loaded?`
@@ -143,11 +141,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // are the association's `@target` / `@loaded` ivars, so association and proxy
   // are one seat rather than two stores to keep coherent.
   private get _target(): T[] {
-    return this._targetAssociation._targetStore as T[];
+    return this._association._targetStore as T[];
   }
 
   private set _target(records: T[]) {
-    this._targetAssociation._targetStore = records;
+    this._association._targetStore = records;
   }
 
   /**
@@ -167,11 +165,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private get _targetLoaded(): boolean {
-    return this._targetAssociation._loadedStore;
+    return this._association._loadedStore;
   }
 
   private set _targetLoaded(value: boolean) {
-    this._targetAssociation._loadedStore = value;
+    this._association._loadedStore = value;
   }
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1112-1116).
@@ -181,11 +179,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // replaced on the in-memory target. `replace_on_target` consults it to
   // dedup by identity rather than appending the same record twice.
   private get _replacedOrAddedTargets(): Set<T> {
-    return this._targetAssociation._replacedOrAddedTargets as Set<T>;
+    return this._association._replacedOrAddedTargets as Set<T>;
   }
 
   private set _replacedOrAddedTargets(value: Set<T>) {
-    this._targetAssociation._replacedOrAddedTargets = value as Set<Base>;
+    this._association._replacedOrAddedTargets = value as Set<Base>;
   }
   private _proxySelf?: this;
 
@@ -292,17 +290,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Self-referential alias so AssociationRelation#execQueries can be called
-   * with `this` = CollectionProxy via `.call(this)`. AR#execQueries reads
-   * `this._association.owner` and `this._association.reflection`; both are
-   * already exposed as getters on CollectionProxy, so returning `this`
-   * satisfies the contract without extra indirection.
-   */
-  private get _association(): this {
-    return this;
-  }
-
-  /**
    * @noRailsEquivalent PERMANENT
    *   (`vendor/rails/activerecord/lib/active_record/relation/delegation.rb:101` — `each` is
    *   delegated to the loaded records).
@@ -377,14 +364,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._assocName = assocName;
     this._assocDef = assocDef;
     const instance = record.association(assocName) as unknown as CollectionAssociation;
-    this._targetAssociation = instance.isCollection()
+    this._association = instance.isCollection()
       ? instance
       : new CollectionAssociation(record, assocDef);
 
     // `extend(*extensions)` (collection_proxy.rb:35-37) mixes into this object
     // only; chained relations get the same modules independently through
     // `scope.extending! reflection.extensions` (association_scope.rb:28).
-    const extensions = this._targetAssociation.extensions;
+    const extensions = this._association.extensions;
     if (extensions.length > 0) {
       const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
       for (const mod of extensions) {
@@ -1153,8 +1140,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `loaded?` read off (collection_proxy.rb:33, 53), not a fresh lookup. For a
     // collection the two are the same object; they differ only for the proxy
     // trails builds for a declared SINGULAR name, where `@association` is this
-    // proxy's own collection seat (see `_targetAssociation`).
-    return this._targetAssociation;
+    // proxy's own collection seat (see `_association`).
+    return this._association;
   }
 
   /**
